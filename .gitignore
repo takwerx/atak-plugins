@@ -20,6 +20,9 @@ keystore.properties
 # Machine-local paths (sdk.dir / sdk.path / takrepo credentials)
 local.properties
 
+# Unpacked by the takdev Gradle plugin at build time (SDK-derived binary)
+.takdev/
+
 # Gradle / Android build output
 .gradle/
 build/
