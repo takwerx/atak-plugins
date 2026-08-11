@@ -1,5 +1,5 @@
 
-package com.atakmap.android.takwerxhello.plugin;
+package com.atakmap.android.plss.plugin;
 
 import android.content.Context;
 
@@ -15,7 +15,7 @@ import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
-public class TakwerxHello implements IPlugin {
+public class PLSS implements IPlugin {
 
     IServiceController serviceController;
     Context pluginContext;
@@ -23,7 +23,7 @@ public class TakwerxHello implements IPlugin {
     ToolbarItem toolbarItem;
     Pane templatePane;
 
-    public TakwerxHello(IServiceController serviceController) {
+    public PLSS(IServiceController serviceController) {
         this.serviceController = serviceController;
         final PluginContextProvider ctxProvider = serviceController
                 .getService(PluginContextProvider.class);

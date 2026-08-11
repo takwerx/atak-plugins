@@ -97,4 +97,4 @@
 
 # Keep this plugin's own classes. tak.gov requires a plugin-specific rule here —
 # a leftover rule from a copied project protects nothing.
--keep class com.atakmap.android.takwerxhello.** { *; }
+-keep class com.atakmap.android.plss.** { *; }

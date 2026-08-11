@@ -103,7 +103,7 @@ def supportedFlavors =
 
 android {
     compileSdk 36
-    namespace 'com.atakmap.android.takwerxhello.plugin'
+    namespace 'com.atakmap.android.plss.plugin'
 
     buildFeatures {
         buildConfig = true

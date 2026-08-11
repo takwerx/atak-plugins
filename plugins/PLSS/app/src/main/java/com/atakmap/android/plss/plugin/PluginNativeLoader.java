@@ -1,5 +1,5 @@
 
-package com.atakmap.android.takwerxhello.plugin;
+package com.atakmap.android.plss.plugin;
 
 import java.io.File;
 import android.content.Context;
