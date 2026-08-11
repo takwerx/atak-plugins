@@ -4,7 +4,7 @@
 
     <extension
         type="gov.tak.api.plugin.IPlugin"
-        impl="com.atakmap.android.takwerxhello.plugin.Takwerxhello"
+        impl="com.atakmap.android.takwerxhello.plugin.TakwerxHello"
         singleton="true" />
 
 </plugin>

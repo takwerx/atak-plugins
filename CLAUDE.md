@@ -63,10 +63,14 @@ Artifactory account exists. Do not "solve" CI by committing the SDK.
 Copies `plugintemplate` out of the SDK, renames the package/class/descriptor, sets
 `rootProject.name`, and writes a gitignored `local.properties`.
 
-**Plugin names are lowercase alphanumeric — no dashes, no underscores.** The template's
-release build emits `-repackageclasses atakplugin.${rootProject.name}` into proguard;
-a dash there is an invalid Java package and the release build fails (debug builds pass,
-so this only bites at submission time).
+**Plugin names are letters and digits only — no dashes, no underscores.** Capitals are
+fine (`UnitTracker`). The release build emits `-repackageclasses atakplugin.${rootProject.name}`
+into proguard; a dash there is an invalid Java package and the release build fails (debug
+builds pass, so this only bites at submission time).
+
+The name is the directory, `rootProject.name`, the proguard descriptor, **and the APK name
+tak.gov produces from a source submission**. It is the plugin's public identity — pick it
+deliberately, renaming later is disruptive.
 
 ## Build / install cycle
 
@@ -110,26 +114,69 @@ produces a plugin that builds fine and then refuses to load:
 
 Never submit or field a plugin that has only been run as `civDebug`.
 
+## ATAK version targeting — the silent-failure trap
+
+Officially built plugins are **version-matched to the ATAK release they were built
+against**. ATAK's own obfuscation mapping changes between releases, so a plugin built for
+5.6 can fail on official 5.7 while working fine against dev/SDK builds — the failure does
+not look like a version problem.
+
+- `ext.ATAK_VERSION` in `app/build.gradle` sets the target.
+- Request a build artifact for **every** ATAK version the fleet runs. One APK is not
+  enough once customers are on mixed versions.
+- Prefer the stable `gov.tak.api.*` classes over `com.atakmap.android.*` internals wherever
+  an equivalent exists — the stable API is not obfuscated and survives version changes.
+  This is a design rule, not a preference: it decides whether a plugin survives an ATAK
+  upgrade.
+
 ## Signing
 
 - **Debug/dev:** the SDK's shared `android_keystore` (`tnttnt` / `wintec_mapping`). It is
-  public and in every SDK download — it is not a secret and must never sign a release.
-- **Release:** a takwerx-owned keystore, held outside the repo and as a CI secret. Android
-  requires every update to be signed by the **same** key as the installed version — losing
-  the release key means users must uninstall/reinstall. Back it up before first release.
+  public and in every SDK download — it is not a secret and must never sign a public release.
+- **Officially published plugins are built and signed by tak.gov** from the source zip, so
+  no takwerx key is involved in that path.
+- A takwerx release keystore is only needed for APKs we distribute **ourselves** (direct
+  sideload, MDM push). If we go that way: Android requires every update to be signed by the
+  same key as the installed version, so generate it once, back it up, and custody it
+  outside the repo. Record custody in the notes repo, never the key.
 
-## Third-party publication (how these reach EUDs)
+## Publication — tak.gov builds from SOURCE, not from our APK
 
-takwerx plugins publish through TAK's third-party plugin pipeline. Keep the submission
-artifacts intact from day one rather than retrofitting them:
+The submission is a **zip of the source tree**; tak.gov runs `./gradlew` itself and
+produces the APK. Do not submit a built APK.
 
-- `README.md` in each plugin keeps the SDK's template headings — PURPOSE AND CAPABILITIES,
-  STATUS, POINT OF CONTACTS, **PORTS REQUIRED** (used for ATO/security review), EQUIPMENT
-  REQUIRED/SUPPORTED, COMPILATION, DEVELOPER NOTES.
-- `docs/user_manual/*.typ` is a typst source for the user manual PDF. `gradle/typst.gradle`
-  compiles it into `assets/usermanual.pdf` **only when `ATAK_CI=1`**, so local builds skip
-  it — keep the `.typ` current anyway; the pipeline builds it.
-- Ship the **release-signed** APK, not a debug APK.
+```bash
+./scripts/submission-zip.sh <PluginName>      # builds dist/<PluginName>.zip and verifies it
+```
+
+The script encodes the pipeline's requirements and checks them, because each one is a
+rejected or silently-broken submission:
+
+- Every path lives under a single `<PluginName>/` root, zipped from the **parent** dir.
+- `gradle/wrapper/gradle-wrapper.jar` **must** be included — without it tak.gov's
+  `./gradlew` cannot bootstrap (`Could not find or load main class …GradleWrapperMain`).
+- `.takdev/`, `app/libs/` (the ~30 MB SDK `main.jar`), `docs/`, build output,
+  `local.properties` and any keystore **must not** be included. tak.gov resolves the SDK
+  itself. The zip is ~100–300 KB; megabytes means something is wrong.
+- `template.local.properties` (placeholders only) is included; the real `local.properties`
+  never is.
+- `proguard-gradle-repackage.txt` must carry a plugin-specific descriptor
+  (`-repackageclasses atakplugin.<PluginName>`), and the proguard **User Section** must
+  keep this plugin's own package (`-keep class com.atakmap.android.<pkg>.** { *; }`).
+  A keep rule inherited from a copied project protects nothing and the release build
+  obfuscates classes the plugin loader needs. `new-plugin.sh` writes both correctly.
+- `assembleCivRelease` must be a defined target, and the `com.atakmap.app.component`
+  discovery activity must be in the manifest.
+
+The script's last check extracts the zip to a clean directory and builds it — a zip that
+does not build from a clean extract will not build on tak.gov.
+
+`README.md` keeps the SDK's template headings — PURPOSE AND CAPABILITIES, STATUS, POINT OF
+CONTACTS, **PORTS REQUIRED** (used for ATO/security review), EQUIPMENT REQUIRED/SUPPORTED,
+COMPILATION, DEVELOPER NOTES — and it *is* part of the zip. `docs/` is not: keep
+`docs/user_manual/*.typ` current for our own use, but it is excluded from the submission
+(`gradle/typst.gradle` only builds the PDF when `ATAK_CI=1`, and degrades to a warning
+when `docs/` is absent).
 
 ## Process rules inherited from infra-TAK
 

@@ -1,1 +1,1 @@
--repackageclasses atakplugin.takwerxhello
+-repackageclasses atakplugin.TakwerxHello

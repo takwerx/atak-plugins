@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 
 include ':app'
 
-rootProject.name = 'takwerxhello'
+rootProject.name = 'TakwerxHello'

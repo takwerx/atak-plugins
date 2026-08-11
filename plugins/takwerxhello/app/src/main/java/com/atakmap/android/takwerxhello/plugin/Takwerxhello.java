@@ -15,7 +15,7 @@ import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
-public class Takwerxhello implements IPlugin {
+public class TakwerxHello implements IPlugin {
 
     IServiceController serviceController;
     Context pluginContext;
@@ -23,7 +23,7 @@ public class Takwerxhello implements IPlugin {
     ToolbarItem toolbarItem;
     Pane templatePane;
 
-    public Takwerxhello(IServiceController serviceController) {
+    public TakwerxHello(IServiceController serviceController) {
         this.serviceController = serviceController;
         final PluginContextProvider ctxProvider = serviceController
                 .getService(PluginContextProvider.class);

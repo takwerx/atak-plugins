@@ -39,3 +39,7 @@ captures/
 *.iws
 
 .DS_Store
+
+# Submission zips
+dist/
+*.zip
