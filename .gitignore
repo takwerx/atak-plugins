@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# ATAK SDK artifacts — NEVER COMMIT THESE.
+# license/LICENSE-atak-civ.txt: "You are not permitted to copy, modify, publish,
+# distribute, sublicense ... the TAK-SDK or to permit others to do so."
+# The SDK lives OUTSIDE this repo (~/atak-sdk/<version>/) and is referenced by
+# the sdk.path property in each plugin's gitignored local.properties.
+# ---------------------------------------------------------------------------
+main.jar
+atak.apk
+atak-javadoc.jar
+atak-gradle-takdev.jar
+android_keystore
+
+# Signing material — dev keystore comes from the SDK, release keystore is a secret
+*.jks
+*.keystore
+*.p12
+keystore.properties
+
+# Machine-local paths (sdk.dir / sdk.path / takrepo credentials)
+local.properties
+
+# Gradle / Android build output
+.gradle/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+.DS_Store
