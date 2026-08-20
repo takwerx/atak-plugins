@@ -42,12 +42,16 @@ public class PlssPackManager {
     public static final String TAG = "PlssPackManager";
 
     /**
-     * Development endpoint. The fielded build points at the release manifest on
-     * the public data repo; pack URLs are relative to this file, so only this
-     * one string changes. See the handoff for the hosting decision.
+     * Where the data packs are published.
+     *
+     * Pack URLs in the manifest are relative to this file, so moving the whole
+     * set to another host is a one-line change here. HTTPS is required, not
+     * incidental: Android blocks cleartext by default and a plugin fetching
+     * data over plain HTTP would not survive security review.
      */
     public static final String MANIFEST_URL =
-            "http://100.67.193.92:8088/manifest.json";
+            "https://github.com/takwerx/plss-data/releases/download/"
+                    + "plss-2026.08/manifest.json";
 
     private static final int CONNECT_TIMEOUT = 20000;
     private static final int READ_TIMEOUT = 60000;
