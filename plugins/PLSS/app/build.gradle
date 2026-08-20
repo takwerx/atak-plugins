@@ -9,7 +9,7 @@
 buildscript {
 
     ext.PLUGIN_VERSION = "0.1"
-    ext.ATAK_VERSION = '5.6.0'
+    ext.ATAK_VERSION = '5.7.0'
 
     def takdevVersion = '3.+'
 
@@ -305,6 +305,9 @@ configurations.all {
         if (details.requested.group == 'com.squareup.okio') {
             details.useVersion "3.2.0"
         } 
+        if (requested.group == 'org.jetbrains.kotlinx' && requested.name == 'kotlinx-serialization-core') {
+            details.useVersion "1.7.3"
+        }
     }   
 }           
         
@@ -316,5 +319,6 @@ configurations.implementation {
        exclude group: 'androidx.lifecycle', module: 'lifecycle-process'
        exclude group: 'com.squareup.okhttp3', module: 'okhttp'
        exclude group: 'com.squareup.okio', module: 'okio' 
+       exclude group: 'org.jetbrains.kotlinx', module: 'kotlinx-serialization-core'
 }       
 

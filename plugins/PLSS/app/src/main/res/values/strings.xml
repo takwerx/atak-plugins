@@ -4,4 +4,11 @@
     <string name="app_name">PLSS Grid</string>
     <!-- description -->
     <string name="app_desc">PLSS Grid</string>
+    <!-- overlay controls -->
+    <string name="plss_show">Show PLSS overlay</string>
+    <string name="plss_hide">Hide PLSS overlay</string>
+    <string name="plss_township_color">Township lines</string>
+    <string name="plss_section_color">Section lines</string>
+    <string name="plss_township_color_title">Township line colour</string>
+    <string name="plss_section_color_title">Section line colour</string>
 </resources>
