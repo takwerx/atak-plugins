@@ -369,14 +369,6 @@ public class GLPlssOverlay extends GLAbstractLayer2
             textFormat = GLRenderGlobals.getDefaultTextFormat();
             glText = GLText.getInstance(textFormat);
 
-            Log.d(TAG, "font: size=" + textFormat.getFontSize()
-                    + " densityAdjusted=" + textFormat.getDensityAdjustedFontSize()
-                    + " relativeScaling=" + GLRenderGlobals.getRelativeScaling()
-                    + " tallestGlyph=" + textFormat.getTallestGlyphHeight()
-                    + " glTextCharHeight=" + glText.getCharHeight()
-                    + " glTextStringHeight=" + glText.getStringHeight()
-                    + " measure9=" + textFormat.measureTextWidth("T16S-R11E")
-                    + " glTextW9=" + glText.getStringWidth("T16S-R11E"));
         }
 
         final float scale = tier.fontScale;
@@ -402,7 +394,11 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final float luma = 0.299f * r + 0.587f * g + 0.114f * b;
         final float halo = luma > 0.5f ? 0f : 1f;
 
-        // unscaled metrics: the matrix applies the tier's scale at draw time
+        // MapTextFormat's metrics match what GLText draws in this pass, so they
+        // are used as-is. They do NOT match in RENDER_PASS_SURFACE, which
+        // magnifies by the density factor (14 vs 24.5 here) -- measuring that
+        // magnified result and then correcting for it after the move to sprites
+        // shifted every label left by a third of its width.
         final float glyphHalf = textFormat.getTallestGlyphHeight() / 2f;
         final float half = glyphHalf * scale;
 
