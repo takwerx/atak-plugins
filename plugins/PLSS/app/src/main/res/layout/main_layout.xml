@@ -13,6 +13,18 @@
         android:orientation="vertical" >
 
         <Button
+            android:id="@+id/plss_manage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/plss_manage_data" />
+
+        <Button
+            android:id="@+id/plss_find"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/plss_find" />
+
+        <Button
             android:id="@+id/plss_toggle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -53,6 +65,26 @@
 
             <Button
                 android:id="@+id/plss_section_color"
+                android:layout_width="64dp"
+                android:layout_height="40dp" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="4dp" >
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/plss_label_color" />
+
+            <Button
+                android:id="@+id/plss_label_color"
                 android:layout_width="64dp"
                 android:layout_height="40dp" />
 

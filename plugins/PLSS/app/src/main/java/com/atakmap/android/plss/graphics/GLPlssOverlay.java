@@ -74,6 +74,18 @@ public class GLPlssOverlay extends GLAbstractLayer2
     /** Fraction of the view size loaded beyond each edge, so small pans are free. */
     private static final double MARGIN = 0.25;
 
+    /**
+     * Offsets, in pixels, at which the halo copies of a label are drawn.
+     *
+     * The halo is drawn by hand because its colour has to follow the text: white
+     * behind dark labels, black behind light ones. ATAK's default text format
+     * outlines in white unconditionally, which makes a white label invisible.
+     */
+    private static final float[][] HALO_OFFSETS = {
+            { -1.5f, 0f }, { 1.5f, 0f }, { 0f, -1.5f }, { 0f, 1.5f },
+            { -1f, -1f }, { 1f, -1f }, { -1f, 1f }, { 1f, 1f }
+    };
+
     /** Gap, in pixels, required between two labels for both to be drawn. */
     private static final float LABEL_SPACING = 4f;
 
@@ -170,6 +182,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
     /** written on the UI thread by the colour picker, read on the GL thread */
     private volatile int sectionColor;
     private volatile int townshipColor;
+    private volatile int labelColor;
 
     public GLPlssOverlay(MapRenderer surface, PlssOverlay subject) {
         super(surface, subject, GLMapView.RENDER_PASS_SURFACE);
@@ -177,6 +190,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
         this.subject = subject;
         this.sectionColor = subject.getSectionColor();
         this.townshipColor = subject.getTownshipColor();
+        this.labelColor = subject.getLabelColor();
     }
 
     @Override
@@ -214,6 +228,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
     public void onPlssColorChanged(PlssOverlay overlay) {
         sectionColor = overlay.getSectionColor();
         townshipColor = overlay.getTownshipColor();
+        labelColor = overlay.getLabelColor();
 
         // ask for a redraw; without this the new colour waits for the next
         // unrelated map movement
@@ -244,8 +259,8 @@ public class GLPlssOverlay extends GLAbstractLayer2
         // townships are placed first so they win any contested spot -- losing a
         // section number is cheaper than losing the survey identity
         placedCount = 0;
-        drawLabels(view, scene, townships, townshipColor);
-        drawLabels(view, scene, sections, sectionColor);
+        drawLabels(view, scene, townships, labelColor);
+        drawLabels(view, scene, sections, labelColor);
     }
 
     /** Drops or reloads a tier for the current view. */
@@ -306,12 +321,14 @@ public class GLPlssOverlay extends GLAbstractLayer2
             return;
 
         if (glText == null) {
-            // ATAK's own format, not one built here. GLText sizes its glyph
-            // texture from the format's metrics, and a hand-built format's
-            // metrics did not match what it drew -- labels came out clipped
-            // mid-string ("T8N-R" for "T8N-R21W"). This one is self-consistent,
-            // and its built-in outline is the white one that reads over imagery.
-            textFormat = GLRenderGlobals.getDefaultTextFormat();
+            // Same typeface and size as ATAK's default, but without its built-in
+            // outline so the halo colour is ours to choose. Copying the default's
+            // own values matters: an earlier attempt hardcoded a different face
+            // and size, which desynced GLText's glyph texture from the format's
+            // metrics and clipped labels mid-string ("T8N-R" for "T8N-R21W").
+            final MapTextFormat def = GLRenderGlobals.getDefaultTextFormat();
+            textFormat = new MapTextFormat(def.getTypeface(), false,
+                    def.getFontSize());
             glText = GLText.getInstance(textFormat);
         }
 
@@ -329,6 +346,12 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final float g = Color.green(c) / 255f;
         final float b = Color.blue(c) / 255f;
         final float a = Color.alpha(c) / 255f;
+
+        // Rec. 601 luma: a light label needs a dark halo and the reverse. Using
+        // perceived brightness rather than a plain average keeps yellow -- which
+        // is bright but low in blue -- on the correct side of the line.
+        final float luma = 0.299f * r + 0.587f * g + 0.114f * b;
+        final float halo = luma > 0.5f ? 0f : 1f;
 
         final float half = textFormat.getTallestGlyphHeight() / 2f;
 
@@ -365,6 +388,18 @@ public class GLPlssOverlay extends GLAbstractLayer2
             // section rather than across it once the operator turns the map off
             // north-up. Rotating about the anchor first, then stepping back by
             // half the text extents, keeps it centred through the turn.
+            for (int o = 0; o < HALO_OFFSETS.length; o++) {
+                GLES20FixedPipeline.glPushMatrix();
+                GLES20FixedPipeline.glTranslatef(x, y, 0f);
+                if (rotation != 0f)
+                    GLES20FixedPipeline.glRotatef(rotation, 0f, 0f, 1f);
+                GLES20FixedPipeline.glTranslatef(
+                        -w / 2f + HALO_OFFSETS[o][0],
+                        -half + HALO_OFFSETS[o][1], 0f);
+                glText.draw(text, halo, halo, halo, a);
+                GLES20FixedPipeline.glPopMatrix();
+            }
+
             GLES20FixedPipeline.glPushMatrix();
             GLES20FixedPipeline.glTranslatef(x, y, 0f);
             if (rotation != 0f)
@@ -411,8 +446,8 @@ public class GLPlssOverlay extends GLAbstractLayer2
                 && scene.northBound <= tier.north)
             return;
 
-        final PlssStore store = subject.getStore();
-        if (store == null)
+        final java.util.List<PlssStore> stores = subject.getStores();
+        if (stores.isEmpty())
             return;
 
         // one load in flight per tier; a fast pan should not queue up work
@@ -435,11 +470,23 @@ public class GLPlssOverlay extends GLAbstractLayer2
             public void run() {
                 PlssStore.Result loaded = null;
                 try {
-                    loaded = "township".equals(tier.table)
-                            ? store.queryTownships(west, south, east, north,
-                                    tier.featureLimit)
-                            : store.querySections(west, south, east, north,
-                                    tier.featureLimit);
+                    // every installed pack is asked; the R-tree makes a pack
+                    // that does not cover this box practically free
+                    final java.util.List<PlssStore.Result> parts =
+                            new java.util.ArrayList<>();
+                    for (PlssStore store : stores) {
+                        final PlssStore.Result part = "township"
+                                .equals(tier.table)
+                                        ? store.queryTownships(west, south,
+                                                east, north,
+                                                tier.featureLimit)
+                                        : store.querySections(west, south,
+                                                east, north,
+                                                tier.featureLimit);
+                        if (part != null)
+                            parts.add(part);
+                    }
+                    loaded = PlssStore.Result.merge(parts);
                 } catch (Exception e) {
                     Log.e(TAG, tier.table + " query failed", e);
                 }

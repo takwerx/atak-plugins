@@ -14,8 +14,9 @@ get slow and can skip or repeat rows, and a keyset resumes exactly after an
 interruption.
 
 Usage:
-    ./fetch_blm.py --state CA --layer 2 --out ca_sections.ndjson
-    ./fetch_blm.py --state CA --layer 1 --out ca_townships.ndjson
+    ./fetch_blm.py --state CA  --layer 2 --out ca_sections.ndjson
+    ./fetch_blm.py --state CA  --layer 1 --out ca_townships.ndjson
+    ./fetch_blm.py --state ALL --layer 2 --out us_sections.ndjson
 """
 
 import argparse
@@ -46,7 +47,13 @@ def state_where(layer, state):
     """
     The township layer carries STATEABBR; the section layer does not, so it is
     filtered on the state prefix of PLSSID instead (see the plan, section 4).
+
+    ALL takes the whole service -- the national build, which is the shipping
+    scope; a state is a checkpoint, not the product (plan, decision 1).
     """
+    if state == "ALL":
+        return "1=1"
+
     if layer == 1:
         return "STATEABBR = '%s'" % state
     return "PLSSID LIKE '%s%%'" % state
@@ -148,7 +155,8 @@ def fetch(layer, state, out_path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--state", required=True, help="two-letter state, e.g. CA")
+    ap.add_argument("--state", required=True,
+                    help="two-letter state (e.g. CA), or ALL for the whole US")
     ap.add_argument("--layer", type=int, choices=(1, 2), required=True,
                     help="1 = township, 2 = section")
     ap.add_argument("--out", required=True, help="output .ndjson path")

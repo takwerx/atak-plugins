@@ -59,6 +59,55 @@ public class PlssStore {
             this.labelPoints = labelPoints;
             this.labels = labels;
         }
+
+        /**
+         * Combines per-pack results into one, so a bbox spanning a state line
+         * still draws in a single GL call. Packs are per-state and the R-tree
+         * makes a miss cheap, so most of these contribute nothing.
+         */
+        public static Result merge(List<Result> parts) {
+            if (parts.isEmpty())
+                return null;
+            if (parts.size() == 1)
+                return parts.get(0);
+
+            int segDoubles = 0, anchorDoubles = 0, labelCount = 0;
+            for (Result r : parts) {
+                segDoubles += r.segments.limit();
+                if (r.labelPoints != null) {
+                    anchorDoubles += r.labelPoints.limit();
+                    labelCount += r.labels.length;
+                }
+            }
+
+            final DoubleBuffer segs = ByteBuffer.allocateDirect(segDoubles * 8)
+                    .order(ByteOrder.nativeOrder()).asDoubleBuffer();
+            DoubleBuffer anchors = null;
+            if (anchorDoubles > 0)
+                anchors = ByteBuffer.allocateDirect(anchorDoubles * 8)
+                        .order(ByteOrder.nativeOrder()).asDoubleBuffer();
+
+            final String[] labels = new String[labelCount];
+            int at = 0;
+
+            for (Result r : parts) {
+                r.segments.rewind();
+                segs.put(r.segments);
+
+                if (r.labelPoints != null) {
+                    r.labelPoints.rewind();
+                    anchors.put(r.labelPoints);
+                    System.arraycopy(r.labels, 0, labels, at, r.labels.length);
+                    at += r.labels.length;
+                }
+            }
+
+            segs.flip();
+            if (anchors != null)
+                anchors.flip();
+
+            return new Result(segs, segDoubles / 2, anchors, labels);
+        }
     }
 
     private final DatabaseIface db;
@@ -202,6 +251,58 @@ public class PlssStore {
 
         return new Result(segBuf, n / 2, anchorBuf,
                 labels.toArray(new String[0]));
+    }
+
+    // --------------------------------------------------------------- lookup
+
+    /** Principal meridians present in this pack, in name order. */
+    public List<String> meridians() {
+        final List<String> out = new ArrayList<>();
+        QueryIface q = null;
+        try {
+            q = db.compileQuery("SELECT DISTINCT meridian FROM township"
+                    + " WHERE meridian IS NOT NULL AND meridian <> ''"
+                    + " ORDER BY meridian");
+            while (q.moveToNext())
+                out.add(q.getString(0));
+        } catch (Exception e) {
+            Log.e(TAG, "meridian query failed", e);
+        } finally {
+            if (q != null)
+                q.close();
+        }
+        return out;
+    }
+
+    /**
+     * Bounding box of one township, as {west, south, east, north}, or null when
+     * this pack does not hold it.
+     *
+     * Keyed on meridian plus label because township and range numbers repeat
+     * across meridians -- "T1N-R1W" exists under most of them, and they are
+     * nowhere near each other on the ground.
+     */
+    public double[] findTownship(String meridian, String label) {
+        QueryIface q = null;
+        try {
+            q = db.compileQuery("SELECT i.minx, i.miny, i.maxx, i.maxy"
+                    + " FROM township t JOIN township_idx i ON i.id = t.id"
+                    + " WHERE t.meridian = ? AND t.label = ? LIMIT 1");
+            q.bind(1, meridian);
+            q.bind(2, label);
+
+            if (q.moveToNext())
+                return new double[] {
+                        q.getDouble(0), q.getDouble(1),
+                        q.getDouble(2), q.getDouble(3)
+                };
+        } catch (Exception e) {
+            Log.e(TAG, "township lookup failed", e);
+        } finally {
+            if (q != null)
+                q.close();
+        }
+        return null;
     }
 
     // ------------------------------------------------------------- decoding

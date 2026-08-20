@@ -8,7 +8,11 @@ import com.atakmap.coremap.log.Log;
 import com.atakmap.map.layer.AbstractLayer;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * The PLSS overlay's model object, mirroring GridLinesOverlay.
@@ -37,42 +41,112 @@ public class PlssOverlay extends AbstractLayer {
     private int sectionColor = Color.YELLOW;
     private int townshipColor = Color.RED;
 
+    /**
+     * Label text, chosen independently of the lines. ATAK's default text format
+     * outlines glyphs in white, so tying the text to the line colour makes white
+     * lines produce white-on-white labels. Black is the readable default against
+     * that halo on any imagery.
+     */
+    private int labelColor = Color.BLACK;
+
     private final ConcurrentLinkedQueue<OnPlssColorChangedListener> colorListeners = new ConcurrentLinkedQueue<>();
 
-    private PlssStore store;
+    /**
+     * Every installed pack, opened at once. The plugin ships bare and the
+     * operator downloads the states they work in, so the set changes at runtime
+     * -- copy-on-write keeps the renderer's read path lock-free while a download
+     * or delete swaps the contents underneath it.
+     */
+    private final CopyOnWriteArrayList<PlssStore> stores = new CopyOnWriteArrayList<>();
 
     public PlssOverlay(final String name) {
         super(name);
     }
 
+    /** Directory holding the installed packs. */
+    public static File packDir() {
+        return new File(Environment.getExternalStorageDirectory(), PACK_DIR);
+    }
+
+    /** Two-letter codes of every installed pack, sorted. */
+    public static List<String> installedStates() {
+        final List<String> out = new ArrayList<>();
+        final File[] files = packDir().listFiles();
+        if (files == null)
+            return out;
+
+        for (File f : files) {
+            final String n = f.getName();
+            if (n.startsWith("plss_") && n.endsWith(".sqlite"))
+                out.add(n.substring(5, n.length() - 7));
+        }
+
+        java.util.Collections.sort(out);
+        return out;
+    }
+
     /**
-     * Opens the sideloaded pack for a state. Returns false when there is none,
-     * which is not an error -- it is the state a fresh install is in.
+     * Opens every pack in the pack directory, replacing whatever was open.
+     * Returns how many opened -- zero is the state a fresh install is in, not an
+     * error.
      */
-    public boolean openPack(String state) {
-        closePack();
+    public int openPacks() {
+        closePacks();
 
-        final File path = new File(Environment.getExternalStorageDirectory(),
-                PACK_DIR + "/plss_" + state + ".sqlite");
-
-        store = PlssStore.open(path);
-        if (store == null) {
-            Log.w(TAG, "no PLSS pack for " + state + " at " + path);
-            return false;
+        final File[] files = packDir().listFiles();
+        if (files == null) {
+            Log.d(TAG, "no pack directory at " + packDir());
+            return 0;
         }
 
-        return true;
-    }
+        Arrays.sort(files);
+        for (File f : files) {
+            final String n = f.getName();
+            if (!n.startsWith("plss_") || !n.endsWith(".sqlite"))
+                continue;
 
-    public void closePack() {
-        if (store != null) {
-            store.close();
-            store = null;
+            final PlssStore s = PlssStore.open(f);
+            if (s != null)
+                stores.add(s);
         }
+
+        Log.d(TAG, "opened " + stores.size() + " PLSS pack(s)");
+        return stores.size();
     }
 
-    public PlssStore getStore() {
-        return store;
+    public void closePacks() {
+        for (PlssStore s : stores)
+            s.close();
+        stores.clear();
+    }
+
+    public List<PlssStore> getStores() {
+        return stores;
+    }
+
+    public boolean hasData() {
+        return !stores.isEmpty();
+    }
+
+    /** Meridians across every installed pack, deduplicated and sorted. */
+    public List<String> meridians() {
+        final java.util.TreeSet<String> set = new java.util.TreeSet<>();
+        for (PlssStore s : stores)
+            set.addAll(s.meridians());
+        return new ArrayList<>(set);
+    }
+
+    /**
+     * Finds a township across the installed packs. Returns {west, south, east,
+     * north} or null.
+     */
+    public double[] findTownship(String meridian, String label) {
+        for (PlssStore s : stores) {
+            final double[] box = s.findTownship(meridian, label);
+            if (box != null)
+                return box;
+        }
+        return null;
     }
 
     public synchronized int getSectionColor() {
@@ -100,6 +174,21 @@ public class PlssOverlay extends AbstractLayer {
                 return;
 
             this.townshipColor = color;
+        }
+
+        dispatchColorChanged();
+    }
+
+    public synchronized int getLabelColor() {
+        return labelColor;
+    }
+
+    public void setLabelColor(final int color) {
+        synchronized (this) {
+            if (this.labelColor == color)
+                return;
+
+            this.labelColor = color;
         }
 
         dispatchColorChanged();

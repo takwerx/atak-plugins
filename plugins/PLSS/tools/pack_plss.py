@@ -21,9 +21,15 @@ Blob layout, all varints:
     blob rather than read back off the R-tree so that geometry decodes without the
     index -- the two are separate concerns and the store is easier to reason about.
 
+The national files are split in a single pass rather than re-read once per
+state: the section NDJSON is ~1.4 GB, and thirty passes over it would dominate
+the whole build.
+
 Usage:
     ./pack_plss.py --sections ca_sections.ndjson --townships ca_townships.ndjson \
                    --out plss_CA.sqlite
+    ./pack_plss.py --sections us_sections.ndjson --townships us_townships.ndjson \
+                   --split-dir packs/
 """
 
 import argparse
@@ -195,13 +201,128 @@ def load(conn, path, kind):
     return rows
 
 
+def state_of(rec):
+    """
+    The two-letter state that prefixes PLSSID, which is how the section layer is
+    attributed -- it carries no STATEABBR of its own (see the plan, section 4).
+    """
+    plssid = rec.get("PLSSID") or ""
+    return plssid[:2].upper() if len(plssid) >= 2 else ""
+
+
+def split(sections, townships, out_dir):
+    """
+    One pass over each input, routing every feature into its state's pack.
+
+    All the connections stay open at once; there are 30 PLSS states, so the
+    handles cost nothing next to re-reading the inputs.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+
+    conns = {}
+    counts = {}
+
+    def conn_for(state):
+        if state not in conns:
+            path = os.path.join(out_dir, "plss_%s.sqlite" % state)
+            if os.path.exists(path):
+                os.remove(path)
+            c = sqlite3.connect(path)
+            c.executescript(SCHEMA)
+            conns[state] = c
+            counts[state] = {"township": 0, "section": 0}
+        return conns[state]
+
+    for kind, path in (("township", townships), ("section", sections)):
+        if not path:
+            continue
+
+        print("splitting %s" % path)
+        seen = 0
+        with open(path) as f:
+            for line in f:
+                if not line.strip():
+                    continue
+
+                rec = json.loads(line)
+                state = state_of(rec)
+                if not state:
+                    continue
+
+                blob, minx, miny, maxx, maxy = encode_rings(rec.get("rings", []))
+                if blob is None:
+                    continue
+
+                c = conn_for(state)
+                oid = rec["OBJECTID"]
+
+                if kind == "township":
+                    c.execute("INSERT INTO township (id, plssid, label,"
+                              " meridian, geom) VALUES (?,?,?,?,?)",
+                              (oid, rec.get("PLSSID"), township_label(rec),
+                               rec.get("PRINMER"), blob))
+                    c.execute("INSERT INTO township_idx (id, minx, maxx, miny,"
+                              " maxy) VALUES (?,?,?,?,?)",
+                              (oid, minx, maxx, miny, maxy))
+                else:
+                    c.execute("INSERT INTO section (id, plssid, divid, divno,"
+                              " label, geom) VALUES (?,?,?,?,?,?)",
+                              (oid, rec.get("PLSSID"), rec.get("FRSTDIVID"),
+                               rec.get("FRSTDIVNO"), rec.get("FRSTDIVLAB"),
+                               blob))
+                    c.execute("INSERT INTO section_idx (id, minx, maxx, miny,"
+                              " maxy) VALUES (?,?,?,?,?)",
+                              (oid, minx, maxx, miny, maxy))
+
+                counts[state][kind] += 1
+                seen += 1
+                if seen % 200000 == 0:
+                    print("  %s: %d" % (kind, seen))
+                    for c2 in conns.values():
+                        c2.commit()
+
+        for c2 in conns.values():
+            c2.commit()
+
+    total = 0
+    for state in sorted(conns):
+        c = conns[state]
+        c.executemany("INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)", [
+            ("schema", "1"),
+            ("state", state),
+            ("scale", str(SCALE)),
+            ("townships", str(counts[state]["township"])),
+            ("sections", str(counts[state]["section"])),
+        ])
+        c.commit()
+        c.execute("VACUUM")
+        c.close()
+
+        size = os.path.getsize(os.path.join(out_dir, "plss_%s.sqlite" % state))
+        total += size
+        print("  %-3s %6d twp %8d sec  %7.1f MB"
+              % (state, counts[state]["township"], counts[state]["section"],
+                 size / 1048576.0))
+
+    print("\n%d state packs, %.1f MB total" % (len(conns), total / 1048576.0))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--sections")
     ap.add_argument("--townships")
     ap.add_argument("--state", default="")
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--out")
+    ap.add_argument("--split-dir",
+                    help="write one pack per state into this directory")
     args = ap.parse_args()
+
+    if args.split_dir:
+        return split(args.sections, args.townships, args.split_dir)
+
+    if not args.out:
+        ap.error("either --out or --split-dir is required")
 
     if os.path.exists(args.out):
         os.remove(args.out)

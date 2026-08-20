@@ -9,6 +9,25 @@
     <string name="plss_hide">Hide PLSS overlay</string>
     <string name="plss_township_color">Township lines</string>
     <string name="plss_section_color">Section lines</string>
+    <string name="plss_label_color">Label text</string>
     <string name="plss_township_color_title">Township line colour</string>
     <string name="plss_section_color_title">Section line colour</string>
+    <string name="plss_label_color_title">Label text colour</string>
+    <!-- data manager -->
+    <string name="plss_manage_data">Manage map data…</string>
+    <string name="plss_data_title">PLSS map data</string>
+    <string name="plss_installed">Installed</string>
+    <string name="plss_available">Available to download</string>
+    <string name="plss_download">Download</string>
+    <string name="plss_delete">Delete</string>
+    <string name="plss_loading">Checking for available data…</string>
+    <string name="plss_no_data">No data installed. Download a state to begin.</string>
+    <string name="plss_close">Close</string>
+    <!-- township lookup -->
+    <string name="plss_find">Find township…</string>
+    <string name="plss_find_title">Go to township</string>
+    <string name="plss_meridian">Principal meridian</string>
+    <string name="plss_township_label">Township</string>
+    <string name="plss_range_label">Range</string>
+    <string name="plss_go">Go</string>
 </resources>
