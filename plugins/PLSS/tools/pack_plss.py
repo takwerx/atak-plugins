@@ -97,6 +97,28 @@ def encode_rings(rings):
             qmaxx / SCALE, qmaxy / SCALE)
 
 
+# BLM spells a few principal meridians more than one way -- "Mount Diablo",
+# "Mt Diablo Meridian" and "Mount Diablo Meridian" are all the same meridian, and
+# so are "Willamette" and "Willamette Meridian". Left alone they appear as
+# separate entries in the plugin's meridian picker, and choosing the wrong one
+# searches a handful of townships instead of thousands. Nationally this affects
+# 6 townships out of 85,983, which is exactly the kind of thing that stays hidden
+# until someone's lookup silently fails.
+MERIDIAN_ALIASES = {
+    "Mount Diablo": "Mount Diablo Meridian",
+    "Mt Diablo Meridian": "Mount Diablo Meridian",
+    "Willamette": "Willamette Meridian",
+}
+
+
+def meridian_of(rec):
+    m = rec.get("PRINMER")
+    if not m:
+        return m
+    m = m.strip()
+    return MERIDIAN_ALIASES.get(m, m)
+
+
 def township_label(rec):
     """
     "T19S-R25E", the form surveyors and fire ops actually say, built from the
@@ -172,7 +194,7 @@ def load(conn, path, kind):
             oid = rec["OBJECTID"]
             if kind == "township":
                 batch_f.append((oid, rec.get("PLSSID"), township_label(rec),
-                                rec.get("PRINMER"), blob))
+                                meridian_of(rec), blob))
             else:
                 batch_f.append((oid, rec.get("PLSSID"), rec.get("FRSTDIVID"),
                                 rec.get("FRSTDIVNO"), rec.get("FRSTDIVLAB"),
@@ -260,7 +282,7 @@ def split(sections, townships, out_dir):
                     c.execute("INSERT INTO township (id, plssid, label,"
                               " meridian, geom) VALUES (?,?,?,?,?)",
                               (oid, rec.get("PLSSID"), township_label(rec),
-                               rec.get("PRINMER"), blob))
+                               meridian_of(rec), blob))
                     c.execute("INSERT INTO township_idx (id, minx, maxx, miny,"
                               " maxy) VALUES (?,?,?,?,?)",
                               (oid, minx, maxx, miny, maxy))

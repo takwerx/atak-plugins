@@ -173,8 +173,8 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
     private final PlssOverlay subject;
 
-    private final Tier townships = new Tier("township", 28.0, 3f, 4000, 1.0f);
-    private final Tier sections = new Tier("section", 14.5, 1.5f, 20000, 1.35f);
+    private final Tier townships = new Tier("township", 28.0, 3f, 4000, 1.55f);
+    private final Tier sections = new Tier("section", 14.5, 1.5f, 20000, 2.1f);
 
     private final ExecutorService loader = Executors.newSingleThreadExecutor();
 
@@ -194,9 +194,6 @@ public class GLPlssOverlay extends GLAbstractLayer2
      * thresholds against the device -- ATAK's scale bar changes length to suit
      * round numbers, so it cannot be converted to m/px reliably.
      */
-    private long lastResolutionLog;
-    private long lastLabelLog;
-    private long labelLogFrame;
 
     /**
      * One text instance shared by every tier, sized at ATAK's default.
@@ -215,7 +212,14 @@ public class GLPlssOverlay extends GLAbstractLayer2
     private volatile int townshipLabelColor;
 
     public GLPlssOverlay(MapRenderer surface, PlssOverlay subject) {
-        super(surface, subject, GLMapView.RENDER_PASS_SURFACE);
+        // Lines go on the map surface so they sit under ATAK's own markers;
+        // labels are drawn in the sprites pass. The surface is composited in
+        // tiles, and text spanning a tile seam is cut mid-glyph -- which is why
+        // one label rendered whole in one place and clipped in another. That
+        // pass also magnified text by roughly 1.55x, which the tier font scales
+        // now carry instead.
+        super(surface, subject, GLMapView.RENDER_PASS_SURFACE
+                | GLMapView.RENDER_PASS_SPRITES);
 
         this.subject = subject;
         this.sectionColor = subject.getSectionColor();
@@ -272,21 +276,19 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
         final GLMapView.State scene = view.currentScene;
 
-        final long now = System.currentTimeMillis();
-        if (now - lastResolutionLog > 1000L) {
-            lastResolutionLog = now;
-            Log.d(TAG, "resolution " + String.format("%.1f", scene.drawMapResolution)
-                    + " m/px");
-        }
-
         // Sections first so the township grid draws over it -- the coarse frame
         // has to stay readable where the two coincide, which is every township
         // boundary.
         updateTier(scene, sections);
         updateTier(scene, townships);
 
-        drawLines(view, scene, sections, sectionColor);
-        drawLines(view, scene, townships, townshipColor);
+        if ((renderPass & GLMapView.RENDER_PASS_SURFACE) != 0) {
+            drawLines(view, scene, sections, sectionColor);
+            drawLines(view, scene, townships, townshipColor);
+        }
+
+        if ((renderPass & GLMapView.RENDER_PASS_SPRITES) == 0)
+            return;
 
         // townships are placed first so they win any contested spot -- losing a
         // section number is cheaper than losing the survey identity
@@ -425,22 +427,6 @@ public class GLPlssOverlay extends GLAbstractLayer2
             final float textW = textFormat.measureTextWidth(text);
             final float w = textW * scale;
 
-            // temporary: what string do we actually hold, and how wide does the
-            // format think it is, for the labels that render short
-            if (tier.township) {
-                final long nowMs = System.currentTimeMillis();
-                if (nowMs - lastLabelLog > 2000L) {
-                    lastLabelLog = nowMs;
-                    labelLogFrame = nowMs;
-                }
-                // log every township label in the chosen frame, not just the
-                // first -- throttling per label hid the one we were chasing
-                if (nowMs == labelLogFrame)
-                    Log.d(TAG, "label [" + text + "] len=" + text.length()
-                            + " measured=" + textW + " strW="
-                            + glText.getStringWidth(text) + " boxW="
-                            + Math.abs(bx1 - bx0));
-            }
 
             // a label wider than its own feature would cross the boundary lines
             if (w > Math.abs(bx1 - bx0) * LABEL_FIT)
