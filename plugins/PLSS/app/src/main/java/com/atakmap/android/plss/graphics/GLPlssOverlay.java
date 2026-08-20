@@ -86,8 +86,17 @@ public class GLPlssOverlay extends GLAbstractLayer2
             { -1f, -1f }, { 1f, -1f }, { -1f, 1f }, { 1f, 1f }
     };
 
-    /** Gap, in pixels, required between two labels for both to be drawn. */
-    private static final float LABEL_SPACING = 4f;
+    /**
+     * Gap required between two labels, in pixels, per axis.
+     *
+     * Horizontal only. A township's centre is a section corner -- where sections
+     * 15, 16, 21 and 22 meet -- so its label sits half a section above and below
+     * the four section numbers around it. That clearance is real but small, and
+     * padding it vertically as well is what makes a township label knock out the
+     * section numbers next to it.
+     */
+    private static final float LABEL_SPACING_X = 4f;
+    private static final float LABEL_SPACING_Y = 0f;
 
     /**
      * Largest share of a feature's on-screen width a label may occupy.
@@ -119,6 +128,16 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final float lineWidth;
         final int featureLimit;
 
+        /**
+         * Label size relative to ATAK's default, applied as a matrix scale.
+         *
+         * Not a second font: giving each tier its own GLText truncated the
+         * longer labels ("T17S-R" for "T17S-R11E"), because GLText shares glyph
+         * state between instances and the larger face perturbed the smaller
+         * one's metrics. One font, scaled at draw time, avoids that entirely.
+         */
+        final float fontScale;
+
         final AtomicBoolean loading = new AtomicBoolean(false);
 
         DoubleBuffer geo;
@@ -133,12 +152,13 @@ public class GLPlssOverlay extends GLAbstractLayer2
         boolean loaded;
 
         Tier(String table, double maxResolution, float lineWidth,
-                int featureLimit) {
+                int featureLimit, float fontScale) {
             this.table = table;
             this.township = "township".equals(table);
             this.maxResolution = maxResolution;
             this.lineWidth = lineWidth;
             this.featureLimit = featureLimit;
+            this.fontScale = fontScale;
         }
 
         void clear() {
@@ -153,13 +173,10 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
     private final PlssOverlay subject;
 
-    private final Tier townships = new Tier("township", 28.0, 3f, 4000);
-    private final Tier sections = new Tier("section", 14.5, 1.5f, 20000);
+    private final Tier townships = new Tier("township", 28.0, 3f, 4000, 1.0f);
+    private final Tier sections = new Tier("section", 14.5, 1.5f, 20000, 1.35f);
 
     private final ExecutorService loader = Executors.newSingleThreadExecutor();
-
-    private MapTextFormat textFormat;
-    private GLText glText;
 
     /**
      * Bounding boxes of labels already placed this frame, as x0,y0,x1,y1 runs.
@@ -178,11 +195,24 @@ public class GLPlssOverlay extends GLAbstractLayer2
      * round numbers, so it cannot be converted to m/px reliably.
      */
     private long lastResolutionLog;
+    private long lastLabelLog;
+    private long labelLogFrame;
+
+    /**
+     * One text instance shared by every tier, sized at ATAK's default.
+     *
+     * Deliberately not one per tier: GLText shares glyph state between
+     * instances, and adding a second at a larger size truncated the longer
+     * labels ("T17S-R" for "T17S-R11E"). Tiers scale this one at draw time.
+     */
+    private MapTextFormat textFormat;
+    private GLText glText;
 
     /** written on the UI thread by the colour picker, read on the GL thread */
     private volatile int sectionColor;
     private volatile int townshipColor;
-    private volatile int labelColor;
+    private volatile int sectionLabelColor;
+    private volatile int townshipLabelColor;
 
     public GLPlssOverlay(MapRenderer surface, PlssOverlay subject) {
         super(surface, subject, GLMapView.RENDER_PASS_SURFACE);
@@ -190,7 +220,8 @@ public class GLPlssOverlay extends GLAbstractLayer2
         this.subject = subject;
         this.sectionColor = subject.getSectionColor();
         this.townshipColor = subject.getTownshipColor();
-        this.labelColor = subject.getLabelColor();
+        this.sectionLabelColor = subject.getSectionLabelColor();
+        this.townshipLabelColor = subject.getTownshipLabelColor();
     }
 
     @Override
@@ -228,7 +259,8 @@ public class GLPlssOverlay extends GLAbstractLayer2
     public void onPlssColorChanged(PlssOverlay overlay) {
         sectionColor = overlay.getSectionColor();
         townshipColor = overlay.getTownshipColor();
-        labelColor = overlay.getLabelColor();
+        sectionLabelColor = overlay.getSectionLabelColor();
+        townshipLabelColor = overlay.getTownshipLabelColor();
 
         // ask for a redraw; without this the new colour waits for the next
         // unrelated map movement
@@ -258,9 +290,16 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
         // townships are placed first so they win any contested spot -- losing a
         // section number is cheaper than losing the survey identity
+        // Each tier declutters against itself only. A township's centre is a
+        // section corner, so its label sits right between sections 15, 16, 21
+        // and 22 -- sharing one set meant the label suppressed those numbers,
+        // which are the primary data. The two tiers differ in size and colour,
+        // so the rare few-pixel overlap reads fine.
         placedCount = 0;
-        drawLabels(view, scene, townships, labelColor);
-        drawLabels(view, scene, sections, labelColor);
+        drawLabels(view, scene, townships, townshipLabelColor);
+
+        placedCount = 0;
+        drawLabels(view, scene, sections, sectionLabelColor);
     }
 
     /** Drops or reloads a tier for the current view. */
@@ -321,16 +360,24 @@ public class GLPlssOverlay extends GLAbstractLayer2
             return;
 
         if (glText == null) {
-            // Same typeface and size as ATAK's default, but without its built-in
-            // outline so the halo colour is ours to choose. Copying the default's
-            // own values matters: an earlier attempt hardcoded a different face
-            // and size, which desynced GLText's glyph texture from the format's
-            // metrics and clipped labels mid-string ("T8N-R" for "T8N-R21W").
-            final MapTextFormat def = GLRenderGlobals.getDefaultTextFormat();
-            textFormat = new MapTextFormat(def.getTypeface(), false,
-                    def.getFontSize());
+            // One shared instance for every tier. MapTextFormat(Typeface, int)
+            // is MapTextFormat(typeface, false, size), so the default is already
+            // un-outlined -- the halo below is the only outline, and its colour
+            // is ours.
+            textFormat = GLRenderGlobals.getDefaultTextFormat();
             glText = GLText.getInstance(textFormat);
+
+            Log.d(TAG, "font: size=" + textFormat.getFontSize()
+                    + " densityAdjusted=" + textFormat.getDensityAdjustedFontSize()
+                    + " relativeScaling=" + GLRenderGlobals.getRelativeScaling()
+                    + " tallestGlyph=" + textFormat.getTallestGlyphHeight()
+                    + " glTextCharHeight=" + glText.getCharHeight()
+                    + " glTextStringHeight=" + glText.getStringHeight()
+                    + " measure9=" + textFormat.measureTextWidth("T16S-R11E")
+                    + " glTextW9=" + glText.getStringWidth("T16S-R11E"));
         }
+
+        final float scale = tier.fontScale;
 
         tier.labelGeo.rewind();
         tier.labelScreen.rewind();
@@ -353,7 +400,9 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final float luma = 0.299f * r + 0.587f * g + 0.114f * b;
         final float halo = luma > 0.5f ? 0f : 1f;
 
-        final float half = textFormat.getTallestGlyphHeight() / 2f;
+        // unscaled metrics: the matrix applies the tier's scale at draw time
+        final float glyphHalf = textFormat.getTallestGlyphHeight() / 2f;
+        final float half = glyphHalf * scale;
 
         // the map's own rotation, applied to every label this pass
         final float rotation = (float) -scene.drawRotation;
@@ -373,7 +422,25 @@ public class GLPlssOverlay extends GLAbstractLayer2
                 continue;
 
             final String text = tier.labels[i];
-            final float w = textFormat.measureTextWidth(text);
+            final float textW = textFormat.measureTextWidth(text);
+            final float w = textW * scale;
+
+            // temporary: what string do we actually hold, and how wide does the
+            // format think it is, for the labels that render short
+            if (tier.township) {
+                final long nowMs = System.currentTimeMillis();
+                if (nowMs - lastLabelLog > 2000L) {
+                    lastLabelLog = nowMs;
+                    labelLogFrame = nowMs;
+                }
+                // log every township label in the chosen frame, not just the
+                // first -- throttling per label hid the one we were chasing
+                if (nowMs == labelLogFrame)
+                    Log.d(TAG, "label [" + text + "] len=" + text.length()
+                            + " measured=" + textW + " strW="
+                            + glText.getStringWidth(text) + " boxW="
+                            + Math.abs(bx1 - bx0));
+            }
 
             // a label wider than its own feature would cross the boundary lines
             if (w > Math.abs(bx1 - bx0) * LABEL_FIT)
@@ -388,14 +455,16 @@ public class GLPlssOverlay extends GLAbstractLayer2
             // section rather than across it once the operator turns the map off
             // north-up. Rotating about the anchor first, then stepping back by
             // half the text extents, keeps it centred through the turn.
+            // halo offsets are screen pixels, so they are applied before the
+            // tier's scale rather than through it
             for (int o = 0; o < HALO_OFFSETS.length; o++) {
                 GLES20FixedPipeline.glPushMatrix();
-                GLES20FixedPipeline.glTranslatef(x, y, 0f);
+                GLES20FixedPipeline.glTranslatef(x + HALO_OFFSETS[o][0],
+                        y + HALO_OFFSETS[o][1], 0f);
                 if (rotation != 0f)
                     GLES20FixedPipeline.glRotatef(rotation, 0f, 0f, 1f);
-                GLES20FixedPipeline.glTranslatef(
-                        -w / 2f + HALO_OFFSETS[o][0],
-                        -half + HALO_OFFSETS[o][1], 0f);
+                GLES20FixedPipeline.glScalef(scale, scale, 1f);
+                GLES20FixedPipeline.glTranslatef(-textW / 2f, -glyphHalf, 0f);
                 glText.draw(text, halo, halo, halo, a);
                 GLES20FixedPipeline.glPopMatrix();
             }
@@ -404,7 +473,8 @@ public class GLPlssOverlay extends GLAbstractLayer2
             GLES20FixedPipeline.glTranslatef(x, y, 0f);
             if (rotation != 0f)
                 GLES20FixedPipeline.glRotatef(rotation, 0f, 0f, 1f);
-            GLES20FixedPipeline.glTranslatef(-w / 2f, -half, 0f);
+            GLES20FixedPipeline.glScalef(scale, scale, 1f);
+            GLES20FixedPipeline.glTranslatef(-textW / 2f, -glyphHalf, 0f);
             glText.draw(text, r, g, b, a);
             GLES20FixedPipeline.glPopMatrix();
         }
@@ -417,10 +487,10 @@ public class GLPlssOverlay extends GLAbstractLayer2
      */
     private boolean claimLabelSpace(float x0, float y0, float x1, float y1) {
         for (int i = 0; i < placedCount; i += 4) {
-            if (x0 < placedLabels[i + 2] + LABEL_SPACING
-                    && x1 + LABEL_SPACING > placedLabels[i]
-                    && y0 < placedLabels[i + 3] + LABEL_SPACING
-                    && y1 + LABEL_SPACING > placedLabels[i + 1])
+            if (x0 < placedLabels[i + 2] + LABEL_SPACING_X
+                    && x1 + LABEL_SPACING_X > placedLabels[i]
+                    && y0 < placedLabels[i + 3] + LABEL_SPACING_Y
+                    && y1 + LABEL_SPACING_Y > placedLabels[i + 1])
                 return false;
         }
 

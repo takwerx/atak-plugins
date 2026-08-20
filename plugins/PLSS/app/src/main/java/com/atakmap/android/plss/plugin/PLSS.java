@@ -71,7 +71,8 @@ public class PLSS implements IPlugin,
     Button toggleButton;
     Button townshipColorButton;
     Button sectionColorButton;
-    Button labelColorButton;
+    Button townshipLabelColorButton;
+    Button sectionLabelColorButton;
 
     public PLSS(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -280,7 +281,10 @@ public class PLSS implements IPlugin,
         toggleButton = root.findViewById(R.id.plss_toggle);
         townshipColorButton = root.findViewById(R.id.plss_township_color);
         sectionColorButton = root.findViewById(R.id.plss_section_color);
-        labelColorButton = root.findViewById(R.id.plss_label_color);
+        townshipLabelColorButton = root.findViewById(
+                R.id.plss_township_label_color);
+        sectionLabelColorButton = root.findViewById(
+                R.id.plss_section_label_color);
 
         toggleButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -303,10 +307,17 @@ public class PLSS implements IPlugin,
             }
         });
 
-        labelColorButton.setOnClickListener(new View.OnClickListener() {
+        townshipLabelColorButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showColorPicker(TARGET_LABEL);
+                showColorPicker(TARGET_TOWNSHIP_LABEL);
+            }
+        });
+
+        sectionLabelColorButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showColorPicker(TARGET_SECTION_LABEL);
             }
         });
     }
@@ -328,8 +339,13 @@ public class PLSS implements IPlugin,
             sectionColorButton.setBackgroundColor(
                     plssOverlay.getSectionColor());
 
-        if (labelColorButton != null)
-            labelColorButton.setBackgroundColor(plssOverlay.getLabelColor());
+        if (townshipLabelColorButton != null)
+            townshipLabelColorButton.setBackgroundColor(
+                    plssOverlay.getTownshipLabelColor());
+
+        if (sectionLabelColorButton != null)
+            sectionLabelColorButton.setBackgroundColor(
+                    plssOverlay.getSectionLabelColor());
     }
 
     /**
@@ -612,6 +628,14 @@ public class PLSS implements IPlugin,
             }
 
             @Override
+            public void onRetry(PlssPackManager.Pack p, int attempt,
+                    long soFar) {
+                status.setText(String.format(
+                        "Connection dropped — resuming %s from %.1f MB (try %d)",
+                        p.name, soFar / 1048576.0, attempt + 1));
+            }
+
+            @Override
             public void onComplete(PlssPackManager.Pack p, File installed) {
                 progress.setVisibility(View.GONE);
                 status.setText(p.name + " installed");
@@ -663,7 +687,8 @@ public class PLSS implements IPlugin,
      */
     private static final int TARGET_TOWNSHIP = 0;
     private static final int TARGET_SECTION = 1;
-    private static final int TARGET_LABEL = 2;
+    private static final int TARGET_TOWNSHIP_LABEL = 2;
+    private static final int TARGET_SECTION_LABEL = 3;
 
     private void showColorPicker(final int target) {
         final MapView mapView = MapView.getMapView();
@@ -679,9 +704,13 @@ public class PLSS implements IPlugin,
                 current = plssOverlay.getTownshipColor();
                 titleRes = R.string.plss_township_color_title;
                 break;
-            case TARGET_LABEL:
-                current = plssOverlay.getLabelColor();
-                titleRes = R.string.plss_label_color_title;
+            case TARGET_TOWNSHIP_LABEL:
+                current = plssOverlay.getTownshipLabelColor();
+                titleRes = R.string.plss_township_label_color_title;
+                break;
+            case TARGET_SECTION_LABEL:
+                current = plssOverlay.getSectionLabelColor();
+                titleRes = R.string.plss_section_label_color_title;
                 break;
             default:
                 current = plssOverlay.getSectionColor();
@@ -706,8 +735,11 @@ public class PLSS implements IPlugin,
                             case TARGET_TOWNSHIP:
                                 plssOverlay.setTownshipColor(color);
                                 break;
-                            case TARGET_LABEL:
-                                plssOverlay.setLabelColor(color);
+                            case TARGET_TOWNSHIP_LABEL:
+                                plssOverlay.setTownshipLabelColor(color);
+                                break;
+                            case TARGET_SECTION_LABEL:
+                                plssOverlay.setSectionLabelColor(color);
                                 break;
                             default:
                                 plssOverlay.setSectionColor(color);

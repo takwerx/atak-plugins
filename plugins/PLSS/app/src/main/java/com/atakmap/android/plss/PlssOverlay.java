@@ -42,12 +42,13 @@ public class PlssOverlay extends AbstractLayer {
     private int townshipColor = Color.RED;
 
     /**
-     * Label text, chosen independently of the lines. ATAK's default text format
-     * outlines glyphs in white, so tying the text to the line colour makes white
-     * lines produce white-on-white labels. Black is the readable default against
-     * that halo on any imagery.
+     * Label text, chosen independently of the lines and of each other. Tying
+     * label colour to line colour made white lines draw white text; tying the
+     * two tiers together left no way to tell a township label from a section
+     * number at a glance.
      */
-    private int labelColor = Color.BLACK;
+    private int sectionLabelColor = Color.BLACK;
+    private int townshipLabelColor = Color.BLACK;
 
     private final ConcurrentLinkedQueue<OnPlssColorChangedListener> colorListeners = new ConcurrentLinkedQueue<>();
 
@@ -179,16 +180,31 @@ public class PlssOverlay extends AbstractLayer {
         dispatchColorChanged();
     }
 
-    public synchronized int getLabelColor() {
-        return labelColor;
+    public synchronized int getSectionLabelColor() {
+        return sectionLabelColor;
     }
 
-    public void setLabelColor(final int color) {
+    public void setSectionLabelColor(final int color) {
         synchronized (this) {
-            if (this.labelColor == color)
+            if (this.sectionLabelColor == color)
                 return;
 
-            this.labelColor = color;
+            this.sectionLabelColor = color;
+        }
+
+        dispatchColorChanged();
+    }
+
+    public synchronized int getTownshipLabelColor() {
+        return townshipLabelColor;
+    }
+
+    public void setTownshipLabelColor(final int color) {
+        synchronized (this) {
+            if (this.townshipLabelColor == color)
+                return;
+
+            this.townshipLabelColor = color;
         }
 
         dispatchColorChanged();

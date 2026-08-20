@@ -28,11 +28,14 @@ import java.util.concurrent.Executors;
  * of a few hundred KB (PLAN-PLSS-v0.1.md section 4.1) -- so the plugin downloads
  * one once and is fully offline afterwards.
  *
- * Downloads stream straight to a temporary file while the digest is computed on
- * the way past, so a pack is never held in memory and a truncated or corrupted
- * transfer cannot be mistaken for a good one. The file only takes its real name
- * once the digest matches, which makes a partial download harmless -- there is
- * no state where a half-written pack looks installed.
+ * Downloads stream straight to a temporary file, and the file only takes its
+ * real name once its SHA-256 matches the manifest -- so a pack is never held in
+ * memory and a truncated transfer cannot be mistaken for a good one.
+ *
+ * A partial download is kept, not discarded, and resumed with a Range request.
+ * These packs are tens to hundreds of megabytes and the operators who need them
+ * are on cellular or satellite links that drop; restarting a 124 MB pack from
+ * zero on every stall is not something that would ever finish in the field.
  */
 public class PlssPackManager {
 
@@ -49,6 +52,12 @@ public class PlssPackManager {
     private static final int CONNECT_TIMEOUT = 20000;
     private static final int READ_TIMEOUT = 60000;
     private static final int BUFFER = 64 * 1024;
+
+    /** Attempts per pack before giving up; each resumes where the last stopped. */
+    private static final int ATTEMPTS = 6;
+
+    /** Base backoff between attempts, multiplied by the attempt number. */
+    private static final long BACKOFF_MS = 2000L;
 
     /** One downloadable pack, as described by the manifest. */
     public static final class Pack {
@@ -86,6 +95,9 @@ public class PlssPackManager {
     public interface DownloadCallback {
         /** 0-100, or -1 when the total size is not known */
         void onProgress(int percent, long bytesSoFar, long totalBytes);
+
+        /** A transfer dropped and will be resumed from {@code bytesSoFar}. */
+        void onRetry(Pack pack, int attempt, long bytesSoFar);
 
         void onComplete(Pack pack, File installed);
 
@@ -176,85 +188,153 @@ public class PlssPackManager {
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                File tmp = null;
-                try {
-                    if (!destDir.exists() && !destDir.mkdirs())
-                        throw new IllegalStateException(
-                                "cannot create " + destDir);
+                final File tmp = new File(destDir,
+                        "plss_" + pack.state + ".sqlite.part");
+                Exception last = null;
 
-                    final String base = MANIFEST_URL.substring(0,
-                            MANIFEST_URL.lastIndexOf('/') + 1);
+                for (int attempt = 1; attempt <= ATTEMPTS; attempt++) {
+                    try {
+                        if (!destDir.exists() && !destDir.mkdirs())
+                            throw new IllegalStateException(
+                                    "cannot create " + destDir);
 
-                    tmp = new File(destDir, "plss_" + pack.state
-                            + ".sqlite.part");
-                    final String digest = stream(base + pack.url, tmp, pack,
-                            cb);
+                        final String base = MANIFEST_URL.substring(0,
+                                MANIFEST_URL.lastIndexOf('/') + 1);
 
-                    if (!pack.sha256.isEmpty()
-                            && !pack.sha256.equalsIgnoreCase(digest))
-                        throw new IllegalStateException(
-                                "checksum mismatch; expected " + pack.sha256
-                                        + " got " + digest);
+                        final String digest = stream(base + pack.url, tmp,
+                                pack, cb);
 
-                    final File dest = new File(destDir,
-                            "plss_" + pack.state + ".sqlite");
-                    if (dest.exists() && !dest.delete())
-                        throw new IllegalStateException(
-                                "cannot replace " + dest);
-                    if (!tmp.renameTo(dest))
-                        throw new IllegalStateException(
-                                "cannot install " + dest);
-
-                    Log.d(TAG, "installed " + dest + " (" + dest.length()
-                            + " bytes)");
-
-                    main.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            cb.onComplete(pack, dest);
+                        if (!pack.sha256.isEmpty()
+                                && !pack.sha256.equalsIgnoreCase(digest)) {
+                            // a mismatch means the bytes on disk are wrong, so
+                            // resuming from them would never converge
+                            if (tmp.exists() && !tmp.delete())
+                                Log.w(TAG, "could not discard " + tmp);
+                            throw new IllegalStateException(
+                                    "checksum mismatch; expected "
+                                            + pack.sha256 + " got " + digest);
                         }
-                    });
-                } catch (final Exception e) {
-                    Log.e(TAG, "download failed", e);
-                    if (tmp != null && tmp.exists() && !tmp.delete())
-                        Log.w(TAG, "could not clean up " + tmp);
 
-                    main.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            cb.onError(describe(e));
+                        install(pack, tmp, cb);
+                        return;
+                    } catch (Exception e) {
+                        last = e;
+                        Log.w(TAG, "attempt " + attempt + "/" + ATTEMPTS
+                                + " failed for " + pack.state + ": "
+                                + describe(e));
+
+                        if (attempt == ATTEMPTS)
+                            break;
+
+                        final long have = tmp.exists() ? tmp.length() : 0;
+                        postRetry(cb, pack, attempt, have);
+
+                        try {
+                            Thread.sleep(BACKOFF_MS * attempt);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            return;
                         }
-                    });
+                    }
                 }
+
+                final Exception fail = last;
+                Log.e(TAG, "download failed", fail);
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        cb.onError(describe(fail));
+                    }
+                });
             }
         });
     }
 
-    /** Streams to {@code dest}, reporting progress, and returns the SHA-256. */
+    private void install(final Pack pack, File tmp, final DownloadCallback cb)
+            throws Exception {
+
+        final File dest = new File(destDir, "plss_" + pack.state + ".sqlite");
+        if (dest.exists() && !dest.delete())
+            throw new IllegalStateException("cannot replace " + dest);
+        if (!tmp.renameTo(dest))
+            throw new IllegalStateException("cannot install " + dest);
+
+        Log.d(TAG, "installed " + dest + " (" + dest.length() + " bytes)");
+
+        main.post(new Runnable() {
+            @Override
+            public void run() {
+                cb.onComplete(pack, dest);
+            }
+        });
+    }
+
+    private void postRetry(final DownloadCallback cb, final Pack pack,
+            final int attempt, final long have) {
+        main.post(new Runnable() {
+            @Override
+            public void run() {
+                cb.onRetry(pack, attempt, have);
+            }
+        });
+    }
+
+    /**
+     * Streams to {@code dest}, resuming if it already holds part of the file,
+     * and returns the SHA-256 of the whole thing.
+     *
+     * The digest has to cover bytes written by earlier attempts too, so an
+     * existing prefix is read back through the digest before the transfer picks
+     * up. That costs one sequential read of what is already on disk, which is
+     * nothing next to re-downloading it.
+     */
     private String stream(String url, File dest, Pack pack,
             final DownloadCallback cb) throws Exception {
+
+        long have = dest.exists() ? dest.length() : 0;
+
+        // a stale part larger than the pack cannot be a prefix of it
+        if (pack.bytes > 0 && have > pack.bytes) {
+            if (!dest.delete())
+                throw new IllegalStateException("cannot discard " + dest);
+            have = 0;
+        }
 
         final HttpURLConnection conn = (HttpURLConnection) new URL(url)
                 .openConnection();
         conn.setConnectTimeout(CONNECT_TIMEOUT);
         conn.setReadTimeout(READ_TIMEOUT);
+        if (have > 0)
+            conn.setRequestProperty("Range", "bytes=" + have + "-");
 
         try {
             final int code = conn.getResponseCode();
-            if (code != HttpURLConnection.HTTP_OK)
+
+            boolean append = false;
+            if (code == HttpURLConnection.HTTP_PARTIAL) {
+                append = true;
+                Log.d(TAG, "resuming " + pack.state + " at " + have + " bytes");
+            } else if (code == HttpURLConnection.HTTP_OK) {
+                // the server ignored the range, so start over
+                have = 0;
+            } else {
                 throw new IllegalStateException("HTTP " + code);
+            }
 
             final long total = pack.bytes > 0 ? pack.bytes
-                    : conn.getContentLength();
+                    : have + Math.max(conn.getContentLength(), 0);
 
             final MessageDigest md = MessageDigest.getInstance("SHA-256");
             final byte[] buf = new byte[BUFFER];
 
-            long soFar = 0;
+            if (append)
+                digestExisting(dest, md, buf);
+
+            long soFar = append ? have : 0;
             int lastPercent = -1;
 
             try (InputStream in = conn.getInputStream();
-                    OutputStream out = new FileOutputStream(dest)) {
+                    OutputStream out = new FileOutputStream(dest, append)) {
                 int n;
                 while ((n = in.read(buf)) > 0) {
                     out.write(buf, 0, n);
@@ -268,10 +348,11 @@ public class PlssPackManager {
                     if (percent != lastPercent) {
                         lastPercent = percent;
                         final long at = soFar;
+                        final long tot = total;
                         main.post(new Runnable() {
                             @Override
                             public void run() {
-                                cb.onProgress(percent, at, total);
+                                cb.onProgress(percent, at, tot);
                             }
                         });
                     }
@@ -284,6 +365,16 @@ public class PlssPackManager {
             return hex.toString();
         } finally {
             conn.disconnect();
+        }
+    }
+
+    /** Feeds bytes already on disk through the digest before resuming. */
+    private static void digestExisting(File f, MessageDigest md, byte[] buf)
+            throws Exception {
+        try (InputStream in = new java.io.FileInputStream(f)) {
+            int n;
+            while ((n = in.read(buf)) > 0)
+                md.update(buf, 0, n);
         }
     }
 
