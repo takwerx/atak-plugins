@@ -63,6 +63,15 @@ public class PlssPackManager {
     /** Base backoff between attempts, multiplied by the attempt number. */
     private static final long BACKOFF_MS = 2000L;
 
+    /**
+     * A pack's state code becomes part of a filename, so it is checked against
+     * the closed set it is drawn from before it can reach a path. Without this a
+     * manifest entry of "../.." escapes the pack directory, and the digest check
+     * is no defence because the digest comes from the same manifest.
+     */
+    private static final java.util.regex.Pattern STATE =
+            java.util.regex.Pattern.compile("[A-Za-z]{2}");
+
     /** One downloadable pack, as described by the manifest. */
     public static final class Pack {
         public final String state;
@@ -75,6 +84,10 @@ public class PlssPackManager {
 
         Pack(JSONObject o) {
             state = o.optString("state");
+            if (!STATE.matcher(state).matches())
+                throw new IllegalArgumentException(
+                        "invalid pack state: " + state);
+
             name = o.optString("name", state);
             url = o.optString("url");
             bytes = o.optLong("bytes");
@@ -132,8 +145,15 @@ public class PlssPackManager {
                     final JSONArray arr = root.getJSONArray("packs");
 
                     final List<Pack> packs = new ArrayList<>();
-                    for (int i = 0; i < arr.length(); i++)
-                        packs.add(new Pack(arr.getJSONObject(i)));
+                    for (int i = 0; i < arr.length(); i++) {
+                        try {
+                            packs.add(new Pack(arr.getJSONObject(i)));
+                        } catch (IllegalArgumentException bad) {
+                            // skip the entry, keep the rest usable
+                            Log.w(TAG, "rejected manifest entry: "
+                                    + bad.getMessage());
+                        }
+                    }
 
                     final String date = root.optString("sourceDate", "");
                     Log.d(TAG, "manifest: " + packs.size() + " packs, source "
@@ -192,8 +212,7 @@ public class PlssPackManager {
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                final File tmp = new File(destDir,
-                        "plss_" + pack.state + ".sqlite.part");
+                final File tmp = packFile(pack, ".sqlite.part");
                 Exception last = null;
 
                 for (int attempt = 1; attempt <= ATTEMPTS; attempt++) {
@@ -257,7 +276,7 @@ public class PlssPackManager {
     private void install(final Pack pack, File tmp, final DownloadCallback cb)
             throws Exception {
 
-        final File dest = new File(destDir, "plss_" + pack.state + ".sqlite");
+        final File dest = packFile(pack, ".sqlite");
         if (dest.exists() && !dest.delete())
             throw new IllegalStateException("cannot replace " + dest);
         if (!tmp.renameTo(dest))
@@ -271,6 +290,29 @@ public class PlssPackManager {
                 cb.onComplete(pack, dest);
             }
         });
+    }
+
+    /**
+     * Builds a pack's path and proves it stays inside the pack directory.
+     *
+     * Belt and braces with the state check above: this is the boundary where
+     * remote data becomes a filesystem path, and the plugin writes with ATAK's
+     * uid, so a traversal here would reach ATAK's own private storage.
+     */
+    private File packFile(Pack pack, String suffix) {
+        final File f = new File(destDir, "plss_" + pack.state + suffix);
+
+        try {
+            final String dir = destDir.getCanonicalPath();
+            if (!f.getCanonicalPath().startsWith(dir + File.separator))
+                throw new IllegalStateException(
+                        "pack path escapes " + dir + ": " + f);
+        } catch (java.io.IOException e) {
+            // cannot prove containment, so refuse rather than assume
+            throw new IllegalStateException("cannot resolve " + f, e);
+        }
+
+        return f;
     }
 
     private void postRetry(final DownloadCallback cb, final Pack pack,
