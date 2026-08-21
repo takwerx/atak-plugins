@@ -11,7 +11,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Read side of the packed PLSS store built by tools/pack_plss.py.
@@ -52,18 +54,39 @@ public class PlssStore {
         public final DoubleBuffer labelPoints;
         public final String[] labels;
 
+        /**
+         * One state-independent identity per label, parallel to labels.
+         *
+         * CadNSDI is published per state and clips features at the state
+         * line, so a border township exists in both neighbours' packs --
+         * CA210160N0180E0 and NV210160N0180E0 are the same township -- each
+         * fragment carrying its own index box. The key is the PLSSID (or the
+         * section's division id) with the two-letter state prefix stripped,
+         * which is identical across the packs.
+         */
+        final String[] labelKeys;
+
         Result(DoubleBuffer segments, int segmentVertexCount,
-                DoubleBuffer labelPoints, String[] labels) {
+                DoubleBuffer labelPoints, String[] labels,
+                String[] labelKeys) {
             this.segments = segments;
             this.segmentVertexCount = segmentVertexCount;
             this.labelPoints = labelPoints;
             this.labels = labels;
+            this.labelKeys = labelKeys;
         }
 
         /**
          * Combines per-pack results into one, so a bbox spanning a state line
          * still draws in a single GL call. Packs are per-state and the R-tree
          * makes a miss cheap, so most of these contribute nothing.
+         *
+         * A feature split by the state line arrives once from each pack;
+         * labels are deduplicated on labelKeys and the survivor's index box
+         * grown to the union of the fragments', so the single label centres
+         * on the whole feature rather than on one state's piece. The line
+         * segments are left duplicated -- the fragments abut, so the grid
+         * draws correctly either way.
          */
         public static Result merge(List<Result> parts) {
             if (parts.isEmpty())
@@ -71,42 +94,71 @@ public class PlssStore {
             if (parts.size() == 1)
                 return parts.get(0);
 
-            int segDoubles = 0, anchorDoubles = 0, labelCount = 0;
+            int segDoubles = 0, labelCount = 0;
             for (Result r : parts) {
                 segDoubles += r.segments.limit();
-                if (r.labelPoints != null) {
-                    anchorDoubles += r.labelPoints.limit();
+                if (r.labelPoints != null)
                     labelCount += r.labels.length;
-                }
             }
 
             final DoubleBuffer segs = ByteBuffer.allocateDirect(segDoubles * 8)
                     .order(ByteOrder.nativeOrder()).asDoubleBuffer();
-            DoubleBuffer anchors = null;
-            if (anchorDoubles > 0)
-                anchors = ByteBuffer.allocateDirect(anchorDoubles * 8)
-                        .order(ByteOrder.nativeOrder()).asDoubleBuffer();
-
-            final String[] labels = new String[labelCount];
-            int at = 0;
-
             for (Result r : parts) {
                 r.segments.rewind();
                 segs.put(r.segments);
+            }
+            segs.flip();
 
-                if (r.labelPoints != null) {
-                    r.labelPoints.rewind();
-                    anchors.put(r.labelPoints);
-                    System.arraycopy(r.labels, 0, labels, at, r.labels.length);
-                    at += r.labels.length;
+            final Map<String, Integer> byKey = new HashMap<>();
+            final List<String> outLabels = new ArrayList<>(labelCount);
+            final List<String> outKeys = new ArrayList<>(labelCount);
+            final double[] boxes = new double[labelCount * 4];
+
+            for (Result r : parts) {
+                if (r.labelPoints == null)
+                    continue;
+                r.labelPoints.rewind();
+                for (int i = 0; i < r.labels.length; i++) {
+                    final double minx = r.labelPoints.get();
+                    final double miny = r.labelPoints.get();
+                    final double maxx = r.labelPoints.get();
+                    final double maxy = r.labelPoints.get();
+
+                    final String key = r.labelKeys[i];
+                    final Integer seen = key != null ? byKey.get(key) : null;
+                    if (seen != null) {
+                        final int base = seen * 4;
+                        boxes[base] = Math.min(boxes[base], minx);
+                        boxes[base + 1] = Math.min(boxes[base + 1], miny);
+                        boxes[base + 2] = Math.max(boxes[base + 2], maxx);
+                        boxes[base + 3] = Math.max(boxes[base + 3], maxy);
+                        continue;
+                    }
+
+                    final int at = outLabels.size();
+                    if (key != null)
+                        byKey.put(key, at);
+                    final int base = at * 4;
+                    boxes[base] = minx;
+                    boxes[base + 1] = miny;
+                    boxes[base + 2] = maxx;
+                    boxes[base + 3] = maxy;
+                    outLabels.add(r.labels[i]);
+                    outKeys.add(key);
                 }
             }
 
-            segs.flip();
-            if (anchors != null)
+            DoubleBuffer anchors = null;
+            if (!outLabels.isEmpty()) {
+                anchors = ByteBuffer.allocateDirect(outLabels.size() * 4 * 8)
+                        .order(ByteOrder.nativeOrder()).asDoubleBuffer();
+                anchors.put(boxes, 0, outLabels.size() * 4);
                 anchors.flip();
+            }
 
-            return new Result(segs, segDoubles / 2, anchors, labels);
+            return new Result(segs, segDoubles / 2, anchors,
+                    outLabels.toArray(new String[0]),
+                    outKeys.toArray(new String[0]));
         }
     }
 
@@ -161,9 +213,14 @@ public class PlssStore {
 
         // R-tree columns are (id, minx, maxx, miny, maxy); this is the standard
         // "boxes overlap" test. The label carries the whole index box rather than
-        // just its centre so the renderer can size it against the feature.
+        // just its centre so the renderer can size it against the feature. The
+        // id column feeds cross-pack label deduplication -- see Result.merge;
+        // divid rather than plssid for sections, because a section's plssid is
+        // its parent township's and would collapse all 36 to one label.
+        final String idColumn = "township".equals(table) ? "t.plssid"
+                : "t.divid";
         final String sql = "SELECT t.geom, t.label,"
-                + " i.minx, i.miny, i.maxx, i.maxy"
+                + " i.minx, i.miny, i.maxx, i.maxy, " + idColumn
                 + " FROM " + table + " t"
                 + " JOIN " + table + "_idx i ON i.id = t.id"
                 + " WHERE i.maxx >= ? AND i.minx <= ?"
@@ -177,6 +234,7 @@ public class PlssStore {
         int features = 0;
 
         final List<String> labels = new ArrayList<>();
+        final List<String> labelKeys = new ArrayList<>();
         double[] anchors = new double[1024];
         int an = 0;
 
@@ -220,6 +278,13 @@ public class PlssStore {
                     anchors[an++] = q.getDouble(4);   // maxx
                     anchors[an++] = q.getDouble(5);   // maxy
                     labels.add(label);
+
+                    // state prefix off, so CA/NV copies of a border feature
+                    // share a key
+                    final String id = q.getString(6);
+                    labelKeys.add(id != null && id.length() > 2
+                            ? id.substring(2)
+                            : null);
                 }
             }
         } catch (Exception e) {
@@ -250,7 +315,8 @@ public class PlssStore {
         }
 
         return new Result(segBuf, n / 2, anchorBuf,
-                labels.toArray(new String[0]));
+                labels.toArray(new String[0]),
+                labelKeys.toArray(new String[0]));
     }
 
     // ------------------------------------------------------- point lookup
