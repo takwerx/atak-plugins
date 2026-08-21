@@ -29,9 +29,18 @@ DO_BUILD=1
 PARENT="$REPO_ROOT/plugins"
 PROJECT="$PARENT/$NAME"
 DIST="$REPO_ROOT/dist"
-OUT="$DIST/$NAME.zip"
 
 [ -d "$PROJECT" ] || { echo "error: no plugin at $PROJECT" >&2; exit 1; }
+
+# Naming convention: <Name>-<PLUGIN_VERSION>-<ATAK_VERSION>.zip, both read from
+# the tree being zipped, so the filename always says what is inside. One zip per
+# ATAK target: retarget ext.ATAK_VERSION in app/build.gradle (and sdk.path in
+# local.properties for the verify build), re-run this script, restore.
+PLUGIN_VERSION=$(sed -n "s/.*ext.PLUGIN_VERSION *= *[\"']\([^\"']*\)[\"'].*/\1/p" "$PROJECT/app/build.gradle" | head -1)
+ATAK_VERSION=$(sed -n "s/.*ext.ATAK_VERSION *= *[\"']\([^\"']*\)[\"'].*/\1/p" "$PROJECT/app/build.gradle" | head -1)
+[ -n "$PLUGIN_VERSION" ] && [ -n "$ATAK_VERSION" ] || {
+    echo "error: could not read PLUGIN_VERSION/ATAK_VERSION from $PROJECT/app/build.gradle" >&2; exit 1; }
+OUT="$DIST/$NAME-$PLUGIN_VERSION-$ATAK_VERSION.zip"
 
 mkdir -p "$DIST"
 rm -f "$OUT"
