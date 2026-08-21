@@ -6,9 +6,11 @@ import android.opengl.GLES20;
 import android.util.Pair;
 
 import com.atakmap.android.maps.MapTextFormat;
+import com.atakmap.android.maps.graphics.GLSegmentFloatingLabel;
 import com.atakmap.android.plss.PlssOverlay;
 import com.atakmap.android.plss.PlssStore;
 import com.atakmap.coremap.log.Log;
+import com.atakmap.coremap.maps.coords.GeoPoint;
 import com.atakmap.map.MapRenderer;
 import com.atakmap.map.layer.Layer;
 import com.atakmap.map.layer.opengl.GLAbstractLayer2;
@@ -16,8 +18,9 @@ import com.atakmap.map.layer.opengl.GLLayer2;
 import com.atakmap.map.layer.opengl.GLLayerSpi2;
 import com.atakmap.map.opengl.GLMapView;
 import com.atakmap.map.opengl.GLRenderGlobals;
+import com.atakmap.math.MathUtils;
+import com.atakmap.math.PointD;
 import com.atakmap.opengl.GLES20FixedPipeline;
-import com.atakmap.opengl.GLText;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -75,38 +78,6 @@ public class GLPlssOverlay extends GLAbstractLayer2
     private static final double MARGIN = 0.25;
 
     /**
-     * Offsets, in pixels, at which the halo copies of a label are drawn.
-     *
-     * The halo is drawn by hand because its colour has to follow the text: white
-     * behind dark labels, black behind light ones. ATAK's default text format
-     * outlines in white unconditionally, which makes a white label invisible.
-     */
-    private static final float[][] HALO_OFFSETS = {
-            { -1.5f, 0f }, { 1.5f, 0f }, { 0f, -1.5f }, { 0f, 1.5f },
-            { -1f, -1f }, { 1f, -1f }, { -1f, 1f }, { 1f, 1f }
-    };
-
-    /**
-     * Gap required between two labels, in pixels, per axis.
-     *
-     * Horizontal only. A township's centre is a section corner -- where sections
-     * 15, 16, 21 and 22 meet -- so its label sits half a section above and below
-     * the four section numbers around it. That clearance is real but small, and
-     * padding it vertically as well is what makes a township label knock out the
-     * section numbers next to it.
-     */
-    /**
-     * How much larger a label may get as the operator zooms past its tier's
-     * threshold. Label size was fixed, so zooming in grew the sections but not
-     * their numbers. Growth follows the square root of the zoom ratio and is
-     * capped, so labels keep pace without swelling to fill the cell.
-     */
-    private static final float MAX_LABEL_GROWTH = 2.2f;
-
-    private static final float LABEL_SPACING_X = 4f;
-    private static final float LABEL_SPACING_Y = 0f;
-
-    /**
      * Largest share of a feature's on-screen width a label may occupy.
      *
      * A label wider than its own township spills across the boundary lines on
@@ -114,6 +85,34 @@ public class GLPlssOverlay extends GLAbstractLayer2
      * label simply waits until the feature is big enough to hold it.
      */
     private static final float LABEL_FIT = 0.7f;
+
+    /**
+     * How far a label may sit from its own feature's centre, as a fraction of
+     * the feature's projected diagonal, before it is dropped instead of drawn.
+     *
+     * GLSegmentFloatingLabel slides a label along its segment to keep it on
+     * screen: when one end of the segment is outside the viewport it clips the
+     * segment to the view and re-places the label at the weighted point of what
+     * is left. That is right for a grid line running off the edge and wrong for
+     * a label naming a cell -- a township half off screen ends up with its name
+     * pressed against the boundary it shares with its neighbour, reading as two
+     * labels in one cell.
+     *
+     * Measured rather than assumed: instrumenting getTextPoint against the
+     * projected box centre showed the displacement is *exactly* zero for every
+     * feature whose index box is wholly on screen, and reached 0.44 of the
+     * diagonal for those that were not. So the slide is the only thing this
+     * rejects.
+     *
+     * The displacement is (1 - visible)/2 of the diagonal, so a quarter admits
+     * any feature at least half on screen and holds the label inside the middle
+     * half of its own cell. A feature less than half visible loses its label,
+     * which is what ATAK's own grid does at the screen edge.
+     */
+    private static final float LABEL_MAX_SLIDE = 0.25f;
+
+    /** metres per degree of latitude, near enough for a fit test */
+    private static final double METRES_PER_DEGREE = 111320.0;
 
     /**
      * One zoom tier's worth of geometry, labels and load state.
@@ -136,16 +135,6 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final float lineWidth;
         final int featureLimit;
 
-        /**
-         * Label size relative to ATAK's default, applied as a matrix scale.
-         *
-         * Not a second font: giving each tier its own GLText truncated the
-         * longer labels ("T17S-R" for "T17S-R11E"), because GLText shares glyph
-         * state between instances and the larger face perturbed the smaller
-         * one's metrics. One font, scaled at draw time, avoids that entirely.
-         */
-        final float fontScale;
-
         final AtomicBoolean loading = new AtomicBoolean(false);
 
         DoubleBuffer geo;
@@ -156,17 +145,23 @@ public class GLPlssOverlay extends GLAbstractLayer2
         FloatBuffer labelScreen;
         String[] labels;
 
+        /**
+         * One ATAK floating label per feature, built when the tier loads rather
+         * than per frame -- each one carries the projected state the class
+         * memoises against the draw version.
+         */
+        GLSegmentFloatingLabel[] floating;
+
         double west, south, east, north;
         boolean loaded;
 
         Tier(String table, double maxResolution, float lineWidth,
-                int featureLimit, float fontScale) {
+                int featureLimit) {
             this.table = table;
             this.township = "township".equals(table);
             this.maxResolution = maxResolution;
             this.lineWidth = lineWidth;
             this.featureLimit = featureLimit;
-            this.fontScale = fontScale;
         }
 
         void clear() {
@@ -176,42 +171,30 @@ public class GLPlssOverlay extends GLAbstractLayer2
             labelGeo = null;
             labelScreen = null;
             labels = null;
+            floating = null;
         }
     }
 
     private final PlssOverlay subject;
 
-    private final Tier townships = new Tier("township", 28.0, 3f, 4000, 1.0f);
-    private final Tier sections = new Tier("section", 14.5, 1.5f, 20000, 1.35f);
+    private final Tier townships = new Tier("township", 28.0, 3f, 4000);
+    private final Tier sections = new Tier("section", 14.5, 1.5f, 20000);
 
     private final ExecutorService loader = Executors.newSingleThreadExecutor();
 
     /**
-     * Bounding boxes of labels already placed this frame, as x0,y0,x1,y1 runs.
+     * ATAK's default text format, used both to size the labels and to measure
+     * them for the fit test.
      *
-     * Where the rectangular survey ran up against a Spanish or Mexican land grant
-     * it went around it, leaving small irregular township remnants whose centres
-     * sit almost on top of each other -- the San Fernando Valley is the textbook
-     * case. Without this their labels overprint into an unreadable stack.
-     */
-    private float[] placedLabels = new float[256];
-    private int placedCount;
-
-    /**
-     * Throttled so the current zoom can be read off logcat while tuning the
-     * thresholds against the device -- ATAK's scale bar changes length to suit
-     * round numbers, so it cannot be converted to m/px reliably.
-     */
-
-    /**
-     * One text instance shared by every tier, sized at ATAK's default.
-     *
-     * Deliberately not one per tier: GLText shares glyph state between
-     * instances, and adding a second at a larger size truncated the longer
-     * labels ("T17S-R" for "T17S-R11E"). Tiers scale this one at draw time.
+     * Deliberately the default and not a size of our own: GLSegmentFloatingLabel
+     * otherwise builds itself a GLText two sizes up, and GLText shares glyph
+     * state between instances -- a second, larger face perturbs the smaller
+     * one's metrics and truncates labels mid-string.
      */
     private MapTextFormat textFormat;
-    private GLText glText;
+
+    /** scratch for reading back where a label actually landed */
+    private final PointD probe = new PointD(0d, 0d, 0d);
 
     /** written on the UI thread by the colour picker, read on the GL thread */
     private volatile int sectionColor;
@@ -220,16 +203,12 @@ public class GLPlssOverlay extends GLAbstractLayer2
     private volatile int townshipLabelColor;
 
     public GLPlssOverlay(MapRenderer surface, PlssOverlay subject) {
-        // Everything in the surface pass, labels included.
-        //
-        // The surface is not re-rendered every frame; while the map moves ATAK
-        // warps the existing render. Anything drawn in the sprites pass is
-        // projected fresh each frame instead, so it slides against the warped
-        // grid until the pan stops. Labels have to be warped with the lines.
-        //
-        // The cost is that long labels can be cut at a tile seam. Drift while
-        // panning is worse than an occasional clipped label.
-        super(surface, subject, GLMapView.RENDER_PASS_SURFACE);
+        // Lines on the surface so they warp with the map and sit under ATAK's
+        // own markers; labels in the sprites pass, which is where ATAK draws
+        // its own text and the only pass that does not cut a text quad at a
+        // surface tile seam.
+        super(surface, subject, GLMapView.RENDER_PASS_SURFACE
+                | GLMapView.RENDER_PASS_SPRITES);
 
         this.subject = subject;
         this.sectionColor = subject.getSectionColor();
@@ -284,30 +263,27 @@ public class GLPlssOverlay extends GLAbstractLayer2
     @Override
     protected void drawImpl(GLMapView view, int renderPass) {
 
-        final GLMapView.State scene = view.currentScene;
+        if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SURFACE)) {
+            final GLMapView.State scene = view.currentScene;
 
+            // Sections first so the township grid draws over it -- the coarse
+            // frame has to stay readable where the two coincide, which is every
+            // township boundary.
+            updateTier(scene, sections);
+            updateTier(scene, townships);
 
-        // Sections first so the township grid draws over it -- the coarse frame
-        // has to stay readable where the two coincide, which is every township
-        // boundary.
-        updateTier(scene, sections);
-        updateTier(scene, townships);
+            drawLines(view, scene, sections, sectionColor);
+            drawLines(view, scene, townships, townshipColor);
+        }
 
-        drawLines(view, scene, sections, sectionColor);
-        drawLines(view, scene, townships, townshipColor);
+        if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SPRITES)) {
+            // GLSegmentFloatingLabel projects against currentPass.scene, so the
+            // fit and placement tests here have to use the same state.
+            final GLMapView.State pass = view.currentPass;
 
-        // townships are placed first so they win any contested spot -- losing a
-        // section number is cheaper than losing the survey identity
-        // Each tier declutters against itself only. A township's centre is a
-        // section corner, so its label sits right between sections 15, 16, 21
-        // and 22 -- sharing one set meant the label suppressed those numbers,
-        // which are the primary data. The two tiers differ in size and colour,
-        // so the rare few-pixel overlap reads fine.
-        placedCount = 0;
-        drawLabels(view, scene, townships, townshipLabelColor);
-
-        placedCount = 0;
-        drawLabels(view, scene, sections, sectionLabelColor);
+            drawLabels(view, pass, townships, townshipLabelColor);
+            drawLabels(view, pass, sections, sectionLabelColor);
+        }
     }
 
     /** Drops or reloads a tier for the current view. */
@@ -352,154 +328,131 @@ public class GLPlssOverlay extends GLAbstractLayer2
     }
 
     /**
-     * Labels centred on each feature's index-box centre.
+     * Labels drawn by ATAK's own {@link GLSegmentFloatingLabel}, one per feature,
+     * along the feature's index-box diagonal.
      *
-     * Labels use ATAK's default text format, which outlines the glyphs itself.
-     * An earlier attempt drew a filled quad behind each label instead and it read
-     * badly, and a hand-built format clipped strings mid-word -- see the note at
-     * the format's construction below.
+     * The class supplies its own dark backdrop and, unlike a hand-rolled text
+     * quad, is drawn in the pass ATAK itself uses for text -- so it never gets
+     * cut at a surface tile seam, which is the whole reason for the move.
      */
     private void drawLabels(GLMapView view, GLMapView.State scene, Tier tier,
             int c) {
 
         if (scene.drawMapResolution > tier.maxResolution
-                || tier.labelGeo == null || tier.labels == null
-                || tier.labels.length == 0)
+                || tier.floating == null || tier.labelGeo == null
+                || tier.labels == null)
             return;
 
-        if (glText == null) {
-            // One shared instance for every tier. MapTextFormat(Typeface, int)
-            // is MapTextFormat(typeface, false, size), so the default is already
-            // un-outlined -- the halo below is the only outline, and its colour
-            // is ours.
+        if (textFormat == null)
             textFormat = GLRenderGlobals.getDefaultTextFormat();
-            glText = GLText.getInstance(textFormat);
-
-        }
-
-        // grow with zoom, from 1x at the tier's threshold up to the cap
-        final float zoomRatio = (float) (tier.maxResolution
-                / Math.max(scene.drawMapResolution, 0.0001));
-        final float growth = Math.min(
-                Math.max((float) Math.sqrt(zoomRatio), 1f), MAX_LABEL_GROWTH);
-
-        final float scale = tier.fontScale * growth;
 
         tier.labelGeo.rewind();
         tier.labelScreen.rewind();
         view.forward(tier.labelGeo, tier.labelScreen);
         tier.labelScreen.rewind();
 
-        final float minX = scene.left;
-        final float maxX = scene.right;
-        final float minY = scene.bottom;
-        final float maxY = scene.top;
+        // the rectangle GLSegmentFloatingLabel itself tests a segment against,
+        // via GLArrow2.getWidgetViewF -- currentScene, not currentPass
+        final float vl = view.currentScene.left;
+        final float vr = view.currentScene.right;
+        final float vb = view.currentScene.bottom;
+        final float vt = view.currentScene.top;
 
-        final float r = Color.red(c) / 255f;
-        final float g = Color.green(c) / 255f;
-        final float b = Color.blue(c) / 255f;
-        final float a = Color.alpha(c) / 255f;
+        int considered = 0;
+        int drawn = 0;
+        int slid = 0;
+        int dropped = 0;
+        float maxMove = 0f;
+        float maxMoveFrac = 0f;
 
-        // Rec. 601 luma: a light label needs a dark halo and the reverse. Using
-        // perceived brightness rather than a plain average keeps yellow -- which
-        // is bright but low in blue -- on the correct side of the line.
-        final float luma = 0.299f * r + 0.587f * g + 0.114f * b;
-        final float halo = luma > 0.5f ? 0f : 1f;
+        for (int i = 0; i < tier.floating.length; i++) {
+            final GLSegmentFloatingLabel l = tier.floating[i];
+            if (l == null)
+                continue;
 
-        // MapTextFormat's metrics match what GLText draws in this pass, so they
-        // are used as-is. They do NOT match in RENDER_PASS_SURFACE, which
-        // magnifies by the density factor (14 vs 24.5 here) -- measuring that
-        // magnified result and then correcting for it after the move to sprites
-        // shifted every label left by a third of its width.
-        final float glyphHalf = textFormat.getTallestGlyphHeight() / 2f;
-        final float half = glyphHalf * scale;
+            // the feature's index box, projected: SW at 4i, NE at 4i+2
+            final float sx = tier.labelScreen.get(i * 4);
+            final float sy = tier.labelScreen.get(i * 4 + 1);
+            final float nx = tier.labelScreen.get(i * 4 + 2);
+            final float ny = tier.labelScreen.get(i * 4 + 3);
 
-        // the map's own rotation, applied to every label this pass
-        final float rotation = (float) -scene.drawRotation;
-
-        for (int i = 0; i < tier.labels.length; i++) {
-            // the feature's index box, projected: corners at 4i and 4i+2
-            final float bx0 = tier.labelScreen.get(i * 4);
-            final float by0 = tier.labelScreen.get(i * 4 + 1);
-            final float bx1 = tier.labelScreen.get(i * 4 + 2);
-            final float by1 = tier.labelScreen.get(i * 4 + 3);
-
-            final float x = (bx0 + bx1) / 2f;
-            final float y = (by0 + by1) / 2f;
+            final float cx = (sx + nx) / 2f;
+            final float cy = (sy + ny) / 2f;
 
             // cheap reject -- most of a padded load is off screen
-            if (x < minX || x > maxX || y < minY || y > maxY)
+            if (cx < vl - 256f || cx > vr + 256f
+                    || cy < vb - 256f || cy > vt + 256f)
                 continue;
 
-            final String text = tier.labels[i];
-            final float textW = textFormat.measureTextWidth(text);
-            final float w = textW * scale;
+            // A label wider than its own feature spills across the boundary
+            // lines on both sides. Measured in ground units so the test holds
+            // when the map is rotated, where the projected box corners no
+            // longer bracket the feature's width.
+            final double west = tier.labelGeo.get(i * 4);
+            final double south = tier.labelGeo.get(i * 4 + 1);
+            final double east = tier.labelGeo.get(i * 4 + 2);
+            final double north = tier.labelGeo.get(i * 4 + 3);
 
+            final double widthPx = Math.abs(east - west) * METRES_PER_DEGREE
+                    * Math.cos(Math.toRadians((south + north) / 2.0))
+                    / Math.max(scene.drawMapResolution, 0.0001);
 
-            // a label wider than its own feature would cross the boundary lines
-            if (w > Math.abs(bx1 - bx0) * LABEL_FIT)
+            if (textFormat.measureTextWidth(tier.labels[i]) > widthPx
+                    * LABEL_FIT)
                 continue;
 
-            // first label wins the spot; later ones that would overprint it are
-            // dropped rather than stacked
-            if (!claimLabelSpace(x - w / 2f, y - half, x + w / 2f, y + half))
-                continue;
+            considered++;
 
-            // Rotate with the map so a label lies along its own township or
-            // section rather than across it once the operator turns the map off
-            // north-up. Rotating about the anchor first, then stepping back by
-            // half the text extents, keeps it centred through the turn.
-            // halo offsets are screen pixels, so they are applied before the
-            // tier's scale rather than through it
-            for (int o = 0; o < HALO_OFFSETS.length; o++) {
-                GLES20FixedPipeline.glPushMatrix();
-                GLES20FixedPipeline.glTranslatef(x + HALO_OFFSETS[o][0],
-                        y + HALO_OFFSETS[o][1], 0f);
-                if (rotation != 0f)
-                    GLES20FixedPipeline.glRotatef(rotation, 0f, 0f, 1f);
-                GLES20FixedPipeline.glScalef(scale, scale, 1f);
-                GLES20FixedPipeline.glTranslatef(-textW / 2f, -glyphHalf, 0f);
-                glText.draw(text, halo, halo, halo, a);
-                GLES20FixedPipeline.glPopMatrix();
+            l.setTextColor(c);
+
+            // update() is memoised against the draw version, so reading the
+            // chosen position back here costs nothing extra: the draw() below
+            // reuses it.
+            l.update(view);
+            l.getTextPoint(probe);
+
+            final float move = (float) Math.hypot((float) probe.x - cx,
+                    (float) probe.y - cy);
+            final float diag = (float) Math.hypot(nx - sx, ny - sy);
+
+            if (move > 1f) {
+                if (move > maxMove)
+                    maxMove = move;
+                if (diag > 0f && move / diag > maxMoveFrac)
+                    maxMoveFrac = move / diag;
+                slid++;
             }
 
-            GLES20FixedPipeline.glPushMatrix();
-            GLES20FixedPipeline.glTranslatef(x, y, 0f);
-            if (rotation != 0f)
-                GLES20FixedPipeline.glRotatef(rotation, 0f, 0f, 1f);
-            GLES20FixedPipeline.glScalef(scale, scale, 1f);
-            GLES20FixedPipeline.glTranslatef(-textW / 2f, -glyphHalf, 0f);
-            glText.draw(text, r, g, b, a);
-            GLES20FixedPipeline.glPopMatrix();
+            // the class has carried this label too far from the feature it
+            // names -- drop it rather than let it read as the neighbour's
+            if (diag > 0f && move > diag * LABEL_MAX_SLIDE) {
+                dropped++;
+                continue;
+            }
+
+            l.draw(view);
+            drawn++;
+        }
+
+        // Throttled, and only when the rule actually fires. Keeping it means the
+        // next person can re-establish the numbers above from a running device
+        // instead of re-deriving them: `slid` counts labels the class moved at
+        // all, `dropped` those it moved too far.
+        final long now = System.currentTimeMillis();
+        if (dropped > 0 && now - lastLabelLog > 5000L) {
+            lastLabelLog = now;
+            Log.d(TAG, "labels " + tier.table
+                    + " considered=" + considered
+                    + " drawn=" + drawn
+                    + " slid=" + slid
+                    + " dropped=" + dropped
+                    + " maxSlidePx=" + String.format("%.1f", maxMove)
+                    + " maxSlideFrac=" + String.format("%.2f", maxMoveFrac));
         }
     }
 
-    /**
-     * Reserves screen space for a label, or reports that something is already
-     * there. Linear in the number placed, which is bounded by what fits on a
-     * screen, so it stays cheap.
-     */
-    private boolean claimLabelSpace(float x0, float y0, float x1, float y1) {
-        for (int i = 0; i < placedCount; i += 4) {
-            if (x0 < placedLabels[i + 2] + LABEL_SPACING_X
-                    && x1 + LABEL_SPACING_X > placedLabels[i]
-                    && y0 < placedLabels[i + 3] + LABEL_SPACING_Y
-                    && y1 + LABEL_SPACING_Y > placedLabels[i + 1])
-                return false;
-        }
-
-        if (placedCount + 4 > placedLabels.length) {
-            final float[] bigger = new float[placedLabels.length * 2];
-            System.arraycopy(placedLabels, 0, bigger, 0, placedCount);
-            placedLabels = bigger;
-        }
-
-        placedLabels[placedCount++] = x0;
-        placedLabels[placedCount++] = y0;
-        placedLabels[placedCount++] = x1;
-        placedLabels[placedCount++] = y1;
-        return true;
-    }
+    /** throttles the label-placement log above */
+    private long lastLabelLog;
 
     /** Kicks a background load when the view has left this tier's loaded box. */
     private void maybeLoad(final Tier tier, GLMapView.State scene) {
@@ -596,6 +549,49 @@ public class GLPlssOverlay extends GLAbstractLayer2
             tier.labelScreen = ByteBuffer
                     .allocateDirect(tier.labels.length * 4 * 4)
                     .order(ByteOrder.nativeOrder()).asFloatBuffer();
+            tier.floating = buildFloatingLabels(tier, loaded);
         }
+    }
+
+    /**
+     * One label per feature, laid along its index box's SW-NE diagonal.
+     *
+     * Built here rather than per frame: the class caches its projected state
+     * against the draw version, so a per-frame instance would recompute
+     * everything and allocate for every feature on screen.
+     *
+     * Clamping to ground is off. With it on the labels shift as terrain streams
+     * in, because the clamp resolves against elevation that arrives late.
+     */
+    private GLSegmentFloatingLabel[] buildFloatingLabels(Tier tier,
+            PlssStore.Result loaded) {
+
+        if (textFormat == null)
+            textFormat = GLRenderGlobals.getDefaultTextFormat();
+
+        final int n = loaded.labels.length;
+        final GLSegmentFloatingLabel[] out = new GLSegmentFloatingLabel[n];
+        final DoubleBuffer pts = loaded.labelPoints;
+
+        for (int i = 0; i < n; i++) {
+            final GeoPoint sw = new GeoPoint(pts.get(i * 4 + 1),
+                    pts.get(i * 4));
+            final GeoPoint ne = new GeoPoint(pts.get(i * 4 + 3),
+                    pts.get(i * 4 + 2));
+
+            final GLSegmentFloatingLabel l = new GLSegmentFloatingLabel();
+            l.setTextFormat(textFormat);
+            l.setClampToGround(false);
+            l.setRotateToAlign(false);
+            l.setBackgroundColor(0f, 0f, 0f, 0.6f);
+            l.setSegmentPositionWeight(0.5f);
+            l.setSegment(new GeoPoint[] {
+                    sw, ne
+            });
+            l.setText(tier.labels[i]);
+            l.setInsets(0f, 0f, 0f, 0f);
+            out[i] = l;
+        }
+        return out;
     }
 }

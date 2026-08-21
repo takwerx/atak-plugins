@@ -47,8 +47,8 @@ public class PlssOverlay extends AbstractLayer {
      * two tiers together left no way to tell a township label from a section
      * number at a glance.
      */
-    private int sectionLabelColor = Color.BLACK;
-    private int townshipLabelColor = Color.BLACK;
+    private int sectionLabelColor = Color.WHITE;
+    private int townshipLabelColor = Color.WHITE;
 
     private final ConcurrentLinkedQueue<OnPlssColorChangedListener> colorListeners = new ConcurrentLinkedQueue<>();
 
