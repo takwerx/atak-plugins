@@ -37,18 +37,25 @@ public class PlssOverlay extends AbstractLayer {
     }
 
     // Separate colours so the two tiers read apart on the map: the township
-    // grid is the coarse frame, sections the fine grid inside it.
-    private int sectionColor = Color.YELLOW;
-    private int townshipColor = Color.RED;
+    // grid is the coarse frame, sections the fine grid inside it. Shipped
+    // defaults chosen by the operator: orange townships, white sections.
+    //
+    // The orange is ATAK's palette orange (ColorPalette.COLOR3), not CSS
+    // orange 0xFFFFA500 -- the label engine renders that value as yellow
+    // (measured (255,231,0) on screen, against (255,166,0) for the lines,
+    // regardless of bold or priority) while 0xFFFF7700 renders exactly.
+    private int sectionColor = Color.WHITE;
+    private int townshipColor = 0xFFFF7700; // ATAK palette orange
 
     /**
-     * Label text, chosen independently of the lines and of each other. Tying
-     * label colour to line colour made white lines draw white text; tying the
-     * two tiers together left no way to tell a township label from a section
-     * number at a glance.
+     * Label text. The colour picker sets a tier's label colour along with its
+     * line colour, and the defaults follow the same rule -- each tier's labels
+     * start in its line colour, so the map looks linked from first launch.
+     * The renderer flips the label backdrop by luminance, so any choice stays
+     * readable.
      */
     private int sectionLabelColor = Color.WHITE;
-    private int townshipLabelColor = Color.WHITE;
+    private int townshipLabelColor = 0xFFFF7700; // orange, as the lines
 
     private final ConcurrentLinkedQueue<OnPlssColorChangedListener> colorListeners = new ConcurrentLinkedQueue<>();
 

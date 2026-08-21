@@ -2,7 +2,6 @@
 package com.atakmap.android.plss.graphics;
 
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.util.Pair;
 
 import com.atakmap.android.maps.MapTextFormat;
@@ -271,6 +270,38 @@ public class GLPlssOverlay extends GLAbstractLayer2
         super.release();
     }
 
+    /**
+     * The lines stop on their own when the layer is hidden -- drawImpl is
+     * simply not called -- but the labels live in ATAK's label engine and keep
+     * drawing until told otherwise. This was a shipped bug: "Hide PLSS
+     * overlay" removed the grid and left every section number on the map.
+     */
+    @Override
+    public void onLayerVisibleChanged(Layer layer) {
+        super.onLayerVisibleChanged(layer);
+
+        final boolean show = layer.isVisible();
+        runOnGLThread(new Runnable() {
+            @Override
+            public void run() {
+                pushLabelVisibility(show);
+            }
+        });
+    }
+
+    /** GL thread only. */
+    private void pushLabelVisibility(boolean show) {
+        final GLLabelManager mgr = labelManager();
+        if (mgr == null)
+            return;
+        if (townships.labelIds != null)
+            for (int id : townships.labelIds)
+                mgr.setVisible(id, show);
+        if (sections.labelIds != null)
+            for (int id : sections.labelIds)
+                mgr.setVisible(id, show);
+    }
+
     @Override
     public void onPlssColorChanged(PlssOverlay overlay) {
         sectionColor = overlay.getSectionColor();
@@ -466,15 +497,14 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final DoubleBuffer pts = loaded.labelPoints;
         final int argb = tier.township ? townshipLabelColor : sectionLabelColor;
 
-        // Default format so the labels track ATAK's user font-size setting and
-        // match every other label on the map; townships bold, because they
-        // carry the survey identity and outrank section numbers.
-        final MapTextFormat defaultFormat = GLRenderGlobals
-                .getDefaultTextFormat();
-        final MapTextFormat format = tier.township
-                ? new MapTextFormat(Typeface.DEFAULT_BOLD,
-                        defaultFormat.getFontSize())
-                : defaultFormat;
+        // Default format so the labels track ATAK's user font-size setting
+        // and match every other label on the map. Beware label colours the
+        // engine does not render faithfully: 0xFFFFA500 came out yellow
+        // (255,231,0) on screen regardless of bold or priority, while the
+        // palette colours measured exact -- which is why the shipped orange
+        // is ATAK's 0xFFFF7700. Verify any hard-coded label colour on the
+        // device against its line.
+        final MapTextFormat format = GLRenderGlobals.getDefaultTextFormat();
 
         for (int i = 0; i < n; i++) {
             // centre of the feature's index box
@@ -492,7 +522,8 @@ public class GLPlssOverlay extends GLAbstractLayer2
             mgr.setColor(id, argb);
             mgr.setBackgroundColor(id, backdropFor(argb));
             mgr.setFill(id, true);
-            mgr.setVisible(id, true);
+            // a load kicked off before a hide can land after it
+            mgr.setVisible(id, visible);
             ids[i] = id;
         }
 
