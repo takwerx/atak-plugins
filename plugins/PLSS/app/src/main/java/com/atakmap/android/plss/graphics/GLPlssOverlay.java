@@ -207,10 +207,11 @@ public class GLPlssOverlay extends GLAbstractLayer2
         // the map moves rather than re-projected against it; labels in the
         // sprites pass, which is where ATAK draws its own text and the only
         // pass that does not cut a text quad at a surface tile seam.
-        // Surface only. The overlay has to be warped along with the imagery
-        // as the map moves; anything in the sprites pass is projected fresh
-        // each frame and slides against it until the pan stops.
-        super(surface, subject, GLMapView.RENDER_PASS_SURFACE);
+        // Lines on the surface so they warp along with the imagery rather than
+        // being reprojected against it; labels in the sprites pass, which runs
+        // once per frame in screen space.
+        super(surface, subject, GLMapView.RENDER_PASS_SURFACE
+                | GLMapView.RENDER_PASS_SPRITES);
 
         this.subject = subject;
         this.sectionColor = subject.getSectionColor();
@@ -269,47 +270,33 @@ public class GLPlssOverlay extends GLAbstractLayer2
         // kept so a background load can mark the surface dirty when it lands
         glMapView = view;
 
-        final GLMapView.State scene = view.currentScene;
+        if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SURFACE)) {
+            final GLMapView.State scene = view.currentScene;
 
-        // The surface pass is invoked many times per frame -- 12 measured here
-        // -- each invocation carrying its own currentPass. renderPump, not
-        // drawVersion, identifies a frame; drawVersion changes between
-        // invocations.
-        if (view.currentPass.renderPump != lastRenderPump) {
-            lastRenderPump = view.currentPass.renderPump;
-            if (surfacePasses > 0 && surfacePasses != loggedPasses) {
-                loggedPasses = surfacePasses;
-                Log.d(TAG, "surface invocations per frame = " + surfacePasses
-                        + " multiPartPass=" + view.multiPartPass);
-            }
-            surfacePasses = 0;
-            labelsDrawnThisFrame = false;
+            // Sections first so the township grid draws over it -- the coarse
+            // frame has to stay readable where the two coincide, which is every
+            // township boundary.
+            updateTier(scene, sections);
+            updateTier(scene, townships);
+
+            drawLines(view, scene, sections, sectionColor);
+            drawLines(view, scene, townships, townshipColor);
         }
-        surfacePasses++;
 
-        // Sections first so the township grid draws over it -- the coarse frame
-        // has to stay readable where the two coincide, which is every township
-        // boundary.
-        updateTier(scene, sections);
-        updateTier(scene, townships);
-
-        // Repeating the lines per invocation is harmless: identical geometry
-        // every time.
-        drawLines(view, scene, sections, sectionColor);
-        drawLines(view, scene, townships, townshipColor);
-
-        // Labels in every invocation, but each label only in the invocation
-        // whose tile actually contains it -- see the viewport test in
-        // drawLabels.
+        // Labels in the sprites pass: it runs once per frame, in screen space,
+        // so text is drawn once and stays upright.
         //
-        // The invocations are tiles, each with its own frame. Drawing every
-        // label in every one put the same number on screen several times over.
-        // Drawing them in a single invocation instead covered only that one
-        // tile, so only the middle of the screen got labels at all. Letting
-        // each tile draw its own is the arrangement that covers the screen
-        // exactly once.
-        drawLabels(view, view.currentPass, townships, townshipLabelColor);
-        drawLabels(view, view.currentPass, sections, sectionLabelColor);
+        // Not the surface pass. That is invoked once per tile, each carrying
+        // its own frame. Drawing a label in every invocation duplicates it;
+        // drawing in a single invocation covers only that tile; and claiming
+        // each label by the tile whose reported bounds contain it loses whole
+        // columns, because a tile's own content does not reliably fall inside
+        // those bounds -- projected boxes came back in a 0..640 space while the
+        // screen is 2104 wide.
+        if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SPRITES)) {
+            drawLabels(view, view.currentPass, townships, townshipLabelColor);
+            drawLabels(view, view.currentPass, sections, sectionLabelColor);
+        }
     }
 
     /** Drops or reloads a tier for the current view. */
@@ -386,29 +373,10 @@ public class GLPlssOverlay extends GLAbstractLayer2
         view.forward(tier.labelGeo, tier.labelScreen);
         tier.labelScreen.rewind();
 
-        // The bounds of the invocation being drawn, not of the whole screen.
-        //
-        // view.forward() here returns coordinates in this invocation's own
-        // frame -- the surface pass renders in tiles -- so a label belongs to
-        // exactly one invocation: the one whose viewport contains it. Testing
-        // against the screen's bounds instead let the same label through in
-        // several tiles, which is where the duplicate numbers came from.
         final float vl = scene.left;
         final float vr = scene.right;
         final float vb = scene.bottom;
         final float vt = scene.top;
-
-        // A second rectangle, for a different job. The test above decides which
-        // invocation owns a label; this one has to mirror what
-        // GLSegmentFloatingLabel does inside update(), and that clips the
-        // segment against GLArrow2.getWidgetViewF -- which is currentScene, the
-        // whole screen, regardless of which tile is being drawn. Feeding the
-        // tile rect into the weight solve instead put labels 250 px down their
-        // own segments.
-        final float sl = view.currentScene.left;
-        final float sr = view.currentScene.right;
-        final float sb = view.currentScene.bottom;
-        final float st = view.currentScene.top;
 
         int drawn = 0;
         float maxOff = 0f;
@@ -458,7 +426,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
                     * LABEL_FIT)
                 continue;
 
-            final float w = centringWeight(sx, sy, nx, ny, sl, sb, sr, st);
+            final float w = centringWeight(sx, sy, nx, ny, vl, vb, vr, vt);
             if (Float.isNaN(w))
                 continue;
 
