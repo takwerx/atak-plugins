@@ -18,7 +18,6 @@ import com.atakmap.map.layer.opengl.GLLayer2;
 import com.atakmap.map.layer.opengl.GLLayerSpi2;
 import com.atakmap.map.opengl.GLMapView;
 import com.atakmap.map.opengl.GLRenderGlobals;
-import com.atakmap.math.MathUtils;
 import com.atakmap.math.PointD;
 import com.atakmap.opengl.GLES20FixedPipeline;
 
@@ -87,29 +86,11 @@ public class GLPlssOverlay extends GLAbstractLayer2
     private static final float LABEL_FIT = 0.7f;
 
     /**
-     * How far a label may sit from its own feature's centre, as a fraction of
-     * the feature's projected diagonal, before it is dropped instead of drawn.
-     *
-     * GLSegmentFloatingLabel slides a label along its segment to keep it on
-     * screen: when one end of the segment is outside the viewport it clips the
-     * segment to the view and re-places the label at the weighted point of what
-     * is left. That is right for a grid line running off the edge and wrong for
-     * a label naming a cell -- a township half off screen ends up with its name
-     * pressed against the boundary it shares with its neighbour, reading as two
-     * labels in one cell.
-     *
-     * Measured rather than assumed: instrumenting getTextPoint against the
-     * projected box centre showed the displacement is *exactly* zero for every
-     * feature whose index box is wholly on screen, and reached 0.44 of the
-     * diagonal for those that were not. So the slide is the only thing this
-     * rejects.
-     *
-     * The displacement is (1 - visible)/2 of the diagonal, so a quarter admits
-     * any feature at least half on screen and holds the label inside the middle
-     * half of its own cell. A feature less than half visible loses its label,
-     * which is what ATAK's own grid does at the screen edge.
+     * Below this the clipped segment is treated as degenerate and the label
+     * skipped -- guards the division that solves for the segment weight.
      */
-    private static final float LABEL_MAX_SLIDE = 0.25f;
+    private static final float MIN_CLIP_SPAN = 1e-4f;
+
 
     /** metres per degree of latitude, near enough for a fit test */
     private static final double METRES_PER_DEGREE = 111320.0;
@@ -152,6 +133,12 @@ public class GLPlssOverlay extends GLAbstractLayer2
          */
         GLSegmentFloatingLabel[] floating;
 
+        /**
+         * Segment weight last handed to each label. Setting a weight discards
+         * the class's cached placement, so it is only set when it changes.
+         */
+        float[] weights;
+
         double west, south, east, north;
         boolean loaded;
 
@@ -172,6 +159,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
             labelScreen = null;
             labels = null;
             floating = null;
+            weights = null;
         }
     }
 
@@ -203,12 +191,10 @@ public class GLPlssOverlay extends GLAbstractLayer2
     private volatile int townshipLabelColor;
 
     public GLPlssOverlay(MapRenderer surface, PlssOverlay subject) {
-        // Lines on the surface so they warp with the map and sit under ATAK's
-        // own markers; labels in the sprites pass, which is where ATAK draws
-        // its own text and the only pass that does not cut a text quad at a
-        // surface tile seam.
-        super(surface, subject, GLMapView.RENDER_PASS_SURFACE
-                | GLMapView.RENDER_PASS_SPRITES);
+        // Sprites only. It is the pass ATAK draws its own text in, the only one
+        // that does not cut a text quad at a surface tile seam, and -- see
+        // drawImpl -- the only one whose projection matches what is on screen.
+        super(surface, subject, GLMapView.RENDER_PASS_SPRITES);
 
         this.subject = subject;
         this.sectionColor = subject.getSectionColor();
@@ -263,27 +249,32 @@ public class GLPlssOverlay extends GLAbstractLayer2
     @Override
     protected void drawImpl(GLMapView view, int renderPass) {
 
-        if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SURFACE)) {
-            final GLMapView.State scene = view.currentScene;
+        // Everything in one pass, because the two passes do not agree.
+        //
+        // view.forward() during RENDER_PASS_SURFACE returns coordinates in the
+        // surface *tile* -- currentPass there reports a 512x512 viewport with
+        // its own resolution -- while the matrix the geometry is drawn under is
+        // the scene's. Whenever ATAK picks a surface tile resolution that
+        // differs from the scene resolution, which it does at most zooms, the
+        // grid is drawn to the wrong scale about the focus point: measured at
+        // 3.379/2.389 and 7.695/4.777, and visible as the section grid walking
+        // off a shoreline it should trace exactly.
+        //
+        // Drawing the lines here puts them in the same space as the labels and,
+        // checked against the imagery, the right one.
+        final GLMapView.State scene = view.currentPass;
 
-            // Sections first so the township grid draws over it -- the coarse
-            // frame has to stay readable where the two coincide, which is every
-            // township boundary.
-            updateTier(scene, sections);
-            updateTier(scene, townships);
+        // Sections first so the township grid draws over it -- the coarse frame
+        // has to stay readable where the two coincide, which is every township
+        // boundary.
+        updateTier(scene, sections);
+        updateTier(scene, townships);
 
-            drawLines(view, scene, sections, sectionColor);
-            drawLines(view, scene, townships, townshipColor);
-        }
+        drawLines(view, scene, sections, sectionColor);
+        drawLines(view, scene, townships, townshipColor);
 
-        if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SPRITES)) {
-            // GLSegmentFloatingLabel projects against currentPass.scene, so the
-            // fit and placement tests here have to use the same state.
-            final GLMapView.State pass = view.currentPass;
-
-            drawLabels(view, pass, townships, townshipLabelColor);
-            drawLabels(view, pass, sections, sectionLabelColor);
-        }
+        drawLabels(view, scene, townships, townshipLabelColor);
+        drawLabels(view, scene, sections, sectionLabelColor);
     }
 
     /** Drops or reloads a tier for the current view. */
@@ -334,6 +325,9 @@ public class GLPlssOverlay extends GLAbstractLayer2
      * The class supplies its own dark backdrop and, unlike a hand-rolled text
      * quad, is drawn in the pass ATAK itself uses for text -- so it never gets
      * cut at a surface tile seam, which is the whole reason for the move.
+     *
+     * The segment weight is solved per frame so the label lands on the feature's
+     * centre and stays there. See {@link #centringWeight}.
      */
     private void drawLabels(GLMapView view, GLMapView.State scene, Tier tier,
             int c) {
@@ -358,12 +352,8 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final float vb = view.currentScene.bottom;
         final float vt = view.currentScene.top;
 
-        int considered = 0;
         int drawn = 0;
-        int slid = 0;
-        int dropped = 0;
-        float maxMove = 0f;
-        float maxMoveFrac = 0f;
+        float maxOff = 0f;
 
         for (int i = 0; i < tier.floating.length; i++) {
             final GLSegmentFloatingLabel l = tier.floating[i];
@@ -379,9 +369,11 @@ public class GLPlssOverlay extends GLAbstractLayer2
             final float cx = (sx + nx) / 2f;
             final float cy = (sy + ny) / 2f;
 
-            // cheap reject -- most of a padded load is off screen
-            if (cx < vl - 256f || cx > vr + 256f
-                    || cy < vb - 256f || cy > vt + 256f)
+            // A cell shows its number only while its own centre is on screen.
+            // Anything less and the label would have to sit somewhere other
+            // than the middle of the cell to be visible at all, which is
+            // precisely what makes it read as the neighbour's.
+            if (cx < vl || cx > vr || cy < vb || cy > vt)
                 continue;
 
             // A label wider than its own feature spills across the boundary
@@ -401,54 +393,124 @@ public class GLPlssOverlay extends GLAbstractLayer2
                     * LABEL_FIT)
                 continue;
 
-            considered++;
+            final float w = centringWeight(sx, sy, nx, ny, vl, vb, vr, vt);
+            if (Float.isNaN(w))
+                continue;
 
-            l.setTextColor(c);
-
-            // update() is memoised against the draw version, so reading the
-            // chosen position back here costs nothing extra: the draw() below
-            // reuses it.
-            l.update(view);
-            l.getTextPoint(probe);
-
-            final float move = (float) Math.hypot((float) probe.x - cx,
-                    (float) probe.y - cy);
-            final float diag = (float) Math.hypot(nx - sx, ny - sy);
-
-            if (move > 1f) {
-                if (move > maxMove)
-                    maxMove = move;
-                if (diag > 0f && move / diag > maxMoveFrac)
-                    maxMoveFrac = move / diag;
-                slid++;
+            // Setting the weight invalidates the class's cached placement, so
+            // only touch it when it has actually changed -- otherwise a still
+            // map re-projects every label on every frame for nothing.
+            if (w != tier.weights[i]) {
+                tier.weights[i] = w;
+                l.setSegmentPositionWeight(w);
             }
 
-            // the class has carried this label too far from the feature it
-            // names -- drop it rather than let it read as the neighbour's
-            if (diag > 0f && move > diag * LABEL_MAX_SLIDE) {
-                dropped++;
+            l.setTextColor(c);
+            l.draw(view);
+            drawn++;
+
+            l.getTextPoint(probe);
+            final float off = (float) Math.hypot((float) probe.x - cx,
+                    (float) probe.y - cy);
+            if (off > maxOff)
+                maxOff = off;
+        }
+
+        // Diagnostic, throttled. `maxOffPx` is how far the furthest label
+        // landed from its feature's centre and should stay at zero; the class
+        // nudges a label inward by up to textWidth/2 + 16 when its anchor is
+        // within that of the screen edge, so a value up to about that near an
+        // edge is the padding, not the slide coming back.
+        final long now = System.currentTimeMillis();
+        if (drawn > 0 && now - lastLabelLog > 5000L) {
+            lastLabelLog = now;
+            Log.d(TAG, "labels " + tier.table + " drawn=" + drawn
+                    + " maxOffPx=" + String.format("%.1f", maxOff));
+        }
+    }
+
+    /**
+     * The segment weight that puts the label on the middle of its segment,
+     * cancelling the class's slide. {@link Float#NaN} if it cannot.
+     *
+     * GLSegmentFloatingLabel keeps a label visible by clipping its segment to
+     * the viewport and re-placing the label at the weighted point of what is
+     * left: {@code P1 + weight * (P2 - P1)}, where P1 and P2 are the clip
+     * points and P1 is the one nearer the segment's start. Good for a grid line
+     * running off the edge, wrong for a label naming a cell -- the further the
+     * feature hangs off screen, the further its name walks towards the
+     * neighbour it borders, and along one screen edge every label walks the
+     * same way, so an outer one closes on its neighbour and the two read as a
+     * pair in one box.
+     *
+     * Clipping the segment here as well gives the parameters t0 and t1 of those
+     * same two points along SW-NE, and the placement above is at t0 + w(t1-t0).
+     * The centre is at t=0.5, so w = (0.5 - t0) / (t1 - t0) puts it there and
+     * holds it there however much of the feature is off screen. Unclipped that
+     * is t0=0, t1=1, w=0.5, so one expression covers both.
+     *
+     * Liang-Barsky rather than the class's own polygon intersection: only the
+     * parameter range is wanted, not the points, and the rectangle is the same
+     * one the class tests against -- GLArrow2.getWidgetViewF, which is
+     * currentScene, not currentPass.
+     */
+    private static float centringWeight(float sx, float sy, float nx, float ny,
+            float vl, float vb, float vr, float vt) {
+
+        final float dx = nx - sx;
+        final float dy = ny - sy;
+
+        float t0 = 0f;
+        float t1 = 1f;
+
+        for (int edge = 0; edge < 4; edge++) {
+            final float p;
+            final float q;
+            switch (edge) {
+                case 0:
+                    p = -dx;
+                    q = sx - vl;
+                    break;
+                case 1:
+                    p = dx;
+                    q = vr - sx;
+                    break;
+                case 2:
+                    p = -dy;
+                    q = sy - vb;
+                    break;
+                default:
+                    p = dy;
+                    q = vt - sy;
+                    break;
+            }
+
+            if (p == 0f) {
+                // parallel to this edge; outside it means no visible span
+                if (q < 0f)
+                    return Float.NaN;
                 continue;
             }
 
-            l.draw(view);
-            drawn++;
+            final float r = q / p;
+            if (p < 0f) {
+                if (r > t1)
+                    return Float.NaN;
+                if (r > t0)
+                    t0 = r;
+            } else {
+                if (r < t0)
+                    return Float.NaN;
+                if (r < t1)
+                    t1 = r;
+            }
         }
 
-        // Throttled, and only when the rule actually fires. Keeping it means the
-        // next person can re-establish the numbers above from a running device
-        // instead of re-deriving them: `slid` counts labels the class moved at
-        // all, `dropped` those it moved too far.
-        final long now = System.currentTimeMillis();
-        if (dropped > 0 && now - lastLabelLog > 5000L) {
-            lastLabelLog = now;
-            Log.d(TAG, "labels " + tier.table
-                    + " considered=" + considered
-                    + " drawn=" + drawn
-                    + " slid=" + slid
-                    + " dropped=" + dropped
-                    + " maxSlidePx=" + String.format("%.1f", maxMove)
-                    + " maxSlideFrac=" + String.format("%.2f", maxMoveFrac));
-        }
+        final float span = t1 - t0;
+        if (span < MIN_CLIP_SPAN)
+            return Float.NaN;
+
+        return (0.5f - t0) / span;
     }
 
     /** throttles the label-placement log above */
@@ -550,6 +612,9 @@ public class GLPlssOverlay extends GLAbstractLayer2
                     .allocateDirect(tier.labels.length * 4 * 4)
                     .order(ByteOrder.nativeOrder()).asFloatBuffer();
             tier.floating = buildFloatingLabels(tier, loaded);
+            // NaN so the first frame always sets a weight
+            tier.weights = new float[tier.labels.length];
+            java.util.Arrays.fill(tier.weights, Float.NaN);
         }
     }
 
