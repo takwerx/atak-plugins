@@ -89,8 +89,23 @@ public class GLPlssOverlay extends GLAbstractLayer2
      * both sides, which is what the grid is for. Requiring clearance means a
      * label simply waits until the feature is big enough to hold it.
      */
-    /** backdrop behind label text; the engine fills and outlines it for us */
-    private static final int LABEL_BACKDROP = 0x99000000;
+    /** backdrops behind label text; the engine fills and outlines them for us */
+    private static final int LABEL_BACKDROP_DARK = 0x99000000;
+    private static final int LABEL_BACKDROP_LIGHT = 0x99FFFFFF;
+
+    /**
+     * Picks the backdrop that keeps a label readable in its chosen colour.
+     *
+     * The colour picker drives label colour along with the lines, and a dark
+     * colour -- navy, purple, dark red -- disappears into the standard dark
+     * pill. Flip to a light pill for those instead of forbidding them.
+     */
+    private static int backdropFor(int argb) {
+        final double luma = (0.299 * Color.red(argb)
+                + 0.587 * Color.green(argb)
+                + 0.114 * Color.blue(argb)) / 255.0;
+        return luma < 0.5 ? LABEL_BACKDROP_LIGHT : LABEL_BACKDROP_DARK;
+    }
 
 
     /**
@@ -475,7 +490,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
                     ? GLLabelManager.Priority.High
                     : GLLabelManager.Priority.Standard);
             mgr.setColor(id, argb);
-            mgr.setBackgroundColor(id, LABEL_BACKDROP);
+            mgr.setBackgroundColor(id, backdropFor(argb));
             mgr.setFill(id, true);
             mgr.setVisible(id, true);
             ids[i] = id;
@@ -512,12 +527,20 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final GLLabelManager mgr = labelManager();
         if (mgr == null)
             return;
-        if (townships.labelIds != null)
-            for (int id : townships.labelIds)
+        if (townships.labelIds != null) {
+            final int backdrop = backdropFor(townshipLabelColor);
+            for (int id : townships.labelIds) {
                 mgr.setColor(id, townshipLabelColor);
-        if (sections.labelIds != null)
-            for (int id : sections.labelIds)
+                mgr.setBackgroundColor(id, backdrop);
+            }
+        }
+        if (sections.labelIds != null) {
+            final int backdrop = backdropFor(sectionLabelColor);
+            for (int id : sections.labelIds) {
                 mgr.setColor(id, sectionLabelColor);
+                mgr.setBackgroundColor(id, backdrop);
+            }
+        }
     }
 
     private GLLabelManager labelManager() {
