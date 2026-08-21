@@ -2,6 +2,7 @@
 package com.atakmap.android.plss.graphics;
 
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.util.Pair;
 
 import com.atakmap.android.maps.MapTextFormat;
@@ -124,16 +125,6 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final float lineWidth;
         final int featureLimit;
 
-        /**
-         * Height of this tier's label text, in metres on the ground.
-         *
-         * Ground units rather than font points, because that is what
-         * GLLabelManager wants for a surface label and because it is the right
-         * model for a survey grid: the number stays the same fraction of its
-         * cell at every zoom. A section is 1609 m across, a township 9656.
-         */
-        final double labelHeightMetres;
-
         final AtomicBoolean loading = new AtomicBoolean(false);
 
         DoubleBuffer geo;
@@ -163,13 +154,12 @@ public class GLPlssOverlay extends GLAbstractLayer2
         boolean loaded;
 
         Tier(String table, double maxResolution, float lineWidth,
-                int featureLimit, double labelHeightMetres) {
+                int featureLimit) {
             this.table = table;
             this.township = "township".equals(table);
             this.maxResolution = maxResolution;
             this.lineWidth = lineWidth;
             this.featureLimit = featureLimit;
-            this.labelHeightMetres = labelHeightMetres;
         }
 
         void clear() {
@@ -187,8 +177,8 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
     private final PlssOverlay subject;
 
-    private final Tier townships = new Tier("township", 28.0, 3f, 4000, 300.0);
-    private final Tier sections = new Tier("section", 14.5, 1.5f, 20000, 200.0);
+    private final Tier townships = new Tier("township", 28.0, 3f, 4000);
+    private final Tier sections = new Tier("section", 14.5, 1.5f, 20000);
 
     private final ExecutorService loader = Executors.newSingleThreadExecutor();
 
@@ -438,11 +428,16 @@ public class GLPlssOverlay extends GLAbstractLayer2
      * font size and decluttering -- in the same native engine that places every
      * other label on the map, so it agrees with the map by construction.
      *
-     * HINT_SURFACE anchors a label to the ground, which is what keeps it welded
-     * to the grid while panning. setHeightInMeters sizes the text in ground
-     * units, so a section number stays the same fraction of its section at
-     * every zoom; the engine works the font size out itself, including the
-     * tile-scale factor its own source comments call puzzling.
+     * Labels are in the engine's *sprite* set, sized by setTextFormat in screen
+     * units, not the surface set sized by setHeightInMeters. Surface sizing was
+     * tried first: it keeps a number a constant fraction of its cell, which
+     * reads well mid-band but shrinks with the map, and township names were
+     * unreadable at the zooms where townships are the only tier drawn. A fixed
+     * screen size stays legible at every zoom, and the sprite placement is the
+     * engine's own -- the same path that places every marker callsign -- so it
+     * agrees with the surface-drawn grid, unlike the hand-rolled sprite
+     * attempt above: verified on device through pan, zoom, tier handover and
+     * rotation with every number staying centred in its cell.
      *
      * GL thread only.
      */
@@ -456,6 +451,16 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final DoubleBuffer pts = loaded.labelPoints;
         final int argb = tier.township ? townshipLabelColor : sectionLabelColor;
 
+        // Default format so the labels track ATAK's user font-size setting and
+        // match every other label on the map; townships bold, because they
+        // carry the survey identity and outrank section numbers.
+        final MapTextFormat defaultFormat = GLRenderGlobals
+                .getDefaultTextFormat();
+        final MapTextFormat format = tier.township
+                ? new MapTextFormat(Typeface.DEFAULT_BOLD,
+                        defaultFormat.getFontSize())
+                : defaultFormat;
+
         for (int i = 0; i < n; i++) {
             // centre of the feature's index box
             final double lon = (pts.get(i * 4) + pts.get(i * 4 + 2)) / 2.0;
@@ -464,8 +469,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
             final int id = mgr.addLabel(tier.labels[i]);
             mgr.setGeometry(id, new Point(lon, lat));
             mgr.setAltitudeMode(id, Feature.AltitudeMode.ClampToGround);
-            mgr.setHints(id, GLLabelManager.HINT_SURFACE);
-            mgr.setHeightInMeters(id, tier.labelHeightMetres);
+            mgr.setTextFormat(id, format);
             mgr.setMaxDrawResolution(id, tier.maxResolution);
             mgr.setPriority(id, tier.township
                     ? GLLabelManager.Priority.High
