@@ -95,6 +95,14 @@ public class GLPlssOverlay extends GLAbstractLayer2
      * padding it vertically as well is what makes a township label knock out the
      * section numbers next to it.
      */
+    /**
+     * How much larger a label may get as the operator zooms past its tier's
+     * threshold. Label size was fixed, so zooming in grew the sections but not
+     * their numbers. Growth follows the square root of the zoom ratio and is
+     * capped, so labels keep pace without swelling to fill the cell.
+     */
+    private static final float MAX_LABEL_GROWTH = 2.2f;
+
     private static final float LABEL_SPACING_X = 4f;
     private static final float LABEL_SPACING_Y = 0f;
 
@@ -173,8 +181,8 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
     private final PlssOverlay subject;
 
-    private final Tier townships = new Tier("township", 28.0, 3f, 4000, 1.55f);
-    private final Tier sections = new Tier("section", 14.5, 1.5f, 20000, 2.1f);
+    private final Tier townships = new Tier("township", 28.0, 3f, 4000, 1.0f);
+    private final Tier sections = new Tier("section", 14.5, 1.5f, 20000, 1.35f);
 
     private final ExecutorService loader = Executors.newSingleThreadExecutor();
 
@@ -212,14 +220,16 @@ public class GLPlssOverlay extends GLAbstractLayer2
     private volatile int townshipLabelColor;
 
     public GLPlssOverlay(MapRenderer surface, PlssOverlay subject) {
-        // Lines go on the map surface so they sit under ATAK's own markers;
-        // labels are drawn in the sprites pass. The surface is composited in
-        // tiles, and text spanning a tile seam is cut mid-glyph -- which is why
-        // one label rendered whole in one place and clipped in another. That
-        // pass also magnified text by roughly 1.55x, which the tier font scales
-        // now carry instead.
-        super(surface, subject, GLMapView.RENDER_PASS_SURFACE
-                | GLMapView.RENDER_PASS_SPRITES);
+        // Everything in the surface pass, labels included.
+        //
+        // The surface is not re-rendered every frame; while the map moves ATAK
+        // warps the existing render. Anything drawn in the sprites pass is
+        // projected fresh each frame instead, so it slides against the warped
+        // grid until the pan stops. Labels have to be warped with the lines.
+        //
+        // The cost is that long labels can be cut at a tile seam. Drift while
+        // panning is worse than an occasional clipped label.
+        super(surface, subject, GLMapView.RENDER_PASS_SURFACE);
 
         this.subject = subject;
         this.sectionColor = subject.getSectionColor();
@@ -276,19 +286,15 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
         final GLMapView.State scene = view.currentScene;
 
+
         // Sections first so the township grid draws over it -- the coarse frame
         // has to stay readable where the two coincide, which is every township
         // boundary.
         updateTier(scene, sections);
         updateTier(scene, townships);
 
-        if ((renderPass & GLMapView.RENDER_PASS_SURFACE) != 0) {
-            drawLines(view, scene, sections, sectionColor);
-            drawLines(view, scene, townships, townshipColor);
-        }
-
-        if ((renderPass & GLMapView.RENDER_PASS_SPRITES) == 0)
-            return;
+        drawLines(view, scene, sections, sectionColor);
+        drawLines(view, scene, townships, townshipColor);
 
         // townships are placed first so they win any contested spot -- losing a
         // section number is cheaper than losing the survey identity
@@ -371,7 +377,13 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
         }
 
-        final float scale = tier.fontScale;
+        // grow with zoom, from 1x at the tier's threshold up to the cap
+        final float zoomRatio = (float) (tier.maxResolution
+                / Math.max(scene.drawMapResolution, 0.0001));
+        final float growth = Math.min(
+                Math.max((float) Math.sqrt(zoomRatio), 1f), MAX_LABEL_GROWTH);
+
+        final float scale = tier.fontScale * growth;
 
         tier.labelGeo.rewind();
         tier.labelScreen.rewind();

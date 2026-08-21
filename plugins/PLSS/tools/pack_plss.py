@@ -309,6 +309,9 @@ def split(sections, townships, out_dir):
     total = 0
     for state in sorted(conns):
         c = conns[state]
+        dropped = dedupe_labels(c)
+        if dropped:
+            print("  %-3s dropped %d duplicate label(s)" % (state, dropped))
         c.executemany("INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)", [
             ("schema", "1"),
             ("state", state),
@@ -328,6 +331,53 @@ def split(sections, townships, out_dir):
 
     print("\n%d state packs, %.1f MB total" % (len(conns), total / 1048576.0))
     return 0
+
+
+def dedupe_labels(conn):
+    """
+    Leaves one label per real-world feature, keeping every polygon.
+
+    BLM stores some sections as several polygons -- Idaho has 503 such keys, one
+    of them ten polygons for a single section. Each carried its own label at its
+    own centre, so the same number appeared several times inside one section, and
+    which copy survived the renderer's declutter changed as the map moved, making
+    the numbers appear to drift and flash.
+
+    The geometry is kept: a section split by a river genuinely is two polygons and
+    both should draw. Only the label is dropped, on all but the largest polygon of
+    each group, and the renderer already skips features whose label is empty.
+    """
+    cleared = 0
+
+    # sections key on the township plus the division number
+    cur = conn.execute("""
+        UPDATE section SET label = NULL WHERE id IN (
+            SELECT s.id FROM section s
+            JOIN section_idx i ON i.id = s.id
+            WHERE s.id NOT IN (
+                SELECT s2.id FROM section s2
+                JOIN section_idx i2 ON i2.id = s2.id
+                GROUP BY s2.plssid, s2.divno
+                HAVING MAX((i2.maxx - i2.minx) * (i2.maxy - i2.miny))
+            )
+        )""")
+    cleared += cur.rowcount
+
+    cur = conn.execute("""
+        UPDATE township SET label = NULL WHERE id IN (
+            SELECT t.id FROM township t
+            JOIN township_idx i ON i.id = t.id
+            WHERE t.id NOT IN (
+                SELECT t2.id FROM township t2
+                JOIN township_idx i2 ON i2.id = t2.id
+                GROUP BY t2.meridian, t2.label
+                HAVING MAX((i2.maxx - i2.minx) * (i2.maxy - i2.miny))
+            )
+        )""")
+    cleared += cur.rowcount
+
+    conn.commit()
+    return cleared
 
 
 def main():
@@ -357,6 +407,10 @@ def main():
         counts["township"] = load(conn, args.townships, "township")
     if args.sections:
         counts["section"] = load(conn, args.sections, "section")
+
+    dropped = dedupe_labels(conn)
+    if dropped:
+        print("dropped %d duplicate label(s)" % dropped)
 
     conn.executemany("INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)", [
         ("schema", "1"),
