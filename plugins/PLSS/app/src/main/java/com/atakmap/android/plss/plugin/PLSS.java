@@ -71,8 +71,6 @@ public class PLSS implements IPlugin,
     Button toggleButton;
     Button townshipColorButton;
     Button sectionColorButton;
-    Button townshipLabelColorButton;
-    Button sectionLabelColorButton;
 
     public PLSS(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -281,10 +279,6 @@ public class PLSS implements IPlugin,
         toggleButton = root.findViewById(R.id.plss_toggle);
         townshipColorButton = root.findViewById(R.id.plss_township_color);
         sectionColorButton = root.findViewById(R.id.plss_section_color);
-        townshipLabelColorButton = root.findViewById(
-                R.id.plss_township_label_color);
-        sectionLabelColorButton = root.findViewById(
-                R.id.plss_section_label_color);
 
         toggleButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -306,20 +300,6 @@ public class PLSS implements IPlugin,
                 showColorPicker(TARGET_SECTION);
             }
         });
-
-        townshipLabelColorButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showColorPicker(TARGET_TOWNSHIP_LABEL);
-            }
-        });
-
-        sectionLabelColorButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showColorPicker(TARGET_SECTION_LABEL);
-            }
-        });
     }
 
     /** Keeps the pane's controls showing the overlay's actual state. */
@@ -331,6 +311,9 @@ public class PLSS implements IPlugin,
         if (plssOverlay == null)
             return;
 
+        // the swatch shows the tier's line colour; a pick re-syncs the
+        // label colour to it, so the two only differ for stored settings
+        // that predate the consolidated picker
         if (townshipColorButton != null)
             townshipColorButton.setBackgroundColor(
                     plssOverlay.getTownshipColor());
@@ -338,14 +321,6 @@ public class PLSS implements IPlugin,
         if (sectionColorButton != null)
             sectionColorButton.setBackgroundColor(
                     plssOverlay.getSectionColor());
-
-        if (townshipLabelColorButton != null)
-            townshipLabelColorButton.setBackgroundColor(
-                    plssOverlay.getTownshipLabelColor());
-
-        if (sectionLabelColorButton != null)
-            sectionLabelColorButton.setBackgroundColor(
-                    plssOverlay.getSectionLabelColor());
     }
 
     /**
@@ -687,9 +662,13 @@ public class PLSS implements IPlugin,
      */
     private static final int TARGET_TOWNSHIP = 0;
     private static final int TARGET_SECTION = 1;
-    private static final int TARGET_TOWNSHIP_LABEL = 2;
-    private static final int TARGET_SECTION_LABEL = 3;
 
+    /**
+     * One picker per tier: the chosen colour is applied to the tier's lines
+     * and its labels together. They are one visual layer to the operator, and
+     * two swatches per tier invited them to drift apart. The overlay still
+     * stores the four colours separately, so nothing under the UI changed.
+     */
     private void showColorPicker(final int target) {
         final MapView mapView = MapView.getMapView();
         if (mapView == null || plssOverlay == null) {
@@ -697,26 +676,13 @@ public class PLSS implements IPlugin,
             return;
         }
 
-        final int current;
-        final int titleRes;
-        switch (target) {
-            case TARGET_TOWNSHIP:
-                current = plssOverlay.getTownshipColor();
-                titleRes = R.string.plss_township_color_title;
-                break;
-            case TARGET_TOWNSHIP_LABEL:
-                current = plssOverlay.getTownshipLabelColor();
-                titleRes = R.string.plss_township_label_color_title;
-                break;
-            case TARGET_SECTION_LABEL:
-                current = plssOverlay.getSectionLabelColor();
-                titleRes = R.string.plss_section_label_color_title;
-                break;
-            default:
-                current = plssOverlay.getSectionColor();
-                titleRes = R.string.plss_section_color_title;
-                break;
-        }
+        final boolean township = target == TARGET_TOWNSHIP;
+        final int current = township
+                ? plssOverlay.getTownshipColor()
+                : plssOverlay.getSectionColor();
+        final int titleRes = township
+                ? R.string.plss_township_color_title
+                : R.string.plss_section_color_title;
 
         final ColorPalette palette = new ColorPalette(mapView.getContext());
         palette.setColor(current);
@@ -731,19 +697,12 @@ public class PLSS implements IPlugin,
                 new ColorPalette.OnColorSelectedListener() {
                     @Override
                     public void onColorSelected(int color, String label) {
-                        switch (target) {
-                            case TARGET_TOWNSHIP:
-                                plssOverlay.setTownshipColor(color);
-                                break;
-                            case TARGET_TOWNSHIP_LABEL:
-                                plssOverlay.setTownshipLabelColor(color);
-                                break;
-                            case TARGET_SECTION_LABEL:
-                                plssOverlay.setSectionLabelColor(color);
-                                break;
-                            default:
-                                plssOverlay.setSectionColor(color);
-                                break;
+                        if (township) {
+                            plssOverlay.setTownshipColor(color);
+                            plssOverlay.setTownshipLabelColor(color);
+                        } else {
+                            plssOverlay.setSectionColor(color);
+                            plssOverlay.setSectionLabelColor(color);
                         }
 
                         syncPane();

@@ -7,14 +7,10 @@
     <!-- overlay controls -->
     <string name="plss_show">Show PLSS overlay</string>
     <string name="plss_hide">Hide PLSS overlay</string>
-    <string name="plss_township_color">Township lines</string>
-    <string name="plss_section_color">Section lines</string>
-    <string name="plss_township_label_color">Township labels</string>
-    <string name="plss_section_label_color">Section numbers</string>
-    <string name="plss_township_color_title">Township line colour</string>
-    <string name="plss_section_color_title">Section line colour</string>
-    <string name="plss_township_label_color_title">Township label colour</string>
-    <string name="plss_section_label_color_title">Section number colour</string>
+    <string name="plss_township_color">Township lines &amp; labels</string>
+    <string name="plss_section_color">Section lines &amp; labels</string>
+    <string name="plss_township_color_title">Township colour</string>
+    <string name="plss_section_color_title">Section colour</string>
     <!-- data manager -->
     <string name="plss_manage_data">Manage map data…</string>
     <string name="plss_data_title">PLSS map data</string>
