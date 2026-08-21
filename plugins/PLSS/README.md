@@ -20,24 +20,35 @@ Capabilities:
   - Two zoom tiers: townships with their T/R label, then sections with their
     numbers, each appearing only when large enough to carry its label.
   - Toggled from Overlay Manager alongside Grid Lines, and from the plugin pane.
-  - Independent colour selection for township lines, section lines, township
-    labels and section numbers.
+  - Colour selection per tier: township lines and labels together, section
+    lines and numbers together. The label backdrop flips automatically between
+    dark and light so any chosen colour stays readable.
   - Go-to-township lookup by principal meridian, township and range.
   - Works fully offline once data is installed.
 
 Source data is the BLM National PLSS CadNSDI, which is the authoritative survey
 record. USGS products derive from it.
 
+Screenshots are kept in docs/screenshots/ in the repository (excluded from the
+source submission zip):
+
+  - overview.png       township tier with T/R names, zoomed out
+  - sections.png       section tier, one number per cell
+  - colours.png        plugin pane with the two colour controls
+  - find-township.png  go-to-township dialog
+
 _________________________________________________________________
 STATUS
 
-In development. Version 0.1.
+Release candidate. Version 0.2.
 
-Rendering, data pipeline and data management are working and have been exercised
-on hardware (Samsung Galaxy S21+, Android 15, ATAK-CIV 5.7). California, Idaho
-and Nevada validated against BLM feature counts.
+Rendering, data pipeline and data management are working and have been
+exercised on hardware: Samsung Galaxy S21+ (Android 15, ATAK-CIV 5.7) and
+Samsung Galaxy XCover Pro (ATAK-CIV 5.8.0.3). Labels are placed and sized by
+ATAK's own label engine and verified through pan, zoom, tier handover and
+rotation. California, Idaho and Nevada validated against BLM feature counts.
 
-Not yet released.
+Prepared for tak.gov third-party submission.
 
 _________________________________________________________________
 POINT OF CONTACTS
@@ -112,10 +123,21 @@ DEVELOPER NOTES
   matters because android.database.sqlite passes every argument as text and
   compares wrongly against the index's REAL columns.
 
-  Labels are drawn in RENDER_PASS_SPRITES, not RENDER_PASS_SURFACE. The map
-  surface is composited in tiles; line geometry crossing a tile seam is fine,
-  but a text quad is cut mid-glyph. The surface pass also magnifies drawing,
-  which the label font scales account for explicitly.
+  Labels are not drawn by the plugin at all. Every label is registered with
+  ATAK's own label engine (GLMapView.getLabelManager()), which owns placement,
+  screen-size text, decluttering and rotation -- the same engine that places
+  every marker callsign, so labels agree with the surface-drawn grid by
+  construction. Text placed by hand from either render pass does not: the
+  passes do not share a projection, and the error grows with distance from
+  the screen centre. Labels must be released back to the engine on every
+  clear and hidden with the layer, or they keep drawing with nothing able to
+  reach them.
+
+  The label engine does not render every colour faithfully. 0xFFFFA500 text
+  measured (255,231,0) on screen against (255,166,0) for identically
+  coloured lines, regardless of bold or priority; ATAK's own palette colours
+  measured exact. Ship palette colours for labels, and measure any hard-coded
+  label colour on the device against its line.
 
   Plugin resources must be resolved through the plugin context, while anything
   that opens a window -- dialogs, popups, list choosers -- must be built with
