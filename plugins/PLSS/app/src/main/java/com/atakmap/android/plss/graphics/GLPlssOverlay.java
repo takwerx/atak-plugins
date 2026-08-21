@@ -2,7 +2,6 @@
 package com.atakmap.android.plss.graphics;
 
 import android.graphics.Color;
-import android.opengl.GLES20;
 import android.util.Pair;
 
 import com.atakmap.android.maps.MapTextFormat;
@@ -13,13 +12,15 @@ import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 import com.atakmap.map.MapRenderer;
 import com.atakmap.map.layer.Layer;
+import com.atakmap.map.layer.feature.Feature;
 import com.atakmap.map.layer.opengl.GLAbstractLayer2;
 import com.atakmap.map.layer.opengl.GLLayer2;
 import com.atakmap.map.layer.opengl.GLLayerSpi2;
+import com.atakmap.map.opengl.GLAntiAliasedLine;
 import com.atakmap.map.opengl.GLMapView;
 import com.atakmap.map.opengl.GLRenderGlobals;
+import com.atakmap.math.MathUtils;
 import com.atakmap.math.PointD;
-import com.atakmap.opengl.GLES20FixedPipeline;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -119,8 +120,12 @@ public class GLPlssOverlay extends GLAbstractLayer2
         final AtomicBoolean loading = new AtomicBoolean(false);
 
         DoubleBuffer geo;
-        FloatBuffer screen;
-        int vertexCount;
+
+        /**
+         * ATAK's own line renderer, which holds the grid in map-projection
+         * space and applies the pass's scene matrix itself. See drawLines.
+         */
+        GLAntiAliasedLine line;
 
         DoubleBuffer labelGeo;
         FloatBuffer labelScreen;
@@ -153,8 +158,10 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
         void clear() {
             geo = null;
-            screen = null;
-            vertexCount = 0;
+            if (line != null) {
+                line.release();
+                line = null;
+            }
             labelGeo = null;
             labelScreen = null;
             labels = null;
@@ -191,10 +198,12 @@ public class GLPlssOverlay extends GLAbstractLayer2
     private volatile int townshipLabelColor;
 
     public GLPlssOverlay(MapRenderer surface, PlssOverlay subject) {
-        // Sprites only. It is the pass ATAK draws its own text in, the only one
-        // that does not cut a text quad at a surface tile seam, and -- see
-        // drawImpl -- the only one whose projection matches what is on screen.
-        super(surface, subject, GLMapView.RENDER_PASS_SPRITES);
+        // Lines on the surface so they are warped along with the imagery while
+        // the map moves rather than re-projected against it; labels in the
+        // sprites pass, which is where ATAK draws its own text and the only
+        // pass that does not cut a text quad at a surface tile seam.
+        super(surface, subject, GLMapView.RENDER_PASS_SURFACE
+                | GLMapView.RENDER_PASS_SPRITES);
 
         this.subject = subject;
         this.sectionColor = subject.getSectionColor();
@@ -249,32 +258,27 @@ public class GLPlssOverlay extends GLAbstractLayer2
     @Override
     protected void drawImpl(GLMapView view, int renderPass) {
 
-        // Everything in one pass, because the two passes do not agree.
-        //
-        // view.forward() during RENDER_PASS_SURFACE returns coordinates in the
-        // surface *tile* -- currentPass there reports a 512x512 viewport with
-        // its own resolution -- while the matrix the geometry is drawn under is
-        // the scene's. Whenever ATAK picks a surface tile resolution that
-        // differs from the scene resolution, which it does at most zooms, the
-        // grid is drawn to the wrong scale about the focus point: measured at
-        // 3.379/2.389 and 7.695/4.777, and visible as the section grid walking
-        // off a shoreline it should trace exactly.
-        //
-        // Drawing the lines here puts them in the same space as the labels and,
-        // checked against the imagery, the right one.
-        final GLMapView.State scene = view.currentPass;
+        if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SURFACE)) {
+            final GLMapView.State scene = view.currentScene;
 
-        // Sections first so the township grid draws over it -- the coarse frame
-        // has to stay readable where the two coincide, which is every township
-        // boundary.
-        updateTier(scene, sections);
-        updateTier(scene, townships);
+            // Sections first so the township grid draws over it -- the coarse
+            // frame has to stay readable where the two coincide, which is every
+            // township boundary.
+            updateTier(scene, sections);
+            updateTier(scene, townships);
 
-        drawLines(view, scene, sections, sectionColor);
-        drawLines(view, scene, townships, townshipColor);
+            drawLines(view, scene, sections, sectionColor);
+            drawLines(view, scene, townships, townshipColor);
+        }
 
-        drawLabels(view, scene, townships, townshipLabelColor);
-        drawLabels(view, scene, sections, sectionLabelColor);
+        if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SPRITES)) {
+            // GLSegmentFloatingLabel projects against currentPass.scene, so the
+            // placement tests here use the same state.
+            final GLMapView.State pass = view.currentPass;
+
+            drawLabels(view, pass, townships, townshipLabelColor);
+            drawLabels(view, pass, sections, sectionLabelColor);
+        }
     }
 
     /** Drops or reloads a tier for the current view. */
@@ -292,30 +296,36 @@ public class GLPlssOverlay extends GLAbstractLayer2
         maybeLoad(tier, scene);
     }
 
+    /**
+     * The grid, drawn by ATAK's {@link GLAntiAliasedLine}.
+     *
+     * Not a hand-rolled GL_LINES call over screen coordinates from
+     * view.forward(). That was the bug behind labels landing in a neighbouring
+     * cell: geometry drawn in the surface pass is drawn under a model-view
+     * matrix ATAK has already set to that pass's scene forward, so coordinates
+     * that are already in screen space get transformed a second time. The
+     * surface pass renders into a tile carrying its own resolution -- 2.389
+     * against a scene resolution of 3.379 at one measured zoom, 4.777 against
+     * 7.695 at another -- and the grid came out scaled about the focus point by
+     * that ratio, up to 1.6x, walking off a shoreline the section lines are
+     * surveyed to follow.
+     *
+     * This class holds the geometry in map-projection space and applies
+     * currentPass.scene.forward itself, which is what makes it correct in
+     * either pass. It is what ATAK's own grid lines use.
+     */
     private void drawLines(GLMapView view, GLMapView.State scene, Tier tier,
             int c) {
 
-        if (scene.drawMapResolution > tier.maxResolution
-                || tier.geo == null || tier.vertexCount == 0)
+        if (scene.drawMapResolution > tier.maxResolution || tier.line == null)
             return;
 
-        // geo -> screen every frame; the projection changes as the map moves
-        tier.geo.rewind();
-        tier.screen.rewind();
-        view.forward(tier.geo, tier.screen);
-        tier.screen.rewind();
-
-        GLES20FixedPipeline
-                .glEnableClientState(GLES20FixedPipeline.GL_VERTEX_ARRAY);
-        GLES20FixedPipeline.glVertexPointer(2, GLES20.GL_FLOAT, 0, tier.screen);
-        GLES20FixedPipeline.glColor4f(Color.red(c) / 255f,
+        tier.line.draw(view,
+                Color.red(c) / 255f,
                 Color.green(c) / 255f,
                 Color.blue(c) / 255f,
-                Color.alpha(c) / 255f);
-        GLES20FixedPipeline.glLineWidth(tier.lineWidth);
-        GLES20FixedPipeline.glDrawArrays(GLES20.GL_LINES, 0, tier.vertexCount);
-        GLES20FixedPipeline
-                .glDisableClientState(GLES20FixedPipeline.GL_VERTEX_ARRAY);
+                Color.alpha(c) / 255f,
+                tier.lineWidth);
     }
 
     /**
@@ -599,10 +609,13 @@ public class GLPlssOverlay extends GLAbstractLayer2
             return;
 
         tier.geo = loaded.segments;
-        tier.vertexCount = loaded.segmentVertexCount;
-        tier.screen = ByteBuffer
-                .allocateDirect(tier.vertexCount * 2 * 4)
-                .order(ByteOrder.nativeOrder()).asFloatBuffer();
+        tier.geo.rewind();
+        // lon/lat pairs, two per segment -- SEGMENTS steps two points at a
+        // time, so the buffer is consumed exactly as GL_LINES consumed it
+        tier.line = new GLAntiAliasedLine();
+        tier.line.setLineData(tier.geo, 2,
+                GLAntiAliasedLine.ConnectionType.SEGMENTS,
+                Feature.AltitudeMode.Absolute);
 
         if (loaded.labelPoints != null && loaded.labels.length > 0) {
             tier.labelGeo = loaded.labelPoints;
