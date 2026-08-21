@@ -202,8 +202,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
         // the map moves rather than re-projected against it; labels in the
         // sprites pass, which is where ATAK draws its own text and the only
         // pass that does not cut a text quad at a surface tile seam.
-        super(surface, subject, GLMapView.RENDER_PASS_SURFACE
-                | GLMapView.RENDER_PASS_SPRITES);
+        super(surface, subject, GLMapView.RENDER_PASS_SURFACE);
 
         this.subject = subject;
         this.sectionColor = subject.getSectionColor();
@@ -261,6 +260,33 @@ public class GLPlssOverlay extends GLAbstractLayer2
         if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SURFACE)) {
             final GLMapView.State scene = view.currentScene;
 
+            // The surface pass is invoked more than once per frame, each
+            // invocation carrying its own currentPass -- drawVersion changes
+            // between them, so renderPump is what identifies a frame, not
+            // drawVersion. The count is logged because it is what to look at
+            // first if labels ever ghost again.
+            if (view.currentPass.renderPump != lastRenderPump) {
+                lastRenderPump = view.currentPass.renderPump;
+                if (surfacePasses > 0 && surfacePasses != loggedPasses) {
+                    loggedPasses = surfacePasses;
+                    Log.d(TAG, "surface invocations per frame = "
+                            + surfacePasses);
+                }
+                if (!labelsDrawnThisFrame && !useFirstInvocation) {
+                    if (++blankFrames > 60) {
+                        useFirstInvocation = true;
+                        Log.w(TAG, "no final surface part seen in " + blankFrames
+                                + " frames; drawing labels on the first"
+                                + " invocation instead");
+                    }
+                } else {
+                    blankFrames = 0;
+                }
+                surfacePasses = 0;
+                labelsDrawnThisFrame = false;
+            }
+            surfacePasses++;
+
             // Sections first so the township grid draws over it -- the coarse
             // frame has to stay readable where the two coincide, which is every
             // township boundary.
@@ -269,16 +295,26 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
             drawLines(view, scene, sections, sectionColor);
             drawLines(view, scene, townships, townshipColor);
+
+            // Once per frame, not once per invocation.
+            //
+            // The surface pass is invoked many times per frame -- 12 measured
+            // on the XCover -- each carrying its own currentPass. Drawing the
+            // labels in each one put the same section number on screen several
+            // times over and made others come and go. multiPartPass is ATAK's
+            // own flag for this: it is false on the final part, which is the
+            // test GLGridTile uses to do end-of-frame work.
+            final boolean finalPart = useFirstInvocation
+                    ? surfacePasses == 1
+                    : !view.multiPartPass;
+
+            if (finalPart && !labelsDrawnThisFrame) {
+                labelsDrawnThisFrame = true;
+                drawLabels(view, scene, townships, townshipLabelColor);
+                drawLabels(view, scene, sections, sectionLabelColor);
+            }
         }
 
-        if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SPRITES)) {
-            // GLSegmentFloatingLabel projects against currentPass.scene, so the
-            // placement tests here use the same state.
-            final GLMapView.State pass = view.currentPass;
-
-            drawLabels(view, pass, townships, townshipLabelColor);
-            drawLabels(view, pass, sections, sectionLabelColor);
-        }
     }
 
     /** Drops or reloads a tier for the current view. */
@@ -395,9 +431,16 @@ public class GLPlssOverlay extends GLAbstractLayer2
             final double east = tier.labelGeo.get(i * 4 + 2);
             final double north = tier.labelGeo.get(i * 4 + 3);
 
+            // Measured against the resolution of the pass being drawn, not the
+            // scene's. The surface pass renders into a tile carrying its own,
+            // finer resolution, so the feature is wider in this space than the
+            // scene resolution suggests -- using the scene's understated the
+            // room available by that ratio and silently dropped every label
+            // near the limit, which is why whole pills and section numbers
+            // failed to appear as a tier came on.
             final double widthPx = Math.abs(east - west) * METRES_PER_DEGREE
                     * Math.cos(Math.toRadians((south + north) / 2.0))
-                    / Math.max(scene.drawMapResolution, 0.0001);
+                    / Math.max(view.currentPass.drawMapResolution, 0.0001);
 
             if (textFormat.measureTextWidth(tier.labels[i]) > widthPx
                     * LABEL_FIT)
@@ -432,6 +475,19 @@ public class GLPlssOverlay extends GLAbstractLayer2
         // within that of the screen edge, so a value up to about that near an
         // edge is the padding, not the slide coming back.
         final long now = System.currentTimeMillis();
+        if (now - lastTerrainLog > 5000L) {
+            lastTerrainLog = now;
+            final GLMapView.State p = view.currentPass;
+            Log.d(TAG, "cam perspective=" + p.scene.camera.perspective
+                    + " tilt=" + String.format("%.1f", p.drawTilt)
+                    + " elevOffset=" + GLMapView.elevationOffset
+                    + " elevScale=" + view.elevationScaleFactor
+                    + " terrainAtCentre=" + String.format("%.1f",
+                            view.getTerrainMeshElevation(p.drawLat, p.drawLng))
+                    + " passRes=" + String.format("%.3f", p.drawMapResolution)
+                    + " sceneRes=" + String.format("%.3f",
+                            view.currentScene.drawMapResolution));
+        }
         if (drawn > 0 && now - lastLabelLog > 5000L) {
             lastLabelLog = now;
             Log.d(TAG, "labels " + tier.table + " drawn=" + drawn
@@ -525,6 +581,24 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
     /** throttles the label-placement log above */
     private long lastLabelLog;
+    private long lastTerrainLog;
+
+    /**
+     * Labels are drawn on one invocation per frame; see drawImpl.
+     *
+     * {@code blankFrames} is the safety net. If this build is ever run against
+     * a renderer that never reports a final part, the preferred condition would
+     * never fire and the map would lose its labels entirely, which is not a
+     * failure anyone should have to diagnose from a plane. After a second or so
+     * of that, fall back to the first invocation instead and say so once.
+     */
+    private boolean labelsDrawnThisFrame;
+    private int blankFrames;
+    private boolean useFirstInvocation;
+
+    private int lastRenderPump = -1;
+    private int surfacePasses;
+    private int loggedPasses = -1;
 
     /** Kicks a background load when the view has left this tier's loaded box. */
     private void maybeLoad(final Tier tier, GLMapView.State scene) {

@@ -253,6 +253,119 @@ public class PlssStore {
                 labels.toArray(new String[0]));
     }
 
+    // ------------------------------------------------------- point lookup
+
+    /** A PLSS address, as far down as the installed packs can resolve it. */
+    public static final class Position {
+        /** e.g. "Boise Meridian" */
+        public final String meridian;
+        /** e.g. "T57N-R1E" */
+        public final String township;
+        /** e.g. "34", or null where no section covers the point */
+        public final String section;
+
+        Position(String meridian, String township, String section) {
+            this.meridian = meridian;
+            this.township = township;
+            this.section = section;
+        }
+
+        /** The form you would read over the radio. */
+        public String describe() {
+            final StringBuilder sb = new StringBuilder(township);
+            if (section != null)
+                sb.append(" Sec ").append(section);
+            return sb.toString();
+        }
+    }
+
+    /**
+     * The PLSS address of a point, or null if this pack does not cover it.
+     *
+     * The R-tree narrows to candidates by bounding box, but the answer is
+     * decided by a ray cast against the feature's own rings: index boxes
+     * overlap wherever the survey is irregular -- along meander lines and state
+     * borders especially -- so a box hit is not containment. Reporting the
+     * wrong section over the radio is worse than reporting none.
+     */
+    public Position describe(double lat, double lon) {
+        final String[] twp = containing("township", lat, lon, true);
+        if (twp == null)
+            return null;
+        final String[] sec = containing("section", lat, lon, false);
+        return new Position(twp[1], twp[0], sec != null ? sec[0] : null);
+    }
+
+    /** {label, meridian} of the feature whose rings contain the point. */
+    private String[] containing(String table, double lat, double lon,
+            boolean wantMeridian) {
+
+        final String sql = "SELECT t.label, t.geom"
+                + (wantMeridian ? ", t.meridian" : "")
+                + " FROM " + table + " t"
+                + " JOIN " + table + "_idx i ON i.id = t.id"
+                + " WHERE i.minx <= ? AND i.maxx >= ?"
+                + " AND i.miny <= ? AND i.maxy >= ?";
+
+        QueryIface q = null;
+        try {
+            q = db.compileQuery(sql);
+            q.bind(1, lon);
+            q.bind(2, lon);
+            q.bind(3, lat);
+            q.bind(4, lat);
+
+            double[] segs = new double[8192];
+            while (q.moveToNext()) {
+                final byte[] blob = q.getBlob(1);
+                if (blob == null)
+                    continue;
+
+                final int needed = countSegmentDoubles(blob);
+                if (needed > segs.length)
+                    segs = new double[needed];
+
+                final int n = decodeSegments(blob, segs, 0);
+                if (ringsContain(segs, n, lon, lat)) {
+                    return new String[] {
+                            q.getString(0),
+                            wantMeridian ? q.getString(2) : null
+                    };
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "point lookup failed on " + table, e);
+        } finally {
+            if (q != null)
+                q.close();
+        }
+        return null;
+    }
+
+    /**
+     * Ray cast against the decoded rings -- an odd number of crossings east of
+     * the point means inside. The decoder emits closed rings as independent
+     * segments, which is all this needs; it does not care about winding or the
+     * order the segments arrive in.
+     */
+    private static boolean ringsContain(double[] segs, int n, double lon,
+            double lat) {
+        boolean inside = false;
+        for (int i = 0; i + 3 < n; i += 4) {
+            final double x1 = segs[i];
+            final double y1 = segs[i + 1];
+            final double x2 = segs[i + 2];
+            final double y2 = segs[i + 3];
+
+            if ((y1 > lat) != (y2 > lat)) {
+                final double x = x1 + (lat - y1) / (y2 - y1) * (x2 - x1);
+                if (x > lon)
+                    inside = !inside;
+            }
+        }
+        return inside;
+    }
+
     // --------------------------------------------------------------- lookup
 
     /** Principal meridians present in this pack, in name order. */
