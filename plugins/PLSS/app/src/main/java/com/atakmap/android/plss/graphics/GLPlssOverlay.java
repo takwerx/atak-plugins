@@ -12,6 +12,8 @@ import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 import com.atakmap.map.MapRenderer;
 import com.atakmap.map.layer.Layer;
+import com.atakmap.map.layer.control.SurfaceRendererControl;
+import com.atakmap.map.layer.feature.geometry.Envelope;
 import com.atakmap.map.layer.feature.Feature;
 import com.atakmap.map.layer.opengl.GLAbstractLayer2;
 import com.atakmap.map.layer.opengl.GLLayer2;
@@ -21,6 +23,7 @@ import com.atakmap.map.opengl.GLMapView;
 import com.atakmap.map.opengl.GLRenderGlobals;
 import com.atakmap.math.MathUtils;
 import com.atakmap.math.PointD;
+import com.atakmap.opengl.GLES20FixedPipeline;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -86,11 +89,13 @@ public class GLPlssOverlay extends GLAbstractLayer2
      */
     private static final float LABEL_FIT = 0.7f;
 
+
     /**
      * Below this the clipped segment is treated as degenerate and the label
      * skipped -- guards the division that solves for the segment weight.
      */
     private static final float MIN_CLIP_SPAN = 1e-4f;
+
 
 
     /** metres per degree of latitude, near enough for a fit test */
@@ -202,6 +207,9 @@ public class GLPlssOverlay extends GLAbstractLayer2
         // the map moves rather than re-projected against it; labels in the
         // sprites pass, which is where ATAK draws its own text and the only
         // pass that does not cut a text quad at a surface tile seam.
+        // Surface only. The overlay has to be warped along with the imagery
+        // as the map moves; anything in the sprites pass is projected fresh
+        // each frame and slides against it until the pan stops.
         super(surface, subject, GLMapView.RENDER_PASS_SURFACE);
 
         this.subject = subject;
@@ -232,6 +240,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
         // release() can be reached without stop() on renderer teardown
         subject.removeOnPlssColorChangedListener(this);
 
+
         loader.shutdownNow();
 
         townships.clear();
@@ -257,64 +266,50 @@ public class GLPlssOverlay extends GLAbstractLayer2
     @Override
     protected void drawImpl(GLMapView view, int renderPass) {
 
-        if (MathUtils.hasBits(renderPass, GLMapView.RENDER_PASS_SURFACE)) {
-            final GLMapView.State scene = view.currentScene;
+        // kept so a background load can mark the surface dirty when it lands
+        glMapView = view;
 
-            // The surface pass is invoked more than once per frame, each
-            // invocation carrying its own currentPass -- drawVersion changes
-            // between them, so renderPump is what identifies a frame, not
-            // drawVersion. The count is logged because it is what to look at
-            // first if labels ever ghost again.
-            if (view.currentPass.renderPump != lastRenderPump) {
-                lastRenderPump = view.currentPass.renderPump;
-                if (surfacePasses > 0 && surfacePasses != loggedPasses) {
-                    loggedPasses = surfacePasses;
-                    Log.d(TAG, "surface invocations per frame = "
-                            + surfacePasses);
-                }
-                if (!labelsDrawnThisFrame && !useFirstInvocation) {
-                    if (++blankFrames > 60) {
-                        useFirstInvocation = true;
-                        Log.w(TAG, "no final surface part seen in " + blankFrames
-                                + " frames; drawing labels on the first"
-                                + " invocation instead");
-                    }
-                } else {
-                    blankFrames = 0;
-                }
-                surfacePasses = 0;
-                labelsDrawnThisFrame = false;
+        final GLMapView.State scene = view.currentScene;
+
+        // The surface pass is invoked many times per frame -- 12 measured here
+        // -- each invocation carrying its own currentPass. renderPump, not
+        // drawVersion, identifies a frame; drawVersion changes between
+        // invocations.
+        if (view.currentPass.renderPump != lastRenderPump) {
+            lastRenderPump = view.currentPass.renderPump;
+            if (surfacePasses > 0 && surfacePasses != loggedPasses) {
+                loggedPasses = surfacePasses;
+                Log.d(TAG, "surface invocations per frame = " + surfacePasses
+                        + " multiPartPass=" + view.multiPartPass);
             }
-            surfacePasses++;
-
-            // Sections first so the township grid draws over it -- the coarse
-            // frame has to stay readable where the two coincide, which is every
-            // township boundary.
-            updateTier(scene, sections);
-            updateTier(scene, townships);
-
-            drawLines(view, scene, sections, sectionColor);
-            drawLines(view, scene, townships, townshipColor);
-
-            // Once per frame, not once per invocation.
-            //
-            // The surface pass is invoked many times per frame -- 12 measured
-            // on the XCover -- each carrying its own currentPass. Drawing the
-            // labels in each one put the same section number on screen several
-            // times over and made others come and go. multiPartPass is ATAK's
-            // own flag for this: it is false on the final part, which is the
-            // test GLGridTile uses to do end-of-frame work.
-            final boolean finalPart = useFirstInvocation
-                    ? surfacePasses == 1
-                    : !view.multiPartPass;
-
-            if (finalPart && !labelsDrawnThisFrame) {
-                labelsDrawnThisFrame = true;
-                drawLabels(view, scene, townships, townshipLabelColor);
-                drawLabels(view, scene, sections, sectionLabelColor);
-            }
+            surfacePasses = 0;
+            labelsDrawnThisFrame = false;
         }
+        surfacePasses++;
 
+        // Sections first so the township grid draws over it -- the coarse frame
+        // has to stay readable where the two coincide, which is every township
+        // boundary.
+        updateTier(scene, sections);
+        updateTier(scene, townships);
+
+        // Repeating the lines per invocation is harmless: identical geometry
+        // every time.
+        drawLines(view, scene, sections, sectionColor);
+        drawLines(view, scene, townships, townshipColor);
+
+        // Labels in every invocation, but each label only in the invocation
+        // whose tile actually contains it -- see the viewport test in
+        // drawLabels.
+        //
+        // The invocations are tiles, each with its own frame. Drawing every
+        // label in every one put the same number on screen several times over.
+        // Drawing them in a single invocation instead covered only that one
+        // tile, so only the middle of the screen got labels at all. Letting
+        // each tile draw its own is the arrangement that covers the screen
+        // exactly once.
+        drawLabels(view, view.currentPass, townships, townshipLabelColor);
+        drawLabels(view, view.currentPass, sections, sectionLabelColor);
     }
 
     /** Drops or reloads a tier for the current view. */
@@ -391,12 +386,29 @@ public class GLPlssOverlay extends GLAbstractLayer2
         view.forward(tier.labelGeo, tier.labelScreen);
         tier.labelScreen.rewind();
 
-        // the rectangle GLSegmentFloatingLabel itself tests a segment against,
-        // via GLArrow2.getWidgetViewF -- currentScene, not currentPass
-        final float vl = view.currentScene.left;
-        final float vr = view.currentScene.right;
-        final float vb = view.currentScene.bottom;
-        final float vt = view.currentScene.top;
+        // The bounds of the invocation being drawn, not of the whole screen.
+        //
+        // view.forward() here returns coordinates in this invocation's own
+        // frame -- the surface pass renders in tiles -- so a label belongs to
+        // exactly one invocation: the one whose viewport contains it. Testing
+        // against the screen's bounds instead let the same label through in
+        // several tiles, which is where the duplicate numbers came from.
+        final float vl = scene.left;
+        final float vr = scene.right;
+        final float vb = scene.bottom;
+        final float vt = scene.top;
+
+        // A second rectangle, for a different job. The test above decides which
+        // invocation owns a label; this one has to mirror what
+        // GLSegmentFloatingLabel does inside update(), and that clips the
+        // segment against GLArrow2.getWidgetViewF -- which is currentScene, the
+        // whole screen, regardless of which tile is being drawn. Feeding the
+        // tile rect into the weight solve instead put labels 250 px down their
+        // own segments.
+        final float sl = view.currentScene.left;
+        final float sr = view.currentScene.right;
+        final float sb = view.currentScene.bottom;
+        final float st = view.currentScene.top;
 
         int drawn = 0;
         float maxOff = 0f;
@@ -446,7 +458,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
                     * LABEL_FIT)
                 continue;
 
-            final float w = centringWeight(sx, sy, nx, ny, vl, vb, vr, vt);
+            final float w = centringWeight(sx, sy, nx, ny, sl, sb, sr, st);
             if (Float.isNaN(w))
                 continue;
 
@@ -459,6 +471,7 @@ public class GLPlssOverlay extends GLAbstractLayer2
             }
 
             l.setTextColor(c);
+
             l.draw(view);
             drawn++;
 
@@ -582,19 +595,21 @@ public class GLPlssOverlay extends GLAbstractLayer2
     /** throttles the label-placement log above */
     private long lastLabelLog;
     private long lastTerrainLog;
-
-    /**
-     * Labels are drawn on one invocation per frame; see drawImpl.
-     *
-     * {@code blankFrames} is the safety net. If this build is ever run against
-     * a renderer that never reports a final part, the preferred condition would
-     * never fire and the map would lose its labels entirely, which is not a
-     * failure anyone should have to diagnose from a plane. After a second or so
-     * of that, fall back to the first invocation instead and say so once.
-     */
+    private long lastScaleLog;
+    private GLMapView glMapView;
     private boolean labelsDrawnThisFrame;
-    private int blankFrames;
-    private boolean useFirstInvocation;
+
+    /** great-circle metres between two lat/lon, good enough for a view width */
+    private static double haversine(double lat1, double lon1, double lat2,
+            double lon2) {
+        final double dLat = Math.toRadians(lat2 - lat1);
+        final double dLon = Math.toRadians(lon2 - lon1);
+        final double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                        * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return 6378137.0 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
 
     private int lastRenderPump = -1;
     private int surfacePasses;
@@ -667,6 +682,18 @@ public class GLPlssOverlay extends GLAbstractLayer2
         });
     }
 
+    /** Tells the cached surface that this box needs redrawing. */
+    private void markSurfaceDirty(double west, double south, double east,
+            double north) {
+        if (glMapView == null)
+            return;
+        final SurfaceRendererControl ctrl = glMapView
+                .getControl(SurfaceRendererControl.class);
+        if (ctrl != null)
+            ctrl.markDirty(new Envelope(west, south, 0d, east, north, 0d),
+                    false);
+    }
+
     /** GL thread only. */
     private void install(Tier tier, PlssStore.Result loaded, double west,
             double south, double east, double north) {
@@ -676,6 +703,15 @@ public class GLPlssOverlay extends GLAbstractLayer2
         tier.east = east;
         tier.north = north;
         tier.loaded = true;
+
+        // The surface is cached: ATAK renders a tile once and keeps it until
+        // something says otherwise. Geometry loads off the GL thread, so a tile
+        // drawn before its features arrived would keep its stale contents and
+        // those labels would simply never appear -- which is what "some of the
+        // labels aren't populating on the first render" is. invalidate() asks
+        // for a frame; it does not invalidate the surface. ATAK's own grid
+        // marks the loaded envelope dirty for exactly this reason.
+        markSurfaceDirty(west, south, east, north);
 
         tier.clear();
 
@@ -687,6 +723,19 @@ public class GLPlssOverlay extends GLAbstractLayer2
         // lon/lat pairs, two per segment -- SEGMENTS steps two points at a
         // time, so the buffer is consumed exactly as GL_LINES consumed it
         tier.line = new GLAntiAliasedLine();
+        // Absolute, i.e. sea level, and deliberately so.
+        //
+        // Relative was tried, to sit the grid on the terrain where the imagery
+        // is draped. It is far too expensive: the class does a terrain-mesh
+        // elevation lookup per vertex and re-projects the whole buffer every
+        // time the terrain version changes, which at section zoom is tens of
+        // thousands of segments redone as terrain streams in. Section drawing
+        // slowed to a crawl.
+        //
+        // It also was not buying much. Labels are drawn at altitude zero too,
+        // so both are displaced from the imagery by the same amount and still
+        // agree with each other, which is what actually matters for a number
+        // sitting in its own cell.
         tier.line.setLineData(tier.geo, 2,
                 GLAntiAliasedLine.ConnectionType.SEGMENTS,
                 Feature.AltitudeMode.Absolute);
@@ -712,8 +761,9 @@ public class GLPlssOverlay extends GLAbstractLayer2
      * against the draw version, so a per-frame instance would recompute
      * everything and allocate for every feature on screen.
      *
-     * Clamping to ground is off. With it on the labels shift as terrain streams
-     * in, because the clamp resolves against elevation that arrives late.
+     * Not clamped to ground, matching the lines. Both sit at altitude zero, so
+     * they are displaced from the terrain-draped imagery together rather than
+     * against each other, and neither pays for per-point terrain lookups.
      */
     private GLSegmentFloatingLabel[] buildFloatingLabels(Tier tier,
             PlssStore.Result loaded) {
@@ -733,6 +783,10 @@ public class GLPlssOverlay extends GLAbstractLayer2
 
             final GLSegmentFloatingLabel l = new GLSegmentFloatingLabel();
             l.setTextFormat(textFormat);
+            // Unclamped, matching the lines' Absolute altitude. Clamping makes
+            // the class query terrain per point per update and take its more
+            // expensive placement path, and it has to match whatever the lines
+            // do or the two drift apart.
             l.setClampToGround(false);
             l.setRotateToAlign(false);
             l.setBackgroundColor(0f, 0f, 0f, 0.6f);
