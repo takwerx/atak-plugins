@@ -3,6 +3,17 @@
 takwerx ATAK (Android Team Awareness Kit) plugins. One directory per plugin under
 `plugins/`, each a standalone Gradle project built against the ATAK CIV SDK.
 
+**Looking for a plugin to install?** Each plugin is published from its own
+repository — README, user guide, downloads and issues all in one place:
+
+| Plugin | What it does | Public repo (downloads, guide, issues) |
+|---|---|---|
+| PLSS Grid | Township, range and section overlay from BLM survey data | https://github.com/takwerx/plss-grid |
+
+This repository is the development workspace: shared tooling, build rules, and
+every plugin side by side. Each plugin directory is pushed out to its public repo
+with `git subtree` on release.
+
 Engineering notes, release plans and handoffs live in the private sibling repo
 [`takwerx/atak-plugins-notes`](https://github.com/takwerx/atak-plugins-notes).
 

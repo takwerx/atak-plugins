@@ -11,9 +11,11 @@ approval given before the ship prompt ("go for it", "send it") does not count �
 the answer to THIS prompt is the authorization.
 
 Ship units are per plugin: a ship is `<Plugin> <version>` (e.g. `PLSS 0.3`).
-Tags are `<Plugin>-v<version>` (e.g. `PLSS-v0.3`) because the repo holds many
-plugins. The *real* public release is the tak.gov TPC submission — a GitHub
-Release is optional and product-only when made.
+Each plugin has its OWN public repo (`takwerx/plss-grid`, `takwerx/<name>`) —
+that is where its tag (`v<version>`), GitHub Release (tak.gov-signed APKs
+attached), README, guide and issues live. This monorepo carries no plugin
+release tags. The tak.gov TPC submission is the upstream release; the GitHub
+Release on the plugin repo is how users download.
 
 ## Step 0 — Pre-flight (read-only, before asking anything)
 
@@ -62,8 +64,9 @@ Present exactly this via AskUserQuestion and wait:
 > - device verification: `<one line: device, ATAK version, what was run, result>`
 > - publish scrub: PASS · security scan: `<date/commit>` · zips: `<names>`
 > - open issues: `<count surfaced / none>` · commit scan: `<clean / acknowledged>`
-> - this will: merge the branch into `main` (merge commit), push main, tag
->   `<Plugin>-v<version>` and push it, [create GitHub Release if asked]
+> - this will: merge the branch into `main` (merge commit), push main, subtree-push
+>   `plugins/<Name>` to `takwerx/<plugin-repo>` main, tag `v<version>` there and
+>   create its GitHub Release with the signed APKs
 >
 > **Ship it?**
 
@@ -86,8 +89,12 @@ Expires after 30 minutes. Never create it outside this skill.
    Histories here are not diverged; a real merge commit is wanted — it is the
    release marker. Verify `git diff <branch> main --stat` is empty.
 2. **Push main:** `git push origin main`.
-3. **Tag + push:** `git tag -a <Plugin>-v<version> -m "<headline>" && git push origin <Plugin>-v<version>`.
-4. **GitHub Release (only if the operator asked):** `gh release create <Plugin>-v<version> --title "<Plugin> <version>" --notes "…"`. Body is product-only: what it does, what changed, which ATAK versions. No device names, serials, test locations, or engineering detail. Attach nothing the SDK license forbids (never an SDK artifact); tak.gov-signed APKs only if the operator says so.
+3. **Subtree push to the plugin's public repo (history preserved):**
+   ```bash
+   git subtree split --prefix=plugins/<Name> -b <name>-export
+   git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/heads/main
+   ```
+4. **Tag + GitHub Release ON THE PLUGIN REPO:** `git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/tags/v<version>` (or tag there), then `gh release create v<version> --repo takwerx/<plugin-repo> --title "<Plugin> <version>" --latest --notes-file … dist/signed/*.apk`. Body is product-only: what it does, what changed, a table of which APK is for which ATAK version, link to the guide. No device names, serials, test locations, or engineering detail. Never an SDK artifact. Update the download links at the top of the plugin README/guide to the new release before the subtree push.
 5. **Private notes:** write/update the HANDOFF or a `RELEASE-<Plugin>-v<version>.md`
    in `../atak-plugins-notes/docs/` (what shipped, commit, verification
    evidence, signed-APK digests, residuals). Commit + push the notes repo.
