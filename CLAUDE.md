@@ -227,4 +227,10 @@ Policy the scrub enforces, in words:
   chat longer than ~10 turns.
 - Security scan (`/module-scan`-class review) before a plugin is fielded or published, and
   again on any version bump of vendored third-party code.
-- Never push to `main` / tag / release without explicit operator authorization.
+- **`/ship` is the ONLY path to `main`, a tag, or a GitHub Release.** The
+  PreToolUse hook `.claude/hooks/git-guard.sh` mechanically blocks merge-to-main,
+  `git tag`, pushes of main/tags, and `gh release create`; `/ship` runs pre-flight
+  (publish scrub, device-verification evidence, security scan, zips, open issues,
+  commit scan), presents the ship prompt, and unlocks the guard for 30 minutes
+  after an explicit "Ship it". Never create `.claude/.ship-authorized` outside
+  `/ship`. General approval given before the prompt does not count.

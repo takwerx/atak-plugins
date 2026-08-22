@@ -43,3 +43,6 @@ captures/
 # Submission zips
 dist/
 *.zip
+
+# /ship authorization sentinel — never commit
+.claude/.ship-authorized
