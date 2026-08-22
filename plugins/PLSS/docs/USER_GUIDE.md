@@ -199,4 +199,4 @@ handles this, but it is worth knowing what you are looking at:
 
 ## 6. Contact
 
-Andreas Johansson · takwerx · https://github.com/takwerx/atak-plugins/issues
+Andreas Johansson · takwerx · questions and issues: https://github.com/takwerx/atak-plugins/issues

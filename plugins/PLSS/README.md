@@ -50,7 +50,7 @@ _________________________________________________________________
 POINT OF CONTACTS
 
 Andreas Johansson, takwerx
-https://github.com/takwerx/atak-plugins/issues
+https://github.com/takwerx/atak-plugins (issues)
 
 _________________________________________________________________
 PORTS REQUIRED
