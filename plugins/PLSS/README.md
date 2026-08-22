@@ -29,13 +29,9 @@ Capabilities:
 Source data is the BLM National PLSS CadNSDI, which is the authoritative survey
 record. USGS products derive from it.
 
-Screenshots are kept in docs/screenshots/ in the repository (excluded from the
-source submission zip):
-
-  - overview.png       township tier with T/R names, zoomed out
-  - sections.png       section tier, one number per cell
-  - colours.png        plugin pane with the two colour controls
-  - find-township.png  go-to-township dialog
+A step-by-step user guide with screenshots lives at docs/USER_GUIDE.md in the
+repository, with the images under docs/screenshots/ (both excluded from the
+source submission zip).
 
 _________________________________________________________________
 STATUS
