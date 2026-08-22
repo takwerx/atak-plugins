@@ -61,12 +61,12 @@ find it in the toolbar.
 
 ### Step 2 — The PLSS pane
 
-Three buttons and two colour swatches. That's the whole interface.
+Three buttons and two color swatches. That's the whole interface.
 
 - **Manage map data…** — download and delete state packs.
 - **Find township…** — jump the map to a township by meridian, township and range.
 - **Show / Hide PLSS overlay** — turn the grid on and off.
-- **Township lines & labels** / **Section lines & labels** — colour per tier.
+- **Township lines & labels** / **Section lines & labels** — color per tier.
 
 ![The PLSS pane](screenshots/2_open_plugin.png)
 
@@ -89,7 +89,7 @@ before it is installed.
 ### Step 5 — Installed
 
 Installed states move to the top with a **Delete** button for freeing space
-later. Neighbouring states can be installed together — the plugin merges them
+later. Neighboring states can be installed together — the plugin merges them
 cleanly along the border (see section 4 below).
 
 ![California installed](screenshots/5_map_data_installed.png)
@@ -97,7 +97,7 @@ cleanly along the border (see section 4 below).
 ### Step 6 — Show the overlay: townships first
 
 Tap **Show PLSS overlay**. Zoomed out you see the **township** grid (orange by
-default) with each township's name — T9N‑R28W and its neighbours here.
+default) with each township's name — T9N‑R28W and its neighbors here.
 
 The overlay draws in two tiers by zoom so the map stays readable and fast:
 townships appear first; sections switch on as you zoom closer. Zoomed far out,
@@ -113,21 +113,21 @@ block. Numbers and names keep the same size on screen at every zoom.
 
 ![Section tier](screenshots/7_show_plss_sections_overlay.png)
 
-### Step 8 — Township colour
+### Step 8 — Township color
 
-Tap the **Township lines & labels** swatch. One pick recolours that tier's
-lines *and* labels together. Dark colours are fine — the label backdrop flips
+Tap the **Township lines & labels** swatch. One pick recolors that tier's
+lines *and* labels together. Dark colors are fine — the label backdrop flips
 to light automatically so the text stays readable. Your choice is remembered
 across ATAK restarts.
 
-![Township colour picker](screenshots/8_change_township_color.png)
+![Township color picker](screenshots/8_change_township_color.png)
 
-### Step 9 — Section colour
+### Step 9 — Section color
 
 Same for **Section lines & labels**. Ship defaults are orange townships and
 white sections, which read well on most basemaps.
 
-![Section colour picker](screenshots/9_change_section_color.png)
+![Section color picker](screenshots/9_change_section_color.png)
 
 ### Step 10 — Find a township
 
@@ -139,7 +139,7 @@ Only meridians present in your installed data are offered.
 
 ### Step 11 — Landed
 
-**Go** centres the map on the township and zooms so it fills the screen —
+**Go** centers the map on the township and zooms so it fills the screen —
 here T16S‑R11E under the San Bernardino Meridian, Imperial Valley.
 
 ![T16S-R11E](screenshots/11_find_township_landing.png)
@@ -164,8 +164,8 @@ handles this, but it is worth knowing what you are looking at:
 ![CA/NV line at Crystal Bay, Lake Tahoe](screenshots/13_state_line.png)
 
 - **Each township and each section is named once.** With both states
-  installed, the plugin recognises the two halves as the same feature and
-  centres a single name on the whole of it. Without the neighbouring state
+  installed, the plugin recognizes the two halves as the same feature and
+  centers a single name on the whole of it. Without the neighboring state
   installed you simply see nothing on the far side of the line.
 - **You will see a line running along the state boundary.** That is the edge
   where BLM cut the data, not a survey line. The narrow cells it creates next to
@@ -184,7 +184,7 @@ handles this, but it is worth knowing what you are looking at:
 ## 5. Good to know
 
 - **The overlay starts hidden** each time ATAK launches (like ATAK's own
-  grids). Turn it on from the pane or the Overlay Manager; your colours persist.
+  grids). Turn it on from the pane or the Overlay Manager; your colors persist.
 - **Sections only draw once you are zoomed in far enough**; townships only
   below a wider threshold. If you see nothing, zoom in.
 - **After updating the plugin**, ATAK unloads it: reload it from the Plugins

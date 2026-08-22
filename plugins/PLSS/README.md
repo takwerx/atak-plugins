@@ -20,9 +20,9 @@ Capabilities:
   - Two zoom tiers: townships with their T/R label, then sections with their
     numbers, each appearing only when large enough to carry its label.
   - Toggled from Overlay Manager alongside Grid Lines, and from the plugin pane.
-  - Colour selection per tier: township lines and labels together, section
+  - Color selection per tier: township lines and labels together, section
     lines and numbers together. The label backdrop flips automatically between
-    dark and light so any chosen colour stays readable.
+    dark and light so any chosen color stays readable.
   - Go-to-township lookup by principal meridian, township and range.
   - Works fully offline once data is installed.
 
@@ -125,15 +125,15 @@ DEVELOPER NOTES
   every marker callsign, so labels agree with the surface-drawn grid by
   construction. Text placed by hand from either render pass does not: the
   passes do not share a projection, and the error grows with distance from
-  the screen centre. Labels must be released back to the engine on every
+  the screen center. Labels must be released back to the engine on every
   clear and hidden with the layer, or they keep drawing with nothing able to
   reach them.
 
-  The label engine does not render every colour faithfully. 0xFFFFA500 text
+  The label engine does not render every color faithfully. 0xFFFFA500 text
   measured (255,231,0) on screen against (255,166,0) for identically
-  coloured lines, regardless of bold or priority; ATAK's own palette colours
-  measured exact. Ship palette colours for labels, and measure any hard-coded
-  label colour on the device against its line.
+  colored lines, regardless of bold or priority; ATAK's own palette colors
+  measured exact. Ship palette colors for labels, and measure any hard-coded
+  label color on the device against its line.
 
   Plugin resources must be resolved through the plugin context, while anything
   that opens a window -- dialogs, popups, list choosers -- must be built with
@@ -143,12 +143,12 @@ DEVELOPER NOTES
 
   Zoom thresholds are measured on a device from GLMapView.State.drawMapResolution
   rather than derived from the scale bar, which changes length to suit round
-  numbers and does not convert to a fixed metres-per-pixel.
+  numbers and does not convert to a fixed meters-per-pixel.
 
   PLSS coverage is not universal. The rectangular survey went around Spanish and
   Mexican land grants, so there is no PLSS beneath much of coastal and southern
   California. Gaps in those areas are correct, not missing data.
 
   BLM spells some principal meridians more than one way in its own data. The
-  packer canonicalises them, otherwise the meridian picker offers several
+  packer canonicalizes them, otherwise the meridian picker offers several
   near-identical entries and a lookup against the wrong one silently fails.
