@@ -1,5 +1,7 @@
 PLSS Grid
 
+**User guide with screenshots: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)**
+(https://github.com/takwerx/atak-plugins/blob/main/plugins/PLSS/docs/USER_GUIDE.md)
 
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
