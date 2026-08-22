@@ -40,7 +40,7 @@ source submission zip):
 _________________________________________________________________
 STATUS
 
-Release candidate. Version 0.2.
+Release candidate. Version 0.3.
 
 Rendering, data pipeline and data management are working and have been
 exercised on hardware: Samsung Galaxy S21+ (Android 15, ATAK-CIV 5.7) and
