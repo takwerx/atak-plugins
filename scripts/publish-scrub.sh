@@ -5,7 +5,7 @@
 # credentials, machine-local paths, device identifiers, SDK binaries and
 # signing material. Exit 0 = PASS, exit 1 = FAIL with a findings list.
 #
-#   scripts/publish-scrub.sh                 # every git-tracked text file in this repo
+#   scripts/publish-scrub.sh                 # tracked + untracked (non-ignored) files in this repo
 #   scripts/publish-scrub.sh <dir>           # every text file under a directory (e.g. an extracted zip)
 #   scripts/publish-scrub.sh --file <path>   # one file (e.g. an artifact HTML before publishing)
 #
@@ -39,7 +39,10 @@ esac
 # ---- file list ------------------------------------------------------------
 list_files() {
     case "$MODE" in
-        repo) git -C "$REPO_ROOT" ls-files -z | tr '\0' '\n' | sed "s|^|$REPO_ROOT/|" ;;
+        # tracked AND untracked-but-not-ignored: what a push publishes, plus what
+        # the next commit would add. (A new file checked before `git add` once
+        # slipped through on tracked-only.)
+        repo) git -C "$REPO_ROOT" ls-files -z --cached --others --exclude-standard | tr '\0' '\n' | sed "s|^|$REPO_ROOT/|" ;;
         dir)  find "$TARGET" -type f -not -path '*/.git/*' ;;
         file) echo "$TARGET" ;;
     esac
