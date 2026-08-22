@@ -17,6 +17,29 @@ ATAK plugins are a **completely separate subsystem** from CloudTAK plugins
 (`infra-TAK/cloudtak-plugins/`, Vue/TypeScript) and from TAK Server plugins
 (`.jar`/`.yaml`, `/api/takserver/plugins/*`). Do not mix guidance between them.
 
+## One public repo per plugin; this monorepo is where they are built
+
+Users get a plugin from **its own public repository** — `takwerx/plss-grid` for
+PLSS Grid, `takwerx/<plugin-name>` for each future plugin — whose front page is
+the plugin: download links at the top of the README, the user guide with
+screenshots under `docs/`, its own Releases (`vX.Y`, tak.gov-signed APKs
+attached) and its own Issues. GitHub Releases and Issues are per repository, so
+sharing them across plugins in one repo was confusing to hand out.
+
+`takwerx/atak-plugins` (this repo) is the **development workspace**: shared
+scripts, these rules, the scrub/ship gates, all plugins side by side under
+`plugins/`. A plugin reaches its public repo by subtree push, history preserved:
+
+```bash
+git subtree split --prefix=plugins/<Name> -b <name>-export
+git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/heads/main
+```
+
+Each `plugins/<Name>/` carries its own `.gitignore` so it is safe as a standalone
+repo root. Per-plugin tags/releases live in the plugin repo (`v0.3`); this repo
+does not carry plugin release tags. The root README is the index of plugins →
+public repos. `/ship` covers the subtree push and the per-plugin release.
+
 ## The SDK lives outside this repo
 
 - Path: `~/atak-sdk/ATAK-CIV-<version>/` (currently `ATAK-CIV-5.6.0.8`).

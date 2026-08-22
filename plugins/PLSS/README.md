@@ -1,7 +1,14 @@
 PLSS Grid
 
+**Download PLSS Grid 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+
+- **ATAK-CIV 5.7:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.8.0-civ-release.apk
+
+All releases: https://github.com/takwerx/plss-grid/releases
+
 **User guide with screenshots: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)**
-(https://github.com/takwerx/atak-plugins/blob/main/plugins/PLSS/docs/USER_GUIDE.md)
+(https://github.com/takwerx/plss-grid/blob/main/docs/USER_GUIDE.md)
 
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
@@ -52,7 +59,7 @@ _________________________________________________________________
 POINT OF CONTACTS
 
 Andreas Johansson, takwerx
-https://github.com/takwerx/atak-plugins (issues)
+https://github.com/takwerx/plss-grid/issues
 
 _________________________________________________________________
 PORTS REQUIRED
