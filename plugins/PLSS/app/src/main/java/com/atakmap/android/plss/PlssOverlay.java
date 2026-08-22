@@ -4,6 +4,8 @@ package com.atakmap.android.plss;
 import android.graphics.Color;
 import android.os.Environment;
 
+import com.atakmap.android.maps.MapView;
+import com.atakmap.android.preference.AtakPreferences;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.map.layer.AbstractLayer;
 
@@ -57,6 +59,17 @@ public class PlssOverlay extends AbstractLayer {
     private int sectionLabelColor = Color.WHITE;
     private int townshipLabelColor = 0xFFFF7700; // orange, as the lines
 
+    // Colour picks live in ATAK's preference store so they survive restarts;
+    // the field initializers above are the first-run defaults.
+    private static final String PREF_SECTION_COLOR = "plss.sectionColor";
+    private static final String PREF_TOWNSHIP_COLOR = "plss.townshipColor";
+    private static final String PREF_SECTION_LABEL_COLOR =
+            "plss.sectionLabelColor";
+    private static final String PREF_TOWNSHIP_LABEL_COLOR =
+            "plss.townshipLabelColor";
+
+    private final AtakPreferences prefs;
+
     private final ConcurrentLinkedQueue<OnPlssColorChangedListener> colorListeners = new ConcurrentLinkedQueue<>();
 
     /**
@@ -69,6 +82,27 @@ public class PlssOverlay extends AbstractLayer {
 
     public PlssOverlay(final String name) {
         super(name);
+
+        // The MapView exists by the time the plugin builds its overlay; a
+        // null here (unit tests) just means colours stay in-memory.
+        final MapView mapView = MapView.getMapView();
+        prefs = mapView != null
+                ? new AtakPreferences(mapView.getContext())
+                : null;
+        if (prefs != null) {
+            sectionColor = prefs.get(PREF_SECTION_COLOR, sectionColor);
+            townshipColor = prefs.get(PREF_TOWNSHIP_COLOR, townshipColor);
+            sectionLabelColor = prefs.get(PREF_SECTION_LABEL_COLOR,
+                    sectionLabelColor);
+            townshipLabelColor = prefs.get(PREF_TOWNSHIP_LABEL_COLOR,
+                    townshipLabelColor);
+        }
+    }
+
+    /** Setters write through here so a pick outlives the ATAK process. */
+    private void persist(String key, int color) {
+        if (prefs != null)
+            prefs.set(key, color);
     }
 
     /** Directory holding the installed packs. */
@@ -169,6 +203,7 @@ public class PlssOverlay extends AbstractLayer {
             this.sectionColor = color;
         }
 
+        persist(PREF_SECTION_COLOR, color);
         dispatchColorChanged();
     }
 
@@ -184,6 +219,7 @@ public class PlssOverlay extends AbstractLayer {
             this.townshipColor = color;
         }
 
+        persist(PREF_TOWNSHIP_COLOR, color);
         dispatchColorChanged();
     }
 
@@ -199,6 +235,7 @@ public class PlssOverlay extends AbstractLayer {
             this.sectionLabelColor = color;
         }
 
+        persist(PREF_SECTION_LABEL_COLOR, color);
         dispatchColorChanged();
     }
 
@@ -214,6 +251,7 @@ public class PlssOverlay extends AbstractLayer {
             this.townshipLabelColor = color;
         }
 
+        persist(PREF_TOWNSHIP_LABEL_COLOR, color);
         dispatchColorChanged();
     }
 
