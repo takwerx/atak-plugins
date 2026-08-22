@@ -125,7 +125,17 @@ fi
 
 if [ "$DO_BUILD" = 1 ]; then
     echo
-    echo "==> clean-extract build test (a zip that fails here fails on tak.gov)"
+    echo "==> publish scrub of the zip contents (PII, credentials, forbidden files)"
+SCRUB_DIR="$(mktemp -d)"
+( cd "$SCRUB_DIR" && unzip -q "$OUT" )
+if "$REPO_ROOT/scripts/publish-scrub.sh" "$SCRUB_DIR"; then
+    echo "  PASS  publish scrub"
+else
+    echo "  FAIL  publish scrub — see findings above"; FAIL=1
+fi
+rm -rf "$SCRUB_DIR"
+
+echo "==> clean-extract build test (a zip that fails here fails on tak.gov)"
     TMP="$(mktemp -d)"
     trap 'rm -rf "$TMP"' EXIT
     unzip -q "$OUT" -d "$TMP"

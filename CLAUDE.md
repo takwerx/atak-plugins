@@ -178,6 +178,48 @@ COMPILATION, DEVELOPER NOTES — and it *is* part of the zip. `docs/` is not: ke
 (`gradle/typst.gradle` only builds the PDF when `ATAK_CI=1`, and degrades to a warning
 when `docs/` is absent).
 
+## Publish scrub (hard stop) — nothing leaves this machine unscanned
+
+This repo is public, and so is every branch of it. Before **any** of these —
+`git push` to `takwerx/atak-plugins`, a tak.gov submission zip, a published guide
+or artifact, a GitHub release — run the scrub and get a PASS:
+
+```bash
+./scripts/publish-scrub.sh                 # tracked tree (what a push publishes)
+./scripts/publish-scrub.sh <dir>           # an extracted zip or a docs tree
+./scripts/publish-scrub.sh --file <path>   # one file, e.g. an artifact HTML
+```
+
+It fails on: personal identifiers (email addresses, phone numbers), machine-local
+paths (`/Users/...`, `/home/...`), real-looking IP addresses, credentials and
+keys (password/token/api-key literals, private-key blocks, AWS/GitHub/Slack
+tokens, `takrepo.user/password` values), SDK binaries and signing material
+(`main.jar`, `atak.apk`, `android_keystore`, `*.jks/*.keystore/*.p12`,
+`local.properties`), build output and data packs, and every literal in the
+**private** denylist `../atak-plugins-notes/publish-scrub.denylist` (the
+operator's own addresses, device serials — things that cannot be listed in a
+public file). Allowlisted on purpose: the SDK's shared dev keystore password,
+`noreply@anthropic.com`, schema URLs, loopback addresses.
+
+`.claude/hooks/publish-guard.sh` (wired in `.claude/settings.json`) runs the scrub
+automatically before any `git push`, `gh release`, or `submission-zip.sh` aimed
+at the public repo and **blocks on findings**. Do not work around a block; fix the
+content or move it to the private notes repo. `submission-zip.sh` also scrubs the
+extracted zip. Artifact publishes are tool calls the hook cannot see — run
+`--file` on the HTML yourself first.
+
+Policy the scrub enforces, in words:
+
+- **No personal contact details in public.** Point of contact is name + org +
+  the repository issue tracker. A specific email goes in only when the operator
+  names it for that purpose (the tak.gov submission README needs a POC — ask).
+- **Screenshots are reviewed by eye** before commit: callsigns, coordinates,
+  names, faces, plates, server addresses. The scrub cannot read pictures.
+- **Sensitive engineering detail lives in the private notes repo**, never here —
+  device serials, test locations, credentials custody, hashes of signed builds.
+- The notes repo is where a denylist entry is added the moment something
+  sensitive shows up anywhere; the scrub then holds the line mechanically.
+
 ## Process rules inherited from infra-TAK
 
 - Plan-first for anything beyond a hot fix — PLAN doc in `../atak-plugins-notes/docs/`.
