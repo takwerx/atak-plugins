@@ -1,4 +1,4 @@
-PLSS Grid
+ATAK Plugin — PLSS Grid
 
 **Download PLSS Grid 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
