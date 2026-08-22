@@ -2,6 +2,13 @@
 
 **Version 0.3 · takwerx**
 
+**Download PLSS Grid 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+
+- **ATAK-CIV 5.7:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.8.0-civ-release.apk
+
+All releases: https://github.com/takwerx/plss-grid/releases
+
 PLSS Grid draws the Public Land Survey System — townships, ranges and sections —
 on the ATAK map as a live overlay, from the Bureau of Land Management's own
 survey data. It works fully offline once you have downloaded the states you
@@ -199,4 +206,4 @@ handles this, but it is worth knowing what you are looking at:
 
 ## 6. Contact
 
-Andreas Johansson · takwerx · questions and issues: https://github.com/takwerx/atak-plugins/issues
+Andreas Johansson · takwerx · questions and issues: https://github.com/takwerx/plss-grid/issues
