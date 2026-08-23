@@ -102,6 +102,52 @@ cat >> "$DEST/app/proguard-gradle.txt" <<EOF
 -keep class com.atakmap.android.$PKG.** { *; }
 EOF
 
+# Each plugin directory is pushed out to its own public repo with git subtree, so it has
+# to be safe as a standalone repo root on its own — SDK binaries, signing material and
+# local.properties must be ignored there, not only by the monorepo root .gitignore.
+echo "==> writing .gitignore"
+cat > "$DEST/.gitignore" <<'GITIGNORE_EOF'
+# ATAK SDK artifacts — never commit (SDK license forbids redistribution)
+main.jar
+atak.apk
+atak-javadoc.jar
+atak-gradle-takdev.jar
+android_keystore
+
+# Signing material
+*.jks
+*.keystore
+*.p12
+keystore.properties
+
+# Machine-local paths and credentials
+local.properties
+
+# Unpacked by the takdev Gradle plugin at build time
+.takdev/
+
+# Build output
+.gradle/
+build/
+app/libs/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+
+# Submission zips
+dist/
+*.zip
+GITIGNORE_EOF
+
 echo "==> writing local.properties (gitignored — machine-local paths)"
 cat > "$DEST/local.properties" <<EOF
 # Machine-local. Gitignored: never commit real paths or credentials.
