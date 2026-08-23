@@ -77,6 +77,17 @@ Artifactory account exists. Do not "solve" CI by committing the SDK.
 
 `source scripts/env.sh` exports the above if a shell lacks them.
 
+## Remote dev: operator away with the phone
+
+When the operator is not at the Studio, the test phone is usually plugged into
+their MacBook and reached over NetBird: the MacBook runs the adb server, the
+Studio's adb points at it via `ADB_SERVER_SOCKET`. **Read
+`../atak-plugins-notes/docs/DEVICE-SETUP-remote.md` before touching adb in that
+situation** — it has the exact commands, the address, and the failure table.
+Shell state does not persist between Bash calls: export `ADB_SERVER_SOCKET`
+in every adb-touching command. With it set, only the MacBook's devices are
+visible (the Studio's emulator disappears); unset it for emulator work.
+
 ## Creating a plugin
 
 ```bash
