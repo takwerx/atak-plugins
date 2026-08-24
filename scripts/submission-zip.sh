@@ -90,7 +90,9 @@ echo "==> zipping from $PARENT"
 # rather than being a template with a hole in it.
 POC_FILE="${POC_FILE:-$REPO_ROOT/../atak-plugins-notes/submission-poc.txt}"
 if [ -f "$POC_FILE" ]; then
-    POC_LINE="$(grep -v '^[[:space:]]*#' "$POC_FILE" | sed '/^[[:space:]]*$/d' | head -1)"
+    # A file of comments only is the normal state, and grep matching nothing exits 1 —
+    # which under `set -e` would abort the whole script after the zip had been written.
+    POC_LINE="$(grep -v '^[[:space:]]*#' "$POC_FILE" 2>/dev/null | sed '/^[[:space:]]*$/d' | head -1 || true)"
 fi
 if [ -n "${POC_LINE:-}" ]; then
     POC_TMP="$(mktemp -d)"
@@ -109,6 +111,8 @@ if [ -n "${POC_LINE:-}" ]; then
     ( cd "$POC_TMP" && zip -q "$OUT" "$NAME/README.md" )
     rm -rf "$POC_TMP"
     echo "==> point of contact injected into the zip's README (not the tracked one)"
+elif [ -f "$POC_FILE" ]; then
+    echo "==> $POC_FILE holds no address — zip README carries the public contact line only"
 else
     echo "==> no $POC_FILE — zip README carries the public contact line only"
 fi
