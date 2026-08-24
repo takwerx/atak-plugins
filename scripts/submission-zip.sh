@@ -78,6 +78,45 @@ done
 echo "==> zipping from $PARENT"
 ( cd "$PARENT" && zip -rq "$OUT" "${INCLUDE[@]}" -x "*.DS_Store" "*/.git/*" )
 
+# --- point of contact ---------------------------------------------------------
+# tak.gov wants a contact address in the README. The public repo must never carry
+# one: publish-scrub blocks email addresses, and this same README is subtree-pushed
+# to the plugin's public GitHub repo verbatim. Those two requirements are only
+# compatible if the address never enters the tracked tree at all.
+#
+# So it lives in the private notes repo and is injected into the README *inside the
+# zip*, after the tracked tree has been zipped. The committed README keeps the
+# public contact line (name, org, issue tracker), which is correct on its own
+# rather than being a template with a hole in it.
+POC_FILE="${POC_FILE:-$REPO_ROOT/../atak-plugins-notes/submission-poc.txt}"
+if [ -f "$POC_FILE" ]; then
+    # A file of comments only is the normal state, and grep matching nothing exits 1 —
+    # which under `set -e` would abort the whole script after the zip had been written.
+    POC_LINE="$(grep -v '^[[:space:]]*#' "$POC_FILE" 2>/dev/null | sed '/^[[:space:]]*$/d' | head -1 || true)"
+fi
+if [ -n "${POC_LINE:-}" ]; then
+    POC_TMP="$(mktemp -d)"
+    ( cd "$POC_TMP" && unzip -q "$OUT" "$NAME/README.md" )
+    # Insert directly beneath the existing contact block, keeping the heading intact.
+    awk -v poc="$POC_LINE" '
+        /^POINT OF CONTACTS$/ { inpoc = 1 }
+        inpoc && /^https:\/\// { print; print poc; inpoc = 0; next }
+        { print }
+    ' "$POC_TMP/$NAME/README.md" > "$POC_TMP/README.new"
+    if ! grep -qF "$POC_LINE" "$POC_TMP/README.new"; then
+        echo "error: could not place the point of contact in README.md" >&2
+        rm -rf "$POC_TMP"; exit 1
+    fi
+    mv "$POC_TMP/README.new" "$POC_TMP/$NAME/README.md"
+    ( cd "$POC_TMP" && zip -q "$OUT" "$NAME/README.md" )
+    rm -rf "$POC_TMP"
+    echo "==> point of contact injected into the zip's README (not the tracked one)"
+elif [ -f "$POC_FILE" ]; then
+    echo "==> $POC_FILE holds no address — zip README carries the public contact line only"
+else
+    echo "==> no $POC_FILE — zip README carries the public contact line only"
+fi
+
 echo
 echo "==> verifying $OUT"
 FAIL=0
