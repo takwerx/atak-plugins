@@ -167,7 +167,7 @@ if [ "$DO_BUILD" = 1 ]; then
     echo "==> publish scrub of the zip contents (PII, credentials, forbidden files)"
 SCRUB_DIR="$(mktemp -d)"
 ( cd "$SCRUB_DIR" && unzip -q "$OUT" )
-if "$REPO_ROOT/scripts/publish-scrub.sh" "$SCRUB_DIR"; then
+if POC_ALLOW="${POC_LINE:-}" "$REPO_ROOT/scripts/publish-scrub.sh" "$SCRUB_DIR"; then
     echo "  PASS  publish scrub"
 else
     echo "  FAIL  publish scrub — see findings above"; FAIL=1

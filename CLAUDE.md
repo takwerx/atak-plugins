@@ -205,6 +205,26 @@ rejected or silently-broken submission:
 The script's last check extracts the zip to a clean directory and builds it — a zip that
 does not build from a clean extract will not build on tak.gov.
 
+### Point of contact — recorded once, injected automatically
+
+tak.gov requires a contact address in the submission README. The public repo must
+never carry one (publish-scrub blocks email addresses, and the same README is
+subtree-pushed to the plugin's public repo verbatim). Both hold only because the
+address never enters the tracked tree at all:
+
+- It lives in the **private notes repo**, one line in
+  `../atak-plugins-notes/submission-poc.txt` — the address itself is recorded
+  there and deliberately does not appear anywhere in this repo.
+- `submission-zip.sh` reads it and rewrites the README **inside the zip**, after
+  the tracked tree has been zipped, then passes it to the scrub as `POC_ALLOW` so
+  the zip's own scrub does not fail on the address it was just told to add.
+- `POC_ALLOW` allows that one literal, escaped, in that one run. Any other address,
+  and every other scrub category, still fails. Never widen it, and never set it by
+  hand to get a scrub to pass.
+
+Do not type the address into a README, a commit, or any file in this repo. If it
+ever needs to change, change that one line in the notes repo — nothing else.
+
 `README.md` keeps the SDK's template headings — PURPOSE AND CAPABILITIES, STATUS, POINT OF
 CONTACTS, **PORTS REQUIRED** (used for ATO/security review), EQUIPMENT REQUIRED/SUPPORTED,
 COMPILATION, DEVELOPER NOTES — and it *is* part of the zip. `docs/` is not: keep
@@ -245,8 +265,9 @@ extracted zip. Artifact publishes are tool calls the hook cannot see — run
 Policy the scrub enforces, in words:
 
 - **No personal contact details in public.** Point of contact is name + org +
-  the repository issue tracker. A specific email goes in only when the operator
-  names it for that purpose (the tak.gov submission README needs a POC — ask).
+  the repository issue tracker. The tak.gov submission README additionally needs a
+  real address; that is handled automatically and must never be done by hand — see
+  **Point of contact** under Publication.
 - **Screenshots are reviewed by eye** before commit: callsigns, coordinates,
   names, faces, plates, server addresses. The scrub cannot read pictures.
 - **Sensitive engineering detail lives in the private notes repo**, never here —
