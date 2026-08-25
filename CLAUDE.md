@@ -35,6 +35,48 @@ git subtree split --prefix=plugins/<Name> -b <name>-export
 git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/heads/main
 ```
 
+### The plugin page standard — `plss-grid` is the reference
+
+Every plugin's public repo looks the same. `takwerx/plss-grid` is the reference
+implementation; copy it rather than inventing a layout. A new plugin repo is not
+finished until all of this matches:
+
+**README.md** — in this exact order, and nothing between them:
+1. Title line `ATAK Plugin — <Display Name>`
+2. `**Download <Display Name> <ver>** (pick the one matching your ATAK-CIV
+   version, sideload, then load it in ATAK's Plugins manager):` then one bullet
+   per ATAK target, ascending, then `All releases: <releases URL>`
+3. `**User guide with screenshots: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)**`
+   with the absolute URL beneath it
+4. The SDK template headings, unchanged and in template order: PURPOSE AND
+   CAPABILITIES, STATUS, POINT OF CONTACTS, PORTS REQUIRED, EQUIPMENT REQUIRED,
+   EQUIPMENT SUPPORTED, COMPILATION, DEVELOPER NOTES
+
+Check it mechanically before shipping — this compares a plugin against the
+reference and should print only the plugin's own name:
+
+```bash
+skel() { sed -E 's/[A-Za-z0-9._-]+\.apk/APK/g; s/[0-9]+\.[0-9]+(\.[0-9]+)?/N/g; s#https://[^ )]*#URL#g' "$1" \
+  | awk '/^[A-Z][A-Z ]+$/ || /^\*\*/ || /^- \*\*/ {print}'; }
+diff <(skel plugins/PLSS/README.md) <(skel plugins/<Name>/README.md)
+```
+
+**GitHub repo metadata** — set these with `gh repo edit`; they are what the repo
+list and search show, and they are invisible from inside the README:
+- description: `ATAK Plugin: <Display Name> — <what it does>. Downloads, guide and issues here.`
+- website: the user guide's absolute URL
+- topics: `atak`, `atak-plugin`, `tak`, plus one or two domain topics
+- Issues enabled
+
+**docs/USER_GUIDE.md** — same download block as the README at the top, and a
+"Before you start" note listing which ATAK versions have published builds.
+
+A plugin's *support surface* is its own repo: its Releases carry the
+tak.gov-signed APKs, its Issues take the bug reports. Anything that is not a
+plugin but lives beside them (e.g. `plss-data`, which hosts the packs PLSS Grid
+downloads at runtime) says so in the first words of its description, so the repo
+list does not read as if it were something to install.
+
 Each `plugins/<Name>/` carries its own `.gitignore` so it is safe as a standalone
 repo root. Per-plugin tags/releases live in the plugin repo (`v0.3`); this repo
 does not carry plugin release tags. The root README is the index of plugins →
@@ -76,6 +118,17 @@ Artifactory account exists. Do not "solve" CI by committing the SDK.
 - Gradle comes from each project's wrapper (`./gradlew`, currently 8.14.3)
 
 `source scripts/env.sh` exports the above if a shell lacks them.
+
+## Remote dev: operator away with the phone
+
+When the operator is not at the Studio, the test phone is usually plugged into
+their MacBook and reached over NetBird: the MacBook runs the adb server, the
+Studio's adb points at it via `ADB_SERVER_SOCKET`. **Read
+`../atak-plugins-notes/docs/DEVICE-SETUP-remote.md` before touching adb in that
+situation** — it has the exact commands, the address, and the failure table.
+Shell state does not persist between Bash calls: export `ADB_SERVER_SOCKET`
+in every adb-touching command. With it set, only the MacBook's devices are
+visible (the Studio's emulator disappears); unset it for emulator work.
 
 ## Creating a plugin
 
@@ -178,9 +231,32 @@ rejected or silently-broken submission:
 - Every path lives under a single `<PluginName>/` root, zipped from the **parent** dir.
 - `gradle/wrapper/gradle-wrapper.jar` **must** be included — without it tak.gov's
   `./gradlew` cannot bootstrap (`Could not find or load main class …GradleWrapperMain`).
-- `.takdev/`, `app/libs/` (the ~30 MB SDK `main.jar`), `docs/`, build output,
+- `.takdev/`, `app/libs/` (the ~30 MB SDK `main.jar`), build output,
   `local.properties` and any keystore **must not** be included. tak.gov resolves the SDK
-  itself. The zip is ~100–300 KB; megabytes means something is wrong.
+  itself. Without a manual the zip is ~100–300 KB; megabytes means something is wrong.
+- `docs/user_manual/` **is** included when it exists, and is the one exception to the
+  docs rule. `gradle/typst.gradle` compiles it to `app/src/main/assets/usermanual.pdf`
+  when `ATAK_CI=1`, which is how the manual reaches the plugin — so tak.gov needs the
+  source, not a built PDF. It carries its own fonts and title art, which lifts the zip
+  to a few MB; the size gate moves with it. Everything else under `docs/` stays out.
+  Verify the manual against tak.gov's own typst version (0.13.1, pinned in
+  `typst.gradle`), not whatever is installed locally — the clean-extract build does not
+  run typst, because it builds without `ATAK_CI`.
+
+**A manual in `assets/` is unreachable.** Building the PDF is half the job: ATAK
+surfaces a plugin's documentation through its **Tool Preferences** entry, so a plugin
+without one ships the manual inside the APK with no way for anyone to open it. This
+shipped once, undetected, because the PDF *was* in the APK. Three pieces are required
+(`samples/dsmmanager` is the reference):
+
+- `res/xml/preferences.xml` with a `com.atakmap.android.gui.PanPreference` keyed `manual`
+- a fragment extending `com.atakmap.android.preference.PluginPreferenceFragment` whose
+  click handler calls `PdfHelper.extractAndShow(pluginContext, getActivity(),
+  "usermanual.pdf", <extract path>, true)`
+- `ToolsPreferenceFragment.register(new ToolPreference(title, summary, key, icon,
+  fragment))` on plugin start, and `unregister(key)` on stop
+
+Check it on a device by opening Settings → Tool Preferences, not by unzipping the APK.
 - `template.local.properties` (placeholders only) is included; the real `local.properties`
   never is.
 - `proguard-gradle-repackage.txt` must carry a plugin-specific descriptor
@@ -194,12 +270,33 @@ rejected or silently-broken submission:
 The script's last check extracts the zip to a clean directory and builds it — a zip that
 does not build from a clean extract will not build on tak.gov.
 
+### Point of contact — recorded once, injected automatically
+
+tak.gov requires a contact address in the submission README. The public repo must
+never carry one (publish-scrub blocks email addresses, and the same README is
+subtree-pushed to the plugin's public repo verbatim). Both hold only because the
+address never enters the tracked tree at all:
+
+- It lives in the **private notes repo**, one line in
+  `../atak-plugins-notes/submission-poc.txt` — the address itself is recorded
+  there and deliberately does not appear anywhere in this repo.
+- `submission-zip.sh` reads it and rewrites the README **inside the zip**, after
+  the tracked tree has been zipped, then passes it to the scrub as `POC_ALLOW` so
+  the zip's own scrub does not fail on the address it was just told to add.
+- `POC_ALLOW` allows that one literal, escaped, in that one run. Any other address,
+  and every other scrub category, still fails. Never widen it, and never set it by
+  hand to get a scrub to pass.
+
+Do not type the address into a README, a commit, or any file in this repo. If it
+ever needs to change, change that one line in the notes repo — nothing else.
+
 `README.md` keeps the SDK's template headings — PURPOSE AND CAPABILITIES, STATUS, POINT OF
 CONTACTS, **PORTS REQUIRED** (used for ATO/security review), EQUIPMENT REQUIRED/SUPPORTED,
-COMPILATION, DEVELOPER NOTES — and it *is* part of the zip. `docs/` is not: keep
-`docs/user_manual/*.typ` current for our own use, but it is excluded from the submission
-(`gradle/typst.gradle` only builds the PDF when `ATAK_CI=1`, and degrades to a warning
-when `docs/` is absent).
+COMPILATION, DEVELOPER NOTES — and it *is* part of the zip. So is
+`docs/user_manual/`, which tak.gov compiles into the plugin (see the point above);
+the rest of `docs/` is not. `gradle/typst.gradle` only builds the PDF when
+`ATAK_CI=1`, and degrades to a warning when the manual is absent, so a plugin
+without one still builds.
 
 ## Publish scrub (hard stop) — nothing leaves this machine unscanned
 
@@ -234,8 +331,9 @@ extracted zip. Artifact publishes are tool calls the hook cannot see — run
 Policy the scrub enforces, in words:
 
 - **No personal contact details in public.** Point of contact is name + org +
-  the repository issue tracker. A specific email goes in only when the operator
-  names it for that purpose (the tak.gov submission README needs a POC — ask).
+  the repository issue tracker. The tak.gov submission README additionally needs a
+  real address; that is handled automatically and must never be done by hand — see
+  **Point of contact** under Publication.
 - **Screenshots are reviewed by eye** before commit: callsigns, coordinates,
   names, faces, plates, server addresses. The scrub cannot read pictures.
 - **Sensitive engineering detail lives in the private notes repo**, never here —

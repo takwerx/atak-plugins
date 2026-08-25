@@ -2,6 +2,7 @@ ATAK Plugin — PLSS Grid
 
 **Download PLSS Grid 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
+- **ATAK-CIV 5.6:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.6.0-civ-release.apk
 - **ATAK-CIV 5.7:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.7.0-civ-release.apk
 - **ATAK-CIV 5.8:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.8.0-civ-release.apk
 
@@ -86,7 +87,7 @@ PORTS REQUIRED
 _________________________________________________________________
 EQUIPMENT REQUIRED
 
-  Android device supported by ATAK-CIV 5.7.
+  Android device supported by ATAK-CIV 5.6, 5.7 or 5.8.
   Storage for the data packs the operator installs. Packs are per state and
   range from about 6 MB to 124 MB; a typical western operating area of three or
   four states is under 100 MB.

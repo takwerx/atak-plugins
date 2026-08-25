@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">Map Depot</string>
+    <!-- Shown by ATAK's plugin manager -->
+    <string name="app_desc">Download ATAK map data — imagery map sources and DTED2 elevation by region — from inside ATAK. Every file is checksum-verified before it is installed.</string>
+
+    <!-- Landing -->
+    <string name="elevation_heading">Elevation (DTED2)</string>
+    <string name="maps_heading">Streaming Base Maps</string>
+
+
+    <!-- Depot pane -->
+    <string name="back">‹ Back</string>
+    <string name="loading_catalog">Loading catalog…</string>
+    <string name="get">Get</string>
+    <string name="cancel">Cancel</string>
+    <string name="cancel_download">Cancel download</string>
+    <string name="ok">OK</string>
+    <string name="installed">Installed</string>
+    <string name="remove">Remove</string>
+    <string name="finish">Finish</string>
+    <string name="filter_all">All</string>
+    <string name="filter_installed">Installed</string>
+    <string name="filter_available">Available</string>
+    <string name="forests_heading">Offline Public Lands</string>
+    <string name="search_forests">Search forests…</string>
+    <string name="recmaps_heading">Offline Ranger District Maps</string>
+    <string name="search_recmaps">Search district or forest…</string>
+    <string name="partial">Partial</string>
+    <string name="choose_category">Category</string>
+    <string name="all_categories">All categories</string>
+    <string name="choose_country">Country</string>
+    <string name="catalog_offline">Showing the last catalog — no connection to the depot.</string>
+    <string name="prefs_summary">Open the Map Depot user guide</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the Map Depot user guide: what each section downloads, how to find what you already have, and where files land</string>
+</resources>

@@ -82,6 +82,16 @@ done < <(list_files)
 # Each pattern is an extended regex; ALLOW is applied to matching lines.
 ALLOW='noreply@anthropic\.com|example\.com|schemas\.android\.com|w3\.org|0\.0\.0\.0|127\.0\.0\.1|localhost|tnttnt|wintec_mapping|takrepo\.(user|password)|takrepoUser|takrepoPassword|storePassword|keyPassword'
 
+# The tak.gov submission README must carry a point-of-contact address, and the
+# generic email scan would otherwise block the very zip that needs it. This is the
+# one sanctioned exception: submission-zip.sh exports POC_ALLOW with the single
+# address it just injected (read from the PRIVATE notes repo, never from the
+# tracked tree), and only that literal is allowed. Unset in every other run, so a
+# stray address in the public repo still fails.
+if [ -n "${POC_ALLOW:-}" ]; then
+    ALLOW="$ALLOW|$(printf '%s' "$POC_ALLOW" | sed 's/[^A-Za-z0-9_-]/\\&/g')"
+fi
+
 scan() { # category, regex
     local cat="$1" re="$2"
     while IFS= read -r f; do

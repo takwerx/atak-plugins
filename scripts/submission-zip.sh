@@ -8,7 +8,8 @@
 #   - every path inside the zip must sit under a single "<PluginName>/" root
 #   - the zip must be created from the PARENT of the project directory
 #   - gradle/wrapper/gradle-wrapper.jar MUST be included (tak.gov runs ./gradlew)
-#   - .takdev/, app/libs/, docs/, build output, local.properties and keystores must NOT
+#   - .takdev/, app/libs/, build output, local.properties and keystores must NOT
+#   - docs/user_manual/ IS included when present; tak.gov builds the PDF from it
 #   - the root folder name becomes the APK name
 #
 # By default the zip is extracted to a temp dir and built, because a zip that does not
@@ -58,6 +59,7 @@ CANDIDATES=(
     "$NAME/app/src/gov/"
     "$NAME/template.local.properties"
     "$NAME/README.md"
+    "$NAME/docs/user_manual/"
     "$NAME/gradle/"
     "$NAME/gradlew"
     "$NAME/gradlew.bat"
@@ -132,8 +134,19 @@ check() { # description, offending-lines
 
 SIZE_BYTES=$(wc -c < "$OUT" | tr -d ' ')
 SIZE_HUMAN=$(du -h "$OUT" | cut -f1 | tr -d ' ')
-if [ "$SIZE_BYTES" -lt 2000000 ]; then
-    echo "  PASS  size is $SIZE_HUMAN (expected KB, not MB)"
+# Without a manual a submission is a few hundred KB, and anything larger means the SDK
+# jar or build output crept in. A manual legitimately carries its own fonts, title art
+# and screenshots, so the ceiling moves -- but it is still a ceiling, and still well
+# under the ~30 MB that main.jar alone would add.
+if [ -d "$PROJECT/docs/user_manual" ]; then
+    SIZE_LIMIT=12000000
+    SIZE_NOTE="with the user manual"
+else
+    SIZE_LIMIT=2000000
+    SIZE_NOTE="expected KB, not MB"
+fi
+if [ "$SIZE_BYTES" -lt "$SIZE_LIMIT" ]; then
+    echo "  PASS  size is $SIZE_HUMAN ($SIZE_NOTE)"
 else
     echo "  FAIL  size is $SIZE_HUMAN — something large is in the zip"
     FAIL=1
@@ -141,7 +154,12 @@ fi
 
 check "every path is under $NAME/"        "$(zipinfo -1 "$OUT" | grep -v "^$NAME/" || true)"
 check "no app/libs/ or .takdev/"          "$(zipinfo -1 "$OUT" | grep -E "(libs/|takdev)" || true)"
-check "no docs/ or build output"          "$(zipinfo -1 "$OUT" | grep -E "(^$NAME/docs/|/build/|^$NAME/\.gradle/)" || true)"
+# docs/user_manual is the one part of docs/ that belongs in the zip: gradle/typst.gradle
+# builds the PDF from it when ATAK_CI=1, which is how the manual reaches the plugin's
+# assets. Everything else under docs/ -- screenshots for the public repo, icon sources,
+# the built PDF itself -- stays out; tak.gov builds the PDF rather than being handed one.
+check "no docs/ beyond user_manual"       "$(zipinfo -1 "$OUT" | grep -E "^$NAME/docs/" | grep -v "^$NAME/docs/user_manual/" || true)"
+check "no build output"                   "$(zipinfo -1 "$OUT" | grep -E "(/build/|^$NAME/\.gradle/)" || true)"
 check "only gradle-wrapper.jar as binary" "$(zipinfo -1 "$OUT" | grep -E '\.(jar|aar)$' | grep -v 'gradle-wrapper\.jar' || true)"
 check "no real local.properties/keystore" "$(zipinfo -1 "$OUT" | grep -E "local\.properties|keystore" | grep -v 'template\.local\.properties' || true)"
 
@@ -167,7 +185,7 @@ if [ "$DO_BUILD" = 1 ]; then
     echo "==> publish scrub of the zip contents (PII, credentials, forbidden files)"
 SCRUB_DIR="$(mktemp -d)"
 ( cd "$SCRUB_DIR" && unzip -q "$OUT" )
-if "$REPO_ROOT/scripts/publish-scrub.sh" "$SCRUB_DIR"; then
+if POC_ALLOW="${POC_LINE:-}" "$REPO_ROOT/scripts/publish-scrub.sh" "$SCRUB_DIR"; then
     echo "  PASS  publish scrub"
 else
     echo "  FAIL  publish scrub — see findings above"; FAIL=1
