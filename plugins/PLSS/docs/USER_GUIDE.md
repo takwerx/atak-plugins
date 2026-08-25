@@ -4,6 +4,7 @@
 
 **Download PLSS Grid 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
+- **ATAK-CIV 5.6:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.6.0-civ-release.apk
 - **ATAK-CIV 5.7:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.7.0-civ-release.apk
 - **ATAK-CIV 5.8:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.8.0-civ-release.apk
 
@@ -44,7 +45,7 @@ fills that gap.
 ## 2. Before you start
 
 - **Match the plugin to your ATAK version.** Plugin builds are tied to the ATAK
-  release they were built for (5.7 and 5.8 builds are published). A mismatched
+  release they were built for (5.6, 5.7 and 5.8 builds are published). A mismatched
   build will not load.
 - **Install and load the plugin** through ATAK's *Plugins* manager (TAK Package
   Mgmt), the same as any other plugin.
