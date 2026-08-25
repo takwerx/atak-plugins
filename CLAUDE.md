@@ -35,6 +35,48 @@ git subtree split --prefix=plugins/<Name> -b <name>-export
 git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/heads/main
 ```
 
+### The plugin page standard — `plss-grid` is the reference
+
+Every plugin's public repo looks the same. `takwerx/plss-grid` is the reference
+implementation; copy it rather than inventing a layout. A new plugin repo is not
+finished until all of this matches:
+
+**README.md** — in this exact order, and nothing between them:
+1. Title line `ATAK Plugin — <Display Name>`
+2. `**Download <Display Name> <ver>** (pick the one matching your ATAK-CIV
+   version, sideload, then load it in ATAK's Plugins manager):` then one bullet
+   per ATAK target, ascending, then `All releases: <releases URL>`
+3. `**User guide with screenshots: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)**`
+   with the absolute URL beneath it
+4. The SDK template headings, unchanged and in template order: PURPOSE AND
+   CAPABILITIES, STATUS, POINT OF CONTACTS, PORTS REQUIRED, EQUIPMENT REQUIRED,
+   EQUIPMENT SUPPORTED, COMPILATION, DEVELOPER NOTES
+
+Check it mechanically before shipping — this compares a plugin against the
+reference and should print only the plugin's own name:
+
+```bash
+skel() { sed -E 's/[A-Za-z0-9._-]+\.apk/APK/g; s/[0-9]+\.[0-9]+(\.[0-9]+)?/N/g; s#https://[^ )]*#URL#g' "$1" \
+  | awk '/^[A-Z][A-Z ]+$/ || /^\*\*/ || /^- \*\*/ {print}'; }
+diff <(skel plugins/PLSS/README.md) <(skel plugins/<Name>/README.md)
+```
+
+**GitHub repo metadata** — set these with `gh repo edit`; they are what the repo
+list and search show, and they are invisible from inside the README:
+- description: `ATAK Plugin: <Display Name> — <what it does>. Downloads, guide and issues here.`
+- website: the user guide's absolute URL
+- topics: `atak`, `atak-plugin`, `tak`, plus one or two domain topics
+- Issues enabled
+
+**docs/USER_GUIDE.md** — same download block as the README at the top, and a
+"Before you start" note listing which ATAK versions have published builds.
+
+A plugin's *support surface* is its own repo: its Releases carry the
+tak.gov-signed APKs, its Issues take the bug reports. Anything that is not a
+plugin but lives beside them (e.g. `plss-data`, which hosts the packs PLSS Grid
+downloads at runtime) says so in the first words of its description, so the repo
+list does not read as if it were something to install.
+
 Each `plugins/<Name>/` carries its own `.gitignore` so it is safe as a standalone
 repo root. Per-plugin tags/releases live in the plugin repo (`v0.3`); this repo
 does not carry plugin release tags. The root README is the index of plugins →

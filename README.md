@@ -9,6 +9,11 @@ repository — README, user guide, downloads and issues all in one place:
 | Plugin | What it does | Public repo (downloads, guide, issues) |
 |---|---|---|
 | PLSS Grid | Township, range and section overlay from BLM survey data | https://github.com/takwerx/plss-grid |
+| Traffic | Live traffic over your own base map, refreshing while the map sits still | https://github.com/takwerx/traffic |
+
+PLSS Grid also has a data repository, [plss-data](https://github.com/takwerx/plss-data),
+which hosts the per-state packs the plugin downloads at runtime. It is not a
+plugin and there is nothing to install from it.
 
 This repository is the development workspace: shared tooling, build rules, and
 every plugin side by side. Each plugin directory is pushed out to its public repo
