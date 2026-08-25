@@ -212,6 +212,23 @@ arrives, but it should not be where bugs are first discovered.
 The local PDF lands in `app/src/main/assets/usermanual.pdf`, which is gitignored and
 excluded from the submission zip — tak.gov builds its own.
 
+**If the plugin downloads from a catalog, verify the catalog against the servers
+before shipping.** Reading the catalog is not the same as asking whether anything
+will serve it, and the interesting failures are silent: `data.fs.usda.gov` answers
+`204 No Content` — no body, no error — for a map it does not hold, and ATAK's own
+downloader would report that as a generic failure. Map Depot 0.5 shipped with all 173
+whole-forest maps unreachable because the plugin asked for the wrong `seriesType`, and
+that was found by a user rather than by us.
+
+```bash
+../atak-plugins-notes/tools/verify_packages.py     # 832 packages, ~2 min, non-zero on failure
+```
+
+It builds each URL the way the plugin does and asks for one byte, so it is cheap
+enough to run before every submission and after every catalog regeneration. Keep it
+mirroring the plugin's URL construction — a verifier that builds URLs differently
+proves nothing about what users get.
+
 ## ATAK version targeting — the silent-failure trap
 
 Officially built plugins are **version-matched to the ATAK release they were built
