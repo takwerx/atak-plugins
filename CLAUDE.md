@@ -242,6 +242,21 @@ rejected or silently-broken submission:
   Verify the manual against tak.gov's own typst version (0.13.1, pinned in
   `typst.gradle`), not whatever is installed locally — the clean-extract build does not
   run typst, because it builds without `ATAK_CI`.
+
+**A manual in `assets/` is unreachable.** Building the PDF is half the job: ATAK
+surfaces a plugin's documentation through its **Tool Preferences** entry, so a plugin
+without one ships the manual inside the APK with no way for anyone to open it. This
+shipped once, undetected, because the PDF *was* in the APK. Three pieces are required
+(`samples/dsmmanager` is the reference):
+
+- `res/xml/preferences.xml` with a `com.atakmap.android.gui.PanPreference` keyed `manual`
+- a fragment extending `com.atakmap.android.preference.PluginPreferenceFragment` whose
+  click handler calls `PdfHelper.extractAndShow(pluginContext, getActivity(),
+  "usermanual.pdf", <extract path>, true)`
+- `ToolsPreferenceFragment.register(new ToolPreference(title, summary, key, icon,
+  fragment))` on plugin start, and `unregister(key)` on stop
+
+Check it on a device by opening Settings → Tool Preferences, not by unzipping the APK.
 - `template.local.properties` (placeholders only) is included; the real `local.properties`
   never is.
 - `proguard-gradle-repackage.txt` must carry a plugin-specific descriptor
