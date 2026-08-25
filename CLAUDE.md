@@ -190,6 +190,28 @@ produces a plugin that builds fine and then refuses to load:
 
 Never submit or field a plugin that has only been run as `civDebug`.
 
+**Test the release build BEFORE submitting, not after.** Waiting for tak.gov to sign
+an APK to find out whether the plugin works turns every bug into a full round trip —
+Map Depot burned 0.1 through 0.4 in a day that way, and 0.4's signed APKs were thrown
+away because the manual could not be opened. You do not need tak.gov to test any of
+this: `assembleCivRelease` runs the same minify and proguard locally, signed with the
+SDK's shared dev keystore.
+
+```bash
+cd plugins/<Name>
+./gradlew assembleCivRelease -PbuildManual        # same proguard, manual included
+adb install -r app/build/outputs/apk/civ/release/ATAK-Plugin-*.apk
+```
+
+`-PbuildManual` compiles `docs/user_manual/` with a local typst, so the manual is in
+the APK and can be **opened on the device** — the only way to catch a manual that has
+no preferences entry to reach it. The signed build differs only in who signed it, so
+what passes here passes there. The tak.gov-signed APK still gets a load check when it
+arrives, but it should not be where bugs are first discovered.
+
+The local PDF lands in `app/src/main/assets/usermanual.pdf`, which is gitignored and
+excluded from the submission zip — tak.gov builds its own.
+
 ## ATAK version targeting — the silent-failure trap
 
 Officially built plugins are **version-matched to the ATAK release they were built
