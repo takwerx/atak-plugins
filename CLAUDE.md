@@ -231,9 +231,17 @@ rejected or silently-broken submission:
 - Every path lives under a single `<PluginName>/` root, zipped from the **parent** dir.
 - `gradle/wrapper/gradle-wrapper.jar` **must** be included — without it tak.gov's
   `./gradlew` cannot bootstrap (`Could not find or load main class …GradleWrapperMain`).
-- `.takdev/`, `app/libs/` (the ~30 MB SDK `main.jar`), `docs/`, build output,
+- `.takdev/`, `app/libs/` (the ~30 MB SDK `main.jar`), build output,
   `local.properties` and any keystore **must not** be included. tak.gov resolves the SDK
-  itself. The zip is ~100–300 KB; megabytes means something is wrong.
+  itself. Without a manual the zip is ~100–300 KB; megabytes means something is wrong.
+- `docs/user_manual/` **is** included when it exists, and is the one exception to the
+  docs rule. `gradle/typst.gradle` compiles it to `app/src/main/assets/usermanual.pdf`
+  when `ATAK_CI=1`, which is how the manual reaches the plugin — so tak.gov needs the
+  source, not a built PDF. It carries its own fonts and title art, which lifts the zip
+  to a few MB; the size gate moves with it. Everything else under `docs/` stays out.
+  Verify the manual against tak.gov's own typst version (0.13.1, pinned in
+  `typst.gradle`), not whatever is installed locally — the clean-extract build does not
+  run typst, because it builds without `ATAK_CI`.
 - `template.local.properties` (placeholders only) is included; the real `local.properties`
   never is.
 - `proguard-gradle-repackage.txt` must carry a plugin-specific descriptor
@@ -269,10 +277,11 @@ ever needs to change, change that one line in the notes repo — nothing else.
 
 `README.md` keeps the SDK's template headings — PURPOSE AND CAPABILITIES, STATUS, POINT OF
 CONTACTS, **PORTS REQUIRED** (used for ATO/security review), EQUIPMENT REQUIRED/SUPPORTED,
-COMPILATION, DEVELOPER NOTES — and it *is* part of the zip. `docs/` is not: keep
-`docs/user_manual/*.typ` current for our own use, but it is excluded from the submission
-(`gradle/typst.gradle` only builds the PDF when `ATAK_CI=1`, and degrades to a warning
-when `docs/` is absent).
+COMPILATION, DEVELOPER NOTES — and it *is* part of the zip. So is
+`docs/user_manual/`, which tak.gov compiles into the plugin (see the point above);
+the rest of `docs/` is not. `gradle/typst.gradle` only builds the PDF when
+`ATAK_CI=1`, and degrades to a warning when the manual is absent, so a plugin
+without one still builds.
 
 ## Publish scrub (hard stop) — nothing leaves this machine unscanned
 
