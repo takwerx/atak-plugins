@@ -13,6 +13,28 @@ try:
 except Exception:
     sys.exit(0)
 cmd = (data.get("tool_input") or {}).get("command", "") or ""
+
+# Heredoc bodies are data, not commands. A commit message describing a release,
+# or a handoff document quoting a release command, used to trip every rule below
+# and block work that touched no remote at all -- including, once, the edit that
+# fixed this. Strip heredoc bodies before matching anything.
+def _strip_heredocs(text):
+    out, lines, i = [], text.split("\n"), 0
+    while i < len(lines):
+        out.append(lines[i])
+        m = re.search(r"""<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?""", lines[i])
+        i += 1
+        if not m:
+            continue
+        end = m.group(1)
+        while i < len(lines) and lines[i].strip() != end:
+            i += 1
+        if i < len(lines):
+            out.append(lines[i])
+            i += 1
+    return "\n".join(out)
+
+cmd = _strip_heredocs(cmd)
 if "git" not in cmd and "gh " not in cmd:
     sys.exit(0)
 
@@ -71,7 +93,13 @@ if re.search(r'\bgit\b[^|;&]*\bpush\b', cmd):
         block("git push --tags")
     if re.search(r'\bpush\b[^|;&]*[\s:+]main\b', cmd):
         block("git push to main")
-    if re.search(r'\bpush\b[^|;&]*\s\+?[A-Za-z]*-?v\d+\.\d+', cmd):
+    # Match the ref, not any string containing a version. A branch named
+    # `mapdepot-v0.1` is a branch, and blocking its push blocked ordinary work
+    # for a whole session; only a tag ref, or a bare version standing as its own
+    # argument, is a release push.
+    if re.search(r'\bpush\b[^|;&]*refs/tags/', cmd):
+        block("git push of a tag ref")
+    if re.search(r'\bpush\b[^|;&]*(?<![\w./-])\+?v\d+(?:\.\d+)+(?![\w.-])', cmd):
         block("git push of a version tag")
 
 m = re.search(r'\bgit\s+(?:[-\w=.]+\s+)*tag\b\s*(.*)', cmd)

@@ -78,7 +78,12 @@ for path in "${CANDIDATES[@]}"; do
 done
 
 echo "==> zipping from $PARENT"
-( cd "$PARENT" && zip -rq "$OUT" "${INCLUDE[@]}" -x "*.DS_Store" "*/.git/*" )
+# usermanual.pdf is BUILD OUTPUT that lands in the source tree: a local
+# `-PbuildManual` run writes it into app/src/main/assets/, which is zipped
+# wholesale. tak.gov compiles the manual from docs/user_manual/ itself, so a
+# stale local PDF riding along would be both wrong and megabytes of it.
+( cd "$PARENT" && zip -rq "$OUT" "${INCLUDE[@]}" \
+    -x "*.DS_Store" "*/.git/*" "$NAME/app/src/main/assets/usermanual.pdf" )
 
 # --- point of contact ---------------------------------------------------------
 # tak.gov wants a contact address in the README. The public repo must never carry
@@ -160,6 +165,7 @@ check "no app/libs/ or .takdev/"          "$(zipinfo -1 "$OUT" | grep -E "(libs/
 # the built PDF itself -- stays out; tak.gov builds the PDF rather than being handed one.
 check "no docs/ beyond user_manual"       "$(zipinfo -1 "$OUT" | grep -E "^$NAME/docs/" | grep -v "^$NAME/docs/user_manual/" || true)"
 check "no build output"                   "$(zipinfo -1 "$OUT" | grep -E "(/build/|^$NAME/\.gradle/)" || true)"
+check "no built manual in assets"         "$(zipinfo -1 "$OUT" | grep -E "^$NAME/app/src/main/assets/usermanual\.pdf$" || true)"
 check "only gradle-wrapper.jar as binary" "$(zipinfo -1 "$OUT" | grep -E '\.(jar|aar)$' | grep -v 'gradle-wrapper\.jar' || true)"
 check "no real local.properties/keystore" "$(zipinfo -1 "$OUT" | grep -E "local\.properties|keystore" | grep -v 'template\.local\.properties' || true)"
 

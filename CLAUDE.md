@@ -190,6 +190,68 @@ produces a plugin that builds fine and then refuses to load:
 
 Never submit or field a plugin that has only been run as `civDebug`.
 
+**Test the release build BEFORE submitting, not after.** Waiting for tak.gov to sign
+an APK to find out whether the plugin works turns every bug into a full round trip —
+Map Depot burned 0.1 through 0.4 in a day that way, and 0.4's signed APKs were thrown
+away because the manual could not be opened. You do not need tak.gov to test any of
+this: `assembleCivRelease` runs the same minify and proguard locally, signed with the
+SDK's shared dev keystore.
+
+```bash
+cd plugins/<Name>
+./gradlew assembleCivRelease -PbuildManual        # same proguard, manual included
+adb install -r app/build/outputs/apk/civ/release/ATAK-Plugin-*.apk
+```
+
+`-PbuildManual` compiles `docs/user_manual/` with a local typst, so the manual is in
+the APK and can be **opened on the device** — the only way to catch a manual that has
+no preferences entry to reach it. The signed build differs only in who signed it, so
+what passes here passes there. The tak.gov-signed APK still gets a load check when it
+arrives, but it should not be where bugs are first discovered.
+
+The local PDF lands in `app/src/main/assets/usermanual.pdf`, which is gitignored and
+excluded from the submission zip — tak.gov builds its own.
+
+**A tak.gov-signed APK cannot load on the SDK's development ATAK, and a locally
+built one cannot load on official ATAK.** They are mirror images and neither is
+broken. Official ATAK is obfuscated, so `gov.tak.api.plugin.IServiceController` is
+`gov.tak.api.plugin.a` there; tak.gov builds plugins to match it. The SDK's
+`atak.apk` is a dev build with the real names, so a signed plugin fails on it with
+`ClassNotFoundException: Didn't find class "gov.tak.api.plugin.a"` and
+`failed to load extension`. That reads exactly like a broken release and is not one.
+
+Consequence for testing, and it is not optional:
+
+- **Locally built APKs** (debug or `assembleCivRelease`) — test on a device running
+  the SDK's `atak.apk`. That is where proguard breakage shows up.
+- **tak.gov-signed APKs** — test ONLY on a device running **official** ATAK from
+  tak.gov or the Play Store. A dev-build device can never validate one.
+
+Check which a device has before drawing conclusions: if `versionName` matches the
+SDK's `atak.apk` exactly, including the build hash in brackets, it is the dev build.
+
+```bash
+aapt2 dump badging "$ATAK_SDK/atak.apk" | grep versionName    # e.g. 5.8.0.3 (4f67063)
+adb shell dumpsys package com.atakmap.app.civ | grep versionName
+```
+
+**If the plugin downloads from a catalog, verify the catalog against the servers
+before shipping.** Reading the catalog is not the same as asking whether anything
+will serve it, and the interesting failures are silent: `data.fs.usda.gov` answers
+`204 No Content` — no body, no error — for a map it does not hold, and ATAK's own
+downloader would report that as a generic failure. Map Depot 0.5 shipped with all 173
+whole-forest maps unreachable because the plugin asked for the wrong `seriesType`, and
+that was found by a user rather than by us.
+
+```bash
+../atak-plugins-notes/tools/verify_packages.py     # 832 packages, ~2 min, non-zero on failure
+```
+
+It builds each URL the way the plugin does and asks for one byte, so it is cheap
+enough to run before every submission and after every catalog regeneration. Keep it
+mirroring the plugin's URL construction — a verifier that builds URLs differently
+proves nothing about what users get.
+
 ## ATAK version targeting — the silent-failure trap
 
 Officially built plugins are **version-matched to the ATAK release they were built

@@ -38,7 +38,13 @@ public final class Depot {
      * ampersand or equals here would append a parameter of someone else's
      * choosing.
      */
-    private static final Pattern MAP_ID = Pattern.compile("[A-Za-z0-9 .'-]{1,120}");
+    // Commas are in here because forests have them: "Grand Mesa, Uncompahgre and
+    // Gunnison National Forests" was rejected on every catalog load and was
+    // therefore invisible and undownloadable, while the Forest Service serves it
+    // perfectly well. The value is URL-encoded before it reaches a query string,
+    // so a comma cannot separate a parameter; the pattern is defence in depth,
+    // not the escaping.
+    private static final Pattern MAP_ID = Pattern.compile("[A-Za-z0-9 .,'-]{1,120}");
 
     /**
      * A region id becomes part of a filename in the cache directory, so it is
@@ -519,6 +525,15 @@ public final class Depot {
             unit = o.optString("unit", "");
             state = o.optString("state", "");
             bytes = o.optLong("bytes");
+
+            // Held to the same shape as mapId, and for the same reason: it is
+            // now per-map catalog data going into a query string on a host we
+            // do not control. URLEncoder alone would stop a smuggled
+            // parameter, but the pattern is what the rest of this file relies
+            // on and an unvalidated field here would be the odd one out.
+            if (series == null || !MAP_ID.matcher(series).matches())
+                throw new IllegalArgumentException(
+                        "rec map " + id + " has no usable series: " + series);
             this.series = series;
         }
 
@@ -608,7 +623,14 @@ public final class Depot {
         if (section == null)
             return Collections.emptyList();
 
-        final String series = section.optString("series", "Ranger District");
+        // Section-level default, kept for a catalog that names the series once
+        // for the whole list. Each map may override it, and most do: a
+        // whole-forest sheet is series "Forest", a district sheet is series
+        // "Ranger District", and the Forest Service gateway answers 204 No
+        // Content for the wrong pairing rather than an error anyone could read.
+        // Applying the section default to every map sent all 173 whole-forest
+        // maps to the district series, so not one of them could ever download.
+        final String fallbackSeries = section.optString("series", "Ranger District");
         final JSONArray arr = section.optJSONArray("maps");
         if (arr == null)
             return Collections.emptyList();
@@ -619,7 +641,7 @@ public final class Depot {
             if (o == null)
                 continue;
             try {
-                out.add(new RecMap(o, series));
+                out.add(new RecMap(o, o.optString("series", fallbackSeries)));
             } catch (IllegalArgumentException bad) {
                 com.atakmap.coremap.log.Log.w("MapDepot",
                         "rejected rec map: " + bad.getMessage());
