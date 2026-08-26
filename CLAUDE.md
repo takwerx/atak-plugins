@@ -212,6 +212,29 @@ arrives, but it should not be where bugs are first discovered.
 The local PDF lands in `app/src/main/assets/usermanual.pdf`, which is gitignored and
 excluded from the submission zip — tak.gov builds its own.
 
+**A tak.gov-signed APK cannot load on the SDK's development ATAK, and a locally
+built one cannot load on official ATAK.** They are mirror images and neither is
+broken. Official ATAK is obfuscated, so `gov.tak.api.plugin.IServiceController` is
+`gov.tak.api.plugin.a` there; tak.gov builds plugins to match it. The SDK's
+`atak.apk` is a dev build with the real names, so a signed plugin fails on it with
+`ClassNotFoundException: Didn't find class "gov.tak.api.plugin.a"` and
+`failed to load extension`. That reads exactly like a broken release and is not one.
+
+Consequence for testing, and it is not optional:
+
+- **Locally built APKs** (debug or `assembleCivRelease`) — test on a device running
+  the SDK's `atak.apk`. That is where proguard breakage shows up.
+- **tak.gov-signed APKs** — test ONLY on a device running **official** ATAK from
+  tak.gov or the Play Store. A dev-build device can never validate one.
+
+Check which a device has before drawing conclusions: if `versionName` matches the
+SDK's `atak.apk` exactly, including the build hash in brackets, it is the dev build.
+
+```bash
+aapt2 dump badging "$ATAK_SDK/atak.apk" | grep versionName    # e.g. 5.8.0.3 (4f67063)
+adb shell dumpsys package com.atakmap.app.civ | grep versionName
+```
+
 **If the plugin downloads from a catalog, verify the catalog against the servers
 before shipping.** Reading the catalog is not the same as asking whether anything
 will serve it, and the interesting failures are silent: `data.fs.usda.gov` answers
