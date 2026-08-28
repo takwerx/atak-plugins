@@ -82,6 +82,63 @@ repo root. Per-plugin tags/releases live in the plugin repo (`v0.3`); this repo
 does not carry plugin release tags. The root README is the index of plugins →
 public repos. `/ship` covers the subtree push and the per-plugin release.
 
+## Plugin UI standard — look like ATAK, not like a plugin
+
+Every takwerx plugin uses the same controls, so a user moving between them is not
+learning a new dialect each time. `CamDepot` is the reference implementation.
+
+**Use ATAK's own button drawables.** `new-plugin.sh` already copies them out of the
+SDK template — `btn_gray` is a selector over `new_dark_button_bg` /
+`_selected` / `_disabled`: black-to-`#383838` gradient, `#585858` border, green
+border when pressed, flat grey when disabled. Do not invent a button background.
+
+Add this to `res/values/styles.xml` verbatim and use it on **every** button. ATAK's
+own `darkButton` sets vertical padding only, which lets a short label render wider
+than its own background:
+
+```xml
+<style name="TakwerxButton" parent="@style/darkButton">
+    <item name="android:paddingLeft">12dp</item>
+    <item name="android:paddingRight">12dp</item>
+    <item name="android:paddingTop">6dp</item>
+    <item name="android:paddingBottom">8dp</item>
+    <item name="android:minHeight">44dp</item>
+    <item name="android:minWidth">0dp</item>
+    <item name="android:textSize">15sp</item>
+    <item name="android:singleLine">true</item>
+    <item name="android:ellipsize">end</item>
+</style>
+```
+
+`style="@style/TakwerxButton"` on the widget — no per-button `textSize`, or it
+fights the style. 44dp minimum height is a touch target for a gloved hand on a
+vehicle mount, not a cosmetic choice.
+
+**Never use a Spinner.** Its dropdown is a `Dialog` built from the context that
+inflated the view; on the plugin context that is `BadTokenException` and **ATAK
+dies**. Use a `TakwerxButton` showing the current value, opening an
+`AlertDialog.Builder(mapView.getContext()).setSingleChoiceItems(...)`. Same rule for
+every dialog and toast: **MapView context, never plugin context**.
+
+**A ListView cannot live inside a ScrollView.** If a panel's controls are taller
+than the pane, put them in the list's `addHeaderView()` so the whole panel is one
+scroller — and offset click positions by `getHeaderViewsCount()`.
+
+**Label sections, and put counts on filters.** Small caps headings (10sp,
+`textAllCaps`, `alpha=0.6`) over each group. A filter states what it will cost
+before it is used — `Video (1,013)`, not `Video` — otherwise the only way to learn
+what a control does is to toggle it and watch a total move.
+
+**Distances follow ATAK, never a hardcoded unit.** Read `rab_rng_units_pref` and
+format through `SpanUtilities.formatType(type, metres, Span.METER)`. Note that
+`Span.ENGLISH = 0` and `METRIC = 1` — assuming the obvious ordering gets it exactly
+backwards. For a fixed list of values pin the large unit instead, or 800 m appears
+as "2624 ft" beside entries in miles.
+
+**Say what is not being shown.** If a view is truncated or gated, the panel says so
+in words the operator can act on — "map shows nearest 300, zoom in" — because a
+silently trimmed map reads as the whole picture.
+
 ## The SDK lives outside this repo
 
 - Path: `~/atak-sdk/ATAK-CIV-<version>/` (currently `ATAK-CIV-5.6.0.8`).
