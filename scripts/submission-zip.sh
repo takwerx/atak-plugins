@@ -202,10 +202,28 @@ echo "==> clean-extract build test (a zip that fails here fails on tak.gov)"
     TMP="$(mktemp -d)"
     trap 'rm -rf "$TMP"' EXIT
     unzip -q "$OUT" -d "$TMP"
+    # Build against the SDK this plugin TARGETS, not whatever ATAK_SDK happens to
+    # default to. env.sh pins one version for the repo, and a plugin targeting a
+    # different one was being test-built against the wrong API -- which either
+    # fails for reasons tak.gov will not see, or passes while hiding a real
+    # incompatibility. ext.ATAK_VERSION is the plugin's own answer; the newest
+    # installed SDK matching it is the one tak.gov will use.
+    WANT="$(sed -n "s/.*ext\.ATAK_VERSION *= *'\([^']*\)'.*/\1/p" \
+            "$TMP/$NAME/app/build.gradle" | head -1)"
+    BUILD_SDK="$ATAK_SDK"
+    if [ -n "$WANT" ]; then
+        MATCH="$(ls -d "$HOME"/atak-sdk/ATAK-CIV-"$WANT"* 2>/dev/null | sort -V | tail -1)"
+        if [ -n "$MATCH" ]; then
+            BUILD_SDK="$MATCH"
+        else
+            echo "  WARN  no SDK found for ATAK_VERSION $WANT; using $ATAK_SDK"
+        fi
+    fi
+    echo "  ..    building against $(basename "$BUILD_SDK") (plugin targets $WANT)"
     cat > "$TMP/$NAME/local.properties" <<EOF
 sdk.dir=$ANDROID_HOME
-sdk.path=$ATAK_SDK
-takdev.plugin=$ATAK_SDK/atak-gradle-takdev.jar
+sdk.path=$BUILD_SDK
+takdev.plugin=$BUILD_SDK/atak-gradle-takdev.jar
 EOF
     if ( cd "$TMP/$NAME" && ./gradlew assembleCivDebug -q >/dev/null 2>&1 ); then
         echo "  PASS  extracted zip builds assembleCivDebug"
