@@ -8,8 +8,8 @@
 
 buildscript {
 
-    ext.PLUGIN_VERSION = "0.2"
-    ext.ATAK_VERSION = '5.8.0'
+    ext.PLUGIN_VERSION = "0.1"
+    ext.ATAK_VERSION = '5.7.0'
 
     def takdevVersion = '3.+'
 
@@ -103,7 +103,7 @@ def supportedFlavors =
 
 android {
     compileSdk 36
-    namespace 'com.atakmap.android.traffic.plugin'
+    namespace 'com.atakmap.android.weather.plugin'
 
     buildFeatures {
         buildConfig = true
@@ -286,9 +286,12 @@ def getCommandFlavor() {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: '*.jar')
-    // The SDK template ships an ExampleTest and no junit, so testCivDebugUnitTest
-    // could not compile in any plugin scaffolded from it.
+
+    // Unit tests only — neither reaches the APK. org.json is the JVM implementation of
+    // the same API Android provides, so the source-definition parser and the response
+    // mapper are testable off-device.
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
 }
 
 configurations.all {
@@ -308,9 +311,6 @@ configurations.all {
         if (details.requested.group == 'com.squareup.okio') {
             details.useVersion "3.2.0"
         } 
-        if (requested.group == 'org.jetbrains.kotlinx' && requested.name == 'kotlinx-serialization-core') {
-            details.useVersion "1.7.3"
-        }
     }   
 }           
         
@@ -322,7 +322,5 @@ configurations.implementation {
        exclude group: 'androidx.lifecycle', module: 'lifecycle-process'
        exclude group: 'com.squareup.okhttp3', module: 'okhttp'
        exclude group: 'com.squareup.okio', module: 'okio' 
-       exclude group: 'org.jetbrains.kotlinx', module: 'kotlinx-serialization-core'
-
 }       
 

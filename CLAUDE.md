@@ -460,6 +460,39 @@ Policy the scrub enforces, in words:
 - The notes repo is where a denylist entry is added the moment something
   sensitive shows up anywhere; the scrub then holds the line mechanically.
 
+## The `atak-plugin` skill — useful, but this file wins
+
+`joshuafuller/atak-plugin-skill` is installed at `~/.claude/skills/atak-plugin` and
+auto-triggers on ATAK work. It is good and worth reading, particularly
+`references/testing.md`. Its facts were measured on one ATAK-CIV 5.8.0.1 device;
+ours were measured on this operator's phones across 5.6, 5.7 and 5.8. **Where they
+disagree, this file is authoritative.** Three specific places it will steer a
+session wrong:
+
+- **It says to gitignore template-derived files** and copy them from the SDK at
+  build time. Do not. That would exclude `gradle-wrapper.jar`, `app/build.gradle`
+  and the proguard files — exactly what `submission-zip.sh` requires — and make a
+  tak.gov submission impossible. Its own `references/licensing.md` quotes the
+  clause granting the right to derive and publish work from the SDK.
+- **Its logcat table reads "Incompatible almost always means signature — install
+  the SDK's `atak.apk`".** It has no row for the obfuscation failure, which is our
+  most common one, and that fix is backwards for it: following it wipes official
+  ATAK off the only device able to validate a tak.gov-signed APK. See "Release
+  builds differ from debug builds".
+- **It says an APK must also be copied to
+  `/sdcard/atak/support/apks/sideloaded/` plus a sync to be visible.** Not true on
+  any of our three phones; `adb install -r` then load from the plugin manager is
+  the whole flow. Theirs was measured on an emulator.
+
+Worth taking from it, and not yet done here: instrumented tests inside ATAK. The
+harness ships in `$ATAK_SDK/espresso/` for every version we target. The trap that
+makes it work is that `assembleCivDebugAndroidTest` does **not** run
+`packageCivDebugAndroidTest_modApk` — only `connectedCivDebugAndroidTest` does —
+and without it every test dies at startup in `ATAKStarter`. Note also that
+`am instrument` exits 0 even when tests fail, so a wrapper must parse the output,
+and that the harness permanently rewrites ATAK's `nav_orientation_right`, so a
+device used for instrumented tests is no longer in a user's configuration.
+
 ## Process rules inherited from infra-TAK
 
 - Plan-first for anything beyond a hot fix — PLAN doc in `../atak-plugins-notes/docs/`.
