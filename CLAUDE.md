@@ -495,8 +495,18 @@ version, not the same one again.
 - Plan-first for anything beyond a hot fix — PLAN doc in `../atak-plugins-notes/docs/`.
 - Write a HANDOFF in `../atak-plugins-notes/docs/HANDOFF-<YYYY-MM-DD>.md` at the end of any
   chat longer than ~10 turns.
-- Security scan (`/module-scan`-class review) before a plugin is fielded or published, and
-  again on any version bump of vendored third-party code.
+- **Security scan when the code lands, not at ship.** Ship-time was the rule and it
+  was wrong: Map Depot's incident-map clients were written across 0.7-1.0 and first
+  scanned at the 1.3 ship prompt, which found a path-traversal in the removal path
+  and cost a signed release that was already verified on hardware. The scan is
+  cheap and the round trip is not.
+
+  Run `/security-review` **in the session that writes it**, before the commit,
+  whenever a change touches any of: network fetch, file writes or deletes, path
+  construction from external input, parsing anything a server sent, or a version
+  bump of vendored third-party code. Record the result (date, commit, outcome) in
+  `../atak-plugins-notes/docs/`. `/ship` then cites that record instead of
+  discovering things when the APKs are already signed.
 - **`/ship` is the ONLY path to `main`, a tag, or a GitHub Release.** The
   PreToolUse hook `.claude/hooks/git-guard.sh` mechanically blocks merge-to-main,
   `git tag`, pushes of main/tags, and `gh release create`; `/ship` runs pre-flight
