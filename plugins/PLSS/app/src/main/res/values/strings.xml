@@ -28,4 +28,7 @@
     <string name="plss_township_label">Township</string>
     <string name="plss_range_label">Range</string>
     <string name="plss_go">Go</string>
+    <string name="prefs_summary">Open the PLSS Grid user guide</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the PLSS Grid user guide: installing state packs, reading the grid, and what each label means</string>
 </resources>

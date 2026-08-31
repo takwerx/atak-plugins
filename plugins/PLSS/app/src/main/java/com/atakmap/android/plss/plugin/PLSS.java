@@ -55,6 +55,8 @@ public class PLSS implements IPlugin,
 
 
     IServiceController serviceController;
+    private static final String PREFS_KEY = "plss_preferences";
+
     Context pluginContext;
     IHostUIService uiService;
     ToolbarItem toolbarItem;
@@ -92,7 +94,7 @@ public class PLSS implements IPlugin,
         toolbarItem = new ToolbarItem.Builder(
                 pluginContext.getString(R.string.app_name),
                 MarshalManager.marshal(
-                        pluginContext.getResources().getDrawable(R.drawable.ic_launcher),
+                        pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
                         android.graphics.drawable.Drawable.class,
                         gov.tak.api.commons.graphics.Bitmap.class))
                 .setListener(new ToolbarItemAdapter() {
@@ -134,6 +136,8 @@ public class PLSS implements IPlugin,
             Log.w(TAG, "no MapView at startup; PLSS overlay not attached");
         }
 
+        registerPreferences();
+
         // the plugin is starting, add the button to the toolbar
         if (uiService == null)
             return;
@@ -168,11 +172,47 @@ public class PLSS implements IPlugin,
             packManager = null;
         }
 
+        unregisterPreferences();
+
         // the plugin is stopping, remove the button from the toolbar
         if (uiService == null)
             return;
 
         uiService.removeToolbarItem(toolbarItem);
+    }
+
+    /**
+     * Puts PLSS Grid into ATAK's Tool Preferences, which is the only route to
+     * the user manual. The PDF is built into the plugin's assets, and an asset
+     * is not reachable by anyone -- without this entry it ships inside the APK
+     * with no way to open it, which is what 0.3 did.
+     *
+     * Guarded rather than assumed: a build that does not expose
+     * {@code ToolsPreferenceFragment} should lose the manual, not the plugin.
+     */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment
+                            .ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            pluginContext.getResources().getDrawable(
+                                    R.drawable.ic_toolbar),
+                            new PlssPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment
+                    .unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
     }
 
     // ---------------------------------------------------------------- overlay
@@ -186,7 +226,7 @@ public class PLSS implements IPlugin,
         // the icon lives in the plugin APK, so the authority is the plugin's
         // package -- ATAK's own package cannot resolve it
         overlayEntry.setIconUri("android.resource://"
-                + pluginContext.getPackageName() + "/" + R.drawable.ic_launcher);
+                + pluginContext.getPackageName() + "/" + R.drawable.ic_toolbar);
         overlayEntry.setVisible(isOverlayVisible());
         overlayEntry.addOnVisibleChangedListener(this);
 
