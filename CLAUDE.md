@@ -332,6 +332,33 @@ Check it on a device by opening Settings → Tool Preferences, not by unzipping 
 The script's last check extracts the zip to a clean directory and builds it — a zip that
 does not build from a clean extract will not build on tak.gov.
 
+### When some ATAK targets build at tak.gov and others do not
+
+tak.gov reports no failure reason, so this reads like a version-compatibility
+problem. It usually is not. **Diff the zips before suspecting the plugin** — the
+three zips for a release differ in exactly one character, `ext.ATAK_VERSION`:
+
+```bash
+for v in 5.6.0 5.7.0 5.8.0; do unzip -q dist/<Name>-<ver>-$v.zip -d /tmp/z/$v; done
+diff -rq /tmp/z/5.6.0 /tmp/z/5.7.0        # expect: app/build.gradle only
+```
+
+Identical source with different outcomes means the cause is not what we
+submitted. The known culprit is `gradle/typst.gradle`, which downloads a 30 MB
+typst binary from GitHub once per target; the stock task used `curl -L` without
+`-f`, so an HTTP error was written into the tarball and the build died at `tar`
+saying "Extraction failed" — naming neither the network nor the URL. Hardened in
+Map Depot 1.2; PLSS and Traffic still carry the stock version. **Resubmitting the
+failed targets is the correct response** to this failure.
+
+Note that `submission-zip.sh`'s clean-extract build does **not** run typst — it
+builds without `ATAK_CI=1` — so the gate never covers the manual. Compile it by
+hand against the pinned 0.13.1 when the manual changes. Build each zip against
+its own SDK (retarget `sdk.path` alongside `ext.ATAK_VERSION`) so the
+clean-extract test validates that target rather than re-testing one SDK three
+times. Full write-up:
+`../atak-plugins-notes/docs/NOTES-takgov-build-failures-typst-download.md`.
+
 ### Point of contact — recorded once, injected automatically
 
 tak.gov requires a contact address in the submission README. The public repo must
