@@ -82,6 +82,63 @@ repo root. Per-plugin tags/releases live in the plugin repo (`v0.3`); this repo
 does not carry plugin release tags. The root README is the index of plugins →
 public repos. `/ship` covers the subtree push and the per-plugin release.
 
+## Plugin UI standard — look like ATAK, not like a plugin
+
+Every takwerx plugin uses the same controls, so a user moving between them is not
+learning a new dialect each time. `CamDepot` is the reference implementation.
+
+**Use ATAK's own button drawables.** `new-plugin.sh` already copies them out of the
+SDK template — `btn_gray` is a selector over `new_dark_button_bg` /
+`_selected` / `_disabled`: black-to-`#383838` gradient, `#585858` border, green
+border when pressed, flat grey when disabled. Do not invent a button background.
+
+Add this to `res/values/styles.xml` verbatim and use it on **every** button. ATAK's
+own `darkButton` sets vertical padding only, which lets a short label render wider
+than its own background:
+
+```xml
+<style name="TakwerxButton" parent="@style/darkButton">
+    <item name="android:paddingLeft">12dp</item>
+    <item name="android:paddingRight">12dp</item>
+    <item name="android:paddingTop">6dp</item>
+    <item name="android:paddingBottom">8dp</item>
+    <item name="android:minHeight">44dp</item>
+    <item name="android:minWidth">0dp</item>
+    <item name="android:textSize">15sp</item>
+    <item name="android:singleLine">true</item>
+    <item name="android:ellipsize">end</item>
+</style>
+```
+
+`style="@style/TakwerxButton"` on the widget — no per-button `textSize`, or it
+fights the style. 44dp minimum height is a touch target for a gloved hand on a
+vehicle mount, not a cosmetic choice.
+
+**Never use a Spinner.** Its dropdown is a `Dialog` built from the context that
+inflated the view; on the plugin context that is `BadTokenException` and **ATAK
+dies**. Use a `TakwerxButton` showing the current value, opening an
+`AlertDialog.Builder(mapView.getContext()).setSingleChoiceItems(...)`. Same rule for
+every dialog and toast: **MapView context, never plugin context**.
+
+**A ListView cannot live inside a ScrollView.** If a panel's controls are taller
+than the pane, put them in the list's `addHeaderView()` so the whole panel is one
+scroller — and offset click positions by `getHeaderViewsCount()`.
+
+**Label sections, and put counts on filters.** Small caps headings (10sp,
+`textAllCaps`, `alpha=0.6`) over each group. A filter states what it will cost
+before it is used — `Video (1,013)`, not `Video` — otherwise the only way to learn
+what a control does is to toggle it and watch a total move.
+
+**Distances follow ATAK, never a hardcoded unit.** Read `rab_rng_units_pref` and
+format through `SpanUtilities.formatType(type, metres, Span.METER)`. Note that
+`Span.ENGLISH = 0` and `METRIC = 1` — assuming the obvious ordering gets it exactly
+backwards. For a fixed list of values pin the large unit instead, or 800 m appears
+as "2624 ft" beside entries in miles.
+
+**Say what is not being shown.** If a view is truncated or gated, the panel says so
+in words the operator can act on — "map shows nearest 300, zoom in" — because a
+silently trimmed map reads as the whole picture.
+
 ## The SDK lives outside this repo
 
 - Path: `~/atak-sdk/ATAK-CIV-<version>/` (currently `ATAK-CIV-5.6.0.8`).
@@ -402,6 +459,39 @@ Policy the scrub enforces, in words:
   device serials, test locations, credentials custody, hashes of signed builds.
 - The notes repo is where a denylist entry is added the moment something
   sensitive shows up anywhere; the scrub then holds the line mechanically.
+
+## The `atak-plugin` skill — useful, but this file wins
+
+`joshuafuller/atak-plugin-skill` is installed at `~/.claude/skills/atak-plugin` and
+auto-triggers on ATAK work. It is good and worth reading, particularly
+`references/testing.md`. Its facts were measured on one ATAK-CIV 5.8.0.1 device;
+ours were measured on this operator's phones across 5.6, 5.7 and 5.8. **Where they
+disagree, this file is authoritative.** Three specific places it will steer a
+session wrong:
+
+- **It says to gitignore template-derived files** and copy them from the SDK at
+  build time. Do not. That would exclude `gradle-wrapper.jar`, `app/build.gradle`
+  and the proguard files — exactly what `submission-zip.sh` requires — and make a
+  tak.gov submission impossible. Its own `references/licensing.md` quotes the
+  clause granting the right to derive and publish work from the SDK.
+- **Its logcat table reads "Incompatible almost always means signature — install
+  the SDK's `atak.apk`".** It has no row for the obfuscation failure, which is our
+  most common one, and that fix is backwards for it: following it wipes official
+  ATAK off the only device able to validate a tak.gov-signed APK. See "Release
+  builds differ from debug builds".
+- **It says an APK must also be copied to
+  `/sdcard/atak/support/apks/sideloaded/` plus a sync to be visible.** Not true on
+  any of our three phones; `adb install -r` then load from the plugin manager is
+  the whole flow. Theirs was measured on an emulator.
+
+Worth taking from it, and not yet done here: instrumented tests inside ATAK. The
+harness ships in `$ATAK_SDK/espresso/` for every version we target. The trap that
+makes it work is that `assembleCivDebugAndroidTest` does **not** run
+`packageCivDebugAndroidTest_modApk` — only `connectedCivDebugAndroidTest` does —
+and without it every test dies at startup in `ATAKStarter`. Note also that
+`am instrument` exits 0 even when tests fail, so a wrapper must parse the output,
+and that the harness permanently rewrites ATAK's `nav_orientation_right`, so a
+device used for instrumented tests is no longer in a user's configuration.
 
 ## Process rules inherited from infra-TAK
 
