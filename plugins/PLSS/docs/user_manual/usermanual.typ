@@ -23,9 +23,18 @@ contingency lines and legal descriptions.
 
 #v(6pt)
 
-The survey is held on the device, not streamed. You download the states you
-work in once, and the grid then draws with no network at all -- in airplane
-mode, in a canyon, on a hotspot you would rather not spend.
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("01.png", width: 94%)
+][
+  The survey is held on the device, not streamed. You download the states you
+  work in once, and the grid then draws with no network at all -- in airplane
+  mode, in a canyon, on a hotspot you would rather not spend.
+
+  #v(6pt)
+
+  Everything is on this one panel: the data, the search, the overlay and the
+  two colours.
+]
 ]
 
 #tak-slide[
@@ -100,6 +109,21 @@ USGS products derive from it.
 ]
 
 #tak-slide[
+= Map data
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("02.png", width: 96%)
+
+  Installed states carry Delete, the rest carry Download. The BLM source date
+  is at the top.
+][
+  #image("03.png", width: 96%)
+
+  A download in progress. Each pack says how many sections it holds.
+]
+]
+
+#tak-slide[
 = Showing the grid
 
 The overlay starts hidden every time ATAK launches, the same as ATAK's own
@@ -120,6 +144,37 @@ a colour chosen over imagery can vanish over a topo sheet.
 ]
 
 #tak-slide[
+= Townships, then sections
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("05.jpg", width: 96%)
+
+  Zoomed out: townships only, each labelled with its township and range.
+][
+  #image("06.jpg", width: 96%)
+
+  Zoomed in: the 36 sections inside one township, numbered from the north-east
+  corner and snaking back and forth.
+]
+]
+
+#tak-slide[
+= Colours
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("07.png", width: 96%)
+][
+  Tap either swatch on the panel to change it. Townships and sections are set
+  separately, and both persist across restarts.
+
+  #v(6pt)
+
+  Custom opens a full picker if none of the presets reads well against the base
+  map you are using.
+]
+]
+
+#tak-slide[
 = Finding a township
 
 You can search for a township directly rather than hunting for it on the map.
@@ -130,6 +185,18 @@ Give the meridian, the township and the range, and the map goes there.
 The meridian is not optional and not a formality: T1N-R1W exists under most of
 the three dozen principal meridians, hundreds of miles apart. Without it the
 address is ambiguous.
+
+#v(6pt)
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("08.png", width: 96%)
+
+  The address from the example, entered.
+][
+  #image("09.jpg", width: 96%)
+
+  And where it lands. Section 21 is in the middle of the frame.
+]
 ]
 
 #tak-slide[
@@ -155,6 +222,26 @@ looking at.
   land grants, so there is no PLSS beneath much of coastal and southern
   California. Sparse or irregular sections in land-grant country are the data,
   not a fault.
+]
+
+#tak-slide[
+= A state line, in one picture
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("10.jpg", width: 96%)
+][
+  The California--Nevada line at Crystal Bay, with both states installed.
+
+  #v(6pt)
+
+  The straight line running north is where BLM cut the data, not a survey line.
+  The sections either side of it are numbered normally.
+
+  #v(6pt)
+
+  The ragged orange edge along the water is the surveyed meander line of the
+  shore -- the actual survey, not an artefact.
+]
 ]
 
 #tak-slide[
