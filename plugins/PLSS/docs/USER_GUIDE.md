@@ -1,12 +1,12 @@
 # PLSS Grid for ATAK — User Guide
 
-**Version 0.3 · takwerx**
+**Version 0.5 · takwerx**
 
-**Download PLSS Grid 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download PLSS Grid 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/plss-grid/releases/download/v0.3/ATAK-Plugin-PLSS-0.3--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/plss-grid/releases/download/v0.5/ATAK-Plugin-PLSS-0.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/plss-grid/releases/download/v0.5/ATAK-Plugin-PLSS-0.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/plss-grid/releases/download/v0.5/ATAK-Plugin-PLSS-0.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/plss-grid/releases
 
@@ -111,7 +111,7 @@ The overlay draws in two tiers by zoom so the map stays readable and fast:
 townships appear first; sections switch on as you zoom closer. Zoomed far out,
 nothing is drawn on purpose — at that scale the grid would be solid ink.
 
-![Township tier](screenshots/6_show_plss_townships_overlay.png)
+![Township tier](screenshots/6_show_plss_townships_overlay.jpg)
 
 ### Step 7 — Zoom in: sections
 
@@ -119,7 +119,7 @@ Closer in, the **sections** appear (white by default) with their numbers
 1–36, one per square mile, and the township name stays in the middle of its
 block. Numbers and names keep the same size on screen at every zoom.
 
-![Section tier](screenshots/7_show_plss_sections_overlay.png)
+![Section tier](screenshots/7_show_plss_sections_overlay.jpg)
 
 ### Step 8 — Township color
 
@@ -150,7 +150,7 @@ Only meridians present in your installed data are offered.
 **Go** centers the map on the township and zooms so it fills the screen —
 here T16S‑R11E under the San Bernardino Meridian, Imperial Valley.
 
-![T16S-R11E](screenshots/11_find_township_landing.png)
+![T16S-R11E](screenshots/11_find_township_landing.jpg)
 
 ### Step 12 — Overlay Manager
 
@@ -169,7 +169,7 @@ A township that straddles a state line therefore exists in two files — the
 California half and the Nevada half — each with its own outline. The plugin
 handles this, but it is worth knowing what you are looking at:
 
-![CA/NV line at Crystal Bay, Lake Tahoe](screenshots/13_state_line.png)
+![CA/NV line at Crystal Bay, Lake Tahoe](screenshots/13_state_line.jpg)
 
 - **Each township and each section is named once.** With both states
   installed, the plugin recognizes the two halves as the same feature and
