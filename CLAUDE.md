@@ -389,6 +389,33 @@ Check it on a device by opening Settings → Tool Preferences, not by unzipping 
 The script's last check extracts the zip to a clean directory and builds it — a zip that
 does not build from a clean extract will not build on tak.gov.
 
+### When some ATAK targets build at tak.gov and others do not
+
+tak.gov reports no failure reason, so this reads like a version-compatibility
+problem. It usually is not. **Diff the zips before suspecting the plugin** — the
+three zips for a release differ in exactly one character, `ext.ATAK_VERSION`:
+
+```bash
+for v in 5.6.0 5.7.0 5.8.0; do unzip -q dist/<Name>-<ver>-$v.zip -d /tmp/z/$v; done
+diff -rq /tmp/z/5.6.0 /tmp/z/5.7.0        # expect: app/build.gradle only
+```
+
+Identical source with different outcomes means the cause is not what we
+submitted. The known culprit is `gradle/typst.gradle`, which downloads a 30 MB
+typst binary from GitHub once per target; the stock task used `curl -L` without
+`-f`, so an HTTP error was written into the tarball and the build died at `tar`
+saying "Extraction failed" — naming neither the network nor the URL. Hardened in
+Map Depot 1.2; PLSS and Traffic still carry the stock version. **Resubmitting the
+failed targets is the correct response** to this failure.
+
+Note that `submission-zip.sh`'s clean-extract build does **not** run typst — it
+builds without `ATAK_CI=1` — so the gate never covers the manual. Compile it by
+hand against the pinned 0.13.1 when the manual changes. Build each zip against
+its own SDK (retarget `sdk.path` alongside `ext.ATAK_VERSION`) so the
+clean-extract test validates that target rather than re-testing one SDK three
+times. Full write-up:
+`../atak-plugins-notes/docs/NOTES-takgov-build-failures-typst-download.md`.
+
 ### Point of contact — recorded once, injected automatically
 
 tak.gov requires a contact address in the submission README. The public repo must
@@ -493,13 +520,83 @@ and without it every test dies at startup in `ATAKStarter`. Note also that
 and that the harness permanently rewrites ATAK's `nav_orientation_right`, so a
 device used for instrumented tests is no longer in a user's configuration.
 
+## Release checklist — every item here has shipped broken at least once
+
+Work through this before building submission zips. None of it is theoretical.
+
+**Two icons, not one.** `android:icon` is what Android shows on **light**
+backgrounds — the app list, Settings, and the My Files browser a user reaches the
+manual through. ATAK shows toolbar and Tool Preferences icons on **dark**. The SDK
+template ships one white-on-transparent glyph for both, which is invisible in the
+file manager and looks like a missing image. Keep them separate:
+
+- `ic_launcher.png` — the glyph on a solid dark tile (`#121212`, rounded), used by
+  `android:icon` only.
+- `ic_toolbar.png` — the bare white glyph, used by `ToolbarItem` and
+  `ToolsPreferenceFragment.register`.
+
+Check it by compositing on **white**, not by opening it in a dark image editor,
+where a white glyph looks fine right up until a user sees it.
+
+**tak.gov builds have no git, so version stamping silently degrades.**
+`getVersionCode()` and `getVersionName()` both read the git revision, and the
+submission is a zip with no `.git`. Measured on the same 1.2 zip:
+
+```
+with .git : versionCode=1788195463  versionName='1.2 (4391c747) - [5.8.0]'
+no .git   : versionCode=1           versionName='1.2 () - [5.8.0]'
+```
+
+So **every signed release has `versionCode=1` and a blank hash**. Two consequences:
+
+- Never rely on `versionCode` to detect an upgrade at runtime. ATAK's
+  `PdfHelper.extractAndShow` does exactly that, so a plugin's manual is extracted
+  once to a fixed path and then **frozen on the device forever** — every later
+  release keeps showing the first manual the user ever opened. A plugin that ships
+  a manual must compare `versionName` itself and delete the stale file.
+- A blank hash in the plugins list is expected, not a broken build.
+
+**Verify the manual from the zip, not from your working tree.**
+`app/src/main/assets/usermanual.pdf` is gitignored and only regenerated when typst
+runs, so a local build packages whatever is lying there — which can be months old.
+`submission-zip.sh`'s clean-extract test builds **without** `ATAK_CI=1`, so it never
+compiles the manual and proves nothing about it. Build the zip the way tak.gov
+does and look at what lands in the APK:
+
+```bash
+unzip -q dist/<Name>-<ver>-<atak>.zip -d /tmp/ci && cd /tmp/ci/<Name>
+cp <a local.properties pointing sdk.path at the SDK that zip targets> .
+ATAK_CI=1 ./gradlew assembleCivDebug
+unzip -p app/build/outputs/apk/civ/debug/*.apk assets/usermanual.pdf > /tmp/m.pdf
+pdfinfo /tmp/m.pdf | grep Pages && pdftotext -f 1 -l 1 /tmp/m.pdf - | head -5
+```
+
+The title page must show the version you are shipping. `runTypst` rewrites
+`plugin-version` in `usermanual.typ` **in place** during the build, so that tracked
+file drifts under you and the zip can carry a stale stamp; it is corrected at build
+time, but commit the value so the tree, the zip and the PDF agree.
+
+**Bump `PLUGIN_VERSION` before building zips, every time.** Two builds have gone
+out under one version number twice. A resubmission after a failure is a new
+version, not the same one again.
+
 ## Process rules inherited from infra-TAK
 
 - Plan-first for anything beyond a hot fix — PLAN doc in `../atak-plugins-notes/docs/`.
 - Write a HANDOFF in `../atak-plugins-notes/docs/HANDOFF-<YYYY-MM-DD>.md` at the end of any
   chat longer than ~10 turns.
-- Security scan (`/module-scan`-class review) before a plugin is fielded or published, and
-  again on any version bump of vendored third-party code.
+- **Security scan when the code lands, not at ship.** Ship-time was the rule and it
+  was wrong: Map Depot's incident-map clients were written across 0.7-1.0 and first
+  scanned at the 1.3 ship prompt, which found a path-traversal in the removal path
+  and cost a signed release that was already verified on hardware. The scan is
+  cheap and the round trip is not.
+
+  Run `/security-review` **in the session that writes it**, before the commit,
+  whenever a change touches any of: network fetch, file writes or deletes, path
+  construction from external input, parsing anything a server sent, or a version
+  bump of vendored third-party code. Record the result (date, commit, outcome) in
+  `../atak-plugins-notes/docs/`. `/ship` then cites that record instead of
+  discovering things when the APKs are already signed.
 - **`/ship` is the ONLY path to `main`, a tag, or a GitHub Release.** The
   PreToolUse hook `.claude/hooks/git-guard.sh` mechanically blocks merge-to-main,
   `git tag`, pushes of main/tags, and `gh release create`; `/ship` runs pre-flight

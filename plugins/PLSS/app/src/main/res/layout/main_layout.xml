@@ -13,18 +13,21 @@
         android:orientation="vertical" >
 
         <Button
+            style="@style/TakwerxButton"
             android:id="@+id/plss_manage"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/plss_manage_data" />
 
         <Button
+            style="@style/TakwerxButton"
             android:id="@+id/plss_find"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/plss_find" />
 
         <Button
+            style="@style/TakwerxButton"
             android:id="@+id/plss_toggle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
