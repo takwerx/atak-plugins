@@ -75,6 +75,55 @@ if [ -f "$DEST/app/src/main/java/com/atakmap/android/$PKG/plugin/PluginTemplate.
        "$DEST/app/src/main/java/com/atakmap/android/$PKG/plugin/$CLASS.java"
 fi
 
+echo "==> splitting the icon: a dark tile for Android, the bare glyph for ATAK"
+# The SDK template ships ONE icon and wires it to two places: android:icon in the
+# manifest, and the toolbar button. It is a white glyph on transparency, which is
+# right for the toolbar -- ATAK's UI is dark -- and INVISIBLE for android:icon,
+# because Android draws that on light backgrounds: the app list, Settings, and the
+# My Files browser a user reaches an extracted manual through. It renders as a
+# blank square, and it looks perfect in any dark image viewer right up until a user
+# sees it.
+#
+# Inverting the single icon only moves the problem onto the toolbar. So: two icons.
+# Found on Map Depot 2026-08-31, after several signed releases had shipped with it.
+DRAWABLE="$DEST/app/src/main/res/drawable"
+if [ -f "$DRAWABLE/ic_launcher.png" ]; then
+    cp "$DRAWABLE/ic_launcher.png" "$DRAWABLE/ic_toolbar.png"
+
+    JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/java}"
+    [ -x "$JAVA_BIN" ] || JAVA_BIN="$(command -v java || true)"
+    if [ -n "$JAVA_BIN" ] && [ -x "$JAVA_BIN" ]; then
+        MAKE_ICON="$(mktemp -d)/MakeIcon.java"
+        cat > "$MAKE_ICON" <<'JAVA'
+import javax.imageio.ImageIO; import java.awt.*; import java.awt.geom.RoundRectangle2D;
+import java.awt.image.BufferedImage; import java.io.File;
+public class MakeIcon { public static void main(String[] a) throws Exception {
+  BufferedImage glyph = ImageIO.read(new File(a[0]));
+  BufferedImage out = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
+  Graphics2D g = out.createGraphics();
+  g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+  g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+  g.setColor(new Color(0x12, 0x12, 0x12));
+  g.fill(new RoundRectangle2D.Float(0, 0, 256, 256, 56, 56));
+  g.drawImage(glyph, 30, 30, 196, 196, null);
+  g.dispose();
+  ImageIO.write(out, "png", new File(a[1]));
+}}
+JAVA
+        "$JAVA_BIN" "$MAKE_ICON" "$DRAWABLE/ic_toolbar.png" "$DRAWABLE/ic_launcher.png" \
+            && echo "    ic_launcher.png is now the glyph on a #121212 tile" \
+            || echo "    WARN: could not generate the tile; ic_launcher is still the bare glyph"
+    else
+        echo "    WARN: no java found, so ic_launcher.png is still the bare white glyph."
+        echo "          It will be INVISIBLE in Android's app list and My Files."
+    fi
+
+    # The manifest keeps ic_launcher (the tile). Every Java reference is ATAK-side
+    # and wants the bare glyph.
+    find "$DEST/app/src" -name '*.java' -print0 |
+        xargs -0 sed -i '' -e 's/R\.drawable\.ic_launcher/R.drawable.ic_toolbar/g'
+fi
+
 echo "==> setting display name and rootProject.name"
 cat > "$DEST/app/src/main/res/values/strings.xml" <<EOF
 <?xml version="1.0" encoding="utf-8"?>

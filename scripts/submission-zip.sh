@@ -225,11 +225,56 @@ sdk.dir=$ANDROID_HOME
 sdk.path=$BUILD_SDK
 takdev.plugin=$BUILD_SDK/atak-gradle-takdev.jar
 EOF
-    if ( cd "$TMP/$NAME" && ./gradlew assembleCivDebug -q >/dev/null 2>&1 ); then
-        echo "  PASS  extracted zip builds assembleCivDebug"
+    # ATAK_CI=1, which is the whole point.
+    #
+    # Without it gradle/typst.gradle never runs, so this build proved the CODE
+    # compiles and said NOTHING about the manual -- while tak.gov builds WITH it.
+    # And typst.gradle degrades to a warning when the manual cannot be built, so
+    # the failure was silent end to end: every local gate passed, tak.gov produced
+    # an APK with no manual in it, and nothing anywhere reported an error. That is
+    # how Map Depot shipped a signed release whose manual was missing, on
+    # 2026-08-31, with the gap documented in CLAUDE.md the whole time. A rule
+    # nobody executes is not a rule, so the script executes it.
+    #
+    # typst.gradle downloads a linux-musl binary it cannot run here, but prefers a
+    # ./typst in the project root if one exists -- so a local typst is linked in
+    # when available. Without one the manual check is SKIPPED and says so rather
+    # than passing quietly.
+    LOCAL_TYPST="$(command -v typst || true)"
+    [ -n "$LOCAL_TYPST" ] && ln -sf "$LOCAL_TYPST" "$TMP/$NAME/typst"
+
+    if ( cd "$TMP/$NAME" && ATAK_CI=1 ./gradlew assembleCivDebug -q >/dev/null 2>&1 ); then
+        echo "  PASS  extracted zip builds assembleCivDebug (with ATAK_CI=1)"
+
+        # And the manual actually has to be IN the APK. Building without error is
+        # not the same as producing something, precisely because typst.gradle warns
+        # rather than fails.
+        BUILT_APK="$(ls "$TMP/$NAME"/app/build/outputs/apk/civ/debug/*.apk 2>/dev/null | head -1)"
+        if [ -d "$TMP/$NAME/docs/user_manual" ]; then
+            if [ -z "$LOCAL_TYPST" ]; then
+                echo "  SKIP  manual not checked — no typst on PATH (install it: the"
+                echo "        plugin has docs/user_manual/, so tak.gov WILL build one)"
+            # Captured, not `unzip -l | grep -q`. Under `set -o pipefail` grep -q
+            # closes the pipe on its first match, unzip takes SIGPIPE, and the
+            # pipeline reports 141 -- so a manual that IS there reads as missing.
+            # The same trap is already documented further up this file, and this
+            # check still walked into it.
+            elif MANUAL_LINE="$(unzip -l "$BUILT_APK" 2>/dev/null || true)" &&
+                    case "$MANUAL_LINE" in *assets/usermanual.pdf*) true ;;
+                                           *) false ;; esac; then
+                MANUAL_BYTES="$(printf '%s\n' "$MANUAL_LINE" \
+                    | awk '/assets\/usermanual.pdf/{print $1}')"
+                echo "  PASS  manual built into the APK ($MANUAL_BYTES bytes)"
+            else
+                echo "  FAIL  docs/user_manual/ exists but NO assets/usermanual.pdf"
+                echo "        landed in the APK. tak.gov will sign a plugin whose"
+                echo "        manual cannot be opened, and will not tell you."
+                FAIL=1
+            fi
+        fi
     else
         echo "  FAIL  extracted zip does NOT build — rerun by hand for the error:"
-        echo "        unzip $OUT -d /tmp/x && cd /tmp/x/$NAME && ./gradlew assembleCivDebug"
+        echo "        unzip $OUT -d /tmp/x && cd /tmp/x/$NAME && ATAK_CI=1 ./gradlew assembleCivDebug"
         FAIL=1
     fi
 fi
