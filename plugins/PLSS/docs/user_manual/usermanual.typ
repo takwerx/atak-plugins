@@ -1,40 +1,174 @@
-
 #import "@preview/polylux:0.4.0": *
 #import "formatting.typ": *
 
 #show: userguide.with(
-   plugin-name: "Plugin Template",
-   plugin-version: "0.4",
+   plugin-name: "PLSS Grid",
+   plugin-version: "0.5",
    platform: "ATAK",
    platform-version: "5.7.0",
 )
 
+#tak-slide[
+= Overview
 
-#tak-slide[ 
-  = Overview
-#toolbox.side-by-side(columns: (.75fr, 9fr))[
-#image("plugin_icon.png", width: 70%)
+#toolbox.side-by-side(columns: (1.5fr, 9fr))[
+  #image("plugin_icon.png", width: 85%)
 ][
- This is an example user manual in typst.
+PLSS Grid draws the Public Land Survey System over the map: townships, ranges
+and sections, labelled the way they are called on the radio. ATAK ships MGRS
+and USNG grids and nothing for PLSS, which is what wildland fire and
+public-land operations actually use for division assignments, drop points,
+contingency lines and legal descriptions.
 ]
-= Basic Plugin
-#toolbox.side-by-side(columns: (1.5fr, 10fr))[
-  #image("plugin_toolbar.jpg", width: 90%)
-][
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
- ]
- #toolbox.side-by-side(columns: (1.5fr, 10fr))[
-  #image("new_action.jpg", width: 90%)
- ][
-Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos.
- ]
- == Start
-#toolbox.side-by-side(columns: (11fr, 2fr))[
+#v(6pt)
 
-Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos.
-][
-  #set align(right)
-  #image("new_action.jpg", width: 90%)
+The survey is held on the device, not streamed. You download the states you
+work in once, and the grid then draws with no network at all -- in airplane
+mode, in a canyon, on a hotspot you would rather not spend.
 ]
+
+#tak-slide[
+= The PLSS in one minute
+
+Most of the United States west of Ohio was surveyed into a rectangular grid.
+
+#v(6pt)
+
+- A *principal meridian* and base line anchor each survey region -- the Mount
+  Diablo Meridian, San Bernardino Meridian, Boise Meridian and about three
+  dozen others.
+- *Townships* are six-mile squares, counted north or south of the base line
+  (*T9N* is the ninth township north) and east or west of the meridian
+  (*R28W* is the 28th range west). A township is named by both: *T9N-R28W*.
+- Each township is cut into 36 *sections* of one square mile, numbered 1 to 36
+  starting at the north-east corner and snaking back and forth.
+
+#v(6pt)
+
+So a PLSS address reads like a radio call: "San Bernardino Meridian, Township
+16 South, Range 11 East, Section 21."
+
+#v(6pt)
+
+*The township and range numbers restart at every principal meridian.* T1N-R1W
+exists under most of them, hundreds of miles apart, which is why the meridian
+is part of the address and why the plugin always asks for it.
+]
+
+#tak-slide[
+= Before you start
+
+- *Match the plugin to your ATAK version.* Builds are tied to the ATAK release
+  they were built against; 5.6, 5.7 and 5.8 builds are published. A mismatched
+  build will not load, and the failure does not look like a version problem.
+- *The plugin ships with no map data.* On first use you download the states you
+  need. Packs run from about 6 MB to 124 MB, and a typical western operating
+  area of three or four states is under 100 MB -- worth doing on Wi-Fi.
+- *No other network calls.* Outbound HTTPS on port 443 only, and only while a
+  download is running. Never to the TAK server, and no CoT is generated.
+
+#v(6pt)
+
+Load it from ATAK's Plugins manager (TAK Package Mgmt) like any other plugin,
+then open it from the toolbar.
+]
+
+#tak-slide[
+= Map data
+
+The plugin arrives empty, so the first thing to do is fetch the states you
+work in. *Manage map data* lists every state the survey covers, with the size
+of each pack and whether you already hold it.
+
+#v(6pt)
+
+Downloads resume rather than restart after a dropped connection, and each pack
+is checked against a digest before it is installed -- a truncated pack would
+otherwise draw a grid that is quietly wrong.
+
+#v(6pt)
+
+Installed states can be removed individually from the same dialog to free
+storage. The source date of the survey is shown at the top, so you can tell how
+current the data is.
+
+#v(6pt)
+
+*Data source:* BLM National PLSS CadNSDI, the authoritative survey record.
+USGS products derive from it.
+]
+
+#tak-slide[
+= Showing the grid
+
+The overlay starts hidden every time ATAK launches, the same as ATAK's own
+grids. Turn it on from the plugin's pane or from the Overlay Manager.
+
+#v(6pt)
+
+*Townships draw first, sections as you zoom in.* Each has its own zoom
+threshold, so a view that shows nothing usually means you are zoomed too far
+out rather than that something is broken. Zoom in and the townships appear,
+then the sections inside them.
+
+#v(6pt)
+
+Township and section colours are yours to set, and they persist across
+restarts. Pick something that reads against the base map you actually use --
+a colour chosen over imagery can vanish over a topo sheet.
+]
+
+#tak-slide[
+= Finding a township
+
+You can search for a township directly rather than hunting for it on the map.
+Give the meridian, the township and the range, and the map goes there.
+
+#v(6pt)
+
+The meridian is not optional and not a formality: T1N-R1W exists under most of
+the three dozen principal meridians, hundreds of miles apart. Without it the
+address is ambiguous.
+]
+
+#tak-slide[
+= What you will see along state lines
+
+BLM publishes the survey *one state at a time, clipped at the state boundary*.
+A township straddling a state line therefore exists in two files, each with its
+own outline. The plugin handles it, and it is worth knowing what you are
+looking at.
+
+#v(6pt)
+
+- *Each township and section is named once.* With both states installed the
+  plugin recognises the two halves as one feature and centres a single name
+  over the whole of it. Without the neighbouring state you simply see nothing
+  on the far side of the line.
+- *A line runs along the state boundary.* That is where BLM cut the data, not a
+  survey line. The narrow cells beside it are the two halves of genuine
+  sections, not extra ones -- each carries a single number.
+- *Irregular cells at lakes and rivers are real.* Sections meeting a large lake
+  or a navigable river stop at the surveyed meander line of the shore.
+- *Gaps are real too.* The rectangular survey went around Spanish and Mexican
+  land grants, so there is no PLSS beneath much of coastal and southern
+  California. Sparse or irregular sections in land-grant country are the data,
+  not a fault.
+]
+
+#tak-slide[
+= Good to know
+
+- The overlay starts hidden at every launch; your colours persist.
+- If nothing draws, zoom in. Sections and townships each have their own
+  threshold.
+- After updating the plugin ATAK unloads it. Reload it from the Plugins
+  manager and turn the overlay back on.
+- Several states can be installed side by side, and removed one at a time.
+- Once a state is downloaded the plugin needs no network at all.
+
+#v(6pt)
+
+*Questions and problems:* https://github.com/takwerx/plss-grid/issues
 ]
