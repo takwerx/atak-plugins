@@ -430,6 +430,66 @@ Policy the scrub enforces, in words:
 - The notes repo is where a denylist entry is added the moment something
   sensitive shows up anywhere; the scrub then holds the line mechanically.
 
+## Release checklist — every item here has shipped broken at least once
+
+Work through this before building submission zips. None of it is theoretical.
+
+**Two icons, not one.** `android:icon` is what Android shows on **light**
+backgrounds — the app list, Settings, and the My Files browser a user reaches the
+manual through. ATAK shows toolbar and Tool Preferences icons on **dark**. The SDK
+template ships one white-on-transparent glyph for both, which is invisible in the
+file manager and looks like a missing image. Keep them separate:
+
+- `ic_launcher.png` — the glyph on a solid dark tile (`#121212`, rounded), used by
+  `android:icon` only.
+- `ic_toolbar.png` — the bare white glyph, used by `ToolbarItem` and
+  `ToolsPreferenceFragment.register`.
+
+Check it by compositing on **white**, not by opening it in a dark image editor,
+where a white glyph looks fine right up until a user sees it.
+
+**tak.gov builds have no git, so version stamping silently degrades.**
+`getVersionCode()` and `getVersionName()` both read the git revision, and the
+submission is a zip with no `.git`. Measured on the same 1.2 zip:
+
+```
+with .git : versionCode=1788195463  versionName='1.2 (4391c747) - [5.8.0]'
+no .git   : versionCode=1           versionName='1.2 () - [5.8.0]'
+```
+
+So **every signed release has `versionCode=1` and a blank hash**. Two consequences:
+
+- Never rely on `versionCode` to detect an upgrade at runtime. ATAK's
+  `PdfHelper.extractAndShow` does exactly that, so a plugin's manual is extracted
+  once to a fixed path and then **frozen on the device forever** — every later
+  release keeps showing the first manual the user ever opened. A plugin that ships
+  a manual must compare `versionName` itself and delete the stale file.
+- A blank hash in the plugins list is expected, not a broken build.
+
+**Verify the manual from the zip, not from your working tree.**
+`app/src/main/assets/usermanual.pdf` is gitignored and only regenerated when typst
+runs, so a local build packages whatever is lying there — which can be months old.
+`submission-zip.sh`'s clean-extract test builds **without** `ATAK_CI=1`, so it never
+compiles the manual and proves nothing about it. Build the zip the way tak.gov
+does and look at what lands in the APK:
+
+```bash
+unzip -q dist/<Name>-<ver>-<atak>.zip -d /tmp/ci && cd /tmp/ci/<Name>
+cp <a local.properties pointing sdk.path at the SDK that zip targets> .
+ATAK_CI=1 ./gradlew assembleCivDebug
+unzip -p app/build/outputs/apk/civ/debug/*.apk assets/usermanual.pdf > /tmp/m.pdf
+pdfinfo /tmp/m.pdf | grep Pages && pdftotext -f 1 -l 1 /tmp/m.pdf - | head -5
+```
+
+The title page must show the version you are shipping. `runTypst` rewrites
+`plugin-version` in `usermanual.typ` **in place** during the build, so that tracked
+file drifts under you and the zip can carry a stale stamp; it is corrected at build
+time, but commit the value so the tree, the zip and the PDF agree.
+
+**Bump `PLUGIN_VERSION` before building zips, every time.** Two builds have gone
+out under one version number twice. A resubmission after a failure is a new
+version, not the same one again.
+
 ## Process rules inherited from infra-TAK
 
 - Plan-first for anything beyond a hot fix — PLAN doc in `../atak-plugins-notes/docs/`.
