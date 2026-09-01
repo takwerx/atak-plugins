@@ -82,52 +82,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
-    <!-- Follows the map the way ATAK's Overlay Manager does. Under Where because
-         that is what it filters on: not what a camera is, but where you are looking. -->
-    <CheckBox
-        android:id="@+id/in_view"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="On screen only" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Find a camera by name"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
-
-    <!-- Clear sits beside the box rather than being an X inside it, and it is
-         disabled while the box is empty. That makes it the indicator as well as the
-         control: a live Clear button is the panel saying a search is filtering the
-         list. An operator lost time to a search left in the box from earlier, with
-         nothing on screen to say so. -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:baselineAligned="false">
-
-        <EditText
-            android:id="@+id/search"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:hint="@string/search_hint"
-            android:inputType="text"
-            android:maxLines="1"
-            android:textSize="14sp" />
-
-        <Button
-            style="@style/TakwerxButton"
-            android:id="@+id/search_clear"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:text="@string/clear" />
-    </LinearLayout>
 
     <TextView
         android:layout_width="match_parent"
@@ -179,24 +133,48 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
+    <!-- Full width, one unit a step, to 50.
+         The original covered 0 to 400 across the width of a phone pane, about two
+         miles a pixel, so choosing 5 was a fight and everything useful lived in
+         the first eighth of the track. 100 was better and still too coarse to
+         control by thumb. Nothing here needs more: past 50 the state filter is
+         what is actually selecting, and "Off, the whole state" is the other end. -->
+    <SeekBar
+        android:id="@+id/radius"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="50" />
+
+    <!-- Says which point it measures from, rather than only offering to change it.
+         The old button read "From me" whether the radius was measured from the
+         operator or from the map centre, so the one thing it could not tell you
+         was the state it was in. -->
+    <Button
+        style="@style/TakwerxButton"
+        android:id="@+id/pick_point"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <SeekBar
-            android:id="@+id/radius"
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/radius_extent"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:max="200" />
+            android:text="Use this extent" />
 
         <Button
-        style="@style/TakwerxButton"
-            android:id="@+id/pick_point"
-            android:layout_width="wrap_content"
+            style="@style/TakwerxButton"
+            android:id="@+id/radius_preset"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:text="@string/pick_point" />
+            android:text="Presets" />
     </LinearLayout>
 
     <TextView
@@ -234,6 +212,58 @@
             android:layout_height="wrap_content"
             android:text="Presets" />
     </LinearLayout>
+
+    <!-- Search and "On screen only" sit directly above the list, not up with the
+         state and county buttons. Both of them change what the NEXT few inches of
+         screen contain, so they belong beside it: the operator types a name or
+         ticks the box and the answer is immediately below their thumb, rather
+         than a scroll away past four other groups. -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Find a camera by name"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:paddingTop="6dp"
+        android:alpha="0.6" />
+
+    <!-- Clear sits beside the box rather than being an X inside it, and it is
+         disabled while the box is empty. That makes it the indicator as well as the
+         control: a live Clear button is the panel saying a search is filtering the
+         list. An operator lost time to a search left in the box from earlier, with
+         nothing on screen to say so. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <EditText
+            android:id="@+id/search"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:hint="@string/search_hint"
+            android:inputType="text"
+            android:maxLines="1"
+            android:textSize="14sp" />
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/search_clear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:text="@string/clear" />
+    </LinearLayout>
+
+    <!-- Follows the map the way ATAK's Overlay Manager does. Under Where because
+         that is what it filters on: not what a camera is, but where you are looking. -->
+    <CheckBox
+        android:id="@+id/in_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="On screen only" />
 
     <TextView
         android:layout_width="match_parent"
