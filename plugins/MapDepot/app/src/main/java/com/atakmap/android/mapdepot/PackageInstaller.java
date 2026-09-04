@@ -12,6 +12,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -124,8 +128,119 @@ public final class PackageInstaller {
         return vtpkSupport;
     }
 
+    /**
+     * Where a vector tile package goes when official ATAK 5.8 cannot be left
+     * with it: a sibling of {@code atak/imagery} that ATAK's scanner does not
+     * walk. The one recovery that worked on the phone that measured the crash.
+     */
+    public static final String PARKED_DIR_NAME = "imagery.off";
+
+    /**
+     * Every {@code .vtpk} directly under ATAK's imagery folder, whoever put it
+     * there. By extension, because that is how ATAK's scanner finds them.
+     */
+    public static List<File> vectorPackagesOnDevice() {
+        final List<File> out = new ArrayList<>();
+        final File[] files = FileSystemUtils.getItem("imagery").listFiles();
+        if (files == null)
+            return out;
+        for (File f : files) {
+            if (f.isFile() && f.getName().toLowerCase(Locale.US).endsWith(".vtpk"))
+                out.add(f);
+        }
+        Collections.sort(out);
+        return out;
+    }
+
+    /**
+     * Moves every vector tile package out of {@code atak/imagery} into
+     * {@link #PARKED_DIR_NAME} beside it, and returns how many moved. The only
+     * place this plugin moves a file it did not download: on official ATAK
+     * 5.8.0.4 a cataloged package means ATAK does not start, and the file is
+     * worth less than the app. Nothing is deleted, and a name already parked is
+     * kept by numbering the new one rather than replacing it.
+     *
+     * A rename, not a copy: same filesystem, so it is instant and a gigabyte is
+     * not written twice. ATAK is not told; the layer it holds stays until the
+     * restart this is protecting, and asking for a rescan would run exactly the
+     * code that crashes.
+     */
+    public static int parkVectorPackages() {
+        final File dir = FileSystemUtils.getItem("imagery");
+        final File parked = new File(dir.getParentFile(), PARKED_DIR_NAME);
+        if (!parked.isDirectory() && !parked.mkdirs()) {
+            Log.w(TAG, "could not create " + parked);
+            return 0;
+        }
+        int moved = 0;
+        for (File f : vectorPackagesOnDevice()) {
+            File to = new File(parked, f.getName());
+            for (int n = 2; to.exists() && n < 100; n++) {
+                final String name = f.getName();
+                final int dot = name.lastIndexOf('.');
+                to = new File(parked, name.substring(0, dot) + " (" + n + ")"
+                        + name.substring(dot));
+            }
+            try {
+                guardInside(dir, f);
+                guardInside(parked, to);
+            } catch (Exception escapes) {
+                Log.w(TAG, "not parking " + f.getName() + ": " + escapes);
+                continue;
+            }
+            if (to.exists()) {
+                Log.w(TAG, "not parking " + f.getName() + ": no free name");
+                continue;
+            }
+            if (f.renameTo(to)) {
+                moved++;
+                Log.i(TAG, "parked " + f.getName() + " as " + to);
+            } else {
+                Log.w(TAG, "could not move " + f + " to " + to);
+            }
+        }
+        return moved;
+    }
+
     public static boolean isInstalled(Depot.Package pkg) {
         return held(pkg) != null;
+    }
+
+    /**
+     * Which of these packages are on disk, by id. One directory listing per
+     * destination rather than a stat per package: {@link #held} is right for
+     * one row, and wrong for eighteen thousand quads on the main thread.
+     * Same answer as {@code held} -- present under either name, and the
+     * catalog's length when it states one.
+     */
+    public static java.util.Set<String> installedIds(
+            List<? extends Depot.Package> pkgs) {
+        final java.util.Map<String, java.util.Map<String, Long>> listings =
+                new java.util.HashMap<>();
+        final java.util.Set<String> out = new java.util.HashSet<>();
+        for (Depot.Package pkg : pkgs) {
+            java.util.Map<String, Long> names = listings.get(pkg.destination());
+            if (names == null) {
+                names = new java.util.HashMap<>();
+                final File[] files = dirFor(pkg).listFiles();
+                if (files != null) {
+                    for (File f : files) {
+                        if (f.isFile())
+                            names.put(f.getName(), f.length());
+                    }
+                }
+                listings.put(pkg.destination(), names);
+            }
+            for (String candidate : new String[] {
+                    pkg.fileName(), pkg.legacyFileName() }) {
+                final Long len = names.get(candidate);
+                if (len != null && (pkg.bytes() <= 0 || len == pkg.bytes())) {
+                    out.add(pkg.id());
+                    break;
+                }
+            }
+        }
+        return out;
     }
 
     /**
@@ -478,11 +593,12 @@ public final class PackageInstaller {
 
         final boolean overlay = "grg".equals(pkg.destination());
         final String name = f.getName();
+        final String path = f.getAbsolutePath();
 
         WORKER.execute(new Runnable() {
             @Override
             public void run() {
-                if (selectOnMain(name, overlay)) {
+                if (selectOnMain(name, overlay, path)) {
                     post(cb, pkg, "going", null);
                     return;
                 }
@@ -502,7 +618,7 @@ public final class PackageInstaller {
                         Thread.currentThread().interrupt();
                         return;
                     }
-                    if (selectOnMain(name, overlay)) {
+                    if (selectOnMain(name, overlay, path)) {
                         polling = false;
                         post(cb, pkg, "going", null);
                         return;
@@ -519,7 +635,8 @@ public final class PackageInstaller {
      * Runs the selection on the UI thread and waits for its answer. MapView
      * work belongs there, and the caller is a worker, so blocking is safe.
      */
-    private static boolean selectOnMain(final String name, final boolean overlay) {
+    private static boolean selectOnMain(final String name, final boolean overlay,
+            final String path) {
         final java.util.concurrent.atomic.AtomicBoolean done =
                 new java.util.concurrent.atomic.AtomicBoolean(false);
         final java.util.concurrent.CountDownLatch latch =
@@ -528,7 +645,7 @@ public final class PackageInstaller {
             @Override
             public void run() {
                 try {
-                    done.set(selectDirect(name, overlay));
+                    done.set(selectDirect(name, overlay, path));
                 } finally {
                     latch.countDown();
                 }
@@ -597,7 +714,7 @@ public final class PackageInstaller {
     /** True while the caller is polling, so the per-layer log stays quiet. */
     private static volatile boolean polling = false;
 
-    private static boolean selectDirect(String name, boolean overlay) {
+    private static boolean selectDirect(String name, boolean overlay, String path) {
         try {
             final com.atakmap.android.maps.MapView mv =
                     com.atakmap.android.maps.MapView.getMapView();
@@ -623,9 +740,23 @@ public final class PackageInstaller {
                         public boolean accept(com.atakmap.map.layer.Layer l) {
                             if (!(l instanceof com.atakmap.map.layer.raster.RasterLayer2))
                                 return false;
-                            final java.util.Collection<String> opts =
-                                    ((com.atakmap.map.layer.raster.RasterLayer2) l)
-                                            .getSelectionOptions();
+                            // A layer that cannot answer is a layer that does
+                            // not have it. On ATAK 5.8 one raster layer's
+                            // getSelectionOptions dies inside ATAK on a null
+                            // dataset list, and because findLayers keeps
+                            // asking after a hit, that one layer was aborting
+                            // the whole search -- after the GRG layer had
+                            // already said yes.
+                            final java.util.Collection<String> opts;
+                            try {
+                                opts = ((com.atakmap.map.layer.raster.RasterLayer2) l)
+                                        .getSelectionOptions();
+                            } catch (LinkageError | RuntimeException inAtak) {
+                                if (!polling)
+                                    Log.d(TAG, "layer " + l.getName()
+                                            + " cannot list selections: " + inAtak);
+                                return false;
+                            }
                             final boolean hit = opts != null && opts.contains(name);
                             // Once, or when it succeeds. This runs once a second
                             // for as long as the wait lasts, and on a build that
@@ -648,35 +779,77 @@ public final class PackageInstaller {
 
             final com.atakmap.map.layer.raster.RasterLayer2 layer =
                     (com.atakmap.map.layer.raster.RasterLayer2) found.get(0);
-            layer.setVisible(name, true);
-            // A base map is chosen -- naming it replaces whatever was showing.
-            // An overlay is not: GRGs stack, and several are normally on at
-            // once, so selecting one would amount to turning the others off.
-            if (!overlay)
-                layer.setSelection(name);
-            Log.d(TAG, (overlay ? "showed " : "selected ") + name
-                    + " on " + layer.getName());
-
-            zoomTo(mv, layer, name);
-            return true;
+            // Each step on its own: on ATAK 5.8 the GRG layer's setVisible
+            // died inside ATAK with a NullPointerException, and one try
+            // around all three meant a map ATAK had plainly registered was
+            // reported as never added. The zoom is the part the operator
+            // asked for; the rest is best effort, and the stack is logged so
+            // the next such failure says where it was.
+            boolean shown = false;
+            try {
+                layer.setVisible(name, true);
+                // A base map is chosen -- naming it replaces whatever was
+                // showing. An overlay is not: GRGs stack, and several are
+                // normally on at once, so selecting one would amount to
+                // turning the others off.
+                if (!overlay)
+                    layer.setSelection(name);
+                shown = true;
+                Log.d(TAG, (overlay ? "showed " : "selected ") + name
+                        + " on " + layer.getName());
+            } catch (LinkageError | RuntimeException inAtak) {
+                Log.w(TAG, "could not show " + name + " on " + layer.getName(),
+                        inAtak);
+            }
+            boolean zoomed = false;
+            try {
+                zoomed = zoomTo(mv, layer, name);
+            } catch (LinkageError | RuntimeException inAtak) {
+                Log.w(TAG, "could not zoom to " + name, inAtak);
+            }
+            // ATAK's own way to a GRG, when its layer would not answer
+            // directly: ZOOM_TO_FILE_ACTION hands the path to
+            // URIContentManager, whose GRG handler implements GoTo
+            // (ImportExportMapComponent, GRGContentHandler in the public
+            // ATAK-CIV source). Used for the KMZ already; for a GRG it is
+            // the fallback, because the direct call is what reports "still
+            // scanning" and this cannot.
+            if (!zoomed && overlay) {
+                try {
+                    final android.content.Intent i = new android.content.Intent(
+                            "com.atakmap.android.importexport.ZOOM_TO_FILE_ACTION");
+                    i.putExtra("filepath", path);
+                    com.atakmap.android.ipc.AtakBroadcast.getInstance()
+                            .sendBroadcast(i);
+                    Log.d(TAG, "asked ATAK to zoom to " + name);
+                    zoomed = true;
+                } catch (LinkageError | RuntimeException notThisBuild) {
+                    Log.w(TAG, "could not ask ATAK to zoom to " + name, notThisBuild);
+                }
+            }
+            return shown || zoomed;
         } catch (LinkageError | RuntimeException notThisBuild) {
-            Log.w(TAG, "could not select directly: " + notThisBuild);
+            Log.w(TAG, "could not select directly", notThisBuild);
             return false;
         }
     }
 
-    /** Fits the map to the selection's own coverage. */
-    private static void zoomTo(com.atakmap.android.maps.MapView mv,
+    /** Fits the map to the selection's own coverage; false when it has none. */
+    private static boolean zoomTo(com.atakmap.android.maps.MapView mv,
             com.atakmap.map.layer.raster.RasterLayer2 layer, String name) {
         final com.atakmap.map.layer.feature.geometry.Geometry g =
                 layer.getGeometry(name);
-        if (g == null)
-            return;
+        if (g == null) {
+            Log.d(TAG, "no geometry for " + name + " on " + layer.getName());
+            return false;
+        }
         final com.atakmap.map.layer.feature.geometry.Envelope e = g.getEnvelope();
         com.atakmap.android.util.ATAKUtilities.scaleToFit(mv,
                 new com.atakmap.coremap.maps.coords.GeoBounds(
                         e.minY, e.minX, e.maxY, e.maxX),
                 mv.getWidth(), mv.getHeight());
+        Log.d(TAG, "zoomed to " + name);
+        return true;
     }
 
     private static void post(final GoTo cb, final Depot.Package pkg,

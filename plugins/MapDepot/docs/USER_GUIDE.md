@@ -1,12 +1,12 @@
 # Map Depot for ATAK — User Guide
 
-**Version 1.4 · takwerx**
+**Version 1.5 · takwerx**
 
-**Download Map Depot 1.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.4/ATAK-Plugin-MapDepot-1.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.4/ATAK-Plugin-MapDepot-1.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.4/ATAK-Plugin-MapDepot-1.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.5/ATAK-Plugin-MapDepot-1.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.5/ATAK-Plugin-MapDepot-1.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.5/ATAK-Plugin-MapDepot-1.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -28,11 +28,22 @@ like a version problem.
 Map Depot needs outbound HTTPS (port 443) and nothing else. No account, no key,
 no configuration, and no TAK server involvement.
 
-**On ATAK 5.6, Offline Public Lands does not work.** Vector tile package support
+**On ATAK 5.6, Offline Public Land Vector Tiles does not work.** Vector tile package support
 arrived in ATAK 5.7, so on 5.6 a forest basemap would download and then be
 invisible to ATAK. Map Depot marks those maps as needing 5.7 or newer rather
 than letting you spend a gigabyte on one. Elevation, streaming base maps and
-ranger district maps all work normally on 5.6.
+Forest Service map sheets all work normally on 5.6.
+
+**On official ATAK 5.8.0.4, Offline Public Land Vector Tiles is not available either.** ATAK
+5.8.0.4 does not start with a vector tile package on the phone once it has
+cataloged it — it dies before any plugin loads, with no message. Map Depot dims
+the section and says so, and does not offer the downloads. If you already have
+packages, Map Depot asks once, shortly after ATAK starts, whether to move them to
+`atak/imagery.off`, where ATAK does not look. Take it: otherwise ATAK will not
+open after its next restart, and the recovery is to move the files out with a
+file manager. Move them back by hand when tak.gov ships a fixed ATAK. Elevation,
+streaming base maps, Forest Service map sheets and the incident maps all work
+normally on 5.8.
 
 ---
 
@@ -50,11 +61,14 @@ The landing page offers six kinds of data, each on its own page.
   elevation readouts need.
 - **Streaming Base Maps** — imagery and street maps served over the network,
   including transparent overlays.
-- **Offline Public Lands** — Forest Service vector basemaps, one per national
+- **Offline Public Land Vector Tiles** — Forest Service vector basemaps, one per national
   forest or grassland, held on the device.
-- **Offline Ranger District Maps** — the printed district maps, as GeoPDFs.
+- **Offline Public Land PDFs** — the printed map sheets, as GeoPDFs: ranger
+  district, forest, regional, 100K and FSTopo.
 - **Incident Maps (NIFC)** — the operational maps posted for a going fire: ops,
   division, air operations, transport, briefing and IR.
+- **Beacon Box Maps** — FlameMapper's neighborhood pre-plans, four sheets per
+  neighborhood, as GeoPDFs.
 - **Drone IR Maps (UASWFC)** — infrared flown by uncrewed aircraft, as
   georeferenced PDFs and KMZs.
 
@@ -134,14 +148,16 @@ no street names on it. An overlay puts them back without hiding the imagery.
 
 ---
 
-## 5. Offline public lands
+## 5. Offline public land vector tiles
 
 A Forest Service vector basemap for each national forest and grassland — roads,
 trails, boundaries, contours and labels — held on the device and drawn with no
 network at all. These are large: tens of megabytes for a grassland, over a
 gigabyte for the biggest forests.
 
-**Needs ATAK 5.7 or newer.** On 5.6 these rows are disabled and say so.
+**Needs ATAK 5.7 or newer, and not official 5.8.0.4.** On 5.6 these rows are
+disabled and say so. On official 5.8.0.4 they are disabled too, because ATAK
+does not start with one of these installed; see "Before you start".
 
 Type part of a forest's name to narrow the list.
 
@@ -159,19 +175,38 @@ at any zoom, and takes far less space than the equivalent tiles would.
 
 ---
 
-## 6. Offline ranger district maps
+## 6. Offline Public Land PDFs
 
-The printed ranger district maps, as GeoPDFs. Where a forest basemap is the whole
-forest at map scale, a district map is the sheet a district office hands out,
-with its margin, legend and printed detail.
+The Forest Service's printed map sheets, as GeoPDFs. Where a forest basemap is
+the whole forest at map scale, a sheet is what an office hands out, with its
+margin, legend and printed detail. Four series, picked with the button beside
+Back; each entry shows how many sheets it holds:
 
-Search by forest name to see its districts. Each row names the forest and state
-it belongs to.
+- **Ranger District & Forest** — the district maps and the whole-forest visitor
+  maps. Search by forest name to see its districts. Each row names the forest
+  and state it belongs to.
+- **Regional** — one map per Forest Service region, in two editions: with ranger
+  district boundaries, or with forest boundaries. Eighteen sheets.
+- **100K** — the 1:100,000 series, nationwide, forest land or not. About 1,800
+  sheets of 12 to 46 MB.
+- **USFS Topo 24K** — the 1:24,000 quads. About 18,000 sheets of 3 to 4 MB. The
+  list is fetched the first time you choose it, then kept on the device.
 
-![Ranger districts for a forest](screenshots/15_ranger_districts.png)
+The 100K and FSTopo lists are sorted by distance from the center of the map,
+nearest first, and every row says how far and in which direction. Pan the map
+to where you are working, open the list, and the sheet you want is at the top.
+Only the nearest 300 are listed, and the status line says so; move the map or
+type part of a quad or state name to reach the rest. The distance is in the
+units your ATAK is set to.
 
-Installed, a district map lands as a georeferenced overlay, in the right place on
-the ground, over whatever base map is showing.
+![The district list with the series row](screenshots/15_ranger_districts.png)
+
+![Choosing a series](screenshots/31_series_chooser.png)
+
+![USFS Topo quads nearest you](screenshots/30_usfs_topo_nearest.png)
+
+Installed, a sheet lands as a georeferenced overlay, in the right place on the
+ground, over whatever base map is showing.
 
 ![A district map drawn over imagery](screenshots/16_district_map_on_map.jpg)
 
@@ -266,6 +301,24 @@ what covers the ground in front of you before deciding what to turn on.
 
 ---
 
+### Beacon Box maps
+
+FlameMapper's neighborhood pre-plans for the Santa Monica Mountains
+communities and a few others: for each neighborhood a base map, an aerial, a
+fire-science sheet and a structure-vulnerability sheet, all GeoPDFs. They are
+browsed the same way as the incident maps: pick your area, open a
+neighborhood, tick what you want, Download. Each row says which of the four
+it is and how big. They install as overlays and draw over whatever base map
+is showing, exactly like an incident map.
+
+![Malibu's neighborhoods, east to west](screenshots/33_beacon_neighborhoods.png)
+
+![A neighborhood's maps](screenshots/34_beacon_maps.png)
+
+The maps' own site cannot be reached from a phone, so Map Depot reads them
+from its depot, where they are mirrored with the author's permission. Maps by
+FlameMapper.
+
 ## 8. Finding what you already have
 
 Every page has a filter button, next to **Back**, that cycles **All** →
@@ -334,8 +387,8 @@ indistinguishable from data put there by hand.
 |---|---|
 | Elevation | `atak/DTED/`, one file per one-degree square |
 | Streaming base maps | `atak/imagery/`, as map source files |
-| Offline public lands | `atak/imagery/`, as vector tile packages |
-| Ranger district maps | `atak/grg/`, as georeferenced PDFs |
+| Offline public land vector tiles | `atak/imagery/`, as vector tile packages |
+| Forest Service map sheets | `atak/grg/`, as georeferenced PDFs |
 | Incident and drone maps (PDF) | `atak/grg/`, as georeferenced PDFs |
 | Incident and drone maps (KMZ) | `atak/overlays/`, as ATAK overlays |
 

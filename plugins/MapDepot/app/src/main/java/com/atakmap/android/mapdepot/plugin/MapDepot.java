@@ -22,9 +22,12 @@ import android.widget.Toast;
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.mapdepot.AtakBuild;
 import com.atakmap.android.mapdepot.BaseMapInstaller;
+import com.atakmap.android.mapdepot.BeaconClient;
 import com.atakmap.android.mapdepot.Depot;
 import com.atakmap.android.mapdepot.DepotClient;
+import com.atakmap.android.mapdepot.Distance;
 import com.atakmap.android.mapdepot.InstalledIndex;
 import com.atakmap.android.mapdepot.MapSource;
 import com.atakmap.android.mapdepot.NifcClient;
@@ -33,17 +36,21 @@ import com.atakmap.android.mapdepot.PackageInstaller;
 import com.atakmap.android.mapdepot.Pinned;
 import com.atakmap.android.mapdepot.RegionInstaller;
 import com.atakmap.coremap.log.Log;
+import com.atakmap.coremap.maps.coords.GeoPoint;
 
 import java.io.File;
 
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -153,8 +160,54 @@ public class MapDepot implements IPlugin {
 
     private final List<Depot.Forest> allForests = new ArrayList<>();
     private final List<Depot.RecMap> allRecMaps = new ArrayList<>();
+
+    /**
+     * The Forest Service series that came after the district maps. Regional
+     * and 100K arrive with the catalog; the FSTopo quads are their own
+     * document, fetched the first time that series is chosen, and until then
+     * only their count is known.
+     */
+    private final List<Depot.RecMap> allRegional = new ArrayList<>();
+    private final List<Depot.RecMap> allK100 = new ArrayList<>();
+    private final List<Depot.RecMap> allFstopo = new ArrayList<>();
+    private int fstopoCount;
+    private boolean fstopoLoading;
+
+    private enum Series {
+        DISTRICT, REGIONAL, K100, FSTOPO
+    }
+
+    private Series series = Series.DISTRICT;
+    private Button seriesButton, nearButton;
+    private View seriesRow;
+
+    /**
+     * What "nearest" is measured from. The map center by default -- the
+     * operator pans to where the work is -- and their own position on
+     * request. Said on the button and in the status line, because a list
+     * sorted by an unstated distance reads as random.
+     */
+    private boolean nearMe;
+
+    /**
+     * Distance and bearing from the map center, by id, for the rows on
+     * screen. Filled only for the series that carry a location, and only for
+     * the rows shown, so it is never eighteen thousand entries.
+     */
+    private final Map<String, double[]> distances = new HashMap<>();
+
+    /** How many of the nearest sheets a located series shows. */
+    private static final int NEAREST_CAP = 300;
+
     private final List<Depot.Package> shownPackages = new ArrayList<>();
     private final Set<String> installedPackages = new HashSet<>();
+
+    /**
+     * The offer to park vector tile packages is made once per plugin start.
+     * Refusing it is an answer; asking again every time the pane opens is not
+     * a reminder, it is nagging about something the operator already decided.
+     */
+    private boolean offeredToPark;
     private PackageAdapter packageAdapter;
     private TextView forestStatus;
     private EditText forestSearch;
@@ -182,6 +235,7 @@ public class MapDepot implements IPlugin {
     // operator at the top of the whole server.
     private NifcClient nifc;
     private UaswfcClient uaswfc;
+    private BeaconClient beacon;
 
     /** Whichever archive the browser is currently showing. */
     private MapSource source;
@@ -271,6 +325,128 @@ public class MapDepot implements IPlugin {
         packages = new PackageInstaller();
         uiService.addToolbarItem(toolbarItem);
         registerPreferences();
+
+        // Left until ATAK has finished coming up: this runs while plugins are
+        // still loading, and a dialog thrown at a window that is not ready yet
+        // is lost, or worse. The check itself is cheap either way.
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (packages != null)
+                            offerToParkVectorPackages();
+                    }
+                }, PARK_OFFER_DELAY_MS);
+    }
+
+    private static final long PARK_OFFER_DELAY_MS = 5000L;
+
+    /**
+     * Why a vector tile package should not be downloaded onto this ATAK, in
+     * the form that fits where it is shown: the section's status line, or the
+     * tail of a row. Null when there is nothing in the way.
+     *
+     * Two different reasons, and they must not be confused: 5.6 cannot display
+     * one, which wastes the download; official 5.8.0.4 displays it and then
+     * never starts again, which loses the phone.
+     */
+    private String vectorPackageBlock(boolean brief) {
+        if (!PackageInstaller.supportsVectorPackages())
+            return brief ? pluginContext.getString(R.string.forests_need_57_brief)
+                    : pluginContext.getString(R.string.forests_need_57);
+        if (AtakBuild.blocksVectorPackages(hostContext())) {
+            final String v = AtakBuild.versionNumber(hostContext());
+            return brief ? pluginContext.getString(R.string.forests_blocked_brief, v)
+                    : pluginContext.getString(R.string.forests_blocked, v);
+        }
+        return null;
+    }
+
+    /**
+     * A phone already carrying packages on official 5.8 is one restart from an
+     * ATAK that does not open, and nothing on the phone says so. This does,
+     * once, and offers the one recovery that is known to work: moving the
+     * files to a folder beside atak/imagery that ATAK does not scan. Moving
+     * someone's files is not something this plugin does anywhere else, and
+     * the dialog says why it is right here.
+     */
+    private void offerToParkVectorPackages() {
+        if (offeredToPark)
+            return;
+        offeredToPark = true;
+        final Context host = hostContext();
+        if (!AtakBuild.blocksVectorPackages(host))
+            return;
+        final List<File> found = PackageInstaller.vectorPackagesOnDevice();
+        Log.i(TAG, "vector tile packages on an ATAK that will not start with"
+                + " them: " + found.size());
+        if (found.isEmpty())
+            return;
+
+        final int n = found.size();
+        final String version = AtakBuild.versionNumber(host);
+        final String message = n + " vector tile package" + (n == 1 ? " is" : "s are")
+                + " in atak/imagery (Offline Public Land Vector Tiles). ATAK " + version
+                + " will not start with " + (n == 1 ? "it" : "them")
+                + " there after the next restart.\n\nMove "
+                + (n == 1 ? "it" : "them") + " to atak/" + PackageInstaller.PARKED_DIR_NAME
+                + " now? ATAK does not look in that folder. Map Depot moves no other"
+                + " files, ever; this is the one case where the alternative is an"
+                + " ATAK that does not open. Move " + (n == 1 ? "it" : "them")
+                + " back by hand when tak.gov ships a fixed ATAK.";
+        try {
+            new AlertDialog.Builder(host)
+                    .setTitle("ATAK will not start next time")
+                    .setMessage(message)
+                    .setPositiveButton("Move", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface d, int w) {
+                            parkVectorPackages(n);
+                        }
+                    })
+                    .setNegativeButton("Not now", null)
+                    .show();
+        } catch (RuntimeException noWindow) {
+            // Nothing to draw on -- ATAK is not up the way the delay assumed.
+            // The section itself still says what is wrong; the offer comes
+            // back at the next plugin start.
+            Log.w(TAG, "could not offer to park vector tile packages: " + noWindow);
+            offeredToPark = false;
+        }
+    }
+
+    private void parkVectorPackages(final int expected) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final int moved = PackageInstaller.parkVectorPackages();
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(
+                        new Runnable() {
+                            @Override
+                            public void run() {
+                                reportParked(moved, expected);
+                            }
+                        });
+            }
+        }, "mapdepot-park").start();
+    }
+
+    private void reportParked(int moved, int expected) {
+        final String where = "atak/" + PackageInstaller.PARKED_DIR_NAME;
+        if (moved >= expected) {
+            toast("Moved " + moved + " to " + where + ". ATAK will start.");
+            return;
+        }
+        // Say it in a dialog, not a toast: this phone is still going to fail
+        // and three seconds on screen is not enough to learn that.
+        new AlertDialog.Builder(hostContext())
+                .setTitle("Not all moved")
+                .setMessage("Moved " + moved + " of " + expected + " to " + where
+                        + ". The rest are still in atak/imagery, and ATAK will not"
+                        + " start with them after the next restart. Move them out"
+                        + " with a file manager, or delete them.")
+                .setPositiveButton(pluginContext.getString(R.string.ok), null)
+                .show();
     }
 
     /**
@@ -310,6 +486,10 @@ public class MapDepot implements IPlugin {
     @Override
     public void onStop() {
         unregisterPreferences();
+
+        // A fetch in flight when the client is shut down never calls back,
+        // and a flag left true would make the next FSTopo pick do nothing.
+        fstopoLoading = false;
 
         // Close the pane and let go of it. Its buttons hold a reference to this
         // instance, and everything this instance owns is about to be null, so a
@@ -421,6 +601,27 @@ public class MapDepot implements IPlugin {
         forestView = root.findViewById(R.id.forest_view);
         forestStatus = root.findViewById(R.id.forest_status);
         forestSearch = root.findViewById(R.id.forest_search);
+        seriesRow = root.findViewById(R.id.series_row);
+        seriesButton = root.findViewById(R.id.sheet_series);
+        seriesButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseSeries();
+            }
+        });
+        nearButton = root.findViewById(R.id.near_anchor);
+        nearButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!nearMe && Distance.selfPoint() == null) {
+                    toast(pluginContext.getString(R.string.no_position));
+                    return;
+                }
+                nearMe = !nearMe;
+                refreshSeriesControls();
+                applyForestFilter();
+            }
+        });
         cancelBar = root.findViewById(R.id.cancel_bar);
         cancelBar.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -484,13 +685,28 @@ public class MapDepot implements IPlugin {
                     }
                 });
 
-        root.findViewById(R.id.btn_forests).setOnClickListener(
+        final View forestsButton = root.findViewById(R.id.btn_forests);
+        forestsButton.setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         showPackages(PackageMode.FORESTS);
                     }
                 });
+
+        // A section that vanishes reads as a bug. On an ATAK that must not be
+        // given these maps the button stays, dimmed, and the line under the
+        // buttons says why; it still opens, because a package already on the
+        // phone can still be removed from inside.
+        final TextView homeNote = root.findViewById(R.id.home_note);
+        if (AtakBuild.blocksVectorPackages(hostContext())) {
+            forestsButton.setAlpha(0.5f);
+            homeNote.setText(pluginContext.getString(R.string.home_forests_blocked,
+                    AtakBuild.versionNumber(hostContext())));
+            homeNote.setVisibility(View.VISIBLE);
+        } else {
+            homeNote.setVisibility(View.GONE);
+        }
 
         root.findViewById(R.id.btn_recmaps).setOnClickListener(
                 new View.OnClickListener() {
@@ -539,6 +755,16 @@ public class MapDepot implements IPlugin {
                         if (nifc == null)
                             nifc = new NifcClient();
                         showSource(nifc);
+                    }
+                });
+
+        root.findViewById(R.id.btn_beacon).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if (beacon == null)
+                            beacon = new BeaconClient();
+                        showSource(beacon);
                     }
                 });
 
@@ -647,16 +873,18 @@ public class MapDepot implements IPlugin {
         baseMapView.setVisibility(View.GONE);
         forestView.setVisibility(View.VISIBLE);
         nifcView.setVisibility(View.GONE);
-        forestSearch.setHint(mode == PackageMode.FORESTS
-                ? R.string.search_forests : R.string.search_recmaps);
+        refreshSeriesControls();
         forestSearch.setText("");
 
         // Say it up front rather than after a gigabyte has been downloaded.
         // ATAK 5.6 has no vector tile package support, so a forest basemap
-        // installs and then exists nowhere ATAK can see it.
-        if (mode == PackageMode.FORESTS
-                && !PackageInstaller.supportsVectorPackages())
-            forestStatus.setText(pluginContext.getString(R.string.forests_need_57));
+        // installs and then exists nowhere ATAK can see it; official 5.8.0.4
+        // displays it and then does not start again.
+        if (mode == PackageMode.FORESTS) {
+            final String block = vectorPackageBlock(false);
+            if (block != null)
+                forestStatus.setText(block);
+        }
 
         if (!catalogLoaded)
             loadCatalog();
@@ -664,9 +892,120 @@ public class MapDepot implements IPlugin {
             applyForestFilter();
     }
 
-    /** The list behind the current mode, in catalog order. */
+    /** The list behind the current mode and series, in catalog order. */
     private List<? extends Depot.Package> sourceList() {
-        return packageMode == PackageMode.FORESTS ? allForests : allRecMaps;
+        if (packageMode == PackageMode.FORESTS)
+            return allForests;
+        switch (series) {
+            case REGIONAL:
+                return allRegional;
+            case K100:
+                return allK100;
+            case FSTOPO:
+                return allFstopo;
+            default:
+                return allRecMaps;
+        }
+    }
+
+    /** The chooser button and the search hint follow the mode and series. */
+    private void refreshSeriesControls() {
+        final boolean sheets = packageMode == PackageMode.RECMAPS;
+        final boolean located = locatedList();
+        seriesRow.setVisibility(sheets || located ? View.VISIBLE : View.GONE);
+        seriesButton.setVisibility(sheets ? View.VISIBLE : View.GONE);
+        if (sheets)
+            seriesButton.setText(seriesLabel(series, true) + "  \u25be");
+        nearButton.setVisibility(located ? View.VISIBLE : View.GONE);
+        nearButton.setText(pluginContext.getString(
+                nearMe ? R.string.near_me : R.string.near_map));
+        forestSearch.setHint(!sheets ? R.string.search_forests
+                : series == Series.DISTRICT ? R.string.search_recmaps
+                        : series == Series.REGIONAL ? R.string.search_regional
+                                : R.string.search_sheets);
+    }
+
+    /** With the count, as the UI standard asks: a filter says what it costs. */
+    private String seriesLabel(Series s, boolean withCount) {
+        final int name;
+        final int count;
+        switch (s) {
+            case REGIONAL:
+                name = R.string.series_regional;
+                count = allRegional.size();
+                break;
+            case K100:
+                name = R.string.series_100k;
+                count = allK100.size();
+                break;
+            case FSTOPO:
+                name = R.string.series_fstopo;
+                count = allFstopo.isEmpty() ? fstopoCount : allFstopo.size();
+                break;
+            default:
+                name = R.string.series_district;
+                count = allRecMaps.size();
+        }
+        final String label = pluginContext.getString(name);
+        return withCount ? label + " (" + String.format(Locale.US, "%,d", count) + ")"
+                : label;
+    }
+
+    private void chooseSeries() {
+        final Series[] all = Series.values();
+        final String[] items = new String[all.length];
+        for (int i = 0; i < all.length; i++)
+            items[i] = seriesLabel(all[i], true);
+        new AlertDialog.Builder(hostContext())
+                .setTitle(pluginContext.getString(R.string.choose_series))
+                .setSingleChoiceItems(items, series.ordinal(),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                d.dismiss();
+                                selectSeries(all[which]);
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.cancel), null)
+                .show();
+    }
+
+    private void selectSeries(Series s) {
+        series = s;
+        refreshSeriesControls();
+        // Clearing the search re-filters through the watcher; the FSTopo
+        // list may still have to be fetched first.
+        forestSearch.setText("");
+        if (s == Series.FSTOPO && allFstopo.isEmpty())
+            loadFstopo();
+        else
+            applyForestFilter();
+    }
+
+    private void loadFstopo() {
+        if (client == null || fstopoLoading)
+            return;
+        fstopoLoading = true;
+        forestStatus.setText("Loading " + String.format(Locale.US, "%,d", fstopoCount)
+                + " quads…");
+        client.fetchFstopo(new DepotClient.SheetFileCallback() {
+            @Override
+            public void onSheets(List<Depot.RecMap> sheets) {
+                fstopoLoading = false;
+                Log.i(TAG, "fstopo quads=" + sheets.size());
+                allFstopo.clear();
+                allFstopo.addAll(sheets);
+                refreshInstalledPackages();
+                refreshSeriesControls();
+                applyForestFilter();
+            }
+
+            @Override
+            public void onError(String message) {
+                fstopoLoading = false;
+                forestStatus.setText("Could not read the FSTopo list: " + message);
+            }
+        });
     }
 
     private void showBaseMaps() {
@@ -1311,13 +1650,21 @@ public class MapDepot implements IPlugin {
         client.fetchForests(new DepotClient.ForestCallback() {
             @Override
             public void onForests(List<Depot.Forest> fetched,
-                    List<Depot.RecMap> recMaps) {
+                    List<Depot.RecMap> recMaps, Depot.Sheets sheets) {
                 Log.i(TAG, "onForests forests=" + fetched.size()
-                        + " recmaps=" + recMaps.size());
+                        + " recmaps=" + recMaps.size()
+                        + " regional=" + sheets.regional.size()
+                        + " 100k=" + sheets.k100.size()
+                        + " fstopo=" + sheets.fstopoCount);
                 allForests.clear();
                 allForests.addAll(fetched);
                 allRecMaps.clear();
                 allRecMaps.addAll(recMaps);
+                allRegional.clear();
+                allRegional.addAll(sheets.regional);
+                allK100.clear();
+                allK100.addAll(sheets.k100);
+                fstopoCount = sheets.fstopoCount;
                 refreshInstalledPackages();
                 applyForestFilter();
             }
@@ -1333,12 +1680,11 @@ public class MapDepot implements IPlugin {
     /** Ask the filesystem once per listing rather than once per row. */
     private void refreshInstalledPackages() {
         installedPackages.clear();
-        for (Depot.Forest f : allForests)
-            if (PackageInstaller.isInstalled(f))
-                installedPackages.add(f.id());
-        for (Depot.RecMap m : allRecMaps)
-            if (PackageInstaller.isInstalled(m))
-                installedPackages.add(m.id());
+        installedPackages.addAll(PackageInstaller.installedIds(allForests));
+        installedPackages.addAll(PackageInstaller.installedIds(allRecMaps));
+        installedPackages.addAll(PackageInstaller.installedIds(allRegional));
+        installedPackages.addAll(PackageInstaller.installedIds(allK100));
+        installedPackages.addAll(PackageInstaller.installedIds(allFstopo));
     }
 
     private void applyForestFilter() {
@@ -1359,10 +1705,88 @@ public class MapDepot implements IPlugin {
                 continue;
             shownPackages.add(p);
         }
+        final int hidden = sortNearest();
         packageAdapter.notifyDataSetChanged();
 
         if (activeForestId == null)
-            forestStatus.setText(statusLine(q));
+            forestStatus.setText(statusLine(q, hidden));
+    }
+
+    /**
+     * For the series that carry a location, order the list by distance from
+     * the map and keep the nearest few hundred. Nobody scrolls eighteen
+     * thousand quads, and a crew does not know its quad's name; it knows
+     * where it is standing. Returns how many rows were cut, so the status
+     * line can say so rather than let a trimmed list read as the whole set.
+     *
+     * Computed when the list is rebuilt -- opening the section, choosing a
+     * series, typing -- not on every map move: that callback is the GL
+     * thread and this touches views.
+     */
+    /**
+     * Whether the current list can be sorted by distance: true as soon as any
+     * entry carries a location. Decided by the catalog, not by which list it
+     * is, so a series that gains locations sorts without a plugin release.
+     */
+    private boolean locatedList() {
+        for (Depot.Package p : sourceList()) {
+            if (p instanceof Depot.Located && ((Depot.Located) p).located())
+                return true;
+        }
+        return false;
+    }
+
+    /** The point "nearest" is measured from; falls back to the map center. */
+    private GeoPoint anchor() {
+        final GeoPoint self = nearMe ? Distance.selfPoint() : null;
+        return self != null ? self : Distance.mapCenter();
+    }
+
+    private int sortNearest() {
+        distances.clear();
+        if (!locatedList())
+            return 0;
+        final GeoPoint center = anchor();
+        if (center == null)
+            return 0;
+        for (Depot.Package p : shownPackages) {
+            if (p instanceof Depot.Located && ((Depot.Located) p).located()) {
+                final Depot.Located m = (Depot.Located) p;
+                distances.put(p.id(), new double[] {
+                        Distance.meters(center, m.lat(), m.lon()),
+                        Distance.bearing(center, m.lat(), m.lon()) });
+            }
+        }
+        Collections.sort(shownPackages, new Comparator<Depot.Package>() {
+            @Override
+            public int compare(Depot.Package a, Depot.Package b) {
+                final double[] da = distances.get(a.id());
+                final double[] db = distances.get(b.id());
+                return Double.compare(da == null ? Double.MAX_VALUE : da[0],
+                        db == null ? Double.MAX_VALUE : db[0]);
+            }
+        });
+        if (shownPackages.size() <= NEAREST_CAP)
+            return 0;
+        // The row that is downloading stays on screen whatever the map does.
+        if (activeForestId != null) {
+            for (int i = NEAREST_CAP; i < shownPackages.size(); i++) {
+                if (activeForestId.equals(shownPackages.get(i).id())) {
+                    shownPackages.add(0, shownPackages.remove(i));
+                    break;
+                }
+            }
+        }
+        final int hidden = shownPackages.size() - NEAREST_CAP;
+        shownPackages.subList(NEAREST_CAP, shownPackages.size()).clear();
+        return hidden;
+    }
+
+    /** The row's second line, with how far away the sheet is when that is known. */
+    private String describeRow(Depot.Package pkg) {
+        final double[] d = distances.get(pkg.id());
+        return d == null ? pkg.describe()
+                : pkg.describe() + " · " + Distance.format(d[0], d[1]);
     }
 
     /**
@@ -1370,12 +1794,23 @@ public class MapDepot implements IPlugin {
      * alike: nothing published, nothing matched, or nothing installed. Reporting
      * "0 of 0 installed" for all three reads as a broken search.
      */
-    private String statusLine(String query) {
+    private String statusLine(String query, int hidden) {
         final int total = sourceList().size();
-        if (total == 0)
-            return packageMode == PackageMode.RECMAPS
-                    ? "No ranger district maps in the catalog yet."
-                    : "No packages in the catalog yet.";
+        if (total == 0) {
+            if (packageMode != PackageMode.RECMAPS)
+                return "No packages in the catalog yet.";
+            if (series == Series.FSTOPO && fstopoLoading)
+                return "Loading quads…";
+            return "No " + seriesLabel(series, false) + " maps in the catalog yet.";
+        }
+
+        if (hidden > 0)
+            return String.format(Locale.US,
+                    "Nearest %d of %,d%s to %s · %s",
+                    shownPackages.size(), shownPackages.size() + hidden,
+                    query.isEmpty() ? "" : " matching",
+                    nearMe ? "you" : "the map center",
+                    nearMe ? "search for the rest" : "move the map or search");
 
         if (shownPackages.isEmpty()) {
             if (packageShown == Shown.INSTALLED)
@@ -2222,6 +2657,10 @@ public class MapDepot implements IPlugin {
                     "USFS", "BLM", "NPS", "DPA", "GACC", "NIFC", "UASWFC",
                     "AM", "PM", "DIV", "MP", "US", "USA"));
 
+    private static final java.util.Set<String> SMALL =
+            new HashSet<>(Arrays.asList("of", "and", "the", "at", "in", "on",
+                    "de", "del", "la", "y"));
+
     /**
      * A folder name as a person would write it: {@code pacific_nw} to
      * "Pacific NW", {@code calif_n} to "Calif N", {@code DAILY MAP PRODUCT}
@@ -2240,6 +2679,12 @@ public class MapDepot implements IPlugin {
             final String upper = w.toUpperCase(java.util.Locale.US);
             if (ACRONYM.contains(upper)) {
                 sb.append(upper);
+                continue;
+            }
+            // "City of Malibu", not "City Of Malibu": the little words stay
+            // down unless they start the name.
+            if (sb.length() > 0 && SMALL.contains(w.toLowerCase(java.util.Locale.US))) {
+                sb.append(w.toLowerCase(java.util.Locale.US));
                 continue;
             }
             // Already shouting, or already mixed on purpose -- leave it.
@@ -2566,7 +3011,7 @@ public class MapDepot implements IPlugin {
                 // a state and a size it wrapped wherever the width ran out.
                 final String hint = "\ntap to go there";
                 final SpannableString line =
-                        new SpannableString(pkg.describe() + hint);
+                        new SpannableString(describeRow(pkg) + hint);
                 line.setSpan(
                         new ForegroundColorSpan(pluginContext.getResources()
                                 .getColor(R.color.action_green)),
@@ -2574,7 +3019,7 @@ public class MapDepot implements IPlugin {
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 detail.setText(line);
             } else {
-                detail.setText(pkg.describe());
+                detail.setText(describeRow(pkg));
             }
 
             if (active && forestTotal > 0) {
@@ -2593,8 +3038,9 @@ public class MapDepot implements IPlugin {
             // these run to a gigabyte and two at once on a hotspot serves nobody.
             // A forest basemap this ATAK cannot display is not worth a
             // gigabyte. Removing one already downloaded stays available.
-            final boolean unusable = packageMode == PackageMode.FORESTS
-                    && !done && !PackageInstaller.supportsVectorPackages();
+            final String block = packageMode == PackageMode.FORESTS && !done
+                    ? vectorPackageBlock(true) : null;
+            final boolean unusable = block != null;
 
             action.setEnabled(!active && activeForestId == null && !unusable);
             if (active) {
@@ -2605,7 +3051,7 @@ public class MapDepot implements IPlugin {
                 action.setText(done ? R.string.remove : R.string.download);
             }
             if (unusable)
-                detail.setText(pkg.describe() + " · needs ATAK 5.7 or newer");
+                detail.setText(describeRow(pkg) + " · " + block);
             action.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {

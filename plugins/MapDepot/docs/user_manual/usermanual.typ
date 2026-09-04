@@ -3,9 +3,9 @@
 
 #show: userguide.with(
    plugin-name: "Map Depot",
-   plugin-version: "1.4",
+   plugin-version: "1.6",
    platform: "ATAK",
-   platform-version: "5.8.0",
+   platform-version: "5.7.0",
 )
 
 #tak-slide[
@@ -35,11 +35,14 @@ itself where ATAK expects to find it.
     elevation readouts need.
   - *Streaming Base Maps* -- imagery and street maps served over the network,
     including transparent overlays.
-  - *Offline Public Lands* -- Forest Service vector basemaps, one per national
+  - *Offline Public Land Vector Tiles* -- Forest Service vector basemaps, one per national
     forest or grassland, held on the device.
-  - *Offline Ranger District Maps* -- the printed district maps, as GeoPDFs.
+  - *Offline Public Land PDFs* -- the printed map sheets, as GeoPDFs:
+    ranger district, forest, regional, 100K and FSTopo.
   - *Incident Maps (NIFC)* -- the operational maps posted for a going fire:
     ops, division, air operations, IR.
+  - *Beacon Box Maps* -- FlameMapper's neighborhood pre-plans, four sheets per
+    neighborhood, as GeoPDFs.
   - *Drone IR Maps (UASWFC)* -- infrared products flown over a fire, as
     georeferenced PDFs and KMZs.
 ]
@@ -139,7 +142,7 @@ caches what it has drawn.
 ]
 
 #tak-slide[
-= Offline public lands
+= Offline public land vector tiles
 
 A Forest Service vector basemap for each national forest and grassland --
 roads, trails, boundaries, contours and labels -- held on the device and drawn
@@ -171,18 +174,51 @@ over a gigabyte for the biggest forests.
 ]
 
 #tak-slide[
-= Offline ranger district maps
+= Offline public land PDFs
 
-The printed ranger district maps, as GeoPDFs. Where a forest basemap is the
-whole forest at map scale, a district map is the sheet a district office hands
-out, with its margin, legend and printed detail.
+The Forest Service's printed map sheets, as GeoPDFs. Where a forest basemap is
+the whole forest at map scale, a sheet is what an office hands out, with its
+margin, legend and printed detail. Four series, picked with the button beside
+Back; each entry says how many sheets it holds.
 
 #v(6pt)
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("15.png", width: 72%)
 ][
-  Search by forest name to see its districts. Each row names the forest and
-  state it belongs to.
+  - *Ranger District & Forest* -- the district maps and the whole-forest
+    visitor maps. Search by forest name to see its districts.
+  - *Regional* -- one map per Forest Service region, with district or with
+    forest boundaries. Eighteen sheets.
+  - *100K* -- the 1:100,000 series, nationwide. About 1,800 sheets.
+  - *USFS Topo 24K* -- the 1:24,000 quads. About 18,000 sheets, fetched the first
+    time you choose it and then kept on the device.
+]
+]
+
+#tak-slide[
+= Nearest first
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("46.png", width: 72%)
+][
+  Every offline list is sorted by distance, nearest first, and every row says
+  how far and in which direction, in the units your ATAK is set to. The
+  *Near* button says what that is measured from: the center of the map, or
+  you. Pan the map to where you are working, open the list, and the sheet
+  you want is at the top.
+
+  #v(6pt)
+  The big series list the nearest 300 and the status line says so. Move the
+  map, or type part of a name, to reach the rest.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("47.png", width: 72%)
+][
+  The series button says how many sheets each series holds. Ranger District
+  & Forest is where the list opens; the others are one tap away.
 ]
 ]
 
@@ -425,6 +461,30 @@ covers before deciding to turn it on.
 ]
 
 #tak-slide[
+= Beacon Box maps
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("48.png", width: 72%)
+][
+  FlameMapper's neighborhood pre-plans for the Santa Monica Mountains
+  communities and a few others: a base map, an aerial, and where they exist a
+  fire-science and a structure-vulnerability sheet per neighborhood, as
+  GeoPDFs. Pick your area, open a neighborhood -- Malibu's run east to west,
+  as the author lists them -- tick what you want, Download.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("49.png", width: 72%)
+][
+  Each row says which of the four it is and how big, with the file's own name
+  under it. Installed, a sheet lands as an overlay over whatever base map is
+  showing, like an incident map.
+]
+]
+
+#tak-slide[
 = Finding what you have installed
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
@@ -476,8 +536,8 @@ indistinguishable from data put there by hand.
 #toolbox.side-by-side(columns: (7fr, 5fr))[
   - Elevation → `atak/DTED/`, one file per one-degree square.
   - Streaming base maps → `atak/imagery/`, as map source files.
-  - Offline public lands → `atak/imagery/`, as vector tile packages.
-  - Ranger district maps → `atak/grg/`, as georeferenced PDFs.
+  - Offline public land vector tiles → `atak/imagery/`, as vector tile packages.
+  - Forest Service map sheets → `atak/grg/`, as georeferenced PDFs.
   - Incident and drone maps → `atak/grg/` for a PDF, `atak/overlays/` for a
     KMZ.
 

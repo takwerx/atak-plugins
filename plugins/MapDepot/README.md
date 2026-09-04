@@ -1,10 +1,10 @@
 ATAK Plugin — Map Depot
 
-**Download Map Depot 1.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.4/ATAK-Plugin-MapDepot-1.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.4/ATAK-Plugin-MapDepot-1.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.4/ATAK-Plugin-MapDepot-1.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.5/ATAK-Plugin-MapDepot-1.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.5/ATAK-Plugin-MapDepot-1.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.5/ATAK-Plugin-MapDepot-1.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -31,12 +31,15 @@ nothing has to be imported by hand afterwards:
     -- satellite, street, topographic, nautical, and transparent overlays such as
     BLM roads and trails, FEMA flood hazard zones and current fire perimeters.
 
-  * Offline public lands. US Forest Service vector basemap packages, one per
+  * Offline public land vector tiles. US Forest Service vector basemap packages, one per
     national forest or grassland, fetched directly from ArcGIS Online.
 
-  * Offline ranger district maps. Forest Service ranger district and forest
-    visitor maps as georeferenced PDFs, which install as image overlays and draw
-    over whatever base map is already in use.
+  * Offline public land PDFs. The Forest Service's printed map sheets as
+    georeferenced PDFs, which install as image overlays and draw over whatever
+    base map is already in use: ranger district and forest visitor maps, the
+    nine regional maps, the 1:100,000 series and the 1:24,000 FSTopo quads. The
+    two large series are listed nearest the map first, with distance and
+    direction on every row, because nobody knows the name of their quad.
 
   * Incident maps. The operational products a going fire's GIS shop posts to the
     NIFC archive -- ops, division, air operations, transport, briefing and IR --
@@ -48,6 +51,13 @@ nothing has to be imported by hand afterwards:
     to the UAS Wildland Fire Consortium. Flight logs and geodatabases are left
     out; only georeferenced maps and KMZ overlays are offered.
 
+  * Beacon Box maps. FlameMapper's neighborhood pre-plans for the Santa Monica
+    Mountains communities and a few others -- a base map, an aerial, a
+    fire-science sheet and a structure-vulnerability sheet per neighborhood, as
+    GeoPDFs -- browsed by area and neighborhood the way the incident archives
+    are. Their own site cannot be reached from a phone, so they are mirrored on
+    the depot with the author's permission. Maps by FlameMapper.
+
 Any folder in either archive can be pinned to the top of the list, so a crew
 assigned to a fire reaches it in one tap rather than four.
 
@@ -58,7 +68,39 @@ archives are read live, since what they hold changes through the day.
 _________________________________________________________________
 STATUS
 
-Version 1.4. Verified on ATAK-CIV 5.8.0.3.
+Version 1.6. Verified on ATAK-CIV 5.8.0.3 (SDK build) and, as the tak.gov-signed
+builds, on official ATAK-CIV 5.6.0.18 and 5.8.0.4 -- on the latter the gate,
+the Move offer, and ATAK starting again afterwards.
+
+1.6 adds the rest of the Forest Service's map sheets, and the Beacon Box maps. The Digital Maps site
+publishes eight series behind one download gateway, and 1.0 took two of them,
+the ranger district and forest visitor maps. 1.6 adds the Regional series (18
+sheets), the 1:100,000 series (1,841) and the 1:24,000 FSTopo quads (about
+18,000), each built from the same index and URL template the site's own
+Download button uses, and each sheet confirmed with a byte from the gateway
+before it is cataloged. They share one section with a series chooser, and the
+two large series sort by distance from the map center and show the nearest 300,
+saying so, since a list of eighteen thousand quads is not something anyone
+scrolls. The FSTopo list is fetched the first time it is chosen and kept beside
+the catalog, so it is bigger than the whole catalog only once.
+
+1.5 responds to a fault in ATAK, not in the plugin: official ATAK-CIV 5.8.0.4
+does not start once a vector tile package -- an Offline Public Land Vector Tiles package -- is
+in its layer catalog. The first import survives; every start after it dies in
+ATAK's own imagery scan, before any plugin loads, with an AbstractMethodError on
+TileMatrix.getName(). Measured 2026-09-03 on a Galaxy S22 Ultra, Android 14,
+with a 20 MB and a 242 MB package; the SDK's own 5.8.0.3 build starts fine with
+fifteen of them, so this is the official build's obfuscation. Reported to TAK
+Product Center support with the stack and the reproduction.
+
+So on an official 5.8 build, Map Depot no longer offers those downloads: the
+section stays, dimmed, and says why. A phone that already has packages is one
+restart from an ATAK that does not open, and on start Map Depot offers once to
+move them to atak/imagery.off, which ATAK does not scan; the dialog says that it
+is the only place this plugin moves a file. The gate is by release, not build
+number, and lifts when tak.gov ships a fixed ATAK. Everything else -- elevation,
+streaming base maps, Forest Service map sheets, incident and drone IR maps -- is
+unchanged, on every ATAK version.
 
 _________________________________________________________________
 POINT OF CONTACTS
@@ -79,7 +121,7 @@ Hosts contacted:
     at a Cloudflare R2 bucket.
   * www.arcgis.com and tiles.arcgis.com, for Forest Service basemap packages,
     which are fetched from their publisher rather than mirrored.
-  * data.fs.usda.gov, for Forest Service ranger district and forest maps.
+  * data.fs.usda.gov, for Forest Service map sheets of every series.
   * ftp.wildfire.gov, for NIFC incident maps. Public, no account.
   * uaswfc.org, for UAS Wildland Fire Consortium drone products. Public, no
     account. Both are preferences rather than fixed addresses, and both are
