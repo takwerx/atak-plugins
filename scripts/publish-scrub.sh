@@ -18,6 +18,12 @@
 #   - the SDK's shared dev keystore password/alias (tnttnt / wintec_mapping): in
 #     every SDK download, documented in CLAUDE.md as not a secret
 #   - Co-Authored-By noreply@anthropic.com, example.com, schema/xmlns URLs
+#   - ATAK's plugin-api literal, com.atakmap.app@<x.y.z>.<FLAVOR>. It is not an
+#     address: it is the version string every plugin manifest declares and every
+#     depot catalog line carries. The pattern is deliberately tight (exact ATAK
+#     package, three-part version, uppercase flavor) so it cannot excuse a real
+#     address. Note the allowlist exempts the whole LINE it appears on, which is
+#     the same trade already accepted for the entries above.
 #   - 0.0.0.0 / 127.0.0.1 / localhost
 #
 # What it cannot do: read a screenshot. Pictures must be eyeballed for callsigns,
@@ -56,11 +62,16 @@ is_text() {
     return 0
 }
 
-FAIL=0
+# One sink for every category. This used to be two: section 1 reported through a
+# version that set FAIL, section 2 through a temp file, and the final report
+# tested only the temp file — so a forbidden main.jar, atak.apk, android_keystore
+# or *.jks printed a FINDINGS block and the script still exited 0. Both callers
+# (the publish-guard hook and submission-zip.sh) gate on the exit code alone, so
+# the SDK-redistribution and signing-material rules were not actually enforced.
+# Found 2026-09-02. scan() runs in pipes, hence a file rather than a variable.
+TMP="$(mktemp)"; trap 'rm -f "$TMP"' EXIT
 finding() { # category, line
-    [ $FAIL -eq 0 ] && echo "FINDINGS:"
-    FAIL=1
-    printf '  [%s] %s\n' "$1" "$2"
+    printf '  [%s] %s\n' "$1" "$2" >> "$TMP"
 }
 
 # ---- 1. forbidden files (by name/extension) --------------------------------
@@ -80,7 +91,7 @@ done < <(list_files)
 
 # ---- 2. content patterns ----------------------------------------------------
 # Each pattern is an extended regex; ALLOW is applied to matching lines.
-ALLOW='noreply@anthropic\.com|example\.com|schemas\.android\.com|w3\.org|0\.0\.0\.0|127\.0\.0\.1|localhost|tnttnt|wintec_mapping|takrepo\.(user|password)|takrepoUser|takrepoPassword|storePassword|keyPassword'
+ALLOW='noreply@anthropic\.com|com\.atakmap\.app@[0-9]+\.[0-9]+\.[0-9]+\.[A-Z]+|example\.com|schemas\.android\.com|w3\.org|0\.0\.0\.0|127\.0\.0\.1|localhost|tnttnt|wintec_mapping|takrepoUser|takrepoPassword|storePassword|keyPassword'
 
 # The tak.gov submission README must carry a point-of-contact address, and the
 # generic email scan would otherwise block the very zip that needs it. This is the
@@ -97,15 +108,21 @@ scan() { # category, regex
     while IFS= read -r f; do
         is_text "$f" || continue
         [ -f "$f" ] || continue
-        grep -nHIE "$re" "$f" 2>/dev/null | grep -vE "$ALLOW" | while IFS= read -r line; do
+        # Exempt the allowlisted TOKEN, not the whole line. Dropping any line that
+        # contains an allowed literal is much broader than it looks: the
+        # plugin-api string appears on long machine-generated lines (product.inf
+        # rows, logcat and dumpsys excerpts) which are exactly the lines that also
+        # tend to carry a machine path. So strip the allowed literals, re-test what
+        # is left, and report the ORIGINAL line when something still matches.
+        #
+        # "#" is the sed delimiter, so no allowlist entry may contain one.
+        grep -nHIE "$re" "$f" 2>/dev/null | while IFS= read -r line; do
+            content="${line#*:}"; content="${content#*:}"
+            printf '%s' "$content" | sed -E "s#($ALLOW)##g" | grep -qE "$re" || continue
             finding "$cat" "${line#$REPO_ROOT/}"
         done
     done < <(list_files)
 }
-
-# subshell-safe: collect findings through a temp file since scan() runs in pipes
-TMP="$(mktemp)"; trap 'rm -f "$TMP"' EXIT
-finding() { printf '  [%s] %s\n' "$1" "$2" >> "$TMP"; }
 
 scan "email"        '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 scan "phone"        '(^|[^0-9A-Za-z])\(?[0-9]{3}\)?[-. ][0-9]{3}[-. ][0-9]{4}([^0-9]|$)'
@@ -116,7 +133,10 @@ scan "ip-address"   '(^|[^0-9.])(10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[
 scan "secret"       '(password|passwd|secret|api[_-]?key|access[_-]?key|auth[_-]?token|bearer)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"']{4,}["'"'"']'
 scan "secret"       'BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY'
 scan "secret"       '(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{20,}|xox[bpa]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{32,})'
-scan "takrepo-cred" '^[[:space:]]*takrepo\.(user|password)[[:space:]]*=[[:space:]]*[^[:space:]#]'
+# Excludes the <angle bracket> placeholder form. template.local.properties
+# carries takrepo.user=<username> uncommented, is required in the tak.gov
+# submission zip, and is a placeholder rather than a credential.
+scan "takrepo-cred" '^[[:space:]]*takrepo\.(user|password)[[:space:]]*=[[:space:]]*[^[:space:]#<]'
 
 # ---- 3. private denylist (literals from the notes repo) ---------------------
 if [ -f "$DENYLIST" ]; then

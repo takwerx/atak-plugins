@@ -10,6 +10,9 @@ repository — README, user guide, downloads and issues all in one place:
 |---|---|---|
 | PLSS Grid | Township, range and section overlay from BLM survey data | https://github.com/takwerx/plss-grid |
 | Traffic | Live traffic over your own base map, refreshing while the map sits still | https://github.com/takwerx/traffic |
+| Map Depot | Elevation, base maps and offline public-lands maps, downloaded from inside ATAK | https://github.com/takwerx/map-depot |
+| Cam Depot | Public traffic and wildfire cameras on the map, with live video where the agency streams | https://github.com/takwerx/cam-depot |
+| TAKwerx Market | Install and update the plugins above from inside ATAK, with a count of waiting updates on the toolbar | https://github.com/takwerx/takwerx-market |
 
 PLSS Grid also has a data repository, [plss-data](https://github.com/takwerx/plss-data),
 which hosts the per-state packs the plugin downloads at runtime. It is not a
