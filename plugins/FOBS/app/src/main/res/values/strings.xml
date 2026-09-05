@@ -50,6 +50,16 @@
     <string name="toast_need_three">Need at least 3 points to close</string>
     <string name="start_marker">Start</string>
 
+    <!-- Select a track -->
+    <string name="prompt_select">Tap the shape to use as a track</string>
+    <string name="toast_already_fobs">That is already a FOBS track</string>
+    <string name="toast_shape_no_points">That shape has no points to use</string>
+    <string name="toast_track_made">%1$s: track with %2$d points</string>
+    <string name="strokes_title">%d strokes</string>
+    <string name="strokes_join">Join in order</string>
+    <string name="strokes_separate">One track each</string>
+    <string name="ok">OK</string>
+
     <!-- End of track -->
     <string name="end_title">Track finished</string>
     <string name="end_message">%1$s: %2$d points, %3$s.</string>

@@ -16,6 +16,7 @@ import com.atakmap.android.fobs.plugin.R;
 import com.atakmap.android.fobs.track.DrawTrackTool;
 import com.atakmap.android.fobs.track.FobsShapes;
 import com.atakmap.android.fobs.track.GpsTrackTool;
+import com.atakmap.android.fobs.track.SelectTrack;
 import com.atakmap.android.fobs.track.StylePrefs;
 import com.atakmap.android.gui.ColorPalette;
 import com.atakmap.android.maps.MapView;
@@ -41,6 +42,7 @@ public class FobsPane implements View.OnClickListener {
     private final Context host;
     private final IHostUIService ui;
     private final StylePrefs style;
+    private SelectTrack selectTrack;
     private final View view;
     private final Pane pane;
     private final Button colorBtn;
@@ -69,6 +71,10 @@ public class FobsPane implements View.OnClickListener {
                 .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
                 .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
                 .build();
+    }
+
+    public void setSelectTrack(SelectTrack selectTrack) {
+        this.selectTrack = selectTrack;
     }
 
     /** Toolbar button: open if closed, close if open. */
@@ -101,6 +107,10 @@ public class FobsPane implements View.OnClickListener {
         } else if (id == R.id.draw_track) {
             close();
             nameThenStart(DrawTrackTool.ID);
+        } else if (id == R.id.select_track) {
+            close();
+            if (selectTrack != null)
+                selectTrack.begin();
         } else {
             Toast.makeText(host, plugin.getString(R.string.not_built_yet),
                     Toast.LENGTH_SHORT).show();
