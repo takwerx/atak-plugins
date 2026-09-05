@@ -89,8 +89,9 @@ Present exactly this via AskUserQuestion and wait:
 > - download links: `check-download-links PASS (<Plugin> <version>)`
 > - version code: `check-version-code PASS (<Plugin> <version> -> <code>)`, signed APKs for every target
 > - this will: merge the branch into `main` (merge commit), push main, subtree-push
->   `plugins/<Name>` to `takwerx/<plugin-repo>` main, tag `v<version>` there and
->   create its GitHub Release with the signed APKs
+>   `plugins/<Name>` to `takwerx/<plugin-repo>` main, tag `v<version>` there,
+>   create its GitHub Release with the signed APKs, and refresh the depot
+>   catalog so the TAKwerx Market offers <version>
 >
 > **Ship it?**
 
@@ -101,10 +102,11 @@ Options: "Ship it" / "Abort". Anything other than an explicit yes → stop entir
 Only after the explicit yes:
 
 ```bash
-touch "$CLAUDE_PROJECT_DIR"/.claude/.ship-authorized
+echo "<Plugin>" > "$CLAUDE_PROJECT_DIR"/.claude/.ship-authorized
 ```
 
-Expires after 30 minutes. Never create it outside this skill.
+The file names the plugin directory being shipped (`MapDepot`); the ship-close
+guard reads it. Expires after 30 minutes. Never create it outside this skill.
 
 ## Step 3 — Execute (all of it)
 
@@ -119,10 +121,18 @@ Expires after 30 minutes. Never create it outside this skill.
    git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/heads/main
    ```
 4. **Tag + GitHub Release ON THE PLUGIN REPO:** `git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/tags/v<version>` (or tag there), then `gh release create v<version> --repo takwerx/<plugin-repo> --title "<Plugin> <version>" --latest --notes-file … dist/signed/*.apk`. Body is product-only: what it does, what changed, a table of which APK is for which ATAK version, link to the guide. No device names, serials, test locations, or engineering detail. Never an SDK artifact. The download links at the top of the plugin README/guide were verified against this version in pre-flight step 10; after the release exists, prove they resolve: `./scripts/check-download-links.sh <Plugin> --live` → every link 200. A 404 here means the release tag or an asset name does not match the README; fix the release, not the check.
-5. **Private notes:** write/update the HANDOFF or a `RELEASE-<Plugin>-v<version>.md`
+5. **Depot catalog — the TAKwerx Market installs whatever this says is newest:**
+   `scripts/check-depot-catalog.sh <Name> --refresh`. It rebuilds the catalog
+   from the GitHub Release just created (`../atak-plugins-notes/tools/publish_depot.sh`),
+   uploads it to R2 and checks that every ATAK target now offers `<version>`.
+   Must print `PASS`. Map Depot 1.6 skipped this and the Market installed 1.4
+   the next day; `.claude/hooks/ship-close-guard.sh` blocks Step 4 until it
+   passes. A plugin's first release also needs its repo added to
+   `DEFAULT_REPOS` and `LOCAL_PLUGIN_DIR` in `refresh_depot.py`.
+6. **Private notes:** write/update the HANDOFF or a `RELEASE-<Plugin>-v<version>.md`
    in `../atak-plugins-notes/docs/` (what shipped, commit, verification
    evidence, signed-APK digests, residuals). Commit + push the notes repo.
-6. **Return to the branch:** `git checkout <branch> && git merge --ff-only main`
+7. **Return to the branch:** `git checkout <branch> && git merge --ff-only main`
    so branch == main, push the branch.
 
 ## Step 4 — Re-lock and report
@@ -131,8 +141,12 @@ Expires after 30 minutes. Never create it outside this skill.
 rm -f "$CLAUDE_PROJECT_DIR"/.claude/.ship-authorized
 ```
 
-Report: main SHA, tag, release URL if any, what remains manual (TPC upload of
-the zips, device check of the tak.gov-signed build when it arrives).
+The guard refuses the `rm` while `check-depot-catalog.sh <Name>` fails; fix the
+catalog (step 5), do not work around it.
+
+Report: main SHA, tag, release URL if any, the depot catalog line
+(`<Plugin> <version> offered on: 5.6.0 5.7.0 5.8.0`), what remains manual (TPC
+upload of the zips, device check of the tak.gov-signed build when it arrives).
 
 ## If anything fails mid-sequence
 

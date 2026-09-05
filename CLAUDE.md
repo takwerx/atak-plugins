@@ -692,6 +692,27 @@ screen locked, Doze, network and server drops, Data Sync present or absent,
 plugin reload, ATAK killed. Each PLAN carries a "Background and interruptions"
 section answering the list; "not applicable" is an answer, silence is not.
 
+**HARD RULE 2 — every plugin release updates the TAKwerx Market.** The
+operator's words (2026-09-05): *"any of the plugins we produce that get updated,
+the takwerx market has to be updated and know about it."* The Market installs
+whatever `mapdepot.takwerx.org/depot/<plugin-api>/product.inf` says is newest,
+and nothing updates that file on its own. Map Depot 1.6 shipped with the catalog
+still on 1.4, and the Market installed 1.4 on the operator's phone the next day,
+which read as "the Market is broken". A release is not shipped until the live
+catalog offers it on every ATAK target it was built for, and a new plugin's first
+release is not shipped until its repo is in `refresh_depot.py` so the Market
+lists it at all.
+
+Mechanics: `scripts/check-depot-catalog.sh <Plugin>` checks the live catalog
+against `PLUGIN_VERSION` on every target the README links; `--refresh` first
+rebuilds and publishes it from the GitHub Releases
+(`../atak-plugins-notes/tools/publish_depot.sh`, which refuses to remove or
+downgrade anything). `/ship` runs it as a step, and
+`.claude/hooks/ship-close-guard.sh` blocks `/ship` from re-locking until the
+check passes. A nightly launchd job on the dev Mac runs the same publisher, so
+a missed step self-heals within a day. Do not work around the guard; fix the
+catalog.
+
 ## Process rules inherited from infra-TAK
 
 - Plan-first for anything beyond a hot fix — PLAN doc in `../atak-plugins-notes/docs/`.
