@@ -44,6 +44,11 @@
     <string name="toast_nothing_recorded">Nothing recorded</string>
     <string name="toast_removed_bad_fixes">Removed %d bad fixes</string>
 
+    <!-- Draw a track: which way -->
+    <string name="draw_how">Draw a track</string>
+    <string name="draw_points">Drop points</string>
+    <string name="draw_freehand">Freehand</string>
+
     <!-- Draw a track -->
     <string name="prompt_draw">Tap along the route. Tap End when finished.</string>
     <string name="prompt_draw_close">Tap along the route. Tap the green start point to close it, or End.</string>

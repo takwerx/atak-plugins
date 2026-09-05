@@ -6,6 +6,7 @@ import com.atak.plugins.impl.PluginContextProvider;
 import com.atakmap.android.cot.detail.CotDetailManager;
 import com.atakmap.android.fobs.track.DrawTrackTool;
 import com.atakmap.android.fobs.track.FobsDetailHandler;
+import com.atakmap.android.fobs.track.FreehandTrack;
 import com.atakmap.android.fobs.track.GpsTrackTool;
 import com.atakmap.android.fobs.track.SelectTrack;
 import com.atakmap.android.fobs.ui.FobsPane;
@@ -38,6 +39,7 @@ public class FOBS implements IPlugin {
     private GpsTrackTool gpsTrackTool;
     private DrawTrackTool drawTrackTool;
     private SelectTrack selectTrack;
+    private FreehandTrack freehand;
     private FobsDetailHandler detailHandler;
 
     public FOBS(IServiceController serviceController) {
@@ -92,6 +94,8 @@ public class FOBS implements IPlugin {
         selectTrack = new SelectTrack(mapView, pluginContext);
         pane = new FobsPane(mapView, pluginContext, uiService);
         pane.setSelectTrack(selectTrack);
+        freehand = new FreehandTrack(mapView, pluginContext);
+        pane.setFreehand(freehand);
         uiService.addToolbarItem(toolbarItem);
     }
 
@@ -108,6 +112,10 @@ public class FOBS implements IPlugin {
             ToolManagerBroadcastReceiver.getInstance().unregisterTool(GpsTrackTool.ID);
             gpsTrackTool.dispose();
             gpsTrackTool = null;
+        }
+        if (freehand != null) {
+            freehand.dispose();
+            freehand = null;
         }
         if (selectTrack != null) {
             selectTrack.dispose();

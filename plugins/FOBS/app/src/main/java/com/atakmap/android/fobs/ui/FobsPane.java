@@ -15,6 +15,7 @@ import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.fobs.plugin.R;
 import com.atakmap.android.fobs.track.DrawTrackTool;
 import com.atakmap.android.fobs.track.FobsShapes;
+import com.atakmap.android.fobs.track.FreehandTrack;
 import com.atakmap.android.fobs.track.GpsTrackTool;
 import com.atakmap.android.fobs.track.SelectTrack;
 import com.atakmap.android.fobs.track.StylePrefs;
@@ -43,6 +44,7 @@ public class FobsPane implements View.OnClickListener {
     private final IHostUIService ui;
     private final StylePrefs style;
     private SelectTrack selectTrack;
+    private FreehandTrack freehand;
     private final View view;
     private final Pane pane;
     private final Button colorBtn;
@@ -77,6 +79,38 @@ public class FobsPane implements View.OnClickListener {
         this.selectTrack = selectTrack;
     }
 
+    public void setFreehand(FreehandTrack freehand) {
+        this.freehand = freehand;
+    }
+
+    /** Drop points (tap vertices) or Freehand (ATAK's telestration in FOBS colors). */
+    private void askDrawHow() {
+        new AlertDialog.Builder(host)
+                .setTitle(plugin.getString(R.string.draw_how))
+                .setPositiveButton(plugin.getString(R.string.draw_points),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                nameThenStart(DrawTrackTool.ID);
+                            }
+                        })
+                .setNegativeButton(plugin.getString(R.string.draw_freehand),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                askName(new OnName() {
+                                    @Override
+                                    public void go(String name) {
+                                        if (freehand != null)
+                                            freehand.begin(name);
+                                    }
+                                });
+                            }
+                        })
+                .setNeutralButton(plugin.getString(R.string.cancel), null)
+                .show();
+    }
+
     /** Toolbar button: open if closed, close if open. */
     public void toggle() {
         if (ui.isPaneVisible(pane)) {
@@ -106,7 +140,7 @@ public class FobsPane implements View.OnClickListener {
             nameThenStart(GpsTrackTool.ID);
         } else if (id == R.id.draw_track) {
             close();
-            nameThenStart(DrawTrackTool.ID);
+            askDrawHow();
         } else if (id == R.id.select_track) {
             close();
             if (selectTrack != null)
@@ -209,11 +243,27 @@ public class FobsPane implements View.OnClickListener {
 
     // ---- starting a tool ---------------------------------------------------------
 
+    interface OnName {
+        void go(String name);
+    }
+
     /**
      * Name first, then record. The name is on the track from the first fix, so a
      * teammate watching the mesh sees "Engine 3 - north road" grow, not "Track 1".
      */
     private void nameThenStart(final String toolId) {
+        askName(new OnName() {
+            @Override
+            public void go(String name) {
+                Bundle b = new Bundle();
+                b.putString(GpsTrackTool.EXTRA_TITLE, name);
+                ToolManagerBroadcastReceiver.getInstance().startTool(toolId, b);
+            }
+        });
+    }
+
+    /** "<callsign> - Track N", editable, then hand the name on. */
+    private void askName(final OnName then) {
         String pattern = plugin.getString(R.string.track_default_name);
         String callsign = mapView.getDeviceCallsign();
         int n = FobsShapes.nextTrackNumber(mapView, pattern, callsign);
@@ -230,11 +280,7 @@ public class FobsPane implements View.OnClickListener {
                         new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface d, int which) {
-                                Bundle b = new Bundle();
-                                b.putString(GpsTrackTool.EXTRA_TITLE,
-                                        name.getText().toString().trim());
-                                ToolManagerBroadcastReceiver.getInstance()
-                                        .startTool(toolId, b);
+                                then.go(name.getText().toString().trim());
                             }
                         })
                 .setNegativeButton(plugin.getString(R.string.cancel), null)
