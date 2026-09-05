@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The FOBS popup: six verbs as ATAK-style dark buttons, icon over label, ONE row of
+    equal widths. Fixed height so a label can never be clipped when the dialog is
+    height-constrained in landscape (which is what happened with two rows on the
+    XCover, 2026-09-05). Every button is TakwerxButton (CLAUDE.md, "Plugin UI standard").
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingLeft="8dp"
+    android:paddingRight="2dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <Button
+        android:id="@+id/start_gps"
+        style="@style/FobsTile"
+        android:drawableTop="@drawable/ic_gps_track"
+        android:text="@string/choose_start_gps" />
+
+    <Button
+        android:id="@+id/draw_track"
+        style="@style/FobsTile"
+        android:drawableTop="@drawable/ic_draw"
+        android:text="@string/choose_draw" />
+
+    <Button
+        android:id="@+id/select_track"
+        style="@style/FobsTile"
+        android:drawableTop="@drawable/ic_select"
+        android:text="@string/choose_select" />
+
+    <Button
+        android:id="@+id/import_track"
+        style="@style/FobsTile"
+        android:drawableTop="@drawable/ic_import"
+        android:text="@string/choose_import" />
+
+    <Button
+        android:id="@+id/cut_track"
+        style="@style/FobsTile"
+        android:drawableTop="@drawable/ic_cut"
+        android:text="@string/choose_cut" />
+
+    <Button
+        android:id="@+id/join_tracks"
+        style="@style/FobsTile"
+        android:drawableTop="@drawable/ic_join"
+        android:text="@string/choose_join" />
+</LinearLayout>
