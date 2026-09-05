@@ -4,9 +4,10 @@ import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atakmap.android.cot.detail.CotDetailManager;
+import com.atakmap.android.fobs.track.DrawTrackTool;
 import com.atakmap.android.fobs.track.FobsDetailHandler;
 import com.atakmap.android.fobs.track.GpsTrackTool;
-import com.atakmap.android.fobs.ui.Chooser;
+import com.atakmap.android.fobs.ui.FobsPane;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.toolbar.ToolManagerBroadcastReceiver;
 import com.atakmap.coremap.log.Log;
@@ -32,8 +33,9 @@ public class FOBS implements IPlugin {
     ToolbarItem toolbarItem;
 
     private MapView mapView;
-    private Chooser chooser;
+    private FobsPane pane;
     private GpsTrackTool gpsTrackTool;
+    private DrawTrackTool drawTrackTool;
     private FobsDetailHandler detailHandler;
 
     public FOBS(IServiceController serviceController) {
@@ -58,8 +60,8 @@ public class FOBS implements IPlugin {
                 .setListener(new ToolbarItemAdapter() {
                     @Override
                     public void onClick(ToolbarItem item) {
-                        if (chooser != null)
-                            chooser.show();
+                        if (pane != null)
+                            pane.toggle();
                     }
                 }).setIdentifier(pluginContext.getPackageName())
                 .build();
@@ -81,8 +83,11 @@ public class FOBS implements IPlugin {
         gpsTrackTool = new GpsTrackTool(mapView, pluginContext);
         ToolManagerBroadcastReceiver.getInstance().registerTool(GpsTrackTool.ID,
                 gpsTrackTool);
+        drawTrackTool = new DrawTrackTool(mapView, pluginContext);
+        ToolManagerBroadcastReceiver.getInstance().registerTool(DrawTrackTool.ID,
+                drawTrackTool);
 
-        chooser = new Chooser(mapView, pluginContext);
+        pane = new FobsPane(mapView, pluginContext, uiService);
         uiService.addToolbarItem(toolbarItem);
     }
 
@@ -91,11 +96,19 @@ public class FOBS implements IPlugin {
         if (uiService == null)
             return;
         uiService.removeToolbarItem(toolbarItem);
-        chooser = null;
+        if (pane != null) {
+            pane.close();
+            pane = null;
+        }
         if (gpsTrackTool != null) {
             ToolManagerBroadcastReceiver.getInstance().unregisterTool(GpsTrackTool.ID);
             gpsTrackTool.dispose();
             gpsTrackTool = null;
+        }
+        if (drawTrackTool != null) {
+            ToolManagerBroadcastReceiver.getInstance().unregisterTool(DrawTrackTool.ID);
+            drawTrackTool.dispose();
+            drawTrackTool = null;
         }
         if (detailHandler != null) {
             CotDetailManager.getInstance().unregisterHandler(detailHandler);

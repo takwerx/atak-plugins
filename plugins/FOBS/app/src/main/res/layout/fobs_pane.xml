@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The FOBS side pane (an ATAK Pane, like CamDepot's): six verbs as ATAK-style dark
+    tiles in a 3 x 2 grid, icon over label, then the Default Style rows every new track
+    starts with. Every button is TakwerxButton (CLAUDE.md, "Plugin UI standard").
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fadeScrollbars="false">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <!-- baselineAligned=false: a two-line label would otherwise drop its tile below
+             the single-line ones, as Start a GPS track did on the XCover. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:baselineAligned="false">
+
+            <Button
+                android:id="@+id/start_gps"
+                style="@style/FobsTile"
+                android:drawableTop="@drawable/ic_gps_track"
+                android:text="@string/choose_start_gps" />
+
+            <Button
+                android:id="@+id/draw_track"
+                style="@style/FobsTile"
+                android:drawableTop="@drawable/ic_draw"
+                android:text="@string/choose_draw" />
+
+            <Button
+                android:id="@+id/select_track"
+                style="@style/FobsTile"
+                android:drawableTop="@drawable/ic_select"
+                android:text="@string/choose_select" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:baselineAligned="false"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/import_track"
+                style="@style/FobsTile"
+                android:drawableTop="@drawable/ic_import"
+                android:text="@string/choose_import" />
+
+            <Button
+                android:id="@+id/cut_track"
+                style="@style/FobsTile"
+                android:drawableTop="@drawable/ic_cut"
+                android:text="@string/choose_cut" />
+
+            <Button
+                android:id="@+id/join_tracks"
+                style="@style/FobsTile"
+                android:drawableTop="@drawable/ic_join"
+                android:text="@string/choose_join" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/default_style"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:alpha="0.6"
+            android:paddingTop="14dp"
+            android:paddingBottom="4dp"
+            android:paddingLeft="6dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                style="@style/FobsStyleLabel"
+                android:text="@string/style_color" />
+
+            <Button
+                android:id="@+id/style_color"
+                style="@style/FobsStyleValue"
+                android:text="@string/style_color" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                style="@style/FobsStyleLabel"
+                android:text="@string/style_line" />
+
+            <Button
+                android:id="@+id/style_line"
+                style="@style/FobsStyleValue"
+                android:text="@string/line_solid" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                style="@style/FobsStyleLabel"
+                android:text="@string/style_thickness" />
+
+            <Button
+                android:id="@+id/style_thickness"
+                style="@style/FobsStyleValue"
+                android:text="@string/thick_medium" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

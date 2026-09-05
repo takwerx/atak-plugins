@@ -13,6 +13,19 @@
     <string name="choose_join">Join tracks</string>
     <string name="not_built_yet">Not built yet. Next slice.</string>
 
+    <!-- Default Style box in the popup -->
+    <string name="default_style">Default style</string>
+    <string name="style_color">Color</string>
+    <string name="style_line">Line</string>
+    <string name="style_thickness">Thickness</string>
+    <string name="line_solid">Solid</string>
+    <string name="line_dashed">Dashed</string>
+    <string name="line_dotted">Dotted</string>
+    <string name="line_outlined">Outlined</string>
+    <string name="thick_thin">Thin</string>
+    <string name="thick_medium">Medium</string>
+    <string name="thick_thick">Thick</string>
+
     <!-- Naming -->
     <string name="name_track">Name this track</string>
     <string name="track_default_name">%1$s - Track %2$d</string>
@@ -30,6 +43,12 @@
     <string name="toast_resumed">GPS track resumed</string>
     <string name="toast_nothing_recorded">Nothing recorded</string>
     <string name="toast_removed_bad_fixes">Removed %d bad fixes</string>
+
+    <!-- Draw a track -->
+    <string name="prompt_draw">Tap along the route. Tap End when finished.</string>
+    <string name="prompt_draw_close">Tap along the route. Tap the green start point to close it, or End.</string>
+    <string name="toast_need_three">Need at least 3 points to close</string>
+    <string name="start_marker">Start</string>
 
     <!-- End of track -->
     <string name="end_title">Track finished</string>

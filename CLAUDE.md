@@ -284,13 +284,21 @@ Consequence for testing, and it is not optional:
 - **tak.gov-signed APKs** — test ONLY on a device running **official** ATAK from
   tak.gov or the Play Store. A dev-build device can never validate one.
 
-Check which a device has before drawing conclusions: if `versionName` matches the
-SDK's `atak.apk` exactly, including the build hash in brackets, it is the dev build.
+Check which a device has before drawing conclusions, and **check the signature, not
+the version string.** The hash in `versionName` is the source commit, and tak.gov's
+official build and the SDK's dev build of the same release share it: an S21 on
+official 5.7.0.14 reported `5.7.0.14 (3617502d)`, identical to the SDK's `atak.apk`,
+and was misread as a dev phone on 2026-09-05. What differs is who signed it:
 
 ```bash
-aapt2 dump badging "$ATAK_SDK/atak.apk" | grep versionName    # e.g. 5.8.0.3 (4f67063)
-adb shell dumpsys package com.atakmap.app.civ | grep versionName
+adb shell dumpsys package com.atakmap.app.civ | grep -E "signatures=|pkgFlags"
+# dev (SDK) build:  signatures:[4f0df9aa] ... pkgFlags=[ DEBUGGABLE HAS_CODE ... ]
+# official build:   signatures:[267937e8] ... pkgFlags=[ HAS_CODE ... ]   (no DEBUGGABLE)
 ```
+
+The SDK build is signed with the shared dev keystore and is `DEBUGGABLE`; official
+ATAK is signed by tak.gov and is not. The on-screen `DEVELOPER BUILD` watermark is
+the same fact seen from the phone.
 
 **If the plugin downloads from a catalog, verify the catalog against the servers
 before shipping.** Reading the catalog is not the same as asking whether anything
@@ -537,6 +545,14 @@ file manager and looks like a missing image. Keep them separate:
 
 Check it by compositing on **white**, not by opening it in a dark image editor,
 where a white glyph looks fine right up until a user sees it.
+
+**Size the toolbar glyph edge to edge.** Both PNGs are 256 x 256. In `ic_toolbar.png`
+the glyph's longer side spans the full 256 with no margin, the way PLSS's grid does;
+ATAK draws every toolbar icon in the same square, so a glyph with padding reads
+smaller than its neighbors (FOBS, 2026-09-05, three rounds until it matched). In
+`ic_launcher.png` the glyph sits at about 196 of 256 on the `#121212` rounded tile.
+Artwork should be a square composition to begin with; a tall or wide glyph leaves
+empty sides no scaling can fix.
 
 **tak.gov builds have no git, so version stamping silently degrades.**
 `getVersionCode()` and `getVersionName()` both read the git revision, and the

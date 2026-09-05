@@ -1,8 +1,6 @@
 package com.atakmap.android.fobs.track;
 
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.os.Bundle;
 import android.util.SparseArray;
 import android.view.View;
@@ -62,6 +60,7 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
     private final TextView droppedView;
 
     private final FixFilter.Thresholds thresholds = new FixFilter.Thresholds();
+    private final TrackFinisher finisher;
 
     private DrawingShape shape;
     private Marker self;
@@ -70,6 +69,8 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
     private final List<GeoPointMetaData> acceptedPoints = new ArrayList<>();
     private int raw;
     private boolean paused;
+    /** Set when End was answered in the dialog, so onToolEnd does not ask again. */
+    private boolean answered;
     private long lastPersist;
     private int fixesSincePersist;
 
@@ -78,6 +79,7 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
         this.mapView = mapView;
         this.plugin = pluginContext;
         this.host = mapView.getContext();
+        this.finisher = new TrackFinisher(mapView, pluginContext);
 
         toolbar = (ActionBarView) PluginLayoutInflater.inflate(pluginContext,
                 R.layout.track_toolbar, mapView, false);
@@ -101,6 +103,7 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
         acceptedPoints.clear();
         raw = 0;
         paused = false;
+        answered = false;
         lastPersist = 0;
         fixesSincePersist = 0;
         pauseBtn.setText(R.string.pause);
@@ -224,7 +227,17 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
                     paused ? R.string.prompt_gps_paused : R.string.prompt_gps));
             toast(paused ? R.string.toast_paused : R.string.toast_resumed);
         } else if (v.getId() == R.id.end) {
-            requestEndTool();
+            if (shape == null || acceptedPoints.size() < 2) {
+                requestEndTool();
+                return;
+            }
+            finisher.askThenEnd(shape, new Runnable() {
+                @Override
+                public void run() {
+                    answered = true;
+                    requestEndTool();
+                }
+            });
         }
     }
 
@@ -253,41 +266,8 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
                 + " endPassRemoved=" + removed
                 + " final=" + cleaned.size());
         FobsShapes.persist(mapView, finished, getClass());
-
-        GeoPoint[] pts = finished.getPoints();
-        String length = FobsShapes.formatDistance(host,
-                FobsShapes.perimeterMeters(pts, false));
-        String message = plugin.getString(R.string.end_message, finished.getTitle(),
-                pts.length, length);
-
-        new AlertDialog.Builder(host)
-                .setTitle(R.string.end_title)
-                .setMessage(message)
-                .setPositiveButton(plugin.getString(R.string.make_polygon),
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface d, int which) {
-                                makePolygon(finished);
-                            }
-                        })
-                .setNegativeButton(plugin.getString(R.string.single_line), null)
-                .setCancelable(true)
-                .show();
-    }
-
-    private void makePolygon(DrawingShape finished) {
-        if (finished.getNumPoints() < 3) {
-            toast(R.string.toast_area_too_few);
-            return;
-        }
-        FobsShapes.makeArea(mapView, finished);
-        FobsShapes.persist(mapView, finished, getClass());
-        GeoPoint[] pts = finished.getPoints();
-        String area = FobsShapes.formatArea(host, finished.getArea());
-        String perimeter = FobsShapes.formatDistance(host,
-                FobsShapes.perimeterMeters(pts, true));
-        toast(plugin.getString(R.string.toast_area, area, perimeter));
-        Log.d(TAG, "area " + finished.getUID() + " " + area + " " + perimeter);
+        if (!answered)
+            finisher.ask(finished, getClass()); // ended by ATAK (back), not by our End
     }
 
     private void toast(int res) {

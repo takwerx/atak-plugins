@@ -2,13 +2,11 @@ package com.atakmap.android.fobs.track;
 
 import android.content.Context;
 
-import com.atakmap.android.drawing.DrawingPreferences;
 import com.atakmap.android.drawing.DrawingToolsMapComponent;
 import com.atakmap.android.drawing.mapItems.DrawingShape;
 import com.atakmap.android.maps.MapGroup;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.android.maps.Shape;
 import com.atakmap.android.preference.UnitPreferences;
 import com.atakmap.coremap.conversions.Area;
 import com.atakmap.coremap.conversions.AreaUtilities;
@@ -65,7 +63,7 @@ public final class FobsShapes {
     }
 
     /**
-     * A new, empty, open, dashed track with the user's current drawing color. Not yet
+     * A new, empty, open track in the FOBS default style (popup, Default Style). Not yet
      * on the map and not yet persisted: a polyline with fewer than two points is a
      * degenerate thing to hand the renderer, so the caller adds it with
      * {@link #addToMap} once it has two, and persists after that.
@@ -74,11 +72,11 @@ public final class FobsShapes {
         MapGroup group = DrawingToolsMapComponent.getGroup();
         DrawingShape shape = new DrawingShape(mapView, group,
                 UUID.randomUUID().toString());
-        DrawingPreferences prefs = new DrawingPreferences(mapView);
+        StylePrefs style = new StylePrefs(mapView);
         shape.setTitle(title);
-        shape.setStrokeColor(prefs.getShapeColor());
-        shape.setStrokeWeight(prefs.getStrokeWeight());
-        shape.setLineStyle(Shape.BASIC_LINE_STYLE_DASHED);
+        shape.setStrokeColor(style.color());
+        shape.setStrokeWeight(style.strokeWeight());
+        shape.setLineStyle(style.lineStyle());
         shape.setClosed(false);
         shape.setMetaBoolean("archive", true);
         shape.setMetaString(META_KIND, KIND_TRACK);
@@ -97,10 +95,9 @@ public final class FobsShapes {
      * the mesh or in a feed sees the line become a polygon rather than a second item.
      */
     public static void makeArea(MapView mapView, DrawingShape shape) {
-        DrawingPreferences prefs = new DrawingPreferences(mapView);
+        StylePrefs style = new StylePrefs(mapView);
         shape.setClosed(true);
-        shape.setFillColor(prefs.getFillColor());
-        shape.setLineStyle(Shape.BASIC_LINE_STYLE_SOLID);
+        shape.setFillColor(style.fillColor());
         shape.setMovable(false);
         shape.setMetaString(META_KIND, KIND_AREA);
     }
