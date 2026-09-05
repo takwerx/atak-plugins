@@ -54,6 +54,16 @@ current feature branch (e.g. `plss-overlay-v0.1`).
    Any hit → show each commit (SHA + subject) and get per-commit acknowledgment
    ("still wanted / must be reverted") before the prompt. Zero hits → say
    "commit scan clean".
+10. **Download links (MANDATORY):** `./scripts/check-download-links.sh <Plugin>`
+    → PASS. The download block at the top of `README.md` and
+    `docs/USER_GUIDE.md` must name `PLUGIN_VERSION` and link the `v<version>`
+    assets, and when `dist/signed/` holds this version's APKs each one must be
+    linked. A FAIL stops the ship: fix the block, commit it on the branch,
+    re-run. Map Depot 1.6 shipped with every link aimed at a v1.5 release that
+    was never created, and the 404s were found by a user.
+    `.claude/hooks/release-links-guard.sh` also blocks the subtree push and
+    the `gh release create` mechanically, so a ship that skips this step still
+    cannot publish stale links.
 
 ## Step 1 — The ship prompt (HARD STOP)
 
@@ -64,6 +74,7 @@ Present exactly this via AskUserQuestion and wait:
 > - device verification: `<one line: device, ATAK version, what was run, result>`
 > - publish scrub: PASS · security scan: `<date/commit>` · zips: `<names>`
 > - open issues: `<count surfaced / none>` · commit scan: `<clean / acknowledged>`
+> - download links: `check-download-links PASS (<Plugin> <version>)`
 > - this will: merge the branch into `main` (merge commit), push main, subtree-push
 >   `plugins/<Name>` to `takwerx/<plugin-repo>` main, tag `v<version>` there and
 >   create its GitHub Release with the signed APKs
@@ -94,7 +105,7 @@ Expires after 30 minutes. Never create it outside this skill.
    git subtree split --prefix=plugins/<Name> -b <name>-export
    git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/heads/main
    ```
-4. **Tag + GitHub Release ON THE PLUGIN REPO:** `git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/tags/v<version>` (or tag there), then `gh release create v<version> --repo takwerx/<plugin-repo> --title "<Plugin> <version>" --latest --notes-file … dist/signed/*.apk`. Body is product-only: what it does, what changed, a table of which APK is for which ATAK version, link to the guide. No device names, serials, test locations, or engineering detail. Never an SDK artifact. Update the download links at the top of the plugin README/guide to the new release before the subtree push.
+4. **Tag + GitHub Release ON THE PLUGIN REPO:** `git push https://github.com/takwerx/<plugin-repo>.git <name>-export:refs/tags/v<version>` (or tag there), then `gh release create v<version> --repo takwerx/<plugin-repo> --title "<Plugin> <version>" --latest --notes-file … dist/signed/*.apk`. Body is product-only: what it does, what changed, a table of which APK is for which ATAK version, link to the guide. No device names, serials, test locations, or engineering detail. Never an SDK artifact. The download links at the top of the plugin README/guide were verified against this version in pre-flight step 10; after the release exists, prove they resolve: `./scripts/check-download-links.sh <Plugin> --live` → every link 200. A 404 here means the release tag or an asset name does not match the README; fix the release, not the check.
 5. **Private notes:** write/update the HANDOFF or a `RELEASE-<Plugin>-v<version>.md`
    in `../atak-plugins-notes/docs/` (what shipped, commit, verification
    evidence, signed-APK digests, residuals). Commit + push the notes repo.
