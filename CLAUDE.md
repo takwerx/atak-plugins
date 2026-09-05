@@ -580,6 +580,18 @@ time, but commit the value so the tree, the zip and the PDF agree.
 out under one version number twice. A resubmission after a failure is a new
 version, not the same one again.
 
+**The download links at the top of the README and guide are part of the
+release.** They name a tag and asset filenames that do not exist until the
+GitHub Release is created, so nothing on the page looks wrong until a user
+clicks one. Map Depot 1.6 went out with every link aimed at a v1.5 release that
+was never created, because 1.5 was folded into 1.6 and the block was never
+re-stamped. `scripts/check-download-links.sh <Plugin>` checks the block against
+`PLUGIN_VERSION` with no network, `--live` proves each link returns 200 once the
+release exists, and `.claude/hooks/release-links-guard.sh` blocks the subtree
+push and `gh release create` when the check fails. When a version is skipped
+or folded into the next one, re-stamp the block in the same commit that bumps
+`PLUGIN_VERSION`.
+
 ## Process rules inherited from infra-TAK
 
 - Plan-first for anything beyond a hot fix — PLAN doc in `../atak-plugins-notes/docs/`.
