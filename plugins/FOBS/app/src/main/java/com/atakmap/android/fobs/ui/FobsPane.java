@@ -20,6 +20,7 @@ import com.atakmap.android.fobs.track.FreehandTrack;
 import com.atakmap.android.fobs.track.GpsTrackTool;
 import com.atakmap.android.fobs.track.ImportTrack;
 import com.atakmap.android.fobs.track.JoinTracksTool;
+import com.atakmap.android.fobs.track.LassoJoin;
 import com.atakmap.android.fobs.track.SelectTrack;
 import com.atakmap.android.fobs.track.StylePrefs;
 import com.atakmap.android.gui.ColorPalette;
@@ -89,6 +90,36 @@ public class FobsPane implements View.OnClickListener {
 
     public void setImportTrack(ImportTrack importTrack) {
         this.importTrack = importTrack;
+    }
+
+    private LassoJoin lassoJoin;
+
+    public void setLassoJoin(LassoJoin lassoJoin) {
+        this.lassoJoin = lassoJoin;
+    }
+
+    /** Tap ends, or lasso several tracks and let FOBS chain them. */
+    private void askJoinHow() {
+        new AlertDialog.Builder(host)
+                .setTitle(plugin.getString(R.string.join_how))
+                .setPositiveButton(plugin.getString(R.string.join_tap),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                ToolManagerBroadcastReceiver.getInstance()
+                                        .startTool(JoinTracksTool.ID, new Bundle());
+                            }
+                        })
+                .setNegativeButton(plugin.getString(R.string.join_lasso),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                if (lassoJoin != null)
+                                    lassoJoin.begin();
+                            }
+                        })
+                .setNeutralButton(plugin.getString(R.string.cancel), null)
+                .show();
     }
 
     /** Drop points (tap vertices) or Freehand (ATAK's telestration in FOBS colors). */
@@ -162,7 +193,7 @@ public class FobsPane implements View.OnClickListener {
             ToolManagerBroadcastReceiver.getInstance().startTool(CutTrackTool.ID, new Bundle());
         } else if (id == R.id.join_tracks) {
             close();
-            ToolManagerBroadcastReceiver.getInstance().startTool(JoinTracksTool.ID, new Bundle());
+            askJoinHow();
         } else {
             Toast.makeText(host, plugin.getString(R.string.not_built_yet),
                     Toast.LENGTH_SHORT).show();

@@ -115,6 +115,17 @@
     <string name="toast_join_tap_endpoint">Tap one of the end markers</string>
     <string name="toast_joined">Joined %1$s and %2$s</string>
 
+    <!-- Join by lasso -->
+    <string name="join_how">Join tracks</string>
+    <string name="join_tap">Tap ends</string>
+    <string name="join_lasso">Lasso</string>
+    <string name="lasso_menu_title">FOBS: join into area</string>
+    <string name="toast_lasso_hint">Draw a lasso around the tracks to join</string>
+    <string name="toast_lasso_need_two">Lasso at least two FOBS tracks</string>
+    <string name="lasso_gap_title">Large gap</string>
+    <string name="lasso_gap_message">The largest gap to bridge is %s. Join anyway?</string>
+    <string name="lasso_gap_join">Join anyway</string>
+
     <!-- End of track -->
     <string name="end_title">Track finished</string>
     <string name="end_message">%1$s: %2$d points, %3$s.</string>

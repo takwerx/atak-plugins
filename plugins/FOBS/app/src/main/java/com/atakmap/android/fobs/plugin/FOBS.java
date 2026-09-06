@@ -12,6 +12,7 @@ import com.atakmap.android.fobs.track.FreehandTrack;
 import com.atakmap.android.fobs.track.GpsTrackTool;
 import com.atakmap.android.fobs.track.ImportTrack;
 import com.atakmap.android.fobs.track.JoinTracksTool;
+import com.atakmap.android.fobs.track.LassoJoin;
 import com.atakmap.android.fobs.track.SelectTrack;
 import com.atakmap.android.fobs.ui.FobsPane;
 import com.atakmap.android.maps.MapView;
@@ -45,6 +46,7 @@ public class FOBS implements IPlugin {
     private DrawTrackTool drawTrackTool;
     private CutTrackTool cutTrackTool;
     private JoinTracksTool joinTracksTool;
+    private LassoJoin lassoJoin;
     private SelectTrack selectTrack;
     private FreehandTrack freehand;
     private ImportTrack importTrack;
@@ -114,6 +116,8 @@ public class FOBS implements IPlugin {
         pane.setFreehand(freehand);
         importTrack = new ImportTrack(mapView, pluginContext);
         pane.setImportTrack(importTrack);
+        lassoJoin = new LassoJoin(mapView, pluginContext);
+        pane.setLassoJoin(lassoJoin);
         selectTrack.setImportTrack(importTrack);
         menuFactory = new FobsMenuFactory(mapView, pluginContext, importTrack);
         MapMenuReceiver.getInstance().registerMapMenuFactory(menuFactory);
@@ -149,6 +153,10 @@ public class FOBS implements IPlugin {
         if (selectTrack != null) {
             selectTrack.dispose();
             selectTrack = null;
+        }
+        if (lassoJoin != null) {
+            lassoJoin.dispose();
+            lassoJoin = null;
         }
         if (joinTracksTool != null) {
             ToolManagerBroadcastReceiver.getInstance().unregisterTool(JoinTracksTool.ID);
