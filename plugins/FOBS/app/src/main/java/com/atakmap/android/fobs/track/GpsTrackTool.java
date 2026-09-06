@@ -44,6 +44,8 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
 
     public static final String ID = "com.atakmap.android.fobs.GpsTrackTool";
     public static final String EXTRA_TITLE = "title";
+    public static final String EXTRA_FEED = "feed";
+    public static final String EXTRA_FEED_SERVER = "feedServer";
 
     private static final String TAG = "FOBS.GpsTrackTool";
 
@@ -58,6 +60,7 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
     private final ActionBarView toolbar;
     private final Button pauseBtn;
     private final TextView droppedView;
+    private final TextView feedView;
 
     private final FixFilter.Thresholds thresholds = new FixFilter.Thresholds();
     private final TrackFinisher finisher;
@@ -89,6 +92,7 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
         pauseBtn.setOnClickListener(this);
         toolbar.findViewById(R.id.end).setOnClickListener(this);
         droppedView = toolbar.findViewById(R.id.dropped);
+        feedView = toolbar.findViewById(R.id.feed);
     }
 
     @Override
@@ -98,6 +102,21 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
             title = mapView.getDeviceCallsign();
 
         shape = FobsShapes.newTrack(mapView, title, FobsShapes.SOURCE_GPS);
+        String feed = extras.getString(EXTRA_FEED);
+        String feedServer = extras.getString(EXTRA_FEED_SERVER);
+        if (feed != null && feedServer != null) {
+            shape.setMetaString(com.atakmap.android.fobs.feed.FeedPublisher.META_FEED, feed);
+            shape.setMetaString(com.atakmap.android.fobs.feed.FeedPublisher.META_FEED_SERVER,
+                    feedServer);
+            com.atakmap.android.fobs.feed.FeedPublisher fp =
+                    com.atakmap.android.fobs.feed.FeedPublisher.get();
+            if (fp != null)
+                fp.attach(shape, new com.atakmap.android.fobs.feed.FeedPublisher.Feed(feedServer, feed));
+            feedView.setText(plugin.getString(R.string.feed_label, feed));
+            feedView.setVisibility(View.VISIBLE);
+        } else {
+            feedView.setVisibility(View.GONE);
+        }
         gate = new FixFilter.LiveGate(thresholds);
         accepted.clear();
         acceptedPoints.clear();

@@ -12,6 +12,7 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.fobs.feed.FeedPublisher;
 import com.atakmap.android.fobs.plugin.R;
 import com.atakmap.android.fobs.track.CutTrackTool;
 import com.atakmap.android.fobs.track.DrawTrackTool;
@@ -176,7 +177,22 @@ public class FobsPane implements View.OnClickListener {
             pickThickness();
         } else if (id == R.id.start_gps) {
             close();
-            nameThenStart(GpsTrackTool.ID);
+            askName(new OnName() {
+                @Override
+                public void go(final String name) {
+                    FeedPublisher feed = FeedPublisher.get();
+                    if (feed == null) {
+                        startGps(name, null);
+                        return;
+                    }
+                    feed.ask(new FeedPublisher.OnFeed() {
+                        @Override
+                        public void go(FeedPublisher.Feed f) {
+                            startGps(name, f);
+                        }
+                    });
+                }
+            });
         } else if (id == R.id.draw_track) {
             close();
             askDrawHow();
@@ -294,6 +310,16 @@ public class FobsPane implements View.OnClickListener {
 
     interface OnName {
         void go(String name);
+    }
+
+    private void startGps(String name, FeedPublisher.Feed feed) {
+        Bundle b = new Bundle();
+        b.putString(GpsTrackTool.EXTRA_TITLE, name);
+        if (feed != null) {
+            b.putString(GpsTrackTool.EXTRA_FEED, feed.name);
+            b.putString(GpsTrackTool.EXTRA_FEED_SERVER, feed.server);
+        }
+        ToolManagerBroadcastReceiver.getInstance().startTool(GpsTrackTool.ID, b);
     }
 
     /**

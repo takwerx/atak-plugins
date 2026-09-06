@@ -103,6 +103,10 @@ def supportedFlavors =
 
 android {
     compileSdk 36
+    // ATAK's TakHttpClient hands back Apache HttpRequestBase / TakHttpResponse; the
+    // Apache classes are Android's legacy library, present in ATAK's process at run
+    // time and needed here only to compile (FOBS feed publish, 2026-09-05).
+    useLibrary 'org.apache.http.legacy'
     namespace 'com.atakmap.android.fobs.plugin'
 
     buildFeatures {

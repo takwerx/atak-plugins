@@ -109,6 +109,11 @@ public final class FobsShapes {
 
     public static void persist(MapView mapView, DrawingShape shape, Class<?> from) {
         shape.persist(mapView.getMapEventDispatcher(), null, from);
+        // A track in a feed is re-sent to it on every save; see FeedPublisher.
+        com.atakmap.android.fobs.feed.FeedPublisher feed =
+                com.atakmap.android.fobs.feed.FeedPublisher.get();
+        if (feed != null)
+            feed.onPersisted(shape);
     }
 
     /** Perimeter in meters along the points, closing back to the start if closed. */

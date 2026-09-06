@@ -126,6 +126,21 @@
     <string name="lasso_gap_message">The largest gap to bridge is %s. Join anyway?</string>
     <string name="lasso_gap_join">Join anyway</string>
 
+    <!-- Live to a Data Sync feed -->
+    <string name="feed_ask_title">Send this track live to a feed?</string>
+    <string name="feed_just_local">Just local</string>
+    <string name="feed_choose">Choose feed…</string>
+    <string name="feed_send_to">Send to %s</string>
+    <string name="feed_loading">Getting feeds from the server…</string>
+    <string name="feed_pick">Feeds on %s</string>
+    <string name="feed_locked">%s (password protected)</string>
+    <string name="feed_locked_unsupported">Password-protected feeds are not supported yet</string>
+    <string name="feed_list_failed">Could not get the feed list from the server</string>
+    <string name="feed_none">No feeds on that server</string>
+    <string name="feed_published">Sent to feed %s</string>
+    <string name="feed_publish_failed">Could not add to feed %s</string>
+    <string name="feed_label">→ %s</string>
+
     <!-- End of track -->
     <string name="end_title">Track finished</string>
     <string name="end_message">%1$s: %2$d points, %3$s.</string>

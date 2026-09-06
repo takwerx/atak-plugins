@@ -547,6 +547,15 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         int n2 = FobsShapes.nextSuffix(mapView, base, n1 + 1);
         final DrawingShape first = make(original, base + " " + n1, a);
         final DrawingShape second = make(original, base + " " + n2, b);
+        final com.atakmap.android.fobs.feed.FeedPublisher fp =
+                com.atakmap.android.fobs.feed.FeedPublisher.get();
+        if (fp != null && fp.isLive(original)) {
+            fp.inherit(original, first);
+            fp.inherit(original, second);
+            fp.unpublish(original);
+            FobsShapes.persist(mapView, first, getClass());
+            FobsShapes.persist(mapView, second, getClass());
+        }
         // Show the break: a ring on each new end, either side of the gap.
         clearCandidate();
         ring(a.get(a.size() - 1));
@@ -587,9 +596,13 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
                 int id = v.getId();
                 DrawingShape edit = first;
                 if (id == R.id.cut_delete_first) {
+                    if (fp != null)
+                        fp.unpublish(first);
                     first.removeFromGroup();
                     edit = second;
                 } else if (id == R.id.cut_delete_second) {
+                    if (fp != null)
+                        fp.unpublish(second);
                     second.removeFromGroup();
                 }
                 restore.run();
@@ -658,6 +671,12 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         if (title == null || title.trim().isEmpty())
             title = mapView.getDeviceCallsign();
         DrawingShape line = make(original, title, a);
+        com.atakmap.android.fobs.feed.FeedPublisher fp = com.atakmap.android.fobs.feed.FeedPublisher.get();
+        if (fp != null && fp.isLive(original)) {
+            fp.inherit(original, line);
+            fp.unpublish(original);
+            FobsShapes.persist(mapView, line, getClass());
+        }
         if (!(original instanceof TrackPolyline))
             original.removeFromGroup();
         clearCandidate();

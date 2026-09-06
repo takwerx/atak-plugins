@@ -289,6 +289,13 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
         FobsShapes.addToMap(merged);
         FobsShapes.persist(mapView, merged, getClass());
 
+        com.atakmap.android.fobs.feed.FeedPublisher fp = com.atakmap.android.fobs.feed.FeedPublisher.get();
+        if (fp != null) {
+            fp.inherit(fp.isLive(a) ? a : b, merged);
+            fp.unpublish(a);
+            fp.unpublish(b);
+            FobsShapes.persist(mapView, merged, getClass()); // publishes the merged line
+        }
         removeEndpoints(a);
         removeEndpoints(b);
         a.removeFromGroup();

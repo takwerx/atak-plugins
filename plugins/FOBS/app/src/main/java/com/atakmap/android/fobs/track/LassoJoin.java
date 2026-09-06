@@ -217,6 +217,16 @@ public class LassoJoin extends BroadcastReceiver implements
         area.setLineStyle(first.getLineStyle());
         area.setPoints(chain.points, new SparseArray<PointMapItem>());
         FobsShapes.addToMap(area);
+        com.atakmap.android.fobs.feed.FeedPublisher fp = com.atakmap.android.fobs.feed.FeedPublisher.get();
+        if (fp != null) {
+            for (DrawingShape t : tracks)
+                if (fp.isLive(t)) {
+                    fp.inherit(t, area);
+                    break;
+                }
+            for (DrawingShape t : tracks)
+                fp.unpublish(t);
+        }
         // The tracks were joined, so they come off the map; the area replaces them.
         for (DrawingShape t : tracks)
             t.removeFromGroup();

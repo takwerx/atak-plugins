@@ -22,10 +22,11 @@ public class FobsDetailHandler extends CotDetailHandler {
 
     private static final String[] ATTRS = {
             FobsShapes.META_KIND, FobsShapes.META_SOURCE, FobsShapes.META_ALTSRC,
-            FobsShapes.META_RAW, FobsShapes.META_DROPPED
+            FobsShapes.META_RAW, FobsShapes.META_DROPPED,
+            com.atakmap.android.fobs.feed.FeedPublisher.META_FEED
     };
 
-    private static final String[] NAMES = { "kind", "source", "altsrc", "raw", "dropped" };
+    private static final String[] NAMES = { "kind", "source", "altsrc", "raw", "dropped", "feed" };
 
     public FobsDetailHandler() {
         super(DETAIL);
