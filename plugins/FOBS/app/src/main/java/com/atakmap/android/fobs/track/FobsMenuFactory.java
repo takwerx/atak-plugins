@@ -105,32 +105,33 @@ public class FobsMenuFactory implements MapMenuFactory {
         if (menu == null)
             return null;
 
-        // Same size as the buttons already on the menu.
-        float span = 0, width = 0;
-        int count = 0;
+        // Copy geometry from a button already on the ring. The layout normalizes the
+        // slice angles itself, but each button keeps its own radius, width and
+        // background; a button without them sits off the ring (XCover, 2026-09-05).
+        MapMenuButtonWidget template = null;
         for (MapWidget child : menu.getChildWidgets()) {
             if (child instanceof MapMenuButtonWidget) {
-                MapMenuButtonWidget b = (MapMenuButtonWidget) child;
-                span += b.getButtonSpan();
-                width += b.getButtonWidth();
-                count++;
+                template = (MapMenuButtonWidget) child;
+                break;
             }
         }
-        addButton(menu, icon, handler, count > 0 ? span / count : 0, count > 0 ? width / count : 0);
+        addButton(menu, icon, handler, template);
         if (icon2 != null && handler2 != null)
-            addButton(menu, icon2, handler2, count > 0 ? span / count : 0,
-                    count > 0 ? width / count : 0);
+            addButton(menu, icon2, handler2, template);
         return menu;
     }
 
     private void addButton(MapMenuWidget menu, WidgetIcon icon,
-            IMapMenuButtonWidget.OnButtonClickHandler handler, float span, float width) {
+            IMapMenuButtonWidget.OnButtonClickHandler handler, MapMenuButtonWidget template) {
         MapMenuButtonWidget button = new MapMenuButtonWidget(MapView.getMapView().getContext());
         button.setIcon(icon);
         button.setOnButtonClickHandler(handler);
-        if (span > 0) {
-            button.setLayoutWeight(span);
-            button.setButtonSize(span, width);
+        if (template != null) {
+            button.setOrientation(template.getOrientationAngle(), template.getOrientationRadius());
+            button.setButtonSize(template.getButtonSpan(), template.getButtonWidth());
+            button.setLayoutWeight(template.getLayoutWeight());
+            if (template.getWidgetBackground() != null)
+                button.setWidgetBackground(template.getWidgetBackground());
         }
         menu.addWidget(button);
     }
