@@ -280,7 +280,7 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
                 + " dStart=" + dStart + " dEnd=" + dEnd);
         // Too close to an end for a bite to leave a piece on that side: refuse.
         // A ring has no ends.
-        if (!closed(shape) && (dStart < fingerMeters() / 2 || dEnd < fingerMeters() / 2)) {
+        if (!closed(shape) && (dStart < gapMeters() / 2 || dEnd < gapMeters() / 2)) {
             toast(plugin.getString(R.string.toast_cut_at_end));
             return;
         }
@@ -292,6 +292,17 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
                 android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
         showCandidate(shape, bestSeg, cutPoint);
         cut();
+    }
+
+    /**
+     * The bite taken out of the line, meters. Tiny: just enough to break it. About
+     * 4 px at the current zoom so it can be seen, never less than a meter.
+     */
+    private double gapMeters() {
+        double mpp = mapView.getMapResolution();
+        if (Double.isNaN(mpp) || mpp <= 0)
+            mpp = 1;
+        return Math.max(1.0, 4 * mpp);
     }
 
     /** Meters covered by one finger-width (about 32 px) at the current zoom. */
@@ -449,10 +460,10 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         }
         if (seg >= pts.length - 1)
             return;
-        // Take a bite out of the line around the press, half a finger's width each
-        // way, so the two pieces are separated by a visible gap: no shared vertex, no
-        // two-point stub, nothing to wonder about (operator, 2026-09-05).
-        double half = fingerMeters() / 2;
+        // Take a tiny bite out of the line around the press so the two pieces are
+        // separated by a gap: no shared vertex, no two-point stub, nothing to wonder
+        // about (operator, 2026-09-05). Just enough to break it.
+        double half = gapMeters() / 2;
         List<GeoPointMetaData> a = new ArrayList<>();
         List<GeoPointMetaData> b = new ArrayList<>();
         bite(pts, seg, at.get(), half, a, b);
@@ -555,7 +566,7 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         for (int k = 0; k < n; k++)
             ring[k] = pts[(seg + 1 + k) % n];
         ring[n] = pts[(seg + 1) % n]; // the closing vertex, so the last segment is seg
-        double half = fingerMeters() / 2;
+        double half = gapMeters() / 2;
         List<GeoPointMetaData> a = new ArrayList<>();
         List<GeoPointMetaData> b = new ArrayList<>();
         bite(ring, n - 1, p, half, a, b);
