@@ -1,10 +1,10 @@
 ATAK Plugin — FOBS
 
-**Download FOBS 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download FOBS 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/fobs/releases/download/v0.2/ATAK-Plugin-FOBS-0.2--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/fobs/releases/download/v0.2/ATAK-Plugin-FOBS-0.2--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/fobs/releases/download/v0.2/ATAK-Plugin-FOBS-0.2--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/fobs/releases/download/v0.3/ATAK-Plugin-FOBS-0.3--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/fobs/releases/download/v0.3/ATAK-Plugin-FOBS-0.3--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/fobs/releases/download/v0.3/ATAK-Plugin-FOBS-0.3--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/fobs/releases
 
@@ -34,19 +34,21 @@ Capabilities, six tiles in a side pane:
     recording. At End: keep it as a line, or make it a polygon.
   - Draw a track: drop points by tapping, or draw freehand with ATAK's own
     telestration tool; the scribble becomes a track when you tap Done.
-  - Select element: turn a shape already on the map into a track -- a
-    telestration (one track per stroke, or joined in order), a freeform line
-    or polygon, a route, a rectangle, a circle, or a Track History line.
+  - Select element: turn a shape already on the map into a track -- a line
+    or polygon from an imported KML, a telestration (one track per stroke, or
+    joined in order), a freeform line or polygon, a route, a rectangle, a
+    circle, or a Track History line.
   - Import a track: opens ATAK's Track History. Browse, search the server,
     turn a track on, and its radial menu gets a FOBS button that imports it,
     with the same accuracy filtering as a live walk.
   - Split track: long press any line or closed shape exactly where you want
-    it broken. A line becomes two lines with a hairline gap; a polygon opens
-    into one line. The result opens in ATAK's vertex editor.
+    it broken. A line becomes two lines with a hairline gap, with Undo; a
+    polygon opens into one line. The result opens in ATAK's vertex editor.
   - Join tracks: tap an end on one line and an end on another and they become
     one line; tap both ends of the same line to close it into an area. Or
-    lasso several tracks and they are chained nearest end to nearest end and
-    closed into an area.
+    lasso several lines and they are chained nearest end to nearest end and
+    closed into an area. Any open line on the map can be joined, not only a
+    FOBS track.
 
 Optionally, a GPS track can be sent live to a Data Sync feed on a connected TAK
 Server. The track grows on every subscriber's map as it is walked, and when it
@@ -59,14 +61,17 @@ source submission zip).
 _________________________________________________________________
 STATUS
 
-Version 0.2. Verified on ATAK-CIV 5.8.0.3.
+Version 0.3: the 0.2 tools with the user manual, Join taking any line, and
+fixes found on the signed 0.2 (Split cut where ATAK said the finger was,
+Undo split, the End button while paused, a clearer message for an import
+that filters down to nothing).
 
-All six tools and the live feed have been exercised on hardware: Samsung Galaxy
-XCover Pro (ATAK-CIV 5.8.0.3), with feed delivery confirmed against a TAK Server
-5.7 and observed on a second device (Samsung Galaxy S22, ATAK-CIV 5.8) running
-Data Sync.
+Verified on ATAK-CIV 5.8.0.3 (development build, Samsung Galaxy XCover Pro)
+and, as tak.gov-signed 0.2, on official ATAK-CIV 5.6.0.18, 5.7.0.14 and
+5.8.0.4 (Samsung Galaxy S21+, Note 20, S22 Ultra). Feed delivery confirmed
+against a TAK Server 5.7 and watched on a second device running Data Sync.
 
-Prepared for tak.gov third-party submission.
+Submitted to the tak.gov third-party pipeline.
 
 _________________________________________________________________
 POINT OF CONTACTS
