@@ -40,3 +40,6 @@ dist/
 
 # Uncropped frames straight off the phone: callsign box, coordinates, home imagery. Never committed.
 docs/screenshots/raw/
+
+# Built by typst.gradle from docs/user_manual; tak.gov builds its own.
+app/src/main/assets/usermanual.pdf
