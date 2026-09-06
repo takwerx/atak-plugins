@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- After a split: which half to keep. A pane, not a dialog, so the two colored halves
+     stay visible on the map while the operator decides. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/cut_done_title"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:alpha="0.6"
+        android:paddingBottom="6dp" />
+
+    <TextView
+        android:id="@+id/cut_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="15sp"
+        android:textColor="@color/white"
+        android:paddingBottom="12dp" />
+
+    <Button
+        android:id="@+id/cut_delete_first"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:textColor="#FFFFA000"
+        android:text="@string/cut_delete_first" />
+
+    <Button
+        android:id="@+id/cut_delete_second"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:textColor="#FF00E5FF"
+        android:text="@string/cut_delete_second" />
+
+    <Button
+        android:id="@+id/cut_keep_both"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/cut_keep_both" />
+</LinearLayout>

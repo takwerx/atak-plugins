@@ -13,6 +13,7 @@ import android.widget.Toast;
 
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.fobs.plugin.R;
+import com.atakmap.android.fobs.track.CutTrackTool;
 import com.atakmap.android.fobs.track.DrawTrackTool;
 import com.atakmap.android.fobs.track.FobsShapes;
 import com.atakmap.android.fobs.track.FreehandTrack;
@@ -155,6 +156,9 @@ public class FobsPane implements View.OnClickListener {
             close();
             if (importTrack != null)
                 importTrack.begin();
+        } else if (id == R.id.cut_track) {
+            close();
+            ToolManagerBroadcastReceiver.getInstance().startTool(CutTrackTool.ID, new Bundle());
         } else {
             Toast.makeText(host, plugin.getString(R.string.not_built_yet),
                     Toast.LENGTH_SHORT).show();

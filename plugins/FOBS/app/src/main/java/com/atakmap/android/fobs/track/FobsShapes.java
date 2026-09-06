@@ -128,6 +128,26 @@ public final class FobsShapes {
         return AreaUtilities.formatArea(units.getAreaSystem(), squareMeters, Area.METER2);
     }
 
+    /** First free "<base> N" with N >= from among the drawing shapes on the map. */
+    public static int nextSuffix(MapView mapView, String base, int from) {
+        List<MapItem> shapes = DrawingToolsMapComponent.getGroup()
+                .deepFindItems("type", "u-d-f");
+        int n = Math.max(1, from);
+        while (true) {
+            String candidate = base + " " + n;
+            boolean taken = false;
+            for (MapItem it : shapes) {
+                if (candidate.equals(it.getTitle())) {
+                    taken = true;
+                    break;
+                }
+            }
+            if (!taken)
+                return n;
+            n++;
+        }
+    }
+
     /**
      * First free "callsign - Track N" among the drawing shapes already on the map, so
      * two tracks never share a default name.

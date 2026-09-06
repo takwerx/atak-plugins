@@ -4,6 +4,7 @@ import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atakmap.android.cot.detail.CotDetailManager;
+import com.atakmap.android.fobs.track.CutTrackTool;
 import com.atakmap.android.fobs.track.DrawTrackTool;
 import com.atakmap.android.fobs.track.FobsDetailHandler;
 import com.atakmap.android.fobs.track.FobsMenuFactory;
@@ -41,6 +42,7 @@ public class FOBS implements IPlugin {
     private FobsPane pane;
     private GpsTrackTool gpsTrackTool;
     private DrawTrackTool drawTrackTool;
+    private CutTrackTool cutTrackTool;
     private SelectTrack selectTrack;
     private FreehandTrack freehand;
     private ImportTrack importTrack;
@@ -95,6 +97,10 @@ public class FOBS implements IPlugin {
         drawTrackTool = new DrawTrackTool(mapView, pluginContext);
         ToolManagerBroadcastReceiver.getInstance().registerTool(DrawTrackTool.ID,
                 drawTrackTool);
+        cutTrackTool = new CutTrackTool(mapView, pluginContext);
+        cutTrackTool.setUiService(uiService);
+        ToolManagerBroadcastReceiver.getInstance().registerTool(CutTrackTool.ID,
+                cutTrackTool);
 
         selectTrack = new SelectTrack(mapView, pluginContext);
         pane = new FobsPane(mapView, pluginContext, uiService);
@@ -138,6 +144,11 @@ public class FOBS implements IPlugin {
         if (selectTrack != null) {
             selectTrack.dispose();
             selectTrack = null;
+        }
+        if (cutTrackTool != null) {
+            ToolManagerBroadcastReceiver.getInstance().unregisterTool(CutTrackTool.ID);
+            cutTrackTool.dispose();
+            cutTrackTool = null;
         }
         if (drawTrackTool != null) {
             ToolManagerBroadcastReceiver.getInstance().unregisterTool(DrawTrackTool.ID);
