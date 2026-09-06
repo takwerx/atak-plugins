@@ -41,10 +41,14 @@
         android:visibility="gone"
         android:text="Undo" />
 
+    <!-- Fixed width, sized for the longer label. As wrap_content, the button grew
+         when Pause became Resume, the bar ran out of room, and End was squeezed
+         to a blank tile (its text ellipsized to nothing). Seen on the S22,
+         2026-09-06. -->
     <Button
         android:id="@+id/pause"
         style="@style/TakwerxButton"
-        android:layout_width="wrap_content"
+        android:layout_width="104dp"
         android:layout_height="wrap_content"
         android:layout_marginEnd="6dp"
         android:text="@string/pause" />
