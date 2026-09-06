@@ -78,6 +78,10 @@ public final class FobsShapes {
         shape.setStrokeWeight(style.strokeWeight());
         shape.setLineStyle(style.lineStyle());
         shape.setClosed(false);
+        // On the ground, always. Points carry GPS or interpolated altitudes; drawn at
+        // those, the line sinks under higher terrain and vanishes as you zoom in
+        // (operator spotted it, 2026-09-05).
+        shape.setAltitudeMode(com.atakmap.map.layer.feature.Feature.AltitudeMode.ClampToGround);
         shape.setMetaBoolean("archive", true);
         shape.setMetaString(META_KIND, KIND_TRACK);
         shape.setMetaString(META_SOURCE, source);
@@ -98,6 +102,7 @@ public final class FobsShapes {
         StylePrefs style = new StylePrefs(mapView);
         shape.setClosed(true);
         shape.setFillColor(style.fillColor());
+        shape.setAltitudeMode(com.atakmap.map.layer.feature.Feature.AltitudeMode.ClampToGround);
         shape.setMovable(false);
         shape.setMetaString(META_KIND, KIND_AREA);
     }

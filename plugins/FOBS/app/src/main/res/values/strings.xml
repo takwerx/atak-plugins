@@ -7,7 +7,7 @@
     <!-- Chooser: the five verbs. -->
     <string name="choose_start_gps">Start a GPS track</string>
     <string name="choose_draw">Draw a track</string>
-    <string name="choose_select">Select a track</string>
+    <string name="choose_select">Select element</string>
     <string name="choose_import">Import a track</string>
     <string name="choose_cut">Split track</string>
     <string name="choose_join">Join tracks</string>
@@ -56,7 +56,7 @@
     <string name="start_marker">Start</string>
 
     <!-- Select a track -->
-    <string name="prompt_select">Tap the shape or track line to use as a track</string>
+    <string name="prompt_select">Tap the element to use as a track</string>
     <string name="toast_already_fobs">That is already a FOBS track</string>
     <string name="toast_shape_no_points">That shape has no points to use</string>
     <string name="toast_track_made">%1$s: track with %2$d points</string>
@@ -103,10 +103,17 @@
     <string name="toast_cut_at_end">Too close to the end of the line. Press further in.</string>
     <string name="toast_split_done">Split. Orange: %1$s. Blue: %2$s.</string>
     <string name="cut_done_title">Split</string>
-    <string name="cut_done_message">Split at the yellow marker.\nOrange: %1$s, %2$d points.\nBlue: %3$s, %4$d points.</string>
+    <string name="cut_done_message">Split between the two rings.\nOrange: %1$s, %2$d points.\nBlue: %3$s, %4$d points.</string>
     <string name="cut_keep_both">Keep both</string>
     <string name="cut_delete_first">Delete orange</string>
     <string name="cut_delete_second">Delete blue</string>
+
+    <!-- Join tracks -->
+    <string name="prompt_join_first">Tap an end of a line. Tap End when finished.</string>
+    <string name="prompt_join_second">Now tap an end of the line to join it to. Both ends of the same line closes it.</string>
+    <string name="toast_join_need_two">No tracks on the map to join</string>
+    <string name="toast_join_tap_endpoint">Tap one of the end markers</string>
+    <string name="toast_joined">Joined %1$s and %2$s</string>
 
     <!-- End of track -->
     <string name="end_title">Track finished</string>

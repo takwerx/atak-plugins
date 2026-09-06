@@ -80,6 +80,35 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         this.ui = ui;
     }
 
+    /** White rings on the new ends of every split made in this session of the tool. */
+    private final List<Marker> endRings = new ArrayList<>();
+    private Icon endIcon;
+
+    private void ring(GeoPointMetaData at) {
+        if (endIcon == null)
+            endIcon = new Icon.Builder().setImageUri(0, "asset:/icons/outline.png")
+                    .setAnchor(24, 24).setColor(0, 0xFFFFFFFF).build();
+        Marker m = new Marker(at, UUID.randomUUID().toString());
+        m.setType("shape_marker");
+        m.setIcon(endIcon);
+        m.setMetaBoolean("addToObjList", false);
+        m.setMetaBoolean("nevercot", true);
+        m.setMetaBoolean("ignoreMenu", true);
+        m.setMetaBoolean("ignoreOffscreen", true);
+        m.setMetaBoolean("removable", false);
+        m.setMetaBoolean("movable", false);
+        m.setShowLabel(false);
+        m.setClickable(false);
+        scratch.addItem(m);
+        endRings.add(m);
+    }
+
+    private void clearRings() {
+        for (Marker m : endRings)
+            m.removeFromGroup();
+        endRings.clear();
+    }
+
     private String onlyUid;
     private Shape candidateShape;
     /** The cut point goes after this vertex index; -1 when there is no candidate. */
@@ -171,12 +200,14 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         // A pending choice stays up: both halves exist, Keep both is the default.
         if (resultPane == null)
             clearCandidate();
+        clearRings();
         onlyUid = null;
     }
 
     @Override
     public void dispose() {
         closeResult();
+        clearRings();
         mapView.getRootGroup().removeGroup(scratch);
     }
 
@@ -199,15 +230,15 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
             toast(plugin.getString(R.string.toast_long_press_to_cut));
             return;
         }
-        // Where the finger was: the hit item's recorded click point when there is
-        // one, else the map point under the finger.
+        // Where the finger was: the event's screen position, inverted through the
+        // map. Not the shape's remembered click point and not Tool.findPoint, which
+        // returns that click point for shapes: on a circle it was hundreds of
+        // kilometers stale and the split landed there (log, 2026-09-05).
         GeoPointMetaData tapped = null;
-        if (item instanceof Shape) {
-            GeoPoint click = ((Shape) item).getClickPoint();
-            if (click != null && click.isValid())
-                tapped = GeoPointMetaData.wrap(click);
-        }
-        if (tapped == null)
+        android.graphics.PointF screen = event.getPointF();
+        if (screen != null)
+            tapped = mapView.inverseWithElevation(screen.x, screen.y);
+        if (tapped == null || tapped.get() == null || !tapped.get().isValid())
             tapped = findPoint(event);
         if (tapped == null || tapped.get() == null)
             return;
@@ -303,6 +334,40 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         if (Double.isNaN(mpp) || mpp <= 0)
             mpp = 1;
         return Math.max(1.0, 4 * mpp);
+    }
+
+    /**
+     * Put a shape into ATAK's vertex editor, the same broadcast the radial menu's edit
+     * button sends. The operator wants the vertices live the moment a split is made.
+     */
+    private void editShape(final DrawingShape shape) {
+        if (shape == null || shape.getGroup() == null)
+            return;
+        // ATAK's details pane zooms to fit the shape when it opens and offers no way
+        // to say no. The operator wants to stay where they were when they split, so
+        // remember the view and put it back once the pane is up.
+        final GeoPoint center = mapView.getCenterPoint() == null ? null
+                : mapView.getCenterPoint().get();
+        final double scale = mapView.getMapScale();
+        mapView.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                android.content.Intent i = new android.content.Intent(
+                        "com.atakmap.android.maps.DRAWING_DETAILS");
+                i.putExtra("uid", shape.getUID());
+                i.putExtra("shapeUID", shape.getUID());
+                i.putExtra("edit", true);
+                com.atakmap.android.ipc.AtakBroadcast.getInstance().sendBroadcast(i);
+                if (center != null) {
+                    mapView.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            mapView.getMapController().panZoomTo(center, scale, false);
+                        }
+                    }, 600);
+                }
+            }
+        }, 150);
     }
 
     /** Meters covered by one finger-width (about 32 px) at the current zoom. */
@@ -482,6 +547,10 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         int n2 = FobsShapes.nextSuffix(mapView, base, n1 + 1);
         final DrawingShape first = make(original, base + " " + n1, a);
         final DrawingShape second = make(original, base + " " + n2, b);
+        // Show the break: a ring on each new end, either side of the gap.
+        clearCandidate();
+        ring(a.get(a.size() - 1));
+        ring(b.get(0));
         // The operator cut it, so the original goes, except a Track History line,
         // which is the breadcrumb log's view of itself and not ours to delete.
         if (!(original instanceof TrackPolyline))
@@ -516,11 +585,17 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
             @Override
             public void onClick(View v) {
                 int id = v.getId();
-                if (id == R.id.cut_delete_first)
+                DrawingShape edit = first;
+                if (id == R.id.cut_delete_first) {
                     first.removeFromGroup();
-                else if (id == R.id.cut_delete_second)
+                    edit = second;
+                } else if (id == R.id.cut_delete_second) {
                     second.removeFromGroup();
+                }
                 restore.run();
+                // Then straight into ATAK's vertex editor on what is left.
+                requestEndTool();
+                editShape(edit);
             }
         });
     }
@@ -585,10 +660,13 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         DrawingShape line = make(original, title, a);
         if (!(original instanceof TrackPolyline))
             original.removeFromGroup();
+        clearCandidate();
         Log.d(TAG, "opened ring '" + title + "' at segment " + seg + " -> " + a.size() + " points");
         toast(plugin.getString(R.string.toast_ring_opened, title));
-        clearCandidate();
-        TextContainer.getInstance().displayPrompt(plugin.getString(R.string.prompt_cut));
+        // Straight into ATAK's vertex editor on the new line. That is another tool, so
+        // this one ends first.
+        requestEndTool();
+        editShape(line);
     }
 
     /**

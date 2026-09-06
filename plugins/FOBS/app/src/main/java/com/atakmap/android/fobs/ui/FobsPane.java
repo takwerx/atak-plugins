@@ -19,6 +19,7 @@ import com.atakmap.android.fobs.track.FobsShapes;
 import com.atakmap.android.fobs.track.FreehandTrack;
 import com.atakmap.android.fobs.track.GpsTrackTool;
 import com.atakmap.android.fobs.track.ImportTrack;
+import com.atakmap.android.fobs.track.JoinTracksTool;
 import com.atakmap.android.fobs.track.SelectTrack;
 import com.atakmap.android.fobs.track.StylePrefs;
 import com.atakmap.android.gui.ColorPalette;
@@ -159,6 +160,9 @@ public class FobsPane implements View.OnClickListener {
         } else if (id == R.id.cut_track) {
             close();
             ToolManagerBroadcastReceiver.getInstance().startTool(CutTrackTool.ID, new Bundle());
+        } else if (id == R.id.join_tracks) {
+            close();
+            ToolManagerBroadcastReceiver.getInstance().startTool(JoinTracksTool.ID, new Bundle());
         } else {
             Toast.makeText(host, plugin.getString(R.string.not_built_yet),
                     Toast.LENGTH_SHORT).show();
