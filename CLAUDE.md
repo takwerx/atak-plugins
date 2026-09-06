@@ -71,6 +71,23 @@ list and search show, and they are invisible from inside the README:
 **docs/USER_GUIDE.md** — same download block as the README at the top, and a
 "Before you start" note listing which ATAK versions have published builds.
 
+**How a guide gets built — shot list first.** The guide and the typst manual
+are written around screenshots, and the screenshots come from a signed build
+on an official phone (a dev build watermarks every frame). The order is fixed:
+
+1. Write `../atak-plugins-notes/docs/SHOTLIST-<Name>-manual.md`: framing rules,
+   then a table of numbered shots (section, what it shows, crop). Cam Depot's
+   and Map Depot's are the models.
+2. Give the operator the list; they stage each screen on the screenshot phone
+   and the session pulls it with `adb exec-out screencap -p`, or they take it
+   themselves and drop it in `plugins/<Name>/docs/screenshots/raw/`.
+3. Crop tightly (pane, dialog, toolbar strip, or the map when the map is the
+   point), review every frame by eye for callsigns, coordinates and server
+   names, name them `<n>_<what>.png` under `docs/screenshots/`, and copy the
+   manual's set into `docs/user_manual/` as `<n>.png`.
+4. Write USER_GUIDE.md and `usermanual.typ` around them, add the Tool
+   Preferences entry if the plugin has none, and submit the second build.
+
 A plugin's *support surface* is its own repo: its Releases carry the
 tak.gov-signed APKs, its Issues take the bug reports. Anything that is not a
 plugin but lives beside them (e.g. `plss-data`, which hosts the packs PLSS Grid
