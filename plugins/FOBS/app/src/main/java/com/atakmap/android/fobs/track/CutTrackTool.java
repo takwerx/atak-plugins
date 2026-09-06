@@ -580,6 +580,7 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
             title = mapView.getDeviceCallsign();
         // "Track 15" -> "Track 15 1" and "Track 15 2"; splitting "Track 15 1" again
         // gives "Track 15 3" and "Track 15 4", not "Track 15 1 1".
+        final String backTitle = title;
         String base = title.replaceFirst("\\s+\\d+$", "");
         int n1 = FobsShapes.nextSuffix(mapView, base, 1);
         int n2 = FobsShapes.nextSuffix(mapView, base, n1 + 1);
@@ -636,21 +637,25 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
                 int id = v.getId();
                 if (id == R.id.cut_undo) {
                     // The press landed in the wrong place: put the line back the way
-                    // it was. The original returns to its group, the halves go, and
-                    // the feed membership goes back with it. Asked for on the S22 the
-                    // first time a split landed wrong (2026-09-06).
-                    if (fp != null && wasLive && original instanceof DrawingShape)
-                        fp.inherit(first, (DrawingShape) original);
+                    // it was. Not the same object: ATAK disposes a shape when it
+                    // leaves its group, and re-adding it gave an invisible line on
+                    // the XCover (12:13, 2026-09-06). A new track from the original's
+                    // points, style and title, carrying its feed membership; the
+                    // halves go. Asked for on the S22 the first time a split landed
+                    // wrong ("there is no cancel").
+                    DrawingShape back = null;
+                    if (original.getGroup() == null)
+                        back = make(original, backTitle, copy(java.util.Arrays.asList(pts)));
+                    if (fp != null && wasLive && back != null)
+                        fp.inherit(first, back);
                     if (fp != null) {
                         fp.unpublish(first);
                         fp.unpublish(second);
                     }
                     first.removeFromGroup();
                     second.removeFromGroup();
-                    if (original.getGroup() == null && home != null)
-                        home.addItem(original);
-                    if (original instanceof DrawingShape && original.getGroup() != null)
-                        FobsShapes.persist(mapView, (DrawingShape) original, CutTrackTool.class);
+                    if (back != null)
+                        FobsShapes.persist(mapView, back, CutTrackTool.class);
                     clearRings();
                     clearCandidate();
                     closeResult();
