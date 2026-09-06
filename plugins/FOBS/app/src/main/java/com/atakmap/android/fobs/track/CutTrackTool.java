@@ -301,7 +301,7 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
             return;
         double dStart = GeoCalculations.distanceTo(bestP, pts[0].get());
         double dEnd = GeoCalculations.distanceTo(bestP, pts[n - 1].get());
-        Log.d(TAG, "press on '" + shape.getTitle() + "' " + shape.getClass().getSimpleName()
+        Log.d(TAG, "press on " + shape.getClass().getSimpleName()
                 + " n=" + n + " event=" + event.getType()
                 + " hit_type=" + shape.getMetaString("hit_type", "-")
                 + " hit_index=" + shape.getMetaInteger("hit_index", -1)
@@ -564,7 +564,7 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         // which is the breadcrumb log's view of itself and not ours to delete.
         if (!(original instanceof TrackPolyline))
             original.removeFromGroup();
-        Log.d(TAG, "split '" + title + "' at segment " + seg + " gap=" + (2 * half) + "m -> "
+        Log.d(TAG, "split at segment " + seg + " gap=" + (2 * half) + "m -> "
                 + a.size() + " + " + b.size());
 
         // Orange and blue until the operator chooses in the side pane; the marker
@@ -680,7 +680,7 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         if (!(original instanceof TrackPolyline))
             original.removeFromGroup();
         clearCandidate();
-        Log.d(TAG, "opened ring '" + title + "' at segment " + seg + " -> " + a.size() + " points");
+        Log.d(TAG, "opened ring at segment " + seg + " -> " + a.size() + " points");
         toast(plugin.getString(R.string.toast_ring_opened, title));
         // Straight into ATAK's vertex editor on the new line. That is another tool, so
         // this one ends first.

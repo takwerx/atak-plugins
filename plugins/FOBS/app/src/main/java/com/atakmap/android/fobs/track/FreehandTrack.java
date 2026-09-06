@@ -153,7 +153,7 @@ public class FreehandTrack implements ToolListener {
                 all.add(copy);
             }
         }
-        Log.d(TAG, "freehand '" + title + "' strokes=" + made.getLines().size()
+        Log.d(TAG, "freehand strokes=" + made.getLines().size()
                 + " points=" + all.size());
         if (all.size() < 2) {
             made.removeFromGroup();

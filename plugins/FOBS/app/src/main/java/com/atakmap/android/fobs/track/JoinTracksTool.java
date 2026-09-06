@@ -262,7 +262,7 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
         }
         removeEndpoints(line);
         finisher.makePolygon(line);
-        Log.d(TAG, "closed " + line.getTitle());
+        Log.d(TAG, "closed a line into an area");
     }
 
     /**
@@ -303,7 +303,7 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
         addEndpoints(merged);
         joins.push(new Join(a, b, merged));
         undoBtn.setEnabled(true);
-        Log.d(TAG, "joined " + a.getTitle() + " + " + b.getTitle() + " -> " + all.size() + " points");
+        Log.d(TAG, "joined two lines -> " + all.size() + " points");
         toast(plugin.getString(R.string.toast_joined, a.getTitle(), b.getTitle()));
     }
 

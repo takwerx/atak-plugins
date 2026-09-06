@@ -359,7 +359,7 @@ public class ImportTrack implements RequestManager.RequestListener {
         String baseUrl = ServerListDialog.getBaseUrl(server);
         QueryUserTracksRequest2 req = new QueryUserTracksRequest2(baseUrl, notificationId++,
                 user.getCallsign(), user.getUid(), start, end, server.getConnectString());
-        Log.d(TAG, "server query " + req);
+        Log.d(TAG, "server track query sent");
         showBusy(plugin.getString(R.string.import_fetching_tracks, user.getCallsign()));
         HTTPRequestManager2.from(host).execute(req.createQueryUserTracksRequest(), this);
     }
@@ -563,7 +563,7 @@ public class ImportTrack implements RequestManager.RequestListener {
         int removed = FixFilter.removedCount(keep);
         List<GeoPointMetaData> cleaned = FixFilter.apply(points, keep);
         int dropped = gate.dropped() + removed;
-        Log.d(TAG, "import '" + title + "' raw=" + raw + " accepted=" + points.size()
+        Log.d(TAG, "import raw=" + raw + " accepted=" + points.size()
                 + " tooClose=" + gate.count(FixFilter.Verdict.TOO_CLOSE)
                 + " badAccuracy=" + gate.count(FixFilter.Verdict.BAD_ACCURACY)
                 + " tooFast=" + gate.count(FixFilter.Verdict.TOO_FAST)

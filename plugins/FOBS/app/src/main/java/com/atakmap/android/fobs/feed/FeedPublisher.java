@@ -193,7 +193,7 @@ public class FeedPublisher {
                     TakHttpClient client = TakHttpClient.GetHttpClient(
                             ServerListDialog.getBaseUrl(server), server.getConnectString());
                     String url = client.getUrl("api/missions?passwordProtected=true&defaultRole=true");
-                    Log.d(TAG, "GET " + url);
+                    Log.d(TAG, "GET api/missions");
                     String json = client.get(url);
                     JSONObject root = new JSONObject(json);
                     JSONArray data = root.optJSONArray("data");
@@ -337,7 +337,7 @@ public class FeedPublisher {
         // goes to that server and no other (security review, 2026-09-05); an unknown
         // key sends nothing and logs "Invalid interface key".
         CommsMapComponent.getInstance().sendCoTToServersByMission(server, feed, event);
-        Log.d(TAG, "sent " + shape.getUID() + " to mission " + feed + " on " + server);
+        Log.d(TAG, "sent " + shape.getUID() + " to its feed");
         if (!first)
             return;
         final String uid = shape.getUID();
@@ -414,7 +414,6 @@ public class FeedPublisher {
             url = Uri.parse(url).buildUpon()
                     .appendQueryParameter("uid", MapView.getDeviceUid()).build().toString();
             HttpPut put = new HttpPut(FileSystemUtils.sanitizeURL(url));
-            Log.d(TAG, "PUT " + url);
             TakHttpResponse r = client.execute(put);
             Log.d(TAG, "PUT subscription -> " + r.getStatusCode());
             return r.isOk() || r.isCreated();
@@ -440,7 +439,6 @@ public class FeedPublisher {
             entity.setContentType("application/json");
             put.setEntity(entity);
             put.addHeader("Content-Type", "application/json");
-            Log.d(TAG, "PUT " + url + " body " + body.toString());
             TakHttpResponse r = client.execute(put);
             boolean ok = r.isOk() || r.isCreated();
             Log.d(TAG, "PUT contents -> " + r.getStatusCode() + (ok ? "" : " " + body(r)));
@@ -463,7 +461,6 @@ public class FeedPublisher {
                             .appendQueryParameter("uid", uid)
                             .appendQueryParameter("creatorUid", MapView.getDeviceUid())
                             .build().toString();
-                    Log.d(TAG, "DELETE " + url);
                     TakHttpResponse r = client.execute(new HttpDelete(FileSystemUtils.sanitizeURL(url)));
                     Log.d(TAG, "DELETE contents -> " + r.getStatusCode());
                 } catch (Exception e) {

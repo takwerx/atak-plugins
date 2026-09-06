@@ -104,8 +104,7 @@ public class SelectTrack extends BroadcastReceiver {
         MapItem item = mapView.getRootGroup().deepFindUID(uid);
         if (item == null)
             return;
-        Log.d(TAG, "selected " + item.getClass().getSimpleName() + " type=" + item.getType()
-                + " title=" + item.getTitle());
+        Log.d(TAG, "selected " + item.getClass().getSimpleName() + " type=" + item.getType());
         if (FobsShapes.isOurs(item)) {
             toast(plugin.getString(R.string.toast_already_fobs));
             return;

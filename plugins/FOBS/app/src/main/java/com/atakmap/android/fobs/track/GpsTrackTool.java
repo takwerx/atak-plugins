@@ -276,7 +276,7 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
         finished.setMetaString(FobsShapes.META_RAW, String.valueOf(raw));
         finished.setMetaString(FobsShapes.META_DROPPED, String.valueOf(dropped));
         // One line per track so a field test can be read back from logcat.
-        Log.d(TAG, "end '" + finished.getTitle() + "' raw=" + raw
+        Log.d(TAG, "end raw=" + raw
                 + " accepted=" + accepted.size()
                 + " tooClose=" + gate.count(FixFilter.Verdict.TOO_CLOSE)
                 + " badAccuracy=" + gate.count(FixFilter.Verdict.BAD_ACCURACY)
