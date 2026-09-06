@@ -2,6 +2,9 @@
 <resources>
     <!-- App -->
     <string name="app_name">FOBS</string>
+    <!-- Tool Preferences: the entry the manual is reached through -->
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the FOBS user guide: GPS tracks, drawing, importing, split and join, live feeds</string>
     <string name="app_desc">Field Observation Survey: GPS tracks, tapped tracks, cut and join them into a perimeter and area.</string>
 
     <!-- Chooser: the five verbs. -->
@@ -90,7 +93,7 @@
     <!-- Join tracks -->
     <string name="prompt_join_first">Tap an end of a line. Tap End when finished.</string>
     <string name="prompt_join_second">Now tap an end of the line to join it to. Both ends of the same line closes it.</string>
-    <string name="toast_join_need_two">No tracks on the map to join</string>
+    <string name="toast_join_need_two">No lines on the map to join</string>
     <string name="toast_join_tap_endpoint">Tap one of the end markers</string>
     <string name="toast_joined">Joined %1$s and %2$s</string>
 
@@ -100,7 +103,7 @@
     <string name="join_lasso">Lasso</string>
     <string name="lasso_menu_title">FOBS: join into area</string>
     <string name="toast_lasso_hint">Draw a lasso around the tracks to join</string>
-    <string name="toast_lasso_need_two">Lasso at least two FOBS tracks</string>
+    <string name="toast_lasso_need_two">Lasso at least two lines</string>
     <string name="lasso_gap_title">Large gap</string>
     <string name="lasso_gap_message">The largest gap to bridge is %s. Join anyway?</string>
     <string name="lasso_gap_join">Join anyway</string>

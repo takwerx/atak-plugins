@@ -16,6 +16,7 @@ import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.maps.PointMapItem;
+import com.atakmap.android.maps.Shape;
 import com.atakmap.android.missionpackage.lasso.LassoSelectionReceiver;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoCalculations;
@@ -112,11 +113,11 @@ public class LassoJoin extends BroadcastReceiver implements
 
     @Override
     public void process(List<Object> list) {
-        final List<DrawingShape> tracks = new ArrayList<>();
+        // Any open line, not only FOBS tracks; what is joined becomes a FOBS area.
+        final List<Shape> tracks = new ArrayList<>();
         for (Object o : list)
-            if (o instanceof DrawingShape && FobsShapes.isTrack((MapItem) o)
-                    && ((DrawingShape) o).getNumPoints() >= 2)
-                tracks.add((DrawingShape) o);
+            if (o instanceof MapItem && JoinTracksTool.joinable((MapItem) o))
+                tracks.add((Shape) o);
         if (tracks.size() < 2) {
             toast(plugin.getString(R.string.toast_lasso_need_two));
             return;
@@ -149,9 +150,9 @@ public class LassoJoin extends BroadcastReceiver implements
         int joined = 0;
     }
 
-    static Chain chain(List<DrawingShape> tracks) {
+    static Chain chain(List<? extends Shape> tracks) {
         List<List<GeoPointMetaData>> runs = new ArrayList<>();
-        for (DrawingShape t : tracks)
+        for (Shape t : tracks)
             runs.add(points(t));
         // Longest first, by point count.
         int start = 0;
@@ -194,7 +195,7 @@ public class LassoJoin extends BroadcastReceiver implements
         return c;
     }
 
-    private static List<GeoPointMetaData> points(DrawingShape s) {
+    private static List<GeoPointMetaData> points(Shape s) {
         List<GeoPointMetaData> out = new ArrayList<>();
         GeoPointMetaData[] pts = s.getMetaDataPoints();
         if (pts != null)
@@ -204,7 +205,12 @@ public class LassoJoin extends BroadcastReceiver implements
         return out;
     }
 
-    private void build(List<DrawingShape> tracks, Chain chain) {
+    private void build(List<Shape> lines, Chain chain) {
+        // Adopt first: an ATAK-drawn line becomes a FOBS track, then is consumed
+        // like any other. Done here, after the gap question, so Cancel changes nothing.
+        final List<DrawingShape> tracks = new ArrayList<>();
+        for (Shape l : lines)
+            tracks.add(FobsShapes.adopt(mapView, l));
         String pattern = plugin.getString(R.string.track_default_name);
         String callsign = mapView.getDeviceCallsign();
         String title = String.format(pattern, callsign,

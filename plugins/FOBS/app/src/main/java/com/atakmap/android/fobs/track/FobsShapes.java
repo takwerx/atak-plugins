@@ -14,6 +14,7 @@ import com.atakmap.coremap.conversions.Span;
 import com.atakmap.coremap.conversions.SpanUtilities;
 import com.atakmap.coremap.maps.coords.GeoCalculations;
 import com.atakmap.coremap.maps.coords.GeoPoint;
+import com.atakmap.coremap.maps.coords.GeoPointMetaData;
 
 import java.util.List;
 import java.util.UUID;
@@ -86,6 +87,39 @@ public final class FobsShapes {
         shape.setMetaString(META_KIND, KIND_TRACK);
         shape.setMetaString(META_SOURCE, source);
         return shape;
+    }
+
+    /**
+     * A FOBS track made from any open line on the map: same points, style and
+     * title. The line comes off the map, unless it is a Track History line, which is
+     * the breadcrumb log's view of itself and not ours to delete. A line that is
+     * already a FOBS track is returned as it is. Join takes any line this way, as
+     * Split always has (operator, 2026-09-06).
+     */
+    public static DrawingShape adopt(MapView mapView, com.atakmap.android.maps.Shape line) {
+        if (isTrack(line) && line instanceof DrawingShape)
+            return (DrawingShape) line;
+        String title = line.getTitle();
+        if (title == null || title.trim().isEmpty())
+            title = mapView.getDeviceCallsign();
+        boolean fromLog = line instanceof com.atakmap.android.track.maps.TrackPolyline;
+        DrawingShape t = newTrack(mapView, title, fromLog ? SOURCE_GPS : SOURCE_USER);
+        t.setStrokeColor(line.getStrokeColor());
+        t.setStrokeWeight(line.getStrokeWeight());
+        if (line instanceof com.atakmap.android.editableShapes.EditablePolyline)
+            t.setLineStyle(((com.atakmap.android.editableShapes.EditablePolyline) line).getLineStyle());
+        java.util.List<GeoPointMetaData> pts = new java.util.ArrayList<>();
+        GeoPointMetaData[] src = line.getMetaDataPoints();
+        if (src != null)
+            for (GeoPointMetaData p : src)
+                if (p != null && p.get() != null)
+                    pts.add(new GeoPointMetaData(p));
+        t.setPoints(pts, new android.util.SparseArray<com.atakmap.android.maps.PointMapItem>());
+        addToMap(t);
+        persist(mapView, t, FobsShapes.class);
+        if (!fromLog)
+            line.removeFromGroup();
+        return t;
     }
 
     /** Put a track on the map. Call once it has at least two points. */

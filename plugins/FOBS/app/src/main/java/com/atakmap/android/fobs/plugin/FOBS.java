@@ -125,12 +125,14 @@ public class FOBS implements IPlugin {
         menuFactory = new FobsMenuFactory(mapView, pluginContext, importTrack);
         MapMenuReceiver.getInstance().registerMapMenuFactory(menuFactory);
         uiService.addToolbarItem(toolbarItem);
+        registerPreferences();
     }
 
     @Override
     public void onStop() {
         if (uiService == null)
             return;
+        unregisterPreferences();
         uiService.removeToolbarItem(toolbarItem);
         if (pane != null) {
             pane.close();
@@ -183,6 +185,40 @@ public class FOBS implements IPlugin {
         if (detailHandler != null) {
             CotDetailManager.getInstance().unregisterHandler(detailHandler);
             detailHandler = null;
+        }
+    }
+
+    // ---- Tool Preferences ---------------------------------------------------------
+
+    private static final String PREFS_KEY = "fobsPreference";
+
+    /**
+     * Put the plugin in ATAK's Tool Preferences, which is the only way an operator
+     * can reach the user manual. The manual is compiled into
+     * {@code assets/usermanual.pdf}, and an asset is not reachable by anyone.
+     * Guarded rather than assumed: a build that does not expose
+     * {@code ToolsPreferenceFragment} should cost the manual, not the plugin.
+     */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.manual_summary),
+                            PREFS_KEY,
+                            // ic_toolbar: the bare glyph, for ATAK's dark rows.
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new FobsPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
         }
     }
 }

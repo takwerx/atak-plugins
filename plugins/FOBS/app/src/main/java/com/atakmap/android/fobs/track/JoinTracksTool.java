@@ -19,6 +19,7 @@ import com.atakmap.android.maps.MapTouchController;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.maps.Marker;
 import com.atakmap.android.maps.PointMapItem;
+import com.atakmap.android.maps.Shape;
 import com.atakmap.android.toolbar.Tool;
 import com.atakmap.android.toolbar.widgets.TextContainer;
 import com.atakmap.android.tools.ActionBarReceiver;
@@ -70,13 +71,24 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
     private Marker picked;
 
     /** One join, for Undo: the two originals that were replaced, and by what. */
+    /**
+     * One join, with what it takes to undo it. The points are kept because ATAK
+     * disposes a shape when it leaves its group, so a and b cannot simply be put
+     * back; they are rebuilt from these (seen on Split's undo, 2026-09-06).
+     */
     private static final class Join {
         final DrawingShape a, b, merged;
+        final List<GeoPointMetaData> pa, pb;
+        final boolean liveWasA;
 
-        Join(DrawingShape a, DrawingShape b, DrawingShape merged) {
+        Join(DrawingShape a, DrawingShape b, DrawingShape merged,
+                List<GeoPointMetaData> pa, List<GeoPointMetaData> pb, boolean liveWasA) {
             this.a = a;
             this.b = b;
             this.merged = merged;
+            this.pa = pa;
+            this.pb = pb;
+            this.liveWasA = liveWasA;
         }
     }
 
@@ -112,11 +124,14 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
     @Override
     protected boolean onToolBegin(Bundle extras) {
         reset();
+        // Any open line on the map gets end markers, not only FOBS tracks: a
+        // freeform line, a telestration stroke, a route. Whatever is joined
+        // becomes a FOBS track. Closed shapes have no ends. (Operator, 2026-09-06:
+        // "lets build that in".)
         int tracks = 0;
         for (MapItem m : DrawingToolsMapComponent.getGroup().getItemsRecursive()) {
-            if (FobsShapes.isTrack(m) && m instanceof DrawingShape
-                    && ((DrawingShape) m).getNumPoints() >= 2) {
-                addEndpoints((DrawingShape) m);
+            if (joinable(m)) {
+                addEndpoints((Shape) m);
                 tracks++;
             }
         }
@@ -162,15 +177,23 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
 
     // ---- endpoint markers --------------------------------------------------------
 
-    private void addEndpoints(DrawingShape track) {
-        int n = track.getNumPoints();
-        if (n < 2)
-            return;
-        endpoint(track, track.getPoint(0), "start");
-        endpoint(track, track.getPoint(n - 1), "end");
+    /** An open line with at least two points; a multi-stroke telestration is not one line. */
+    static boolean joinable(MapItem m) {
+        return m instanceof Shape && CutTrackTool.cuttable(m)
+                && !(m instanceof com.atakmap.android.maps.MultiPolyline)
+                && !CutTrackTool.closed((Shape) m);
     }
 
-    private void removeEndpoints(DrawingShape track) {
+    private void addEndpoints(Shape track) {
+        GeoPointMetaData[] pts = track.getMetaDataPoints();
+        int n = pts == null ? 0 : pts.length;
+        if (n < 2 || pts[0] == null || pts[n - 1] == null)
+            return;
+        endpoint(track, pts[0], "start");
+        endpoint(track, pts[n - 1], "end");
+    }
+
+    private void removeEndpoints(Shape track) {
         List<String> gone = new ArrayList<>();
         for (Marker m : endpoints.values())
             if (track.getUID().equals(m.getMetaString(META_TRACK, null))) {
@@ -181,7 +204,7 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
             endpoints.remove(uid);
     }
 
-    private void endpoint(DrawingShape track, GeoPointMetaData at, String which) {
+    private void endpoint(Shape track, GeoPointMetaData at, String which) {
         Marker m = new Marker(at, UUID.randomUUID().toString());
         m.setType("shape_marker");
         m.setTitle(track.getTitle() + " " + which);
@@ -243,15 +266,25 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
         Marker a = picked;
         picked = null;
         a.setIcon(endpointIcon);
-        if (!(ia instanceof DrawingShape) || !(ib instanceof DrawingShape))
+        if (!(ia instanceof Shape) || !(ib instanceof Shape))
             return;
         if (ua.equals(ub)) {
-            closeLine((DrawingShape) ia);
+            closeLine(asTrack((Shape) ia));
         } else {
-            join((DrawingShape) ia, "end".equals(a.getMetaString(META_END, "start")),
-                    (DrawingShape) ib, "end".equals(m.getMetaString(META_END, "start")));
+            join(asTrack((Shape) ia), "end".equals(a.getMetaString(META_END, "start")),
+                    asTrack((Shape) ib), "end".equals(m.getMetaString(META_END, "start")));
         }
         TextContainer.getInstance().displayPrompt(plugin.getString(R.string.prompt_join_first));
+    }
+
+    /** The line as a FOBS track: itself if it is one, else adopted, end markers moved over. */
+    private DrawingShape asTrack(Shape line) {
+        if (FobsShapes.isTrack(line) && line instanceof DrawingShape)
+            return (DrawingShape) line;
+        removeEndpoints(line);
+        DrawingShape t = FobsShapes.adopt(mapView, line);
+        addEndpoints(t);
+        return t;
     }
 
     /** Both ends of the same line tapped: it closes into an area. */
@@ -273,6 +306,8 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
     private void join(DrawingShape a, boolean aTappedEnd, DrawingShape b, boolean bTappedEnd) {
         List<GeoPointMetaData> pa = points(a);
         List<GeoPointMetaData> pb = points(b);
+        final List<GeoPointMetaData> keepA = points(a);
+        final List<GeoPointMetaData> keepB = points(b);
         if (!aTappedEnd)
             Collections.reverse(pa);
         if (bTappedEnd)
@@ -290,6 +325,7 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
         FobsShapes.persist(mapView, merged, getClass());
 
         com.atakmap.android.fobs.feed.FeedPublisher fp = com.atakmap.android.fobs.feed.FeedPublisher.get();
+        boolean liveWasA = fp != null && fp.isLive(a);
         if (fp != null) {
             fp.inherit(fp.isLive(a) ? a : b, merged);
             fp.unpublish(a);
@@ -301,13 +337,13 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
         a.removeFromGroup();
         b.removeFromGroup();
         addEndpoints(merged);
-        joins.push(new Join(a, b, merged));
+        joins.push(new Join(a, b, merged, keepA, keepB, liveWasA));
         undoBtn.setEnabled(true);
         Log.d(TAG, "joined two lines -> " + all.size() + " points");
         toast(plugin.getString(R.string.toast_joined, a.getTitle(), b.getTitle()));
     }
 
-    private static List<GeoPointMetaData> points(DrawingShape s) {
+    private static List<GeoPointMetaData> points(Shape s) {
         List<GeoPointMetaData> out = new ArrayList<>();
         GeoPointMetaData[] pts = s.getMetaDataPoints();
         if (pts != null)
@@ -333,17 +369,34 @@ public class JoinTracksTool extends Tool implements MapEventDispatcher.MapEventD
             return;
         Join j = joins.pop();
         removeEndpoints(j.merged);
+        // Rebuilt, not re-added: a shape that left its group is disposed by ATAK
+        // and comes back invisible.
+        DrawingShape a = rebuild(j.a, j.pa);
+        DrawingShape b = rebuild(j.b, j.pb);
+        com.atakmap.android.fobs.feed.FeedPublisher fp = com.atakmap.android.fobs.feed.FeedPublisher.get();
+        if (fp != null) {
+            if (fp.isLive(j.merged))
+                fp.inherit(j.merged, j.liveWasA ? a : b);
+            fp.unpublish(j.merged);
+        }
         j.merged.removeFromGroup();
-        MapGroup group = DrawingToolsMapComponent.getGroup();
-        if (j.a.getGroup() == null)
-            group.addItem(j.a);
-        if (j.b.getGroup() == null)
-            group.addItem(j.b);
-        FobsShapes.persist(mapView, j.a, getClass());
-        FobsShapes.persist(mapView, j.b, getClass());
-        addEndpoints(j.a);
-        addEndpoints(j.b);
+        FobsShapes.persist(mapView, a, getClass());
+        FobsShapes.persist(mapView, b, getClass());
+        addEndpoints(a);
+        addEndpoints(b);
         undoBtn.setEnabled(!joins.isEmpty());
+    }
+
+    /** A new track in the image of a removed one: its title, style and source, these points. */
+    private DrawingShape rebuild(DrawingShape like, List<GeoPointMetaData> pts) {
+        DrawingShape t = FobsShapes.newTrack(mapView, like.getTitle(),
+                like.getMetaString(FobsShapes.META_SOURCE, FobsShapes.SOURCE_USER));
+        t.setStrokeColor(like.getStrokeColor());
+        t.setStrokeWeight(like.getStrokeWeight());
+        t.setLineStyle(like.getLineStyle());
+        t.setPoints(new ArrayList<>(pts), new SparseArray<PointMapItem>());
+        FobsShapes.addToMap(t);
+        return t;
     }
 
     private void toast(String s) {
