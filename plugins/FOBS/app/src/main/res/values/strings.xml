@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">FOBS</string>
+    <!-- Tool Preferences: the entry the manual is reached through -->
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the FOBS user guide: GPS tracks, drawing, importing, split and join, live feeds</string>
+    <string name="app_desc">Field Observation Survey: GPS tracks, tapped tracks, cut and join them into a perimeter and area.</string>
+
+    <!-- Chooser: the five verbs. -->
+    <string name="choose_start_gps">Start a GPS track</string>
+    <string name="choose_draw">Draw a track</string>
+    <string name="choose_select">Select element</string>
+    <string name="choose_import">Import a track</string>
+    <string name="choose_cut">Split track</string>
+    <string name="choose_join">Join tracks</string>
+    <string name="not_built_yet">Not built yet. Next slice.</string>
+
+    <!-- Default Style box in the popup -->
+    <string name="default_style">Default style</string>
+    <string name="style_color">Color</string>
+    <string name="style_line">Line</string>
+    <string name="style_thickness">Thickness</string>
+    <string name="line_solid">Solid</string>
+    <string name="line_dashed">Dashed</string>
+    <string name="line_dotted">Dotted</string>
+    <string name="line_outlined">Outlined</string>
+    <string name="thick_thin">Thin</string>
+    <string name="thick_medium">Medium</string>
+    <string name="thick_thick">Thick</string>
+
+    <!-- Naming -->
+    <string name="name_track">Name this track</string>
+    <string name="track_default_name">%1$s - Track %2$d</string>
+    <string name="start">Start</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- GPS track toolbar and prompts -->
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="end">End</string>
+    <string name="dropped_count">dropped %d</string>
+    <string name="prompt_gps">Recording where you go. Tap End when finished.</string>
+    <string name="prompt_gps_paused">Paused. Tap Resume to keep recording.</string>
+    <string name="toast_paused">GPS track paused</string>
+    <string name="toast_resumed">GPS track resumed</string>
+    <string name="toast_nothing_recorded">Nothing recorded</string>
+    <string name="toast_removed_bad_fixes">Removed %d bad fixes</string>
+
+    <!-- Draw a track: which way -->
+    <string name="draw_how">Draw a track</string>
+    <string name="draw_points">Drop points</string>
+    <string name="draw_freehand">Freehand</string>
+
+    <!-- Draw a track -->
+    <string name="prompt_draw">Tap along the route. Tap End when finished.</string>
+    <string name="prompt_draw_close">Tap along the route. Tap the green start point to close it, or End.</string>
+    <string name="toast_need_three">Need at least 3 points to close</string>
+    <string name="start_marker">Start</string>
+
+    <!-- Select a track -->
+    <string name="prompt_select">Tap the element to use as a track</string>
+    <string name="toast_already_fobs">That is already a FOBS track</string>
+    <string name="toast_shape_no_points">That shape has no points to use</string>
+    <string name="toast_track_made">%1$s: track with %2$d points</string>
+    <string name="strokes_title">%d strokes</string>
+    <string name="strokes_join">Join in order</string>
+    <string name="strokes_separate">One track each</string>
+    <string name="ok">OK</string>
+
+    <!-- Import a track -->
+    <string name="import_track_history_hint">Turn on the track you want, then tap its line on the map and pick the FOBS button</string>
+    <string name="toast_import_all_dropped">Nothing to import: %1$d fixes, %2$d standing still, %3$d with poor accuracy</string>
+
+    <!-- Cut a track -->
+    <string name="prompt_cut">Long press a line or shape exactly where you want to split it. Tap End when finished.</string>
+    <string name="cut_here">Split here</string>
+    <string name="toast_tap_a_track">Long press a line on the map</string>
+    <string name="toast_tap_that_track">Tap the track you opened the menu on</string>
+    <string name="toast_ring_opened">%s is now an open line</string>
+    <string name="toast_cut_too_short">Too short to split</string>
+    <string name="toast_long_press_to_cut">Long press the line where you want to split it</string>
+    <string name="toast_cut_at_end">Too close to the end of the line. Press further in.</string>
+    <string name="toast_split_done">Split. Orange: %1$s. Blue: %2$s.</string>
+    <string name="cut_done_title">Split</string>
+    <string name="cut_done_message">Split between the two rings.\nOrange: %1$s, %2$d points.\nBlue: %3$s, %4$d points.</string>
+    <string name="cut_keep_both">Keep both</string>
+    <string name="cut_delete_first">Delete orange</string>
+    <string name="cut_delete_second">Delete blue</string>
+    <string name="cut_undo">Undo split</string>
+    <string name="toast_split_undone">Split undone</string>
+
+    <!-- Join tracks -->
+    <string name="prompt_join_first">Tap an end of a line. Tap End when finished.</string>
+    <string name="prompt_join_second">Now tap an end of the line to join it to. Both ends of the same line closes it.</string>
+    <string name="toast_join_need_two">No lines on the map to join</string>
+    <string name="toast_join_tap_endpoint">Tap one of the end markers</string>
+    <string name="toast_joined">Joined %1$s and %2$s</string>
+
+    <!-- Join by lasso -->
+    <string name="join_how">Join tracks</string>
+    <string name="join_tap">Tap ends</string>
+    <string name="join_lasso">Lasso</string>
+    <string name="lasso_menu_title">FOBS: join into area</string>
+    <string name="toast_lasso_hint">Draw a lasso around the tracks to join</string>
+    <string name="toast_lasso_need_two">Lasso at least two lines</string>
+    <string name="lasso_gap_title">Large gap</string>
+    <string name="lasso_gap_message">The largest gap to bridge is %s. Join anyway?</string>
+    <string name="lasso_gap_join">Join anyway</string>
+
+    <!-- Live to a Data Sync feed -->
+    <string name="feed_ask_title">Send this track live to a feed?</string>
+    <string name="feed_just_local">Just local</string>
+    <string name="feed_choose">Choose feed…</string>
+    <string name="feed_send_to">Send to %s</string>
+    <string name="feed_loading">Getting feeds from the server…</string>
+    <string name="feed_pick">Feeds on %s</string>
+    <string name="feed_locked">%s (password protected)</string>
+    <string name="feed_locked_unsupported">Password-protected feeds are not supported yet</string>
+    <string name="feed_list_failed">Could not get the feed list from the server</string>
+    <string name="feed_none">No feeds on that server</string>
+    <string name="feed_published">Sent to feed %s</string>
+    <string name="feed_publish_failed">Could not add to feed %s</string>
+    <string name="feed_label">→ %s</string>
+
+    <!-- End of track -->
+    <string name="end_title">Track finished</string>
+    <string name="end_message">%1$s: %2$d points, %3$s.</string>
+    <string name="single_line">Single line</string>
+    <string name="make_polygon">Make polygon</string>
+    <string name="toast_area">Area %1$s, perimeter %2$s</string>
+    <string name="toast_area_too_few">Need at least 3 points for a polygon; kept as a line</string>
+</resources>

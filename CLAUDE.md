@@ -71,6 +71,23 @@ list and search show, and they are invisible from inside the README:
 **docs/USER_GUIDE.md** — same download block as the README at the top, and a
 "Before you start" note listing which ATAK versions have published builds.
 
+**How a guide gets built — shot list first.** The guide and the typst manual
+are written around screenshots, and the screenshots come from a signed build
+on an official phone (a dev build watermarks every frame). The order is fixed:
+
+1. Write `../atak-plugins-notes/docs/SHOTLIST-<Name>-manual.md`: framing rules,
+   then a table of numbered shots (section, what it shows, crop). Cam Depot's
+   and Map Depot's are the models.
+2. Give the operator the list; they stage each screen on the screenshot phone
+   and the session pulls it with `adb exec-out screencap -p`, or they take it
+   themselves and drop it in `plugins/<Name>/docs/screenshots/raw/`.
+3. Crop tightly (pane, dialog, toolbar strip, or the map when the map is the
+   point), review every frame by eye for callsigns, coordinates and server
+   names, name them `<n>_<what>.png` under `docs/screenshots/`, and copy the
+   manual's set into `docs/user_manual/` as `<n>.png`.
+4. Write USER_GUIDE.md and `usermanual.typ` around them, add the Tool
+   Preferences entry if the plugin has none, and submit the second build.
+
 A plugin's *support surface* is its own repo: its Releases carry the
 tak.gov-signed APKs, its Issues take the bug reports. Anything that is not a
 plugin but lives beside them (e.g. `plss-data`, which hosts the packs PLSS Grid
@@ -284,13 +301,21 @@ Consequence for testing, and it is not optional:
 - **tak.gov-signed APKs** — test ONLY on a device running **official** ATAK from
   tak.gov or the Play Store. A dev-build device can never validate one.
 
-Check which a device has before drawing conclusions: if `versionName` matches the
-SDK's `atak.apk` exactly, including the build hash in brackets, it is the dev build.
+Check which a device has before drawing conclusions, and **check the signature, not
+the version string.** The hash in `versionName` is the source commit, and tak.gov's
+official build and the SDK's dev build of the same release share it: an S21 on
+official 5.7.0.14 reported `5.7.0.14 (3617502d)`, identical to the SDK's `atak.apk`,
+and was misread as a dev phone on 2026-09-05. What differs is who signed it:
 
 ```bash
-aapt2 dump badging "$ATAK_SDK/atak.apk" | grep versionName    # e.g. 5.8.0.3 (4f67063)
-adb shell dumpsys package com.atakmap.app.civ | grep versionName
+adb shell dumpsys package com.atakmap.app.civ | grep -E "signatures=|pkgFlags"
+# dev (SDK) build:  signatures:[4f0df9aa] ... pkgFlags=[ DEBUGGABLE HAS_CODE ... ]
+# official build:   signatures:[267937e8] ... pkgFlags=[ HAS_CODE ... ]   (no DEBUGGABLE)
 ```
+
+The SDK build is signed with the shared dev keystore and is `DEBUGGABLE`; official
+ATAK is signed by tak.gov and is not. The on-screen `DEVELOPER BUILD` watermark is
+the same fact seen from the phone.
 
 **If the plugin downloads from a catalog, verify the catalog against the servers
 before shipping.** Reading the catalog is not the same as asking whether anything
@@ -361,6 +386,17 @@ rejected or silently-broken submission:
   Verify the manual against tak.gov's own typst version (0.13.1, pinned in
   `typst.gradle`), not whatever is installed locally — the clean-extract build does not
   run typst, because it builds without `ATAK_CI`.
+  **The template ships a placeholder manual** titled "Plugin Template 0.1", and
+  `new-plugin.sh` copies it with everything else. Until the plugin has a manual of
+  its own, `git rm -r docs/user_manual` before the first zip — otherwise tak.gov
+  compiles the template's manual into the APK. FOBS 0.2 caught this one zip away
+  from submission; Weather still carries it.
+- **Compile against every target SDK before zipping**, not just the one on the dev
+  phone. Classes come and go between ATAK releases: `QueryUserTracksRequest2`,
+  `HTTPRequestManager2` and `com.atakmap.comms.datadroidlite` exist only in 5.8, and
+  FOBS 0.2's 5.6 and 5.7 zips failed the clean-extract build on dead code that used
+  them. The zip loop already builds each target against its own SDK; read its log
+  per target, and when one fails rerun the extracted zip by hand and read javac.
 
 **A manual in `assets/` is unreachable.** Building the PDF is half the job: ATAK
 surfaces a plugin's documentation through its **Tool Preferences** entry, so a plugin
@@ -537,6 +573,14 @@ file manager and looks like a missing image. Keep them separate:
 
 Check it by compositing on **white**, not by opening it in a dark image editor,
 where a white glyph looks fine right up until a user sees it.
+
+**Size the toolbar glyph edge to edge.** Both PNGs are 256 x 256. In `ic_toolbar.png`
+the glyph's longer side spans the full 256 with no margin, the way PLSS's grid does;
+ATAK draws every toolbar icon in the same square, so a glyph with padding reads
+smaller than its neighbors (FOBS, 2026-09-05, three rounds until it matched). In
+`ic_launcher.png` the glyph sits at about 196 of 256 on the `#121212` rounded tile.
+Artwork should be a square composition to begin with; a tall or wide glyph leaves
+empty sides no scaling can fix.
 
 **tak.gov builds have no git, so version stamping silently degrades.**
 `getVersionCode()` and `getVersionName()` both read the git revision, and the

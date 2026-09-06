@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Floating toolbar shown while a GPS track is recording. Same shape as ATAK's own
+    drawing-tool toolbars (an ActionBarView handed to ActionBarReceiver), so it lands
+    where the operator expects a tool's controls to be.
+-->
+<com.atakmap.android.tools.ActionBarView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="6dp">
+
+    <TextView
+        android:id="@+id/feed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:textColor="#FF80D8FF"
+        android:textSize="12sp"
+        android:visibility="gone"
+        android:text="@string/feed_label" />
+
+    <TextView
+        android:id="@+id/dropped"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:textColor="@color/heading_yellow"
+        android:textSize="12sp"
+        android:visibility="gone"
+        android:text="@string/dropped_count" />
+
+    <Button
+        android:id="@+id/undo"
+        style="@style/TakwerxButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="6dp"
+        android:visibility="gone"
+        android:text="Undo" />
+
+    <!-- Fixed width, sized for the longer label. As wrap_content, the button grew
+         when Pause became Resume, the bar ran out of room, and End was squeezed
+         to a blank tile (its text ellipsized to nothing). Seen on the S22,
+         2026-09-06. -->
+    <Button
+        android:id="@+id/pause"
+        style="@style/TakwerxButton"
+        android:layout_width="104dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="6dp"
+        android:text="@string/pause" />
+
+    <Button
+        android:id="@+id/end"
+        style="@style/TakwerxButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/end" />
+
+</com.atakmap.android.tools.ActionBarView>
