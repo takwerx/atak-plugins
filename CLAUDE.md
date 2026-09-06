@@ -369,6 +369,17 @@ rejected or silently-broken submission:
   Verify the manual against tak.gov's own typst version (0.13.1, pinned in
   `typst.gradle`), not whatever is installed locally — the clean-extract build does not
   run typst, because it builds without `ATAK_CI`.
+  **The template ships a placeholder manual** titled "Plugin Template 0.1", and
+  `new-plugin.sh` copies it with everything else. Until the plugin has a manual of
+  its own, `git rm -r docs/user_manual` before the first zip — otherwise tak.gov
+  compiles the template's manual into the APK. FOBS 0.2 caught this one zip away
+  from submission; Weather still carries it.
+- **Compile against every target SDK before zipping**, not just the one on the dev
+  phone. Classes come and go between ATAK releases: `QueryUserTracksRequest2`,
+  `HTTPRequestManager2` and `com.atakmap.comms.datadroidlite` exist only in 5.8, and
+  FOBS 0.2's 5.6 and 5.7 zips failed the clean-extract build on dead code that used
+  them. The zip loop already builds each target against its own SDK; read its log
+  per target, and when one fails rerun the extracted zip by hand and read javac.
 
 **A manual in `assets/` is unreachable.** Building the PDF is half the job: ATAK
 surfaces a plugin's documentation through its **Tool Preferences** entry, so a plugin
