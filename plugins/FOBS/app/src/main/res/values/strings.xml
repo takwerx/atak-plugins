@@ -84,6 +84,8 @@
     <string name="cut_keep_both">Keep both</string>
     <string name="cut_delete_first">Delete orange</string>
     <string name="cut_delete_second">Delete blue</string>
+    <string name="cut_undo">Undo split</string>
+    <string name="toast_split_undone">Split undone</string>
 
     <!-- Join tracks -->
     <string name="prompt_join_first">Tap an end of a line. Tap End when finished.</string>

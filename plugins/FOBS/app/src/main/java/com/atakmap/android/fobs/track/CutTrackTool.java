@@ -230,26 +230,30 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
             toast(plugin.getString(R.string.toast_long_press_to_cut));
             return;
         }
-        // Where the finger was: the event's screen position, inverted through the
-        // map. Not the shape's remembered click point and not Tool.findPoint, which
-        // returns that click point for shapes: on a circle it was hundreds of
-        // kilometers stale and the split landed there (log, 2026-09-05).
-        GeoPointMetaData tapped = null;
+        // Where the finger was. ATAK's own hit test is the authority: it stamps the
+        // item it hit with hit_type ("point" or "line") and hit_index (which vertex
+        // or segment), and those are right. The event's screen point inverted
+        // through the map is the fallback: on the S22 (official 5.8, 2026-09-06) it
+        // came out 38 m off and a press on the middle of a 23-point line cut it at
+        // segment 0. The shape's remembered click point is the last resort; on a
+        // circle it was hundreds of kilometers stale (2026-09-05).
+        GeoPoint tap = null;
         android.graphics.PointF screen = event.getPointF();
-        if (screen != null)
-            tapped = mapView.inverseWithElevation(screen.x, screen.y);
-        if (tapped == null || tapped.get() == null || !tapped.get().isValid())
-            tapped = findPoint(event);
-        if (tapped == null || tapped.get() == null)
-            return;
-        GeoPoint tap = tapped.get();
+        if (screen != null) {
+            GeoPointMetaData t = mapView.inverseWithElevation(screen.x, screen.y);
+            if (t != null && t.get() != null && t.get().isValid())
+                tap = t.get();
+        }
 
-        // Which line: not necessarily the one ATAK hit. At a junction a two-point stub
-        // from an earlier split sits on top of the long line and ATAK reports the
-        // stub; splitting it just makes more stubs (log, 2026-09-05). So look at every
-        // line within a finger's width of the press and take the closest, and when
-        // two are equally close, the longer one.
-        Shape shape = nearestLine(tap, item);
+        // Which line: the item ATAK hit, once the deconfliction listener has picked
+        // the longest of a stack (a two-point stub from an earlier split sits on top
+        // of the long line, 2026-09-05). Without a hit item, a press beside the
+        // line, take the line nearest the screen point within a finger's width.
+        Shape shape = null;
+        if (cuttable(item) && !(item instanceof MultiPolyline))
+            shape = (Shape) item;
+        else if (tap != null)
+            shape = nearestLine(tap, item);
         if (shape == null) {
             toast(plugin.getString(R.string.toast_tap_a_track));
             return;
@@ -269,36 +273,65 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
             toast(plugin.getString(R.string.toast_cut_too_short));
             return;
         }
-        // ATAK records which segment the finger hit on the item it hit. Use that
-        // when it is this line; otherwise drop the press onto the nearest segment.
+        int segCount = closed(shape) ? n : n - 1; // a ring closes last -> first
         int bestSeg = -1;
         double bestD = Double.MAX_VALUE;
         GeoPoint bestP = null;
-        if (shape == item && "line".equals(shape.getMetaString("hit_type", ""))) {
+        String how = "";
+        if (shape == item) {
+            String hitType = shape.getMetaString("hit_type", "");
             int hi = shape.getMetaInteger("hit_index", -1);
-            if (hi >= 0 && hi < n - 1 && pts[hi] != null && pts[hi + 1] != null
-                    && pts[hi].get() != null && pts[hi + 1].get() != null) {
+            if ("point".equals(hitType) && hi >= 0 && hi < n && has(pts[hi])) {
+                // The finger was on a vertex: cut there.
+                bestSeg = closed(shape) ? hi : Math.min(hi, n - 2);
+                bestP = pts[hi].get();
+                bestD = 0;
+                how = "vertex " + hi;
+            } else if ("line".equals(hitType) && hi >= 0 && hi < segCount
+                    && has(pts[hi]) && has(pts[(hi + 1) % n])) {
+                // The finger was on this segment. Where along it: the screen point
+                // if it agrees with the segment, else the click point if that does,
+                // else the middle of the segment.
+                GeoPoint a = pts[hi].get();
+                GeoPoint b = pts[(hi + 1) % n].get();
+                double finger = fingerMeters();
+                GeoPoint cp = shape.getClickPoint();
+                if (tap != null && GeoCalculations.distanceTo(tap, project(tap, a, b)) <= finger) {
+                    bestP = project(tap, a, b);
+                    how = "segment " + hi + " at the screen point";
+                } else if (cp != null && cp.isValid()
+                        && GeoCalculations.distanceTo(cp, project(cp, a, b)) <= finger) {
+                    bestP = project(cp, a, b);
+                    how = "segment " + hi + " at the click point";
+                } else {
+                    bestP = along(a, b, 0.5);
+                    how = "segment " + hi + " at its middle";
+                }
                 bestSeg = hi;
-                bestP = project(tap, pts[hi].get(), pts[hi + 1].get());
                 bestD = 0;
             }
         }
-        int segCount = closed(shape) ? n : n - 1; // a ring closes last -> first
-        for (int i = 0; bestSeg < 0 && i < segCount; i++) {
-            GeoPointMetaData a = pts[i];
-            GeoPointMetaData b = pts[(i + 1) % n];
-            if (a == null || b == null || a.get() == null || b.get() == null)
-                continue;
-            GeoPoint proj = project(tap, a.get(), b.get());
-            double d = GeoCalculations.distanceTo(tap, proj);
-            if (d < bestD) {
-                bestD = d;
-                bestSeg = i;
-                bestP = proj;
+        if (bestSeg < 0 && tap != null) {
+            // No usable hit record: drop the screen point onto the nearest segment.
+            for (int i = 0; i < segCount; i++) {
+                GeoPointMetaData a = pts[i];
+                GeoPointMetaData b = pts[(i + 1) % n];
+                if (!has(a) || !has(b))
+                    continue;
+                GeoPoint proj = project(tap, a.get(), b.get());
+                double d = GeoCalculations.distanceTo(tap, proj);
+                if (d < bestD) {
+                    bestD = d;
+                    bestSeg = i;
+                    bestP = proj;
+                }
             }
+            how = "nearest segment to the screen point";
         }
-        if (bestSeg < 0 || bestP == null)
+        if (bestSeg < 0 || bestP == null) {
+            toast(plugin.getString(R.string.toast_tap_a_track));
             return;
+        }
         double dStart = GeoCalculations.distanceTo(bestP, pts[0].get());
         double dEnd = GeoCalculations.distanceTo(bestP, pts[n - 1].get());
         Log.d(TAG, "press on " + shape.getClass().getSimpleName()
@@ -306,7 +339,8 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
                 + " hit_type=" + shape.getMetaString("hit_type", "-")
                 + " hit_index=" + shape.getMetaInteger("hit_index", -1)
                 + " clickPoint=" + (shape.getClickPoint() != null)
-                + " tap=" + tap.getLatitude() + "," + tap.getLongitude()
+                + " tap=" + (tap == null ? "none" : tap.getLatitude() + "," + tap.getLongitude())
+                + " -> " + how
                 + " seg=" + bestSeg + " offLine=" + bestD
                 + " dStart=" + dStart + " dEnd=" + dEnd);
         // Too close to an end for a bite to leave a piece on that side: refuse.
@@ -441,6 +475,10 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         return p != null && p.length >= 2;
     }
 
+    private static boolean has(GeoPointMetaData p) {
+        return p != null && p.get() != null;
+    }
+
     /** A closed shape: a polygon, a FOBS area, a rectangle, a circle. */
     static boolean closed(Shape shape) {
         return FobsShapes.isArea(shape) || shape instanceof Rectangle
@@ -549,7 +587,9 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         final DrawingShape second = make(original, base + " " + n2, b);
         final com.atakmap.android.fobs.feed.FeedPublisher fp =
                 com.atakmap.android.fobs.feed.FeedPublisher.get();
-        if (fp != null && fp.isLive(original)) {
+        final MapGroup home = original.getGroup();
+        final boolean wasLive = fp != null && fp.isLive(original);
+        if (wasLive) {
             fp.inherit(original, first);
             fp.inherit(original, second);
             fp.unpublish(original);
@@ -594,6 +634,31 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
             @Override
             public void onClick(View v) {
                 int id = v.getId();
+                if (id == R.id.cut_undo) {
+                    // The press landed in the wrong place: put the line back the way
+                    // it was. The original returns to its group, the halves go, and
+                    // the feed membership goes back with it. Asked for on the S22 the
+                    // first time a split landed wrong (2026-09-06).
+                    if (fp != null && wasLive && original instanceof DrawingShape)
+                        fp.inherit(first, (DrawingShape) original);
+                    if (fp != null) {
+                        fp.unpublish(first);
+                        fp.unpublish(second);
+                    }
+                    first.removeFromGroup();
+                    second.removeFromGroup();
+                    if (original.getGroup() == null && home != null)
+                        home.addItem(original);
+                    if (original instanceof DrawingShape && original.getGroup() != null)
+                        FobsShapes.persist(mapView, (DrawingShape) original, CutTrackTool.class);
+                    clearRings();
+                    clearCandidate();
+                    closeResult();
+                    TextContainer.getInstance().displayPrompt(plugin.getString(R.string.prompt_cut));
+                    toast(plugin.getString(R.string.toast_split_undone));
+                    Log.d(TAG, "split undone");
+                    return;
+                }
                 DrawingShape edit = first;
                 if (id == R.id.cut_delete_first) {
                     if (fp != null)
@@ -627,6 +692,7 @@ public class CutTrackTool extends Tool implements MapEventDispatcher.MapEventDis
         v.findViewById(R.id.cut_delete_first).setOnClickListener(onChoice);
         v.findViewById(R.id.cut_delete_second).setOnClickListener(onChoice);
         v.findViewById(R.id.cut_keep_both).setOnClickListener(onChoice);
+        v.findViewById(R.id.cut_undo).setOnClickListener(onChoice);
         resultPane = new gov.tak.api.ui.PaneBuilder(v)
                 .setMetaValue(gov.tak.api.ui.Pane.RELATIVE_LOCATION,
                         gov.tak.api.ui.Pane.Location.Default)
