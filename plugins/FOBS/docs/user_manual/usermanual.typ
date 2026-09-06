@@ -275,17 +275,32 @@ Standing still adds nothing.
 #tak-slide[
 == What a split leaves
 
-A *line* becomes two lines. They show *orange* and *blue* with a small pane
-beside the map: *Delete orange*, *Delete blue*, *Keep both*, or *Undo split*,
-which puts the original line back.
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("19.jpg", width: 100%)
+][
+  A *line* becomes two lines. They show *orange* and *blue*, with rings at the
+  gap and a pane beside the map: *Delete orange*, *Delete blue*, *Keep both*,
+  or *Undo split*, which puts the original line back.
 
-A *closed shape* opens into one line, starting and ending at the gap.
+  Use it to cut a drive off the front of a walked track, or to drop the leg
+  where the GPS wandered.
+]
+]
 
-The result opens in ATAK's vertex editor, so the point that was wrong can be
-moved right away. The map stays where you were when you pressed.
+#tak-slide[
+== Then the editor
 
-Use it to cut a drive off the front of a walked track, to drop the leg where
-the GPS wandered, or to open a polygon that needs a piece redone.
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("19b.jpg", width: 100%)
+  #v(4pt)
+  The result opens in ATAK's vertex editor, so the point that was wrong can be
+  moved right away. The map stays where you were when you pressed.
+][
+  #image("20.jpg", width: 100%)
+  #v(4pt)
+  A *closed shape* opens into one line, starting and ending at the gap. The
+  polygon is gone; the line can be split again or joined.
+]
 ]
 
 #tak-slide[
@@ -387,9 +402,19 @@ once whether to publish the change; the answer is a Data Sync setting.
 #tak-slide[
 = This guide, on the device
 
-ATAK's *Settings* #sym.arrow.r *Tool Preferences* lists FOBS with the other
-tools. *Plugin Documentation* opens this guide, so it is on the device with you
-and needs no network.
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("31.jpg", width: 100%)
+
+  #v(4pt)
+  ATAK's *Settings* #sym.arrow.r *Tool Preferences* lists FOBS with the other
+  tools.
+][
+  #image("31b.jpg", width: 100%)
+
+  #v(4pt)
+  *Plugin Documentation* opens this guide, so it is on the device with you
+  and needs no network.
+]
 ]
 
 #tak-slide[

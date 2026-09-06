@@ -146,13 +146,19 @@ that line.
 
 ![The Split prompt](screenshots/18_split_prompt.png)
 
-- A **line** becomes two lines. They show orange and blue with a small pane:
-  Delete orange, Delete blue, Keep both, or Undo split, which puts the original
-  back.
+- A **line** becomes two lines. They show orange and blue, with rings at the
+  gap and a pane beside the map: Delete orange, Delete blue, Keep both, or Undo
+  split, which puts the original back.
 - A **closed shape** opens into one line, starting and ending at the gap.
+
+![A line split at the pressed vertex](screenshots/19_split_result.png)
 
 The result opens in ATAK's vertex editor so the point that was wrong can be
 moved right away. The map stays where you were when you pressed.
+
+![The vertex editor after Keep both](screenshots/19b_vertex_editor.png)
+
+![A polygon opened at the gap](screenshots/20_ring_opened.png)
 
 ## 7. Join tracks
 
@@ -211,6 +217,12 @@ once whether to publish the change; the answer is a Data Sync setting.
 
 ATAK's Settings → Tool Preferences lists FOBS with the other tools. Plugin
 Documentation opens the same guide as a PDF, on the device, with no network.
+
+![FOBS in Tool Preferences](screenshots/31_tool_preferences.png)
+
+![Plugin Documentation](screenshots/31b_plugin_documentation.png)
+
+![The manual open on the device](screenshots/31c_manual_on_device.png)
 
 ## Notes
 
