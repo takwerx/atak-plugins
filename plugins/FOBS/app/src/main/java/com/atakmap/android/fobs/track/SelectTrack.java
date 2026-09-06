@@ -24,6 +24,7 @@ import com.atakmap.android.maps.PointMapItem;
 import com.atakmap.android.maps.Shape;
 import com.atakmap.android.missionpackage.MapItemSelectTool;
 import com.atakmap.android.toolbar.ToolManagerBroadcastReceiver;
+import com.atakmap.android.track.maps.TrackPolyline;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPointMetaData;
 
@@ -49,13 +50,19 @@ public class SelectTrack extends BroadcastReceiver {
     /** What may be tapped: telestration, freeform, route, rectangle, circle, feature. */
     private static final String[] ALLOW_TYPES = {
             "u-d-f-m", "u-d-f", "b-m-r", "u-d-r", "u-d-c-c", "u-r-b-c-c", "u-rb-a",
-            "u-d-feature"
+            "u-d-feature", TrackPolyline.COT_TYPE
     };
 
     private final MapView mapView;
     private final Context plugin;
     private final Context host;
     private final TrackFinisher finisher;
+    private ImportTrack importTrack;
+
+    /** Track lines from Track History are imported with their crumbs, gate and all. */
+    public void setImportTrack(ImportTrack importTrack) {
+        this.importTrack = importTrack;
+    }
 
     public SelectTrack(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
@@ -101,6 +108,10 @@ public class SelectTrack extends BroadcastReceiver {
                 + " title=" + item.getTitle());
         if (FobsShapes.isOurs(item)) {
             toast(plugin.getString(R.string.toast_already_fobs));
+            return;
+        }
+        if (item instanceof TrackPolyline && importTrack != null) {
+            importTrack.importVisible((TrackPolyline) item);
             return;
         }
         final List<Stroke> strokes = strokesOf(item);

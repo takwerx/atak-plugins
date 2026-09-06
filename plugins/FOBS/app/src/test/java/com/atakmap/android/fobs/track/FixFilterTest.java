@@ -60,9 +60,19 @@ public class FixFilterTest {
     public void gateRejectsImpossibleJump() {
         LiveGate g = new LiveGate(new Thresholds());
         assertEquals(Verdict.ACCEPTED, g.judge(at(0, 0, 5, 1000)));
-        // 200 m in one second is a multipath jump, not a walk.
+        // 200 m in one second is a multipath jump, not a walk or a drive.
         assertEquals(Verdict.TOO_FAST, g.judge(at(200, 0, 5, 2000)));
         assertEquals(1, g.dropped());
+    }
+
+    @Test
+    public void gateKeepsADrivenRoad() {
+        LiveGate g = new LiveGate(new Thresholds());
+        assertEquals(Verdict.ACCEPTED, g.judge(at(0, 0, 5, 1000)));
+        // 25 m/s, highway speed: real, and it was thrown away on 2026-09-05.
+        assertEquals(Verdict.ACCEPTED, g.judge(at(25, 0, 5, 2000)));
+        assertEquals(Verdict.ACCEPTED, g.judge(at(50, 0, 5, 3000)));
+        assertEquals(0, g.dropped());
     }
 
     @Test
@@ -97,11 +107,23 @@ public class FixFilterTest {
             pts.add(at(i * 5, 0, 5, i * 1000));
         // Insert a 60 m excursion between points 5 and 6 that comes straight back.
         pts.add(6, at(27, 60, 5, 5500));
-        boolean[] keep = FixFilter.cleanup(pts, new Thresholds());
+        Thresholds t = new Thresholds();
+        t.removeSpikes = true;
+        boolean[] keep = FixFilter.cleanup(pts, t);
         assertFalse("spike vertex should be dropped", keep[6]);
         assertTrue(keep[0]);
         assertTrue(keep[pts.size() - 1]);
         assertEquals(FixFilter.removedCount(keep) >= 1, true);
+    }
+
+    @Test
+    public void spikesAreKeptByDefault() {
+        List<Fix> pts = new ArrayList<>();
+        for (int i = 0; i <= 10; i++)
+            pts.add(at(i * 5, 0, 5, i * 1000));
+        pts.add(6, at(27, 60, 5, 5500)); // a driven cul-de-sac looks just like this
+        boolean[] keep = FixFilter.cleanup(pts, new Thresholds());
+        assertEquals(0, FixFilter.removedCount(keep));
     }
 
     @Test

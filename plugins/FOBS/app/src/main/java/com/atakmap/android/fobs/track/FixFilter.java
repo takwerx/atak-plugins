@@ -52,10 +52,22 @@ public final class FixFilter {
     public static final class Thresholds {
         /** Reject a fix with a reported horizontal error above this, meters. */
         public double maxCe = 25.0;
-        /** Reject a fix implying travel faster than this since the last accepted, m/s. */
-        public double maxSpeed = 8.0;
+        /**
+         * Reject a fix implying travel faster than this since the last accepted, m/s.
+         * 45 m/s is 100 mph: a multipath jump is hundreds of meters in a second and
+         * still fails; a driven road passes. 8 m/s (walking) threw away most of a
+         * driven track on 2026-09-05 and drew straight lines between the survivors.
+         */
+        public double maxSpeed = 45.0;
         /** Reject a fix closer than this to the last accepted one, meters (jitter). */
         public double minSpacing = 2.0;
+        /**
+         * Out-and-back spike removal. Off by default: on a driven track it removed
+         * cul-de-sac turnarounds that were really driven (416 vertices on one import,
+         * 2026-09-05). The accuracy and speed gates catch the fixes that cannot be
+         * real; what is left is the walk.
+         */
+        public boolean removeSpikes = false;
         /** Drop an interior vertex this far out on an out-and-back, meters. */
         public double spikeMin = 10.0;
         /**
@@ -145,7 +157,8 @@ public final class FixFilter {
             keep[i] = true;
         if (n < 3)
             return keep;
-        removeSpikes(pts, keep, t.spikeMin);
+        if (t.removeSpikes)
+            removeSpikes(pts, keep, t.spikeMin);
         // Thin only past the cap, and no more than needed: double the tolerance until
         // the track fits. Under the cap the walk is kept exactly as accepted.
         double tol = t.simplifyStart;

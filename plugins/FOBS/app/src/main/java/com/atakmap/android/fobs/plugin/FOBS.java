@@ -6,11 +6,14 @@ import com.atak.plugins.impl.PluginContextProvider;
 import com.atakmap.android.cot.detail.CotDetailManager;
 import com.atakmap.android.fobs.track.DrawTrackTool;
 import com.atakmap.android.fobs.track.FobsDetailHandler;
+import com.atakmap.android.fobs.track.FobsMenuFactory;
 import com.atakmap.android.fobs.track.FreehandTrack;
 import com.atakmap.android.fobs.track.GpsTrackTool;
+import com.atakmap.android.fobs.track.ImportTrack;
 import com.atakmap.android.fobs.track.SelectTrack;
 import com.atakmap.android.fobs.ui.FobsPane;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.menu.MapMenuReceiver;
 import com.atakmap.android.toolbar.ToolManagerBroadcastReceiver;
 import com.atakmap.coremap.log.Log;
 
@@ -40,6 +43,8 @@ public class FOBS implements IPlugin {
     private DrawTrackTool drawTrackTool;
     private SelectTrack selectTrack;
     private FreehandTrack freehand;
+    private ImportTrack importTrack;
+    private FobsMenuFactory menuFactory;
     private FobsDetailHandler detailHandler;
 
     public FOBS(IServiceController serviceController) {
@@ -96,6 +101,11 @@ public class FOBS implements IPlugin {
         pane.setSelectTrack(selectTrack);
         freehand = new FreehandTrack(mapView, pluginContext);
         pane.setFreehand(freehand);
+        importTrack = new ImportTrack(mapView, pluginContext);
+        pane.setImportTrack(importTrack);
+        selectTrack.setImportTrack(importTrack);
+        menuFactory = new FobsMenuFactory(mapView, pluginContext, importTrack);
+        MapMenuReceiver.getInstance().registerMapMenuFactory(menuFactory);
         uiService.addToolbarItem(toolbarItem);
     }
 
@@ -112,6 +122,14 @@ public class FOBS implements IPlugin {
             ToolManagerBroadcastReceiver.getInstance().unregisterTool(GpsTrackTool.ID);
             gpsTrackTool.dispose();
             gpsTrackTool = null;
+        }
+        if (menuFactory != null) {
+            MapMenuReceiver.getInstance().unregisterMapMenuFactory(menuFactory);
+            menuFactory = null;
+        }
+        if (importTrack != null) {
+            importTrack.dispose();
+            importTrack = null;
         }
         if (freehand != null) {
             freehand.dispose();

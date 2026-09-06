@@ -56,7 +56,7 @@
     <string name="start_marker">Start</string>
 
     <!-- Select a track -->
-    <string name="prompt_select">Tap the shape to use as a track</string>
+    <string name="prompt_select">Tap the shape or track line to use as a track</string>
     <string name="toast_already_fobs">That is already a FOBS track</string>
     <string name="toast_shape_no_points">That shape has no points to use</string>
     <string name="toast_track_made">%1$s: track with %2$d points</string>
@@ -64,6 +64,33 @@
     <string name="strokes_join">Join in order</string>
     <string name="strokes_separate">One track each</string>
     <string name="ok">OK</string>
+
+    <!-- Import a track -->
+    <string name="import_track_history">Track History (browse, toggle, then Select a track)</string>
+    <string name="import_track_history_hint">Turn on the track you want, then tap its line on the map and pick the FOBS button</string>
+    <string name="import_local">My track log</string>
+    <string name="import_server">Server tracks</string>
+    <string name="import_whose">Whose track?</string>
+    <string name="import_search_hint">Search callsigns</string>
+    <string name="import_me">%s (this device)</string>
+    <string name="import_when">%s: which period?</string>
+    <string name="import_window_today">Today</string>
+    <string name="import_window_24h">Last 24 hours</string>
+    <string name="import_window_7d">Last 7 days</string>
+    <string name="import_window_dates">Choose dates…</string>
+    <string name="import_pick_start">Pick the first day</string>
+    <string name="import_pick_end">Pick the last day</string>
+    <string name="import_bad_dates">The last day must be after the first</string>
+    <string name="import_fetching_users">Asking the server who has tracks…</string>
+    <string name="import_fetching_tracks">Getting tracks for %s from the server…</string>
+    <string name="import_server_title">Server tracks: %s</string>
+    <string name="import_server_none">No tracks on the server for %s in that period</string>
+    <string name="import_server_failed">Could not reach the server</string>
+    <string name="import_none">No tracks found</string>
+    <string name="import_loading">Loading track log…</string>
+    <string name="import_row">Started %1$s\nLasted %2$s, %3$s, %4$d GPS fixes</string>
+    <string name="import_minutes">%d minutes</string>
+    <string name="import_hours_minutes">%1$d hours %2$d minutes</string>
 
     <!-- End of track -->
     <string name="end_title">Track finished</string>

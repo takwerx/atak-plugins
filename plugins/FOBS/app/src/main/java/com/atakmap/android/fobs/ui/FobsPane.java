@@ -17,6 +17,7 @@ import com.atakmap.android.fobs.track.DrawTrackTool;
 import com.atakmap.android.fobs.track.FobsShapes;
 import com.atakmap.android.fobs.track.FreehandTrack;
 import com.atakmap.android.fobs.track.GpsTrackTool;
+import com.atakmap.android.fobs.track.ImportTrack;
 import com.atakmap.android.fobs.track.SelectTrack;
 import com.atakmap.android.fobs.track.StylePrefs;
 import com.atakmap.android.gui.ColorPalette;
@@ -45,6 +46,7 @@ public class FobsPane implements View.OnClickListener {
     private final StylePrefs style;
     private SelectTrack selectTrack;
     private FreehandTrack freehand;
+    private ImportTrack importTrack;
     private final View view;
     private final Pane pane;
     private final Button colorBtn;
@@ -81,6 +83,10 @@ public class FobsPane implements View.OnClickListener {
 
     public void setFreehand(FreehandTrack freehand) {
         this.freehand = freehand;
+    }
+
+    public void setImportTrack(ImportTrack importTrack) {
+        this.importTrack = importTrack;
     }
 
     /** Drop points (tap vertices) or Freehand (ATAK's telestration in FOBS colors). */
@@ -145,6 +151,10 @@ public class FobsPane implements View.OnClickListener {
             close();
             if (selectTrack != null)
                 selectTrack.begin();
+        } else if (id == R.id.import_track) {
+            close();
+            if (importTrack != null)
+                importTrack.begin();
         } else {
             Toast.makeText(host, plugin.getString(R.string.not_built_yet),
                     Toast.LENGTH_SHORT).show();
