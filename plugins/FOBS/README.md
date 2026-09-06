@@ -1,10 +1,10 @@
 ATAK Plugin — FOBS
 
-**Download FOBS 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download FOBS 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/fobs/releases/download/v0.3/ATAK-Plugin-FOBS-0.3--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/fobs/releases/download/v0.3/ATAK-Plugin-FOBS-0.3--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/fobs/releases/download/v0.3/ATAK-Plugin-FOBS-0.3--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/fobs/releases/download/v0.4/ATAK-Plugin-FOBS-0.4--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/fobs/releases/download/v0.4/ATAK-Plugin-FOBS-0.4--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/fobs/releases/download/v0.4/ATAK-Plugin-FOBS-0.4--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/fobs/releases
 
@@ -61,13 +61,14 @@ source submission zip).
 _________________________________________________________________
 STATUS
 
-Version 0.3: the 0.2 tools with the user manual, Join taking any line, and
+Version 0.4: the 0.2 tools with the user manual, Join taking any line, and
 fixes found on the signed 0.2 (Split cut where ATAK said the finger was,
 Undo split, the End button while paused, a clearer message for an import
-that filters down to nothing).
+that filters down to nothing). 0.3 was the same code; 0.4 completes the
+manual with the Split and Tool Preferences pictures, taken on signed 0.3.
 
 Verified on ATAK-CIV 5.8.0.3 (development build, Samsung Galaxy XCover Pro)
-and, as tak.gov-signed 0.2, on official ATAK-CIV 5.6.0.18, 5.7.0.14 and
+and, as tak.gov-signed 0.2 and 0.3, on official ATAK-CIV 5.6.0.18, 5.7.0.14 and
 5.8.0.4 (Samsung Galaxy S21+, Note 20, S22 Ultra). Feed delivery confirmed
 against a TAK Server 5.7 and watched on a second device running Data Sync.
 
