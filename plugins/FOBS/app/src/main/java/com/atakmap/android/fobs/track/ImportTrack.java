@@ -167,7 +167,15 @@ public class ImportTrack {
                 }
         }
         if (points.size() < 2) {
-            toast(plugin.getString(R.string.toast_nothing_recorded));
+            // Say why, not just that. A 17-minute track of a phone sitting on a desk
+            // is 110 ft of jitter, and every fix of it fails the spacing or accuracy
+            // gate; "Nothing recorded" read as a broken import (S22, 2026-09-06).
+            toast(plugin.getString(R.string.toast_import_all_dropped, raw,
+                    gate.count(FixFilter.Verdict.TOO_CLOSE),
+                    gate.count(FixFilter.Verdict.BAD_ACCURACY)));
+            Log.d(TAG, "import raw=" + raw + " accepted=" + points.size()
+                    + " tooClose=" + gate.count(FixFilter.Verdict.TOO_CLOSE)
+                    + " badAccuracy=" + gate.count(FixFilter.Verdict.BAD_ACCURACY));
             return;
         }
         boolean[] keep = FixFilter.cleanup(fixes, t);

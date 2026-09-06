@@ -67,6 +67,7 @@
 
     <!-- Import a track -->
     <string name="import_track_history_hint">Turn on the track you want, then tap its line on the map and pick the FOBS button</string>
+    <string name="toast_import_all_dropped">Nothing to import: %1$d fixes, %2$d standing still, %3$d with poor accuracy</string>
 
     <!-- Cut a track -->
     <string name="prompt_cut">Long press a line or shape exactly where you want to split it. Tap End when finished.</string>
