@@ -37,3 +37,6 @@ captures/
 # Submission zips
 dist/
 *.zip
+
+# Uncropped frames straight off the phone: callsign box, coordinates, home imagery. Never committed.
+docs/screenshots/raw/
