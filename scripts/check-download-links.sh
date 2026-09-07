@@ -48,8 +48,9 @@ done
 
 # when this version's signed APKs are staged, each one must be linked from the
 # README (dist/signed keeps every past release, so match the version)
-if ls "$ROOT"/dist/signed/ATAK-Plugin-"$PLUGIN"-"$VER"--*.apk >/dev/null 2>&1; then
-  for a in "$ROOT"/dist/signed/ATAK-Plugin-"$PLUGIN"-"$VER"--*.apk; do
+SIGNED_DIR="${ATAK_DIST:-$HOME/atak-dist}/signed"   # one place for every checkout (env.sh)
+if ls "$SIGNED_DIR"/ATAK-Plugin-"$PLUGIN"-"$VER"--*.apk >/dev/null 2>&1; then
+  for a in "$SIGNED_DIR"/ATAK-Plugin-"$PLUGIN"-"$VER"--*.apk; do
     b="$(basename "$a")"
     grep -q "/$b" "$DIR/README.md" || finding "dist/signed/$b is not linked from README.md"
   done

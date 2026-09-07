@@ -17,6 +17,58 @@ ATAK plugins are a **completely separate subsystem** from CloudTAK plugins
 (`infra-TAK/cloudtak-plugins/`, Vue/TypeScript) and from TAK Server plugins
 (`.jar`/`.yaml`, `/api/takserver/plugins/*`). Do not mix guidance between them.
 
+## Working in parallel — one worktree per plugin
+
+Several sessions build plugins at the same time. They never share a checkout,
+and everything a checkout does not carry (zips, signed APKs, auto-memory) lives
+in one place outside all of them. The layout on the dev Mac:
+
+| Path | What it is |
+|---|---|
+| `~/GitHub/atak-plugins` | The **main checkout**, on `main`, always. Nobody's workspace: `/ship` merges here and `refresh_depot.py` reads here. |
+| `~/GitHub/atak-plugins-<plugin>` | One worktree per plugin, lowercase (`atak-plugins-fobs`, `atak-plugins-camdepot`), on that plugin's branch. It lives as long as the plugin; the branch inside it changes per release. |
+| `~/GitHub/atak-plugins-tooling` | The worktree for shared files, on a `tooling-<topic>` branch. |
+| `~/atak-dist/` | Every submission zip, and every tak.gov-signed APK under `signed/`. `dist` in each checkout is a symlink to it, so `ls dist/` is the same list everywhere and `submission-zip.sh` writes to one place. `env.sh` exports it as `ATAK_DIST`. |
+| `~/GitHub/atak-plugins-notes` | The private notes repo: one checkout, shared by every session. |
+
+`scripts/worktree.sh` is the only way a worktree is made or removed:
+
+```bash
+./scripts/worktree.sh new CamDepot camdepot-v1.4   # from main, or an existing branch
+./scripts/worktree.sh list                         # branch, distance from main, state
+./scripts/worktree.sh remove CamDepot              # refuses uncommitted or unmerged work
+```
+
+`new` writes what git does not carry into a fresh worktree: the `dist` link, a
+`local.properties` per plugin pointing at the SDK it targets, and a link so
+that Claude Code's auto-memory for the new directory is the main checkout's.
+Memory is keyed by directory, and a session opened in a worktree otherwise
+starts knowing none of it — the `atak-plugins-buttons` worktree had zero
+memories after days of use.
+
+The rules:
+
+- **A session edits its own plugin's directory and nothing else.** One
+  worktree per plugin means two sessions never hold the same plugin. Two
+  sessions on one phone collide the same way: say which phone a session has
+  and keep it.
+- **Shared files change only on a tooling branch** in `atak-plugins-tooling`:
+  `scripts/`, `.claude/`, this file, the root `README.md`, `.gitignore`, and
+  any rule applied to every plugin's `app/build.gradle`. They reach `main` the
+  same day with `/ship tooling` (merge and push, nothing published) and never
+  ride a plugin's release branch. The MDM versionCode rule sat on
+  `camdepot-v1.3` for a day while FOBS 0.4 shipped without it.
+- **A plugin branch contains `main` before it builds a zip or ships.**
+  `scripts/check-main-merged.sh` says whether it does; `submission-zip.sh`
+  and `/ship` run it and refuse otherwise. The fix is always `git merge main`
+  on the branch.
+- **The main checkout stays on `main`.** `/ship` merges there with
+  `git -C ~/GitHub/atak-plugins`, so `main` is checked out in exactly one
+  place and every worktree sees a new `main` the moment it lands. Never
+  `git checkout main` in a worktree; git refuses anyway.
+- **In the notes repo, add files by name.** `git add -A` there sweeps up
+  another session's half-written handoff; `git pull --rebase` before a push.
+
 ## One public repo per plugin; this monorepo is where they are built
 
 Users get a plugin from **its own public repository** — `takwerx/plss-grid` for
@@ -368,7 +420,7 @@ The submission is a **zip of the source tree**; tak.gov runs `./gradlew` itself 
 produces the APK. Do not submit a built APK.
 
 ```bash
-./scripts/submission-zip.sh <PluginName>      # builds dist/<PluginName>.zip and verifies it
+./scripts/submission-zip.sh <PluginName>      # builds ~/atak-dist/<Name>-<ver>-<atak>.zip and verifies it
 ```
 
 The script encodes the pipeline's requirements and checks them, because each one is a
@@ -613,7 +665,7 @@ computed from `PLUGIN_VERSION` as `MAJOR*10000 + MINOR*100 + PATCH` (1.3 →
 when the code is not that number.
 
 `scripts/check-version-code.sh <Plugin>` holds the rest of the rule, and it
-is the rule: the version is above every release in `dist/signed/` (a
+is the rule: the version is above every release in `~/atak-dist/signed/` (a
 resubmission is a new version; `--target` lets one target that was never
 signed be re-zipped), and with `--signed` this version's APKs are all present,
 one per target the README links, carry that code, and keep the package name
@@ -660,7 +712,7 @@ time, but commit the value so the tree, the zip and the PDF agree.
 **Bump `PLUGIN_VERSION` before building zips, every time.** Two builds have gone
 out under one version number twice. A resubmission after a failure is a new
 version, not the same one again. Mechanical since 2026-09-06:
-`submission-zip.sh` refuses a version that `dist/signed/` already holds for
+`submission-zip.sh` refuses a version that `~/atak-dist/signed/` already holds for
 that target, because a same-version build carries the same `versionCode` and
 no MDM would push it.
 
@@ -736,4 +788,6 @@ catalog.
   (publish scrub, device-verification evidence, security scan, zips, open issues,
   commit scan), presents the ship prompt, and unlocks the guard for 30 minutes
   after an explicit "Ship it". Never create `.claude/.ship-authorized` outside
-  `/ship`. General approval given before the prompt does not count.
+  `/ship`. General approval given before the prompt does not count. Shared
+  files (scripts, hooks, this file) go to `main` with `/ship tooling` the same
+  day they change: merge and push, nothing published anywhere.

@@ -222,19 +222,7 @@ dist/
 GITIGNORE_EOF
 
 echo "==> writing local.properties (gitignored — machine-local paths)"
-cat > "$DEST/local.properties" <<EOF
-# Machine-local. Gitignored: never commit real paths or credentials.
-# Offline build against the SDK unpacked outside the repo.
-sdk.dir=$ANDROID_HOME
-sdk.path=$ATAK_SDK
-takdev.plugin=$ATAK_SDK/atak-gradle-takdev.jar
-
-# Artifactory build (alternative to offline) — uncomment and fill in if a tak.gov
-# Artifactory account exists. Setting takrepo.url switches takdev out of offline mode.
-#takrepo.url=https://artifacts.tak.gov/artifactory/maven
-#takrepo.user=
-#takrepo.password=
-EOF
+"$REPO_ROOT/scripts/local-properties.sh" "$DEST" "$ATAK_SDK"
 
 sed -i '' "1s/.*/$DISPLAY/" "$DEST/README.md"
 

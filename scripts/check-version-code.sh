@@ -71,14 +71,11 @@ grep -qE '^[[:space:]]*ext\.PLUGIN_VERSION_CODE[[:space:]]*=' "$GRADLE" \
 
 # 2. Above every release already signed. The version in the file name is the
 #    truth for builds from before the fix: they all read versionCode 1.
-# dist/ is gitignored and lives in the main checkout; a worktree has none. Fall
-# back to the main worktree's, and say which one was read, so an empty result
-# is never mistaken for "nothing signed yet".
-SIGNED_DIR="${ATAK_SIGNED_DIR:-$ROOT/dist/signed}"
-if [ ! -d "$SIGNED_DIR" ]; then
-  MAIN_WT="$(git -C "$ROOT" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')"
-  [ -n "$MAIN_WT" ] && [ -d "$MAIN_WT/dist/signed" ] && SIGNED_DIR="$MAIN_WT/dist/signed"
-fi
+# Every signed APK is filed in ONE place outside every checkout, $ATAK_DIST/signed
+# (env.sh; ~/atak-dist). Before 2026-09-07 each worktree had its own dist/, and
+# the main checkout's held no Map Depot 1.4, PLSS 0.5 or Traffic 0.5 -- this
+# check would have passed a version below them.
+SIGNED_DIR="${ATAK_SIGNED_DIR:-${ATAK_DIST:-$HOME/atak-dist}/signed}"
 [ -d "$SIGNED_DIR" ] || finding "no signed-release folder at $SIGNED_DIR (set ATAK_SIGNED_DIR); cannot tell whether $VER is an update"
 seen=0
 prev_max=0; prev_ver=""; prev_apk=""
