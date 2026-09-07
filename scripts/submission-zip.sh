@@ -43,6 +43,15 @@ ATAK_VERSION=$(sed -n "s/.*ext.ATAK_VERSION *= *[\"']\([^\"']*\)[\"'].*/\1/p" "$
     echo "error: could not read PLUGIN_VERSION/ATAK_VERSION from $PROJECT/app/build.gradle" >&2; exit 1; }
 OUT="$DIST/$NAME-$PLUGIN_VERSION-$ATAK_VERSION.zip"
 
+# A release must be an update the fleet's MDM can push: above every release
+# already signed, and never the same version twice for one target. Watchtower
+# refused Cam Depot 1.2 over 1.1 because both carried versionCode 1; the code
+# now comes from PLUGIN_VERSION, and this refuses to zip a version that is not
+# higher than what dist/signed/ already holds for this target.
+echo "==> version code (the MDM must see this as an update)"
+"$REPO_ROOT/scripts/check-version-code.sh" "$NAME" --target "$ATAK_VERSION" || {
+    echo "error: not zipping a version an MDM could not push as an update — bump PLUGIN_VERSION" >&2; exit 1; }
+
 mkdir -p "$DIST"
 rm -f "$OUT"
 
@@ -250,6 +259,34 @@ EOF
         # not the same as producing something, precisely because typst.gradle warns
         # rather than fails.
         BUILT_APK="$(ls "$TMP/$NAME"/app/build/outputs/apk/civ/debug/*.apk 2>/dev/null | head -1)"
+
+        # The versionCode this APK carries is the one tak.gov's will carry: this
+        # build has no .git either. The SDK's getVersionCode() returns 1 here, and
+        # a versionCode-1 release is not an update to any MDM -- Watchtower refused
+        # Cam Depot 1.2 over 1.1 on 2026-09-06 because both were 1 to it. Every
+        # plugin derives the code from PLUGIN_VERSION as MAJOR*10000+MINOR*100+PATCH
+        # (PLUGIN_VERSION_CODE in app/build.gradle); this checks the APK agrees.
+        # No `| head -1` after sed: only the package: line matches, and head would
+        # close the pipe early under pipefail (see the SIGPIPE note below).
+        AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt 2>/dev/null | sort -V | tail -1)"
+        EXPECT_CODE="$(printf '%s' "$PLUGIN_VERSION" | awk -F. '{printf "%d", $1*10000 + $2*100 + $3}')"
+        GOT_CODE=""
+        if [ -n "$AAPT" ] && [ -n "$BUILT_APK" ]; then
+            GOT_CODE="$("$AAPT" dump badging "$BUILT_APK" 2>/dev/null \
+                | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p")"
+        fi
+        if [ -z "$GOT_CODE" ]; then
+            echo "  FAIL  could not read versionCode from the built APK (aapt: ${AAPT:-none})"
+            FAIL=1
+        elif [ "$GOT_CODE" = "$EXPECT_CODE" ] && [ "$GOT_CODE" -gt 1 ]; then
+            echo "  PASS  versionCode=$GOT_CODE from PLUGIN_VERSION $PLUGIN_VERSION (no .git needed)"
+        else
+            echo "  FAIL  versionCode=$GOT_CODE, expected $EXPECT_CODE from PLUGIN_VERSION $PLUGIN_VERSION."
+            echo "        A signed release with versionCode 1 cannot be pushed as an update by"
+            echo "        any MDM. app/build.gradle must set versionCode = PLUGIN_VERSION_CODE,"
+            echo "        not getVersionCode() -- see CLAUDE.md, release checklist."
+            FAIL=1
+        fi
         if [ -d "$TMP/$NAME/docs/user_manual" ]; then
             if [ -z "$LOCAL_TYPST" ]; then
                 echo "  SKIP  manual not checked — no typst on PATH (install it: the"

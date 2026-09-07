@@ -1,12 +1,12 @@
 # FOBS for ATAK — User Guide
 
-**Version 0.4 · takwerx**
+**Version 0.5 · takwerx**
 
-**Download FOBS 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download FOBS 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/fobs/releases/download/v0.4/ATAK-Plugin-FOBS-0.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/fobs/releases/download/v0.4/ATAK-Plugin-FOBS-0.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/fobs/releases/download/v0.4/ATAK-Plugin-FOBS-0.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/fobs/releases/download/v0.5/ATAK-Plugin-FOBS-0.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/fobs/releases/download/v0.5/ATAK-Plugin-FOBS-0.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/fobs/releases/download/v0.5/ATAK-Plugin-FOBS-0.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/fobs/releases
 
@@ -57,7 +57,8 @@ Sync feed. **Just local** keeps it on the device. See section 8.
 Then walk. Every fix that passes the filter is added to the line: reported
 accuracy better than 25 m, no impossible jumps, at least 2 m from the last one.
 Standing still adds nothing. The bar shows the feed the track is going to, then
-Pause and End, and a count of rejected fixes if there were any.
+Pause and End, and a count of bad fixes if there were any: fixes refused for
+poor accuracy or an impossible jump. Standing still is not counted.
 
 ![Recording](screenshots/7_recording.png)
 

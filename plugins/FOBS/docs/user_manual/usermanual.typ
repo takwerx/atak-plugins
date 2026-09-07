@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "FOBS",
-   plugin-version: "0.4",
+   plugin-version: "0.5",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -96,7 +96,8 @@ Standing still adds nothing.
   #image("7.jpg", width: 100%)
 ][
   The bar shows the feed the track is going to, then *Pause* and *End*. If the
-  filter has rejected fixes, a count of them appears there too.
+  filter has refused fixes for poor accuracy or an impossible jump, a count of
+  them appears there too. Standing still is not counted.
 
   #image("7b.jpg", width: 100%)
 

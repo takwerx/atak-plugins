@@ -75,6 +75,30 @@ if [ -f "$DEST/app/src/main/java/com/atakmap/android/$PKG/plugin/PluginTemplate.
        "$DEST/app/src/main/java/com/atakmap/android/$PKG/plugin/$CLASS.java"
 fi
 
+echo "==> versionCode from PLUGIN_VERSION (the SDK's getVersionCode() is 1 in a tak.gov build)"
+# tak.gov builds from a zip with no .git, so the template's git-derived versionCode
+# is 1 on every signed release and no MDM can see one release as an update to the
+# last (Cam Depot 1.2 on Watchtower, 2026-09-06). Every takwerx plugin derives it
+# from PLUGIN_VERSION instead; submission-zip.sh fails the zip when the APK disagrees.
+cat > "$DEST/.version-code.block" <<'EOF'
+    // Android's integer version. The package manager and every MDM decide "is
+    // this an update" from this number alone; versionName is display only. The
+    // SDK's getVersionCode() reads the git commit and tak.gov builds from a zip
+    // with no .git, so every signed release carried versionCode 1 and Watchtower
+    // could not push Cam Depot 1.2 over 1.1 (2026-09-06). Derived from
+    // PLUGIN_VERSION instead, the same on every machine: 1.3 -> 10300,
+    // 1.3.1 -> 10301. submission-zip.sh fails the zip when the APK disagrees.
+    ext.PLUGIN_VERSION_CODE = { ->
+        def p = (PLUGIN_VERSION.tokenize('.') + ['0', '0']).collect { it as int }
+        return p[0] * 10000 + p[1] * 100 + p[2]
+    }()
+EOF
+sed -i '' "/^[[:space:]]*ext\.PLUGIN_VERSION[[:space:]]*=/r $DEST/.version-code.block" "$DEST/app/build.gradle"
+rm -f "$DEST/.version-code.block"
+sed -i '' 's|^\([[:space:]]*\)defaultConfig.versionCode = getVersionCode()$|\1// Not getVersionCode(): that is 1 at tak.gov. See PLUGIN_VERSION_CODE above.\n\1defaultConfig.versionCode = PLUGIN_VERSION_CODE|' "$DEST/app/build.gradle"
+grep -q 'defaultConfig.versionCode = PLUGIN_VERSION_CODE' "$DEST/app/build.gradle" || {
+    echo "error: could not rewrite versionCode in $DEST/app/build.gradle" >&2; exit 1; }
+
 echo "==> splitting the icon: a dark tile for Android, the bare glyph for ATAK"
 # The SDK template ships ONE icon and wires it to two places: android:icon in the
 # manifest, and the toolbar button. It is a white glyph on transparency, which is
