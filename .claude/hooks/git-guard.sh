@@ -41,14 +41,24 @@ if "git" not in cmd and "gh " not in cmd:
 # Scope to the PUBLIC repo. The private notes repo also has a branch named
 # main and its pushes are routine (CLAUDE.md says to push them). Fail-closed:
 # if the target repo cannot be determined, treat it as the public repo.
+def _expand(p):
+    # The variables a command here can plausibly name a checkout with. Anything
+    # else stays unresolved, and the merge rule below fails closed on it.
+    p = p.strip('\'"')
+    for var, val in (("CLAUDE_PROJECT_DIR", root),
+                     ("HOME", os.path.expanduser("~")),
+                     ("PWD", data.get("cwd") or root)):
+        p = p.replace("${%s}" % var, val).replace("$%s" % var, val)
+    return os.path.expanduser(p)
+
 def _target_dir():
     d = data.get("cwd") or root
     m = re.search(r'(?:^|&&|;)\s*cd\s+([^\s;&|]+)', cmd)
     if m:
-        d = os.path.expanduser(m.group(1).strip('\'"'))
+        d = _expand(m.group(1))
     m = re.search(r'\bgit\s+(?:[-\w=.]+\s+)*-C\s+([^\s;&|]+)', cmd)
     if m:
-        d = os.path.expanduser(m.group(1).strip('\'"'))
+        d = _expand(m.group(1))
     return d
 
 def _is_public_repo():
@@ -110,10 +120,17 @@ if m:
         block("git tag creation/deletion")
 
 if re.search(r'\bgit\b[^|;&]*\bmerge\b', cmd) and not re.search(r'--abort|--continue|--quit', cmd):
+    # /ship merges in the main checkout with `git -C ~/GitHub/atak-plugins`, so
+    # the directory the merge runs in decides. A directory the guard could not
+    # resolve (a shell variable it does not know) used to read as "not main"
+    # and let the merge through; it now blocks, and the fix is a literal path.
+    tdir = _target_dir()
+    if not os.path.isdir(tdir):
+        block("git merge in a directory the guard cannot resolve (%s); use a literal path" % tdir)
     branch = ""
     try:
         branch = subprocess.run(
-            ["git", "-C", _target_dir(), "branch", "--show-current"],
+            ["git", "-C", tdir, "branch", "--show-current"],
             capture_output=True, text=True, timeout=5).stdout.strip()
     except Exception:
         pass

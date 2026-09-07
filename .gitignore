@@ -40,7 +40,9 @@ captures/
 
 .DS_Store
 
-# Submission zips
+# Submission zips. dist is a symlink to $ATAK_DIST (~/atak-dist) in every
+# checkout (scripts/worktree.sh): the bare name matches the link, dist/ a directory.
+dist
 dist/
 *.zip
 

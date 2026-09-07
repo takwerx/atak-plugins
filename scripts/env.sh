@@ -17,3 +17,11 @@ export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
 if [ ! -d "$ATAK_SDK" ]; then
     echo "warning: ATAK_SDK not found at $ATAK_SDK — download the SDK from tak.gov" >&2
 fi
+
+# Build artifacts live OUTSIDE every checkout, in one place. There is one git
+# worktree per plugin (CLAUDE.md, "Working in parallel"), and a zip written
+# into one checkout's dist/ is invisible from the others -- the operator looked
+# in the wrong one twice. submission-zip.sh writes here; every tak.gov-signed
+# APK is filed under signed/. `dist` in each checkout is a symlink to this
+# directory (scripts/worktree.sh makes it), so `ls dist/` is the same anywhere.
+export ATAK_DIST="${ATAK_DIST:-$HOME/atak-dist}"

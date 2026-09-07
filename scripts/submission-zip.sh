@@ -29,7 +29,10 @@ DO_BUILD=1
 
 PARENT="$REPO_ROOT/plugins"
 PROJECT="$PARENT/$NAME"
-DIST="$REPO_ROOT/dist"
+# One place for every checkout's zips: there is a worktree per plugin, and a
+# zip written into one checkout was looked for in another twice. env.sh sets
+# ATAK_DIST (~/atak-dist); `dist` in each checkout is a symlink to it.
+DIST="$ATAK_DIST"
 
 [ -d "$PROJECT" ] || { echo "error: no plugin at $PROJECT" >&2; exit 1; }
 
@@ -51,6 +54,14 @@ OUT="$DIST/$NAME-$PLUGIN_VERSION-$ATAK_VERSION.zip"
 echo "==> version code (the MDM must see this as an update)"
 "$REPO_ROOT/scripts/check-version-code.sh" "$NAME" --target "$ATAK_VERSION" || {
     echo "error: not zipping a version an MDM could not push as an update — bump PLUGIN_VERSION" >&2; exit 1; }
+
+# The branch must contain every commit on main. Shared release rules reach
+# main on their own tooling ship, and a plugin branch that has not merged main
+# builds without them: FOBS 0.5's zips were built on 2026-09-06 without the
+# versionCode gate that camdepot-v1.3 had already added.
+echo "==> branch contains main (shared rules current)"
+"$REPO_ROOT/scripts/check-main-merged.sh" || {
+    echo "error: not zipping from a branch behind main — git merge main, then rerun" >&2; exit 1; }
 
 mkdir -p "$DIST"
 rm -f "$OUT"
