@@ -12,6 +12,7 @@ repository — README, user guide, downloads and issues all in one place:
 | Traffic | Live traffic over your own base map, refreshing while the map sits still | https://github.com/takwerx/traffic |
 | Map Depot | Elevation, base maps and offline public-lands maps, downloaded from inside ATAK | https://github.com/takwerx/map-depot |
 | Cam Depot | Public traffic and wildfire cameras on the map, with live video where the agency streams | https://github.com/takwerx/cam-depot |
+| FOBS | Field Observation Survey: walk, draw, import, split and join a perimeter into an ATAK shape, live to a Data Sync feed | https://github.com/takwerx/fobs |
 | TAKwerx Market | Install and update the plugins above from inside ATAK, with a count of waiting updates on the toolbar | https://github.com/takwerx/takwerx-market |
 
 PLSS Grid also has a data repository, [plss-data](https://github.com/takwerx/plss-data),

@@ -24,6 +24,7 @@ import com.atakmap.android.fobs.track.JoinTracksTool;
 import com.atakmap.android.fobs.track.LassoJoin;
 import com.atakmap.android.fobs.track.SelectTrack;
 import com.atakmap.android.fobs.track.StylePrefs;
+import com.atakmap.android.fobs.track.TrackRecorder;
 import com.atakmap.android.gui.ColorPalette;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.toolbar.ToolManagerBroadcastReceiver;
@@ -158,7 +159,25 @@ public class FobsPane implements View.OnClickListener {
             return;
         }
         refreshStyle();
+        refreshRecording();
         ui.showPane(pane, null);
+        // A walk is running: opening FOBS puts its bar back on the screen too, so
+        // Pause and End are one tap away again (operator, 2026-09-06: "if you open
+        // the plugin up that on the screen should come back"). A beat later, not
+        // now: opening the pane ends the active tool, so a bar started here was
+        // knocked straight down again.
+        TrackRecorder rec = TrackRecorder.get();
+        if (rec != null && rec.isRecording())
+            rec.reshowBar(600);
+    }
+
+    /** The GPS tile says Recording while a walk is running, so nobody wonders. */
+    private void refreshRecording() {
+        TrackRecorder rec = TrackRecorder.get();
+        boolean live = rec != null && rec.isRecording();
+        Button gps = view.findViewById(R.id.start_gps);
+        if (gps != null)
+            gps.setText(live ? R.string.choose_start_gps_recording : R.string.choose_start_gps);
     }
 
     public void close() {
@@ -177,6 +196,14 @@ public class FobsPane implements View.OnClickListener {
             pickThickness();
         } else if (id == R.id.start_gps) {
             close();
+            TrackRecorder rec = TrackRecorder.get();
+            if (rec != null && rec.isRecording()) {
+                // A walk is already running: bring its bar back rather than start
+                // another. Pause and End live there. The pane just closed, which
+                // may itself end a tool; same beat, same quiet.
+                rec.reshowBar(300);
+                return;
+            }
             askName(new OnName() {
                 @Override
                 public void go(final String name) {
