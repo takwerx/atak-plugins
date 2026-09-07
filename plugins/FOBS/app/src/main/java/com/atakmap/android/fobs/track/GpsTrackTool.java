@@ -124,7 +124,7 @@ public class GpsTrackTool extends Tool implements View.OnClickListener, TrackRec
         boolean paused = rec.isPaused();
         pauseBtn.setText(paused ? R.string.resume : R.string.pause);
         pauseBtn.setSelected(paused);
-        int n = rec.dropped();
+        int n = rec.badFixes();
         if (n > 0) {
             droppedView.setText(plugin.getString(R.string.dropped_count, n));
             droppedView.setVisibility(View.VISIBLE);

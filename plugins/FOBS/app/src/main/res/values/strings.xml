@@ -39,7 +39,7 @@
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>
     <string name="end">End</string>
-    <string name="dropped_count">dropped %d</string>
+    <string name="dropped_count">%d bad fixes</string>
     <string name="prompt_gps">Recording where you go. Tap End when finished.</string>
     <string name="toast_still_recording">Still recording %s. Open FOBS to pause or end it.</string>
     <string name="choose_start_gps_recording">Recording…</string>

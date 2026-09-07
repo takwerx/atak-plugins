@@ -161,6 +161,13 @@ public class FobsPane implements View.OnClickListener {
         refreshStyle();
         refreshRecording();
         ui.showPane(pane, null);
+        // A walk is running: opening FOBS puts its bar back on the screen too, so
+        // Pause and End are one tap away again (operator, 2026-09-06: "if you open
+        // the plugin up that on the screen should come back").
+        TrackRecorder rec = TrackRecorder.get();
+        if (rec != null && rec.isRecording()
+                && !(ToolManagerBroadcastReceiver.getInstance().getActiveTool() instanceof GpsTrackTool))
+            ToolManagerBroadcastReceiver.getInstance().startTool(GpsTrackTool.ID, new Bundle());
     }
 
     /** The GPS tile says Recording while a walk is running, so nobody wonders. */

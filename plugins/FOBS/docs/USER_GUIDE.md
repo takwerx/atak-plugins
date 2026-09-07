@@ -57,7 +57,8 @@ Sync feed. **Just local** keeps it on the device. See section 8.
 Then walk. Every fix that passes the filter is added to the line: reported
 accuracy better than 25 m, no impossible jumps, at least 2 m from the last one.
 Standing still adds nothing. The bar shows the feed the track is going to, then
-Pause and End, and a count of rejected fixes if there were any.
+Pause and End, and a count of bad fixes if there were any: fixes refused for
+poor accuracy or an impossible jump. Standing still is not counted.
 
 ![Recording](screenshots/7_recording.png)
 

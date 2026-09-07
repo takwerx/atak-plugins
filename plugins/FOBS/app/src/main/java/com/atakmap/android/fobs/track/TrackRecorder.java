@@ -124,8 +124,23 @@ public class TrackRecorder implements PointMapItem.OnPointChangedListener, ToolL
         return acceptedPoints.size();
     }
 
+    /** Every fix the gate refused, standing still included. The record at End. */
     public int dropped() {
         return gate == null ? 0 : gate.dropped();
+    }
+
+    /**
+     * Fixes refused because they could not be real: poor accuracy, an impossible
+     * jump, a stale time. Not the standing-still ones, which are normal and would
+     * climb by the second while the operator waits (XCover indoors, 2026-09-06:
+     * "dropped 1" with no GPS). This is what the bar shows.
+     */
+    public int badFixes() {
+        if (gate == null)
+            return 0;
+        return gate.count(FixFilter.Verdict.BAD_ACCURACY)
+                + gate.count(FixFilter.Verdict.TOO_FAST)
+                + gate.count(FixFilter.Verdict.STALE_TIME);
     }
 
     public void setListener(Listener l) {
