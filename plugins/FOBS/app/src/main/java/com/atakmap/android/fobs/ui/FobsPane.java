@@ -24,6 +24,7 @@ import com.atakmap.android.fobs.track.JoinTracksTool;
 import com.atakmap.android.fobs.track.LassoJoin;
 import com.atakmap.android.fobs.track.SelectTrack;
 import com.atakmap.android.fobs.track.StylePrefs;
+import com.atakmap.android.fobs.track.TrackRecorder;
 import com.atakmap.android.gui.ColorPalette;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.toolbar.ToolManagerBroadcastReceiver;
@@ -158,7 +159,17 @@ public class FobsPane implements View.OnClickListener {
             return;
         }
         refreshStyle();
+        refreshRecording();
         ui.showPane(pane, null);
+    }
+
+    /** The GPS tile says Recording while a walk is running, so nobody wonders. */
+    private void refreshRecording() {
+        TrackRecorder rec = TrackRecorder.get();
+        boolean live = rec != null && rec.isRecording();
+        Button gps = view.findViewById(R.id.start_gps);
+        if (gps != null)
+            gps.setText(live ? R.string.choose_start_gps_recording : R.string.choose_start_gps);
     }
 
     public void close() {
@@ -177,6 +188,13 @@ public class FobsPane implements View.OnClickListener {
             pickThickness();
         } else if (id == R.id.start_gps) {
             close();
+            TrackRecorder rec = TrackRecorder.get();
+            if (rec != null && rec.isRecording()) {
+                // A walk is already running: bring its bar back rather than start
+                // another. Pause and End live there.
+                ToolManagerBroadcastReceiver.getInstance().startTool(GpsTrackTool.ID, new Bundle());
+                return;
+            }
             askName(new OnName() {
                 @Override
                 public void go(final String name) {

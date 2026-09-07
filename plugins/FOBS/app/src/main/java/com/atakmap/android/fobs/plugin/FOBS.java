@@ -15,6 +15,7 @@ import com.atakmap.android.fobs.track.ImportTrack;
 import com.atakmap.android.fobs.track.JoinTracksTool;
 import com.atakmap.android.fobs.track.LassoJoin;
 import com.atakmap.android.fobs.track.SelectTrack;
+import com.atakmap.android.fobs.track.TrackRecorder;
 import com.atakmap.android.fobs.ui.FobsPane;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.menu.MapMenuReceiver;
@@ -43,6 +44,7 @@ public class FOBS implements IPlugin {
 
     private MapView mapView;
     private FobsPane pane;
+    private TrackRecorder recorder;
     private GpsTrackTool gpsTrackTool;
     private DrawTrackTool drawTrackTool;
     private CutTrackTool cutTrackTool;
@@ -98,6 +100,7 @@ public class FOBS implements IPlugin {
         CotDetailManager.getInstance().registerHandler(detailHandler);
         feed = new FeedPublisher(mapView, pluginContext);
 
+        recorder = new TrackRecorder(mapView, pluginContext);
         gpsTrackTool = new GpsTrackTool(mapView, pluginContext);
         ToolManagerBroadcastReceiver.getInstance().registerTool(GpsTrackTool.ID,
                 gpsTrackTool);
@@ -142,6 +145,10 @@ public class FOBS implements IPlugin {
             ToolManagerBroadcastReceiver.getInstance().unregisterTool(GpsTrackTool.ID);
             gpsTrackTool.dispose();
             gpsTrackTool = null;
+        }
+        if (recorder != null) {
+            recorder.dispose(); // keeps whatever was walked
+            recorder = null;
         }
         if (menuFactory != null) {
             MapMenuReceiver.getInstance().unregisterMapMenuFactory(menuFactory);

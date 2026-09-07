@@ -41,6 +41,8 @@
     <string name="end">End</string>
     <string name="dropped_count">dropped %d</string>
     <string name="prompt_gps">Recording where you go. Tap End when finished.</string>
+    <string name="toast_still_recording">Still recording %s. Open FOBS to pause or end it.</string>
+    <string name="choose_start_gps_recording">Recording…</string>
     <string name="prompt_gps_paused">Paused. Tap Resume to keep recording.</string>
     <string name="toast_paused">GPS track paused</string>
     <string name="toast_resumed">GPS track resumed</string>

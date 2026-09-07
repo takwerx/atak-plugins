@@ -2,7 +2,6 @@ package com.atakmap.android.fobs.track;
 
 import android.content.Context;
 import android.os.Bundle;
-import android.util.SparseArray;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -12,35 +11,22 @@ import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.drawing.mapItems.DrawingShape;
 import com.atakmap.android.fobs.plugin.R;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.android.maps.Marker;
-import com.atakmap.android.maps.PointMapItem;
 import com.atakmap.android.toolbar.Tool;
 import com.atakmap.android.toolbar.widgets.TextContainer;
 import com.atakmap.android.tools.ActionBarReceiver;
 import com.atakmap.android.tools.ActionBarView;
-import com.atakmap.coremap.log.Log;
-import com.atakmap.coremap.maps.coords.GeoPoint;
-import com.atakmap.coremap.maps.coords.GeoPointMetaData;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
- * Start a GPS track: follow the self marker, append each fix that passes the live gate
- * to a dashed drawing shape, Pause / Resume / End on a floating toolbar. At End, run the
- * cleanup pass and ask Single line or Make polygon.
+ * The bar for a GPS track: the feed it is going to, a count of rejected fixes,
+ * Pause / Resume, End. Nothing more. The recording itself is {@link TrackRecorder},
+ * which outlives this tool: ATAK ends the active tool whenever another one starts,
+ * and the walk must not end with it (field report, 2026-09-06).
  *
- * <p>Design follows PAR's Fire Area Survey leg-collection tool, read from its APK, with
- * the GPS filtering it did not have. Same ATAK plumbing as ATAK's own drawing tools:
- * a {@link Tool} registered with the tool manager, an {@link ActionBarView} handed to
- * {@link ActionBarReceiver}, a prompt in {@link TextContainer}.
- *
- * <p>Threading: the self marker's point-changed callback is not guaranteed to arrive on
- * the main thread, and the shape is a View-like map item. Every fix is posted to the
- * main thread before it touches the shape.
+ * <p>Started with a title (and optionally a feed) it begins a new recording. Started
+ * with no extras it re-attaches to the one running, which is how the bar comes back
+ * after another tool, or from the pane's tile.
  */
-public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedListener,
-        View.OnClickListener {
+public class GpsTrackTool extends Tool implements View.OnClickListener, TrackRecorder.Listener {
 
     public static final String ID = "com.atakmap.android.fobs.GpsTrackTool";
     public static final String EXTRA_TITLE = "title";
@@ -49,11 +35,6 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
 
     private static final String TAG = "FOBS.GpsTrackTool";
 
-    /** Re-send the growing track over the mesh at most this often, milliseconds. */
-    private static final long PERSIST_INTERVAL_MS = 15_000;
-    /** ... or after this many accepted fixes, whichever first. */
-    private static final int PERSIST_EVERY_FIXES = 25;
-
     private final MapView mapView;
     private final Context plugin;
     private final Context host;
@@ -61,21 +42,10 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
     private final Button pauseBtn;
     private final TextView droppedView;
     private final TextView feedView;
-
-    private final FixFilter.Thresholds thresholds = new FixFilter.Thresholds();
     private final TrackFinisher finisher;
 
-    private DrawingShape shape;
-    private Marker self;
-    private FixFilter.LiveGate gate;
-    private final List<FixFilter.Fix> accepted = new ArrayList<>();
-    private final List<GeoPointMetaData> acceptedPoints = new ArrayList<>();
-    private int raw;
-    private boolean paused;
-    /** Set when End was answered in the dialog, so onToolEnd does not ask again. */
-    private boolean answered;
-    private long lastPersist;
-    private int fixesSincePersist;
+    /** Set when End was answered on the bar, so the tool's end is not a dismissal. */
+    private boolean endedHere;
 
     public GpsTrackTool(MapView mapView, Context pluginContext) {
         super(mapView, ID);
@@ -97,196 +67,105 @@ public class GpsTrackTool extends Tool implements PointMapItem.OnPointChangedLis
 
     @Override
     protected boolean onToolBegin(Bundle extras) {
-        String title = extras.getString(EXTRA_TITLE);
-        if (title == null || title.trim().isEmpty())
-            title = mapView.getDeviceCallsign();
-
-        shape = FobsShapes.newTrack(mapView, title, FobsShapes.SOURCE_GPS);
-        String feed = extras.getString(EXTRA_FEED);
-        String feedServer = extras.getString(EXTRA_FEED_SERVER);
-        if (feed != null && feedServer != null) {
-            shape.setMetaString(com.atakmap.android.fobs.feed.FeedPublisher.META_FEED, feed);
-            shape.setMetaString(com.atakmap.android.fobs.feed.FeedPublisher.META_FEED_SERVER,
-                    feedServer);
-            com.atakmap.android.fobs.feed.FeedPublisher fp =
-                    com.atakmap.android.fobs.feed.FeedPublisher.get();
-            if (fp != null)
-                fp.attach(shape, new com.atakmap.android.fobs.feed.FeedPublisher.Feed(feedServer, feed));
-            feedView.setText(plugin.getString(R.string.feed_label, feed));
-            feedView.setVisibility(View.VISIBLE);
-        } else {
-            feedView.setVisibility(View.GONE);
-        }
-        gate = new FixFilter.LiveGate(thresholds);
-        accepted.clear();
-        acceptedPoints.clear();
-        raw = 0;
-        paused = false;
-        answered = false;
-        lastPersist = 0;
-        fixesSincePersist = 0;
-        pauseBtn.setText(R.string.pause);
-        pauseBtn.setSelected(false);
-        droppedView.setVisibility(View.GONE);
-
-        self = mapView.getSelfMarker();
-        if (self == null) {
-            toast(R.string.toast_nothing_recorded);
+        TrackRecorder rec = TrackRecorder.get();
+        if (rec == null)
             return false;
+        String title = extras == null ? null : extras.getString(EXTRA_TITLE);
+        if (!rec.isRecording()) {
+            if (title == null)
+                return false; // nothing to attach to and nothing asked for
+            if (!rec.start(title, extras.getString(EXTRA_FEED), extras.getString(EXTRA_FEED_SERVER))) {
+                toast(R.string.toast_nothing_recorded);
+                return false;
+            }
         }
-        self.addOnPointChangedListener(this);
-        // Seed with the current position rather than waiting for the next fix.
-        onPointChanged(self);
-
+        endedHere = false;
+        rec.setListener(this);
+        refresh();
         ActionBarReceiver.getInstance().setToolView(toolbar);
-        TextContainer.getInstance().displayPrompt(plugin.getString(R.string.prompt_gps));
         return true;
     }
 
     @Override
     protected void onToolEnd() {
-        if (self != null)
-            self.removeOnPointChangedListener(this);
-        self = null;
+        TrackRecorder rec = TrackRecorder.get();
+        if (rec != null)
+            rec.setListener(null);
         ActionBarReceiver.getInstance().setToolView(null);
         TextContainer.getInstance().closePrompt();
-
-        final DrawingShape finished = shape;
-        shape = null;
-        if (finished == null)
-            return;
-        if (acceptedPoints.size() < 2) {
-            // Never reached the map; nothing to remove.
-            toast(R.string.toast_nothing_recorded);
-            return;
-        }
-        finish(finished);
+        // The bar went away but the walk did not. Say so once when it was not End:
+        // another tool took the bar, or ATAK's back dismissed it.
+        if (!endedHere && rec != null && rec.isRecording())
+            toast(plugin.getString(R.string.toast_still_recording, rec.title()));
     }
 
     @Override
     public void dispose() {
     }
 
-    // ---- fixes -------------------------------------------------------------------
+    // ---- the bar reflects the recorder --------------------------------------------
 
     @Override
-    public void onPointChanged(final PointMapItem item) {
-        final GeoPointMetaData gpm = item.getGeoPointMetaData();
-        if (gpm == null)
-            return;
-        final GeoPoint gp = gpm.get();
-        if (gp == null || !gp.isValid())
-            return;
-        final long time = item.getMetaLong("gpsTimestamp", 0L);
-        mapView.post(new Runnable() {
-            @Override
-            public void run() {
-                offer(gpm, gp, time);
-            }
-        });
+    public void onRecordingChanged() {
+        refresh();
     }
 
-    /** Main thread only. */
-    private void offer(GeoPointMetaData gpm, GeoPoint gp, long time) {
-        if (shape == null || gate == null)
+    private void refresh() {
+        TrackRecorder rec = TrackRecorder.get();
+        if (rec == null || !rec.isRecording())
             return;
-        raw++;
-        if (paused)
-            return;
-        double ce = gp.getCE();
-        if (ce == GeoPoint.UNKNOWN)
-            ce = Double.NaN;
-        FixFilter.Fix fix = new FixFilter.Fix(gp.getLatitude(), gp.getLongitude(), ce, time);
-        FixFilter.Verdict v = gate.judge(fix);
-        if (v != FixFilter.Verdict.ACCEPTED) {
-            showDropped();
-            return;
+        String feed = rec.feed();
+        if (feed != null) {
+            feedView.setText(plugin.getString(R.string.feed_label, feed));
+            feedView.setVisibility(View.VISIBLE);
+        } else {
+            feedView.setVisibility(View.GONE);
         }
-        GeoPointMetaData copy = new GeoPointMetaData(gpm);
-        if (copy.getGeopointSource() == null)
-            copy.setGeoPointSource(FobsShapes.SOURCE_GPS);
-        accepted.add(fix);
-        acceptedPoints.add(copy);
-        shape.addPoint(copy);
-        if (acceptedPoints.size() == 1 && copy.getAltitudeSource() != null)
-            shape.setMetaString(FobsShapes.META_ALTSRC, copy.getAltitudeSource());
-        // On the map only once it is a line. See FobsShapes.newTrack.
-        if (acceptedPoints.size() == 2)
-            FobsShapes.addToMap(shape);
-
-        fixesSincePersist++;
-        long now = System.currentTimeMillis();
-        if (acceptedPoints.size() >= 2 && (fixesSincePersist >= PERSIST_EVERY_FIXES
-                || now - lastPersist >= PERSIST_INTERVAL_MS)) {
-            FobsShapes.persist(mapView, shape, getClass());
-            lastPersist = now;
-            fixesSincePersist = 0;
+        boolean paused = rec.isPaused();
+        pauseBtn.setText(paused ? R.string.resume : R.string.pause);
+        pauseBtn.setSelected(paused);
+        int n = rec.dropped();
+        if (n > 0) {
+            droppedView.setText(plugin.getString(R.string.dropped_count, n));
+            droppedView.setVisibility(View.VISIBLE);
+        } else {
+            droppedView.setVisibility(View.GONE);
         }
+        TextContainer.getInstance().displayPrompt(plugin.getString(
+                paused ? R.string.prompt_gps_paused : R.string.prompt_gps));
     }
 
-    private void showDropped() {
-        int n = gate.dropped();
-        if (n <= 0)
-            return;
-        droppedView.setText(plugin.getString(R.string.dropped_count, n));
-        droppedView.setVisibility(View.VISIBLE);
-    }
-
-    // ---- toolbar -----------------------------------------------------------------
+    // ---- buttons -----------------------------------------------------------------
 
     @Override
     public void onClick(View v) {
+        final TrackRecorder rec = TrackRecorder.get();
+        if (rec == null)
+            return;
         if (v == pauseBtn) {
-            paused = !paused;
-            pauseBtn.setText(paused ? R.string.resume : R.string.pause);
-            pauseBtn.setSelected(paused);
-            if (!paused && gate != null)
-                gate.resetReference();
-            TextContainer.getInstance().displayPrompt(plugin.getString(
-                    paused ? R.string.prompt_gps_paused : R.string.prompt_gps));
+            boolean paused = !rec.isPaused();
+            rec.setPaused(paused);
             toast(paused ? R.string.toast_paused : R.string.toast_resumed);
         } else if (v.getId() == R.id.end) {
-            if (shape == null || acceptedPoints.size() < 2) {
+            DrawingShape shape = rec.shape();
+            if (shape == null || rec.points() < 2) {
+                endedHere = true;
+                rec.end();
+                toast(R.string.toast_nothing_recorded);
                 requestEndTool();
                 return;
             }
+            // Make polygon / Single line / Cancel while still recording, so a
+            // fat-fingered End costs nothing. Only an answer ends the recording.
             finisher.askThenEnd(shape, new Runnable() {
                 @Override
                 public void run() {
-                    answered = true;
+                    endedHere = true;
+                    rec.end();
                     requestEndTool();
                 }
             });
         }
-    }
-
-    // ---- end of track ------------------------------------------------------------
-
-    private void finish(final DrawingShape finished) {
-        boolean[] keep = FixFilter.cleanup(accepted, thresholds);
-        int removed = FixFilter.removedCount(keep);
-        List<GeoPointMetaData> cleaned = FixFilter.apply(acceptedPoints, keep);
-        if (removed > 0) {
-            // The SparseArray is required, not optional: ATAK dereferences it
-            // (NPE on the phone, 2026-09-05). Empty means no vertex markers.
-            finished.setPoints(cleaned, new SparseArray<PointMapItem>());
-            toast(plugin.getString(R.string.toast_removed_bad_fixes, removed));
-        }
-        int dropped = gate.dropped() + removed;
-        finished.setMetaString(FobsShapes.META_RAW, String.valueOf(raw));
-        finished.setMetaString(FobsShapes.META_DROPPED, String.valueOf(dropped));
-        // One line per track so a field test can be read back from logcat.
-        Log.d(TAG, "end raw=" + raw
-                + " accepted=" + accepted.size()
-                + " tooClose=" + gate.count(FixFilter.Verdict.TOO_CLOSE)
-                + " badAccuracy=" + gate.count(FixFilter.Verdict.BAD_ACCURACY)
-                + " tooFast=" + gate.count(FixFilter.Verdict.TOO_FAST)
-                + " staleTime=" + gate.count(FixFilter.Verdict.STALE_TIME)
-                + " endPassRemoved=" + removed
-                + " final=" + cleaned.size());
-        FobsShapes.persist(mapView, finished, getClass());
-        if (!answered)
-            finisher.ask(finished, getClass()); // ended by ATAK (back), not by our End
     }
 
     private void toast(int res) {
