@@ -64,6 +64,18 @@ current feature branch (e.g. `plss-overlay-v0.1`).
     `.claude/hooks/release-links-guard.sh` also blocks the subtree push and
     the `gh release create` mechanically, so a ship that skips this step still
     cannot publish stale links.
+11. **Version code (MANDATORY):** `./scripts/check-version-code.sh <Plugin>
+    --signed --live` → PASS. The fleet gets plugins pushed by Watchtower MDM,
+    which keys updates on Android's integer `versionCode`; every signed
+    release before Cam Depot 1.3 carried 1 and could not be pushed over the
+    one before it. The check proves the tree derives the code from
+    `PLUGIN_VERSION`, the version is above every signed release and every
+    live GitHub Release, and this version's signed APKs are all present (one
+    per target the README links), carry that code, and keep the package name
+    and signing certificate of the last release. A FAIL stops the ship; the
+    fix is a version bump and a resubmission, never an edit to the check.
+    `release-links-guard.sh` runs the same check (without `--live`) before
+    the subtree push and the `gh release create`.
 
 ## Step 1 — The ship prompt (HARD STOP)
 
@@ -75,6 +87,7 @@ Present exactly this via AskUserQuestion and wait:
 > - publish scrub: PASS · security scan: `<date/commit>` · zips: `<names>`
 > - open issues: `<count surfaced / none>` · commit scan: `<clean / acknowledged>`
 > - download links: `check-download-links PASS (<Plugin> <version>)`
+> - version code: `check-version-code PASS (<Plugin> <version> -> <code>)`, signed APKs for every target
 > - this will: merge the branch into `main` (merge commit), push main, subtree-push
 >   `plugins/<Name>` to `takwerx/<plugin-repo>` main, tag `v<version>` there and
 >   create its GitHub Release with the signed APKs

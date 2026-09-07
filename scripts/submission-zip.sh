@@ -43,6 +43,15 @@ ATAK_VERSION=$(sed -n "s/.*ext.ATAK_VERSION *= *[\"']\([^\"']*\)[\"'].*/\1/p" "$
     echo "error: could not read PLUGIN_VERSION/ATAK_VERSION from $PROJECT/app/build.gradle" >&2; exit 1; }
 OUT="$DIST/$NAME-$PLUGIN_VERSION-$ATAK_VERSION.zip"
 
+# A release must be an update the fleet's MDM can push: above every release
+# already signed, and never the same version twice for one target. Watchtower
+# refused Cam Depot 1.2 over 1.1 because both carried versionCode 1; the code
+# now comes from PLUGIN_VERSION, and this refuses to zip a version that is not
+# higher than what dist/signed/ already holds for this target.
+echo "==> version code (the MDM must see this as an update)"
+"$REPO_ROOT/scripts/check-version-code.sh" "$NAME" --target "$ATAK_VERSION" || {
+    echo "error: not zipping a version an MDM could not push as an update — bump PLUGIN_VERSION" >&2; exit 1; }
+
 mkdir -p "$DIST"
 rm -f "$OUT"
 

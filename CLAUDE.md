@@ -610,7 +610,18 @@ So every plugin's `app/build.gradle` sets `versionCode = PLUGIN_VERSION_CODE`,
 computed from `PLUGIN_VERSION` as `MAJOR*10000 + MINOR*100 + PATCH` (1.3 →
 10300), the same on every machine. `new-plugin.sh` writes it, and
 `submission-zip.sh` reads the clean-extract APK with `aapt` and fails the zip
-when the code is not that number. What remains:
+when the code is not that number.
+
+`scripts/check-version-code.sh <Plugin>` holds the rest of the rule, and it
+is the rule: the version is above every release in `dist/signed/` (a
+resubmission is a new version; `--target` lets one target that was never
+signed be re-zipped), and with `--signed` this version's APKs are all present,
+one per target the README links, carry that code, and keep the package name
+and signing certificate of the last release. `submission-zip.sh` runs it per
+target before zipping, `/ship` runs it with `--signed --live`, and
+`release-links-guard.sh` blocks the subtree push and `gh release create` on a
+FAIL. Watchtower accepted Cam Depot 1.3 as the update to 1.2 on 2026-09-06,
+which is the proof this is the shape an update has to have. What remains:
 
 - `versionName` still carries a blank hash in every signed build. That is
   expected, not a broken build.
@@ -648,7 +659,10 @@ time, but commit the value so the tree, the zip and the PDF agree.
 
 **Bump `PLUGIN_VERSION` before building zips, every time.** Two builds have gone
 out under one version number twice. A resubmission after a failure is a new
-version, not the same one again.
+version, not the same one again. Mechanical since 2026-09-06:
+`submission-zip.sh` refuses a version that `dist/signed/` already holds for
+that target, because a same-version build carries the same `versionCode` and
+no MDM would push it.
 
 **The download links at the top of the README and guide are part of the
 release.** They name a tag and asset filenames that do not exist until the

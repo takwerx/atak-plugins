@@ -6,6 +6,12 @@
 # release that did not exist; git-guard only scopes to the monorepo, so the
 # subtree push that published those links was never checked.
 #
+# Since 2026-09-06 it also runs scripts/check-version-code.sh --signed: the
+# fleet gets plugins pushed by Watchtower MDM, which keys updates on Android's
+# integer versionCode, and every signed release before Cam Depot 1.3 carried 1.
+# A release whose signed APKs are missing a target, carry the wrong code, or
+# change package or signer is not an update and does not get published.
+#
 # The plugin is found by its README's "All releases:" line, which names the
 # public repo. A push to a repo no README claims is not a plugin release and
 # is left alone.
@@ -51,6 +57,17 @@ if r.returncode != 0:
                      + plugin + "/README.md and docs/USER_GUIDE.md do not match PLUGIN_VERSION. "
                      "Users would get 404s. Fix the download block and commit it before this push; "
                      "do not work around this.\n\n" + r.stdout + r.stderr)
+    sys.exit(2)
+
+vc = os.path.join(root, "scripts", "check-version-code.sh")
+if not os.path.exists(vc):
+    sys.stderr.write("release-links-guard: scripts/check-version-code.sh missing; refusing to publish a plugin release without it.\n")
+    sys.exit(2)
+r = subprocess.run(["bash", vc, plugin, "--signed"], capture_output=True, text=True, timeout=180)
+if r.returncode != 0:
+    sys.stderr.write("BLOCKED by release-links-guard: plugins/" + plugin + " is not a release the MDM "
+                     "could push as an update (versionCode, missing target, package or signer). "
+                     "Fix the finding, do not work around this.\n\n" + r.stdout + r.stderr)
     sys.exit(2)
 sys.exit(0)
 PYEOF
