@@ -52,6 +52,12 @@ The rules:
   worktree per plugin means two sessions never hold the same plugin. Two
   sessions on one phone collide the same way: say which phone a session has
   and keep it.
+- **Check the live session list before touching a worktree you did not
+  make.** `worktree.sh list` shows branches and distance from main, not who
+  is working where; `ListAgents` does. On 2026-09-07 one session committed
+  into the tooling worktree while another was shipping from it, and neither
+  could see the other in the listing. A worktree with a live session is that
+  session's: message it, do not `git -C` into it.
 - **Shared files change only on a tooling branch** in `atak-plugins-tooling`:
   `scripts/`, `.claude/`, this file, the root `README.md`, `.gitignore`, and
   any rule applied to every plugin's `app/build.gradle`. They reach `main` the
@@ -258,12 +264,24 @@ visible (the Studio's emulator disappears); unset it for emulator work.
 
 ## Creating a plugin
 
+A new plugin gets its worktree first and is scaffolded inside it, so it never
+touches the main checkout or another plugin's worktree. Run the first line from
+anywhere (`worktree.sh` reads `main` for what exists; a name with no plugin on
+`main` is a new plugin, and a misspelt existing one is refused):
+
 ```bash
-./scripts/new-plugin.sh <name> "Display Name"    # name: lowercase letters/digits only
+~/GitHub/atak-plugins/scripts/worktree.sh new <Name> <name>-v0.1
+cd ~/GitHub/atak-plugins-<name>
+./scripts/new-plugin.sh <Name> "Display Name"    # name: letters/digits only
+git add plugins/<Name> && git commit
 ```
 
-Copies `plugintemplate` out of the SDK, renames the package/class/descriptor, sets
-`rootProject.name`, and writes a gitignored `local.properties`.
+`new-plugin.sh` copies `plugintemplate` out of the SDK, renames the
+package/class/descriptor, sets `rootProject.name`, and writes a gitignored
+`local.properties`. Open the session in that worktree; the plugin lives there
+through every release, the branch changing per version. Before its first
+`/ship`, its public repo `takwerx/<plugin-repo>` must exist (see "One public
+repo per plugin") and `refresh_depot.py` must list it (HARD RULE 2).
 
 **Plugin names are letters and digits only — no dashes, no underscores.** Capitals are
 fine (`UnitTracker`). The release build emits `-repackageclasses atakplugin.${rootProject.name}`
