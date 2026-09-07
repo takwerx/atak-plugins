@@ -249,9 +249,11 @@ produces a plugin that builds fine and then refuses to load:
 - `<meta-data android:name="plugin-api" android:value="${atakApiVersion}"/>` — resolves to
   `com.atakmap.app@<ATAK_VERSION>.<FLAVOR>`. This must match the target ATAK build; a
   mismatch means ATAK will not load the plugin.
-- `archivesBaseName` / `getVersionCode()` / `getVersionName()` logic — the SDK explicitly
-  asks developers not to change these, and the third-party publication pipeline expects
-  the resulting `ATAK-Plugin-<name>-<ver>-<gitsha>-<atakver>.apk` naming.
+- `archivesBaseName` / `getVersionName()` logic — the SDK explicitly asks developers
+  not to change these, and the third-party publication pipeline expects the resulting
+  `ATAK-Plugin-<name>-<ver>-<gitsha>-<atakver>.apk` naming. The one deliberate
+  departure is `versionCode`: it is `PLUGIN_VERSION_CODE`, derived from
+  `PLUGIN_VERSION`, never the SDK's `getVersionCode()` — see the release checklist.
 
 ## Release builds differ from debug builds — test the release APK
 
@@ -560,6 +562,13 @@ device used for instrumented tests is no longer in a user's configuration.
 
 Work through this before building submission zips. None of it is theoretical.
 
+**Think like the MDM and the package manager, not only the plugin loader.** The
+fleet gets these plugins pushed by Watchtower MDM. A release that sideloads fine
+but cannot be pushed as an update is a broken release: same package name, same
+signer, a `versionCode` higher than the last release, and one APK per ATAK
+target the fleet runs. When a new fleet-side failure turns up, add a mechanical
+check for it the same day.
+
 **Two icons, not one.** `android:icon` is what Android shows on **light**
 backgrounds — the app list, Settings, and the My Files browser a user reaches the
 manual through. ATAK shows toolbar and Tool Preferences icons on **dark**. The SDK
@@ -582,23 +591,40 @@ smaller than its neighbors (FOBS, 2026-09-05, three rounds until it matched). In
 Artwork should be a square composition to begin with; a tall or wide glyph leaves
 empty sides no scaling can fix.
 
-**tak.gov builds have no git, so version stamping silently degrades.**
-`getVersionCode()` and `getVersionName()` both read the git revision, and the
-submission is a zip with no `.git`. Measured on the same 1.2 zip:
+**tak.gov builds have no git, so `versionCode` is derived from `PLUGIN_VERSION`.**
+The SDK's `getVersionCode()` and `getVersionName()` both read the git revision,
+and the submission is a zip with no `.git`. Measured on the same 1.2 zip:
 
 ```
 with .git : versionCode=1788195463  versionName='1.2 (4391c747) - [5.8.0]'
 no .git   : versionCode=1           versionName='1.2 () - [5.8.0]'
 ```
 
-So **every signed release has `versionCode=1` and a blank hash**. Two consequences:
+**Every signed release before 2026-09-06 has `versionCode=1`**, and that is the
+number an MDM keys updates on; `versionName` is a display string. Watchtower
+refused Cam Depot 1.2 as an update to 1.1 because both were version 1 to it, and
+Cam Depot 1.3 exists only to carry the fix. Sideloading and the Market never
+showed it, because the system installer replaces a same-version-code package.
 
-- Never rely on `versionCode` to detect an upgrade at runtime. ATAK's
-  `PdfHelper.extractAndShow` does exactly that, so a plugin's manual is extracted
-  once to a fixed path and then **frozen on the device forever** — every later
-  release keeps showing the first manual the user ever opened. A plugin that ships
-  a manual must compare `versionName` itself and delete the stale file.
-- A blank hash in the plugins list is expected, not a broken build.
+So every plugin's `app/build.gradle` sets `versionCode = PLUGIN_VERSION_CODE`,
+computed from `PLUGIN_VERSION` as `MAJOR*10000 + MINOR*100 + PATCH` (1.3 →
+10300), the same on every machine. `new-plugin.sh` writes it, and
+`submission-zip.sh` reads the clean-extract APK with `aapt` and fails the zip
+when the code is not that number. What remains:
+
+- `versionName` still carries a blank hash in every signed build. That is
+  expected, not a broken build.
+- ATAK's `PdfHelper.extractAndShow` re-extracts the manual when `versionCode`
+  changes, so from the first fixed release on it works by itself. Keep the
+  `versionName` comparison the plugins already do; a device that opened the
+  manual under code 1 is handled by either.
+- A rising code means Android refuses a downgrade. A device on 1.4 for ATAK 5.7
+  cannot be moved to 1.3 for 5.8, so every release ships every target, which
+  was already the rule.
+- On a dev phone, the first install over a build from before the change fails
+  with `INSTALL_FAILED_VERSION_DOWNGRADE`, because the git-derived code was a
+  timestamp. Uninstall the plugin first. Official phones only ever had code 1,
+  so for them the fixed release is a plain upgrade.
 
 **Verify the manual from the zip, not from your working tree.**
 `app/src/main/assets/usermanual.pdf` is gitignored and only regenerated when typst
