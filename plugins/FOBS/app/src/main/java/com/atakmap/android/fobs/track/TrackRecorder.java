@@ -78,6 +78,8 @@ public class TrackRecorder implements PointMapItem.OnPointChangedListener, ToolL
     private int fixesSincePersist;
     private String feed;
     private Listener listener;
+    /** While now is before this, a bar dismissal is FOBS's own doing: no toast. */
+    private long quietUntil;
 
     public TrackRecorder(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
@@ -307,6 +309,34 @@ public class TrackRecorder implements PointMapItem.OnPointChangedListener, ToolL
     }
 
     // ---- the bar comes back ------------------------------------------------------
+
+    /**
+     * Put the bar back a beat from now, quietly. Opening the FOBS pane makes ATAK end
+     * the active tool, so a bar started at the same moment is knocked down again and
+     * the "still recording" toast fires while FOBS is plainly open (XCover,
+     * 2026-09-06). Waiting until the pane has settled, and holding the toast for
+     * that long, gives one bar and no toast.
+     */
+    public void reshowBar(long delayMs) {
+        if (!isRecording())
+            return;
+        quietUntil = System.currentTimeMillis() + delayMs + 500;
+        mapView.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!isRecording())
+                    return;
+                ToolManagerBroadcastReceiver tm = ToolManagerBroadcastReceiver.getInstance();
+                if (!(tm.getActiveTool() instanceof GpsTrackTool))
+                    tm.startTool(GpsTrackTool.ID, new Bundle());
+            }
+        }, delayMs);
+    }
+
+    /** True while a bar dismissal should pass without the "still recording" toast. */
+    public boolean quiet() {
+        return System.currentTimeMillis() < quietUntil;
+    }
 
     @Override
     public void onToolBegin(Tool tool, Bundle extras) {

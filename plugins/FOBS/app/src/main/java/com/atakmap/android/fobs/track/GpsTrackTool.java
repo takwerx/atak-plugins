@@ -95,7 +95,7 @@ public class GpsTrackTool extends Tool implements View.OnClickListener, TrackRec
         TextContainer.getInstance().closePrompt();
         // The bar went away but the walk did not. Say so once when it was not End:
         // another tool took the bar, or ATAK's back dismissed it.
-        if (!endedHere && rec != null && rec.isRecording())
+        if (!endedHere && rec != null && rec.isRecording() && !rec.quiet())
             toast(plugin.getString(R.string.toast_still_recording, rec.title()));
     }
 

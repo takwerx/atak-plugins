@@ -163,11 +163,12 @@ public class FobsPane implements View.OnClickListener {
         ui.showPane(pane, null);
         // A walk is running: opening FOBS puts its bar back on the screen too, so
         // Pause and End are one tap away again (operator, 2026-09-06: "if you open
-        // the plugin up that on the screen should come back").
+        // the plugin up that on the screen should come back"). A beat later, not
+        // now: opening the pane ends the active tool, so a bar started here was
+        // knocked straight down again.
         TrackRecorder rec = TrackRecorder.get();
-        if (rec != null && rec.isRecording()
-                && !(ToolManagerBroadcastReceiver.getInstance().getActiveTool() instanceof GpsTrackTool))
-            ToolManagerBroadcastReceiver.getInstance().startTool(GpsTrackTool.ID, new Bundle());
+        if (rec != null && rec.isRecording())
+            rec.reshowBar(600);
     }
 
     /** The GPS tile says Recording while a walk is running, so nobody wonders. */
@@ -198,8 +199,9 @@ public class FobsPane implements View.OnClickListener {
             TrackRecorder rec = TrackRecorder.get();
             if (rec != null && rec.isRecording()) {
                 // A walk is already running: bring its bar back rather than start
-                // another. Pause and End live there.
-                ToolManagerBroadcastReceiver.getInstance().startTool(GpsTrackTool.ID, new Bundle());
+                // another. Pause and End live there. The pane just closed, which
+                // may itself end a tool; same beat, same quiet.
+                rec.reshowBar(300);
                 return;
             }
             askName(new OnName() {
