@@ -18,7 +18,9 @@
 #
 # <branch> is created from main when it does not exist yet. Plugin names are
 # the directory names under plugins/ (CamDepot, FOBS); `tooling` is the
-# worktree for shared files (scripts/, .claude/, CLAUDE.md).
+# worktree for shared files (scripts/, .claude/, CLAUDE.md). A name with no
+# plugin on main yet is a NEW plugin: its worktree is made here first, then
+# new-plugin.sh scaffolds the plugin inside it (CLAUDE.md, "Creating a plugin").
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=./env.sh
@@ -38,8 +40,9 @@ path_of() { # <Plugin|tooling|path> -> absolute worktree path
 }
 
 is_plugin_wt() { # <path>: named for a plugin under plugins/ (atak-plugins-<plugin>)?
+    # On main, or only in this worktree: a new plugin before its first ship.
     local suffix="${1##*/$BASE-}" d
-    for d in "$MAIN_WT"/plugins/*/; do
+    for d in "$MAIN_WT"/plugins/*/ "$1"/plugins/*/; do
         [ "$(basename "$d" | tr '[:upper:]' '[:lower:]')" = "$suffix" ] && return 0
     done
     return 1
@@ -90,8 +93,27 @@ cmd_new() {
     local name="${1:-}" branch="${2:-}" wt
     [ -n "$name" ] && [ -n "$branch" ] || usage
     case "$name" in */*) echo "error: give a plugin name (CamDepot, FOBS) or 'tooling', not a path" >&2; exit 2 ;; esac
-    if [ "$name" != tooling ] && [ ! -f "$MAIN_WT/plugins/$name/app/build.gradle" ]; then
-        echo "error: no plugin at plugins/$name in $MAIN_WT (names are case-sensitive)" >&2; exit 2
+    # Compare against the directory names main actually has, never by probing
+    # the path: the Mac's filesystem is case-insensitive, so plugins/Camdepot
+    # "exists" there while git and Linux know only CamDepot.
+    local new_plugin=0 d found=0
+    if [ "$name" != tooling ]; then
+        for d in "$MAIN_WT"/plugins/*/; do
+            d="$(basename "$d")"
+            [ -f "$MAIN_WT/plugins/$d/app/build.gradle" ] || continue
+            if [ "$d" = "$name" ]; then found=1; break; fi
+            if [ "$(printf '%s' "$d" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')" ]; then
+                echo "error: no plugin at plugins/$name on main; did you mean $d? (names are case-sensitive)" >&2; exit 2
+            fi
+        done
+        if [ "$found" = 0 ]; then
+            # Not on main: a brand-new plugin, worktree before scaffold.
+            case "$name" in *[!A-Za-z0-9]*)
+                echo "error: a plugin name is letters and digits only, no dashes or underscores (new-plugin.sh)" >&2; exit 2 ;;
+            esac
+            new_plugin=1
+            echo "==> no plugins/$name on main yet: a NEW plugin. Worktree first, then new-plugin.sh inside it."
+        fi
     fi
     wt="$(path_of "$name")"
     if [ -e "$wt" ]; then
@@ -110,6 +132,10 @@ cmd_new() {
     setup "$wt"
     echo
     echo "$wt  [$branch]"
+    if [ "$new_plugin" = 1 ]; then
+        echo "Next, in that worktree:"
+        echo "  ./scripts/new-plugin.sh $name \"Display Name\"   # then commit plugins/$name"
+    fi
     echo "Open the session there. Before zips or a ship the branch must contain main:"
     echo "  scripts/check-main-merged.sh   (fix: git merge main)"
 }
