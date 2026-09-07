@@ -662,6 +662,22 @@ push and `gh release create` when the check fails. When a version is skipped
 or folded into the next one, re-stamp the block in the same commit that bumps
 `PLUGIN_VERSION`.
 
+## Anything that keeps running after the tap
+
+ATAK runs one tool at a time and ends the active tool whenever another starts,
+a dropdown or pane opens, or Back is pressed. Work that must outlive a tap (a
+recording, a live feed, a download, a self-marker listener) lives in a component
+that lasts for the plugin's life, never inside a `Tool`; the tool is only its
+bar. FOBS 0.4 went to the field with a GPS recording inside its tool, and
+switching base maps ended the walk.
+
+Before a device test and again at the ship prompt, stage every interruption in
+`../atak-plugins-notes/docs/CHECKLIST-background-behavior.md` that applies:
+other tools, base map switch, Back, pane closed and reopened, ATAK backgrounded,
+screen locked, Doze, network and server drops, Data Sync present or absent,
+plugin reload, ATAK killed. Each PLAN carries a "Background and interruptions"
+section answering the list; "not applicable" is an answer, silence is not.
+
 ## Process rules inherited from infra-TAK
 
 - Plan-first for anything beyond a hot fix — PLAN doc in `../atak-plugins-notes/docs/`.
