@@ -134,7 +134,11 @@ cmd_list() {
         elif [ "$ahead" = 0 ] && [ "$dirty" = 0 ]; then
             # a plugin's worktree lives as long as the plugin; a topic worktree
             # (tooling-*, an old task name) is done once it equals main
-            if is_plugin_wt "$wt"; then state="$state up-to-date"; else state="$state merged,removable"; fi
+            if is_plugin_wt "$wt"; then
+                [ "$behind" = 0 ] && state="$state up-to-date"
+            else
+                state="$state merged,removable"
+            fi
         fi
         printf '%-44s %-24s %s\n' "${wt/#$HOME/~}" "$br" "${state# }"
     done
