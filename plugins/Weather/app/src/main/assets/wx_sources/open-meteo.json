@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "open-meteo",
+  "displayName": "Open-Meteo",
+  "description": "Global forecast, no account or API key. Blends national weather models (ECMWF, GFS, ICON) automatically.",
+  "attribution": "Weather data by Open-Meteo.com (CC BY 4.0)",
+  "termsUrl": "https://open-meteo.com/en/terms",
+  "requestUrl": "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current={group:current}&hourly={group:hourly}&timezone=UTC&temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm",
+  "layout": "columns",
+  "timePath": "hourly.time",
+  "currentTimePath": "current.time",
+  "parameters": [
+    {
+      "key": "temperature_2m",
+      "label": "Temperature",
+      "quantity": "temperature",
+      "unit": "celsius",
+      "requestGroups": ["current", "hourly"],
+      "currentPath": "current.temperature_2m",
+      "seriesPath": "hourly.temperature_2m",
+      "defaultOn": true
+    },
+    {
+      "key": "relative_humidity_2m",
+      "label": "Relative humidity",
+      "quantity": "percent",
+      "requestGroups": ["current", "hourly"],
+      "currentPath": "current.relative_humidity_2m",
+      "seriesPath": "hourly.relative_humidity_2m",
+      "defaultOn": true
+    },
+    {
+      "key": "wind_speed_10m",
+      "label": "Wind",
+      "quantity": "speed",
+      "unit": "m/s",
+      "requestGroups": ["current", "hourly"],
+      "currentPath": "current.wind_speed_10m",
+      "seriesPath": "hourly.wind_speed_10m",
+      "defaultOn": true
+    },
+    {
+      "key": "wind_gusts_10m",
+      "label": "Gusts",
+      "quantity": "speed",
+      "unit": "m/s",
+      "requestGroups": ["current", "hourly"],
+      "currentPath": "current.wind_gusts_10m",
+      "seriesPath": "hourly.wind_gusts_10m",
+      "defaultOn": true
+    },
+    {
+      "key": "wind_direction_10m",
+      "label": "Wind direction",
+      "quantity": "angle",
+      "requestGroups": ["current", "hourly"],
+      "currentPath": "current.wind_direction_10m",
+      "seriesPath": "hourly.wind_direction_10m",
+      "defaultOn": true
+    },
+    {
+      "key": "precipitation",
+      "label": "Precipitation",
+      "quantity": "precipitation",
+      "unit": "mm",
+      "requestGroups": ["current", "hourly"],
+      "currentPath": "current.precipitation",
+      "seriesPath": "hourly.precipitation",
+      "defaultOn": true
+    },
+    {
+      "key": "precipitation_probability",
+      "label": "Chance of precipitation",
+      "quantity": "percent",
+      "requestGroups": ["hourly"],
+      "seriesPath": "hourly.precipitation_probability",
+      "defaultOn": true
+    },
+    {
+      "key": "dew_point_2m",
+      "label": "Dew point",
+      "quantity": "temperature",
+      "unit": "celsius",
+      "requestGroups": ["current", "hourly"],
+      "currentPath": "current.dew_point_2m",
+      "seriesPath": "hourly.dew_point_2m",
+      "defaultOn": false
+    },
+    {
+      "key": "apparent_temperature",
+      "label": "Feels like",
+      "quantity": "temperature",
+      "unit": "celsius",
+      "requestGroups": ["current", "hourly"],
+      "currentPath": "current.apparent_temperature",
+      "seriesPath": "hourly.apparent_temperature",
+      "defaultOn": false
+    },
+    {
+      "key": "surface_pressure",
+      "label": "Surface pressure",
+      "quantity": "pressure",
+      "unit": "hPa",
+      "requestGroups": ["current", "hourly"],
+      "currentPath": "current.surface_pressure",
+      "seriesPath": "hourly.surface_pressure",
+      "defaultOn": false
+    },
+    {
+      "key": "cloud_cover",
+      "label": "Cloud cover",
+      "quantity": "percent",
+      "requestGroups": ["current", "hourly"],
+      "currentPath": "current.cloud_cover",
+      "seriesPath": "hourly.cloud_cover",
+      "defaultOn": false
+    },
+    {
+      "key": "visibility",
+      "label": "Visibility",
+      "quantity": "length",
+      "unit": "m",
+      "requestGroups": ["hourly"],
+      "seriesPath": "hourly.visibility",
+      "defaultOn": false
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "nws",
+  "displayName": "NWS (United States)",
+  "description": "National Weather Service hourly forecast. US coverage only, public domain, no API key. Two-step: the point lookup returns the gridpoint forecast URL.",
+  "attribution": "Forecast from the US National Weather Service (api.weather.gov)",
+  "termsUrl": "https://www.weather.gov/documentation/services-web-api",
+  "resolveUrl": "https://api.weather.gov/points/{lat},{lon}",
+  "resolvePath": "properties.forecastHourly",
+  "headers": {
+    "Accept": "application/geo+json"
+  },
+  "layout": "records",
+  "recordsPath": "properties.periods",
+  "timePath": "startTime",
+  "parameters": [
+    {
+      "key": "temperature",
+      "label": "Temperature",
+      "quantity": "temperature",
+      "unitPath": "temperatureUnit",
+      "seriesPath": "temperature",
+      "defaultOn": true
+    },
+    {
+      "key": "relativeHumidity",
+      "label": "Relative humidity",
+      "quantity": "percent",
+      "seriesPath": "relativeHumidity.value",
+      "defaultOn": true
+    },
+    {
+      "key": "windSpeed",
+      "label": "Wind",
+      "quantity": "speed",
+      "unit": "mph",
+      "parse": "leadingNumber",
+      "seriesPath": "windSpeed",
+      "defaultOn": true
+    },
+    {
+      "key": "windDirection",
+      "label": "Wind direction",
+      "quantity": "angle",
+      "parse": "compass",
+      "seriesPath": "windDirection",
+      "defaultOn": true
+    },
+    {
+      "key": "probabilityOfPrecipitation",
+      "label": "Chance of precipitation",
+      "quantity": "percent",
+      "seriesPath": "probabilityOfPrecipitation.value",
+      "defaultOn": true
+    },
+    {
+      "key": "dewpoint",
+      "label": "Dew point",
+      "quantity": "temperature",
+      "unitPath": "dewpoint.unitCode",
+      "seriesPath": "dewpoint.value",
+      "defaultOn": false
+    }
+  ]
+}
