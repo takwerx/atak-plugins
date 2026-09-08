@@ -3,5 +3,14 @@
     <!-- App -->
     <string name="app_name">Evac Map</string>
     <!-- description -->
-    <string name="app_desc">Evac Map</string>
+    <string name="app_desc">Evacuation zones from state and county services, browsed by state.</string>
+
+    <string name="pick_state">Pick a state</string>
+    <string name="refresh_all">Refresh</string>
+    <string name="loading_catalog">Loading catalog…</string>
+    <string name="section_sources">Sources</string>
+    <string name="section_attributes">Attributes</string>
+    <string name="toggle_off">OFF</string>
+    <string name="go_to">Go to</string>
+    <string name="refresh">Refresh</string>
 </resources>

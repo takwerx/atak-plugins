@@ -1,22 +1,82 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:fadeScrollbars="false"
-    android:layout_marginLeft="3dp"
-    android:layout_marginRight="3dp">
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="6dp">
 
+    <!-- Pinned above the list: the state picker is the one control an operator must
+         reach without scrolling. Top-aligned, not center_vertical (a bottom margin
+         under centering lifts a button off its own top edge). -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical" >
-
-        <TextView
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+        <Button
+            android:id="@+id/btn_state"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="@string/pick_state" />
+        <Button
+            android:id="@+id/btn_refresh_all"
+            style="@style/TakwerxButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/app_name" />
-
+            android:layout_marginLeft="6dp"
+            android:text="@string/refresh_all" />
     </LinearLayout>
-</ScrollView>
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="4dp"
+        android:textSize="12sp"
+        android:textColor="#BBBBBB"
+        android:text="@string/loading_catalog" />
+
+    <TextView
+        android:id="@+id/legend"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:paddingBottom="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/section_sources"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:alpha="0.6"
+        android:textColor="#FFFFFF"
+        android:paddingTop="4dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <LinearLayout
+                android:id="@+id/sources_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+            <TextView
+                android:id="@+id/sources_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#BBBBBB"
+                android:paddingTop="4dp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

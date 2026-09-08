@@ -122,5 +122,21 @@
         <item name="android:textSize">@dimen/fontSize</item>
     </style>
 
+    <!--
+        Standard takwerx plugin button: ATAK's own darkButton drawable and text treatment,
+        with horizontal padding and a touch-sized minimum height (a gloved hand on a
+        vehicle mount). Every button in the plugin uses it.
+    -->
+    <style name="TakwerxButton" parent="@style/darkButton">
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+    </style>
 
 </resources>
