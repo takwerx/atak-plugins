@@ -145,6 +145,8 @@ public class ZoneLayer {
         public final int color;
         public final double lat, lon;
         public final double[] bounds;
+        /** The feature's id in the store, for the details pane. */
+        public long featureId = -1;
 
         ZoneInfo(Pending pf, Catalog.Source source) {
             name = pf.name;
@@ -473,13 +475,14 @@ public class ZoneLayer {
                         out++;
                         continue;
                     }
-                    listed.add(new ZoneInfo(pf, source));
+                    final ZoneInfo zi = new ZoneInfo(pf, source);
+                    listed.add(zi);
                     Long fsid = sets.get(pf.setName);
                     if (fsid == null) {
                         fsid = newSet(pf.setName, Math.min(pf.minGsd, zoomGate));
                         sets.put(pf.setName, fsid);
                     }
-                    store.insertFeature(new Feature(fsid, pf.name, pf.geometry, pf.style, pf.attrs,
+                    zi.featureId = store.insertFeature(new Feature(fsid, pf.name, pf.geometry, pf.style, pf.attrs,
                             Feature.AltitudeMode.ClampToGround, 0d));
                     in++;
                 }

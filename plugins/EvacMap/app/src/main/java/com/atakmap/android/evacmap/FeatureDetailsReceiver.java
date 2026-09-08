@@ -43,8 +43,11 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
             Log.d(TAG, "details: no map item for " + uid);
             return;
         }
-        final long fid = item.getMetaLong("featureid", -1);
-        final String sourceId = item.getMetaString("evacmap_source", null);
+        show(item.getMetaString("evacmap_source", null), item.getMetaLong("featureid", -1));
+    }
+
+    /** Opens the details of one zone: from a tap on the map, or from a row in the list. */
+    public void show(String sourceId, long fid) {
         final FeatureDataStore2 store = sourceId == null ? null : manager.storeFor(sourceId);
         Feature f = null;
         try {

@@ -598,6 +598,13 @@ public class EvacMap implements IPlugin {
                     manager.frame(z.bounds);
                 }
             });
+            // The row itself opens the details; the button beside it goes there.
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    manager.showDetails(z.sourceId, z.featureId);
+                }
+            });
             container.addView(row);
         }
     }

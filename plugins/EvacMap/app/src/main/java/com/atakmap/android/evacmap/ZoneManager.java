@@ -136,6 +136,12 @@ public class ZoneManager {
         applyVisibility();
     }
 
+    /** The details pane for one zone, by source and feature id. Main thread. */
+    public void showDetails(String sourceId, long featureId) {
+        if (details != null && featureId >= 0)
+            details.show(sourceId, featureId);
+    }
+
     /** Pushes the current radius and zoom gate to every layer, on the worker. */
     public void applyVisibility() {
         final GeoPoint from = visibility.from(mapView);
