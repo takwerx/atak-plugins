@@ -192,7 +192,7 @@ public class ZoneManager {
                     if (c.sources.isEmpty())
                         throw new IllegalStateException("catalog is empty");
                     catalog = c;
-                    catalogStatus = c.sources.size() + " sources, catalog of " + c.generated.replaceAll("T.*$", "");
+                    catalogStatus = c.sources.size() + " sources, catalog of " + localTime(c.generated);
                     Log.d(TAG, "depot catalog: " + c.sources.size() + " sources, generated " + c.generated);
                 } catch (Exception e) {
                     // Offline, or nothing published yet: the built-in copy is the catalog,
@@ -210,6 +210,19 @@ public class ZoneManager {
                 });
             }
         });
+    }
+
+    /** "2026-09-08 12:56" in the phone's time zone for the catalog's UTC stamp; the stamp itself if unreadable. */
+    static String localTime(String iso) {
+        try {
+            final java.text.SimpleDateFormat in = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US);
+            in.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            final java.util.Date d = in.parse(iso);
+            final java.text.SimpleDateFormat out = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US);
+            return out.format(d);
+        } catch (Exception e) {
+            return iso;
+        }
     }
 
     // ---- sources on and off -------------------------------------------------------
