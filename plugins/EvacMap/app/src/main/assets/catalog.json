@@ -1,6 +1,6 @@
 {
  "format": 1,
- "generated": "2026-09-08T18:20:31Z",
+ "generated": "2026-09-08T19:08:44Z",
  "sources": [
   {
    "id": "us-ca-caloes-active",
@@ -26,7 +26,7 @@
     -114.1
    ],
    "note": "Orders and warnings only, every county, refreshed by Cal OES every 5 minutes.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-ca-calfire-combined",
@@ -52,7 +52,7 @@
     -114.1
    ],
    "note": "Adds the reason, population and lifted zones; also carries county feeds that are not in Genasys.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-or-oem",
@@ -69,7 +69,7 @@
    "status_field": "Fire_Evacuation_Level",
    "name_field": "Evac_Area_Name",
    "refresh_min": 5,
-   "features": 92,
+   "features": 89,
    "simplify": 0.0001,
    "bounds": [
     41.99,
@@ -78,7 +78,7 @@
     -116.45
    ],
    "note": "Level 1 Be Ready, 2 Be Set, 3 Go Now.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "ca-bc-evac",
@@ -104,7 +104,7 @@
     -114.0
    ],
    "note": "Order, Alert (be ready to leave), Tactical Evacuation, All Clear.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-ca-sonoma",
@@ -130,7 +130,7 @@
     -122.3496
    ],
    "note": "Every zone, most of them Normal.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-ca-napa",
@@ -156,7 +156,7 @@
     -122.0613
    ],
    "note": "Every zone, most of them Normal.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-ca-monterey",
@@ -182,7 +182,7 @@
     -120.9219
    ],
    "note": "",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-ca-plumas",
@@ -208,7 +208,7 @@
     -120.2638
    ],
    "note": "",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-ca-san-diego",
@@ -234,7 +234,7 @@
     -117.1423
    ],
    "note": "",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-ca-la-city",
@@ -255,7 +255,7 @@
    "simplify": 0.0001,
    "bounds": null,
    "note": "Empty between incidents.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-ca-la-county",
@@ -281,7 +281,7 @@
     -117.6671
    ],
    "note": "Areas under an active alert; the alert text is in the details.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-ca-ventura",
@@ -302,7 +302,7 @@
    "simplify": 0.0001,
    "bounds": null,
    "note": "Empty between incidents.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-ca-mariposa",
@@ -323,7 +323,59 @@
    "simplify": 0.0001,
    "bounds": null,
    "note": "Empty between incidents.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
+  },
+  {
+   "id": "us-ca-riverside-zones",
+   "title": "Genasys zone boundaries",
+   "publisher": "City of Riverside GIS",
+   "st": "CA",
+   "co": "Riverside",
+   "kind": "static",
+   "url": "https://services.arcgis.com/Fu2oOWg1Aw7azh41/arcgis/rest/services/Evacuation_Zone_Genasys_RIVCO_Alert_Public_view/FeatureServer",
+   "layer": 0,
+   "layer_name": "Evacuation Zone Genasys",
+   "geometry": "polygon",
+   "where": "1=1",
+   "status_field": "zone_statu",
+   "name_field": "zone_id",
+   "refresh_min": 360,
+   "features": 1989,
+   "simplify": 0.0001,
+   "bounds": [
+    33.4416,
+    -117.6763,
+    34.0344,
+    -116.0087
+   ],
+   "note": "All Genasys zones for the county, copied nightly by the city. Status here lags; live status is in the statewide layers.",
+   "checked": "2026-09-08T19:08:44Z"
+  },
+  {
+   "id": "us-ca-riverside-emd-mountain",
+   "title": "Mountain evacuation zones",
+   "publisher": "Riverside County EMD",
+   "st": "CA",
+   "co": "Riverside",
+   "kind": "static",
+   "url": "https://services1.arcgis.com/pWmBUdSlVpXStHU6/arcgis/rest/services/Mast_Zones___Read_Only/FeatureServer",
+   "layer": 0,
+   "layer_name": "Mast_Zones___Read_Only",
+   "geometry": "polygon",
+   "where": "1=1",
+   "status_field": "",
+   "name_field": "EVAC_Zone",
+   "refresh_min": 1440,
+   "features": 88,
+   "simplify": 0.0001,
+   "bounds": [
+    33.4272,
+    -116.8694,
+    33.9034,
+    -116.408
+   ],
+   "note": "Pre-planned zones for the mountain communities (Idyllwild, Poppet Flats, Pine Cove).",
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-or-deschutes-levels",
@@ -349,7 +401,7 @@
     -118.2149
    ],
    "note": "",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-or-deschutes-shelters",
@@ -375,7 +427,7 @@
     -121.5707
    ],
    "note": "",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-or-jackson",
@@ -401,7 +453,7 @@
     -122.2536
    ],
    "note": "Every zone, most at no level.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-fl-hillsborough",
@@ -427,7 +479,7 @@
     -82.1206
    ],
    "note": "Zones A to E.",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   },
   {
    "id": "us-fl-lee",
@@ -453,7 +505,7 @@
     -81.5607
    ],
    "note": "",
-   "checked": "2026-09-08T18:20:31Z"
+   "checked": "2026-09-08T19:08:44Z"
   }
  ]
 }
