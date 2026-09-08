@@ -25,4 +25,5 @@
     <string name="search_hint">Zone id, name or county</string>
     <string name="clear">Clear</string>
     <string name="status_all">Status: all</string>
+    <string name="back">Back</string>
 </resources>

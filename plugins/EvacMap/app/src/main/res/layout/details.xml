@@ -4,19 +4,36 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="8dp">
-    <TextView
-        android:id="@+id/details_title"
+    <!-- Pinned: Back stays put while the attributes scroll, so it is always reachable. -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="#FFFFFF" />
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+        <Button
+            android:id="@+id/btn_back"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/back" />
+        <TextView
+            android:id="@+id/details_title"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="8dp"
+            android:layout_marginTop="6dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF" />
+    </LinearLayout>
     <TextView
         android:id="@+id/details_subtitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textSize="13sp"
         android:textColor="#BBBBBB"
+        android:paddingTop="4dp"
         android:paddingBottom="6dp" />
     <TextView
         android:layout_width="wrap_content"

@@ -165,6 +165,13 @@ public class EvacMap implements IPlugin {
             wireVisibility();
             wireZoneList();
             if (manager != null)
+                manager.setOnDetailsBack(new Runnable() {
+                    @Override
+                    public void run() {
+                        showPane();
+                    }
+                });
+            if (manager != null)
                 manager.setListener(new ZoneManager.Listener() {
                     @Override
                     public void onChanged() {

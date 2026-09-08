@@ -28,11 +28,24 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
 
     private final ZoneManager manager;
     private final View view;
+    /** What Back does after closing, when the details came from the pane's list. */
+    private Runnable onBack;
+    private boolean returnToPane;
 
     public FeatureDetailsReceiver(MapView mapView, Context pluginContext, ZoneManager manager) {
         super(mapView);
         this.manager = manager;
         this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.details, null);
+        view.findViewById(R.id.btn_back).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                closeDropDown();
+            }
+        });
+    }
+
+    public void setOnBack(Runnable r) {
+        onBack = r;
     }
 
     @Override
@@ -43,11 +56,16 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
             Log.d(TAG, "details: no map item for " + uid);
             return;
         }
-        show(item.getMetaString("evacmap_source", null), item.getMetaLong("featureid", -1));
+        // From the map: Back returns to the map, not to a pane that was not open.
+        show(item.getMetaString("evacmap_source", null), item.getMetaLong("featureid", -1), false);
     }
 
-    /** Opens the details of one zone: from a tap on the map, or from a row in the list. */
-    public void show(String sourceId, long fid) {
+    /**
+     * Opens the details of one zone. From a row in the list, Back puts the pane back;
+     * from a tap on the map it just closes.
+     */
+    public void show(String sourceId, long fid, boolean fromPane) {
+        returnToPane = fromPane;
         final FeatureDataStore2 store = sourceId == null ? null : manager.storeFor(sourceId);
         Feature f = null;
         try {
@@ -107,6 +125,12 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
 
     @Override
     public void onDropDownClose() {
+        // Back, the Android back key, or ATAK closing it: the pane comes back when the
+        // details came from it. Once, then the flag is spent.
+        if (returnToPane && onBack != null) {
+            returnToPane = false;
+            onBack.run();
+        }
     }
 
     @Override

@@ -136,10 +136,16 @@ public class ZoneManager {
         applyVisibility();
     }
 
-    /** The details pane for one zone, by source and feature id. Main thread. */
+    /** The details pane for one zone from the pane's list, by source and feature id. Main thread. */
     public void showDetails(String sourceId, long featureId) {
         if (details != null && featureId >= 0)
-            details.show(sourceId, featureId);
+            details.show(sourceId, featureId, true);
+    }
+
+    /** What Back in the details does when they were opened from the pane. */
+    public void setOnDetailsBack(Runnable r) {
+        if (details != null)
+            details.setOnBack(r);
     }
 
     /** Pushes the current radius and zoom gate to every layer, on the worker. */
