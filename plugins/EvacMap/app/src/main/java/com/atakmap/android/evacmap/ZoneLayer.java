@@ -19,6 +19,7 @@ import com.atakmap.map.layer.feature.FeatureSetCursor;
 import com.atakmap.map.layer.feature.datastore.FeatureSetDatabase2;
 import com.atakmap.map.layer.feature.geometry.Envelope;
 import com.atakmap.map.layer.feature.geometry.Geometry;
+import com.atakmap.map.layer.feature.geometry.GeometryCollection;
 import com.atakmap.map.layer.feature.geometry.Point;
 import com.atakmap.map.layer.feature.style.Style;
 
@@ -48,13 +49,14 @@ public class ZoneLayer {
 
     /** Polygon fill opacity, 0..255. Zones sit over a base map; an opaque fill hides it. */
     static final int FILL_ALPHA = 0x50;
-    /**
-     * Zone names on the map, as their own label point at each zone's center, drawn from
-     * this resolution (meters per pixel) in. ATAK labels a polygon only along an edge
-     * long enough to hold the text, which at county scale is never; and every polygon
-     * and line carries an empty label so nothing is drawn twice.
+    /*
+     * Zone names on the map. ATAK labels a polygon only along an edge long enough to
+     * hold the text, which at county scale is never, so each zone's geometry is the
+     * polygon plus its center point in one collection, with the name as a label style:
+     * the point child draws the name, the polygon child the fill and edge, and there is
+     * one feature to tap, list and refresh. A separate label feature was tried first and
+     * ATAK's tap chooser listed it beside the zone. Lines carry an empty label.
      */
-    static final double LABEL_GSD = 60d;
 
     public final Catalog.Source source;
     private final MapView mapView;
@@ -176,50 +178,18 @@ public class ZoneLayer {
                 item.setMetaString("evacmap_source", source.id);
                 final AttributeSet a = feature.getAttributes();
                 String title = null;
-                boolean label = false;
                 try {
                     title = a == null ? null : a.getStringAttribute("_title");
-                    label = a != null && a.containsAttribute("_label");
                 } catch (Exception ignored) {
-                }
-                if (label) {
-                    // The zone's label point: drawn, never picked. See the hit tests below.
-                    item.setMetaBoolean("evacmap_label", true);
-                    item.setClickable(false);
                 }
                 if (title == null || title.isEmpty())
                     title = feature.getName();
                 item.setMetaString("title", title);
                 item.setMetaString("callsign", title);
                 // Lines and polygons have no icon of their own; give the tap chooser one.
-                if (!point) {
-                    final Geometry g = feature.getGeometry();
-                    final boolean poly = g != null && g.getClass().getSimpleName().contains("Polygon");
-                    item.setMetaString("iconUri", poly ? polygonGlyph : lineGlyph);
-                }
+                if (!point)
+                    item.setMetaString("iconUri", hasPolygon(feature.getGeometry()) ? polygonGlyph : lineGlyph);
                 return item;
-            }
-
-            // A zone and its label are one thing to the finger. The label point sits
-            // inside its polygon, so a tap on it always finds the polygon too; the
-            // label is dropped from every hit test and the chooser lists the zone once.
-
-            @Override
-            public java.util.SortedSet<MapItem> deepHitTest(MapView view,
-                    com.atakmap.map.hittest.HitTestQueryParameters params,
-                    java.util.Map<com.atakmap.map.layer.Layer2, java.util.Collection<com.atakmap.map.hittest.HitTestControl>> controls) {
-                return dropLabels(super.deepHitTest(view, params, controls));
-            }
-
-            @Override
-            public java.util.SortedSet<MapItem> deepHitTestItems(int x, int y, GeoPoint at, MapView view) {
-                return dropLabels(super.deepHitTestItems(x, y, at, view));
-            }
-
-            @Override
-            public MapItem deepHitTest(int x, int y, GeoPoint at, MapView view) {
-                final java.util.SortedSet<MapItem> items = deepHitTestItems(x, y, at, view);
-                return items == null || items.isEmpty() ? null : items.first();
             }
         };
         overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
@@ -235,34 +205,6 @@ public class ZoneLayer {
         final int stored = countFeatures();
         count = stored == 0 ? 0 : (zoneCount > 0 ? zoneCount : stored);
         status = count > 0 ? "cached" : "empty";
-    }
-
-    /** The hit-test result without label points; a copy when the set will not be edited in place. */
-    static java.util.SortedSet<MapItem> dropLabels(java.util.SortedSet<MapItem> items) {
-        if (items == null || items.isEmpty())
-            return items;
-        boolean any = false;
-        for (MapItem m : items)
-            if (m.getMetaBoolean("evacmap_label", false)) {
-                any = true;
-                break;
-            }
-        if (!any)
-            return items;
-        try {
-            final java.util.Iterator<MapItem> it = items.iterator();
-            while (it.hasNext())
-                if (it.next().getMetaBoolean("evacmap_label", false))
-                    it.remove();
-            return items;
-        } catch (UnsupportedOperationException e) {
-            final java.util.SortedSet<MapItem> out = new java.util.TreeSet<>(
-                    items.comparator() != null ? items.comparator() : MapItem.ZORDER_HITTEST_COMPARATOR);
-            for (MapItem m : items)
-                if (!m.getMetaBoolean("evacmap_label", false))
-                    out.add(m);
-            return out;
-        }
     }
 
     /**
@@ -547,7 +489,6 @@ public class ZoneLayer {
         final boolean normalize = statusField != null && !isPoint;
         final Set<String> dates = info.dateFields;
         final String setName = info.name;
-        final String labelSet = info.name + " labels";
         final int[] seen = { 0 };
 
         Esri.query(source.url, source.layer, source.where, Math.min(1000, info.maxRecordCount),
@@ -568,8 +509,21 @@ public class ZoneLayer {
                             style = renderer.styleFor(props);
                             key = statusText == null ? "(no status)" : statusText;
                         }
-                        if (!isPoint)
+                        Geometry geometry = g;
+                        if (isLine) {
                             style = Styles.silentLabel(style);
+                        } else if (!isPoint) {
+                            final Point at = labelPoint(g);
+                            if (at != null) {
+                                final GeometryCollection gc = new GeometryCollection(2);
+                                gc.addGeometry(g);
+                                gc.addGeometry(at);
+                                geometry = gc;
+                                style = Styles.withLabel(style, shortLabel(name));
+                            } else {
+                                style = Styles.silentLabel(style);
+                            }
+                        }
                         final String title = statusText != null && !statusText.equals(name)
                                 ? statusText + ": " + name : name;
                         final AttributeSet attrs = Esri.toAttributes(props, dates);
@@ -592,21 +546,7 @@ public class ZoneLayer {
                                 t.bounds = union(t.bounds, g);
                             }
                         }
-                        out.add(new Pending(setName, Double.MAX_VALUE, name, g, style, attrs));
-                        // The zone's name at its center, as its own gated point. Same
-                        // attributes, so a tap on the label opens the zone's details.
-                        if (!isPoint && !isLine) {
-                            final Point at = labelPoint(g);
-                            if (at != null) {
-                                final String text = shortLabel(name);
-                                final AttributeSet la = Esri.toAttributes(props, dates);
-                                la.setAttribute("_title", title);
-                                la.setAttribute("_label", "1");
-                                if (statusText != null)
-                                    la.setAttribute("_status", statusText);
-                                out.add(new Pending(labelSet, LABEL_GSD, text, at, Styles.label(text), la));
-                            }
-                        }
+                        out.add(new Pending(setName, Double.MAX_VALUE, name, geometry, style, attrs));
                         if (++seen[0] % 25 == 0) {
                             progress = seen[0];
                             status = "refreshing: " + seen[0];
@@ -642,7 +582,7 @@ public class ZoneLayer {
         if (g instanceof com.atakmap.map.layer.feature.geometry.Polygon) {
             best = (com.atakmap.map.layer.feature.geometry.Polygon) g;
         } else if (g instanceof com.atakmap.map.layer.feature.geometry.GeometryCollection) {
-            for (Geometry c : ((com.atakmap.map.layer.feature.geometry.GeometryCollection) g).getGeometries()) {
+            for (Geometry c : ((GeometryCollection) g).getGeometries()) {
                 if (!(c instanceof com.atakmap.map.layer.feature.geometry.Polygon))
                     continue;
                 final double a = Math.abs(ringArea(((com.atakmap.map.layer.feature.geometry.Polygon) c).getExteriorRing()));
@@ -696,6 +636,17 @@ public class ZoneLayer {
         if (b == null)
             return new double[] { e.minY, e.minX, e.maxY, e.maxX };
         return new double[] { Math.min(b[0], e.minY), Math.min(b[1], e.minX), Math.max(b[2], e.maxY), Math.max(b[3], e.maxX) };
+    }
+
+    /** A polygon, or a collection holding one (a zone with its label point). */
+    static boolean hasPolygon(Geometry g) {
+        if (g instanceof com.atakmap.map.layer.feature.geometry.Polygon)
+            return true;
+        if (g instanceof GeometryCollection)
+            for (Geometry c : ((GeometryCollection) g).getGeometries())
+                if (hasPolygon(c))
+                    return true;
+        return false;
     }
 
     private static String str(JSONObject p, String k) {

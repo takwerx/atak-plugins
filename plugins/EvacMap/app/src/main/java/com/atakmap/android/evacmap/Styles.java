@@ -39,15 +39,27 @@ final class Styles {
      * every line.
      */
     static Style silentLabel(Style s) {
-        final Style silent = new LabelPointStyle("", 0, 0, LabelPointStyle.ScrollMode.OFF);
+        return plus(s, new LabelPointStyle("", 0, 0, LabelPointStyle.ScrollMode.OFF));
+    }
+
+    /**
+     * The style plus a label with text. On a geometry that is a polygon and its center
+     * point in one collection, the point child draws this as the zone's name and the
+     * polygon child draws the fill and edge, all one feature.
+     */
+    static Style withLabel(Style s, String text) {
+        return plus(s, label(text));
+    }
+
+    private static Style plus(Style s, Style extra) {
         if (s instanceof CompositeStyle) {
             final CompositeStyle cs = (CompositeStyle) s;
             final Style[] all = new Style[cs.getNumStyles() + 1];
             for (int i = 0; i < cs.getNumStyles(); i++)
                 all[i] = cs.getStyle(i);
-            all[all.length - 1] = silent;
+            all[all.length - 1] = extra;
             return new CompositeStyle(all);
         }
-        return new CompositeStyle(new Style[] { s, silent });
+        return new CompositeStyle(new Style[] { s, extra });
     }
 }
