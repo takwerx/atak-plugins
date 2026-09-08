@@ -136,8 +136,8 @@ cmd_new() {
         echo "Next, in that worktree:"
         echo "  ./scripts/new-plugin.sh $name \"Display Name\"   # then commit plugins/$name"
     fi
-    echo "Open the session there. Before zips or a ship the branch must contain main:"
-    echo "  scripts/check-main-merged.sh   (fix: git merge main)"
+    echo "Open the session there. It merges main into the branch by itself when it opens"
+    echo "and before every zip (scripts/check-main-merged.sh --merge); only a conflict needs a hand."
 }
 
 cmd_list() {

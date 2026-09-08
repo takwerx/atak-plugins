@@ -59,9 +59,9 @@ echo "==> version code (the MDM must see this as an update)"
 # main on their own tooling ship, and a plugin branch that has not merged main
 # builds without them: FOBS 0.5's zips were built on 2026-09-06 without the
 # versionCode gate that camdepot-v1.3 had already added.
-echo "==> branch contains main (shared rules current)"
-"$REPO_ROOT/scripts/check-main-merged.sh" || {
-    echo "error: not zipping from a branch behind main — git merge main, then rerun" >&2; exit 1; }
+echo "==> branch contains main (shared rules current; merged in now if it was not)"
+"$REPO_ROOT/scripts/check-main-merged.sh" --merge || {
+    echo "error: not zipping from a branch behind main; see above for why main could not be merged in" >&2; exit 1; }
 
 mkdir -p "$DIST"
 rm -f "$OUT"

@@ -37,9 +37,11 @@ main checkout; `git -C ~/GitHub/atak-plugins branch --show-current` must print
 1. `git fetch origin` and confirm the branch tip is pushed (`git status -sb`).
    Record `git log -1 --format='%h %s'`. Then `./scripts/check-main-merged.sh`
    → PASS: the branch contains every commit on main, so it carries every
-   shared rule and the merge below is clean. A FAIL means `git merge main` on
-   the branch first (FOBS 0.5's zips were built without the versionCode gate
-   that already existed on another branch).
+   shared rule and the merge below is clean. A FAIL means main landed since
+   this session opened: `./scripts/check-main-merged.sh --merge` brings it in
+   on a clean tree (the session-start hook does the same), and only a
+   conflict needs a hand (FOBS 0.5's zips were built without the versionCode
+   gate that already existed on another branch).
 2. Version: `grep PLUGIN_VERSION plugins/<Plugin>/app/build.gradle` — this is the
    version being shipped; it must already be bumped in-branch, and `README.md`
    STATUS must say the same number.
@@ -180,7 +182,8 @@ guard, same sentinel, shorter list, because nothing leaves this machine but
 the push of `main`.
 
 Pre-flight:
-1. `git status -sb` clean; `./scripts/check-main-merged.sh` → PASS.
+1. `git status -sb` clean; `./scripts/check-main-merged.sh` → PASS (`--merge`
+   brings main in if it is not).
 2. The branch changes only shared paths:
    `git diff --stat main...HEAD -- . ':!scripts' ':!.claude' ':!CLAUDE.md' ':!README.md' ':!.gitignore'`
    is empty, or lists only one rule applied to every plugin's `app/build.gradle`
@@ -196,8 +199,9 @@ Prompt, via AskUserQuestion:
 > - what changes: `<one line per concern: scripts, hooks, CLAUDE.md …>`
 > - publish scrub: PASS · commit scan: `<clean / acknowledged>` · contains main: PASS
 > - this will: merge the branch into `main` and push main. No plugin repo, no
->   tag, no release, no catalog. Every plugin worktree then needs `git merge main`
->   before its next zip (`check-main-merged.sh` says so).
+>   tag, no release, no catalog. Every plugin worktree picks the new main up by
+>   itself when its session next opens or builds a zip; only a conflict is
+>   handed to a person.
 >
 > **Ship it?**
 
