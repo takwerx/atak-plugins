@@ -27,6 +27,7 @@ import org.json.JSONArray;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -234,33 +235,90 @@ public class EvacMap implements IPlugin {
 
     // ---- counties -----------------------------------------------------------------
 
-    /** Counties picked for a state, remembered per state so a picked list stays up. */
+    /**
+     * Counties picked for a state, as {@link Catalog#countyKey} keys, remembered per state
+     * so a picked list stays up. The first time a state is opened, the county under the
+     * map center is picked for it.
+     */
     private Set<String> selectedCounties(String st) {
         final Set<String> out = new LinkedHashSet<>();
         if (st == null)
             return out;
+        final String saved = uiPrefs().getString("counties." + st, null);
+        if (saved == null) {
+            try {
+                final Catalog c = manager.catalog();
+                final GeoPoint center = mapView.getCenterPoint().get();
+                final Catalog.County at = c == null ? null
+                        : c.countyAt(st, center.getLatitude(), center.getLongitude());
+                if (at != null)
+                    out.add(Catalog.countyKey(at.name));
+            } catch (Exception e) {
+                Log.w(TAG, "map center unavailable", e);
+            }
+            saveCounties(st, out);
+            return out;
+        }
         try {
-            final JSONArray arr = new JSONArray(uiPrefs().getString("counties." + st, "[]"));
+            final JSONArray arr = new JSONArray(saved);
             for (int i = 0; i < arr.length(); i++)
-                out.add(arr.getString(i));
+                out.add(Catalog.countyKey(arr.getString(i)));
         } catch (Exception e) {
             Log.w(TAG, "county selection unreadable", e);
         }
         return out;
     }
 
-    private void saveCounties(String st, Collection<String> counties) {
-        uiPrefs().edit().putString("counties." + st, new JSONArray(counties).toString()).apply();
+    private void saveCounties(String st, Collection<String> keys) {
+        uiPrefs().edit().putString("counties." + st, new JSONArray(keys).toString()).apply();
     }
 
-    /** Counties of this state that have sources, in catalog order, with their source counts. */
-    private static Map<String, Integer> countiesOf(List<Catalog.Source> srcs) {
-        final Map<String, Integer> out = new LinkedHashMap<>();
+    /** What the picker knows about one county: its name, its own sources, its zones in the statewide feeds. */
+    private static final class CountyEntry {
+        final String key;
+        String name;
+        int sources, zones;
+        double[] bounds;
+
+        CountyEntry(String key, String name) {
+            this.key = key;
+            this.name = name;
+        }
+    }
+
+    /**
+     * Every county of the state, by name: the Census list, plus any county a source
+     * names, plus any county a statewide feed that is on has zones in.
+     */
+    private Map<String, CountyEntry> countyEntries(Catalog c, List<Catalog.Source> srcs) {
+        final Map<String, CountyEntry> out = new java.util.TreeMap<>();
+        for (Catalog.County county : c.countiesOf(state)) {
+            final CountyEntry e = new CountyEntry(Catalog.countyKey(county.name), county.name);
+            e.bounds = county.bounds;
+            out.put(e.key, e);
+        }
         for (Catalog.Source s : srcs) {
             if (s.statewide())
                 continue;
-            final Integer n = out.get(s.county);
-            out.put(s.county, n == null ? 1 : n + 1);
+            final String k = Catalog.countyKey(s.county);
+            CountyEntry e = out.get(k);
+            if (e == null) {
+                e = new CountyEntry(k, s.county);
+                out.put(k, e);
+            }
+            e.sources++;
+        }
+        for (ZoneLayer l : manager.snapshot()) {
+            if (!l.isVisible() || !l.source.statewide() || !l.source.st.equalsIgnoreCase(state))
+                continue;
+            for (Map.Entry<String, ZoneLayer.CountyTally> t : l.countyTallies.entrySet()) {
+                CountyEntry e = out.get(t.getKey());
+                if (e == null) {
+                    e = new CountyEntry(t.getKey(), t.getValue().name);
+                    out.put(t.getKey(), e);
+                }
+                e.zones += t.getValue().total();
+            }
         }
         return out;
     }
@@ -270,19 +328,33 @@ public class EvacMap implements IPlugin {
         final Catalog c = manager == null ? null : manager.catalog();
         if (c == null || state == null)
             return;
-        final Map<String, Integer> counties = countiesOf(c.forState(state));
-        if (counties.isEmpty()) {
-            toast("No county sources for " + state + " yet");
+        final Map<String, CountyEntry> entries = countyEntries(c, c.forState(state));
+        if (entries.isEmpty()) {
+            toast("No county list for " + state + " yet");
             return;
         }
-        final String[] names = counties.keySet().toArray(new String[0]);
-        final String[] labels = new String[names.length];
-        final boolean[] ticked = new boolean[names.length];
+        final List<CountyEntry> list = new ArrayList<>(entries.values());
+        Collections.sort(list, new java.util.Comparator<CountyEntry>() {
+            @Override
+            public int compare(CountyEntry a, CountyEntry b) {
+                return a.name.compareToIgnoreCase(b.name);
+            }
+        });
+        final String[] labels = new String[list.size()];
+        final boolean[] ticked = new boolean[list.size()];
         final Set<String> selected = selectedCounties(state);
-        for (int i = 0; i < names.length; i++) {
-            final int n = counties.get(names[i]);
-            labels[i] = names[i] + "  (" + n + (n == 1 ? " source)" : " sources)");
-            ticked[i] = selected.contains(names[i]);
+        for (int i = 0; i < list.size(); i++) {
+            final CountyEntry e = list.get(i);
+            final StringBuilder sb = new StringBuilder(e.name);
+            final List<String> parts = new ArrayList<>();
+            if (e.zones > 0)
+                parts.add(e.zones + (e.zones == 1 ? " zone" : " zones"));
+            if (e.sources > 0)
+                parts.add(e.sources + (e.sources == 1 ? " source" : " sources"));
+            if (!parts.isEmpty())
+                sb.append("  (").append(TextUtils.join(", ", parts)).append(')');
+            labels[i] = sb.toString();
+            ticked[i] = selected.contains(e.key);
         }
         new AlertDialog.Builder(mapView.getContext())
                 .setTitle("Counties in " + state)
@@ -296,9 +368,9 @@ public class EvacMap implements IPlugin {
                     @Override
                     public void onClick(DialogInterface d, int w) {
                         final List<String> chosen = new ArrayList<>();
-                        for (int i = 0; i < names.length; i++)
+                        for (int i = 0; i < list.size(); i++)
                             if (ticked[i])
-                                chosen.add(names[i]);
+                                chosen.add(list.get(i).key);
                         saveCounties(state, chosen);
                         render();
                     }
@@ -379,34 +451,98 @@ public class EvacMap implements IPlugin {
         statewideEmpty.setText("No statewide source for " + state + " yet.");
 
         // Counties: the picked ones stay listed, plus any county with a source that is
-        // on, so nothing drawn on the map can be missing from the pane.
-        final Map<String, Integer> counties = countiesOf(srcs);
+        // on, so nothing drawn on the map can be missing from the pane. Under each, the
+        // county's share of every statewide feed, then the county's own sources.
+        final Map<String, CountyEntry> entries = countyEntries(c, srcs);
         final Set<String> selected = selectedCounties(state);
         for (Catalog.Source s : srcs)
             if (!s.statewide() && manager.isOn(s))
-                selected.add(s.county);
-        if (counties.isEmpty()) {
-            countiesButton.setText("No county sources for " + state + " yet");
+                selected.add(Catalog.countyKey(s.county));
+        if (entries.isEmpty()) {
+            countiesButton.setText("No county list for " + state + " yet");
             countiesButton.setEnabled(false);
             countyHint.setVisibility(View.GONE);
             return;
         }
         countiesButton.setEnabled(true);
-        final List<String> shown = new ArrayList<>();
-        for (String name : counties.keySet())
-            if (selected.contains(name))
-                shown.add(name);
+        final List<CountyEntry> shown = new ArrayList<>();
+        for (CountyEntry e : entries.values())
+            if (selected.contains(e.key))
+                shown.add(e);
+        Collections.sort(shown, new java.util.Comparator<CountyEntry>() {
+            @Override
+            public int compare(CountyEntry a, CountyEntry b) {
+                return a.name.compareToIgnoreCase(b.name);
+            }
+        });
         if (shown.isEmpty()) {
-            countiesButton.setText("Pick counties  (" + counties.size() + " available)");
+            countiesButton.setText("Pick counties  (" + entries.size() + " in " + state + ")");
             countyHint.setVisibility(View.VISIBLE);
             return;
         }
+        final List<String> names = new ArrayList<>();
+        for (CountyEntry e : shown)
+            names.add(e.name);
         countiesButton.setText((shown.size() == 1 ? "County: " : shown.size() + " counties: ")
-                + TextUtils.join(", ", shown));
+                + TextUtils.join(", ", names));
         countyHint.setVisibility(View.GONE);
-        for (Catalog.Source s : srcs)
-            if (!s.statewide() && selected.contains(s.county))
-                county.addView(sourceRow(s));
+        for (CountyEntry e : shown) {
+            for (Catalog.Source s : srcs)
+                if (s.statewide() && !s.countyField.isEmpty())
+                    county.addView(countyShareRow(e, s));
+            for (Catalog.Source s : srcs)
+                if (!s.statewide() && Catalog.countyKey(s.county).equals(e.key))
+                    county.addView(sourceRow(s));
+        }
+    }
+
+    /**
+     * One county's share of one statewide feed: "Monterey in Active Evacuation Zones",
+     * the status counts there, and Go to. The feed is turned on and off in its own row
+     * above; this row only says what it holds for the county.
+     */
+    private View countyShareRow(final CountyEntry e, final Catalog.Source s) {
+        final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.county_row, null);
+        final ZoneLayer l = manager.find(s.id);
+        ((TextView) row.findViewById(R.id.row_title)).setText(e.name + " in " + s.title);
+        final TextView status = row.findViewById(R.id.row_status);
+        final ZoneLayer.CountyTally t = l == null ? null : l.countyTallies.get(e.key);
+        final double[] target;
+        if (l == null || !l.isVisible()) {
+            status.setText(s.publisher + " · statewide source is off");
+            target = e.bounds;
+        } else if (l.refreshing || l.busy) {
+            status.setText(s.publisher + " · loading");
+            target = e.bounds;
+        } else if (t == null || t.total() == 0) {
+            status.setText(s.publisher + " · no zones in " + e.name + " now");
+            target = e.bounds;
+        } else {
+            final SpannableStringBuilder sb = new SpannableStringBuilder(s.publisher + " · ");
+            sb.append(legendText(t.counts, l.statusColors));
+            status.setText(sb);
+            target = t.bounds != null ? t.bounds : e.bounds;
+        }
+        final Button go = row.findViewById(R.id.row_goto);
+        go.setEnabled(target != null);
+        go.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                frame(target);
+            }
+        });
+        return row;
+    }
+
+    private void frame(double[] b) {
+        if (b == null || b[2] <= b[0] || b[3] <= b[1])
+            return;
+        final double padLat = Math.max(0.002, (b[2] - b[0]) * 0.15);
+        final double padLon = Math.max(0.002, (b[3] - b[1]) * 0.15);
+        com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, new GeoPoint[] {
+                new GeoPoint(b[0] - padLat, b[1] - padLon),
+                new GeoPoint(b[2] + padLat, b[3] + padLon) }, 0d,
+                mapView.getWidth(), mapView.getHeight());
     }
 
     /** "Order 37 · Warning 48 · Advisory 16", each label in its own color. */

@@ -7,8 +7,11 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * {@code catalog.json}: every evacuation service the plugin knows, one entry per layer.
@@ -41,6 +44,8 @@ public final class Catalog {
         public final String statusField;
         /** The field holding the zone's name, or empty for the layer's display field. */
         public final String nameField;
+        /** On a statewide source, the field naming each zone's county, or empty. */
+        public final String countyField;
         public final int refreshMin;
         /** Feature count when the catalog was built; what the row promises before it is turned on. */
         public final int features;
@@ -68,6 +73,7 @@ public final class Catalog {
             where = o.optString("where", "1=1");
             statusField = o.optString("status_field", "");
             nameField = o.optString("name_field", "");
+            countyField = o.optString("county_field", "");
             refreshMin = o.optInt("refresh_min", "live".equals(kind) ? 5 : 1440);
             features = o.optInt("features", 0);
             maxFeatures = o.optInt("max_features", 0);
@@ -99,9 +105,27 @@ public final class Catalog {
         }
     }
 
+    /** A county of a state, from the Census, whether or not anything is published for it. */
+    public static final class County {
+        public final String name;
+        /** South, west, north, east, or null. */
+        public final double[] bounds;
+
+        County(String name, double[] bounds) {
+            this.name = name;
+            this.bounds = bounds;
+        }
+
+        public boolean contains(double lat, double lon) {
+            return bounds != null && lat >= bounds[0] && lat <= bounds[2]
+                    && lon >= bounds[1] && lon <= bounds[3];
+        }
+    }
+
     public final int format;
     public final String generated;
     public final List<Source> sources = new ArrayList<>();
+    private final Map<String, List<County>> counties = new HashMap<>();
 
     public Catalog(JSONObject o) throws JSONException {
         format = o.optInt("format", 0);
@@ -109,6 +133,57 @@ public final class Catalog {
         final JSONArray arr = o.optJSONArray("sources");
         for (int i = 0; arr != null && i < arr.length(); i++)
             sources.add(new Source(arr.getJSONObject(i)));
+        final JSONObject cs = o.optJSONObject("counties");
+        if (cs != null) {
+            final Iterator<String> it = cs.keys();
+            while (it.hasNext()) {
+                final String st = it.next();
+                final JSONArray list = cs.optJSONArray(st);
+                final List<County> out = new ArrayList<>();
+                for (int i = 0; list != null && i < list.length(); i++) {
+                    final JSONObject c = list.getJSONObject(i);
+                    final JSONArray b = c.optJSONArray("b");
+                    out.add(new County(c.optString("n"), b != null && b.length() == 4
+                            ? new double[] { b.getDouble(0), b.getDouble(1), b.getDouble(2), b.getDouble(3) } : null));
+                }
+                counties.put(st.toUpperCase(Locale.US), out);
+            }
+        }
+    }
+
+    /** Every county of a state the catalog knows, sorted; empty when it has no list. */
+    public List<County> countiesOf(String st) {
+        final List<County> l = st == null ? null : counties.get(st.toUpperCase(Locale.US));
+        return l == null ? new ArrayList<County>() : l;
+    }
+
+    /** The smallest county box containing a point, or null. */
+    public County countyAt(String st, double lat, double lon) {
+        County best = null;
+        double bestArea = Double.MAX_VALUE;
+        for (County c : countiesOf(st)) {
+            if (!c.contains(lat, lon))
+                continue;
+            final double area = (c.bounds[2] - c.bounds[0]) * (c.bounds[3] - c.bounds[1]);
+            if (area < bestArea) {
+                bestArea = area;
+                best = c;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * "MONTEREY" for "Monterey County", "monterey" and "MONTEREY": how county names from
+     * the Census, the catalog and each feed meet.
+     */
+    public static String countyKey(String s) {
+        if (s == null)
+            return "";
+        String k = s.trim().toUpperCase(Locale.US);
+        if (k.endsWith(" COUNTY"))
+            k = k.substring(0, k.length() - 7).trim();
+        return k;
     }
 
     /** Every state code in the catalog, sorted. */

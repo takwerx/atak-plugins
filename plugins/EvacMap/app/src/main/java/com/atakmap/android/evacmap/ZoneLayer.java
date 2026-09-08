@@ -82,6 +82,25 @@ public class ZoneLayer {
     public volatile Map<String, Integer> statusCounts = new LinkedHashMap<>();
     /** The color the pane shows beside each status label; absent means plain text. */
     public volatile Map<String, Integer> statusColors = new HashMap<>();
+    /** One county's share of this layer, keyed by {@link Catalog#countyKey}; empty unless the source names a county field. */
+    public volatile Map<String, CountyTally> countyTallies = new HashMap<>();
+
+    public static class CountyTally {
+        public final String name;
+        public final Map<String, Integer> counts = new LinkedHashMap<>();
+        public double[] bounds;
+
+        CountyTally(String name) {
+            this.name = name;
+        }
+
+        public int total() {
+            int n = 0;
+            for (Integer v : counts.values())
+                n += v;
+            return n;
+        }
+    }
 
     private volatile boolean closed;
     private final Object lock = new Object();
@@ -475,8 +494,9 @@ public class ZoneLayer {
         final List<Pending> pending = new ArrayList<>();
         final Map<String, Integer> counts = new LinkedHashMap<>();
         final Map<String, Integer> colors = new HashMap<>();
+        final Map<String, CountyTally> tallies = new HashMap<>();
         try {
-            fetch(pending, counts, colors, progress);
+            fetch(pending, counts, colors, tallies, progress);
             synchronized (lock) {
                 if (store == null || closed)
                     throw new IllegalStateException("layer closed");
@@ -491,6 +511,7 @@ public class ZoneLayer {
                     bounds = ext;
                 statusCounts = counts;
                 statusColors = colors;
+                countyTallies = tallies;
                 rewriteStore();
             }
             lastRefresh = System.currentTimeMillis();
@@ -511,7 +532,8 @@ public class ZoneLayer {
     }
 
     private void fetch(final List<Pending> out, final Map<String, Integer> counts,
-            final Map<String, Integer> colors, final Runnable progressCb) throws Exception {
+            final Map<String, Integer> colors, final Map<String, CountyTally> tallies,
+            final Runnable progressCb) throws Exception {
         final Esri.LayerInfo info = Esri.layerInfo(source.url, source.layer);
         final boolean isPoint = info.geometryType.contains("Point");
         final boolean isLine = info.geometryType.contains("Polyline");
@@ -519,6 +541,7 @@ public class ZoneLayer {
         final String nameField = fieldOf(source.nameField, info);
         final String statusField = fieldOf(source.statusField, info);
         final String displayField = fieldOf(info.displayField, info);
+        final String countyField = fieldOf(source.countyField, info);
         // One color language when the catalog says where the status is; the service's
         // own symbols otherwise (and always for points, which are icons, not zones).
         final boolean normalize = statusField != null && !isPoint;
@@ -555,6 +578,20 @@ public class ZoneLayer {
                             attrs.setAttribute("_status", statusText);
                         final Integer n = counts.get(key);
                         counts.put(key, n == null ? 1 : n + 1);
+                        if (countyField != null) {
+                            final String raw = str(props, countyField);
+                            if (raw != null && !raw.trim().isEmpty()) {
+                                final String ck = Catalog.countyKey(raw);
+                                CountyTally t = tallies.get(ck);
+                                if (t == null) {
+                                    t = new CountyTally(raw.trim());
+                                    tallies.put(ck, t);
+                                }
+                                final Integer tn = t.counts.get(key);
+                                t.counts.put(key, tn == null ? 1 : tn + 1);
+                                t.bounds = union(t.bounds, g);
+                            }
+                        }
                         out.add(new Pending(setName, Double.MAX_VALUE, name, g, style, attrs));
                         // The zone's name at its center, as its own gated point. Same
                         // attributes, so a tap on the label opens the zone's details.
@@ -648,6 +685,17 @@ public class ZoneLayer {
             a += ring.getX(i) * ring.getY(j) - ring.getX(j) * ring.getY(i);
         }
         return a / 2;
+    }
+
+    /** {@code b} grown to hold {@code g}'s envelope; a zero coordinate is a missing one. */
+    private static double[] union(double[] b, Geometry g) {
+        final Envelope e = g == null ? null : g.getEnvelope();
+        if (e == null || Double.isNaN(e.minX) || Double.isNaN(e.minY)
+                || Math.abs(e.minX) < 1e-6 || Math.abs(e.minY) < 1e-6)
+            return b;
+        if (b == null)
+            return new double[] { e.minY, e.minX, e.maxY, e.maxX };
+        return new double[] { Math.min(b[0], e.minY), Math.min(b[1], e.minX), Math.max(b[2], e.maxY), Math.max(b[3], e.maxX) };
     }
 
     private static String str(JSONObject p, String k) {
