@@ -26,4 +26,7 @@
     <string name="clear">Clear</string>
     <string name="status_all">Status: all</string>
     <string name="back">Back</string>
+    <string name="prefs_summary">Evacuation zones on the map: the user manual</string>
+    <string name="manual_title">User manual</string>
+    <string name="manual_summary">Open the Evac Zone user guide (PDF)</string>
 </resources>

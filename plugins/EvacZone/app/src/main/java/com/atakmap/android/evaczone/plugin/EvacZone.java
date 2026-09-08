@@ -52,6 +52,8 @@ import gov.tak.platform.marshal.MarshalManager;
 public class EvacZone implements IPlugin {
 
     private static final String TAG = "EvacZone";
+    /** Key for the plugin's entry in ATAK's Tool Preferences. */
+    private static final String PREFS_KEY = "evaczonePreference";
 
     IServiceController serviceController;
     Context pluginContext;
@@ -106,6 +108,35 @@ public class EvacZone implements IPlugin {
             manager = new ZoneManager(mapView, pluginContext);
             manager.start();
         }
+        registerPreferences();
+    }
+
+    /**
+     * Put the plugin in ATAK's Tool Preferences, which is the only way an operator can
+     * reach the user manual. Guarded rather than assumed: a build that does not expose
+     * ToolsPreferenceFragment should cost the manual, not the plugin.
+     */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            // ic_toolbar, not ic_launcher: this row sits on ATAK's dark UI.
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new EvacZonePreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
     }
 
     @Override
@@ -125,6 +156,7 @@ public class EvacZone implements IPlugin {
             manager.stop();
             manager = null;
         }
+        unregisterPreferences();
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
     }
