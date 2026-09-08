@@ -43,12 +43,13 @@ final class Styles {
     }
 
     /**
-     * The style plus a label with text. On a geometry that is a polygon and its center
-     * point in one collection, the point child draws this as the zone's name and the
-     * polygon child draws the fill and edge, all one feature.
+     * The style plus a label with no text of its own, white on a dark pill. On a
+     * geometry that is a polygon and its center point in one collection, the point
+     * child draws the feature's name in it and the polygon child, which labels only
+     * from a label style's own text, stays silent. One feature, one label, at the center.
      */
-    static Style withLabel(Style s, String text) {
-        return plus(s, label(text));
+    static Style withNameLabel(Style s) {
+        return plus(s, new LabelPointStyle("", 0xFFFFFFFF, 0xA0000000, LabelPointStyle.ScrollMode.OFF, 0f, 0, 100, 0f, false));
     }
 
     private static Style plus(Style s, Style extra) {

@@ -510,6 +510,7 @@ public class ZoneLayer {
                             key = statusText == null ? "(no status)" : statusText;
                         }
                         Geometry geometry = g;
+                        String featureName = name;
                         if (isLine) {
                             style = Styles.silentLabel(style);
                         } else if (!isPoint) {
@@ -519,7 +520,10 @@ public class ZoneLayer {
                                 gc.addGeometry(g);
                                 gc.addGeometry(at);
                                 geometry = gc;
-                                style = Styles.withLabel(style, shortLabel(name));
+                                style = Styles.withNameLabel(style);
+                                // The feature's name is what the center point draws;
+                                // the full id stays in the title and the details.
+                                featureName = shortLabel(name);
                             } else {
                                 style = Styles.silentLabel(style);
                             }
@@ -546,7 +550,7 @@ public class ZoneLayer {
                                 t.bounds = union(t.bounds, g);
                             }
                         }
-                        out.add(new Pending(setName, Double.MAX_VALUE, name, geometry, style, attrs));
+                        out.add(new Pending(setName, Double.MAX_VALUE, featureName, geometry, style, attrs));
                         if (++seen[0] % 25 == 0) {
                             progress = seen[0];
                             status = "refreshing: " + seen[0];
