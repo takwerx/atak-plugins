@@ -63,6 +63,9 @@ public class EvacMap implements IPlugin {
     MapView mapView;
     /** The state the pane is showing, a two-letter code, or null before one is picked. */
     private String state;
+    private android.widget.SeekBar radius;
+    private TextView radiusLabel, zoomLabel;
+    private Button radiusFromButton, radiusPresetButton;
 
     public EvacMap(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -153,6 +156,7 @@ public class EvacMap implements IPlugin {
                         manager.refreshAll();
                 }
             });
+            wireVisibility();
             if (manager != null)
                 manager.setListener(new ZoneManager.Listener() {
                     @Override
@@ -163,6 +167,11 @@ public class EvacMap implements IPlugin {
                     @Override
                     public void onCatalog() {
                         render();
+                    }
+
+                    @Override
+                    public void onMapMoved() {
+                        updateZoomLabel();
                     }
                 });
             pane = new PaneBuilder(paneView)
@@ -231,6 +240,199 @@ public class EvacMap implements IPlugin {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    // ---- visibility: Cam Depot's radius and zoom controls ---------------------------
+
+    /**
+     * Quote the scale bar, because it is already on screen. Presets are what the bar
+     * would read, in the operator's own big unit, so every entry is a clean number in
+     * whatever system ATAK is set to.
+     */
+    static final String ALWAYS = "Always draw them";
+    private static final double[] PRESET_BAR_BIG = { 0.25, 1, 5, 15, 50 };
+    private static final String[] PRESET_NAMES = { "city block", "neighborhood", "town", "county", "region" };
+    /** Radius choices in the big unit; 0 is off. Stops where the slider stops. */
+    private static final int[] RADIUS_PRESETS = { 0, 2, 5, 10, 25, 50 };
+
+    private static String presetLabel(int i) {
+        final double n = PRESET_BAR_BIG[i];
+        final String num = n == Math.floor(n) ? String.format(java.util.Locale.US, "%.0f", n)
+                : String.format(java.util.Locale.US, "%.2f", n);
+        return num + " " + com.atakmap.android.evacmap.Units.bigLabel() + "  —  " + PRESET_NAMES[i];
+    }
+
+    private static String radiusPresetLabel(int r) {
+        return r == 0 ? "Off — the whole state"
+                : String.format(java.util.Locale.US, "%d %s", r, com.atakmap.android.evacmap.Units.bigLabel());
+    }
+
+    private void wireVisibility() {
+        final com.atakmap.android.evacmap.Visibility v = manager.visibility;
+        radius = paneView.findViewById(R.id.radius);
+        radiusLabel = paneView.findViewById(R.id.radius_label);
+        zoomLabel = paneView.findViewById(R.id.zoom_label);
+        radiusFromButton = paneView.findViewById(R.id.pick_point);
+        radiusPresetButton = paneView.findViewById(R.id.radius_preset);
+        radius.setMax(com.atakmap.android.evacmap.Visibility.RADIUS_MAX);
+        radius.setProgress(v.radiusBig);
+        radius.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean user) {
+                if (!user)
+                    return;
+                v.radiusBig = progress;
+                updateRadiusLabels();
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar bar) {
+                // The filter runs when the thumb is let go, not on every step of the drag.
+                manager.setRadiusBig(bar.getProgress());
+            }
+        });
+        radiusFromButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // Rotates between the operator and the map.
+                manager.setFromMap(!v.fromMap);
+                updateRadiusLabels();
+            }
+        });
+        radiusPresetButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                final String[] names = new String[RADIUS_PRESETS.length];
+                int current = -1;
+                for (int i = 0; i < RADIUS_PRESETS.length; i++) {
+                    names[i] = radiusPresetLabel(RADIUS_PRESETS[i]);
+                    if (v.radiusBig == RADIUS_PRESETS[i])
+                        current = i;
+                }
+                choose("Show zones within", names, current, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        radius.setProgress(RADIUS_PRESETS[which]);
+                        manager.setRadiusBig(RADIUS_PRESETS[which]);
+                        updateRadiusLabels();
+                    }
+                });
+            }
+        });
+        paneView.findViewById(R.id.radius_extent).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // "What I am looking at", as a radius: center to corner, so the whole
+                // visible rectangle is inside the circle.
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                final GeoPoint c = mapView.getPoint().get();
+                if (b == null || c == null) {
+                    toast("The map has no extent yet");
+                    return;
+                }
+                final double meters = com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(c,
+                        new GeoPoint(b.getNorth(), b.getEast()));
+                final double big = meters / com.atakmap.android.evacmap.Units.bigToMeters(1);
+                final int max = com.atakmap.android.evacmap.Visibility.RADIUS_MAX;
+                if (big > max)
+                    toast(String.format(java.util.Locale.US, "That view is wider than %d %s — radius set to the maximum",
+                            max, com.atakmap.android.evacmap.Units.bigLabel()));
+                final int r = (int) Math.max(1, Math.min(max, Math.round(big)));
+                v.fromMap = true;
+                radius.setProgress(r);
+                manager.setRadiusBig(r);
+                manager.setFromMap(true);
+                updateRadiusLabels();
+            }
+        });
+        paneView.findViewById(R.id.zoom_set).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                // Whatever the operator is looking at right now becomes the threshold.
+                manager.setZoomThreshold(mapView.getMapResolution());
+                updateZoomLabel();
+            }
+        });
+        paneView.findViewById(R.id.zoom_preset).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                final String[] names = new String[PRESET_BAR_BIG.length + 1];
+                for (int i = 0; i < PRESET_BAR_BIG.length; i++)
+                    names[i] = presetLabel(i);
+                names[PRESET_BAR_BIG.length] = ALWAYS;
+                choose("Draw zones when the scale bar reads", names, -1, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (which >= PRESET_BAR_BIG.length)
+                            manager.setZoomThreshold(Double.MAX_VALUE);
+                        else
+                            manager.setZoomThreshold(com.atakmap.android.evacmap.Units.bigToMeters(PRESET_BAR_BIG[which])
+                                    / scaleBarPixels());
+                        updateZoomLabel();
+                    }
+                });
+            }
+        });
+        updateRadiusLabels();
+        updateZoomLabel();
+    }
+
+    /** A single-choice list on the MapView context, the way Cam Depot's pickers open. */
+    private void choose(String title, String[] names, int checked, final DialogInterface.OnClickListener onPick) {
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle(title)
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        d.dismiss();
+                        onPick.onClick(d, which);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void updateRadiusLabels() {
+        if (radiusLabel == null || manager == null)
+            return;
+        final com.atakmap.android.evacmap.Visibility v = manager.visibility;
+        radiusLabel.setText(v.radiusBig <= 0 ? "Radius: off — the whole state"
+                : String.format(java.util.Locale.US, "Within %d %s of %s", v.radiusBig,
+                        com.atakmap.android.evacmap.Units.bigLabel(), v.fromLabel()));
+        radiusFromButton.setText("Measuring from: " + v.fromLabel());
+        String preset = "Presets";
+        for (int r : RADIUS_PRESETS)
+            if (v.radiusBig == r)
+                preset = r == 0 ? "Preset: Off" : String.format(java.util.Locale.US, "Preset: %d %s", r,
+                        com.atakmap.android.evacmap.Units.bigLabel());
+        radiusPresetButton.setText(preset);
+    }
+
+    private void updateZoomLabel() {
+        if (zoomLabel == null || manager == null)
+            return;
+        final String bar = com.atakmap.android.evacmap.ScaleBar.text(mapView);
+        final double limit = manager.visibility.maxResolution;
+        if (limit == Double.MAX_VALUE) {
+            zoomLabel.setText("Always drawn  ·  scale bar: " + bar);
+            return;
+        }
+        final String at = com.atakmap.android.evacmap.ScaleBar.describe(limit * scaleBarPixels());
+        zoomLabel.setText(String.format(java.util.Locale.US, "Drawn at %s or closer  ·  scale bar now: %s%s",
+                at, bar, manager.visibility.withinZoom(mapView) ? "" : "  — hidden"));
+    }
+
+    /** Pixels the scale bar spans, derived so the quoted threshold matches its text. */
+    private double scaleBarPixels() {
+        final double res = mapView.getMapResolution();
+        if (res <= 0)
+            return 200;
+        final double m = com.atakmap.android.evacmap.ScaleBar.meters(mapView);
+        return m > 0 ? m / res : 200;
     }
 
     // ---- counties -----------------------------------------------------------------
@@ -432,8 +634,10 @@ public class EvacMap implements IPlugin {
         final StringBuilder sb = new StringBuilder();
         sb.append(on == 0 ? "Nothing on" : on + " on, " + drawn + " zones drawn");
         if (loading > 0)
-            sb.append(", ").append(loading).append(loading == 1 ? " loading" : " loading");
+            sb.append(", ").append(loading).append(" loading");
         sb.append(" · ").append(manager.catalogStatus);
+        if (on > 0 && !manager.visibility.withinZoom(mapView))
+            sb.append("\nMap: none drawn — zoom in past your threshold");
         status.setText(sb.toString());
         legend.setText(legendText(totals, colors));
 
@@ -535,14 +739,7 @@ public class EvacMap implements IPlugin {
     }
 
     private void frame(double[] b) {
-        if (b == null || b[2] <= b[0] || b[3] <= b[1])
-            return;
-        final double padLat = Math.max(0.002, (b[2] - b[0]) * 0.15);
-        final double padLon = Math.max(0.002, (b[3] - b[1]) * 0.15);
-        com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, new GeoPoint[] {
-                new GeoPoint(b[0] - padLat, b[1] - padLon),
-                new GeoPoint(b[2] + padLat, b[3] + padLon) }, 0d,
-                mapView.getWidth(), mapView.getHeight());
+        manager.frame(b);
     }
 
     /** "Order 37 · Warning 48 · Advisory 16", each label in its own color. */
@@ -588,17 +785,7 @@ public class EvacMap implements IPlugin {
             @Override
             public void onClick(View v) {
                 final ZoneLayer now = manager.find(s.id);
-                if (now != null) {
-                    now.panTo();
-                } else if (s.bounds != null) {
-                    final double[] b = s.bounds;
-                    final double padLat = Math.max(0.002, (b[2] - b[0]) * 0.15);
-                    final double padLon = Math.max(0.002, (b[3] - b[1]) * 0.15);
-                    com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, new GeoPoint[] {
-                            new GeoPoint(b[0] - padLat, b[1] - padLon),
-                            new GeoPoint(b[2] + padLat, b[3] + padLon) }, 0d,
-                            mapView.getWidth(), mapView.getHeight());
-                }
+                manager.frame(now != null && now.bounds != null ? now.bounds : s.bounds);
             }
         });
         final Button refresh = row.findViewById(R.id.row_refresh);
@@ -639,7 +826,10 @@ public class EvacMap implements IPlugin {
                 sb.append(" ~").append(s.features).append(" features");
             return sb.toString();
         }
-        sb.append(l.count).append(l.count == 1 ? " feature" : " features");
+        if (l.outsideRadius > 0)
+            sb.append(l.count).append(" of ").append(l.count + l.outsideRadius).append(" zones within the radius");
+        else
+            sb.append(l.count).append(l.count == 1 ? " feature" : " features");
         if (l.lastRefresh > 0)
             sb.append(" · refreshed ").append(age(l.lastRefresh)).append(" ago");
         else

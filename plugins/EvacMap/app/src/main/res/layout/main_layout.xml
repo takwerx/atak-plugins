@@ -55,6 +55,93 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- Cam Depot's visibility tools, the same words in the same order. -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/section_radius"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6"
+                android:textColor="#FFFFFF"
+                android:paddingTop="4dp" />
+            <TextView
+                android:id="@+id/radius_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#FFFFFF" />
+            <!-- Full width, one unit a step, to 50: past that the state is what selects. -->
+            <SeekBar
+                android:id="@+id/radius"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="50" />
+            <!-- Says which point it measures from, and a tap rotates it. -->
+            <Button
+                android:id="@+id/pick_point"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+                <Button
+                    android:id="@+id/radius_extent"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/use_this_extent" />
+                <Button
+                    android:id="@+id/radius_preset"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="@string/presets" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/section_zoom"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6"
+                android:textColor="#FFFFFF"
+                android:paddingTop="10dp" />
+            <TextView
+                android:id="@+id/zoom_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#FFFFFF" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+                <Button
+                    android:id="@+id/zoom_set"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/use_this_zoom" />
+                <Button
+                    android:id="@+id/zoom_preset"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="@string/presets" />
+            </LinearLayout>
+
             <!-- Statewide sources: always listed for the picked state. -->
             <TextView
                 android:layout_width="wrap_content"
@@ -64,7 +151,7 @@
                 android:textAllCaps="true"
                 android:alpha="0.6"
                 android:textColor="#FFFFFF"
-                android:paddingTop="4dp" />
+                android:paddingTop="10dp" />
             <LinearLayout
                 android:id="@+id/statewide_container"
                 android:layout_width="match_parent"

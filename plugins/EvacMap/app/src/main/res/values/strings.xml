@@ -16,4 +16,9 @@
     <string name="toggle_off">OFF</string>
     <string name="go_to">Go to</string>
     <string name="refresh">Refresh</string>
+    <string name="section_radius">Distance from a point</string>
+    <string name="section_zoom">Draw on the map</string>
+    <string name="use_this_extent">Use this extent</string>
+    <string name="use_this_zoom">Use this zoom</string>
+    <string name="presets">Presets</string>
 </resources>

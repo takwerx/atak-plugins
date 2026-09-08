@@ -117,6 +117,8 @@ public class ZoneLayer {
         final Geometry geometry;
         final Style style;
         final AttributeSet attrs;
+        /** The geometry's box, read once, for the radius test on every rewrite. */
+        final Envelope env;
 
         Pending(String setName, double minGsd, String name, Geometry geometry, Style style, AttributeSet attrs) {
             this.setName = setName;
@@ -125,7 +127,83 @@ public class ZoneLayer {
             this.geometry = geometry;
             this.style = style;
             this.attrs = attrs;
+            this.env = geometry == null ? null : geometry.getEnvelope();
         }
+    }
+
+    // ---- visibility: Cam Depot's radius and zoom gate, applied to the store --------
+
+    /** Where the radius is measured from; null when the radius is off. */
+    private GeoPoint filterFrom;
+    private double filterRadius;
+    /** The feature set's own resolution gate: zones draw at or below this many m/px. */
+    private double zoomGate = Double.MAX_VALUE;
+    /** Zones in the store after the radius filter; {@link #count} is the same number. */
+    public volatile int shown;
+    /** Zones the radius left out last rewrite. */
+    public volatile int outsideRadius;
+
+    /** Records the settings without touching the store, for a layer about to attach and refresh. */
+    public void presetVisibility(GeoPoint from, double radiusMeters, double maxResolution) {
+        synchronized (lock) {
+            filterFrom = radiusMeters > 0 ? from : null;
+            filterRadius = radiusMeters;
+            zoomGate = maxResolution;
+        }
+    }
+
+    /**
+     * Applies the radius and the zoom gate. The gate is a property of the feature set
+     * and changes in place; a changed radius rewrites the store from the memory copy,
+     * no network. Worker thread.
+     */
+    public void applyVisibility(GeoPoint from, double radiusMeters, double maxResolution) {
+        synchronized (lock) {
+            if (store == null)
+                return;
+            final GeoPoint newFrom = radiusMeters > 0 ? from : null;
+            final boolean radiusChanged = radiusMeters != filterRadius || !samePoint(newFrom, filterFrom);
+            final boolean gateChanged = maxResolution != zoomGate;
+            filterFrom = newFrom;
+            filterRadius = radiusMeters;
+            zoomGate = maxResolution;
+            if (gateChanged)
+                applyGateLocked();
+            if (radiusChanged && layerOn && !cache.isEmpty())
+                rewriteStore();
+        }
+    }
+
+    private static boolean samePoint(GeoPoint a, GeoPoint b) {
+        if (a == null || b == null)
+            return a == b;
+        return Math.abs(a.getLatitude() - b.getLatitude()) < 1e-7
+                && Math.abs(a.getLongitude() - b.getLongitude()) < 1e-7;
+    }
+
+    /** Lock held. */
+    private void applyGateLocked() {
+        for (Long id : existingSets()) {
+            try {
+                store.updateFeatureSet(id, zoomGate, 0d);
+            } catch (Exception e) {
+                Log.w(TAG, "zoom gate on set " + id, e);
+            }
+        }
+    }
+
+    /**
+     * Any part of the zone within the radius: the distance from the point to the
+     * nearest point of the zone's box. A zone whose corner is 20 miles off but whose
+     * edge runs past the operator is in.
+     */
+    private static boolean withinRadius(Pending pf, GeoPoint from, double radiusMeters) {
+        final Envelope e = pf.env;
+        if (e == null)
+            return true;
+        final double lat = Math.max(e.minY, Math.min(e.maxY, from.getLatitude()));
+        final double lon = Math.max(e.minX, Math.min(e.maxX, from.getLongitude()));
+        return com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(from, new GeoPoint(lat, lon)) <= radiusMeters;
     }
 
     /** Zones fetched last time, labels not counted; what the pane calls "features". */
@@ -347,17 +425,27 @@ public class ZoneLayer {
             bulk = true;
             final List<Long> old = existingSets();
             final Map<String, Long> sets = new HashMap<>();
+            int in = 0, out = 0;
             if (layerOn) {
+                final GeoPoint from = filterFrom;
+                final double radius = filterRadius;
                 for (Pending pf : cache) {
+                    if (from != null && radius > 0 && !withinRadius(pf, from, radius)) {
+                        out++;
+                        continue;
+                    }
                     Long fsid = sets.get(pf.setName);
                     if (fsid == null) {
-                        fsid = newSet(pf.setName, pf.minGsd);
+                        fsid = newSet(pf.setName, Math.min(pf.minGsd, zoomGate));
                         sets.put(pf.setName, fsid);
                     }
                     store.insertFeature(new Feature(fsid, pf.name, pf.geometry, pf.style, pf.attrs,
                             Feature.AltitudeMode.ClampToGround, 0d));
+                    in++;
                 }
             }
+            shown = in;
+            outsideRadius = out;
             for (Long id : old) {
                 try {
                     store.deleteFeatureSet(id);
@@ -365,9 +453,9 @@ public class ZoneLayer {
                     Log.w(TAG, "old set " + id, e);
                 }
             }
-            count = layerOn ? zoneCount : 0;
-            Log.d(TAG, source.id + ": store rewritten, " + countFeatures() + " features in " + sets.size()
-                    + " sets, " + count + " zones");
+            count = layerOn ? shown : 0;
+            Log.d(TAG, source.id + ": store rewritten, " + count + " of " + zoneCount + " zones shown"
+                    + (out > 0 ? ", " + out + " outside the radius" : ""));
         } catch (Exception e) {
             Log.w(TAG, "store rewrite failed", e);
         } finally {
