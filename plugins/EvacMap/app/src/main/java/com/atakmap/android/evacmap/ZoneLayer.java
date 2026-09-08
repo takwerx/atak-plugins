@@ -157,9 +157,16 @@ public class ZoneLayer {
                 item.setMetaString("evacmap_source", source.id);
                 final AttributeSet a = feature.getAttributes();
                 String title = null;
+                boolean label = false;
                 try {
                     title = a == null ? null : a.getStringAttribute("_title");
+                    label = a != null && a.containsAttribute("_label");
                 } catch (Exception ignored) {
+                }
+                if (label) {
+                    // The zone's label point: drawn, never picked. See the hit tests below.
+                    item.setMetaBoolean("evacmap_label", true);
+                    item.setClickable(false);
                 }
                 if (title == null || title.isEmpty())
                     title = feature.getName();
@@ -172,6 +179,28 @@ public class ZoneLayer {
                     item.setMetaString("iconUri", poly ? polygonGlyph : lineGlyph);
                 }
                 return item;
+            }
+
+            // A zone and its label are one thing to the finger. The label point sits
+            // inside its polygon, so a tap on it always finds the polygon too; the
+            // label is dropped from every hit test and the chooser lists the zone once.
+
+            @Override
+            public java.util.SortedSet<MapItem> deepHitTest(MapView view,
+                    com.atakmap.map.hittest.HitTestQueryParameters params,
+                    java.util.Map<com.atakmap.map.layer.Layer2, java.util.Collection<com.atakmap.map.hittest.HitTestControl>> controls) {
+                return dropLabels(super.deepHitTest(view, params, controls));
+            }
+
+            @Override
+            public java.util.SortedSet<MapItem> deepHitTestItems(int x, int y, GeoPoint at, MapView view) {
+                return dropLabels(super.deepHitTestItems(x, y, at, view));
+            }
+
+            @Override
+            public MapItem deepHitTest(int x, int y, GeoPoint at, MapView view) {
+                final java.util.SortedSet<MapItem> items = deepHitTestItems(x, y, at, view);
+                return items == null || items.isEmpty() ? null : items.first();
             }
         };
         overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
@@ -187,6 +216,34 @@ public class ZoneLayer {
         final int stored = countFeatures();
         count = stored == 0 ? 0 : (zoneCount > 0 ? zoneCount : stored);
         status = count > 0 ? "cached" : "empty";
+    }
+
+    /** The hit-test result without label points; a copy when the set will not be edited in place. */
+    static java.util.SortedSet<MapItem> dropLabels(java.util.SortedSet<MapItem> items) {
+        if (items == null || items.isEmpty())
+            return items;
+        boolean any = false;
+        for (MapItem m : items)
+            if (m.getMetaBoolean("evacmap_label", false)) {
+                any = true;
+                break;
+            }
+        if (!any)
+            return items;
+        try {
+            final java.util.Iterator<MapItem> it = items.iterator();
+            while (it.hasNext())
+                if (it.next().getMetaBoolean("evacmap_label", false))
+                    it.remove();
+            return items;
+        } catch (UnsupportedOperationException e) {
+            final java.util.SortedSet<MapItem> out = new java.util.TreeSet<>(
+                    items.comparator() != null ? items.comparator() : MapItem.ZORDER_HITTEST_COMPARATOR);
+            for (MapItem m : items)
+                if (!m.getMetaBoolean("evacmap_label", false))
+                    out.add(m);
+            return out;
+        }
     }
 
     /**
@@ -507,6 +564,7 @@ public class ZoneLayer {
                                 final String text = shortLabel(name);
                                 final AttributeSet la = Esri.toAttributes(props, dates);
                                 la.setAttribute("_title", title);
+                                la.setAttribute("_label", "1");
                                 if (statusText != null)
                                     la.setAttribute("_status", statusText);
                                 out.add(new Pending(labelSet, LABEL_GSD, text, at, Styles.label(text), la));
