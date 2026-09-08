@@ -163,7 +163,7 @@ public class ZoneManager {
         try {
             final Catalog c = new Catalog(new JSONObject(readAsset("catalog.json")));
             catalog = c;
-            catalogStatus = "built-in catalog (" + c.sources.size() + " sources)";
+            catalogStatus = c.sources.size() + " sources, built-in catalog";
         } catch (Exception e) {
             Log.e(TAG, "bundled catalog unreadable", e);
             catalogStatus = "catalog unreadable";
@@ -192,13 +192,14 @@ public class ZoneManager {
                     if (c.sources.isEmpty())
                         throw new IllegalStateException("catalog is empty");
                     catalog = c;
-                    catalogStatus = c.sources.size() + " sources, catalog " + c.generated;
+                    catalogStatus = c.sources.size() + " sources, catalog of " + c.generated.replaceAll("T.*$", "");
                     Log.d(TAG, "depot catalog: " + c.sources.size() + " sources, generated " + c.generated);
                 } catch (Exception e) {
+                    // Offline, or nothing published yet: the built-in copy is the catalog,
+                    // and the pane says which one it has, not what it could not reach.
                     Log.w(TAG, "depot catalog unavailable, keeping the built-in copy: " + e.getMessage());
                     final Catalog c = catalog;
-                    catalogStatus = "built-in catalog (" + (c == null ? 0 : c.sources.size())
-                            + " sources); depot copy unreachable";
+                    catalogStatus = (c == null ? 0 : c.sources.size()) + " sources, built-in catalog";
                 }
                 main.post(new Runnable() {
                     @Override
