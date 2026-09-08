@@ -64,10 +64,15 @@ The rules:
   same day with `/ship tooling` (merge and push, nothing published) and never
   ride a plugin's release branch. The MDM versionCode rule sat on
   `camdepot-v1.3` for a day while FOBS 0.4 shipped without it.
-- **A plugin branch contains `main` before it builds a zip or ships.**
-  `scripts/check-main-merged.sh` says whether it does; `submission-zip.sh`
-  and `/ship` run it and refuse otherwise. The fix is always `git merge main`
-  on the branch.
+- **A plugin branch contains `main` before it builds a zip or ships, and
+  nobody does that by hand.** A session opening in a worktree merges `main`
+  into its branch (SessionStart hook `.claude/hooks/update-from-main.sh`),
+  and `submission-zip.sh` does the same before zipping; both go through
+  `scripts/check-main-merged.sh --merge`, which touches only a clean tree and
+  on a conflict aborts and names the files. `/ship` runs the plain check. A
+  conflict is the one case for a person: `git merge main`, resolve, commit.
+  Before 2026-09-07 the check only refused, and every plugin worktree fell one
+  commit behind at every ship.
 - **The main checkout stays on `main`.** `/ship` merges there with
   `git -C ~/GitHub/atak-plugins`, so `main` is checked out in exactly one
   place and every worktree sees a new `main` the moment it lands. Never
