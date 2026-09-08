@@ -219,7 +219,7 @@ public class ZoneManager {
         if (on) {
             if (l == null) {
                 l = new ZoneLayer(s, mapView, pluginContext, new File(layersDir, s.fileKey() + ".sqlite"),
-                        iconDir, lineGlyph, polygonGlyph, 0);
+                        iconDir, lineGlyph, polygonGlyph, 0, 0);
                 try {
                     l.attach();
                 } catch (Exception e) {
@@ -239,8 +239,10 @@ public class ZoneManager {
                 @Override
                 public void run() {
                     try {
+                        // Fetch here, on this task, not queued behind it: the row must
+                        // read "Loading" from the tap until the zones are drawn.
                         if (target.setVisible(true) || target.lastRefresh == 0)
-                            refresh(target);
+                            refreshNow(target);
                     } finally {
                         target.busy = false;
                         changed();
@@ -265,15 +267,20 @@ public class ZoneManager {
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                l.refresh(new Runnable() {
-                    @Override
-                    public void run() {
-                        changed();
-                    }
-                });
-                saveOn();
+                refreshNow(l);
             }
         });
+    }
+
+    /** The fetch itself. Worker thread. */
+    private void refreshNow(ZoneLayer l) {
+        l.refresh(new Runnable() {
+            @Override
+            public void run() {
+                changed();
+            }
+        });
+        saveOn();
     }
 
     public void refreshAll() {
@@ -302,7 +309,7 @@ public class ZoneManager {
                     continue;
                 final ZoneLayer l = new ZoneLayer(s, mapView, pluginContext,
                         new File(layersDir, s.fileKey() + ".sqlite"), iconDir, lineGlyph, polygonGlyph,
-                        o.optLong("lastRefresh", 0));
+                        o.optLong("lastRefresh", 0), o.optInt("count", 0));
                 try {
                     l.attach();
                     synchronized (layers) {
@@ -325,7 +332,7 @@ public class ZoneManager {
             for (ZoneLayer l : snapshot()) {
                 if (!l.isVisible())
                     continue;
-                arr.put(new JSONObject().put("id", l.source.id).put("lastRefresh", l.lastRefresh));
+                arr.put(new JSONObject().put("id", l.source.id).put("lastRefresh", l.lastRefresh).put("count", l.count));
             }
             uiPrefs().edit().putString("on", arr.toString()).apply();
         } catch (Exception e) {

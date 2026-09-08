@@ -360,7 +360,7 @@ public class EvacMap implements IPlugin {
         final StringBuilder sb = new StringBuilder();
         sb.append(on == 0 ? "Nothing on" : on + " on, " + drawn + " zones drawn");
         if (loading > 0)
-            sb.append(", loading");
+            sb.append(", ").append(loading).append(loading == 1 ? " loading" : " loading");
         sb.append(" · ").append(manager.catalogStatus);
         status.setText(sb.toString());
         legend.setText(legendText(totals, colors));
@@ -495,10 +495,14 @@ public class EvacMap implements IPlugin {
             return sb.toString();
         }
         sb.append("\n");
-        if (l.refreshing)
-            return sb.append("Loading… ").append(l.progress).append(" so far").toString();
-        if (l.busy)
-            return sb.append("Loading…").toString();
+        if (l.refreshing || l.busy) {
+            sb.append("Loading…");
+            if (l.progress > 0)
+                sb.append(' ').append(l.progress).append(s.features > 0 ? " of ~" + s.features : " so far");
+            else if (s.features > 0)
+                sb.append(" ~").append(s.features).append(" features");
+            return sb.toString();
+        }
         sb.append(l.count).append(l.count == 1 ? " feature" : " features");
         if (l.lastRefresh > 0)
             sb.append(" · refreshed ").append(age(l.lastRefresh)).append(" ago");

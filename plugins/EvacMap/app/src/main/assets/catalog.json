@@ -1,6 +1,6 @@
 {
  "format": 1,
- "generated": "2026-09-08T19:08:44Z",
+ "generated": "2026-09-08T19:25:53Z",
  "sources": [
   {
    "id": "us-ca-caloes-active",
@@ -26,7 +26,8 @@
     -114.1
    ],
    "note": "Orders and warnings only, every county, refreshed by Cal OES every 5 minutes.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-09-08",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-ca-calfire-combined",
@@ -52,7 +53,8 @@
     -114.1
    ],
    "note": "Adds the reason, population and lifted zones; also carries county feeds that are not in Genasys.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-09-08",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-or-oem",
@@ -78,7 +80,8 @@
     -116.45
    ],
    "note": "Level 1 Be Ready, 2 Be Set, 3 Go Now.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-09-08",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "ca-bc-evac",
@@ -95,7 +98,7 @@
    "status_field": "ORDER_ALERT_STATUS",
    "name_field": "ORDER_ALERT_NAME",
    "refresh_min": 10,
-   "features": 38,
+   "features": 36,
    "simplify": 0.0001,
    "bounds": [
     48.3,
@@ -104,7 +107,8 @@
     -114.0
    ],
    "note": "Order, Alert (be ready to leave), Tactical Evacuation, All Clear.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-09-08",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-ca-sonoma",
@@ -130,15 +134,16 @@
     -122.3496
    ],
    "note": "Every zone, most of them Normal.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-08-26",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-ca-napa",
-   "title": "Evacuation Zones",
+   "title": "Zone boundaries",
    "publisher": "Napa County",
    "st": "CA",
    "co": "Napa",
-   "kind": "live",
+   "kind": "static",
    "url": "https://gis.napacounty.gov/arcgis/rest/services/Hosted/EvacuationZones_Public/FeatureServer",
    "layer": 0,
    "layer_name": "EvacuationZones_Public",
@@ -146,7 +151,7 @@
    "where": "1=1",
    "status_field": "zone_status",
    "name_field": "zone_id",
-   "refresh_min": 5,
+   "refresh_min": 1440,
    "features": 239,
    "simplify": 0.0001,
    "bounds": [
@@ -155,60 +160,9 @@
     38.865,
     -122.0613
    ],
-   "note": "Every zone, most of them Normal.",
-   "checked": "2026-09-08T19:08:44Z"
-  },
-  {
-   "id": "us-ca-monterey",
-   "title": "Fire Evacuation Areas",
-   "publisher": "Monterey County",
-   "st": "CA",
-   "co": "Monterey",
-   "kind": "live",
-   "url": "https://services2.arcgis.com/nOGTdfb4kF4dZljH/arcgis/rest/services/Fire_Evacuation_Areas2_Public/FeatureServer",
-   "layer": 0,
-   "layer_name": "Fire_Evacuation_Areas",
-   "geometry": "polygon",
-   "where": "1=1",
-   "status_field": "alert_level",
-   "name_field": "incident_name",
-   "refresh_min": 5,
-   "features": 77,
-   "simplify": 0.0001,
-   "bounds": [
-    35.794,
-    -121.9125,
-    36.8249,
-    -120.9219
-   ],
-   "note": "",
-   "checked": "2026-09-08T19:08:44Z"
-  },
-  {
-   "id": "us-ca-plumas",
-   "title": "Evacuation Zones",
-   "publisher": "Plumas County",
-   "st": "CA",
-   "co": "Plumas",
-   "kind": "live",
-   "url": "https://services.arcgis.com/3t3QfTXFRFX44zo8/arcgis/rest/services/Plumas_County_Evacuation_Zones_View/FeatureServer",
-   "layer": 0,
-   "layer_name": "PlumasCountyEvacuationZones",
-   "geometry": "polygon",
-   "where": "1=1",
-   "status_field": "Status",
-   "name_field": "NAME",
-   "refresh_min": 5,
-   "features": 42,
-   "simplify": 0.0001,
-   "bounds": [
-    39.8517,
-    -121.502,
-    40.4515,
-    -120.2638
-   ],
-   "note": "",
-   "checked": "2026-09-08T19:08:44Z"
+   "note": "All zones for the county. Status here lags; live status is in the statewide layers.",
+   "last_edit": "2025-04-12",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-ca-san-diego",
@@ -234,7 +188,8 @@
     -117.1423
    ],
    "note": "",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-09-08",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-ca-la-city",
@@ -255,7 +210,8 @@
    "simplify": 0.0001,
    "bounds": null,
    "note": "Empty between incidents.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2025-03-14",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-ca-la-county",
@@ -281,7 +237,8 @@
     -117.6671
    ],
    "note": "Areas under an active alert; the alert text is in the details.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-09-08",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-ca-ventura",
@@ -302,7 +259,8 @@
    "simplify": 0.0001,
    "bounds": null,
    "note": "Empty between incidents.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-05-02",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-ca-mariposa",
@@ -323,7 +281,8 @@
    "simplify": 0.0001,
    "bounds": null,
    "note": "Empty between incidents.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-09-08",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-ca-riverside-zones",
@@ -349,7 +308,8 @@
     -116.0087
    ],
    "note": "All Genasys zones for the county, copied nightly by the city. Status here lags; live status is in the statewide layers.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-09-07",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-ca-riverside-emd-mountain",
@@ -375,7 +335,8 @@
     -116.408
    ],
    "note": "Pre-planned zones for the mountain communities (Idyllwild, Poppet Flats, Pine Cove).",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2025-08-04",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-or-deschutes-levels",
@@ -401,7 +362,8 @@
     -118.2149
    ],
    "note": "",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-07-28",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-or-deschutes-shelters",
@@ -427,15 +389,16 @@
     -121.5707
    ],
    "note": "",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2026-07-28",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-or-jackson",
-   "title": "Evacuation Zones",
+   "title": "Zone boundaries",
    "publisher": "Jackson County",
    "st": "OR",
    "co": "Jackson",
-   "kind": "live",
+   "kind": "static",
    "url": "https://services1.arcgis.com/DwYBkWQPdaJNWrPG/arcgis/rest/services/Evacuation_Zones_Jackson_County_Public_ViewTemp/FeatureServer",
    "layer": 4,
    "layer_name": "EvacuationZonesCounty",
@@ -443,7 +406,7 @@
    "where": "1=1",
    "status_field": "Fire_Evacuation_Level",
    "name_field": "Evac_Area_Name",
-   "refresh_min": 5,
+   "refresh_min": 1440,
    "features": 357,
    "simplify": 0.0001,
    "bounds": [
@@ -452,8 +415,9 @@
     42.9984,
     -122.2536
    ],
-   "note": "Every zone, most at no level.",
-   "checked": "2026-09-08T19:08:44Z"
+   "note": "All zones for the county. Levels here lag; live levels are in the Oregon OEM layer.",
+   "last_edit": "2025-04-28",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-fl-hillsborough",
@@ -479,7 +443,8 @@
     -82.1206
    ],
    "note": "Zones A to E.",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2024-09-26",
+   "checked": "2026-09-08T19:25:53Z"
   },
   {
    "id": "us-fl-lee",
@@ -505,7 +470,8 @@
     -81.5607
    ],
    "note": "",
-   "checked": "2026-09-08T19:08:44Z"
+   "last_edit": "2021-07-03",
+   "checked": "2026-09-08T19:25:53Z"
   }
  ]
 }

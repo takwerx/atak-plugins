@@ -19,6 +19,7 @@ import com.atakmap.map.layer.feature.FeatureSetCursor;
 import com.atakmap.map.layer.feature.datastore.FeatureSetDatabase2;
 import com.atakmap.map.layer.feature.geometry.Envelope;
 import com.atakmap.map.layer.feature.geometry.Geometry;
+import com.atakmap.map.layer.feature.geometry.Point;
 import com.atakmap.map.layer.feature.style.Style;
 
 import org.json.JSONObject;
@@ -47,8 +48,13 @@ public class ZoneLayer {
 
     /** Polygon fill opacity, 0..255. Zones sit over a base map; an opaque fill hides it. */
     static final int FILL_ALPHA = 0x50;
-    /** Zone names on the map. Lines never carry labels: ATAK repeats them along the length. */
-    static final boolean LABEL_POLYGONS = true;
+    /**
+     * Zone names on the map, as their own label point at each zone's center, drawn from
+     * this resolution (meters per pixel) in. ATAK labels a polygon only along an edge
+     * long enough to hold the text, which at county scale is never; and every polygon
+     * and line carries an empty label so nothing is drawn twice.
+     */
+    static final double LABEL_GSD = 60d;
 
     public final Catalog.Source source;
     private final MapView mapView;
@@ -86,12 +92,14 @@ public class ZoneLayer {
     /** A feature fetched and styled, waiting to be written into the store. */
     private static class Pending {
         final String setName, name;
+        final double minGsd;
         final Geometry geometry;
         final Style style;
         final AttributeSet attrs;
 
-        Pending(String setName, String name, Geometry geometry, Style style, AttributeSet attrs) {
+        Pending(String setName, double minGsd, String name, Geometry geometry, Style style, AttributeSet attrs) {
             this.setName = setName;
+            this.minGsd = minGsd;
             this.name = name;
             this.geometry = geometry;
             this.style = style;
@@ -99,8 +107,11 @@ public class ZoneLayer {
         }
     }
 
+    /** Zones fetched last time, labels not counted; what the pane calls "features". */
+    private int zoneCount;
+
     public ZoneLayer(Catalog.Source source, MapView mapView, Context pluginContext, File storeFile,
-            File iconDir, String lineGlyph, String polygonGlyph, long lastRefresh) {
+            File iconDir, String lineGlyph, String polygonGlyph, long lastRefresh, int savedCount) {
         this.source = source;
         this.mapView = mapView;
         this.pluginContext = pluginContext;
@@ -109,6 +120,7 @@ public class ZoneLayer {
         this.lineGlyph = lineGlyph;
         this.polygonGlyph = polygonGlyph;
         this.lastRefresh = lastRefresh;
+        this.zoneCount = savedCount;
         this.bounds = source.bounds;
     }
 
@@ -170,21 +182,29 @@ public class ZoneLayer {
         pruneHidden();
         mapView.getMapOverlayManager().addFilesOverlay(overlay);
         mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
-        count = countFeatures();
+        // The store holds zones and their label points; the pane counts zones. After a
+        // restart the split is not known, so the count saved with the ON list is used.
+        final int stored = countFeatures();
+        count = stored == 0 ? 0 : (zoneCount > 0 ? zoneCount : stored);
         status = count > 0 ? "cached" : "empty";
     }
 
-    /** A refresh interrupted by a plugin reload can leave two generations of sets; keep the newest. */
+    /**
+     * A refresh interrupted by a plugin reload can leave two generations of sets; keep
+     * the newest of each name (zones, labels) and drop the rest.
+     */
     private void dedupeSets() {
-        Long newest = null;
+        final Map<String, Long> newest = new HashMap<>();
         final List<Long> drop = new ArrayList<>();
-        for (Long id : existingSets()) {
-            if (newest == null || id > newest) {
-                if (newest != null)
-                    drop.add(newest);
-                newest = id;
+        for (SetInfo si : setsLocked()) {
+            final Long prev = newest.get(si.name);
+            if (prev == null) {
+                newest.put(si.name, si.id);
+            } else if (si.id > prev) {
+                drop.add(prev);
+                newest.put(si.name, si.id);
             } else {
-                drop.add(id);
+                drop.add(si.id);
             }
         }
         for (Long id : drop) {
@@ -194,6 +214,34 @@ public class ZoneLayer {
                 Log.w(TAG, "dedupe " + id, e);
             }
         }
+    }
+
+    private static class SetInfo {
+        final long id;
+        final String name;
+
+        SetInfo(long id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+    }
+
+    private List<SetInfo> setsLocked() {
+        final List<SetInfo> out = new ArrayList<>();
+        if (store == null)
+            return out;
+        try {
+            final FeatureSetCursor c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
+            try {
+                while (c.moveToNext())
+                    out.add(new SetInfo(c.getId(), c.getName()));
+            } finally {
+                c.close();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "set listing failed", e);
+        }
+        return out;
     }
 
     public void detach() {
@@ -280,11 +328,14 @@ public class ZoneLayer {
             store.acquireModifyLock(true);
             bulk = true;
             final List<Long> old = existingSets();
-            long fsid = -1;
+            final Map<String, Long> sets = new HashMap<>();
             if (layerOn) {
                 for (Pending pf : cache) {
-                    if (fsid < 0)
-                        fsid = newSet(pf.setName);
+                    Long fsid = sets.get(pf.setName);
+                    if (fsid == null) {
+                        fsid = newSet(pf.setName, pf.minGsd);
+                        sets.put(pf.setName, fsid);
+                    }
                     store.insertFeature(new Feature(fsid, pf.name, pf.geometry, pf.style, pf.attrs,
                             Feature.AltitudeMode.ClampToGround, 0d));
                 }
@@ -296,8 +347,9 @@ public class ZoneLayer {
                     Log.w(TAG, "old set " + id, e);
                 }
             }
-            count = countFeatures();
-            Log.d(TAG, source.id + ": store rewritten, " + count + " shown of " + cache.size());
+            count = layerOn ? zoneCount : 0;
+            Log.d(TAG, source.id + ": store rewritten, " + countFeatures() + " features in " + sets.size()
+                    + " sets, " + count + " zones");
         } catch (Exception e) {
             Log.w(TAG, "store rewrite failed", e);
         } finally {
@@ -372,6 +424,11 @@ public class ZoneLayer {
                 if (store == null || closed)
                     throw new IllegalStateException("layer closed");
                 cache = pending;
+                int zones = 0;
+                for (Pending pf : pending)
+                    if (pf.minGsd == Double.MAX_VALUE)
+                        zones++;
+                zoneCount = zones;
                 final double[] ext = extentOf(pending);
                 if (ext != null)
                     bounds = ext;
@@ -382,9 +439,9 @@ public class ZoneLayer {
             lastRefresh = System.currentTimeMillis();
             stale = false;
             status = "ok";
-            if (source.maxFeatures > 0 && pending.size() >= source.maxFeatures)
+            if (source.maxFeatures > 0 && zoneCount >= source.maxFeatures)
                 status = "capped at " + source.maxFeatures;
-            Log.d(TAG, source.id + ": refresh done, " + pending.size() + " fetched");
+            Log.d(TAG, source.id + ": refresh done, " + zoneCount + " zones fetched");
         } catch (Exception e) {
             Log.w(TAG, source.id + " refresh failed", e);
             stale = true;
@@ -410,6 +467,7 @@ public class ZoneLayer {
         final boolean normalize = statusField != null && !isPoint;
         final Set<String> dates = info.dateFields;
         final String setName = info.name;
+        final String labelSet = info.name + " labels";
         final int[] seen = { 0 };
 
         Esri.query(source.url, source.layer, source.where, Math.min(1000, info.maxRecordCount),
@@ -430,7 +488,7 @@ public class ZoneLayer {
                             style = renderer.styleFor(props);
                             key = statusText == null ? "(no status)" : statusText;
                         }
-                        if (isLine || (!isPoint && !LABEL_POLYGONS))
+                        if (!isPoint)
                             style = Styles.silentLabel(style);
                         final String title = statusText != null && !statusText.equals(name)
                                 ? statusText + ": " + name : name;
@@ -440,8 +498,21 @@ public class ZoneLayer {
                             attrs.setAttribute("_status", statusText);
                         final Integer n = counts.get(key);
                         counts.put(key, n == null ? 1 : n + 1);
-                        out.add(new Pending(setName, name, g, style, attrs));
-                        if (++seen[0] % 100 == 0) {
+                        out.add(new Pending(setName, Double.MAX_VALUE, name, g, style, attrs));
+                        // The zone's name at its center, as its own gated point. Same
+                        // attributes, so a tap on the label opens the zone's details.
+                        if (!isPoint && !isLine) {
+                            final Point at = labelPoint(g);
+                            if (at != null) {
+                                final String text = shortLabel(name);
+                                final AttributeSet la = Esri.toAttributes(props, dates);
+                                la.setAttribute("_title", title);
+                                if (statusText != null)
+                                    la.setAttribute("_status", statusText);
+                                out.add(new Pending(labelSet, LABEL_GSD, text, at, Styles.label(text), la));
+                            }
+                        }
+                        if (++seen[0] % 25 == 0) {
                             progress = seen[0];
                             status = "refreshing: " + seen[0];
                             if (progressCb != null)
@@ -449,6 +520,76 @@ public class ZoneLayer {
                         }
                     }
                 });
+    }
+
+    /**
+     * "RVC-1001" for "US-CA-XRI-RVC-1001": a Genasys id on the map keeps its last two
+     * parts, the way CAL FIRE's statewide feed already shows them. Anything else is
+     * itself. The details pane keeps the full id.
+     */
+    static String shortLabel(String name) {
+        if (name == null)
+            return "";
+        final String[] p = name.split("-");
+        if (p.length >= 4 && "US".equals(p[0]) && p[1].length() == 2)
+            return p[p.length - 2] + "-" + p[p.length - 1];
+        return name;
+    }
+
+    /**
+     * Where a zone's label goes: the centroid of its largest ring. A zero-area or
+     * degenerate ring falls back to the envelope center; nothing is returned for a
+     * geometry with no usable ring.
+     */
+    static Point labelPoint(Geometry g) {
+        com.atakmap.map.layer.feature.geometry.Polygon best = null;
+        double bestArea = -1;
+        if (g instanceof com.atakmap.map.layer.feature.geometry.Polygon) {
+            best = (com.atakmap.map.layer.feature.geometry.Polygon) g;
+        } else if (g instanceof com.atakmap.map.layer.feature.geometry.GeometryCollection) {
+            for (Geometry c : ((com.atakmap.map.layer.feature.geometry.GeometryCollection) g).getGeometries()) {
+                if (!(c instanceof com.atakmap.map.layer.feature.geometry.Polygon))
+                    continue;
+                final double a = Math.abs(ringArea(((com.atakmap.map.layer.feature.geometry.Polygon) c).getExteriorRing()));
+                if (a > bestArea) {
+                    bestArea = a;
+                    best = (com.atakmap.map.layer.feature.geometry.Polygon) c;
+                }
+            }
+        }
+        if (best == null)
+            return null;
+        final com.atakmap.map.layer.feature.geometry.LineString ring = best.getExteriorRing();
+        if (ring == null || ring.getNumPoints() < 3)
+            return null;
+        double a = 0, cx = 0, cy = 0;
+        final int n = ring.getNumPoints();
+        for (int i = 0; i < n; i++) {
+            final int j = (i + 1) % n;
+            final double x0 = ring.getX(i), y0 = ring.getY(i), x1 = ring.getX(j), y1 = ring.getY(j);
+            final double cross = x0 * y1 - x1 * y0;
+            a += cross;
+            cx += (x0 + x1) * cross;
+            cy += (y0 + y1) * cross;
+        }
+        if (Math.abs(a) < 1e-12) {
+            final Envelope e = best.getEnvelope();
+            return e == null ? null : new Point((e.minX + e.maxX) / 2, (e.minY + e.maxY) / 2);
+        }
+        a *= 0.5;
+        return new Point(cx / (6 * a), cy / (6 * a));
+    }
+
+    private static double ringArea(com.atakmap.map.layer.feature.geometry.LineString ring) {
+        if (ring == null)
+            return 0;
+        double a = 0;
+        final int n = ring.getNumPoints();
+        for (int i = 0; i < n; i++) {
+            final int j = (i + 1) % n;
+            a += ring.getX(i) * ring.getY(j) - ring.getX(j) * ring.getY(i);
+        }
+        return a / 2;
     }
 
     private static String str(JSONObject p, String k) {
@@ -460,8 +601,8 @@ public class ZoneLayer {
         return name != null && !name.isEmpty() && info.fields.contains(name) ? name : null;
     }
 
-    private long newSet(String name) throws Exception {
-        final long id = store.insertFeatureSet(new FeatureSet("EvacMap", source.id, name, Double.MAX_VALUE, 0d));
+    private long newSet(String name, double minGsd) throws Exception {
+        final long id = store.insertFeatureSet(new FeatureSet("EvacMap", source.id, name, minGsd, 0d));
         store.setFeatureSetVisible(id, true);
         return id;
     }

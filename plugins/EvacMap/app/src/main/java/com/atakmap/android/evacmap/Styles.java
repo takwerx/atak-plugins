@@ -16,6 +16,11 @@ final class Styles {
     static final short DOT = (short) 0xAAAA;       // 1 on, 1 off
     static final short DASH_DOT = (short) 0xFC30;  // 6 on, 4 off, 2 on, 4 off
 
+    /** A zone's name as a label point: white on a dark pill, no icon. */
+    static Style label(String text) {
+        return new LabelPointStyle(text, 0xFFFFFFFF, 0xA0000000, LabelPointStyle.ScrollMode.OFF, 0f, 0, 100, 0f, false);
+    }
+
     static Style solid(int color, float width) {
         return new BasicStrokeStyle(color, width);
     }
