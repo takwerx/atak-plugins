@@ -6,11 +6,13 @@ import android.content.DialogInterface;
 import android.graphics.Color;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
+import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
@@ -21,9 +23,15 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 
+import org.json.JSONArray;
+
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
@@ -35,9 +43,10 @@ import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
 /**
- * Evac Map: evacuation zones from state and county services, browsed by state the way
- * Cam Depot browses cameras. The manager lives for the plugin's life; the pane is only
- * its controls.
+ * Evac Map: evacuation zones from state and county services, browsed the way Cam Depot
+ * browses cameras. Pick a state; its statewide sources are always listed; pick one or
+ * more counties and their sources stay listed underneath. The manager lives for the
+ * plugin's life; the pane is only its controls.
  */
 public class EvacMap implements IPlugin {
 
@@ -114,6 +123,11 @@ public class EvacMap implements IPlugin {
         return mapView.getContext().getSharedPreferences("evacmap.ui", Context.MODE_PRIVATE);
     }
 
+    /** MapView context, never plugin context: a toast on the plugin context kills ATAK. */
+    private void toast(String s) {
+        Toast.makeText(mapView.getContext(), s, Toast.LENGTH_SHORT).show();
+    }
+
     // ---- pane ---------------------------------------------------------------------
 
     private void showPane() {
@@ -123,6 +137,12 @@ public class EvacMap implements IPlugin {
                 @Override
                 public void onClick(View v) {
                     pickState();
+                }
+            });
+            paneView.findViewById(R.id.btn_counties).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    pickCounties();
                 }
             });
             paneView.findViewById(R.id.btn_refresh_all).setOnClickListener(new View.OnClickListener() {
@@ -212,6 +232,83 @@ public class EvacMap implements IPlugin {
                 .show();
     }
 
+    // ---- counties -----------------------------------------------------------------
+
+    /** Counties picked for a state, remembered per state so a picked list stays up. */
+    private Set<String> selectedCounties(String st) {
+        final Set<String> out = new LinkedHashSet<>();
+        if (st == null)
+            return out;
+        try {
+            final JSONArray arr = new JSONArray(uiPrefs().getString("counties." + st, "[]"));
+            for (int i = 0; i < arr.length(); i++)
+                out.add(arr.getString(i));
+        } catch (Exception e) {
+            Log.w(TAG, "county selection unreadable", e);
+        }
+        return out;
+    }
+
+    private void saveCounties(String st, Collection<String> counties) {
+        uiPrefs().edit().putString("counties." + st, new JSONArray(counties).toString()).apply();
+    }
+
+    /** Counties of this state that have sources, in catalog order, with their source counts. */
+    private static Map<String, Integer> countiesOf(List<Catalog.Source> srcs) {
+        final Map<String, Integer> out = new LinkedHashMap<>();
+        for (Catalog.Source s : srcs) {
+            if (s.statewide())
+                continue;
+            final Integer n = out.get(s.county);
+            out.put(s.county, n == null ? 1 : n + 1);
+        }
+        return out;
+    }
+
+    /** One or many, ticked in a multi-choice dialog on the MapView context, the way Cam Depot picks counties. */
+    private void pickCounties() {
+        final Catalog c = manager == null ? null : manager.catalog();
+        if (c == null || state == null)
+            return;
+        final Map<String, Integer> counties = countiesOf(c.forState(state));
+        if (counties.isEmpty()) {
+            toast("No county sources for " + state + " yet");
+            return;
+        }
+        final String[] names = counties.keySet().toArray(new String[0]);
+        final String[] labels = new String[names.length];
+        final boolean[] ticked = new boolean[names.length];
+        final Set<String> selected = selectedCounties(state);
+        for (int i = 0; i < names.length; i++) {
+            final int n = counties.get(names[i]);
+            labels[i] = names[i] + "  (" + n + (n == 1 ? " source)" : " sources)");
+            ticked[i] = selected.contains(names[i]);
+        }
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Counties in " + state)
+                .setMultiChoiceItems(labels, ticked, new DialogInterface.OnMultiChoiceClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which, boolean isChecked) {
+                        ticked[which] = isChecked;
+                    }
+                })
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        final List<String> chosen = new ArrayList<>();
+                        for (int i = 0; i < names.length; i++)
+                            if (ticked[i])
+                                chosen.add(names[i]);
+                        saveCounties(state, chosen);
+                        render();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // ---- rendering ----------------------------------------------------------------
+
     private void render() {
         if (paneView == null || manager == null)
             return;
@@ -219,16 +316,22 @@ public class EvacMap implements IPlugin {
         final Button stateButton = paneView.findViewById(R.id.btn_state);
         final TextView status = paneView.findViewById(R.id.status);
         final TextView legend = paneView.findViewById(R.id.legend);
-        final LinearLayout container = paneView.findViewById(R.id.sources_container);
-        final TextView empty = paneView.findViewById(R.id.sources_empty);
-        container.removeAllViews();
+        final LinearLayout statewide = paneView.findViewById(R.id.statewide_container);
+        final TextView statewideEmpty = paneView.findViewById(R.id.statewide_empty);
+        final Button countiesButton = paneView.findViewById(R.id.btn_counties);
+        final LinearLayout county = paneView.findViewById(R.id.county_container);
+        final TextView countyHint = paneView.findViewById(R.id.county_hint);
+        statewide.removeAllViews();
+        county.removeAllViews();
 
         if (c == null) {
             stateButton.setText("No catalog");
             status.setText(manager.catalogStatus);
             legend.setText("");
-            empty.setVisibility(View.VISIBLE);
-            empty.setText("The catalog could not be read.");
+            statewideEmpty.setVisibility(View.VISIBLE);
+            statewideEmpty.setText("The catalog could not be read.");
+            countiesButton.setEnabled(false);
+            countyHint.setVisibility(View.GONE);
             return;
         }
         if (state == null || !c.states().contains(state))
@@ -262,11 +365,48 @@ public class EvacMap implements IPlugin {
         status.setText(sb.toString());
         legend.setText(legendText(totals, colors));
 
-        final List<Catalog.Source> srcs = state == null ? new java.util.ArrayList<Catalog.Source>() : c.forState(state);
-        empty.setVisibility(srcs.isEmpty() ? View.VISIBLE : View.GONE);
-        empty.setText("No sources for this state yet.");
-        for (final Catalog.Source s : srcs)
-            container.addView(sourceRow(s));
+        final List<Catalog.Source> srcs = state == null ? new ArrayList<Catalog.Source>() : c.forState(state);
+
+        // Statewide: always listed.
+        int nStatewide = 0;
+        for (Catalog.Source s : srcs) {
+            if (!s.statewide())
+                continue;
+            statewide.addView(sourceRow(s));
+            nStatewide++;
+        }
+        statewideEmpty.setVisibility(nStatewide == 0 ? View.VISIBLE : View.GONE);
+        statewideEmpty.setText("No statewide source for " + state + " yet.");
+
+        // Counties: the picked ones stay listed, plus any county with a source that is
+        // on, so nothing drawn on the map can be missing from the pane.
+        final Map<String, Integer> counties = countiesOf(srcs);
+        final Set<String> selected = selectedCounties(state);
+        for (Catalog.Source s : srcs)
+            if (!s.statewide() && manager.isOn(s))
+                selected.add(s.county);
+        if (counties.isEmpty()) {
+            countiesButton.setText("No county sources for " + state + " yet");
+            countiesButton.setEnabled(false);
+            countyHint.setVisibility(View.GONE);
+            return;
+        }
+        countiesButton.setEnabled(true);
+        final List<String> shown = new ArrayList<>();
+        for (String name : counties.keySet())
+            if (selected.contains(name))
+                shown.add(name);
+        if (shown.isEmpty()) {
+            countiesButton.setText("Pick counties  (" + counties.size() + " available)");
+            countyHint.setVisibility(View.VISIBLE);
+            return;
+        }
+        countiesButton.setText((shown.size() == 1 ? "County: " : shown.size() + " counties: ")
+                + TextUtils.join(", ", shown));
+        countyHint.setVisibility(View.GONE);
+        for (Catalog.Source s : srcs)
+            if (!s.statewide() && selected.contains(s.county))
+                county.addView(sourceRow(s));
     }
 
     /** "Order 37 · Warning 48 · Advisory 16", each label in its own color. */
@@ -297,7 +437,7 @@ public class EvacMap implements IPlugin {
             toggle.setEnabled(false);
         } else {
             toggle.setText(isOn ? "ON" : "OFF");
-            toggle.setTextColor(isOn ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+            toggle.setTextColor(isOn ? Color.parseColor("#3ddc61") : Color.parseColor("#ff5b52"));
             toggle.setEnabled(true);
         }
         toggle.setOnClickListener(new View.OnClickListener() {

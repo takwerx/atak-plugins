@@ -44,17 +44,7 @@
         android:layout_height="wrap_content"
         android:textSize="12sp"
         android:textStyle="bold"
-        android:paddingBottom="4dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/section_sources"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:alpha="0.6"
-        android:textColor="#FFFFFF"
-        android:paddingTop="4dp" />
+        android:paddingBottom="2dp" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -64,19 +54,62 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
+
+            <!-- Statewide sources: always listed for the picked state. -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/section_statewide"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6"
+                android:textColor="#FFFFFF"
+                android:paddingTop="4dp" />
             <LinearLayout
-                android:id="@+id/sources_container"
+                android:id="@+id/statewide_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
             <TextView
-                android:id="@+id/sources_empty"
+                android:id="@+id/statewide_empty"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="13sp"
                 android:textColor="#BBBBBB"
                 android:paddingTop="4dp"
+                android:paddingBottom="4dp"
                 android:visibility="gone" />
+
+            <!-- County sources: the picked counties stay listed here. -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/section_counties"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6"
+                android:textColor="#FFFFFF"
+                android:paddingTop="10dp" />
+            <Button
+                android:id="@+id/btn_counties"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/pick_counties" />
+            <TextView
+                android:id="@+id/county_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#BBBBBB"
+                android:paddingTop="4dp"
+                android:text="@string/county_hint"
+                android:visibility="gone" />
+            <LinearLayout
+                android:id="@+id/county_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>
