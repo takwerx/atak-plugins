@@ -69,6 +69,11 @@ public final class Catalog {
             county = o.optString("co", "");
             kind = o.optString("kind", "live");
             url = o.getString("url").replaceAll("/+$", "");
+            // HTTPS only. ATAK-CIV allows cleartext, so a plaintext entry would let
+            // anyone on the path feed fabricated zones; the constructor refuses it and
+            // the entry is skipped, rather than trusting whoever wrote the catalog.
+            if (!url.startsWith("https://"))
+                throw new JSONException("source " + id + ": url must be https");
             layer = o.optInt("layer", 0);
             where = o.optString("where", "1=1");
             statusField = o.optString("status_field", "");
@@ -131,8 +136,14 @@ public final class Catalog {
         format = o.optInt("format", 0);
         generated = o.optString("generated", "");
         final JSONArray arr = o.optJSONArray("sources");
-        for (int i = 0; arr != null && i < arr.length(); i++)
-            sources.add(new Source(arr.getJSONObject(i)));
+        for (int i = 0; arr != null && i < arr.length(); i++) {
+            try {
+                sources.add(new Source(arr.getJSONObject(i)));
+            } catch (JSONException e) {
+                // One bad entry costs that entry, not the catalog.
+                com.atakmap.coremap.log.Log.w("EvacZone", "catalog entry skipped: " + e.getMessage());
+            }
+        }
         final JSONObject cs = o.optJSONObject("counties");
         if (cs != null) {
             final Iterator<String> it = cs.keys();

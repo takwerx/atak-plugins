@@ -336,9 +336,11 @@ public class ZoneManager {
         }
     }
 
+    /** The depot host from the preference, HTTPS only; anything else is the default. */
     private String baseUrl() {
         final SharedPreferences p = PreferenceManager.getDefaultSharedPreferences(mapView.getContext());
-        return p.getString(PREF_BASE_URL, DEFAULT_BASE_URL).replaceAll("/+$", "");
+        final String u = p.getString(PREF_BASE_URL, DEFAULT_BASE_URL).trim().replaceAll("/+$", "");
+        return u.startsWith("https://") ? u : DEFAULT_BASE_URL;
     }
 
     /**
