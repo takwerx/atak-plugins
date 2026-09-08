@@ -21,4 +21,8 @@
     <string name="use_this_extent">Use this extent</string>
     <string name="use_this_zoom">Use this zoom</string>
     <string name="presets">Presets</string>
+    <string name="section_zones">Zones on the map</string>
+    <string name="search_hint">Zone id, name or county</string>
+    <string name="clear">Clear</string>
+    <string name="status_all">Status: all</string>
 </resources>

@@ -119,6 +119,10 @@ public class ZoneLayer {
         final AttributeSet attrs;
         /** The geometry's box, read once, for the radius test on every rewrite. */
         final Envelope env;
+        /** For the zone list: the status label, its color, the county, a point to measure from. */
+        String title, statusKey, county;
+        int color;
+        double lat = Double.NaN, lon = Double.NaN;
 
         Pending(String setName, double minGsd, String name, Geometry geometry, Style style, AttributeSet attrs) {
             this.setName = setName;
@@ -128,8 +132,42 @@ public class ZoneLayer {
             this.style = style;
             this.attrs = attrs;
             this.env = geometry == null ? null : geometry.getEnvelope();
+            if (env != null) {
+                lat = (env.minY + env.maxY) / 2;
+                lon = (env.minX + env.maxX) / 2;
+            }
         }
     }
+
+    /** One zone as the pane lists it: what is on the map right now, nothing more. */
+    public static final class ZoneInfo {
+        public final String name, title, status, county, sourceId, sourceTitle;
+        public final int color;
+        public final double lat, lon;
+        public final double[] bounds;
+
+        ZoneInfo(Pending pf, Catalog.Source source) {
+            name = pf.name;
+            title = pf.title == null ? pf.name : pf.title;
+            status = pf.statusKey == null ? "" : pf.statusKey;
+            county = pf.county == null ? source.county : pf.county;
+            sourceId = source.id;
+            sourceTitle = source.title;
+            color = pf.color;
+            lat = pf.lat;
+            lon = pf.lon;
+            bounds = pf.env == null ? null : new double[] { pf.env.minY, pf.env.minX, pf.env.maxY, pf.env.maxX };
+        }
+
+        public boolean matches(String q) {
+            return q.isEmpty() || name.toLowerCase(java.util.Locale.US).contains(q)
+                    || title.toLowerCase(java.util.Locale.US).contains(q)
+                    || county.toLowerCase(java.util.Locale.US).contains(q);
+        }
+    }
+
+    /** The zones in the store after the radius filter, in fetch order. */
+    public volatile List<ZoneInfo> zones = new ArrayList<>();
 
     // ---- visibility: Cam Depot's radius and zoom gate, applied to the store --------
 
@@ -425,6 +463,7 @@ public class ZoneLayer {
             bulk = true;
             final List<Long> old = existingSets();
             final Map<String, Long> sets = new HashMap<>();
+            final List<ZoneInfo> listed = new ArrayList<>();
             int in = 0, out = 0;
             if (layerOn) {
                 final GeoPoint from = filterFrom;
@@ -434,6 +473,7 @@ public class ZoneLayer {
                         out++;
                         continue;
                     }
+                    listed.add(new ZoneInfo(pf, source));
                     Long fsid = sets.get(pf.setName);
                     if (fsid == null) {
                         fsid = newSet(pf.setName, Math.min(pf.minGsd, zoomGate));
@@ -446,6 +486,7 @@ public class ZoneLayer {
             }
             shown = in;
             outsideRadius = out;
+            zones = listed;
             for (Long id : old) {
                 try {
                     store.deleteFeatureSet(id);
@@ -638,7 +679,20 @@ public class ZoneLayer {
                                 t.bounds = union(t.bounds, g);
                             }
                         }
-                        out.add(new Pending(setName, Double.MAX_VALUE, featureName, geometry, style, attrs));
+                        final Pending pf = new Pending(setName, Double.MAX_VALUE, featureName, geometry, style, attrs);
+                        pf.title = title;
+                        pf.statusKey = key;
+                        pf.color = colors.containsKey(key) ? colors.get(key) : 0;
+                        if (countyField != null && !props.isNull(countyField))
+                            pf.county = props.optString(countyField, null);
+                        if (!isPoint && !isLine) {
+                            final Point at = labelPoint(g);
+                            if (at != null) {
+                                pf.lat = at.getY();
+                                pf.lon = at.getX();
+                            }
+                        }
+                        out.add(pf);
                         if (++seen[0] % 25 == 0) {
                             progress = seen[0];
                             status = "refreshing: " + seen[0];

@@ -66,6 +66,12 @@ public class EvacMap implements IPlugin {
     private android.widget.SeekBar radius;
     private TextView radiusLabel, zoomLabel;
     private Button radiusFromButton, radiusPresetButton;
+    private android.widget.EditText search;
+    private Button searchClear, statusFilterButton;
+    /** The status the list is narrowed to, a legend key, or null for all. */
+    private String statusFilter;
+    /** Rows the list draws before it says "narrow the search". */
+    private static final int LIST_CAP = 100;
 
     public EvacMap(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -157,6 +163,7 @@ public class EvacMap implements IPlugin {
                 }
             });
             wireVisibility();
+            wireZoneList();
             if (manager != null)
                 manager.setListener(new ZoneManager.Listener() {
                     @Override
@@ -435,6 +442,166 @@ public class EvacMap implements IPlugin {
         return m > 0 ? m / res : 200;
     }
 
+    // ---- the zone list: search, a status filter, Go to ------------------------------
+
+    private void wireZoneList() {
+        search = paneView.findViewById(R.id.search);
+        searchClear = paneView.findViewById(R.id.search_clear);
+        statusFilterButton = paneView.findViewById(R.id.status_filter);
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence c, int a, int b, int d) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence c, int a, int b, int d) {
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable e) {
+                renderZones();
+            }
+        });
+        // Clear sits beside the box and is disabled while it is empty: a live Clear
+        // button is the panel saying a search is narrowing the list.
+        searchClear.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                search.setText("");
+            }
+        });
+        statusFilterButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickStatus();
+            }
+        });
+    }
+
+    /** Every zone on the map in this state: the ON layers' lists, joined. */
+    private List<ZoneLayer.ZoneInfo> zonesInState() {
+        final List<ZoneLayer.ZoneInfo> out = new ArrayList<>();
+        for (ZoneLayer l : manager.snapshot())
+            if (l.isVisible() && (state == null || l.source.st.equalsIgnoreCase(state)))
+                out.addAll(l.zones);
+        return out;
+    }
+
+    /** The filter states what it will cost before it is used: each status with its count. */
+    private void pickStatus() {
+        final Map<String, Integer> counts = new LinkedHashMap<>();
+        final Map<String, Integer> colors = new LinkedHashMap<>();
+        for (ZoneLayer.ZoneInfo z : zonesInState()) {
+            final Integer n = counts.get(z.status);
+            counts.put(z.status, n == null ? 1 : n + 1);
+            if (z.color != 0)
+                colors.put(z.status, z.color);
+        }
+        final List<String> keys = new ArrayList<>(counts.keySet());
+        final String[] names = new String[keys.size() + 1];
+        names[0] = "All  (" + zonesInState().size() + ")";
+        int checked = statusFilter == null ? 0 : -1;
+        for (int i = 0; i < keys.size(); i++) {
+            names[i + 1] = keys.get(i) + "  (" + counts.get(keys.get(i)) + ")";
+            if (keys.get(i).equals(statusFilter))
+                checked = i + 1;
+        }
+        choose("Zones with status", names, checked, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface d, int which) {
+                statusFilter = which == 0 ? null : keys.get(which - 1);
+                renderZones();
+            }
+        });
+    }
+
+    /**
+     * The list: what is on the map in this state, narrowed by the search box and the
+     * status filter, nearest first from the point the radius measures from, with the
+     * distance on each row and Go to. Capped, and it says so.
+     */
+    private void renderZones() {
+        if (paneView == null || manager == null)
+            return;
+        final LinearLayout container = paneView.findViewById(R.id.zones_container);
+        final TextView summary = paneView.findViewById(R.id.zones_summary);
+        container.removeAllViews();
+        final String q = search.getText().toString().trim().toLowerCase(java.util.Locale.US);
+        searchClear.setEnabled(!q.isEmpty());
+        final List<ZoneLayer.ZoneInfo> all = zonesInState();
+        statusFilterButton.setText(statusFilter == null ? "Status: all" : "Status: " + statusFilter);
+        if (statusFilter != null) {
+            boolean seen = false;
+            for (ZoneLayer.ZoneInfo z : all)
+                if (statusFilter.equals(z.status)) {
+                    seen = true;
+                    break;
+                }
+            if (!seen)
+                statusFilterButton.setText("Status: " + statusFilter + " (none now)");
+        }
+        final List<ZoneLayer.ZoneInfo> hits = new ArrayList<>();
+        for (ZoneLayer.ZoneInfo z : all) {
+            if (statusFilter != null && !statusFilter.equals(z.status))
+                continue;
+            if (!z.matches(q))
+                continue;
+            hits.add(z);
+        }
+        final GeoPoint from = manager.visibility.from(mapView);
+        final Map<ZoneLayer.ZoneInfo, Double> dist = new java.util.HashMap<>();
+        for (ZoneLayer.ZoneInfo z : hits)
+            dist.put(z, from == null || Double.isNaN(z.lat) ? Double.MAX_VALUE
+                    : com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(from, new GeoPoint(z.lat, z.lon)));
+        Collections.sort(hits, new java.util.Comparator<ZoneLayer.ZoneInfo>() {
+            @Override
+            public int compare(ZoneLayer.ZoneInfo a, ZoneLayer.ZoneInfo b) {
+                return Double.compare(dist.get(a), dist.get(b));
+            }
+        });
+        final StringBuilder sb = new StringBuilder();
+        if (all.isEmpty())
+            sb.append("No zones on the map for ").append(state == null ? "this state" : state)
+                    .append(". Turn a source on.");
+        else if (hits.isEmpty())
+            sb.append("No zone matches").append(q.isEmpty() ? "" : " \u201c" + q + "\u201d")
+                    .append(statusFilter == null ? "" : " with status " + statusFilter).append('.');
+        else if (hits.size() > LIST_CAP)
+            sb.append("Nearest ").append(LIST_CAP).append(" of ").append(hits.size())
+                    .append(" zones, from ").append(manager.visibility.fromLabel()).append(" \u00b7 narrow the search");
+        else
+            sb.append(hits.size()).append(hits.size() == 1 ? " zone" : " zones").append(", nearest first from ")
+                    .append(manager.visibility.fromLabel());
+        summary.setText(sb.toString());
+        int n = 0;
+        for (final ZoneLayer.ZoneInfo z : hits) {
+            if (n++ >= LIST_CAP)
+                break;
+            final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.zone_row, null);
+            final double d = dist.get(z);
+            ((TextView) row.findViewById(R.id.row_title)).setText(z.name
+                    + (d == Double.MAX_VALUE ? "" : "  \u00b7  " + com.atakmap.android.evacmap.Units.format(d)));
+            final TextView sub = row.findViewById(R.id.row_status);
+            final SpannableStringBuilder line = new SpannableStringBuilder();
+            if (!z.status.isEmpty()) {
+                line.append(z.status);
+                if (z.color != 0)
+                    line.setSpan(new ForegroundColorSpan(z.color), 0, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            if (!z.county.isEmpty())
+                line.append(line.length() > 0 ? " \u00b7 " : "").append(z.county);
+            line.append(line.length() > 0 ? " \u00b7 " : "").append(z.sourceTitle);
+            sub.setText(line);
+            row.findViewById(R.id.row_goto).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    manager.frame(z.bounds);
+                }
+            });
+            container.addView(row);
+        }
+    }
+
     // ---- counties -----------------------------------------------------------------
 
     /**
@@ -666,6 +833,7 @@ public class EvacMap implements IPlugin {
             countiesButton.setText("No county list for " + state + " yet");
             countiesButton.setEnabled(false);
             countyHint.setVisibility(View.GONE);
+            renderZones();
             return;
         }
         countiesButton.setEnabled(true);
@@ -682,6 +850,7 @@ public class EvacMap implements IPlugin {
         if (shown.isEmpty()) {
             countiesButton.setText("Pick counties  (" + entries.size() + " in " + state + ")");
             countyHint.setVisibility(View.VISIBLE);
+            renderZones();
             return;
         }
         final List<String> names = new ArrayList<>();
@@ -698,6 +867,7 @@ public class EvacMap implements IPlugin {
                 if (!s.statewide() && Catalog.countyKey(s.county).equals(e.key))
                     county.addView(sourceRow(s));
         }
+        renderZones();
     }
 
     /**
