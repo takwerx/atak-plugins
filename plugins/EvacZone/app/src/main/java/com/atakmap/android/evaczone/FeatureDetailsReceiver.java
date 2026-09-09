@@ -42,7 +42,19 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
                 closeDropDown();
             }
         });
+        // Go there from the details, so a zone found in the list can be read and then
+        // framed without going back to the list first. The details stay open.
+        view.findViewById(R.id.btn_go).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (shownBounds != null)
+                    manager.frame(shownBounds);
+            }
+        });
     }
+
+    /** South, west, north, east of the zone on show, for Go there. */
+    private double[] shownBounds;
 
     public void setOnBack(Runnable r) {
         onBack = r;
@@ -79,6 +91,15 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
             return;
         }
         final ZoneLayer layer = manager.find(sourceId);
+        shownBounds = null;
+        try {
+            final com.atakmap.map.layer.feature.geometry.Envelope e = f.getGeometry() == null ? null
+                    : f.getGeometry().getEnvelope();
+            if (e != null && !Double.isNaN(e.minX))
+                shownBounds = new double[] { e.minY, e.minX, e.maxY, e.maxX };
+        } catch (Exception ignored) {
+        }
+        view.findViewById(R.id.btn_go).setEnabled(shownBounds != null);
         final AttributeSet attrs = f.getAttributes();
         final List<String> keys = new ArrayList<>();
         if (attrs != null)
