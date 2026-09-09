@@ -118,6 +118,12 @@ public class EvacZone implements IPlugin {
      * ToolsPreferenceFragment should cost the manual, not the plugin.
      */
     private void registerPreferences() {
+        // No manual in this build, no entry: a row that opens nothing is worse than none.
+        try {
+            pluginContext.getAssets().open("usermanual.pdf").close();
+        } catch (java.io.IOException noManual) {
+            return;
+        }
         try {
             com.atakmap.app.preferences.ToolsPreferenceFragment.register(
                     new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
