@@ -37,3 +37,6 @@ captures/
 # Submission zips
 dist/
 *.zip
+
+# Built by typst at tak.gov (ATAK_CI=1) or by hand locally; never tracked.
+app/src/main/assets/usermanual.pdf

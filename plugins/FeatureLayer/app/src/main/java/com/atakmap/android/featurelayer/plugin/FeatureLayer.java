@@ -74,10 +74,36 @@ public class FeatureLayer implements IPlugin {
                 .build();
     }
 
+    private static final String PREFS_KEY = "featurelayerPreference";
+
+    /** The Tool Preferences entry the manual is reached through; a build without the class costs the manual, not the plugin. */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new FeatureLayerPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
+    }
+
     @Override
     public void onStart() {
         if (uiService != null)
             uiService.addToolbarItem(toolbarItem);
+        registerPreferences();
         mapView = MapView.getMapView();
         if (mapView != null && manager == null) {
             manager = new LayerManager(mapView, pluginContext, BuildConfig.ARCGIS_CLIENT_ID);
@@ -104,6 +130,7 @@ public class FeatureLayer implements IPlugin {
         }
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+        unregisterPreferences();
     }
 
     private void toast(String s) {

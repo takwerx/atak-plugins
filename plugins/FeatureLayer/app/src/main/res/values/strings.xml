@@ -4,4 +4,7 @@
     <string name="app_name">Feature Layer</string>
     <!-- description -->
     <string name="app_desc">Feature Layer</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the Feature Layer user guide: sources, signing in, layers and features, search, and what the symbols mean</string>
+    <string name="prefs_summary">Live ArcGIS feature layers on the map</string>
 </resources>
