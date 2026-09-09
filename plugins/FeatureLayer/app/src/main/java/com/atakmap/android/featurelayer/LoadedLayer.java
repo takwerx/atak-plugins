@@ -315,11 +315,58 @@ public class LoadedLayer {
         synchronized (lock) {
             if (store == null)
                 return false;
+            loadCacheLocked();
             if (v && cache.isEmpty())
                 return countFeatures() == 0;
             rewriteStore();
         }
         return false;
+    }
+
+    /**
+     * After a restart the store on disk is full and the memory copy is empty. Every
+     * rewrite works from the memory copy, so an empty one must be filled from the store
+     * first; without this, the first type toggle after a restart deleted every feature
+     * and, offline, nothing could bring them back (Plaskett, 2026-09-09).
+     */
+    private void loadCacheLocked() {
+        if (!cache.isEmpty() || store == null)
+            return;
+        final List<Pending> loaded = new ArrayList<>();
+        try {
+            final Map<Long, String> names = new HashMap<>();
+            final Map<Long, Double> gsds = new HashMap<>();
+            final FeatureSetCursor sc = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
+            try {
+                while (sc.moveToNext()) {
+                    names.put(sc.getId(), sc.getName());
+                    gsds.put(sc.getId(), sc.get().getMinResolution());
+                }
+            } finally {
+                sc.close();
+            }
+            final com.atakmap.map.layer.feature.FeatureCursor c = store.queryFeatures(new FeatureDataStore2.FeatureQueryParameters());
+            try {
+                while (c.moveToNext()) {
+                    final Feature f = c.get();
+                    final String setName = names.get(f.getFeatureSetId());
+                    if (setName == null)
+                        continue;
+                    final Double gsd = gsds.get(f.getFeatureSetId());
+                    loaded.add(new Pending(setName, gsd == null ? GSD_ALWAYS : gsd, f.getName(), f.getGeometry(),
+                            f.getStyle(), f.getAttributes()));
+                }
+            } finally {
+                c.close();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, spec.id + ": could not load the cache from the store", e);
+            return;
+        }
+        if (!loaded.isEmpty()) {
+            cache = loaded;
+            Log.d(TAG, spec.id + ": memory copy rebuilt from the store, " + loaded.size() + " features");
+        }
     }
 
     private boolean layerOn = true;
@@ -341,7 +388,10 @@ public class LoadedLayer {
     public void setGate(double metersPerPixel) {
         spec.gateGsd = metersPerPixel;
         synchronized (lock) {
-            if (store != null && !closed && !cache.isEmpty())
+            if (store == null || closed)
+                return;
+            loadCacheLocked();
+            if (!cache.isEmpty())
                 rewriteStore();
         }
     }
@@ -350,7 +400,10 @@ public class LoadedLayer {
     public void setLabels(boolean on) {
         spec.labels = on;
         synchronized (lock) {
-            if (store != null && !closed && !cache.isEmpty())
+            if (store == null || closed)
+                return;
+            loadCacheLocked();
+            if (!cache.isEmpty())
                 rewriteStore();
         }
     }
@@ -359,7 +412,10 @@ public class LoadedLayer {
     public void setRepairStatus(boolean on) {
         spec.repairStatus = on;
         synchronized (lock) {
-            if (store != null && !closed && !cache.isEmpty())
+            if (store == null || closed)
+                return;
+            loadCacheLocked();
+            if (!cache.isEmpty())
                 rewriteStore();
         }
     }
@@ -369,8 +425,19 @@ public class LoadedLayer {
         synchronized (lock) {
             if (store == null)
                 return false;
-            if (v && cache.isEmpty())
-                return true;
+            loadCacheLocked();
+            if (v) {
+                // A type that was off at the last fetch is not in the store, so the memory
+                // copy cannot show it either: that one needs a fetch.
+                boolean have = false;
+                for (Pending pf : cache)
+                    if (setName.equals(pf.setName)) {
+                        have = true;
+                        break;
+                    }
+                if (!have)
+                    return true;
+            }
             rewriteStore();
         }
         return false;
@@ -404,6 +471,11 @@ public class LoadedLayer {
      * the previous ones out. Lock held.
      */
     private void rewriteStore() {
+        if (cache.isEmpty()) {
+            // Never trade a full store for an empty memory copy.
+            Log.w(TAG, spec.id + ": rewrite skipped, nothing in memory to write");
+            return;
+        }
         // Bulk mode: one content-changed notification at the end instead of one per
         // insert, each of which had ATAK re-querying the store and stalling its main thread.
         boolean bulk = false;
