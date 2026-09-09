@@ -1,0 +1,1687 @@
+{
+ "format": 1,
+ "generated": "2026-09-09T04:51:56Z",
+ "sources": [
+  {
+   "id": "us-ca-statewide",
+   "title": "California",
+   "publisher": "Cal OES",
+   "st": "CA",
+   "co": "",
+   "kind": "live",
+   "url": "https://services.arcgis.com/BLN4oKB0N1YSgvY8/arcgis/rest/services/CA_EVACUATIONS_CalOESHosted_view/FeatureServer",
+   "layer": 0,
+   "layer_name": "CA_EVACUATIONS",
+   "geometry": "polygon",
+   "where": "1=1",
+   "status_field": "STATUS",
+   "name_field": "ZONE_ID",
+   "county_field": "COUNTY",
+   "refresh_min": 5,
+   "features": 84,
+   "simplify": 0.0001,
+   "bounds": [
+    32.5,
+    -124.5,
+    42.0,
+    -114.1
+   ],
+   "note": "Every live California feed in one: Cal OES orders and warnings, CAL FIRE's reason, population and lifted zones, and the county and city feeds, de-duplicated.",
+   "last_edit": "2026-09-08",
+   "checked": "2026-09-09T04:51:56Z",
+   "also": [
+    {
+     "url": "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/Combined_Statewide_Evacuation_Public_View/FeatureServer",
+     "layer": 0,
+     "publisher": "CAL FIRE",
+     "county": "",
+     "where": "1=1",
+     "status_field": "zone_status",
+     "name_field": "zone_id",
+     "county_field": "county_name"
+    },
+    {
+     "url": "https://services1.arcgis.com/P5Mv5GY5S66M8Z1Q/arcgis/rest/services/Sonoma_County_Evacuation_Areas_public/FeatureServer",
+     "layer": 0,
+     "publisher": "Sonoma County",
+     "county": "Sonoma",
+     "where": "zone_status <> 'Normal'",
+     "status_field": "zone_status",
+     "name_field": "ZoneNumber",
+     "county_field": ""
+    },
+    {
+     "url": "https://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Emergency_Notification_Areas_view/FeatureServer",
+     "layer": 0,
+     "publisher": "County of San Diego OES",
+     "county": "San Diego",
+     "where": "1=1",
+     "status_field": "zone_status",
+     "name_field": "zone_label",
+     "county_field": ""
+    },
+    {
+     "url": "https://services.arcgis.com/xsiPoFK0f7RrxF0D/arcgis/rest/services/LA_City_Evacuation_Areas/FeatureServer",
+     "layer": 0,
+     "publisher": "LAFD",
+     "county": "Los Angeles",
+     "where": "1=1",
+     "status_field": "EvacType",
+     "name_field": "EvacArea",
+     "county_field": ""
+    },
+    {
+     "url": "https://services.arcgis.com/RmCCgQtiZLDCtblq/arcgis/rest/services/Public_Emergency_Map_GENASYS_Alert_Warning_Area/FeatureServer",
+     "layer": 0,
+     "publisher": "LA County OEM",
+     "county": "Los Angeles",
+     "where": "1=1",
+     "status_field": "AlertReason",
+     "name_field": "zone_id",
+     "county_field": ""
+    },
+    {
+     "url": "https://services5.arcgis.com/Mn9RcWO3YYOeWUyC/arcgis/rest/services/Evacuation_Perimeters_-_Public_Maps/FeatureServer",
+     "layer": 0,
+     "publisher": "Ventura County Sheriff",
+     "county": "Ventura",
+     "where": "1=1",
+     "status_field": "Evac_Status",
+     "name_field": "Evac_Zone",
+     "county_field": ""
+    },
+    {
+     "url": "https://services2.arcgis.com/wEula7SYiezXcdRv/arcgis/rest/services/Public_Evacuations_(Live_Feed)/FeatureServer",
+     "layer": 0,
+     "publisher": "Mariposa County",
+     "county": "Mariposa",
+     "where": "1=1",
+     "status_field": "TYPE",
+     "name_field": "IncidentName",
+     "county_field": ""
+    }
+   ]
+  },
+  {
+   "id": "us-or-statewide",
+   "title": "Oregon",
+   "publisher": "Oregon OEM",
+   "st": "OR",
+   "co": "",
+   "kind": "live",
+   "url": "https://services.arcgis.com/uUvqNMGPm7axC2dD/arcgis/rest/services/Fire_Evacuation_Areas_Public/FeatureServer",
+   "layer": 0,
+   "layer_name": "Fire_Evacuation_Areas",
+   "geometry": "polygon",
+   "where": "1=1",
+   "status_field": "Fire_Evacuation_Level",
+   "name_field": "Evac_Area_Name",
+   "county_field": "County",
+   "refresh_min": 5,
+   "features": 89,
+   "simplify": 0.0001,
+   "bounds": [
+    41.99,
+    -124.6,
+    46.3,
+    -116.45
+   ],
+   "note": "Level 1 Be Ready, 2 Be Set, 3 Go Now. Oregon OEM with the county feeds folded in, de-duplicated.",
+   "last_edit": "2026-09-09",
+   "checked": "2026-09-09T04:51:56Z",
+   "also": [
+    {
+     "url": "https://services1.arcgis.com/znO8Hz1SuVVohYhZ/arcgis/rest/services/Emergency_Response_OEM_Public/FeatureServer",
+     "layer": 4,
+     "publisher": "Deschutes County",
+     "county": "Deschutes",
+     "where": "1=1",
+     "status_field": "Fire_Evacuation_Level",
+     "name_field": "Evac_Area_Name",
+     "county_field": ""
+    }
+   ]
+  },
+  {
+   "id": "ca-bc-evac",
+   "title": "British Columbia",
+   "publisher": "EmergencyInfoBC",
+   "st": "BC",
+   "co": "",
+   "kind": "live",
+   "url": "https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/Evacuation_Orders_and_Alerts/FeatureServer",
+   "layer": 0,
+   "layer_name": "Evacuation Orders and Alerts - View",
+   "geometry": "polygon",
+   "where": "1=1",
+   "status_field": "ORDER_ALERT_STATUS",
+   "name_field": "ORDER_ALERT_NAME",
+   "county_field": "",
+   "refresh_min": 10,
+   "features": 32,
+   "simplify": 0.0001,
+   "bounds": [
+    48.3,
+    -139.1,
+    60.0,
+    -114.0
+   ],
+   "note": "Order, Alert (be ready to leave), Tactical Evacuation, All Clear.",
+   "last_edit": "2026-09-09",
+   "checked": "2026-09-09T04:51:56Z"
+  },
+  {
+   "id": "us-fl-hillsborough",
+   "title": "Hillsborough County \u00b7 hurricane zones A to E",
+   "publisher": "Hillsborough County",
+   "st": "FL",
+   "co": "Hillsborough",
+   "kind": "static",
+   "url": "https://services.arcgis.com/apTfC6SUmnNfnxuF/arcgis/rest/services/Evacuation_Zones_2023/FeatureServer",
+   "layer": 0,
+   "layer_name": "Evacuation_Zones_2023",
+   "geometry": "polygon",
+   "where": "1=1",
+   "status_field": "",
+   "name_field": "ZONE",
+   "county_field": "",
+   "refresh_min": 1440,
+   "features": 834,
+   "simplify": 0.0001,
+   "bounds": [
+    27.6454,
+    -82.6502,
+    28.1476,
+    -82.1206
+   ],
+   "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
+   "last_edit": "2024-09-26",
+   "checked": "2026-09-09T04:51:56Z"
+  },
+  {
+   "id": "us-fl-lee",
+   "title": "Lee County \u00b7 hurricane zones A to E",
+   "publisher": "Lee County",
+   "st": "FL",
+   "co": "Lee",
+   "kind": "static",
+   "url": "https://services2.arcgis.com/LvWGAAhHwbCJ2GMP/arcgis/rest/services/NewEvacZones_PublishAGOL/FeatureServer",
+   "layer": 0,
+   "layer_name": "Evacuation Zones",
+   "geometry": "polygon",
+   "where": "1=1",
+   "status_field": "",
+   "name_field": "CountyZone",
+   "county_field": "",
+   "refresh_min": 1440,
+   "features": 5,
+   "simplify": 0.0001,
+   "bounds": [
+    26.3157,
+    -82.2742,
+    26.7898,
+    -81.5607
+   ],
+   "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
+   "last_edit": "2021-07-03",
+   "checked": "2026-09-09T04:51:56Z"
+  }
+ ],
+ "counties": {
+  "CA": [
+   {
+    "n": "Alameda",
+    "b": [
+     37.459,
+     -122.373,
+     37.904,
+     -121.471
+    ]
+   },
+   {
+    "n": "Alpine",
+    "b": [
+     38.327,
+     -120.073,
+     38.933,
+     -119.543
+    ]
+   },
+   {
+    "n": "Amador",
+    "b": [
+     38.221,
+     -121.028,
+     38.705,
+     -120.072
+    ]
+   },
+   {
+    "n": "Butte",
+    "b": [
+     39.296,
+     -122.069,
+     40.152,
+     -121.08
+    ]
+   },
+   {
+    "n": "Calaveras",
+    "b": [
+     37.832,
+     -120.996,
+     38.51,
+     -120.02
+    ]
+   },
+   {
+    "n": "Colusa",
+    "b": [
+     38.924,
+     -122.785,
+     39.415,
+     -121.795
+    ]
+   },
+   {
+    "n": "Contra Costa",
+    "b": [
+     37.719,
+     -122.442,
+     38.096,
+     -121.538
+    ]
+   },
+   {
+    "n": "Del Norte",
+    "b": [
+     41.381,
+     -124.44,
+     42.001,
+     -123.518
+    ]
+   },
+   {
+    "n": "El Dorado",
+    "b": [
+     38.502,
+     -121.142,
+     39.067,
+     -119.877
+    ]
+   },
+   {
+    "n": "Fresno",
+    "b": [
+     35.907,
+     -120.919,
+     37.586,
+     -118.361
+    ]
+   },
+   {
+    "n": "Glenn",
+    "b": [
+     39.383,
+     -122.938,
+     39.8,
+     -121.857
+    ]
+   },
+   {
+    "n": "Humboldt",
+    "b": [
+     40.002,
+     -124.482,
+     41.464,
+     -123.406
+    ]
+   },
+   {
+    "n": "Imperial",
+    "b": [
+     32.618,
+     -116.106,
+     33.434,
+     -114.468
+    ]
+   },
+   {
+    "n": "Inyo",
+    "b": [
+     35.789,
+     -118.79,
+     37.465,
+     -115.648
+    ]
+   },
+   {
+    "n": "Kern",
+    "b": [
+     34.789,
+     -120.194,
+     35.798,
+     -117.632
+    ]
+   },
+   {
+    "n": "Kings",
+    "b": [
+     35.789,
+     -120.315,
+     36.489,
+     -119.475
+    ]
+   },
+   {
+    "n": "Lake",
+    "b": [
+     38.671,
+     -123.093,
+     39.581,
+     -122.34
+    ]
+   },
+   {
+    "n": "Lassen",
+    "b": [
+     39.708,
+     -121.332,
+     41.184,
+     -120.0
+    ]
+   },
+   {
+    "n": "Los Angeles",
+    "b": [
+     32.752,
+     -118.952,
+     34.823,
+     -117.646
+    ]
+   },
+   {
+    "n": "Madera",
+    "b": [
+     36.763,
+     -120.542,
+     37.778,
+     -119.022
+    ]
+   },
+   {
+    "n": "Marin",
+    "b": [
+     37.815,
+     -123.135,
+     38.321,
+     -122.347
+    ]
+   },
+   {
+    "n": "Mariposa",
+    "b": [
+     37.183,
+     -120.395,
+     37.903,
+     -119.307
+    ]
+   },
+   {
+    "n": "Mendocino",
+    "b": [
+     38.758,
+     -124.135,
+     40.002,
+     -122.822
+    ]
+   },
+   {
+    "n": "Merced",
+    "b": [
+     36.74,
+     -121.249,
+     37.633,
+     -120.052
+    ]
+   },
+   {
+    "n": "Modoc",
+    "b": [
+     41.183,
+     -121.448,
+     41.997,
+     -119.999
+    ]
+   },
+   {
+    "n": "Mono",
+    "b": [
+     37.465,
+     -119.651,
+     38.713,
+     -117.833
+    ]
+   },
+   {
+    "n": "Monterey",
+    "b": [
+     35.789,
+     -122.052,
+     36.913,
+     -120.214
+    ]
+   },
+   {
+    "n": "Napa",
+    "b": [
+     38.155,
+     -122.633,
+     38.864,
+     -122.062
+    ]
+   },
+   {
+    "n": "Nevada",
+    "b": [
+     39.014,
+     -121.28,
+     39.527,
+     -120.004
+    ]
+   },
+   {
+    "n": "Orange",
+    "b": [
+     33.334,
+     -118.148,
+     33.946,
+     -117.413
+    ]
+   },
+   {
+    "n": "Placer",
+    "b": [
+     38.712,
+     -121.484,
+     39.316,
+     -120.002
+    ]
+   },
+   {
+    "n": "Plumas",
+    "b": [
+     39.597,
+     -121.498,
+     40.447,
+     -120.1
+    ]
+   },
+   {
+    "n": "Riverside",
+    "b": [
+     33.432,
+     -117.676,
+     34.08,
+     -114.435
+    ]
+   },
+   {
+    "n": "Sacramento",
+    "b": [
+     38.019,
+     -121.862,
+     38.736,
+     -121.027
+    ]
+   },
+   {
+    "n": "San Benito",
+    "b": [
+     36.197,
+     -121.644,
+     36.983,
+     -120.597
+    ]
+   },
+   {
+    "n": "San Bernardino",
+    "b": [
+     33.871,
+     -117.803,
+     35.809,
+     -114.133
+    ]
+   },
+   {
+    "n": "San Diego",
+    "b": [
+     32.53,
+     -117.611,
+     33.505,
+     -116.085
+    ]
+   },
+   {
+    "n": "San Francisco",
+    "b": [
+     37.642,
+     -123.174,
+     37.93,
+     -122.282
+    ]
+   },
+   {
+    "n": "San Joaquin",
+    "b": [
+     37.482,
+     -121.584,
+     38.3,
+     -120.921
+    ]
+   },
+   {
+    "n": "San Luis Obispo",
+    "b": [
+     34.898,
+     -121.438,
+     35.797,
+     -119.472
+    ]
+   },
+   {
+    "n": "San Mateo",
+    "b": [
+     37.055,
+     -122.587,
+     37.708,
+     -122.081
+    ]
+   },
+   {
+    "n": "Santa Barbara",
+    "b": [
+     33.414,
+     -120.734,
+     35.115,
+     -118.964
+    ]
+   },
+   {
+    "n": "Santa Clara",
+    "b": [
+     36.893,
+     -122.203,
+     37.485,
+     -121.208
+    ]
+   },
+   {
+    "n": "Santa Cruz",
+    "b": [
+     36.82,
+     -122.318,
+     37.286,
+     -121.581
+    ]
+   },
+   {
+    "n": "Shasta",
+    "b": [
+     40.305,
+     -123.069,
+     41.184,
+     -121.323
+    ]
+   },
+   {
+    "n": "Sierra",
+    "b": [
+     39.392,
+     -121.058,
+     39.777,
+     -120.001
+    ]
+   },
+   {
+    "n": "Siskiyou",
+    "b": [
+     40.994,
+     -123.719,
+     42.001,
+     -121.446
+    ]
+   },
+   {
+    "n": "Solano",
+    "b": [
+     38.033,
+     -122.407,
+     38.538,
+     -121.593
+    ]
+   },
+   {
+    "n": "Sonoma",
+    "b": [
+     38.073,
+     -123.632,
+     38.852,
+     -122.347
+    ]
+   },
+   {
+    "n": "Stanislaus",
+    "b": [
+     37.135,
+     -121.487,
+     38.077,
+     -120.387
+    ]
+   },
+   {
+    "n": "Sutter",
+    "b": [
+     38.735,
+     -121.946,
+     39.306,
+     -121.414
+    ]
+   },
+   {
+    "n": "Tehama",
+    "b": [
+     39.798,
+     -123.065,
+     40.446,
+     -121.342
+    ]
+   },
+   {
+    "n": "Trinity",
+    "b": [
+     39.977,
+     -123.624,
+     41.368,
+     -122.446
+    ]
+   },
+   {
+    "n": "Tulare",
+    "b": [
+     35.789,
+     -119.573,
+     36.742,
+     -117.983
+    ]
+   },
+   {
+    "n": "Tuolumne",
+    "b": [
+     37.634,
+     -120.653,
+     38.434,
+     -119.201
+    ]
+   },
+   {
+    "n": "Ventura",
+    "b": [
+     33.168,
+     -119.636,
+     34.901,
+     -118.632
+    ]
+   },
+   {
+    "n": "Yolo",
+    "b": [
+     38.313,
+     -122.422,
+     38.925,
+     -121.504
+    ]
+   },
+   {
+    "n": "Yuba",
+    "b": [
+     38.922,
+     -121.636,
+     39.639,
+     -121.009
+    ]
+   }
+  ],
+  "FL": [
+   {
+    "n": "Alachua",
+    "b": [
+     29.419,
+     -82.659,
+     29.945,
+     -82.05
+    ]
+   },
+   {
+    "n": "Baker",
+    "b": [
+     30.136,
+     -82.46,
+     30.584,
+     -82.049
+    ]
+   },
+   {
+    "n": "Bay",
+    "b": [
+     29.507,
+     -86.001,
+     30.568,
+     -85.373
+    ]
+   },
+   {
+    "n": "Bradford",
+    "b": [
+     29.719,
+     -82.419,
+     30.143,
+     -82.049
+    ]
+   },
+   {
+    "n": "Brevard",
+    "b": [
+     27.822,
+     -80.987,
+     28.791,
+     -80.385
+    ]
+   },
+   {
+    "n": "Broward",
+    "b": [
+     25.957,
+     -80.881,
+     26.356,
+     -80.015
+    ]
+   },
+   {
+    "n": "Calhoun",
+    "b": [
+     30.2,
+     -85.39,
+     30.608,
+     -84.933
+    ]
+   },
+   {
+    "n": "Charlotte",
+    "b": [
+     26.77,
+     -82.566,
+     27.034,
+     -81.563
+    ]
+   },
+   {
+    "n": "Citrus",
+    "b": [
+     28.666,
+     -83.188,
+     29.053,
+     -82.169
+    ]
+   },
+   {
+    "n": "Clay",
+    "b": [
+     29.719,
+     -82.049,
+     30.19,
+     -81.581
+    ]
+   },
+   {
+    "n": "Collier",
+    "b": [
+     25.801,
+     -82.245,
+     26.517,
+     -80.873
+    ]
+   },
+   {
+    "n": "Columbia",
+    "b": [
+     29.826,
+     -82.8,
+     30.596,
+     -82.456
+    ]
+   },
+   {
+    "n": "DeSoto",
+    "b": [
+     27.032,
+     -82.058,
+     27.341,
+     -81.563
+    ]
+   },
+   {
+    "n": "Dixie",
+    "b": [
+     29.242,
+     -83.575,
+     29.824,
+     -82.904
+    ]
+   },
+   {
+    "n": "Duval",
+    "b": [
+     30.105,
+     -82.049,
+     30.586,
+     -81.317
+    ]
+   },
+   {
+    "n": "Escambia",
+    "b": [
+     30.126,
+     -87.635,
+     30.999,
+     -86.918
+    ]
+   },
+   {
+    "n": "Flagler",
+    "b": [
+     29.261,
+     -81.524,
+     29.671,
+     -81.042
+    ]
+   },
+   {
+    "n": "Franklin",
+    "b": [
+     29.437,
+     -85.225,
+     30.014,
+     -84.297
+    ]
+   },
+   {
+    "n": "Gadsden",
+    "b": [
+     30.388,
+     -84.933,
+     30.712,
+     -84.283
+    ]
+   },
+   {
+    "n": "Gilchrist",
+    "b": [
+     29.565,
+     -82.959,
+     29.928,
+     -82.656
+    ]
+   },
+   {
+    "n": "Glades",
+    "b": [
+     26.769,
+     -81.566,
+     27.211,
+     -80.879
+    ]
+   },
+   {
+    "n": "Gulf",
+    "b": [
+     29.497,
+     -85.44,
+     30.201,
+     -85.021
+    ]
+   },
+   {
+    "n": "Hamilton",
+    "b": [
+     30.317,
+     -83.309,
+     30.634,
+     -82.647
+    ]
+   },
+   {
+    "n": "Hardee",
+    "b": [
+     27.338,
+     -82.056,
+     27.647,
+     -81.564
+    ]
+   },
+   {
+    "n": "Hendry",
+    "b": [
+     26.253,
+     -81.567,
+     26.959,
+     -80.88
+    ]
+   },
+   {
+    "n": "Hernando",
+    "b": [
+     28.431,
+     -82.89,
+     28.695,
+     -82.054
+    ]
+   },
+   {
+    "n": "Highlands",
+    "b": [
+     27.032,
+     -81.564,
+     27.647,
+     -80.941
+    ]
+   },
+   {
+    "n": "Hillsborough",
+    "b": [
+     27.531,
+     -82.933,
+     28.173,
+     -82.054
+    ]
+   },
+   {
+    "n": "Holmes",
+    "b": [
+     30.703,
+     -86.038,
+     30.997,
+     -85.498
+    ]
+   },
+   {
+    "n": "Indian River",
+    "b": [
+     27.557,
+     -80.882,
+     27.861,
+     -80.264
+    ]
+   },
+   {
+    "n": "Jackson",
+    "b": [
+     30.564,
+     -85.6,
+     31.001,
+     -84.858
+    ]
+   },
+   {
+    "n": "Jefferson",
+    "b": [
+     29.899,
+     -84.076,
+     30.672,
+     -83.604
+    ]
+   },
+   {
+    "n": "Lafayette",
+    "b": [
+     29.822,
+     -83.369,
+     30.261,
+     -82.876
+    ]
+   },
+   {
+    "n": "Lake",
+    "b": [
+     28.345,
+     -81.958,
+     29.277,
+     -81.353
+    ]
+   },
+   {
+    "n": "Lee",
+    "b": [
+     26.318,
+     -82.462,
+     26.787,
+     -81.562
+    ]
+   },
+   {
+    "n": "Leon",
+    "b": [
+     30.274,
+     -84.715,
+     30.683,
+     -83.977
+    ]
+   },
+   {
+    "n": "Levy",
+    "b": [
+     28.987,
+     -83.346,
+     29.591,
+     -82.403
+    ]
+   },
+   {
+    "n": "Liberty",
+    "b": [
+     29.971,
+     -85.154,
+     30.606,
+     -84.543
+    ]
+   },
+   {
+    "n": "Madison",
+    "b": [
+     30.26,
+     -83.822,
+     30.651,
+     -83.171
+    ]
+   },
+   {
+    "n": "Manatee",
+    "b": [
+     27.208,
+     -82.924,
+     27.646,
+     -82.054
+    ]
+   },
+   {
+    "n": "Marion",
+    "b": [
+     28.96,
+     -82.535,
+     29.522,
+     -81.642
+    ]
+   },
+   {
+    "n": "Martin",
+    "b": [
+     26.959,
+     -80.886,
+     27.264,
+     -80.023
+    ]
+   },
+   {
+    "n": "Miami-Dade",
+    "b": [
+     25.137,
+     -80.873,
+     25.979,
+     -80.063
+    ]
+   },
+   {
+    "n": "Monroe",
+    "b": [
+     24.399,
+     -83.109,
+     25.805,
+     -80.185
+    ]
+   },
+   {
+    "n": "Nassau",
+    "b": [
+     30.273,
+     -82.049,
+     30.828,
+     -81.347
+    ]
+   },
+   {
+    "n": "Okaloosa",
+    "b": [
+     30.227,
+     -86.803,
+     30.997,
+     -86.389
+    ]
+   },
+   {
+    "n": "Okeechobee",
+    "b": [
+     26.959,
+     -81.214,
+     27.643,
+     -80.677
+    ]
+   },
+   {
+    "n": "Orange",
+    "b": [
+     28.347,
+     -81.657,
+     28.786,
+     -80.863
+    ]
+   },
+   {
+    "n": "Osceola",
+    "b": [
+     27.642,
+     -81.657,
+     28.347,
+     -80.863
+    ]
+   },
+   {
+    "n": "Palm Beach",
+    "b": [
+     26.321,
+     -80.886,
+     26.97,
+     -79.975
+    ]
+   },
+   {
+    "n": "Pasco",
+    "b": [
+     28.171,
+     -83.022,
+     28.478,
+     -82.055
+    ]
+   },
+   {
+    "n": "Pinellas",
+    "b": [
+     27.611,
+     -83.019,
+     28.173,
+     -82.562
+    ]
+   },
+   {
+    "n": "Polk",
+    "b": [
+     27.646,
+     -82.106,
+     28.362,
+     -81.133
+    ]
+   },
+   {
+    "n": "Putnam",
+    "b": [
+     29.324,
+     -82.056,
+     29.84,
+     -81.446
+    ]
+   },
+   {
+    "n": "Santa Rosa",
+    "b": [
+     30.218,
+     -87.312,
+     30.999,
+     -86.786
+    ]
+   },
+   {
+    "n": "Sarasota",
+    "b": [
+     26.945,
+     -82.851,
+     27.391,
+     -82.056
+    ]
+   },
+   {
+    "n": "Seminole",
+    "b": [
+     28.611,
+     -81.46,
+     28.879,
+     -80.987
+    ]
+   },
+   {
+    "n": "St. Johns",
+    "b": [
+     29.622,
+     -81.689,
+     30.253,
+     -81.151
+    ]
+   },
+   {
+    "n": "St. Lucie",
+    "b": [
+     27.206,
+     -80.68,
+     27.559,
+     -80.138
+    ]
+   },
+   {
+    "n": "Sumter",
+    "b": [
+     28.309,
+     -82.312,
+     28.96,
+     -81.954
+    ]
+   },
+   {
+    "n": "Suwannee",
+    "b": [
+     29.882,
+     -83.253,
+     30.431,
+     -82.759
+    ]
+   },
+   {
+    "n": "Taylor",
+    "b": [
+     29.527,
+     -84.0,
+     30.304,
+     -83.319
+    ]
+   },
+   {
+    "n": "Union",
+    "b": [
+     29.92,
+     -82.576,
+     30.143,
+     -82.143
+    ]
+   },
+   {
+    "n": "Volusia",
+    "b": [
+     28.613,
+     -81.681,
+     29.432,
+     -80.663
+    ]
+   },
+   {
+    "n": "Wakulla",
+    "b": [
+     29.746,
+     -84.729,
+     30.303,
+     -84.076
+    ]
+   },
+   {
+    "n": "Walton",
+    "b": [
+     30.104,
+     -86.4,
+     30.994,
+     -85.844
+    ]
+   },
+   {
+    "n": "Washington",
+    "b": [
+     30.389,
+     -85.993,
+     30.831,
+     -85.432
+    ]
+   }
+  ],
+  "OR": [
+   {
+    "n": "Baker",
+    "b": [
+     44.255,
+     -118.519,
+     45.079,
+     -116.784
+    ]
+   },
+   {
+    "n": "Benton",
+    "b": [
+     44.281,
+     -123.817,
+     44.721,
+     -123.077
+    ]
+   },
+   {
+    "n": "Clackamas",
+    "b": [
+     44.886,
+     -122.868,
+     45.462,
+     -121.652
+    ]
+   },
+   {
+    "n": "Clatsop",
+    "b": [
+     45.775,
+     -124.16,
+     46.299,
+     -123.362
+    ]
+   },
+   {
+    "n": "Columbia",
+    "b": [
+     45.721,
+     -123.364,
+     46.185,
+     -122.761
+    ]
+   },
+   {
+    "n": "Coos",
+    "b": [
+     42.671,
+     -124.552,
+     43.611,
+     -123.702
+    ]
+   },
+   {
+    "n": "Crook",
+    "b": [
+     43.698,
+     -121.108,
+     44.564,
+     -119.656
+    ]
+   },
+   {
+    "n": "Curry",
+    "b": [
+     41.998,
+     -124.704,
+     42.954,
+     -123.716
+    ]
+   },
+   {
+    "n": "Deschutes",
+    "b": [
+     43.611,
+     -122.002,
+     44.393,
+     -119.897
+    ]
+   },
+   {
+    "n": "Douglas",
+    "b": [
+     42.699,
+     -124.29,
+     43.945,
+     -121.974
+    ]
+   },
+   {
+    "n": "Gilliam",
+    "b": [
+     45.068,
+     -120.654,
+     45.813,
+     -119.76
+    ]
+   },
+   {
+    "n": "Grant",
+    "b": [
+     43.959,
+     -119.672,
+     44.995,
+     -118.228
+    ]
+   },
+   {
+    "n": "Harney",
+    "b": [
+     41.994,
+     -119.944,
+     44.048,
+     -118.197
+    ]
+   },
+   {
+    "n": "Hood River",
+    "b": [
+     45.258,
+     -121.922,
+     45.721,
+     -121.441
+    ]
+   },
+   {
+    "n": "Jackson",
+    "b": [
+     42.004,
+     -123.231,
+     42.997,
+     -122.283
+    ]
+   },
+   {
+    "n": "Jefferson",
+    "b": [
+     44.39,
+     -121.849,
+     44.822,
+     -120.371
+    ]
+   },
+   {
+    "n": "Josephine",
+    "b": [
+     41.996,
+     -124.029,
+     42.784,
+     -123.231
+    ]
+   },
+   {
+    "n": "Klamath",
+    "b": [
+     41.994,
+     -122.29,
+     43.617,
+     -120.88
+    ]
+   },
+   {
+    "n": "Lake",
+    "b": [
+     41.994,
+     -121.35,
+     43.617,
+     -119.36
+    ]
+   },
+   {
+    "n": "Lane",
+    "b": [
+     43.437,
+     -124.23,
+     44.288,
+     -121.768
+    ]
+   },
+   {
+    "n": "Lincoln",
+    "b": [
+     44.277,
+     -124.187,
+     45.044,
+     -123.597
+    ]
+   },
+   {
+    "n": "Linn",
+    "b": [
+     44.2,
+     -123.254,
+     44.794,
+     -121.799
+    ]
+   },
+   {
+    "n": "Malheur",
+    "b": [
+     41.997,
+     -118.232,
+     44.445,
+     -116.894
+    ]
+   },
+   {
+    "n": "Marion",
+    "b": [
+     44.684,
+     -123.18,
+     45.285,
+     -121.733
+    ]
+   },
+   {
+    "n": "Morrow",
+    "b": [
+     44.995,
+     -120.007,
+     45.925,
+     -119.145
+    ]
+   },
+   {
+    "n": "Multnomah",
+    "b": [
+     45.433,
+     -122.929,
+     45.729,
+     -121.82
+    ]
+   },
+   {
+    "n": "Polk",
+    "b": [
+     44.72,
+     -123.724,
+     45.076,
+     -123.041
+    ]
+   },
+   {
+    "n": "Sherman",
+    "b": [
+     45.084,
+     -121.024,
+     45.737,
+     -120.358
+    ]
+   },
+   {
+    "n": "Tillamook",
+    "b": [
+     45.044,
+     -124.096,
+     45.78,
+     -123.299
+    ]
+   },
+   {
+    "n": "Umatilla",
+    "b": [
+     44.996,
+     -119.435,
+     46.001,
+     -117.973
+    ]
+   },
+   {
+    "n": "Union",
+    "b": [
+     44.956,
+     -118.698,
+     45.861,
+     -117.266
+    ]
+   },
+   {
+    "n": "Wallowa",
+    "b": [
+     45.078,
+     -117.978,
+     46.001,
+     -116.464
+    ]
+   },
+   {
+    "n": "Wasco",
+    "b": [
+     44.822,
+     -121.805,
+     45.697,
+     -120.371
+    ]
+   },
+   {
+    "n": "Washington",
+    "b": [
+     45.317,
+     -123.486,
+     45.78,
+     -122.744
+    ]
+   },
+   {
+    "n": "Wheeler",
+    "b": [
+     44.307,
+     -120.496,
+     45.068,
+     -119.656
+    ]
+   },
+   {
+    "n": "Yamhill",
+    "b": [
+     45.075,
+     -123.785,
+     45.433,
+     -122.85
+    ]
+   }
+  ]
+ }
+}
