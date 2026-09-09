@@ -1,6 +1,6 @@
 {
  "format": 1,
- "generated": "2026-09-09T04:42:05Z",
+ "generated": "2026-09-09T04:51:56Z",
  "sources": [
   {
    "id": "us-ca-statewide",
@@ -28,7 +28,7 @@
    ],
    "note": "Every live California feed in one: Cal OES orders and warnings, CAL FIRE's reason, population and lifted zones, and the county and city feeds, de-duplicated.",
    "last_edit": "2026-09-08",
-   "checked": "2026-09-09T04:42:05Z",
+   "checked": "2026-09-09T04:51:56Z",
    "also": [
     {
      "url": "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/Combined_Statewide_Evacuation_Public_View/FeatureServer",
@@ -128,7 +128,7 @@
    ],
    "note": "Level 1 Be Ready, 2 Be Set, 3 Go Now. Oregon OEM with the county feeds folded in, de-duplicated.",
    "last_edit": "2026-09-09",
-   "checked": "2026-09-09T04:42:05Z",
+   "checked": "2026-09-09T04:51:56Z",
    "also": [
     {
      "url": "https://services1.arcgis.com/znO8Hz1SuVVohYhZ/arcgis/rest/services/Emergency_Response_OEM_Public/FeatureServer",
@@ -168,147 +168,7 @@
    ],
    "note": "Order, Alert (be ready to leave), Tactical Evacuation, All Clear.",
    "last_edit": "2026-09-09",
-   "checked": "2026-09-09T04:42:05Z"
-  },
-  {
-   "id": "us-ca-napa",
-   "title": "Napa County \u00b7 all zones",
-   "publisher": "Napa County",
-   "st": "CA",
-   "co": "Napa",
-   "kind": "static",
-   "url": "https://gis.napacounty.gov/arcgis/rest/services/Hosted/EvacuationZones_Public/FeatureServer",
-   "layer": 0,
-   "layer_name": "EvacuationZones_Public",
-   "geometry": "polygon",
-   "where": "1=1",
-   "status_field": "zone_status",
-   "name_field": "zone_id",
-   "county_field": "",
-   "refresh_min": 1440,
-   "features": 239,
-   "simplify": 0.0001,
-   "bounds": [
-    38.1534,
-    -122.6492,
-    38.865,
-    -122.0613
-   ],
-   "note": "All zones for the county. Status here lags; live status is in the statewide layers.",
-   "last_edit": "2025-04-12",
-   "checked": "2026-09-09T04:42:05Z"
-  },
-  {
-   "id": "us-ca-riverside-zones",
-   "title": "Riverside County \u00b7 all zones",
-   "publisher": "City of Riverside GIS",
-   "st": "CA",
-   "co": "Riverside",
-   "kind": "static",
-   "url": "https://services.arcgis.com/Fu2oOWg1Aw7azh41/arcgis/rest/services/Evacuation_Zone_Genasys_RIVCO_Alert_Public_view/FeatureServer",
-   "layer": 0,
-   "layer_name": "Evacuation Zone Genasys",
-   "geometry": "polygon",
-   "where": "1=1",
-   "status_field": "zone_statu",
-   "name_field": "zone_id",
-   "county_field": "",
-   "refresh_min": 360,
-   "features": 1989,
-   "simplify": 0.0001,
-   "bounds": [
-    33.4416,
-    -117.6763,
-    34.0344,
-    -116.0087
-   ],
-   "note": "All Genasys zones for the county, copied nightly by the city. Status here lags; live status is in the statewide layers.",
-   "last_edit": "2026-09-07",
-   "checked": "2026-09-09T04:42:05Z"
-  },
-  {
-   "id": "us-ca-riverside-emd-mountain",
-   "title": "Riverside County \u00b7 mountain zones",
-   "publisher": "Riverside County EMD",
-   "st": "CA",
-   "co": "Riverside",
-   "kind": "static",
-   "url": "https://services1.arcgis.com/pWmBUdSlVpXStHU6/arcgis/rest/services/Mast_Zones___Read_Only/FeatureServer",
-   "layer": 0,
-   "layer_name": "Mast_Zones___Read_Only",
-   "geometry": "polygon",
-   "where": "1=1",
-   "status_field": "",
-   "name_field": "EVAC_Zone",
-   "county_field": "",
-   "refresh_min": 1440,
-   "features": 88,
-   "simplify": 0.0001,
-   "bounds": [
-    33.4272,
-    -116.8694,
-    33.9034,
-    -116.408
-   ],
-   "note": "Pre-planned zones for the mountain communities (Idyllwild, Poppet Flats, Pine Cove).",
-   "last_edit": "2025-08-04",
-   "checked": "2026-09-09T04:42:05Z"
-  },
-  {
-   "id": "us-or-deschutes-shelters",
-   "title": "Deschutes County \u00b7 shelters",
-   "publisher": "Deschutes County",
-   "st": "OR",
-   "co": "Deschutes",
-   "kind": "support",
-   "url": "https://services1.arcgis.com/znO8Hz1SuVVohYhZ/arcgis/rest/services/Emergency_Response_OEM_Public/FeatureServer",
-   "layer": 3,
-   "layer_name": "Shelters",
-   "geometry": "point",
-   "where": "1=1",
-   "status_field": "",
-   "name_field": "INCIDENT_NAME",
-   "county_field": "",
-   "refresh_min": 30,
-   "features": 2,
-   "simplify": 0,
-   "bounds": [
-    44.2905,
-    -121.576,
-    44.2964,
-    -121.5707
-   ],
-   "note": "",
-   "last_edit": "2026-07-28",
-   "checked": "2026-09-09T04:42:05Z"
-  },
-  {
-   "id": "us-or-jackson",
-   "title": "Jackson County \u00b7 all zones",
-   "publisher": "Jackson County",
-   "st": "OR",
-   "co": "Jackson",
-   "kind": "static",
-   "url": "https://services1.arcgis.com/DwYBkWQPdaJNWrPG/arcgis/rest/services/Evacuation_Zones_Jackson_County_Public_ViewTemp/FeatureServer",
-   "layer": 4,
-   "layer_name": "EvacuationZonesCounty",
-   "geometry": "polygon",
-   "where": "1=1",
-   "status_field": "Fire_Evacuation_Level",
-   "name_field": "Evac_Area_Name",
-   "county_field": "",
-   "refresh_min": 1440,
-   "features": 357,
-   "simplify": 0.0001,
-   "bounds": [
-    41.9888,
-    -123.2741,
-    42.9984,
-    -122.2536
-   ],
-   "note": "All zones for the county. Levels here lag; live levels are in the Oregon OEM layer.",
-   "last_edit": "2025-04-28",
-   "checked": "2026-09-09T04:42:05Z"
+   "checked": "2026-09-09T04:51:56Z"
   },
   {
    "id": "us-fl-hillsborough",
@@ -336,7 +196,7 @@
    ],
    "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
    "last_edit": "2024-09-26",
-   "checked": "2026-09-09T04:42:05Z"
+   "checked": "2026-09-09T04:51:56Z"
   },
   {
    "id": "us-fl-lee",
@@ -364,7 +224,7 @@
    ],
    "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
    "last_edit": "2021-07-03",
-   "checked": "2026-09-09T04:42:05Z"
+   "checked": "2026-09-09T04:51:56Z"
   }
  ],
  "counties": {

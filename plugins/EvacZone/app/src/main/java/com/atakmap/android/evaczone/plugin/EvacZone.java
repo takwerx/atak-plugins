@@ -919,16 +919,16 @@ public class EvacZone implements IPlugin {
 
         final List<Catalog.Source> srcs = state == null ? new ArrayList<Catalog.Source>() : c.forState(state);
 
-        // Statewide: always listed.
-        int nStatewide = 0;
+        // The state's feeds, every one of them, one row each. Florida's are county
+        // hurricane-zone maps because that is all Florida publishes; they are still
+        // just the state's rows.
+        int nRows = 0;
         for (Catalog.Source s : srcs) {
-            if (!s.statewide())
-                continue;
             statewide.addView(sourceRow(s));
-            nStatewide++;
+            nRows++;
         }
-        statewideEmpty.setVisibility(nStatewide == 0 ? View.VISIBLE : View.GONE);
-        statewideEmpty.setText("No statewide source for " + state + " yet.");
+        statewideEmpty.setVisibility(nRows == 0 ? View.VISIBLE : View.GONE);
+        statewideEmpty.setText("Nothing for " + state + " yet.");
 
         // Counties: the button says the pick, and the county zone maps (counties that
         // publish every zone they drew) are listed for the picked counties only.
@@ -944,9 +944,6 @@ public class EvacZone implements IPlugin {
             countiesButton.setText((names.size() == 1 ? "County: " : names.size() + " counties: ")
                     + TextUtils.join(", ", names));
         }
-        for (Catalog.Source s : srcs)
-            if (!s.statewide() && (selected.isEmpty() || selected.contains(Catalog.countyKey(s.county))))
-                county.addView(sourceRow(s));
         countyHint.setVisibility(View.GONE);
         renderZones();
     }
