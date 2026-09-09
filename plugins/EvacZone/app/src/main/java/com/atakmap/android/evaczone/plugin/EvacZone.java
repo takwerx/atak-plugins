@@ -681,16 +681,22 @@ public class EvacZone implements IPlugin {
             }
             if (!z.county.isEmpty())
                 line.append(line.length() > 0 ? " \u00b7 " : "").append(z.county);
-            line.append(line.length() > 0 ? " \u00b7 " : "").append(z.sourceTitle);
+            // The hint is the only colored part, the way Map Depot's rows read:
+            // tap the row and the map goes there.
+            final String hint = "\ntap to go there";
+            final int start = line.length();
+            line.append(hint);
+            line.setSpan(new ForegroundColorSpan(pluginContext.getResources().getColor(R.color.action_green)),
+                    start, line.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             sub.setText(line);
-            row.findViewById(R.id.row_goto).setOnClickListener(new View.OnClickListener() {
+            row.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     manager.frame(z.bounds);
                 }
             });
-            // The row itself opens the details; the button beside it goes there.
-            row.setOnClickListener(new View.OnClickListener() {
+            // Details beside it, for everything the agency publishes about the zone.
+            row.findViewById(R.id.row_goto).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     manager.showDetails(z.sourceId, z.featureId);
