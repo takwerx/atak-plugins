@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.2/ATAK-Plugin-FeatureLayer-0.2--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.2/ATAK-Plugin-FeatureLayer-0.2--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.2/ATAK-Plugin-FeatureLayer-0.2--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.3/ATAK-Plugin-FeatureLayer-0.3--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.3/ATAK-Plugin-FeatureLayer-0.3--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.3/ATAK-Plugin-FeatureLayer-0.3--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -45,7 +45,7 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 _________________________________________________________________
 STATUS
 
-0.2, first release for feedback (0.1 was signed but could not sign in: its OAuth client ID was empty). Tested on ATAK-CIV 5.8 with live NIFS incidents,
+0.3, first release for feedback (0.1 could not sign in, its OAuth client ID was empty; 0.2 lost cached features on the first toggle after a restart). Tested on ATAK-CIV 5.8 with live NIFS incidents,
 the SARCOP training sandbox and CA Air Intel. SARCOP Live is not wired yet.
 
 _________________________________________________________________
