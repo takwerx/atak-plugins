@@ -850,12 +850,13 @@ public class EvacZone implements IPlugin {
         all.setText(manager.isMapOn() ? "ON" : "OFF");
         all.setTextColor(manager.isMapOn() ? Color.parseColor("#3ddc61") : Color.parseColor("#ff5b52"));
 
-        // Totals across everything that is on, in the plugin's status vocabulary.
+        // Totals for the state on the button: what its feeds hold right now. Another
+        // state's feed that is still on is not this state's news.
         final Map<String, Integer> totals = new LinkedHashMap<>();
         final Map<String, Integer> colors = new LinkedHashMap<>();
         int on = 0, drawn = 0, loading = 0;
         for (ZoneLayer l : manager.snapshot()) {
-            if (!l.isVisible())
+            if (!l.isVisible() || (state != null && !l.source.st.equalsIgnoreCase(state)))
                 continue;
             on++;
             drawn += l.count;
