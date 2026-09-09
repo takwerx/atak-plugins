@@ -1,10 +1,10 @@
 ATAK Plugin — Evac Zone
 
-**Download Evac Zone 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Evac Zone 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/evac-zone/releases/download/v0.2/ATAK-Plugin-EvacZone-0.2--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/evac-zone/releases/download/v0.2/ATAK-Plugin-EvacZone-0.2--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/evac-zone/releases/download/v0.2/ATAK-Plugin-EvacZone-0.2--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/evac-zone/releases/download/v0.3/ATAK-Plugin-EvacZone-0.3--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/evac-zone/releases/download/v0.3/ATAK-Plugin-EvacZone-0.3--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/evac-zone/releases/download/v0.3/ATAK-Plugin-EvacZone-0.3--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/evac-zone/releases
 
@@ -54,12 +54,12 @@ A step-by-step user guide lives at docs/USER_GUIDE.md in the repository
 _________________________________________________________________
 STATUS
 
-Version 0.2. Verified on ATAK-CIV 5.8.0.3 (Samsung Galaxy XCover Pro), release
+Version 0.3. Verified on ATAK-CIV 5.8.0.3 (Samsung Galaxy XCover Pro), release
 build with proguard. Compiles against the 5.6, 5.7 and 5.8 SDKs.
 
-Eighteen sources at release: California and Oregon statewide, British
-Columbia, nine California counties and cities, three Oregon county layers, two
-Florida counties. More states and counties arrive through the catalog.
+Feeds at release: California (Cal OES with CAL FIRE and the county feeds folded in), Oregon (OEM with Deschutes), British
+Columbia, and hurricane zones for two
+Florida counties. More states arrive through the catalog, by request.
 
 Prepared for tak.gov third-party submission.
 
