@@ -443,7 +443,7 @@ public class EvacZone implements IPlugin {
         if (radiusLabel == null || manager == null)
             return;
         final com.atakmap.android.evaczone.Visibility v = manager.visibility;
-        radiusLabel.setText(v.radiusBig <= 0 ? "Radius: off — everything that is on"
+        radiusLabel.setText(v.radiusBig <= 0 ? "Radius: off — the whole state"
                 : String.format(java.util.Locale.US, "Within %d %s of %s", v.radiusBig,
                         com.atakmap.android.evaczone.Units.bigLabel(), v.fromLabel()));
         if (nearestMap != null) {
