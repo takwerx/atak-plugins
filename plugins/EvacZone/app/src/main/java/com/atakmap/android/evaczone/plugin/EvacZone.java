@@ -716,23 +716,22 @@ public class EvacZone implements IPlugin {
 
     // ---- counties: a filter on the zones, the way Cam Depot's is on cameras ----------
 
-    /** Counties picked for a state, as {@link Catalog#countyKey} keys. Empty means all. */
+    /**
+     * Counties picked for a state, as {@link Catalog#countyKey} keys. Empty means all,
+     * and all is where every start begins: a pick lasts the session, not the plugin's
+     * life, so the pane never opens narrowed to a county picked days ago.
+     */
     private Set<String> selectedCounties(String st) {
         final Set<String> out = new LinkedHashSet<>();
-        if (st == null)
+        if (st == null || manager == null)
             return out;
-        try {
-            final JSONArray arr = new JSONArray(uiPrefs().getString("counties." + st, "[]"));
-            for (int i = 0; i < arr.length(); i++)
-                out.add(Catalog.countyKey(arr.getString(i)));
-        } catch (Exception e) {
-            Log.w(TAG, "county selection unreadable", e);
-        }
+        final Set<String> keys = manager.countiesFor(st);
+        if (keys != null)
+            out.addAll(keys);
         return out;
     }
 
     private void saveCounties(String st, Collection<String> keys) {
-        uiPrefs().edit().putString("counties." + st, new JSONArray(keys).toString()).apply();
         manager.setCounties(st, new java.util.HashSet<>(keys));
     }
 

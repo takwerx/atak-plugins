@@ -218,27 +218,6 @@ public class ZoneManager {
         });
     }
 
-    /** The county filters the pane saved, one per state, read before any layer attaches. */
-    private void loadCountyFilters() {
-        final Catalog c = catalog;
-        if (c == null)
-            return;
-        for (String st : c.states()) {
-            try {
-                final JSONArray arr = new JSONArray(uiPrefs().getString("counties." + st, "[]"));
-                final java.util.Set<String> keys = new java.util.HashSet<>();
-                for (int i = 0; i < arr.length(); i++)
-                    keys.add(Catalog.countyKey(arr.getString(i)));
-                synchronized (countyFilters) {
-                    if (!keys.isEmpty())
-                        countyFilters.put(st, keys);
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "county filter for " + st + " unreadable", e);
-            }
-        }
-    }
-
     public java.util.Set<String> countiesFor(String st) {
         synchronized (countyFilters) {
             final java.util.Set<String> k = countyFilters.get(st);
@@ -364,7 +343,6 @@ public class ZoneManager {
         filter.addAction(ACTION_DETAILS, "show the attributes of an evacuation zone");
         AtakBroadcast.getInstance().registerReceiver(details, filter);
         loadBundledCatalog();
-        loadCountyFilters();
         restore();
         main.postDelayed(timer, TICK_MS);
         fetchRemoteCatalog();
