@@ -5,7 +5,8 @@
     <!-- description -->
     <string name="app_desc">Evacuation zones from state and county services, browsed by state.</string>
 
-    <string name="pick_state">Pick a state</string>
+    <string name="pick_state">State</string>
+    <string name="toggle_on">ON</string>
     <string name="pick_counties">Counties: all</string>
     <string name="county_hint">County feeds appear here as agencies publish them.</string>
     <string name="refresh_all">Refresh</string>

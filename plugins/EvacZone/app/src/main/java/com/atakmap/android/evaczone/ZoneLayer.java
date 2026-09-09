@@ -107,6 +107,8 @@ public class ZoneLayer {
     private volatile boolean closed;
     private final Object lock = new Object();
     private boolean layerOn = true;
+    /** The pane's all-ON/OFF switch, over every layer's own ON. Off draws nothing, forgets nothing. */
+    private boolean masterOn = true;
     /** Everything fetched last time; the store holds it only while the layer is on. */
     private List<Pending> cache = new ArrayList<>();
 
@@ -419,6 +421,24 @@ public class ZoneLayer {
         layerOn = v;
     }
 
+    /** Records the all-switch without touching the store, for a layer about to attach. */
+    public void presetMaster(boolean on) {
+        masterOn = on;
+    }
+
+    /** The all-switch. Returns true when a fetch is needed to show the layer (no memory copy). */
+    public boolean setMasterVisible(boolean on) {
+        synchronized (lock) {
+            masterOn = on;
+            if (store == null)
+                return false;
+            if (on && layerOn && cache.isEmpty())
+                return countFeatures() == 0;
+            rewriteStore();
+        }
+        return false;
+    }
+
     /**
      * Layer on/off. Returns true when a fetch is needed to show it (no memory copy, e.g.
      * after a restart); the manager then refreshes.
@@ -437,7 +457,7 @@ public class ZoneLayer {
 
     /** Removes from the store what should not be shown right now. Lock held. */
     private void pruneHidden() {
-        if (layerOn)
+        if (layerOn && masterOn)
             return;
         boolean bulk = false;
         try {
@@ -467,7 +487,7 @@ public class ZoneLayer {
             final Map<String, Long> sets = new HashMap<>();
             final List<ZoneInfo> listed = new ArrayList<>();
             int in = 0, out = 0;
-            if (layerOn) {
+            if (layerOn && masterOn) {
                 final GeoPoint from = filterFrom;
                 final double radius = filterRadius;
                 for (Pending pf : cache) {
@@ -497,7 +517,7 @@ public class ZoneLayer {
                     Log.w(TAG, "old set " + id, e);
                 }
             }
-            count = layerOn ? shown : 0;
+            count = layerOn && masterOn ? shown : 0;
             Log.d(TAG, source.id + ": store rewritten, " + count + " of " + zoneCount + " zones shown"
                     + (out > 0 ? ", " + out + " outside the radius" : ""));
         } catch (Exception e) {

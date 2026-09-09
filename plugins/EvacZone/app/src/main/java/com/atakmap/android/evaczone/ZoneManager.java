@@ -68,6 +68,36 @@ public class ZoneManager {
     public volatile String catalogStatus = "loading catalog";
     /** Radius and zoom threshold, one setting for every source. */
     public final Visibility visibility;
+    /** The pane's all-ON/OFF: off draws nothing, keeps every feed's own ON for when it comes back. */
+    private boolean mapOn = true;
+
+    public boolean isMapOn() {
+        return mapOn;
+    }
+
+    public void setMapOn(final boolean on) {
+        if (mapOn == on)
+            return;
+        mapOn = on;
+        uiPrefs().edit().putBoolean("mapOn", on).apply();
+        for (ZoneLayer l : snapshot())
+            l.busy = true;
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                for (ZoneLayer l : snapshot()) {
+                    try {
+                        if (l.setMasterVisible(on) && l.isVisible())
+                            refreshNow(l);
+                    } finally {
+                        l.busy = false;
+                    }
+                }
+                changed();
+            }
+        });
+    }
 
     /**
      * <strong>Runs on the GL render thread.</strong> ATAK dispatches map-moved from
@@ -231,6 +261,7 @@ public class ZoneManager {
         iconDir = new File(root, "icons");
         layersDir = new File(root, "layers");
         visibility = new Visibility(mapView.getContext());
+        mapOn = uiPrefs().getBoolean("mapOn", true);
     }
 
     public void setListener(Listener l) {
@@ -403,6 +434,7 @@ public class ZoneManager {
                 l = new ZoneLayer(s, mapView, pluginContext, new File(layersDir, s.fileKey() + ".sqlite"),
                         iconDir, lineGlyph, polygonGlyph, 0, 0);
                 l.presetVisibility(visibility.from(mapView), visibility.radiusMeters(), visibility.maxResolution);
+                l.presetMaster(mapOn);
                 try {
                     l.attach();
                 } catch (Exception e) {
@@ -494,6 +526,7 @@ public class ZoneManager {
                         new File(layersDir, s.fileKey() + ".sqlite"), iconDir, lineGlyph, polygonGlyph,
                         o.optLong("lastRefresh", 0), o.optInt("count", 0));
                 l.presetVisibility(visibility.from(mapView), visibility.radiusMeters(), visibility.maxResolution);
+                l.presetMaster(mapOn);
                 try {
                     l.attach();
                     synchronized (layers) {

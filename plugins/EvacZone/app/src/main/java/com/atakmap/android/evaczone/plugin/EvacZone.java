@@ -195,6 +195,15 @@ public class EvacZone implements IPlugin {
                         manager.refreshAll();
                 }
             });
+            // The map's switch, the way Cam Depot's reads: ON in green, OFF in red, on
+            // ATAK's own dark button. Off draws nothing; every feed keeps its own ON.
+            paneView.findViewById(R.id.btn_all).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (manager != null)
+                        manager.setMapOn(!manager.isMapOn());
+                }
+            });
             wireVisibility();
             wireZoneList();
             if (manager != null)
@@ -818,7 +827,7 @@ public class EvacZone implements IPlugin {
         county.removeAllViews();
 
         if (c == null) {
-            stateButton.setText("No catalog");
+            stateButton.setText("State");
             status.setText(manager.catalogStatus);
             legend.setText("");
             statewideEmpty.setVisibility(View.VISIBLE);
@@ -829,7 +838,10 @@ public class EvacZone implements IPlugin {
         }
         if (state == null || !c.states().contains(state))
             state = defaultState();
-        stateButton.setText(state == null ? "Pick a state" : "State: " + state);
+        stateButton.setText(state == null ? "State" : state);
+        final Button all = paneView.findViewById(R.id.btn_all);
+        all.setText(manager.isMapOn() ? "ON" : "OFF");
+        all.setTextColor(manager.isMapOn() ? Color.parseColor("#3ddc61") : Color.parseColor("#ff5b52"));
 
         // Totals across everything that is on, in the plugin's status vocabulary.
         final Map<String, Integer> totals = new LinkedHashMap<>();
@@ -855,7 +867,9 @@ public class EvacZone implements IPlugin {
         if (loading > 0)
             sb.append(", ").append(loading).append(" loading");
         sb.append(" · ").append(manager.catalogStatus);
-        if (on > 0 && !manager.visibility.withinZoom(mapView))
+        if (!manager.isMapOn())
+            sb.append("\nMap: off — press ON to draw the zones");
+        else if (on > 0 && !manager.visibility.withinZoom(mapView))
             sb.append("\nMap: none drawn — zoom in past your threshold");
         status.setText(sb.toString());
         legend.setText(legendText(totals, colors));

@@ -23,10 +23,20 @@
         <Button
             android:id="@+id/btn_refresh_all"
             style="@style/TakwerxButton"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
             android:layout_marginLeft="6dp"
             android:text="@string/refresh_all" />
+        <!-- ON / OFF for everything drawn, the way Cam Depot's map switch reads. -->
+        <Button
+            android:id="@+id/btn_all"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="@string/toggle_on" />
     </LinearLayout>
 
     <TextView
