@@ -563,7 +563,8 @@ public class EvacZone implements IPlugin {
             }
         }
         for (ZoneLayer l : manager.snapshot()) {
-            if (!l.isVisible())
+            // The state on the button is the list's state, whatever else is on.
+            if (!l.isVisible() || (state != null && !l.source.st.equalsIgnoreCase(state)))
                 continue;
             for (ZoneLayer.ZoneInfo z : l.zones) {
                 if (view != null && z.bounds != null
@@ -652,8 +653,8 @@ public class EvacZone implements IPlugin {
         });
         final StringBuilder sb = new StringBuilder();
         if (all.isEmpty())
-            sb.append(viewOnly ? "No zones on screen. Pan to an area with zones, or untick On screen only."
-                    : "No zones on the map. Turn a feed on.");
+            sb.append(viewOnly ? "No " + state + " zones on screen. Pan to them, or untick On screen only."
+                    : "No " + state + " zones on the map. Turn " + state + " on.");
         else if (hits.isEmpty())
             sb.append("No zone matches").append(q.isEmpty() ? "" : " \u201c" + q + "\u201d")
                     .append(statusFilter == null ? "" : " with status " + statusFilter).append('.');
