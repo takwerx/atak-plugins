@@ -270,19 +270,13 @@ public class EvacZone implements IPlugin {
         final Catalog c = manager == null ? null : manager.catalog();
         if (c == null)
             return;
+        // Just the states. Counts here read as something to decode.
         final List<String> states = c.states();
         final String[] labels = new String[states.size()];
         int checked = -1;
         for (int i = 0; i < states.size(); i++) {
-            final String st = states.get(i);
-            final List<Catalog.Source> srcs = c.forState(st);
-            int on = 0;
-            for (Catalog.Source s : srcs)
-                if (manager.isOn(s))
-                    on++;
-            labels[i] = st + "  (" + srcs.size() + (srcs.size() == 1 ? " source" : " sources")
-                    + (on > 0 ? ", " + on + " on" : "") + ")";
-            if (st.equals(state))
+            labels[i] = states.get(i);
+            if (states.get(i).equals(state))
                 checked = i;
         }
         new AlertDialog.Builder(mapView.getContext())
