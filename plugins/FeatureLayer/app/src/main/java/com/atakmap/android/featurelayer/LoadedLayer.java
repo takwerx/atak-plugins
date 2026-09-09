@@ -335,13 +335,10 @@ public class LoadedLayer {
         final List<Pending> loaded = new ArrayList<>();
         try {
             final Map<Long, String> names = new HashMap<>();
-            final Map<Long, Double> gsds = new HashMap<>();
             final FeatureSetCursor sc = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
             try {
-                while (sc.moveToNext()) {
+                while (sc.moveToNext())
                     names.put(sc.getId(), sc.getName());
-                    gsds.put(sc.getId(), sc.get().getMinResolution());
-                }
             } finally {
                 sc.close();
             }
@@ -352,8 +349,10 @@ public class LoadedLayer {
                     final String setName = names.get(f.getFeatureSetId());
                     if (setName == null)
                         continue;
-                    final Double gsd = gsds.get(f.getFeatureSetId());
-                    loaded.add(new Pending(setName, gsd == null ? GSD_ALWAYS : gsd, f.getName(), f.getGeometry(),
+                    // The kind's own zoom default, never the store's number: the store holds
+                    // the gate-capped value, and rebuilding from it made the cap permanent
+                    // (Plaskett gated at level 14 on every type, perimeter included, 2026-09-09).
+                    loaded.add(new Pending(setName, defaultGsd(setName, f.getGeometry()), f.getName(), f.getGeometry(),
                             f.getStyle(), f.getAttributes()));
                 }
             } finally {
@@ -406,6 +405,24 @@ public class LoadedLayer {
             if (!cache.isEmpty())
                 rewriteStore();
         }
+    }
+
+    /** The zoom default a set's kind gets at fetch time: repair points close in, points, lines, areas always. */
+    private static double defaultGsd(String setName, Geometry g) {
+        if (setName != null && setName.endsWith(" (repair)"))
+            return GSD_REPAIR;
+        if (isArea(g))
+            return GSD_ALWAYS;
+        if (g instanceof com.atakmap.map.layer.feature.geometry.Point)
+            return GSD_POINTS;
+        if (g instanceof GeometryCollection) {
+            boolean anyLine = false;
+            for (Geometry c : ((GeometryCollection) g).getGeometries())
+                if (c instanceof LineString)
+                    anyLine = true;
+            return anyLine ? GSD_LINES : GSD_POINTS;
+        }
+        return GSD_LINES;
     }
 
     /** Repair Status halos on or off, from the memory copy; nothing is fetched. */
