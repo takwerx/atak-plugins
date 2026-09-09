@@ -961,15 +961,6 @@ public class EvacZone implements IPlugin {
                 manager.setOn(s, !manager.isOn(s));
             }
         });
-        final Button go = row.findViewById(R.id.row_goto);
-        go.setEnabled(l != null ? l.bounds != null : s.bounds != null);
-        go.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                final ZoneLayer now = manager.find(s.id);
-                manager.frame(now != null && now.bounds != null ? now.bounds : s.bounds);
-            }
-        });
         final Button refresh = row.findViewById(R.id.row_refresh);
         refresh.setEnabled(isOn && !(l.refreshing || l.busy));
         refresh.setOnClickListener(new View.OnClickListener() {

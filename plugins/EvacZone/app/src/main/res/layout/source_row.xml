@@ -32,14 +32,6 @@
             android:layout_height="wrap_content"
             android:text="@string/toggle_off" />
         <Button
-            android:id="@+id/row_goto"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="4dp"
-            android:text="@string/go_to" />
-        <Button
             android:id="@+id/row_refresh"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
