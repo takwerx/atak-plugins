@@ -146,7 +146,9 @@ public class ZoneLayer {
 
     /** One zone as the pane lists it: what is on the map right now, nothing more. */
     public static final class ZoneInfo {
-        public final String name, title, status, county, sourceId, sourceTitle;
+        public final String name, title, status, sourceId, sourceTitle;
+        /** The county's name as the row shows it, however the zone was placed. */
+        public String county;
         public final int color;
         public final double lat, lon;
         public final double[] bounds;
@@ -207,6 +209,31 @@ public class ZoneLayer {
 
     public void setCountyList(List<Catalog.County> counties) {
         countyList = counties == null ? new ArrayList<Catalog.County>() : counties;
+    }
+
+    /** The county's name for the row: the placed county, title-cased when the feed shouts it. */
+    private String countyNameOf(Pending pf) {
+        final String key = countyKeyOf(pf);
+        if (key == null)
+            return "";
+        for (Catalog.County c : countyList)
+            if (Catalog.countyKey(c.name).equals(key))
+                return c.name;
+        if (pf.county != null && !pf.county.trim().isEmpty())
+            return titleCase(pf.county.trim());
+        if (pf.layerCounty != null && !pf.layerCounty.isEmpty())
+            return pf.layerCounty;
+        return source.county.isEmpty() ? titleCase(key) : source.county;
+    }
+
+    private static String titleCase(String s) {
+        final StringBuilder sb = new StringBuilder();
+        boolean up = true;
+        for (char ch : s.toLowerCase(java.util.Locale.US).toCharArray()) {
+            sb.append(up ? Character.toUpperCase(ch) : ch);
+            up = ch == ' ' || ch == '-';
+        }
+        return sb.toString();
     }
 
     /**
@@ -570,6 +597,7 @@ public class ZoneLayer {
                         continue;
                     }
                     final ZoneInfo zi = new ZoneInfo(pf, source);
+                    zi.county = countyNameOf(pf);
                     listed.add(zi);
                     Long fsid = sets.get(pf.setName);
                     if (fsid == null) {
