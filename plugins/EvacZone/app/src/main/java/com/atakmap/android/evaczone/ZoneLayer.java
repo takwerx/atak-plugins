@@ -605,56 +605,128 @@ public class ZoneLayer {
         }
     }
 
+    /**
+     * Every layer of the source, merged by zone key. The first layer is the authority:
+     * a later layer adds a zone the first does not have, and adds fields the first
+     * lacks to a zone it does, but never changes a status. Duplicate rows in any layer
+     * collapse to the first seen. The key is the short zone id the labels use, so
+     * Cal OES's US-CA-XMY-FHL-G019 and CAL FIRE's FHL-G019 are one zone.
+     */
     private void fetch(final List<Pending> out, final Map<String, Integer> counts,
             final Map<String, Integer> colors, final Map<String, CountyTally> tallies,
             final Runnable progressCb) throws Exception {
-        final Esri.LayerInfo info = Esri.layerInfo(source.url, source.layer);
+        final Map<String, Pending> byKey = new LinkedHashMap<>();
+        final int[] seen = { 0 };
+        final List<String> problems = new ArrayList<>();
+        for (int li = 0; li < source.layers.size(); li++) {
+            final Catalog.Layer lay = source.layers.get(li);
+            final boolean authority = li == 0;
+            try {
+                fetchLayer(lay, authority, byKey, seen, progressCb);
+            } catch (Exception e) {
+                if (authority)
+                    throw e;
+                // An extra layer that fails costs its extras, not the feed.
+                Log.w(TAG, source.id + ": extra layer " + lay.publisher + " failed: " + e.getMessage());
+                problems.add(lay.publisher);
+            }
+        }
+        for (Pending pf : byKey.values()) {
+            final String key = pf.statusKey == null ? "(no status)" : pf.statusKey;
+            final Integer n = counts.get(key);
+            counts.put(key, n == null ? 1 : n + 1);
+            if (pf.color != 0)
+                colors.put(key, pf.color);
+            if (pf.county != null && !pf.county.trim().isEmpty()) {
+                final String ck = Catalog.countyKey(pf.county);
+                CountyTally t = tallies.get(ck);
+                if (t == null) {
+                    t = new CountyTally(pf.county.trim());
+                    tallies.put(ck, t);
+                }
+                final Integer tn = t.counts.get(key);
+                t.counts.put(key, tn == null ? 1 : tn + 1);
+                t.bounds = union(t.bounds, pf.geometry);
+            }
+            out.add(pf);
+        }
+        if (!problems.isEmpty())
+            status = "without " + problems.get(0);
+    }
+
+    private void fetchLayer(final Catalog.Layer lay, final boolean authority, final Map<String, Pending> byKey,
+            final int[] seen, final Runnable progressCb) throws Exception {
+        final Esri.LayerInfo info = Esri.layerInfo(lay.url, lay.layer);
         final boolean isPoint = info.geometryType.contains("Point");
         final boolean isLine = info.geometryType.contains("Polyline");
         final EsriRenderer renderer = new EsriRenderer(info.drawingInfo, info.geometryType, iconDir, FILL_ALPHA);
-        final String nameField = fieldOf(source.nameField, info);
-        final String statusField = fieldOf(source.statusField, info);
+        final String nameField = fieldOf(lay.nameField, info);
+        final String statusField = fieldOf(lay.statusField, info);
         final String displayField = fieldOf(info.displayField, info);
-        final String countyField = fieldOf(source.countyField, info);
+        final String countyField = fieldOf(lay.countyField, info);
         // One color language when the catalog says where the status is; the service's
         // own symbols otherwise (and always for points, which are icons, not zones).
         final boolean normalize = statusField != null && !isPoint;
         final Set<String> dates = info.dateFields;
-        final String setName = info.name;
-        final int[] seen = { 0 };
+        final String setName = source.layers.get(0) == lay ? info.name : source.layers.get(0).publisher;
 
-        Esri.query(source.url, source.layer, source.where, Math.min(1000, info.maxRecordCount),
-                source.maxFeatures, source.simplify, new Esri.FeatureSink() {
+        Esri.query(lay.url, lay.layer, lay.where, Math.min(1000, info.maxRecordCount),
+                source.maxFeatures, lay.simplify, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
                         final String cls = renderer.labelFor(props);
-                        final String name = Esri.firstNonEmpty(str(props, nameField), str(props, displayField), cls, setName);
+                        final String name = Esri.firstNonEmpty(str(props, nameField), str(props, displayField), cls, info.name);
                         final String statusText = Esri.firstNonEmpty(str(props, statusField), cls);
+                        final String zoneKey = isPoint ? lay.publisher + ":" + name + ":" + g.getEnvelope().minX + "," + g.getEnvelope().minY
+                                : shortLabel(name);
+                        Pending existing = byKey.get(zoneKey);
+                        if (existing == null && !authority && !isPoint && !isLine)
+                            existing = sameZone(byKey.values(), labelPoint(g), g.getEnvelope());
+                        if (existing != null) {
+                            // Already have this zone: add the fields it lacks, keep its status.
+                            final AttributeSet a = existing.attrs;
+                            final java.util.Iterator<String> keys = props.keys();
+                            while (keys.hasNext()) {
+                                final String k = keys.next();
+                                if (props.isNull(k) || a.containsAttribute(k))
+                                    continue;
+                                final Object v = props.opt(k);
+                                if (v == null)
+                                    continue;
+                                a.setAttribute(k, dates.contains(k) && v instanceof Number
+                                        ? new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
+                                                .format(new java.util.Date(((Number) v).longValue()))
+                                        : String.valueOf(v));
+                            }
+                            if (!authority && !a.containsAttribute("_also"))
+                                a.setAttribute("_also", lay.publisher);
+                            return;
+                        }
                         Style style;
                         String key;
+                        int color = 0;
                         if (normalize) {
                             final StatusColors.Level level = StatusColors.classify(statusText);
                             style = isLine ? StatusColors.line(level) : StatusColors.polygon(level, FILL_ALPHA);
                             key = level == StatusColors.Level.OTHER && statusText != null ? statusText : level.label;
-                            colors.put(key, level.color);
+                            color = level.color;
                         } else {
                             style = renderer.styleFor(props);
                             key = statusText == null ? "(no status)" : statusText;
                         }
                         Geometry geometry = g;
                         String featureName = name;
+                        Point at = null;
                         if (isLine) {
                             style = Styles.silentLabel(style);
                         } else if (!isPoint) {
-                            final Point at = labelPoint(g);
+                            at = labelPoint(g);
                             if (at != null) {
                                 final GeometryCollection gc = new GeometryCollection(2);
                                 gc.addGeometry(g);
                                 gc.addGeometry(at);
                                 geometry = gc;
                                 style = Styles.withNameLabel(style);
-                                // The feature's name is what the center point draws;
-                                // the full id stays in the title and the details.
                                 featureName = shortLabel(name);
                             } else {
                                 style = Styles.silentLabel(style);
@@ -666,36 +738,19 @@ public class ZoneLayer {
                         attrs.setAttribute("_title", title);
                         if (statusText != null)
                             attrs.setAttribute("_status", statusText);
-                        final Integer n = counts.get(key);
-                        counts.put(key, n == null ? 1 : n + 1);
-                        if (countyField != null) {
-                            final String raw = str(props, countyField);
-                            if (raw != null && !raw.trim().isEmpty()) {
-                                final String ck = Catalog.countyKey(raw);
-                                CountyTally t = tallies.get(ck);
-                                if (t == null) {
-                                    t = new CountyTally(raw.trim());
-                                    tallies.put(ck, t);
-                                }
-                                final Integer tn = t.counts.get(key);
-                                t.counts.put(key, tn == null ? 1 : tn + 1);
-                                t.bounds = union(t.bounds, g);
-                            }
-                        }
+                        if (!authority)
+                            attrs.setAttribute("_also", lay.publisher);
                         final Pending pf = new Pending(setName, Double.MAX_VALUE, featureName, geometry, style, attrs);
                         pf.title = title;
                         pf.statusKey = key;
-                        pf.color = colors.containsKey(key) ? colors.get(key) : 0;
+                        pf.color = color;
                         if (countyField != null && !props.isNull(countyField))
                             pf.county = props.optString(countyField, null);
-                        if (!isPoint && !isLine) {
-                            final Point at = labelPoint(g);
-                            if (at != null) {
-                                pf.lat = at.getY();
-                                pf.lon = at.getX();
-                            }
+                        if (at != null) {
+                            pf.lat = at.getY();
+                            pf.lon = at.getX();
                         }
-                        out.add(pf);
+                        byKey.put(zoneKey, pf);
                         if (++seen[0] % 25 == 0) {
                             progress = seen[0];
                             status = "refreshing: " + seen[0];
@@ -715,9 +770,48 @@ public class ZoneLayer {
         if (name == null)
             return "";
         final String[] p = name.split("-");
-        if (p.length >= 4 && "US".equals(p[0]) && p[1].length() == 2)
-            return p[p.length - 2] + "-" + p[p.length - 1];
+        // Genasys: US-<state>-<county code>-<city code>-<number>[-<part>]. Drop the
+        // country, state and county; keep everything from the city code on, so
+        // US-CA-XMY-FHL-G012-A is FHL-G012-A and US-CA-SLC-002 is SLC-002.
+        if (p.length >= 4 && "US".equals(p[0]) && p[1].length() == 2 && p[2].length() == 3) {
+            final StringBuilder sb = new StringBuilder();
+            for (int i = 3; i < p.length; i++)
+                sb.append(i > 3 ? "-" : "").append(p[i]);
+            return sb.toString();
+        }
+        if (p.length == 3 && "US".equals(p[0]) && p[1].length() == 2)
+            return p[2];
         return name;
+    }
+
+    /**
+     * The same zone under another agency's id: an authority zone whose center is within
+     * 150 m of this one's and whose box overlaps it by more than half. County feeds do
+     * not all use the Genasys id, so the key alone would draw a Sonoma zone twice.
+     */
+    private static Pending sameZone(java.util.Collection<Pending> have, Point at, Envelope env) {
+        if (at == null || env == null)
+            return null;
+        final double area = Math.max(1e-12, (env.maxX - env.minX) * (env.maxY - env.minY));
+        for (Pending pf : have) {
+            if (pf.env == null || Double.isNaN(pf.lat))
+                continue;
+            if (Math.abs(pf.lat - at.getY()) > 0.01 || Math.abs(pf.lon - at.getX()) > 0.01)
+                continue;
+            final double d = com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(
+                    new GeoPoint(pf.lat, pf.lon), new GeoPoint(at.getY(), at.getX()));
+            if (d > 150)
+                continue;
+            final double ix = Math.min(pf.env.maxX, env.maxX) - Math.max(pf.env.minX, env.minX);
+            final double iy = Math.min(pf.env.maxY, env.maxY) - Math.max(pf.env.minY, env.minY);
+            if (ix <= 0 || iy <= 0)
+                continue;
+            final double inter = ix * iy;
+            final double other = Math.max(1e-12, (pf.env.maxX - pf.env.minX) * (pf.env.maxY - pf.env.minY));
+            if (inter / (area + other - inter) > 0.5)
+                return pf;
+        }
+        return null;
     }
 
     /**

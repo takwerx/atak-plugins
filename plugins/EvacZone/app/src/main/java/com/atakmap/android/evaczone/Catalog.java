@@ -26,6 +26,31 @@ public final class Catalog {
     /** The format this build understands. A newer catalog is refused, not guessed at. */
     public static final int SUPPORTED_FORMAT = 1;
 
+    /**
+     * One ArcGIS layer of a source. A source may fetch several: the first is the
+     * authority, later ones add zones the first does not have and fields the first
+     * lacks, and never override a status. California is Cal OES with CAL FIRE's
+     * combined layer as the second, so one feed carries both without double drawing.
+     */
+    public static final class Layer {
+        public final String url, publisher, where, statusField, nameField, countyField;
+        public final int layer;
+        public final double simplify;
+
+        Layer(JSONObject o, String defaultPublisher, double defaultSimplify) throws JSONException {
+            url = o.getString("url").replaceAll("/+$", "");
+            if (!url.startsWith("https://"))
+                throw new JSONException("layer url must be https: " + url);
+            publisher = o.optString("publisher", defaultPublisher);
+            layer = o.optInt("layer", 0);
+            where = o.optString("where", "1=1");
+            statusField = o.optString("status_field", "");
+            nameField = o.optString("name_field", "");
+            countyField = o.optString("county_field", "");
+            simplify = o.optDouble("simplify", defaultSimplify);
+        }
+    }
+
     public static final class Source {
         public final String id;
         public final String title;
@@ -60,6 +85,8 @@ public final class Catalog {
         /** South, west, north, east at catalog time, or null. */
         public final double[] bounds;
         public final String note;
+        /** The layers to fetch, the source's own first. Never empty. */
+        public final List<Layer> layers = new ArrayList<>();
 
         Source(JSONObject o) throws JSONException {
             id = o.getString("id");
@@ -88,6 +115,15 @@ public final class Catalog {
             bounds = b != null && b.length() == 4
                     ? new double[] { b.getDouble(0), b.getDouble(1), b.getDouble(2), b.getDouble(3) }
                     : null;
+            layers.add(new Layer(o, publisher, simplify));
+            final JSONArray also = o.optJSONArray("also");
+            for (int i = 0; also != null && i < also.length(); i++) {
+                try {
+                    layers.add(new Layer(also.getJSONObject(i), publisher, simplify));
+                } catch (JSONException e) {
+                    com.atakmap.coremap.log.Log.w("EvacZone", id + ": extra layer skipped: " + e.getMessage());
+                }
+            }
         }
 
         public boolean statewide() {

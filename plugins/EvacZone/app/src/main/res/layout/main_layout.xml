@@ -77,12 +77,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:max="50" />
-            <!-- Says which point it measures from, and a tap rotates it. -->
-            <Button
-                android:id="@+id/pick_point"
-                style="@style/TakwerxButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -235,12 +229,33 @@
                     android:layout_marginLeft="6dp"
                     android:text="@string/clear" />
             </LinearLayout>
-            <Button
-                android:id="@+id/status_filter"
-                style="@style/TakwerxButton"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/status_all" />
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+                <Button
+                    android:id="@+id/status_filter"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/status_all" />
+                <Button
+                    android:id="@+id/nearest_to"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="@string/nearest_to" />
+            </LinearLayout>
+            <!-- Follows the map the way ATAK's Overlay Manager does. -->
+            <CheckBox
+                android:id="@+id/in_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/in_view" />
             <TextView
                 android:id="@+id/zones_summary"
                 android:layout_width="match_parent"

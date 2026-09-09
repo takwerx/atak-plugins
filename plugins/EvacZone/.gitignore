@@ -37,3 +37,7 @@ captures/
 # Submission zips
 dist/
 *.zip
+
+# Raw phone frames carry the callsign box and coordinates. Only reviewed crops under
+# docs/screenshots/ are tracked; the raw folder never is.
+docs/screenshots/raw/

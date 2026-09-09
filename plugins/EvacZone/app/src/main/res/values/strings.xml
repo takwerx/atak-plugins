@@ -6,8 +6,8 @@
     <string name="app_desc">Evacuation zones from state and county services, browsed by state.</string>
 
     <string name="pick_state">Pick a state</string>
-    <string name="pick_counties">Pick counties</string>
-    <string name="county_hint">Pick one or more counties to list their sources here.</string>
+    <string name="pick_counties">Counties: all</string>
+    <string name="county_hint">County feeds appear here as agencies publish them.</string>
     <string name="refresh_all">Refresh</string>
     <string name="loading_catalog">Loading catalog…</string>
     <string name="section_statewide">Statewide</string>
@@ -25,6 +25,8 @@
     <string name="search_hint">Zone id, name or county</string>
     <string name="clear">Clear</string>
     <string name="status_all">Status: all</string>
+    <string name="nearest_to">Nearest to: My Location</string>
+    <string name="in_view">On screen only</string>
     <string name="back">Back</string>
     <string name="prefs_summary">Evacuation zones on the map: the user manual</string>
     <string name="manual_title">User manual</string>
