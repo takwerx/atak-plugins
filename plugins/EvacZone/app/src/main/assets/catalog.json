@@ -1,6 +1,6 @@
 {
  "format": 1,
- "generated": "2026-09-09T04:34:01Z",
+ "generated": "2026-09-09T04:42:05Z",
  "sources": [
   {
    "id": "us-ca-statewide",
@@ -28,12 +28,13 @@
    ],
    "note": "Every live California feed in one: Cal OES orders and warnings, CAL FIRE's reason, population and lifted zones, and the county and city feeds, de-duplicated.",
    "last_edit": "2026-09-08",
-   "checked": "2026-09-09T04:34:01Z",
+   "checked": "2026-09-09T04:42:05Z",
    "also": [
     {
      "url": "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/Combined_Statewide_Evacuation_Public_View/FeatureServer",
      "layer": 0,
      "publisher": "CAL FIRE",
+     "county": "",
      "where": "1=1",
      "status_field": "zone_status",
      "name_field": "zone_id",
@@ -43,6 +44,7 @@
      "url": "https://services1.arcgis.com/P5Mv5GY5S66M8Z1Q/arcgis/rest/services/Sonoma_County_Evacuation_Areas_public/FeatureServer",
      "layer": 0,
      "publisher": "Sonoma County",
+     "county": "Sonoma",
      "where": "zone_status <> 'Normal'",
      "status_field": "zone_status",
      "name_field": "ZoneNumber",
@@ -52,6 +54,7 @@
      "url": "https://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Emergency_Notification_Areas_view/FeatureServer",
      "layer": 0,
      "publisher": "County of San Diego OES",
+     "county": "San Diego",
      "where": "1=1",
      "status_field": "zone_status",
      "name_field": "zone_label",
@@ -61,6 +64,7 @@
      "url": "https://services.arcgis.com/xsiPoFK0f7RrxF0D/arcgis/rest/services/LA_City_Evacuation_Areas/FeatureServer",
      "layer": 0,
      "publisher": "LAFD",
+     "county": "Los Angeles",
      "where": "1=1",
      "status_field": "EvacType",
      "name_field": "EvacArea",
@@ -70,6 +74,7 @@
      "url": "https://services.arcgis.com/RmCCgQtiZLDCtblq/arcgis/rest/services/Public_Emergency_Map_GENASYS_Alert_Warning_Area/FeatureServer",
      "layer": 0,
      "publisher": "LA County OEM",
+     "county": "Los Angeles",
      "where": "1=1",
      "status_field": "AlertReason",
      "name_field": "zone_id",
@@ -79,6 +84,7 @@
      "url": "https://services5.arcgis.com/Mn9RcWO3YYOeWUyC/arcgis/rest/services/Evacuation_Perimeters_-_Public_Maps/FeatureServer",
      "layer": 0,
      "publisher": "Ventura County Sheriff",
+     "county": "Ventura",
      "where": "1=1",
      "status_field": "Evac_Status",
      "name_field": "Evac_Zone",
@@ -88,6 +94,7 @@
      "url": "https://services2.arcgis.com/wEula7SYiezXcdRv/arcgis/rest/services/Public_Evacuations_(Live_Feed)/FeatureServer",
      "layer": 0,
      "publisher": "Mariposa County",
+     "county": "Mariposa",
      "where": "1=1",
      "status_field": "TYPE",
      "name_field": "IncidentName",
@@ -121,12 +128,13 @@
    ],
    "note": "Level 1 Be Ready, 2 Be Set, 3 Go Now. Oregon OEM with the county feeds folded in, de-duplicated.",
    "last_edit": "2026-09-09",
-   "checked": "2026-09-09T04:34:01Z",
+   "checked": "2026-09-09T04:42:05Z",
    "also": [
     {
      "url": "https://services1.arcgis.com/znO8Hz1SuVVohYhZ/arcgis/rest/services/Emergency_Response_OEM_Public/FeatureServer",
      "layer": 4,
      "publisher": "Deschutes County",
+     "county": "Deschutes",
      "where": "1=1",
      "status_field": "Fire_Evacuation_Level",
      "name_field": "Evac_Area_Name",
@@ -160,7 +168,7 @@
    ],
    "note": "Order, Alert (be ready to leave), Tactical Evacuation, All Clear.",
    "last_edit": "2026-09-09",
-   "checked": "2026-09-09T04:34:01Z"
+   "checked": "2026-09-09T04:42:05Z"
   },
   {
    "id": "us-ca-napa",
@@ -188,7 +196,7 @@
    ],
    "note": "All zones for the county. Status here lags; live status is in the statewide layers.",
    "last_edit": "2025-04-12",
-   "checked": "2026-09-09T04:34:01Z"
+   "checked": "2026-09-09T04:42:05Z"
   },
   {
    "id": "us-ca-riverside-zones",
@@ -216,7 +224,7 @@
    ],
    "note": "All Genasys zones for the county, copied nightly by the city. Status here lags; live status is in the statewide layers.",
    "last_edit": "2026-09-07",
-   "checked": "2026-09-09T04:34:01Z"
+   "checked": "2026-09-09T04:42:05Z"
   },
   {
    "id": "us-ca-riverside-emd-mountain",
@@ -244,7 +252,7 @@
    ],
    "note": "Pre-planned zones for the mountain communities (Idyllwild, Poppet Flats, Pine Cove).",
    "last_edit": "2025-08-04",
-   "checked": "2026-09-09T04:34:01Z"
+   "checked": "2026-09-09T04:42:05Z"
   },
   {
    "id": "us-or-deschutes-shelters",
@@ -272,7 +280,7 @@
    ],
    "note": "",
    "last_edit": "2026-07-28",
-   "checked": "2026-09-09T04:34:01Z"
+   "checked": "2026-09-09T04:42:05Z"
   },
   {
    "id": "us-or-jackson",
@@ -300,7 +308,7 @@
    ],
    "note": "All zones for the county. Levels here lag; live levels are in the Oregon OEM layer.",
    "last_edit": "2025-04-28",
-   "checked": "2026-09-09T04:34:01Z"
+   "checked": "2026-09-09T04:42:05Z"
   },
   {
    "id": "us-fl-hillsborough",
@@ -328,7 +336,7 @@
    ],
    "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
    "last_edit": "2024-09-26",
-   "checked": "2026-09-09T04:34:01Z"
+   "checked": "2026-09-09T04:42:05Z"
   },
   {
    "id": "us-fl-lee",
@@ -356,7 +364,7 @@
    ],
    "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
    "last_edit": "2021-07-03",
-   "checked": "2026-09-09T04:34:01Z"
+   "checked": "2026-09-09T04:42:05Z"
   }
  ],
  "counties": {

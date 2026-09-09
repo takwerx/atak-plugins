@@ -124,6 +124,8 @@ public class ZoneLayer {
         final Envelope env;
         /** For the zone list: the status label, its color, the county, a point to measure from. */
         String title, statusKey, county;
+        /** The county of the layer this came from, when that layer is one county's. */
+        String layerCounty;
         int color;
         double lat = Double.NaN, lon = Double.NaN;
 
@@ -155,7 +157,7 @@ public class ZoneLayer {
             name = pf.name;
             title = pf.title == null ? pf.name : pf.title;
             status = pf.statusKey == null ? "" : pf.statusKey;
-            county = pf.county == null ? source.county : pf.county;
+            county = pf.county != null ? pf.county : pf.layerCounty != null && !pf.layerCounty.isEmpty() ? pf.layerCounty : source.county;
             sourceId = source.id;
             sourceTitle = source.title;
             color = pf.color;
@@ -200,11 +202,41 @@ public class ZoneLayer {
         }
     }
 
-    /** A zone's county key: its own county field, else the source's county. */
+    /** The state's counties with their boxes, for placing a zone no feed put in a county. */
+    private volatile List<Catalog.County> countyList = new ArrayList<>();
+
+    public void setCountyList(List<Catalog.County> counties) {
+        countyList = counties == null ? new ArrayList<Catalog.County>() : counties;
+    }
+
+    /**
+     * A zone's county key: its own county field, else its layer's county, else the
+     * source's county, else the smallest county box its center sits in. Null only when
+     * nothing places it.
+     */
     private String countyKeyOf(Pending pf) {
         if (pf.county != null && !pf.county.trim().isEmpty())
             return Catalog.countyKey(pf.county);
-        return source.county.isEmpty() ? null : Catalog.countyKey(source.county);
+        if (pf.layerCounty != null && !pf.layerCounty.isEmpty())
+            return Catalog.countyKey(pf.layerCounty);
+        if (!source.county.isEmpty())
+            return Catalog.countyKey(source.county);
+        if (!Double.isNaN(pf.lat)) {
+            Catalog.County best = null;
+            double bestArea = Double.MAX_VALUE;
+            for (Catalog.County c : countyList) {
+                if (!c.contains(pf.lat, pf.lon))
+                    continue;
+                final double area = (c.bounds[2] - c.bounds[0]) * (c.bounds[3] - c.bounds[1]);
+                if (area < bestArea) {
+                    bestArea = area;
+                    best = c;
+                }
+            }
+            if (best != null)
+                return Catalog.countyKey(best.name);
+        }
+        return null;
     }
 
     /** Where the radius is measured from; null when the radius is off. */
@@ -525,10 +557,10 @@ public class ZoneLayer {
                 final Set<String> counties = filterCounties;
                 for (Pending pf : cache) {
                     if (counties != null) {
+                        // Only the picked counties. A zone nothing can place is left out
+                        // too: "I want Monterey" means Monterey.
                         final String ck = countyKeyOf(pf);
-                        // A zone whose county is unknown stays: a filter must not hide
-                        // what it cannot place.
-                        if (ck != null && !counties.contains(ck)) {
+                        if (ck == null || !counties.contains(ck)) {
                             outCounty++;
                             continue;
                         }
@@ -809,6 +841,7 @@ public class ZoneLayer {
                         pf.color = color;
                         if (countyField != null && !props.isNull(countyField))
                             pf.county = props.optString(countyField, null);
+                        pf.layerCounty = lay.county;
                         if (at != null) {
                             pf.lat = at.getY();
                             pf.lon = at.getX();

@@ -481,6 +481,7 @@ public class ZoneManager {
 
     /** Turns a source on (load and draw) or off (remove from the map and forget its cache). */
     public void setOn(final Catalog.Source s, final boolean on) {
+        final Catalog c = catalog;
         ZoneLayer l = find(s.id);
         if (on) {
             if (l == null) {
@@ -489,6 +490,7 @@ public class ZoneManager {
                 l.presetVisibility(visibility.from(mapView), visibility.radiusMeters(), visibility.maxResolution);
                 l.presetMaster(mapOn);
                 l.presetCounties(countiesFor(s.st));
+                l.setCountyList(c.countiesOf(s.st));
                 try {
                     l.attach();
                 } catch (Exception e) {
@@ -582,6 +584,7 @@ public class ZoneManager {
                 l.presetVisibility(visibility.from(mapView), visibility.radiusMeters(), visibility.maxResolution);
                 l.presetMaster(mapOn);
                 l.presetCounties(countiesFor(s.st));
+                l.setCountyList(c.countiesOf(s.st));
                 try {
                     l.attach();
                     synchronized (layers) {

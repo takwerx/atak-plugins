@@ -34,6 +34,8 @@ public final class Catalog {
      */
     public static final class Layer {
         public final String url, publisher, where, statusField, nameField, countyField;
+        /** The county every zone of this layer belongs to, when the feed is one county's; else empty. */
+        public final String county;
         public final int layer;
         public final double simplify;
 
@@ -42,6 +44,7 @@ public final class Catalog {
             if (!url.startsWith("https://"))
                 throw new JSONException("layer url must be https: " + url);
             publisher = o.optString("publisher", defaultPublisher);
+            county = o.optString("county", o.optString("co", ""));
             layer = o.optInt("layer", 0);
             where = o.optString("where", "1=1");
             statusField = o.optString("status_field", "");
