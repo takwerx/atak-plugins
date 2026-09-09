@@ -194,6 +194,58 @@ public class ZoneManager {
         });
     }
 
+    /**
+     * The county filter for one state's layers: null draws every county. Applied to
+     * every layer of that state, on the worker, and given to layers that attach later.
+     */
+    private final java.util.Map<String, java.util.Set<String>> countyFilters = new java.util.HashMap<>();
+
+    public void setCounties(final String st, final java.util.Set<String> keys) {
+        synchronized (countyFilters) {
+            if (keys == null || keys.isEmpty())
+                countyFilters.remove(st);
+            else
+                countyFilters.put(st, new java.util.HashSet<>(keys));
+        }
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                for (ZoneLayer l : snapshot())
+                    if (l.source.st.equalsIgnoreCase(st))
+                        l.applyCounties(keys == null || keys.isEmpty() ? null : keys);
+                changed();
+            }
+        });
+    }
+
+    /** The county filters the pane saved, one per state, read before any layer attaches. */
+    private void loadCountyFilters() {
+        final Catalog c = catalog;
+        if (c == null)
+            return;
+        for (String st : c.states()) {
+            try {
+                final JSONArray arr = new JSONArray(uiPrefs().getString("counties." + st, "[]"));
+                final java.util.Set<String> keys = new java.util.HashSet<>();
+                for (int i = 0; i < arr.length(); i++)
+                    keys.add(Catalog.countyKey(arr.getString(i)));
+                synchronized (countyFilters) {
+                    if (!keys.isEmpty())
+                        countyFilters.put(st, keys);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "county filter for " + st + " unreadable", e);
+            }
+        }
+    }
+
+    public java.util.Set<String> countiesFor(String st) {
+        synchronized (countyFilters) {
+            final java.util.Set<String> k = countyFilters.get(st);
+            return k == null ? null : new java.util.HashSet<>(k);
+        }
+    }
+
     public void setRadiusBig(int big) {
         visibility.radiusBig = Math.max(0, Math.min(Visibility.RADIUS_MAX, big));
         visibility.save();
@@ -312,6 +364,7 @@ public class ZoneManager {
         filter.addAction(ACTION_DETAILS, "show the attributes of an evacuation zone");
         AtakBroadcast.getInstance().registerReceiver(details, filter);
         loadBundledCatalog();
+        loadCountyFilters();
         restore();
         main.postDelayed(timer, TICK_MS);
         fetchRemoteCatalog();
@@ -435,6 +488,7 @@ public class ZoneManager {
                         iconDir, lineGlyph, polygonGlyph, 0, 0);
                 l.presetVisibility(visibility.from(mapView), visibility.radiusMeters(), visibility.maxResolution);
                 l.presetMaster(mapOn);
+                l.presetCounties(countiesFor(s.st));
                 try {
                     l.attach();
                 } catch (Exception e) {
@@ -527,6 +581,7 @@ public class ZoneManager {
                         o.optLong("lastRefresh", 0), o.optInt("count", 0));
                 l.presetVisibility(visibility.from(mapView), visibility.radiusMeters(), visibility.maxResolution);
                 l.presetMaster(mapOn);
+                l.presetCounties(countiesFor(s.st));
                 try {
                     l.attach();
                     synchronized (layers) {

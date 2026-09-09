@@ -28,6 +28,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -174,6 +175,37 @@ public class ZoneLayer {
     public volatile List<ZoneInfo> zones = new ArrayList<>();
 
     // ---- visibility: Cam Depot's radius and zoom gate, applied to the store --------
+
+    /** Counties to draw, as {@link Catalog#countyKey} keys; null draws every county. */
+    private Set<String> filterCounties;
+    /** Zones the county filter left out last rewrite. */
+    public volatile int outsideCounties;
+
+    /** The county filter, from the pane's picker. Rewrites the store from memory. Worker thread. */
+    public void applyCounties(Set<String> keys) {
+        synchronized (lock) {
+            final boolean same = (keys == null && filterCounties == null)
+                    || (keys != null && keys.equals(filterCounties));
+            filterCounties = keys == null ? null : new HashSet<>(keys);
+            if (store == null || same)
+                return;
+            if (layerOn && masterOn && !cache.isEmpty())
+                rewriteStore();
+        }
+    }
+
+    public void presetCounties(Set<String> keys) {
+        synchronized (lock) {
+            filterCounties = keys == null ? null : new HashSet<>(keys);
+        }
+    }
+
+    /** A zone's county key: its own county field, else the source's county. */
+    private String countyKeyOf(Pending pf) {
+        if (pf.county != null && !pf.county.trim().isEmpty())
+            return Catalog.countyKey(pf.county);
+        return source.county.isEmpty() ? null : Catalog.countyKey(source.county);
+    }
 
     /** Where the radius is measured from; null when the radius is off. */
     private GeoPoint filterFrom;
@@ -486,11 +518,21 @@ public class ZoneLayer {
             final List<Long> old = existingSets();
             final Map<String, Long> sets = new HashMap<>();
             final List<ZoneInfo> listed = new ArrayList<>();
-            int in = 0, out = 0;
+            int in = 0, out = 0, outCounty = 0;
             if (layerOn && masterOn) {
                 final GeoPoint from = filterFrom;
                 final double radius = filterRadius;
+                final Set<String> counties = filterCounties;
                 for (Pending pf : cache) {
+                    if (counties != null) {
+                        final String ck = countyKeyOf(pf);
+                        // A zone whose county is unknown stays: a filter must not hide
+                        // what it cannot place.
+                        if (ck != null && !counties.contains(ck)) {
+                            outCounty++;
+                            continue;
+                        }
+                    }
                     if (from != null && radius > 0 && !withinRadius(pf, from, radius)) {
                         out++;
                         continue;
@@ -509,6 +551,7 @@ public class ZoneLayer {
             }
             shown = in;
             outsideRadius = out;
+            outsideCounties = outCounty;
             zones = listed;
             for (Long id : old) {
                 try {

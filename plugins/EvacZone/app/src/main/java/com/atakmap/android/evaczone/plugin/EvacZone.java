@@ -569,7 +569,8 @@ public class EvacZone implements IPlugin {
             }
         }
         for (ZoneLayer l : manager.snapshot()) {
-            // The state on the button is the list's state, whatever else is on.
+            // The state on the button is the list's state, whatever else is on. The
+            // store already holds only the picked counties, so the list does too.
             if (!l.isVisible() || (state != null && !l.source.st.equalsIgnoreCase(state)))
                 continue;
             for (ZoneLayer.ZoneInfo z : l.zones) {
@@ -713,12 +714,9 @@ public class EvacZone implements IPlugin {
         }
     }
 
-    // ---- counties -----------------------------------------------------------------
+    // ---- counties: a filter on the zones, the way Cam Depot's is on cameras ----------
 
-    /**
-     * Counties picked for a state, as {@link Catalog#countyKey} keys. Empty means all:
-     * nothing picked, nothing filtered. Nothing is ever picked for the operator.
-     */
+    /** Counties picked for a state, as {@link Catalog#countyKey} keys. Empty means all. */
     private Set<String> selectedCounties(String st) {
         final Set<String> out = new LinkedHashSet<>();
         if (st == null)
@@ -735,13 +733,13 @@ public class EvacZone implements IPlugin {
 
     private void saveCounties(String st, Collection<String> keys) {
         uiPrefs().edit().putString("counties." + st, new JSONArray(keys).toString()).apply();
+        manager.setCounties(st, new java.util.HashSet<>(keys));
     }
 
-    /** A county that has a feed of its own: its name and how many. */
+    /** One county in the picker: name, key, and how many zones the state's feeds have there now. */
     private static final class CountyEntry {
-        final String key;
-        final String name;
-        int sources;
+        final String key, name;
+        int zones;
 
         CountyEntry(String key, String name) {
             this.key = key;
@@ -749,21 +747,38 @@ public class EvacZone implements IPlugin {
         }
     }
 
-    /** The counties of the state that have feeds of their own, by name. */
-    private static Map<String, CountyEntry> countyEntries(List<Catalog.Source> srcs) {
+    /**
+     * Every county of the state, from the Census, with the zones the feeds that are on
+     * hold there right now, so the picker says what a county will show before it is
+     * picked. Counties named by a feed but missing from the Census list are added.
+     */
+    private List<CountyEntry> countyEntries(Catalog c) {
         final Map<String, CountyEntry> out = new java.util.TreeMap<>();
-        for (Catalog.Source s : srcs) {
-            if (s.statewide())
+        for (Catalog.County county : c.countiesOf(state))
+            out.put(Catalog.countyKey(county.name), new CountyEntry(Catalog.countyKey(county.name), county.name));
+        for (Catalog.Source src : c.forState(state))
+            if (!src.statewide() && !out.containsKey(Catalog.countyKey(src.county)))
+                out.put(Catalog.countyKey(src.county), new CountyEntry(Catalog.countyKey(src.county), src.county));
+        for (ZoneLayer l : manager.snapshot()) {
+            if (!l.isVisible() || !l.source.st.equalsIgnoreCase(state))
                 continue;
-            final String k = Catalog.countyKey(s.county);
-            CountyEntry e = out.get(k);
-            if (e == null) {
-                e = new CountyEntry(k, s.county);
-                out.put(k, e);
+            for (Map.Entry<String, ZoneLayer.CountyTally> t : l.countyTallies.entrySet()) {
+                CountyEntry e = out.get(t.getKey());
+                if (e == null) {
+                    e = new CountyEntry(t.getKey(), t.getValue().name);
+                    out.put(t.getKey(), e);
+                }
+                e.zones += t.getValue().total();
             }
-            e.sources++;
         }
-        return out;
+        final List<CountyEntry> list = new ArrayList<>(out.values());
+        Collections.sort(list, new java.util.Comparator<CountyEntry>() {
+            @Override
+            public int compare(CountyEntry a, CountyEntry b) {
+                return a.name.compareToIgnoreCase(b.name);
+            }
+        });
+        return list;
     }
 
     /** All, or one or many, ticked in a multi-choice dialog on the MapView context. */
@@ -771,17 +786,11 @@ public class EvacZone implements IPlugin {
         final Catalog c = manager == null ? null : manager.catalog();
         if (c == null || state == null)
             return;
-        final List<CountyEntry> list = new ArrayList<>(countyEntries(c.forState(state)).values());
+        final List<CountyEntry> list = countyEntries(c);
         if (list.isEmpty()) {
-            toast("No county layers for " + state + " yet; the statewide feed covers every county");
+            toast("No county list for " + state + " yet");
             return;
         }
-        Collections.sort(list, new java.util.Comparator<CountyEntry>() {
-            @Override
-            public int compare(CountyEntry a, CountyEntry b) {
-                return a.name.compareToIgnoreCase(b.name);
-            }
-        });
         final Set<String> selected = selectedCounties(state);
         final String[] labels = new String[list.size() + 1];
         final boolean[] ticked = new boolean[list.size() + 1];
@@ -789,17 +798,16 @@ public class EvacZone implements IPlugin {
         ticked[0] = selected.isEmpty();
         for (int i = 0; i < list.size(); i++) {
             final CountyEntry e = list.get(i);
-            labels[i + 1] = e.name + "  (" + e.sources + (e.sources == 1 ? " layer)" : " layers)");
+            labels[i + 1] = e.zones > 0 ? e.name + "  (" + e.zones + ")" : e.name;
             ticked[i + 1] = selected.contains(e.key);
         }
         new AlertDialog.Builder(mapView.getContext())
-                .setTitle("County layers in " + state)
+                .setTitle("Counties")
                 .setMultiChoiceItems(labels, ticked, new DialogInterface.OnMultiChoiceClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which, boolean isChecked) {
                         ticked[which] = isChecked;
-                        // All and a county are not both true: ticking All clears the
-                        // counties, ticking a county clears All.
+                        // All and a county are never both ticked.
                         final android.widget.ListView lv = ((AlertDialog) d).getListView();
                         if (which == 0 && isChecked) {
                             for (int i = 1; i < ticked.length; i++) {
@@ -828,6 +836,17 @@ public class EvacZone implements IPlugin {
                 .show();
     }
 
+    /** The name of a county key, from the catalog's list, else the key itself. */
+    private String countyName(Catalog c, String key) {
+        for (Catalog.County county : c.countiesOf(state))
+            if (Catalog.countyKey(county.name).equals(key))
+                return county.name;
+        for (Catalog.Source src : c.forState(state))
+            if (Catalog.countyKey(src.county).equals(key))
+                return src.county;
+        return key;
+    }
+
     // ---- rendering ----------------------------------------------------------------
 
     private void render() {
@@ -839,7 +858,6 @@ public class EvacZone implements IPlugin {
         final TextView legend = paneView.findViewById(R.id.legend);
         final LinearLayout statewide = paneView.findViewById(R.id.statewide_container);
         final TextView statewideEmpty = paneView.findViewById(R.id.statewide_empty);
-        final Button countiesButton = paneView.findViewById(R.id.btn_counties);
         final LinearLayout county = paneView.findViewById(R.id.county_container);
         final TextView countyHint = paneView.findViewById(R.id.county_hint);
         statewide.removeAllViews();
@@ -852,7 +870,6 @@ public class EvacZone implements IPlugin {
             legend.setText("");
             statewideEmpty.setVisibility(View.VISIBLE);
             statewideEmpty.setText("The catalog could not be read.");
-            countiesButton.setEnabled(false);
             countyHint.setVisibility(View.GONE);
             return;
         }
@@ -875,12 +892,15 @@ public class EvacZone implements IPlugin {
             drawn += l.count;
             if (l.refreshing || l.busy)
                 loading++;
-            for (Map.Entry<String, Integer> e : l.statusCounts.entrySet()) {
-                final Integer prev = totals.get(e.getKey());
-                totals.put(e.getKey(), prev == null ? e.getValue() : prev + e.getValue());
-                final Integer col = l.statusColors.get(e.getKey());
-                if (col != null)
-                    colors.put(e.getKey(), col);
+            // What is on the map, after the county and radius filters: the legend and
+            // the map agree by construction.
+            for (ZoneLayer.ZoneInfo z : l.zones) {
+                if (z.status.isEmpty())
+                    continue;
+                final Integer prev = totals.get(z.status);
+                totals.put(z.status, prev == null ? 1 : prev + 1);
+                if (z.color != 0)
+                    colors.put(z.status, z.color);
             }
         }
         // The legend is the status: Order 38, Warning 52. The counts of feeds and the
@@ -910,31 +930,24 @@ public class EvacZone implements IPlugin {
         statewideEmpty.setVisibility(nStatewide == 0 ? View.VISIBLE : View.GONE);
         statewideEmpty.setText("No statewide source for " + state + " yet.");
 
-        // Counties: only a chooser for county feeds. Nothing picked means all of them.
-        final Map<String, CountyEntry> entries = countyEntries(srcs);
+        // Counties: the button says the pick, and the county zone maps (counties that
+        // publish every zone they drew) are listed for the picked counties only.
+        final Button countiesButton = paneView.findViewById(R.id.btn_counties);
         final Set<String> selected = selectedCounties(state);
-        if (entries.isEmpty()) {
-            countiesButton.setText("No county layers for " + state + " yet");
-            countiesButton.setEnabled(false);
-            countyHint.setVisibility(View.VISIBLE);
-            countyHint.setText("The statewide feed covers every county. Some counties also publish every zone they have drawn; those appear here.");
-            renderZones();
-            return;
-        }
-        countiesButton.setEnabled(true);
-        countyHint.setVisibility(View.GONE);
-        final List<String> names = new ArrayList<>();
-        for (CountyEntry e : entries.values())
-            if (selected.contains(e.key))
-                names.add(e.name);
-        if (names.isEmpty())
+        if (selected.isEmpty()) {
             countiesButton.setText("All counties");
-        else
+        } else {
+            final List<String> names = new ArrayList<>();
+            for (String k : selected)
+                names.add(countyName(c, k));
+            Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
             countiesButton.setText((names.size() == 1 ? "County: " : names.size() + " counties: ")
                     + TextUtils.join(", ", names));
+        }
         for (Catalog.Source s : srcs)
             if (!s.statewide() && (selected.isEmpty() || selected.contains(Catalog.countyKey(s.county))))
                 county.addView(sourceRow(s));
+        countyHint.setVisibility(View.GONE);
         renderZones();
     }
 

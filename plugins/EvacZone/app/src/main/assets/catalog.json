@@ -1,10 +1,10 @@
 {
  "format": 1,
- "generated": "2026-09-09T03:30:58Z",
+ "generated": "2026-09-09T04:34:01Z",
  "sources": [
   {
    "id": "us-ca-statewide",
-   "title": "California statewide",
+   "title": "California",
    "publisher": "Cal OES",
    "st": "CA",
    "co": "",
@@ -28,7 +28,7 @@
    ],
    "note": "Every live California feed in one: Cal OES orders and warnings, CAL FIRE's reason, population and lifted zones, and the county and city feeds, de-duplicated.",
    "last_edit": "2026-09-08",
-   "checked": "2026-09-09T03:30:58Z",
+   "checked": "2026-09-09T04:34:01Z",
    "also": [
     {
      "url": "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/Combined_Statewide_Evacuation_Public_View/FeatureServer",
@@ -97,7 +97,7 @@
   },
   {
    "id": "us-or-statewide",
-   "title": "Oregon statewide",
+   "title": "Oregon",
    "publisher": "Oregon OEM",
    "st": "OR",
    "co": "",
@@ -121,7 +121,7 @@
    ],
    "note": "Level 1 Be Ready, 2 Be Set, 3 Go Now. Oregon OEM with the county feeds folded in, de-duplicated.",
    "last_edit": "2026-09-09",
-   "checked": "2026-09-09T03:30:58Z",
+   "checked": "2026-09-09T04:34:01Z",
    "also": [
     {
      "url": "https://services1.arcgis.com/znO8Hz1SuVVohYhZ/arcgis/rest/services/Emergency_Response_OEM_Public/FeatureServer",
@@ -160,11 +160,11 @@
    ],
    "note": "Order, Alert (be ready to leave), Tactical Evacuation, All Clear.",
    "last_edit": "2026-09-09",
-   "checked": "2026-09-09T03:30:58Z"
+   "checked": "2026-09-09T04:34:01Z"
   },
   {
    "id": "us-ca-napa",
-   "title": "Zone boundaries",
+   "title": "Napa County \u00b7 all zones",
    "publisher": "Napa County",
    "st": "CA",
    "co": "Napa",
@@ -188,11 +188,11 @@
    ],
    "note": "All zones for the county. Status here lags; live status is in the statewide layers.",
    "last_edit": "2025-04-12",
-   "checked": "2026-09-09T03:30:58Z"
+   "checked": "2026-09-09T04:34:01Z"
   },
   {
    "id": "us-ca-riverside-zones",
-   "title": "Genasys zone boundaries",
+   "title": "Riverside County \u00b7 all zones",
    "publisher": "City of Riverside GIS",
    "st": "CA",
    "co": "Riverside",
@@ -216,11 +216,11 @@
    ],
    "note": "All Genasys zones for the county, copied nightly by the city. Status here lags; live status is in the statewide layers.",
    "last_edit": "2026-09-07",
-   "checked": "2026-09-09T03:30:58Z"
+   "checked": "2026-09-09T04:34:01Z"
   },
   {
    "id": "us-ca-riverside-emd-mountain",
-   "title": "Mountain evacuation zones",
+   "title": "Riverside County \u00b7 mountain zones",
    "publisher": "Riverside County EMD",
    "st": "CA",
    "co": "Riverside",
@@ -244,11 +244,11 @@
    ],
    "note": "Pre-planned zones for the mountain communities (Idyllwild, Poppet Flats, Pine Cove).",
    "last_edit": "2025-08-04",
-   "checked": "2026-09-09T03:30:58Z"
+   "checked": "2026-09-09T04:34:01Z"
   },
   {
    "id": "us-or-deschutes-shelters",
-   "title": "Shelters",
+   "title": "Deschutes County \u00b7 shelters",
    "publisher": "Deschutes County",
    "st": "OR",
    "co": "Deschutes",
@@ -272,11 +272,11 @@
    ],
    "note": "",
    "last_edit": "2026-07-28",
-   "checked": "2026-09-09T03:30:58Z"
+   "checked": "2026-09-09T04:34:01Z"
   },
   {
    "id": "us-or-jackson",
-   "title": "Zone boundaries",
+   "title": "Jackson County \u00b7 all zones",
    "publisher": "Jackson County",
    "st": "OR",
    "co": "Jackson",
@@ -300,11 +300,11 @@
    ],
    "note": "All zones for the county. Levels here lag; live levels are in the Oregon OEM layer.",
    "last_edit": "2025-04-28",
-   "checked": "2026-09-09T03:30:58Z"
+   "checked": "2026-09-09T04:34:01Z"
   },
   {
    "id": "us-fl-hillsborough",
-   "title": "Hurricane zones A to E",
+   "title": "Hillsborough County \u00b7 hurricane zones A to E",
    "publisher": "Hillsborough County",
    "st": "FL",
    "co": "Hillsborough",
@@ -328,11 +328,11 @@
    ],
    "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
    "last_edit": "2024-09-26",
-   "checked": "2026-09-09T03:30:58Z"
+   "checked": "2026-09-09T04:34:01Z"
   },
   {
    "id": "us-fl-lee",
-   "title": "Hurricane zones A to E",
+   "title": "Lee County \u00b7 hurricane zones A to E",
    "publisher": "Lee County",
    "st": "FL",
    "co": "Lee",
@@ -356,7 +356,7 @@
    ],
    "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
    "last_edit": "2021-07-03",
-   "checked": "2026-09-09T03:30:58Z"
+   "checked": "2026-09-09T04:34:01Z"
   }
  ],
  "counties": {
