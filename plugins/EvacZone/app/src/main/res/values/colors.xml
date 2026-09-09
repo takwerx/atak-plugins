@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    
+    <color name="white">#ffffff</color>
+    <color name="darker_gray">#121212</color>
+    <color name="heading_yellow">#dfb228</color>
+
+    <!-- Map Depot's "tap to go there" green, the one action color across the plugins. -->
+    <color name="action_green">#4caf50</color>
+</resources>
