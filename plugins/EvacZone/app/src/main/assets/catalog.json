@@ -1,6 +1,6 @@
 {
  "format": 1,
- "generated": "2026-09-09T01:47:35Z",
+ "generated": "2026-09-09T03:30:58Z",
  "sources": [
   {
    "id": "us-ca-statewide",
@@ -28,7 +28,7 @@
    ],
    "note": "Every live California feed in one: Cal OES orders and warnings, CAL FIRE's reason, population and lifted zones, and the county and city feeds, de-duplicated.",
    "last_edit": "2026-09-08",
-   "checked": "2026-09-09T01:47:35Z",
+   "checked": "2026-09-09T03:30:58Z",
    "also": [
     {
      "url": "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/Combined_Statewide_Evacuation_Public_View/FeatureServer",
@@ -121,7 +121,7 @@
    ],
    "note": "Level 1 Be Ready, 2 Be Set, 3 Go Now. Oregon OEM with the county feeds folded in, de-duplicated.",
    "last_edit": "2026-09-09",
-   "checked": "2026-09-09T01:47:35Z",
+   "checked": "2026-09-09T03:30:58Z",
    "also": [
     {
      "url": "https://services1.arcgis.com/znO8Hz1SuVVohYhZ/arcgis/rest/services/Emergency_Response_OEM_Public/FeatureServer",
@@ -160,7 +160,7 @@
    ],
    "note": "Order, Alert (be ready to leave), Tactical Evacuation, All Clear.",
    "last_edit": "2026-09-09",
-   "checked": "2026-09-09T01:47:35Z"
+   "checked": "2026-09-09T03:30:58Z"
   },
   {
    "id": "us-ca-napa",
@@ -188,7 +188,7 @@
    ],
    "note": "All zones for the county. Status here lags; live status is in the statewide layers.",
    "last_edit": "2025-04-12",
-   "checked": "2026-09-09T01:47:35Z"
+   "checked": "2026-09-09T03:30:58Z"
   },
   {
    "id": "us-ca-riverside-zones",
@@ -216,7 +216,7 @@
    ],
    "note": "All Genasys zones for the county, copied nightly by the city. Status here lags; live status is in the statewide layers.",
    "last_edit": "2026-09-07",
-   "checked": "2026-09-09T01:47:35Z"
+   "checked": "2026-09-09T03:30:58Z"
   },
   {
    "id": "us-ca-riverside-emd-mountain",
@@ -244,7 +244,7 @@
    ],
    "note": "Pre-planned zones for the mountain communities (Idyllwild, Poppet Flats, Pine Cove).",
    "last_edit": "2025-08-04",
-   "checked": "2026-09-09T01:47:35Z"
+   "checked": "2026-09-09T03:30:58Z"
   },
   {
    "id": "us-or-deschutes-shelters",
@@ -272,7 +272,7 @@
    ],
    "note": "",
    "last_edit": "2026-07-28",
-   "checked": "2026-09-09T01:47:35Z"
+   "checked": "2026-09-09T03:30:58Z"
   },
   {
    "id": "us-or-jackson",
@@ -300,11 +300,11 @@
    ],
    "note": "All zones for the county. Levels here lag; live levels are in the Oregon OEM layer.",
    "last_edit": "2025-04-28",
-   "checked": "2026-09-09T01:47:35Z"
+   "checked": "2026-09-09T03:30:58Z"
   },
   {
    "id": "us-fl-hillsborough",
-   "title": "Evacuation Zones",
+   "title": "Hurricane zones A to E",
    "publisher": "Hillsborough County",
    "st": "FL",
    "co": "Hillsborough",
@@ -326,13 +326,13 @@
     28.1476,
     -82.1206
    ],
-   "note": "Zones A to E.",
+   "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
    "last_edit": "2024-09-26",
-   "checked": "2026-09-09T01:47:35Z"
+   "checked": "2026-09-09T03:30:58Z"
   },
   {
    "id": "us-fl-lee",
-   "title": "Evacuation Zones",
+   "title": "Hurricane zones A to E",
    "publisher": "Lee County",
    "st": "FL",
    "co": "Lee",
@@ -343,7 +343,7 @@
    "geometry": "polygon",
    "where": "1=1",
    "status_field": "",
-   "name_field": "Surge_Zone",
+   "name_field": "CountyZone",
    "county_field": "",
    "refresh_min": 1440,
    "features": 5,
@@ -354,9 +354,9 @@
     26.7898,
     -81.5607
    ],
-   "note": "",
+   "note": "Pre-drawn surge zones, A goes first. No live status here; the county calls zones by letter.",
    "last_edit": "2021-07-03",
-   "checked": "2026-09-09T01:47:35Z"
+   "checked": "2026-09-09T03:30:58Z"
   }
  ],
  "counties": {

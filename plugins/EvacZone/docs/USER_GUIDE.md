@@ -23,6 +23,11 @@ go to it.
 - The plugin needs internet access to fetch zones. Once a source has been
   fetched it keeps drawing without a connection and tells you how old it is.
 - Nothing is sent from your phone: no location, no callsign.
+- Built and tested in California. Other states are there where public data
+  was found: Oregon, British Columbia, and hurricane zones for two Florida
+  counties (lettered A to E, no live status; the county calls zones by letter).
+  If your state publishes evacuation zones and they are not here, point us at
+  the data: https://github.com/takwerx/evac-zone/issues
 - Screenshots for this guide will be added with the next release.
 
 ## 1. Open the pane

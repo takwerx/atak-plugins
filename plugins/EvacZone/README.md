@@ -42,6 +42,12 @@ Capabilities:
   - Each row says what it costs before it is used (feature counts, lag notes)
     and what is not shown (outside the radius, hidden by the zoom threshold).
 
+Coverage grows the way Cam Depot's did: built and tested in California, with
+Oregon, British Columbia and two Florida counties from public data. If your
+state or county publishes evacuation zones and they are not here, point us at
+the data through the issue tracker below and they go into the catalog without
+a plugin release.
+
 A step-by-step user guide lives at docs/USER_GUIDE.md in the repository
 (excluded from the source submission zip).
 
