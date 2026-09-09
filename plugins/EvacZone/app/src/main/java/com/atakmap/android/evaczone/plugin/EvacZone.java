@@ -834,7 +834,8 @@ public class EvacZone implements IPlugin {
 
         if (c == null) {
             stateButton.setText("State");
-            status.setText(manager.catalogStatus);
+            status.setVisibility(View.VISIBLE);
+            status.setText("No zone list could be read. Check the connection and press Refresh.");
             legend.setText("");
             statewideEmpty.setVisibility(View.VISIBLE);
             statewideEmpty.setText("The catalog could not be read.");
@@ -868,16 +869,18 @@ public class EvacZone implements IPlugin {
                     colors.put(e.getKey(), col);
             }
         }
-        final StringBuilder sb = new StringBuilder();
-        sb.append(on == 0 ? "Nothing on" : on + " on, " + drawn + " zones drawn");
-        if (loading > 0)
-            sb.append(", ").append(loading).append(" loading");
-        sb.append(" · ").append(manager.catalogStatus);
+        // The legend is the status: Order 38, Warning 52. The counts of feeds and the
+        // catalog's date are not the operator's concern; the only other line is one
+        // that tells them why the map is empty and what to do about it.
+        String why = null;
         if (!manager.isMapOn())
-            sb.append("\nMap: off — press ON to draw the zones");
+            why = "Map is off. Press ON to draw the zones.";
         else if (on > 0 && !manager.visibility.withinZoom(mapView))
-            sb.append("\nMap: none drawn — zoom in past your threshold");
-        status.setText(sb.toString());
+            why = "Zoom in to see the zones.";
+        else if (loading > 0)
+            why = "Loading\u2026";
+        status.setText(why == null ? "" : why);
+        status.setVisibility(why == null ? View.GONE : View.VISIBLE);
         legend.setText(legendText(totals, colors));
 
         final List<Catalog.Source> srcs = state == null ? new ArrayList<Catalog.Source>() : c.forState(state);
