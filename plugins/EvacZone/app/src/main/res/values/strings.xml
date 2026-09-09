@@ -7,12 +7,12 @@
 
     <string name="pick_state">State</string>
     <string name="toggle_on">ON</string>
-    <string name="pick_counties">Counties: all</string>
-    <string name="county_hint">County feeds appear here as agencies publish them.</string>
+    <string name="pick_counties">All counties</string>
+    <string name="county_hint">Some counties publish every zone they have drawn; those appear here.</string>
     <string name="refresh_all">Refresh</string>
     <string name="loading_catalog">Loading catalog…</string>
     <string name="section_statewide">Statewide</string>
-    <string name="section_counties">Counties</string>
+    <string name="section_counties">County layers</string>
     <string name="section_attributes">Attributes</string>
     <string name="toggle_off">OFF</string>
     <string name="go_to">Go to</string>
@@ -26,7 +26,9 @@
     <string name="search_hint">Zone id, name or county</string>
     <string name="clear">Clear</string>
     <string name="status_all">Status: all</string>
-    <string name="nearest_to">Nearest to: My Location</string>
+    <string name="nearest_to">Nearest to</string>
+    <string name="nearest_map">Map Center</string>
+    <string name="nearest_me">My Location</string>
     <string name="in_view">On screen only</string>
     <string name="back">Back</string>
     <string name="prefs_summary">Evacuation zones on the map: the user manual</string>

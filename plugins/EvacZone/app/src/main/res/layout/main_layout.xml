@@ -239,26 +239,43 @@
                     android:layout_marginLeft="6dp"
                     android:text="@string/clear" />
             </LinearLayout>
+            <Button
+                android:id="@+id/status_filter"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/status_all" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/nearest_to"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6"
+                android:textColor="#FFFFFF"
+                android:paddingTop="6dp" />
+            <!-- Where nearest is measured from; the chosen one reads green. The radius
+                 up top follows the same choice. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:baselineAligned="false">
                 <Button
-                    android:id="@+id/status_filter"
+                    android:id="@+id/nearest_map"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:text="@string/status_all" />
+                    android:text="@string/nearest_map" />
                 <Button
-                    android:id="@+id/nearest_to"
+                    android:id="@+id/nearest_me"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:layout_marginLeft="4dp"
-                    android:text="@string/nearest_to" />
+                    android:text="@string/nearest_me" />
             </LinearLayout>
             <!-- Follows the map the way ATAK's Overlay Manager does. -->
             <CheckBox

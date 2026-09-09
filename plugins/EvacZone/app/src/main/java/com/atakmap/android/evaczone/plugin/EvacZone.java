@@ -69,7 +69,7 @@ public class EvacZone implements IPlugin {
     private TextView radiusLabel, zoomLabel;
     private Button radiusPresetButton;
     private android.widget.EditText search;
-    private Button searchClear, statusFilterButton, nearestButton;
+    private Button searchClear, statusFilterButton, nearestMap, nearestMe;
     private android.widget.CheckBox inView;
     /** The status the list is narrowed to, a legend key, or null for all. */
     private String statusFilter;
@@ -452,8 +452,11 @@ public class EvacZone implements IPlugin {
         radiusLabel.setText(v.radiusBig <= 0 ? "Radius: off — everything that is on"
                 : String.format(java.util.Locale.US, "Within %d %s of %s", v.radiusBig,
                         com.atakmap.android.evaczone.Units.bigLabel(), v.fromLabel()));
-        if (nearestButton != null)
-            nearestButton.setText("Nearest to: " + v.fromLabel());
+        if (nearestMap != null) {
+            // The chosen one in green, the way ON reads; the other plain.
+            nearestMap.setTextColor(v.fromMap ? Color.parseColor("#3ddc61") : Color.WHITE);
+            nearestMe.setTextColor(v.fromMap ? Color.WHITE : Color.parseColor("#3ddc61"));
+        }
         String preset = "Presets";
         for (int r : RADIUS_PRESETS)
             if (v.radiusBig == r)
@@ -491,7 +494,8 @@ public class EvacZone implements IPlugin {
         search = paneView.findViewById(R.id.search);
         searchClear = paneView.findViewById(R.id.search_clear);
         statusFilterButton = paneView.findViewById(R.id.status_filter);
-        nearestButton = paneView.findViewById(R.id.nearest_to);
+        nearestMap = paneView.findViewById(R.id.nearest_map);
+        nearestMe = paneView.findViewById(R.id.nearest_me);
         inView = paneView.findViewById(R.id.in_view);
         inView.setChecked(uiPrefs().getBoolean("inView", true));
         inView.setOnCheckedChangeListener(new android.widget.CompoundButton.OnCheckedChangeListener() {
@@ -501,12 +505,20 @@ public class EvacZone implements IPlugin {
                 renderZones();
             }
         });
-        // One switch for where "nearest" and the radius are measured from, placed by the
+        // One choice for where "nearest" and the radius are measured from, placed by the
         // list where it is read. The radius label up top says the same thing.
-        nearestButton.setOnClickListener(new View.OnClickListener() {
+        nearestMap.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                manager.setFromMap(!manager.visibility.fromMap);
+                manager.setFromMap(true);
+                updateRadiusLabels();
+                renderZones();
+            }
+        });
+        nearestMe.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setFromMap(false);
                 updateRadiusLabels();
                 renderZones();
             }
@@ -754,7 +766,7 @@ public class EvacZone implements IPlugin {
             return;
         final List<CountyEntry> list = new ArrayList<>(countyEntries(c.forState(state)).values());
         if (list.isEmpty()) {
-            toast("No county feeds for " + state + " yet; the statewide feed covers it");
+            toast("No county layers for " + state + " yet; the statewide feed covers every county");
             return;
         }
         Collections.sort(list, new java.util.Comparator<CountyEntry>() {
@@ -770,11 +782,11 @@ public class EvacZone implements IPlugin {
         ticked[0] = selected.isEmpty();
         for (int i = 0; i < list.size(); i++) {
             final CountyEntry e = list.get(i);
-            labels[i + 1] = e.name + "  (" + e.sources + (e.sources == 1 ? " feed)" : " feeds)");
+            labels[i + 1] = e.name + "  (" + e.sources + (e.sources == 1 ? " layer)" : " layers)");
             ticked[i + 1] = selected.contains(e.key);
         }
         new AlertDialog.Builder(mapView.getContext())
-                .setTitle("County feeds in " + state)
+                .setTitle("County layers in " + state)
                 .setMultiChoiceItems(labels, ticked, new DialogInterface.OnMultiChoiceClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which, boolean isChecked) {
@@ -891,10 +903,10 @@ public class EvacZone implements IPlugin {
         final Map<String, CountyEntry> entries = countyEntries(srcs);
         final Set<String> selected = selectedCounties(state);
         if (entries.isEmpty()) {
-            countiesButton.setText("No county feeds for " + state + " yet");
+            countiesButton.setText("No county layers for " + state + " yet");
             countiesButton.setEnabled(false);
             countyHint.setVisibility(View.VISIBLE);
-            countyHint.setText("The statewide feed covers every county. County feeds appear here as agencies publish them.");
+            countyHint.setText("The statewide feed covers every county. Some counties also publish every zone they have drawn; those appear here.");
             renderZones();
             return;
         }
@@ -905,7 +917,7 @@ public class EvacZone implements IPlugin {
             if (selected.contains(e.key))
                 names.add(e.name);
         if (names.isEmpty())
-            countiesButton.setText("Counties: all  (" + entries.size() + " with feeds)");
+            countiesButton.setText("All counties");
         else
             countiesButton.setText((names.size() == 1 ? "County: " : names.size() + " counties: ")
                     + TextUtils.join(", ", names));
