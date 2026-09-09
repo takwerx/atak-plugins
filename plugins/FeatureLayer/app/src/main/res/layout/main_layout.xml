@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+  <!-- Pinned: stays put while the list below scrolls, so Back is always reachable. -->
+  <LinearLayout
+    android:id="@+id/features_header"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="8dp"
+    android:visibility="gone">
+    <Button
+        android:id="@+id/btn_features_back"
+        style="@style/TakwerxButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Back" />
+    <TextView
+        android:id="@+id/features_title"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF" />
+  </LinearLayout>
+
+<ScrollView
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1">
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+  <LinearLayout
+    android:id="@+id/features_panel"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:visibility="gone">
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="FIND IN THIS LAYER"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:alpha="0.6"
+        android:textColor="#FFFFFF" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <EditText
+            android:id="@+id/layer_search_text"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:hint="Name, number or type"
+            android:inputType="textCapWords"
+            android:imeOptions="actionSearch|flagNoExtractUi|flagNoFullscreen"
+            android:singleLine="true"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#888888" />
+        <Button
+            android:id="@+id/btn_layer_find"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Find" />
+    </LinearLayout>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="FEATURES"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:alpha="0.6"
+        android:textColor="#FFFFFF"
+        android:paddingTop="8dp" />
+    <LinearLayout
+        android:id="@+id/features_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+  </LinearLayout>
+
+  <LinearLayout
+    android:id="@+id/search_panel"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:visibility="gone">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <EditText
+            android:id="@+id/result_search_text"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:hint="Name, number or type"
+            android:inputType="textCapWords"
+            android:imeOptions="actionSearch|flagNoExtractUi|flagNoFullscreen"
+            android:singleLine="true"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#888888" />
+        <Button
+            android:id="@+id/btn_result_find"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Find" />
+        <Button
+            android:id="@+id/btn_result_clear"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Clear" />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="6dp">
+        <Button
+            android:id="@+id/btn_filter_type"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="All types" />
+        <Button
+            android:id="@+id/btn_from"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="From: Me" />
+        <Button
+            android:id="@+id/btn_sort"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Nearest" />
+    </LinearLayout>
+    <TextView
+        android:id="@+id/search_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="#BBBBBB"
+        android:paddingTop="6dp"
+        android:paddingBottom="2dp" />
+    <LinearLayout
+        android:id="@+id/results_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+  </LinearLayout>
+
+  <LinearLayout
+    android:id="@+id/main_panel"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SOURCE"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:alpha="0.6"
+        android:textColor="#FFFFFF" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btn_org"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Pick a source" />
+        <Button
+            android:id="@+id/btn_signin"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Sign in" />
+        <Button
+            android:id="@+id/btn_forget"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Forget"
+            android:visibility="gone" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/search_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="4dp">
+        <EditText
+            android:id="@+id/search_text"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:hint="Name"
+            android:inputType="textCapWords"
+            android:imeOptions="actionSearch|flagNoExtractUi|flagNoFullscreen"
+            android:singleLine="true"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#888888" />
+        <Button
+            android:id="@+id/btn_find"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Find" />
+        <Button
+            android:id="@+id/btn_find_feature"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Feature" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="6dp">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="LAYERS"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:alpha="0.6"
+            android:textColor="#FFFFFF" />
+        <Button
+            android:id="@+id/btn_clear_search"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="6dp"
+            android:text="Clear" />
+        <Button
+            android:id="@+id/btn_all"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="90dp"
+            android:text="All OFF" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/layers_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+    <TextView
+        android:id="@+id/layers_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="#BBBBBB"
+        android:paddingTop="4dp"
+        android:text="No layers yet. Pick a source and find something." />
+  </LinearLayout>
+</LinearLayout>
+</ScrollView>
+</LinearLayout>
