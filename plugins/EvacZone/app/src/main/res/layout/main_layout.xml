@@ -146,18 +146,10 @@
                     android:text="@string/presets" />
             </LinearLayout>
 
-            <!-- Statewide sources: always listed for the picked state. -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/section_statewide"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6"
-                android:textColor="#FFFFFF"
-                android:paddingTop="10dp" />
+            <!-- The state's feed rows, one per feed; no heading, the state button is the heading. -->
             <LinearLayout
                 android:id="@+id/statewide_container"
+                android:paddingTop="10dp"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />

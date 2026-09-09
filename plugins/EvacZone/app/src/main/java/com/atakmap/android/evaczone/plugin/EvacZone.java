@@ -234,6 +234,7 @@ public class EvacZone implements IPlugin {
                     @Override
                     public void onMapMoved() {
                         updateZoomLabel();
+                        updateStatusLine();
                         if (inView != null && (inView.isChecked() || manager.visibility.fromMap))
                             renderZones();
                     }
@@ -488,6 +489,18 @@ public class EvacZone implements IPlugin {
         return m > 0 ? m / res : 200;
     }
 
+    private void hideKeyboard(View v) {
+        try {
+            final android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) mapView.getContext()
+                            .getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm != null)
+                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+        } catch (RuntimeException ignored) {
+        }
+        v.clearFocus();
+    }
+
     // ---- the zone list: search, a status filter, Go to ------------------------------
 
     private void wireZoneList() {
@@ -521,6 +534,15 @@ public class EvacZone implements IPlugin {
                 manager.setFromMap(false);
                 updateRadiusLabels();
                 renderZones();
+            }
+        });
+        // The keyboard's search key puts the keyboard away. The rows are under it,
+        // and they are what the operator typed to see.
+        search.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, android.view.KeyEvent event) {
+                hideKeyboard(v);
+                return true;
             }
         });
         search.addTextChangedListener(new android.text.TextWatcher() {
@@ -883,14 +905,9 @@ public class EvacZone implements IPlugin {
         // state's feed that is still on is not this state's news.
         final Map<String, Integer> totals = new LinkedHashMap<>();
         final Map<String, Integer> colors = new LinkedHashMap<>();
-        int on = 0, drawn = 0, loading = 0;
         for (ZoneLayer l : manager.snapshot()) {
             if (!l.isVisible() || (state != null && !l.source.st.equalsIgnoreCase(state)))
                 continue;
-            on++;
-            drawn += l.count;
-            if (l.refreshing || l.busy)
-                loading++;
             // What is on the map, after the county and radius filters: the legend and
             // the map agree by construction.
             for (ZoneLayer.ZoneInfo z : l.zones) {
@@ -905,15 +922,7 @@ public class EvacZone implements IPlugin {
         // The legend is the status: Order 38, Warning 52. The counts of feeds and the
         // catalog's date are not the operator's concern; the only other line is one
         // that tells them why the map is empty and what to do about it.
-        String why = null;
-        if (!manager.isMapOn())
-            why = "Map is off. Press ON to draw the zones.";
-        else if (on > 0 && !manager.visibility.withinZoom(mapView))
-            why = "Zoom in to see the zones.";
-        else if (loading > 0)
-            why = "Loading\u2026";
-        status.setText(why == null ? "" : why);
-        status.setVisibility(why == null ? View.GONE : View.VISIBLE);
+        updateStatusLine();
         legend.setText(legendText(totals, colors));
 
         final List<Catalog.Source> srcs = state == null ? new ArrayList<Catalog.Source>() : c.forState(state);
@@ -947,10 +956,53 @@ public class EvacZone implements IPlugin {
         renderZones();
     }
 
-    /** "Order 37 · Warning 48 · Advisory 16", each label in its own color. */
+    /**
+     * The one line under the buttons that says why the map is empty and what to do,
+     * or nothing. It follows the map: a pinch out past the threshold puts "Zoom in"
+     * up, a pinch back in takes it down.
+     */
+    private void updateStatusLine() {
+        if (paneView == null || manager == null || manager.catalog() == null)
+            return;
+        final TextView status = paneView.findViewById(R.id.status);
+        int on = 0, loading = 0;
+        for (ZoneLayer l : manager.snapshot()) {
+            if (!l.isVisible() || (state != null && !l.source.st.equalsIgnoreCase(state)))
+                continue;
+            on++;
+            if (l.refreshing || l.busy)
+                loading++;
+        }
+        String why = null;
+        if (!manager.isMapOn())
+            why = "Map is off. Press ON to draw the zones.";
+        else if (on > 0 && !manager.visibility.withinZoom(mapView))
+            why = "Zoom in to see the zones.";
+        else if (loading > 0)
+            why = "Loading\u2026";
+        status.setText(why == null ? "" : why);
+        status.setVisibility(why == null ? View.GONE : View.VISIBLE);
+    }
+
+    /**
+     * "Order 37 · Warning 48 · Advisory 16", each label in its own color, in order of
+     * severity: an Order is the first word whichever count arrived first.
+     */
     private static CharSequence legendText(Map<String, Integer> totals, Map<String, Integer> colors) {
+        final List<Map.Entry<String, Integer>> entries = new ArrayList<>(totals.entrySet());
+        final List<String> arrival = new ArrayList<>(totals.keySet());
+        Collections.sort(entries, new java.util.Comparator<Map.Entry<String, Integer>>() {
+            @Override
+            public int compare(Map.Entry<String, Integer> a, Map.Entry<String, Integer> b) {
+                final int ra = com.atakmap.android.evaczone.StatusColors.rank(a.getKey());
+                final int rb = com.atakmap.android.evaczone.StatusColors.rank(b.getKey());
+                if (ra != rb)
+                    return ra < rb ? -1 : 1;
+                return arrival.indexOf(a.getKey()) - arrival.indexOf(b.getKey());
+            }
+        });
         final SpannableStringBuilder out = new SpannableStringBuilder();
-        for (Map.Entry<String, Integer> e : totals.entrySet()) {
+        for (Map.Entry<String, Integer> e : entries) {
             if (out.length() > 0)
                 out.append("  ·  ");
             final int start = out.length();

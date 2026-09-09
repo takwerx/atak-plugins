@@ -15,7 +15,7 @@ import java.util.Locale;
  * between states reads one legend. Colors follow Genasys Protect's, which most fleet
  * users already know from their phones.
  */
-final class StatusColors {
+public final class StatusColors {
     private StatusColors() {
     }
 
@@ -84,5 +84,13 @@ final class StatusColors {
 
     static Style line(Level level) {
         return new BasicStrokeStyle(level.color, 3f);
+    }
+
+    /** Where a legend label sits in severity order: Order first, Lifted after, unknown last. */
+    public static int rank(String label) {
+        for (Level l : Level.values())
+            if (l.label.equalsIgnoreCase(label))
+                return l.ordinal();
+        return Level.values().length;
     }
 }
