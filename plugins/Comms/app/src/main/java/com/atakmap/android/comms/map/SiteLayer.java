@@ -100,7 +100,6 @@ public final class SiteLayer {
     private String menu;
     /** The invisible marker the operator's own viewshed hangs on. */
     private static final String ME_UID = UID_PREFIX + "me";
-    private static final int SEEN_COLOR = 0xFF3DDC61;
     private Marker me;
     private boolean meViewshed;
     /** Site id to whether it has line of sight from the operator; absent means not checked. */
@@ -297,23 +296,26 @@ public final class SiteLayer {
         return m;
     }
 
-    private Icon buildIcon(int color) {
+    /** An icon drawn as shipped: white multiplies to no tint, so the symbol keeps its colors. */
+    private Icon buildIcon(int drawable) {
         return new Icon.Builder()
                 .setImageUri(Icon.STATE_DEFAULT, "android.resource://"
-                        + pluginContext.getPackageName() + "/"
-                        + com.atakmap.android.comms.plugin.R.drawable.ic_marker)
+                        + pluginContext.getPackageName() + "/" + drawable)
                 .setAnchor(Icon.ANCHOR_CENTER, Icon.ANCHOR_CENTER)
-                .setColor(Icon.STATE_DEFAULT, color)
+                .setColor(Icon.STATE_DEFAULT, 0xFFFFFFFF)
                 .build();
     }
 
-    /** White, or green when the site has line of sight from the operator. */
+    /**
+     * The NWCG GeoOps repeater symbol, as Feature Layer draws it, or the same on a
+     * green ring when the site has line of sight from the operator.
+     */
     private void applyIcon(Marker m, Site s) {
         try {
             if (icon == null)
-                icon = buildIcon(0xFFFFFFFF);
+                icon = buildIcon(com.atakmap.android.comms.plugin.R.drawable.ic_marker);
             if (iconSeen == null)
-                iconSeen = buildIcon(SEEN_COLOR);
+                iconSeen = buildIcon(com.atakmap.android.comms.plugin.R.drawable.ic_marker_seen);
             final Boolean seen = lineOfSight.get(s.id);
             final Icon want = seen != null && seen ? iconSeen : icon;
             if (m.getIcon() != want)
