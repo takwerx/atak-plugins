@@ -41,3 +41,17 @@ Viewshed ON in a site's details draws ATAK's viewshed from that site's antenna.
 It is line of sight from the antenna, not radio coverage: terrain that can see
 the antenna is painted, terrain that cannot is not. It needs elevation data on
 the device. Viewsheds are removed when the plugin is unloaded.
+
+## Which repeaters can I reach from here
+
+**From me ON** in the pane's Viewshed section draws the viewshed from your own
+position (or from the map center when you have chosen that), at the height
+ATAK's viewshed tool is set to, out to the Range you picked. Every site within
+that range is then checked for line of sight to its antenna over the elevation
+data on the device: sites you can see turn green on the map and list first
+under "Line of sight from you", the rest under "No line of sight", and sites
+beyond the range are listed as not checked. With a search running, say
+"Command 1", the top row is the nearest Command 1 site you can see. It follows
+you as you move. Optical line of sight is a good first answer on VHF and not the
+last one: a ridge can be worked over, and a clear path at the edge of the range
+can still be weak.

@@ -9,7 +9,7 @@
     <string name="resync">Sync catalog</string>
     <string name="toggle_on">ON</string>
     <string name="toggle_off">OFF</string>
-    <string name="viewshed_note">Line of sight from the antenna, not radio coverage. Needs elevation data on the device (Map Depot has it).</string>
+    <string name="viewshed_note">Line of sight, not radio coverage. Needs elevation data on the device (Map Depot has it). Sites you can see turn green on the map and list first.</string>
     <string name="manual_title">Plugin Documentation</string>
     <string name="manual_summary">Open the Comms user guide: finding the nearest site or net, reading tones, and what the viewshed means</string>
     <string name="prefs_summary">Radio sites and nets on the map</string>

@@ -145,10 +145,11 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <!-- Turns off every viewshed at once, carrying the count; disabled at zero. -->
+        <!-- The operator's own viewshed, and the sites inside it. ON in green, OFF
+             in red, the way Traffic's toggles read. -->
         <Button
             style="@style/TakwerxButton"
-            android:id="@+id/viewsheds_off"
+            android:id="@+id/me_viewshed"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content" />
@@ -160,7 +161,29 @@
             android:layout_height="wrap_content" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <!-- How high the operator's own antenna is: handheld, vehicle, mast. -->
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/me_height"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <!-- Turns off every site viewshed at once, carrying the count; disabled at zero. -->
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/viewsheds_off"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
     <TextView
+        android:id="@+id/viewshed_note"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/viewshed_note"

@@ -33,8 +33,11 @@ Capabilities:
   - Nearest first, measured from the device or from the map center, within a
     chosen radius, filtered by agency with counts.
   - Site details: county, elevation, distance and bearing, and every net on it.
-  - Viewshed from the antenna through ATAK's own viewshed layer: line of sight,
-    not radio coverage, and labeled as such.
+  - Viewshed from a site's antenna through ATAK's own viewshed layer, and a
+    viewshed from the operator with the sites inside it: each site in range gets
+    a line-of-sight check over the device's elevation data, turns green on the
+    map when it can be seen, and lists first. Line of sight, not radio coverage,
+    and labeled as such.
   - Catalog refreshed from the depot host once a day and on demand, with the
     built-in copy and the last download as fallbacks. Adding a site or a net is
     a catalog change, not a plugin release.

@@ -27,6 +27,7 @@ import com.atakmap.android.comms.data.CatalogStore;
 import com.atakmap.android.comms.data.ScaleBar;
 import com.atakmap.android.comms.data.Tones;
 import com.atakmap.android.comms.data.Units;
+import com.atakmap.android.comms.map.LineOfSight;
 import com.atakmap.android.comms.map.SiteLayer;
 import com.atakmap.android.comms.model.Catalog;
 import com.atakmap.android.comms.model.Catalog.Channel;
@@ -79,6 +80,13 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     private static final String PREF_ZOOM = "comms_zoom_threshold";
     private static final String PREF_VIEWSHED_RANGE = "comms_viewshed_range_big";
     private static final String PREF_MAP_ON = "comms_map_on";
+    /** The operator's own antenna height above ground, meters. A standing preference: what you carry. */
+    private static final String PREF_ME_HEIGHT = "comms_operator_height_m";
+    private static final double DEFAULT_ME_HEIGHT_M = 1.5;
+    /** Handheld, vehicle, mast, tower, aircraft; feet or meters depending on ATAK's unit. */
+    private static final double[] HEIGHT_PRESETS_FT = { 5, 8, 20, 50, 100 };
+    private static final double[] HEIGHT_PRESETS_M = { 1.5, 2.5, 6, 15, 30 };
+    private static final String[] HEIGHT_NAMES = { "handheld", "vehicle", "mast", "tower", "aircraft" };
 
     /** Radius choices in the operator's own big unit; 0 is off. */
     private static final int[] RADIUS_PRESETS = { 0, 10, 25, 50, 100, 200 };
@@ -115,7 +123,8 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     private final Button stateButton, fromButton, radiusButton;
     private final LinearLayout agencyBox;
     private final TextView zoomLabel;
-    private final Button viewshedsOff, viewshedRange, sync;
+    private final Button viewshedsOff, viewshedRange, meViewshed, meHeight, sync;
+    private final TextView viewshedNote;
     private final RowAdapter adapter;
     private DetailHost detailHost;
 
@@ -127,6 +136,19 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     private final Map<String, CheckBox> agencyBoxes = new LinkedHashMap<>();
     private Site openSite;           // the site whose detail pane is up, if any
     private boolean syncPressed;     // the operator asked for a refresh; say how it went
+
+    /**
+     * The viewshed from the operator, and the sites inside it. Per task, not
+     * remembered: a viewshed from where you stood yesterday is not one you asked for.
+     */
+    private boolean meViewshedOn;
+    private GeoPoint meFrom;          // where the operator's viewshed was drawn from
+    private final Map<String, Boolean> los = new java.util.HashMap<>();
+    private boolean losPending;
+    private int losUnknown, losChecked;
+    private int losGeneration;
+    private final java.util.concurrent.ExecutorService losWorker =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
 
     /**
      * Runs on the GL render thread. Touching a View here is a native SIGSEGV with no
@@ -158,8 +180,11 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         public void run() {
             if (!fromMapCenter) {
                 final GeoPoint me = selfPoint();
-                if (me != null && (lastFrom == null || distance(me, lastFrom) > 250))
+                if (me != null && (lastFrom == null || distance(me, lastFrom) > 250)) {
                     apply();
+                    if (meViewshedOn)
+                        refreshMeViewshed();
+                }
             }
             handler.postDelayed(this, 20_000);
         }
@@ -189,6 +214,9 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         zoomLabel = controls.findViewById(R.id.zoom_label);
         viewshedsOff = controls.findViewById(R.id.viewsheds_off);
         viewshedRange = controls.findViewById(R.id.viewshed_range);
+        meViewshed = controls.findViewById(R.id.me_viewshed);
+        meHeight = controls.findViewById(R.id.me_height);
+        viewshedNote = controls.findViewById(R.id.viewshed_note);
         sync = controls.findViewById(R.id.sync);
 
         // A ListView blocks focus to its children by default, which means an EditText
@@ -225,6 +253,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         handler.removeCallbacks(mapTick);
         handler.removeCallbacks(selfTick);
         mapView.removeOnMapMovedListener(mapWatch);
+        losWorker.shutdownNow();
         layer.dispose();
         store.dispose();
     }
@@ -371,7 +400,59 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                         prefs().edit().putFloat(PREF_VIEWSHED_RANGE, r).apply();
                         layer.setViewshedRangeMeters(Units.bigToMeters(r));
                         updateButtons();
-                        toast("Applies to the next viewshed you turn on");
+                        if (meViewshedOn)
+                            refreshMeViewshed();
+                        else
+                            toast("Applies to the next viewshed you turn on");
+                    }
+                });
+            }
+        });
+
+        meViewshed.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (meViewshedOn) {
+                    meViewshedOn = false;
+                    meFrom = null;
+                    losGeneration++;
+                    losPending = false;
+                    los.clear();
+                    layer.hideMeViewshed();
+                    layer.setLineOfSight(null);
+                    updateButtons();
+                    apply();
+                    return;
+                }
+                if (originPoint() == null) {
+                    toast("No position to draw from");
+                    return;
+                }
+                meViewshedOn = true;
+                refreshMeViewshed();
+                updateButtons();
+            }
+        });
+
+        meHeight.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final List<String> names = new ArrayList<>();
+                String current = null;
+                for (int i = 0; i < HEIGHT_NAMES.length; i++) {
+                    names.add(heightPresetLabel(i));
+                    if (Math.abs(heightPresetMeters(i) - operatorHeightM()) < 0.05)
+                        current = heightPresetLabel(i);
+                }
+                choose("Your antenna height above ground", names, current, new Chosen() {
+                    @Override
+                    public void onChosen(String value) {
+                        for (int i = 0; i < HEIGHT_NAMES.length; i++)
+                            if (heightPresetLabel(i).equals(value))
+                                prefs().edit().putFloat(PREF_ME_HEIGHT, (float) heightPresetMeters(i)).apply();
+                        updateButtons();
+                        if (meViewshedOn)
+                            refreshMeViewshed();
                     }
                 });
             }
@@ -484,6 +565,145 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         viewshedsOff.setText(n == 0 ? "No viewsheds shown"
                 : String.format(Locale.US, "Turn off %d viewshed%s", n, n == 1 ? "" : "s"));
         viewshedRange.setText("Range: " + Math.round(prefs().getFloat(PREF_VIEWSHED_RANGE, 20)) + " " + Units.bigLabel());
+        meViewshed.setText((fromMapCenter ? "From map center " : "From me ") + (meViewshedOn ? "ON" : "OFF"));
+        meHeight.setText("Height: " + heightLabel(operatorHeightM()));
+        meViewshed.setTextColor(meViewshedOn ? 0xFF3DDC61 : 0xFFFF5B52);
+        viewshedNote.setText(meViewshedOn
+                ? String.format(Locale.US, "Your viewshed is drawn from %s above the ground where you are. Line of sight, not radio coverage.",
+                        heightLabel(operatorHeightM()))
+                : pluginContext.getString(R.string.viewshed_note));
+    }
+
+    // ---- the operator's own viewshed ------------------------------------------------
+
+    /** Where "from me" is right now: the device, or the map center by choice or with no fix. */
+    private GeoPoint originPoint() {
+        final GeoPoint me = fromMapCenter ? null : selfPoint();
+        return me != null ? me : mapCenter();
+    }
+
+    /**
+     * How high the operator's antenna is above the ground. The plugin's own setting,
+     * not ATAK's viewshed-tool height: that one was found at 1,000 ft on the XCover
+     * from an earlier experiment, and a handheld drawn from 1,000 ft up sees
+     * everything. Handheld by default.
+     */
+    private double operatorHeightM() {
+        try {
+            final float v = prefs().getFloat(PREF_ME_HEIGHT, (float) DEFAULT_ME_HEIGHT_M);
+            return v > 0 && v < 1000 ? v : DEFAULT_ME_HEIGHT_M;
+        } catch (RuntimeException ignored) {
+            return DEFAULT_ME_HEIGHT_M;
+        }
+    }
+
+    private static String heightPresetLabel(int i) {
+        final boolean metric = Units.type() == Span.METRIC;
+        final double v = metric ? HEIGHT_PRESETS_M[i] : HEIGHT_PRESETS_FT[i];
+        final String num = v == Math.floor(v) ? String.format(Locale.US, "%.0f", v) : String.format(Locale.US, "%.1f", v);
+        return num + (metric ? " m" : " ft") + "  —  " + HEIGHT_NAMES[i];
+    }
+
+    private static double heightPresetMeters(int i) {
+        return Units.type() == Span.METRIC ? HEIGHT_PRESETS_M[i] : HEIGHT_PRESETS_FT[i] * 0.3048;
+    }
+
+    private static String heightLabel(double meters) {
+        if (Units.type() == Span.METRIC)
+            return String.format(Locale.US, "%.1f m", meters);
+        return String.format(Locale.US, "%.0f ft", SpanUtilities.convert(meters, Span.METER, Span.FOOT));
+    }
+
+    /** Draw (or move) the operator's viewshed and check line of sight to every site in range. */
+    private void refreshMeViewshed() {
+        final GeoPoint from = originPoint();
+        if (from == null) {
+            toast("No position to draw from");
+            return;
+        }
+        meFrom = from;
+        if (!layer.showMeViewshed(from, operatorHeightM())) {
+            toast("ATAK could not draw the viewshed");
+            return;
+        }
+        runLineOfSight(from);
+    }
+
+    /**
+     * Off the main thread: every site in the state within the viewshed range gets a
+     * line-of-sight test over the device's elevation data. A few hundred sites is a
+     * few seconds on a slow phone; the status line says it is working.
+     */
+    private void runLineOfSight(final GeoPoint from) {
+        final Catalog c = store.catalog();
+        if (c == null)
+            return;
+        final int generation = ++losGeneration;
+        final double range = layer.getViewshedRangeMeters();
+        final double h0 = operatorHeightM();
+        final List<Site> candidates = new ArrayList<>();
+        for (Site s : c.sites) {
+            if (state != null && !s.st.equals(state))
+                continue;
+            if (distance(from, new GeoPoint(s.lat, s.lon)) <= range)
+                candidates.add(s);
+        }
+        losPending = true;
+        apply();
+        losWorker.execute(new Runnable() {
+            @Override
+            public void run() {
+                final Map<String, Boolean> out = new java.util.HashMap<>();
+                final long started = System.currentTimeMillis();
+                int unknown = 0;
+                for (Site s : candidates) {
+                    if (generation != losGeneration)
+                        return;         // superseded by a newer request
+                    final GeoPoint to = new GeoPoint(s.lat, s.lon);
+                    final Boolean r = LineOfSight.clear(from, h0, to, SiteLayer.antennaHeight(s),
+                            distance(from, to));
+                    if (r == null)
+                        unknown++;
+                    else
+                        out.put(s.id, r);
+                }
+                final int finalUnknown = unknown;
+                int seenCount = 0;
+                for (Boolean b : out.values())
+                    if (b)
+                        seenCount++;
+                Log.d(TAG, String.format(Locale.US, "line of sight: %d of %d sites within %.0f m, %d unknown, %d ms",
+                        seenCount, candidates.size(), range, unknown, System.currentTimeMillis() - started));
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (generation != losGeneration || !meViewshedOn)
+                            return;
+                        los.clear();
+                        los.putAll(out);
+                        losUnknown = finalUnknown;
+                        losChecked = candidates.size();
+                        losPending = false;
+                        layer.setLineOfSight(los);
+                        apply();
+                    }
+                });
+            }
+        });
+    }
+
+    /** "yes", "no", "not checked" or "unknown" for one site, when the operator's viewshed is on. */
+    private String lineOfSightWord(Site s) {
+        if (!meViewshedOn)
+            return null;
+        if (losPending)
+            return "checking";
+        final Boolean r = los.get(s.id);
+        if (r != null)
+            return r ? "yes" : "no";
+        if (meFrom != null && distance(meFrom, new GeoPoint(s.lat, s.lon)) > layer.getViewshedRangeMeters())
+            return "beyond the range";
+        return "unknown, no elevation data";
     }
 
     // ---- zoom gate --------------------------------------------------------------
@@ -697,7 +917,42 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         }
         layer.show(forMap);
 
-        adapter.set(cards, rows, q.isEmpty() ? null : (named == null ? q : named.name));
+        final List<Object> listRows = new ArrayList<>(cards.size() + rows.size() + 4);
+        if (!cards.isEmpty()) {
+            listRows.add(String.format(Locale.US, "Nets with no fixed site here (%,d)", cards.size()));
+            listRows.addAll(cards);
+        }
+        int seen = 0;
+        if (meViewshedOn && !losPending) {
+            // Three sections: what you can see, what you cannot, what is out of range.
+            final List<Row> yes = new ArrayList<>(), no = new ArrayList<>(), far = new ArrayList<>();
+            for (Row r : rows) {
+                final Boolean v = los.get(r.site.id);
+                if (v != null && v)
+                    yes.add(r);
+                else if (v != null)
+                    no.add(r);
+                else
+                    far.add(r);
+            }
+            seen = yes.size();
+            listRows.add(String.format(Locale.US, "Line of sight from %s (%,d)", fromMapCenter ? "the map center" : "you", yes.size()));
+            listRows.addAll(yes);
+            if (!no.isEmpty()) {
+                listRows.add(String.format(Locale.US, "No line of sight (%,d)", no.size()));
+                listRows.addAll(no);
+            }
+            if (!far.isEmpty()) {
+                listRows.add(String.format(Locale.US, "Beyond %s, not checked (%,d)",
+                        Units.formatBig(layer.getViewshedRangeMeters()), far.size()));
+                listRows.addAll(far);
+            }
+        } else {
+            if (!cards.isEmpty())
+                listRows.add(String.format(Locale.US, "Sites (%,d)", rows.size()));
+            listRows.addAll(rows);
+        }
+        adapter.set(listRows);
         updateAgencyCounts(c, inState);
 
         // Say what is and is not being shown.
@@ -710,6 +965,17 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         if (!cards.isEmpty())
             b.append(String.format(Locale.US, " · %d net%s with no fixed site here, listed first",
                     cards.size(), cards.size() == 1 ? "" : "s"));
+        if (meViewshedOn) {
+            if (losPending)
+                b.append(" · checking line of sight…");
+            else {
+                b.append(String.format(Locale.US, " · %d of %d within %s have line of sight from %s",
+                        seen, losChecked, Units.formatBig(layer.getViewshedRangeMeters()),
+                        fromMapCenter ? "the map center" : "you"));
+                if (losUnknown > 0)
+                    b.append(String.format(Locale.US, ", %d unknown (no elevation data)", losUnknown));
+            }
+        }
         if (!mapOn)
             b.append(" · map OFF");
         else if (rows.size() > MAX_MAP)
@@ -930,6 +1196,9 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             for (int i = 0; i < s.managers.size(); i++)
                 b.append(i > 0 ? " · " : "").append(s.managers.get(i));
         }
+        final String losWord = lineOfSightWord(s);
+        if (losWord != null)
+            b.append("\nLine of sight from ").append(fromMapCenter ? "the map center: " : "you: ").append(losWord);
         b.append(String.format(Locale.US, "\n%.5f, %.5f", s.lat, s.lon));
         info.setText(b.toString());
 
@@ -1011,15 +1280,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         /** Each entry is a heading String, a site Row or a net Row. */
         private List<Object> rows = new ArrayList<>();
 
-        void set(List<Row> cards, List<Row> sites, String named) {
-            final List<Object> next = new ArrayList<>(cards.size() + sites.size() + 2);
-            if (!cards.isEmpty()) {
-                next.add(String.format(Locale.US, "Nets with no fixed site here (%,d)", cards.size()));
-                next.addAll(cards);
-                next.add(named == null ? String.format(Locale.US, "Sites (%,d)", sites.size())
-                        : String.format(Locale.US, "Sites (%,d)", sites.size()));
-            }
-            next.addAll(sites);
+        void set(List<Object> next) {
             rows = next;
             notifyDataSetChanged();
         }

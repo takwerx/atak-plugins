@@ -47,6 +47,14 @@ not. It needs elevation data on the device (Map Depot's DTED packs provide it).
 *Range* sets how far the next viewshed reaches; *Turn off viewsheds* removes them
 all. Viewsheds are removed when the plugin is unloaded.
 
+= Which repeaters can I reach from here
+*From me ON* draws the viewshed from your own position, at the height ATAK's
+viewshed tool is set to, out to the chosen range, and checks every site in that
+range for line of sight to its antenna over the elevation data on the device.
+Sites you can see turn green on the map and list first; the rest list under
+"No line of sight". With a search running, the top row is the nearest matching
+site you can see. It follows you as you move.
+
 = The catalog
 Sites and nets come from a catalog refreshed from the depot host once a day and
 on *Sync catalog*. The status line says which copy is shown and how old it is.

@@ -96,8 +96,15 @@ public final class SiteLayer {
     private final List<Site> selected = new ArrayList<>();
     private final Handler main = new Handler(Looper.getMainLooper());
     private Listener listener;
-    private Icon icon;
+    private Icon icon, iconSeen;
     private String menu;
+    /** The invisible marker the operator's own viewshed hangs on. */
+    private static final String ME_UID = UID_PREFIX + "me";
+    private static final int SEEN_COLOR = 0xFF3DDC61;
+    private Marker me;
+    private boolean meViewshed;
+    /** Site id to whether it has line of sight from the operator; absent means not checked. */
+    private final Map<String, Boolean> lineOfSight = new HashMap<>();
     private double maxResolution = 500;
     private boolean mapOn = true;
     private double viewshedRangeM = 30000;
@@ -172,6 +179,7 @@ public final class SiteLayer {
         }
         // ATAK would otherwise keep the viewshed layers alive with nothing owning them.
         hideAllViewsheds();
+        hideMeViewshed();
         for (String id : new ArrayList<>(markers.keySet()))
             remove(id);
         mapView.getRootGroup().removeGroup(group);
@@ -284,21 +292,35 @@ public final class SiteLayer {
         } catch (LinkageError | RuntimeException e) {
             Log.w(TAG, "could not attach the radial menu", e);
         }
+        m.setMetaBoolean("adapt_marker_icon", false);
+        applyIcon(m, s);
+        return m;
+    }
+
+    private Icon buildIcon(int color) {
+        return new Icon.Builder()
+                .setImageUri(Icon.STATE_DEFAULT, "android.resource://"
+                        + pluginContext.getPackageName() + "/"
+                        + com.atakmap.android.comms.plugin.R.drawable.ic_marker)
+                .setAnchor(Icon.ANCHOR_CENTER, Icon.ANCHOR_CENTER)
+                .setColor(Icon.STATE_DEFAULT, color)
+                .build();
+    }
+
+    /** White, or green when the site has line of sight from the operator. */
+    private void applyIcon(Marker m, Site s) {
         try {
             if (icon == null)
-                icon = new Icon.Builder()
-                        .setImageUri(Icon.STATE_DEFAULT, "android.resource://"
-                                + pluginContext.getPackageName() + "/"
-                                + com.atakmap.android.comms.plugin.R.drawable.ic_marker)
-                        .setAnchor(Icon.ANCHOR_CENTER, Icon.ANCHOR_CENTER)
-                        .setColor(Icon.STATE_DEFAULT, 0xFFFFFFFF)
-                        .build();
-            m.setMetaBoolean("adapt_marker_icon", false);
-            m.setIcon(icon);
+                icon = buildIcon(0xFFFFFFFF);
+            if (iconSeen == null)
+                iconSeen = buildIcon(SEEN_COLOR);
+            final Boolean seen = lineOfSight.get(s.id);
+            final Icon want = seen != null && seen ? iconSeen : icon;
+            if (m.getIcon() != want)
+                m.setIcon(want);
         } catch (LinkageError | RuntimeException e) {
             Log.w(TAG, "could not set the site icon", e);
         }
-        return m;
     }
 
     private void update(Marker m, Site s) {
@@ -306,6 +328,87 @@ public final class SiteLayer {
         m.setMetaString("callsign", s.name);
         m.setMetaString("remarks", remarks(s));
         m.setMetaBoolean(META_VIEWSHED, viewsheds.contains(s.id));
+        applyIcon(m, s);
+    }
+
+    /** Take the line-of-sight answers and repaint; an empty map clears the tint. */
+    public void setLineOfSight(Map<String, Boolean> los) {
+        lineOfSight.clear();
+        if (los != null)
+            lineOfSight.putAll(los);
+        for (Map.Entry<String, Marker> e : markers.entrySet()) {
+            final Site s = shown.get(e.getKey());
+            if (s != null)
+                applyIcon(e.getValue(), s);
+        }
+    }
+
+    // ---- the operator's own viewshed --------------------------------------------
+
+    public boolean isMeViewshedOn() {
+        return meViewshed;
+    }
+
+    /**
+     * Draw ATAK's viewshed from the operator, {@code aboveGround} meters up, out to
+     * the same range the site viewsheds use. Re-issuing with a new point moves it:
+     * the receiver updates the layer it already holds for the uid.
+     */
+    public boolean showMeViewshed(GeoPoint at, double aboveGround) {
+        try {
+            final GeoPoint p = new GeoPoint(at.getLatitude(), at.getLongitude(), aboveGround,
+                    GeoPoint.AltitudeReference.AGL);
+            if (me == null) {
+                // Invisible and unclickable: the self marker is already on the map, and
+                // this one exists only so the viewshed has a uid to hang on.
+                me = new Marker(p, ME_UID);
+                me.setType("b-m-p-w");
+                me.setTitle("Viewshed from you");
+                me.setMetaBoolean("addToObjList", false);
+                me.setMetaBoolean("removable", false);
+                me.setMetaBoolean("editable", false);
+                me.setMetaBoolean("archive", false);
+                me.setMovable(false);
+                me.setClickable(false);
+                me.setVisible(false);
+                group.addItem(me);
+            } else {
+                me.setPoint(p);
+            }
+            final Intent i = new Intent(VS_SHOW);
+            i.putExtra("uid", ME_UID);
+            i.putExtra("point", p);
+            i.putExtra("radius", viewshedRangeM);
+            i.putExtra("circle", true);
+            i.putExtra("show_icon", false);
+            i.putExtra("title", "Viewshed from you");
+            AtakBroadcast.getInstance().sendBroadcast(i);
+            meViewshed = true;
+            Log.d(TAG, String.format(java.util.Locale.US, "viewshed from operator: %.5f, %.5f %.1f m up, radius %.0f m",
+                    at.getLatitude(), at.getLongitude(), aboveGround, viewshedRangeM));
+            return true;
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "viewshed from the operator failed", e);
+            return false;
+        }
+    }
+
+    public void hideMeViewshed() {
+        if (!meViewshed && me == null)
+            return;
+        meViewshed = false;
+        try {
+            final Intent i = new Intent(VS_DISMISS);
+            i.putExtra("uid", ME_UID);
+            AtakBroadcast.getInstance().sendBroadcast(i);
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "viewshed dismiss failed for the operator", e);
+        }
+        if (me != null) {
+            group.removeItem(me);
+            me = null;
+        }
+        Log.d(TAG, "viewshed from operator off");
     }
 
     private static String remarks(Site s) {
