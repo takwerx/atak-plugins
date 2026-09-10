@@ -24,6 +24,7 @@ SRC = os.path.join(HERE, "nwcg_repeater.png")
 SIZE = 256
 SS = 4
 NAVY = (0, 0, 128, 255)
+MARKER = 48
 SEEN = (0x3D, 0xDC, 0x61, 255)
 
 
@@ -54,16 +55,18 @@ def diamond(px, edge=True):
 
 
 def main():
-    src = Image.open(SRC).convert("RGBA")
+    # The standard's file is 60 px, which Feature Layer draws as is; on a phone that
+    # sits a hair larger than ATAK's own point markers, so sites draw at 48 px.
+    src = Image.open(SRC).convert("RGBA").resize((MARKER, MARKER), Image.LANCZOS)
     src.save(os.path.join(OUT, "ic_marker.png"))
 
-    # The seen variant: the symbol on a green ring, 76 px, as Feature Layer rings status.
-    ring = 8
+    # The seen variant: the symbol on a green ring, as Feature Layer rings status.
+    ring = 7
     size = src.size[0] + 2 * ring
     seen = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     big = Image.new("RGBA", (size * SS, size * SS), (0, 0, 0, 0))
     d = ImageDraw.Draw(big)
-    d.ellipse([2 * SS, 2 * SS, size * SS - 2 * SS, size * SS - 2 * SS], outline=SEEN, width=5 * SS)
+    d.ellipse([2 * SS, 2 * SS, size * SS - 2 * SS, size * SS - 2 * SS], outline=SEEN, width=4 * SS)
     seen.alpha_composite(big.resize((size, size), Image.LANCZOS))
     seen.alpha_composite(src, (ring, ring))
     seen.save(os.path.join(OUT, "ic_marker_seen.png"))
