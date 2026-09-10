@@ -267,7 +267,21 @@ Shell state does not persist between Bash calls: export `ADB_SERVER_SOCKET`
 in every adb-touching command. With it set, only the MacBook's devices are
 visible (the Studio's emulator disappears); unset it for emulator work.
 
-## Creating a plugin
+## Creating a plugin — `/new-plugin`, on the first message about it
+
+**`/new-plugin` is the only way a plugin starts.** Invoke it on the message
+that first proposes one, *before* any design conversation: it settles the name,
+makes the worktree, scaffolds inside it, removes the template manual, opens the
+PLAN, and hands the session over to the new worktree. This is a skill for the
+same reason `/ship` is: the rule was prose and prose lost to momentum. Comms
+and Feature Layer both got their folder late, because a session that starts
+talking about an idea keeps working in whatever directory it is already in.
+
+`.claude/hooks/new-plugin-guard.sh` holds the line mechanically: in the **main
+checkout** it blocks `new-plugin.sh` and any edit under `plugins/` — the Write
+and Edit tools, and shell edits (`sed -i`, a heredoc, a redirect) too. Every
+worktree is untouched and `worktree.sh new` is never blocked, so there is
+always a way forward and never a reason to work around it.
 
 A new plugin gets its worktree first and is scaffolded inside it, so it never
 touches the main checkout or another plugin's worktree. Run the first line from
@@ -278,6 +292,7 @@ anywhere (`worktree.sh` reads `main` for what exists; a name with no plugin on
 ~/GitHub/atak-plugins/scripts/worktree.sh new <Name> <name>-v0.1
 cd ~/GitHub/atak-plugins-<name>
 ./scripts/new-plugin.sh <Name> "Display Name"    # name: letters/digits only
+git rm -r plugins/<Name>/docs/user_manual        # the template's placeholder manual
 git add plugins/<Name> && git commit
 ```
 
@@ -805,6 +820,8 @@ catalog.
   bump of vendored third-party code. Record the result (date, commit, outcome) in
   `../atak-plugins-notes/docs/`. `/ship` then cites that record instead of
   discovering things when the APKs are already signed.
+- **`/new-plugin` is the ONLY way a new plugin starts**, invoked on the first
+  message that proposes one — see "Creating a plugin".
 - **`/ship` is the ONLY path to `main`, a tag, or a GitHub Release.** The
   PreToolUse hook `.claude/hooks/git-guard.sh` mechanically blocks merge-to-main,
   `git tag`, pushes of main/tags, and `gh release create`; `/ship` runs pre-flight
