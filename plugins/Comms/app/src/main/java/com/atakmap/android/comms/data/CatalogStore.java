@@ -62,6 +62,14 @@ public final class CatalogStore {
     private final MapView mapView;
     private final Listener listener;
     private final File cacheFile;
+    /**
+     * An operator-supplied catalog. Some sources are not for a public host -- the
+     * Region 5 radio guide is marked CUI -- so a catalog built from them is put on
+     * the device by hand or by MDM as {@code tools/comms/local.json}. When that file
+     * is there it is the catalog: the depot is not fetched and the file is never
+     * written to, so nothing the plugin does can overwrite it or send it anywhere.
+     */
+    private final File localFile;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private Catalog catalog;
@@ -73,6 +81,7 @@ public final class CatalogStore {
         this.mapView = mapView;
         this.listener = listener;
         this.cacheFile = new File(FileSystemUtils.getItem("tools/comms"), "catalog.json");
+        this.localFile = new File(FileSystemUtils.getItem("tools/comms"), "local.json");
     }
 
     public Catalog catalog() {
@@ -90,6 +99,16 @@ public final class CatalogStore {
             public void run() {
                 Catalog c = null;
                 String origin = null;
+                if (localFile.isFile()) {
+                    try {
+                        publish(parse(new String(FileSystemUtils.read(localFile), "UTF-8")),
+                                null);
+                        return;
+                    } catch (Exception e) {
+                        Log.w(TAG, "local catalog unreadable, ignoring it", e);
+                        failed("local.json is unreadable: " + e.getMessage());
+                    }
+                }
                 if (cacheFile.isFile()) {
                     try {
                         c = parse(new String(FileSystemUtils.read(cacheFile), "UTF-8"));
@@ -121,8 +140,12 @@ public final class CatalogStore {
         });
     }
 
-    /** The operator's Sync: fetch now whatever the age. */
+    /** The operator's Sync: fetch now whatever the age; nothing to fetch over a local catalog. */
     public void sync() {
+        if (localFile.isFile()) {
+            failed("This device has its own catalog; nothing to refresh");
+            return;
+        }
         fetch();
     }
 
@@ -196,7 +219,8 @@ public final class CatalogStore {
         return b.toString();
     }
 
-    private void publish(final Catalog c, final String s) {
+    private void publish(final Catalog c, String s) {
+        final String text = s != null ? s : describe(c, "this device's own catalog");
         main.post(new Runnable() {
             @Override
             public void run() {
@@ -204,8 +228,8 @@ public final class CatalogStore {
                     catalog = c;
                     Tones.use(c.tones);
                 }
-                status = s;
-                listener.onCatalog(c, s);
+                status = text;
+                listener.onCatalog(c, text);
             }
         });
     }

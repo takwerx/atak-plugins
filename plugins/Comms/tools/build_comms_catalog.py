@@ -151,9 +151,20 @@ def macs_text(refresh=False):
 
 
 def tone_value(s):
-    """'103.5' -> 103.5; '0.0' -> None (carrier squelch); 'OST' and NACs stay strings."""
-    if s in ("0.0", "0", "CSQ", "None", "none"):
+    """
+    '103.5' -> 103.5; '0.0' -> None (carrier squelch); 'OST' and NACs stay strings.
+
+    A call plan names a tone by its California standard number as often as by its
+    frequency, so 'T8', 'tone 8' and a bare '8' resolve through the table. There is
+    no ambiguity: every CTCSS tone is 67.0 Hz or higher and carries a decimal, and
+    every tone number is 1 to 32.
+    """
+    s = (s or "").strip()
+    if s in ("", "0.0", "0", "CSQ", "None", "none", "N/A"):
         return None
+    m = re.fullmatch(r"(?:[Tt](?:one)?[ -]?)?(\d{1,2})", s)
+    if m and 1 <= int(m.group(1)) <= 32:
+        return TONES[int(m.group(1))]
     try:
         v = float(s)
         return v if v > 0 else None
@@ -351,6 +362,138 @@ def elevation_m(lat, lon, refresh=False):
         return None
 
 
+GNIS = "https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer"
+# Landforms (summits, ridges, buttes), then cultural points (towers, locales).
+GNIS_LAYERS = (5, 9)
+# A repeater is on one of its own forest's mountains, so a candidate this far from
+# the rest of that forest's sites is a different mountain with the same name --
+# California has a dozen Black Mountains. Los Padres runs 400 km end to end, so the
+# cap is generous and anything landing past REVIEW_KM from the anchor is reported.
+GNIS_MAX_KM = 250
+GNIS_REVIEW_KM = 120
+# A repeater sits inside the forest or park it serves, or just outside it on a peak
+# that looks into it. The boundary is the real constraint; the anchor is only a
+# tiebreak, because a centroid put Yosemite's Mount Hoffmann in Fresno County.
+AREA_PAD_KM = 25
+# With no boundary to check against (BLM districts, CAL FIRE units) the anchor is all
+# there is, so it has to be held tightly.
+NO_AREA_MAX_KM = 90
+
+USFS_BOUNDARY = "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_ForestSystemBoundaries_01/MapServer/0"
+NPS_BOUNDARY = ("https://services1.arcgis.com/fBc8EJBxQRMcHlei/arcgis/rest/services/"
+                "NPS_Land_Resources_Division_Boundary_and_Tract_Data_Service/FeatureServer/2")
+
+
+def area_bounds(area, refresh=False):
+    """
+    The bounding box of a named forest or park, padded, as (south, west, north, east).
+
+    {@code area} is "USFS:<forest name>" or "NPS:<four-letter unit code>". Web
+    Mercator comes back from both services; only the box is wanted, so the corners
+    are converted rather than the geometry.
+    """
+    kind, _, name = area.partition(":")
+    if kind == "USFS":
+        url = USFS_BOUNDARY + "/query?" + urllib.parse.urlencode(dict(
+            where="forestname='%s'" % name.replace("'", "''"), returnExtentOnly="true", f="json"))
+    elif kind == "NPS":
+        # A park may be administered as one unit and mapped as two: Sequoia and
+        # Kings Canyon is SEQU plus KICA, so a comma-separated list is a union.
+        codes = ",".join("'%s'" % c.strip() for c in name.split(",") if c.strip())
+        url = NPS_BOUNDARY + "/query?" + urllib.parse.urlencode(dict(
+            where="UNIT_CODE IN (%s)" % codes, returnExtentOnly="true", f="json"))
+    else:
+        return None
+    try:
+        e = getj(url, refresh).get("extent")
+        if not e:
+            return None
+        wkid = (e.get("spatialReference") or {}).get("latestWkid") or 4326
+
+        def unproject(x, y):
+            if wkid == 4326:
+                return y, x
+            lon = x / 20037508.34 * 180
+            lat = math.degrees(2 * math.atan(math.exp(y / 20037508.34 * math.pi)) - math.pi / 2)
+            return lat, lon
+
+        s_lat, w_lon = unproject(e["xmin"], e["ymin"])
+        n_lat, e_lon = unproject(e["xmax"], e["ymax"])
+        pad = AREA_PAD_KM / 111.0
+        return (s_lat - pad, w_lon - pad / max(0.2, math.cos(math.radians(s_lat))),
+                n_lat + pad, e_lon + pad / max(0.2, math.cos(math.radians(n_lat))))
+    except Exception as ex:  # noqa: BLE001
+        print("  boundary lookup failed for %s: %s" % (area, ex), file=sys.stderr)
+        return None
+GENERICS = ("", " Mountain", " Peak", " Ridge", " Hill", " Butte", " Summit", " Point",
+            " Lookout", " Mount")
+
+
+def gnis(name, state, anchor, refresh=False, bounds=None, max_km=None):
+    """
+    The nearest USGS-named landform to {@code anchor} whose name starts with
+    {@code name}. The guide abbreviates ("Bully Choop" for Bully Choop Mountain), so
+    the query is a prefix and the exact name wins ties.
+
+    <p>{@code bounds} is the forest or park the site belongs to: a candidate outside
+    it is a different place with the same name, whatever its distance.
+
+    <p>With no anchor the name has to be unambiguous: exactly one place in the state
+    answers to it, or nothing is returned. That is what bootstraps a forest whose
+    sites are all absent from the GIS layers -- one unambiguous summit anchors the
+    rest.
+
+    @return (lat, lon, official name, county, km from the anchor) or None
+    """
+    base = re.sub(r"\s+", " ", name).strip()
+    base = re.sub(r"\b(Lookout|Benchmark|LKO|BM)\b\.?$", "", base).strip()
+    if not base:
+        return None
+    like = base.replace("'", "''") + "%"
+    best = None
+    for layer in GNIS_LAYERS:
+        q = urllib.parse.urlencode(dict(
+            where="state_alpha='%s' AND gaz_name LIKE '%s'" % (state, like),
+            outFields="gaz_name,gaz_featureclass,county_name", f="json",
+            returnGeometry="true", outSR="4326", resultRecordCount=200))
+        try:
+            d = getj(GNIS + "/%d/query?" % layer + q, refresh)
+        except Exception as e:  # noqa: BLE001
+            print("  names lookup failed for %r: %s" % (name, e), file=sys.stderr)
+            continue
+        for f in d.get("features", []):
+            g = f.get("geometry") or {}
+            pts = g.get("points") or ([[g["x"], g["y"]]] if "x" in g else [])
+            a = f["attributes"]
+            got = (a.get("gaz_name") or "").strip()
+            # A prefix match is only the same place when the extra words are a
+            # generic: "Black Mountain" yes, "Blackwood Canyon" no.
+            tail = got[len(base):].strip()
+            if got.lower() != base.lower() and (" " + tail) not in GENERICS:
+                continue
+            for x, y in pts:
+                if anchor is None:
+                    # Unambiguous or nothing: two places by this name and there is no
+                    # way to tell which one the guide meant.
+                    here = (round(y, 3), round(x, 3))
+                    if best is not None and best[5] != here:
+                        return None
+                    best = ((0, 0), y, x, got, (a.get("county_name") or "").strip(), here)
+                    continue
+                if bounds is not None and not (bounds[0] <= y <= bounds[2]
+                                               and bounds[1] <= x <= bounds[3]):
+                    continue
+                d_km = haversine(anchor[0], anchor[1], y, x) / 1000.0
+                if d_km > (max_km or GNIS_MAX_KM):
+                    continue
+                score = (0 if got.lower() == base.lower() else 1, d_km)
+                if best is None or score < best[0]:
+                    best = (score, y, x, got, (a.get("county_name") or "").strip(), None)
+    if best is None:
+        return None
+    return best[1], best[2], best[3], best[4], best[0][1]
+
+
 def county_of(lat, lon, refresh=False):
     q = urllib.parse.urlencode(dict(geometry="%f,%f" % (lon, lat), geometryType="esriGeometryPoint", inSR=4326,
                                     spatialRel="esriSpatialRelIntersects", outFields="NAME,STATE",
@@ -500,53 +643,170 @@ def build(args):
                   manager="USFS" + (" · " + forest + " NF" if forest else ""), source=title, priority=8)
 
     # ---- the operator's rows -------------------------------------------------------------
-    csv_path = os.path.join(HERE, "sites.csv")
-    n_rows = 0
-    if os.path.isfile(csv_path):
+    # sites.csv beside this script, plus anything named with --rows. A row file may
+    # live outside the repo: the Region 5 radio guide is marked CUI, so a catalog
+    # built from it is never committed here and never published to the depot.
+    #
+    # Three passes, because a name can only be placed once something is on the map:
+    # rows carrying coordinates first, then rows whose name is already in the GIS
+    # layers, then the rest looked up in the USGS names database against the anchor
+    # those two passes give each forest.
+    row_files = [os.path.join(HERE, "sites.csv")] + list(args.rows or [])
+    parsed = []
+    for csv_path in row_files:
+        if not os.path.isfile(csv_path):
+            if csv_path != row_files[0]:
+                raise SystemExit("no such row file: " + csv_path)
+            continue
+        label = os.path.basename(csv_path)
         with open(csv_path, newline="") as f:
-            rows = [r for r in csv.DictReader(l for l in f if not l.lstrip().startswith("#"))]
-        for r in rows:
-            r = {k.strip(): (v or "").strip() for k, v in r.items() if k}
-            if not r.get("site"):
+            for r in csv.DictReader(l for l in f if not l.lstrip().startswith("#")):
+                r = {k.strip(): (v or "").strip() for k, v in r.items() if k}
+                if r.get("site"):
+                    r["_label"] = label
+                    r["_st"] = (r.get("state") or "CA").upper()
+                    parsed.append(r)
+
+    area_cache = {}
+
+    def area_of(r):
+        """The forest or park boundary a row names, fetched once."""
+        area = (r.get("area") or "").strip()
+        if not area:
+            return None
+        if area not in area_cache:
+            area_cache[area] = area_bounds(area, args.refresh)
+            if area_cache[area] is None:
+                print("  no boundary for %s; falling back to the anchor" % area, file=sys.stderr)
+        return area_cache[area]
+
+    def anchor_key(r):
+        """What a row belongs to: the net's first word, which is the forest or unit."""
+        return (r["_st"], net_key(r.get("net", "")).split(" ")[0])
+
+    placed = {}          # id(row) -> site
+    anchor_pts = {}      # anchor_key -> [(lat, lon), ...]
+
+    def remember(r, site):
+        placed[id(r)] = site
+        anchor_pts.setdefault(anchor_key(r), []).append((site["lat"], site["lon"]))
+
+    for r in parsed:                                   # 1: explicit coordinates
+        if r.get("lat") and r.get("lon"):
+            remember(r, sites.add(r["site"], float(r["lat"]), float(r["lon"]), r["_st"],
+                                  county=r.get("county", ""),
+                                  elev_m=float(r["elev_m"]) if r.get("elev_m") else None,
+                                  ant_m=float(r["ant_m"]) if r.get("ant_m") else None,
+                                  manager=r.get("agency", ""), source=r["_label"], priority=0))
+
+    for r in parsed:                                   # 2: a name the GIS layers know
+        if id(r) in placed:
+            continue
+        site = sites.find(r["site"], r["_st"])
+        if site is not None:
+            remember(r, site)
+
+    # 3a: a forest with nothing placed has no anchor. Bootstrap it on any of its own
+    # sites whose name is unambiguous in the state.
+    for key in {anchor_key(r) for r in parsed} - set(anchor_pts):
+        for r in parsed:
+            if id(r) in placed or anchor_key(r) != key:
                 continue
-            st = (r.get("state") or "CA").upper()
-            lat, lon = r.get("lat"), r.get("lon")
-            if lat and lon:
-                site = sites.add(r["site"], float(lat), float(lon), st, county=r.get("county", ""),
-                                 elev_m=float(r["elev_m"]) if r.get("elev_m") else None,
-                                 ant_m=float(r["ant_m"]) if r.get("ant_m") else None,
-                                 manager=r.get("agency", ""), source="sites.csv", priority=0)
-            else:
-                site = sites.find(r["site"], st)
-                if site is None:
-                    raise SystemExit("sites.csv: %r has no lat/lon and matches no site in the GIS layers" % r["site"])
-                if r.get("ant_m"):
-                    site["ant_m"] = float(r["ant_m"])
-                if r.get("agency") and r["agency"] not in site["managers"]:
-                    site["managers"].append(r["agency"])
-            net = net_key(r.get("net", ""))
-            if not net:
+            hit = gnis(r["site"], r["_st"], None, args.refresh,
+                       bounds=area_of(r))
+            if hit is None:
                 continue
-            if net not in by_id:
-                if not (r.get("rx") and r.get("tx")):
-                    raise SystemExit("sites.csv: net %r is not in the plan and the row has no rx/tx" % net)
-                by_id[net] = S(id=net, name=r.get("net"), agency=r.get("agency") or "Local", rx=r["rx"], tx=r["tx"],
-                               rx_tone=tone_value(r.get("rx_tone") or "0.0"), tx_tone=tone_value(r.get("tx_tone") or "OST"),
-                               band="N", power="", mode="A", config="", usage="", remarks=r.get("notes", ""),
-                               portable=False)
-                nets.append(by_id[net])
-            rxt = tone_value(r.get("rx_tone") or "0.0")
-            txt_ = tone_value(r.get("tx_tone") or "0.0")
-            channels.append(S(site=site, net=net, callsign=r.get("callsign", ""),
-                              tx_tone=txt_ if isinstance(txt_, float) else None,
-                              tx_tone_num=TONE_NUMBER.get(txt_) if isinstance(txt_, float) else None,
-                              rx_tone=rxt if isinstance(rxt, float) else None,
-                              rx_tone_num=TONE_NUMBER.get(rxt) if isinstance(rxt, float) else None,
-                              notes=r.get("notes", ""), source=r.get("source") or "sites.csv",
-                              as_of=r.get("as_of") or today))
-            n_rows += 1
-        print("sites.csv: %d net rows" % n_rows)
-        sources.append(S(id="operator", title="Operator rows (sites.csv)", url="", as_of=today, kind="sites+channels"))
+            lat, lon, official, county, _ = hit
+            site = sites.add(official or r["site"], lat, lon, r["_st"], county=county,
+                             manager=r.get("agency", ""), source="USGS geographic names", priority=5)
+            remember(r, site)
+            print("  anchored %s on %s, the one place in %s by that name"
+                  % (key[1], official, r["_st"]))
+            break
+
+    unplaced = []
+    named = 0
+    far = []
+    for r in parsed:                                   # 3b: the USGS names database
+        if id(r) in placed:
+            continue
+        pts = anchor_pts.get(anchor_key(r)) or []
+        if not pts:
+            unplaced.append((r["_label"], r["site"], r.get("net", ""),
+                             "no site of this forest is placed, so nothing to anchor on"))
+            continue
+        anchor = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
+        bounds = area_of(r)
+        hit = gnis(r["site"], r["_st"], anchor, args.refresh, bounds=bounds,
+                   max_km=None if bounds else NO_AREA_MAX_KM)
+        if hit is None:
+            unplaced.append((r["_label"], r["site"], r.get("net", ""),
+                             "the names database has no such place in %s"
+                             % (r.get("area") or "range of the other sites")))
+            continue
+        lat, lon, official, county, d_km = hit
+        site = sites.add(official or r["site"], lat, lon, r["_st"], county=county,
+                         manager=r.get("agency", ""), source="USGS geographic names", priority=5)
+        remember(r, site)
+        named += 1
+        if d_km > GNIS_REVIEW_KM and not bounds:
+            far.append((r["site"], official, county, d_km, anchor_key(r)[1]))
+    if named:
+        print("USGS geographic names: placed %d rows the GIS layers did not have" % named)
+        sources.append(S(id="gnis", title="USGS Geographic Names (GNIS)", url=GNIS, as_of=today,
+                         kind="sites"))
+    if far:
+        print("  %d landed more than %d km from the rest of their forest; check these by eye:"
+              % (len(far), GNIS_REVIEW_KM), file=sys.stderr)
+        for name, official, county, d_km, group in sorted(set(far), key=lambda t: -t[3]):
+            print("    %-24s -> %s, %s County (%.0f km from %s)"
+                  % (name, official, county, d_km, group), file=sys.stderr)
+
+    n_rows = 0
+    per_file = {}
+    for r in parsed:                                   # every placed row becomes a channel
+        site = placed.get(id(r))
+        if site is None:
+            continue
+        if r.get("ant_m"):
+            site["ant_m"] = float(r["ant_m"])
+        if r.get("agency") and r["agency"] not in site["managers"]:
+            site["managers"].append(r["agency"])
+        net = net_key(r.get("net", ""))
+        if not net:
+            continue
+        if net not in by_id:
+            if not (r.get("rx") and r.get("tx")):
+                raise SystemExit("%s: net %r is not in the plan and the row has no rx/tx"
+                                 % (r["_label"], net))
+            # The net's own tones, NOT this row's: a repeater net has one pair and a
+            # different tone at every site, and the first site's tone is not the net's.
+            by_id[net] = S(id=net, name=r.get("net_name") or r.get("net"),
+                           agency=r.get("agency") or "Local", rx=r["rx"], tx=r["tx"],
+                           rx_tone=tone_value(r.get("net_rx_tone")),
+                           tx_tone=tone_value(r.get("net_tx_tone") or "OST"),
+                           band="N", power="", mode="A", config="", usage="",
+                           remarks=r.get("net_name", ""), portable=False)
+            nets.append(by_id[net])
+        rxt = tone_value(r.get("rx_tone"))
+        txt_ = tone_value(r.get("tx_tone"))
+        channels.append(S(site=site, net=net, callsign=r.get("callsign", ""),
+                          tx_tone=txt_ if isinstance(txt_, float) else None,
+                          tx_tone_num=TONE_NUMBER.get(txt_) if isinstance(txt_, float) else None,
+                          rx_tone=rxt if isinstance(rxt, float) else None,
+                          rx_tone_num=TONE_NUMBER.get(rxt) if isinstance(rxt, float) else None,
+                          notes=r.get("notes", ""), source=r.get("source") or r["_label"],
+                          as_of=r.get("as_of") or today))
+        n_rows += 1
+        per_file[r["_label"]] = per_file.get(r["_label"], 0) + 1
+    for label, n in sorted(per_file.items()):
+        print("%s: %d net rows" % (label, n))
+        sources.append(S(id=slug(label), title="Operator rows (" + label + ")", url="",
+                         as_of=today, kind="sites+channels"))
+    if unplaced:
+        print("  %d rows could not be placed:" % len(unplaced), file=sys.stderr)
+        for label, name, net, why in sorted(set(unplaced)):
+            print("    %s: %s (%s) -- %s" % (label, name, net, why), file=sys.stderr)
 
     # ---- fill in county and elevation ----------------------------------------------------
     for s in sites.sites:
@@ -610,6 +870,8 @@ def main():
     ap.add_argument("--upload", action="store_true", help="rclone the catalog to %s" % REMOTE)
     ap.add_argument("--dry-run", action="store_true", help="fetch and report, write nothing")
     ap.add_argument("--refresh", action="store_true", help="ignore the download cache")
+    ap.add_argument("--rows", action="append", metavar="CSV",
+                    help="another site/net row file, repeatable; may live outside the repo")
     args = ap.parse_args()
     if not args.out and not args.dry_run:
         ap.error("--out or --dry-run")

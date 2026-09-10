@@ -1125,11 +1125,14 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         return String.format(Locale.US, "%,.0f ft", SpanUtilities.convert(m, Span.METER, Span.FOOT));
     }
 
-    /** "CDF Command 5 · 151.3175 / 159.3525 · RX 103.5 (Tone 8) · KMF695". */
+    /**
+     * "CDF Command 5 · Tone 8 (103.5) · KMF695". No frequencies on a site: the radio
+     * already knows the net's pair, and what the operator needs from the map is which
+     * tone opens this site (operator, 2026-09-10).
+     */
     static String channelLine(Channel c) {
         final StringBuilder b = new StringBuilder();
         b.append(c.net.name.equals(c.net.id) ? c.net.id : c.net.id + " · " + c.net.name);
-        b.append(" · ").append(c.pair());
         b.append(" · ").append(toneLine(c.effectiveRxTone(), c.net.rxToneText, c.effectiveTxTone(), c.net.txToneText));
         if (!c.callsign.isEmpty())
             b.append(" · ").append(c.callsign);
@@ -1137,18 +1140,12 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     }
 
     static String netLine(Net n) {
-        final StringBuilder b = new StringBuilder();
-        b.append(n.pair()).append(" · ").append(toneLine(n.rxTone, n.rxToneText, n.txTone, n.txToneText));
-        return b.toString();
+        return toneLine(n.rxTone, n.rxToneText, n.txTone, n.txToneText);
     }
 
-    /** "RX 103.5 (Tone 8) / TX OST", or one tone when both are the same. */
+    /** The tone line, formatted where the tone table lives so a test can reach it. */
     static String toneLine(double rx, String rxText, double tx, String txText) {
-        final String r = Tones.describe(rx, rxText);
-        final String t = Tones.describe(tx, txText);
-        if (r.equals(t))
-            return "tone " + r;
-        return "RX " + r + " · TX " + t;
+        return Tones.line(rx, rxText, tx, txText);
     }
 
     private static String netsSummary(Site s) {
@@ -1214,8 +1211,8 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.net_row, null);
             ((TextView) row.findViewById(R.id.title)).setText(
                     c.net.name.equals(c.net.id) ? c.net.id : c.net.id + " · " + c.net.name);
-            ((TextView) row.findViewById(R.id.line)).setText(c.pair() + " · "
-                    + toneLine(c.effectiveRxTone(), c.net.rxToneText, c.effectiveTxTone(), c.net.txToneText)
+            ((TextView) row.findViewById(R.id.line)).setText(
+                    toneLine(c.effectiveRxTone(), c.net.rxToneText, c.effectiveTxTone(), c.net.txToneText)
                     + (c.callsign.isEmpty() ? "" : " · " + c.callsign));
             final StringBuilder n = new StringBuilder();
             if (c.net.portable)

@@ -58,16 +58,46 @@ public final class Tones {
         return d == null ? Double.NaN : d;
     }
 
-    /** "103.5 (Tone 8)", "103.5", "CSQ" for none, or the text ("OST") as given. */
+    /** "Tone 8 (103.5)", "103.5" for one outside the table, "none" for carrier squelch, or the text ("OST") as given. */
     public static String describe(double hz, String text) {
         if (!Double.isNaN(hz)) {
             final int n = numberOf(hz);
             final String v = String.format(Locale.US, "%.1f", hz);
-            return n > 0 ? v + " (Tone " + n + ")" : v;
+            return n > 0 ? "Tone " + n + " (" + v + ")" : v;
         }
         if (text != null && !text.isEmpty())
-            return "OST".equals(text) ? "OST (site tone)" : text;
-        return "CSQ";
+            return "OST".equals(text) ? "site tone" : text;
+        return "none";
+    }
+
+    /**
+     * The tone line for a channel or a net, as an operator reads it off a call plan.
+     *
+     * <p>Almost always one tone: what you transmit to open the repeater, "Tone 8
+     * (103.5)". Both sides appear only when the receive side is tone protected on a
+     * different tone, which is how CAL FIRE runs its command nets: every site
+     * receives on Tone 8 and answers to the site's own tone on transmit.
+     *
+     * <p>"site tone" is the plans' OST, operator selectable tone: the net does not
+     * fix one, the site does.
+     *
+     * @param rxHz   receive tone in Hz, or NaN
+     * @param rxText what the plan printed when there is no fixed receive tone
+     * @param txHz   transmit tone in Hz, or NaN
+     * @param txText what the plan printed when there is no fixed transmit tone
+     */
+    public static String line(double rxHz, String rxText, double txHz, String txText) {
+        final String r = describe(rxHz, rxText);
+        final String t = describe(txHz, txText);
+        final boolean txKnown = !Double.isNaN(txHz);
+        final boolean rxKnown = !Double.isNaN(rxHz);
+        if (txKnown && rxKnown && !r.equals(t))
+            return "TX " + t + " · RX " + r;
+        if (txKnown)
+            return t;
+        if (rxKnown)
+            return "RX " + r + (txText == null || txText.isEmpty() ? "" : " · TX " + t);
+        return "none".equals(t) ? "no tone" : t;
     }
 
     /**
