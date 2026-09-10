@@ -37,9 +37,18 @@ public final class Esri {
         public String id, title, type, owner, url;
     }
 
-    /** Feature services in the signed-in user's reach whose title matches. */
+    /**
+     * Feature services the organization owns whose title matches. The query carries the
+     * org's own ID: without it ArcGIS Online answers from every public item on the
+     * platform (0.3 listed DC fire hydrants for a California city), and an Enterprise
+     * portal does the same with everything it federates.
+     */
     public static java.util.List<Item> searchItems(String portal, String token, String text) throws Exception {
-        final String q = "(" + text.trim() + ") type:\"Feature Service\"";
+        final String orgId = portalId(portal, token);
+        if (orgId == null)
+            throw new IllegalStateException("could not read the organization's ID; sign in and try again");
+        final String words = text.trim();
+        final String q = (words.isEmpty() ? "" : "(" + words + ") ") + "type:\"Feature Service\" orgid:" + orgId;
         final String url = portal + "/sharing/rest/search?q=" + enc(q)
                 + "&sortField=modified&sortOrder=desc&num=25&f=json";
         final JSONObject d = new JSONObject(get(url, token));
@@ -96,6 +105,22 @@ public final class Esri {
             // "ArcGIS Online"), so that is "unknown", not a name.
             final String n = d.optString("name", null);
             return n == null || n.trim().isEmpty() || "ArcGIS Online".equalsIgnoreCase(n.trim()) ? null : n.trim();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * The organization's ID from the portal's self description, the value a content
+     * search is scoped with. Read fresh every time, so it always belongs to whoever is
+     * signed in now; null when the portal does not say (an anonymous read of a private
+     * org).
+     */
+    public static String portalId(String portal, String token) {
+        try {
+            final JSONObject d = new JSONObject(get(portal + "/sharing/rest/portals/self?f=json", token));
+            final String id = d.optString("id", null);
+            return id == null || id.trim().isEmpty() ? null : id.trim();
         } catch (Exception e) {
             return null;
         }

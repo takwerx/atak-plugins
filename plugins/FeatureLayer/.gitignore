@@ -40,3 +40,6 @@ dist/
 
 # Built by typst at tak.gov (ATAK_CI=1) or by hand locally; never tracked.
 app/src/main/assets/usermanual.pdf
+
+# Raw screenshot frames carry the callsign box and coordinates; only crops are committed.
+docs/screenshots/raw/

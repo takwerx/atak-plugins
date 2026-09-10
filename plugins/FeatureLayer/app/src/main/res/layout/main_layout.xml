@@ -190,26 +190,30 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
+        <!-- The org's own name can run long ("Welcome to the City of Corona GIS
+             System"); two lines beat an ellipsis, and the neighbors stretch to match. -->
         <Button
             android:id="@+id/btn_org"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
+            android:singleLine="false"
+            android:maxLines="2"
             android:text="Pick a source" />
         <Button
             android:id="@+id/btn_signin"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_marginLeft="6dp"
             android:text="Sign in" />
         <Button
             android:id="@+id/btn_forget"
             style="@style/TakwerxButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_marginLeft="6dp"
             android:text="Forget"
             android:visibility="gone" />

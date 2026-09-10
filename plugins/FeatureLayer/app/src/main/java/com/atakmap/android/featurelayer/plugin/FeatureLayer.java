@@ -830,6 +830,18 @@ public class FeatureLayer implements IPlugin {
         find.setText(org.findLabel);
         search.setHint(org.hint);
         search.setVisibility("nifs-archive".equals(org.id) || "ca-air-intel".equals(org.id) ? View.GONE : View.VISIBLE);
+        // A source that is one fixed layer has nothing to search: its button adds the
+        // layer, and once the layer is in the list below the button goes away (the
+        // operator read "Add perimeters" over an added layer as a second thing to add).
+        final String fixedLayer = "ca-air-intel".equals(org.id) ? "ca-air-intel"
+                : "nifs-archive".equals(org.id) ? "nifs-archive:Dragon Bravo" : null;
+        if (fixedLayer != null && manager != null) {
+            boolean loaded = false;
+            for (LoadedLayer l : manager.snapshot())
+                if (fixedLayer.equals(l.spec.id))
+                    loaded = true;
+            searchRow.setVisibility(loaded ? View.GONE : View.VISIBLE);
+        }
         if (org.portal == null || manager == null) {
             signin.setVisibility(View.GONE);
             return;
@@ -929,6 +941,7 @@ public class FeatureLayer implements IPlugin {
     private void renderRows() {
         if (paneView == null || manager == null)
             return;
+        refreshOrgUi(); // the source row hides its add button once its layer is listed
         final LinearLayout container = paneView.findViewById(R.id.layers_container);
         final TextView empty = paneView.findViewById(R.id.layers_empty);
         container.removeAllViews();
@@ -1160,7 +1173,7 @@ public class FeatureLayer implements IPlugin {
             if (note == null) {
                 ((TextView) row.findViewById(R.id.feature_name)).setText(si.name);
             } else {
-                // The name, then what it is in smaller grey type underneath.
+                // The name, then what it is in smaller gray type underneath.
                 final android.text.SpannableString two = new android.text.SpannableString(si.name + "\n" + note);
                 two.setSpan(new android.text.style.RelativeSizeSpan(0.78f), si.name.length() + 1, two.length(), 0);
                 two.setSpan(new android.text.style.ForegroundColorSpan(0xFFBBBBBB), si.name.length() + 1, two.length(), 0);
