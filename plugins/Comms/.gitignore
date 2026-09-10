@@ -37,3 +37,10 @@ captures/
 # Submission zips
 dist/
 *.zip
+
+# Raw phone frames carry the callsign box and coordinates. Only reviewed crops under
+# docs/screenshots/ are tracked; the raw folder never is.
+docs/screenshots/raw/
+
+# Built by gradle/typst.gradle (ATAK_CI=1 or -PbuildManual); never tracked, never in the zip.
+app/src/main/assets/usermanual.pdf

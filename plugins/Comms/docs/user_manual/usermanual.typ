@@ -3,38 +3,52 @@
 #import "formatting.typ": *
 
 #show: userguide.with(
-   plugin-name: "Plugin Template",
+   plugin-name: "Comms",
    plugin-version: "0.1",
    platform: "ATAK",
-   platform-version: "5.6.0",
+   platform-version: "5.8.0",
 )
 
 
-#tak-slide[ 
+#tak-slide[
   = Overview
 #toolbox.side-by-side(columns: (.75fr, 9fr))[
 #image("plugin_icon.png", width: 70%)
 ][
- This is an example user manual in typst.
+ Comms puts mountaintop radio sites on the ATAK map, nearest first, with the nets
+ that live on each one: name, frequencies, tone and callsign. It answers "what is
+ the closest Command 5 repeater, what mountain is it on and what tone does it use"
+ from a side pane, and draws ATAK's own viewshed from the site's antenna.
 ]
-= Basic Plugin
-#toolbox.side-by-side(columns: (1.5fr, 10fr))[
-  #image("plugin_toolbar.jpg", width: 90%)
-][
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
- ]
- #toolbox.side-by-side(columns: (1.5fr, 10fr))[
-  #image("new_action.jpg", width: 90%)
- ][
-Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos.
- ]
- == Start
-#toolbox.side-by-side(columns: (11fr, 2fr))[
+= Finding a site or a net
+The pane opens from the Comms toolbar button. Type in the search box: a site
+name ("Santiago"), a net name or designator ("Command 5", "CDF C5"), a frequency
+("151.3175"), a tone ("103.5" or "tone 8") or a callsign. The list shows the
+nearest sites first. When the search names a net, each row shows that net's line
+at that site, so the nearest one is readable without opening anything. A net with
+no fixed site, such as an incident portable repeater, is shown as its own card.
 
-Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos.
-][
-  #set align(right)
-  #image("new_action.jpg", width: 90%)
-]
+*Where* picks the state, whether distances are measured from you or from the map
+center, and a radius. *Show* is one checkbox per agency, with the number of sites
+it would show. *Draw on the map* sets the zoom at which sites are drawn, quoted
+as what the scale bar reads.
+
+= Site details
+Tap a row, or Details on a site's radial menu, for county, elevation, distance
+and bearing, and every net on the site with its frequencies, tones as Hz and as
+California tone numbers, callsign and notes.
+
+= Viewshed
+*Viewshed ON* in a site's details, or the eye on its radial menu, draws ATAK's
+viewshed from the site's antenna. It is line of sight from the antenna, not radio
+coverage: terrain that can see the antenna is painted, terrain that cannot is
+not. It needs elevation data on the device (Map Depot's DTED packs provide it).
+*Range* sets how far the next viewshed reaches; *Turn off viewsheds* removes them
+all. Viewsheds are removed when the plugin is unloaded.
+
+= The catalog
+Sites and nets come from a catalog refreshed from the depot host once a day and
+on *Sync catalog*. The status line says which copy is shown and how old it is.
+The plugin works offline from its built-in copy.
 ]
