@@ -344,11 +344,36 @@ class Sites:
         return s
 
     def find(self, name, st):
+        """
+        A site already on the map by this name.
+
+        <p>Call plans abbreviate, and they do not agree with each other: the CAL FIRE
+        command sheets say "Bloomer" and "Hatchet" where the Cal OES layer says
+        Bloomer Mountain and Hatchet Mountain, and "Pierce" where it says Mount
+        Pierce. So a match may differ by a leading Mount or a trailing generic --
+        and only if exactly one site fits, because "Red Mountain" is two different
+        mountains in this catalog and guessing between them would put a repeater in
+        the wrong county.
+        """
         key = norm_name(name)
-        for s in self.sites:
-            if s["st"] == st and norm_name(s["name"]) == key:
-                return s
-        return None
+        exact = [s for s in self.sites if s["st"] == st and norm_name(s["name"]) == key]
+        if exact:
+            return exact[0]
+
+        def variants(k):
+            out = {k}
+            if k.startswith("MOUNT "):
+                out.add(k[6:])
+            else:
+                out.add("MOUNT " + k)
+            for g in ("MOUNTAIN", "PEAK", "RIDGE", "HILL", "BUTTE", "SUMMIT", "POINT", "LOOKOUT"):
+                out.add(k + " " + g)
+            return out
+
+        mine = variants(key)
+        loose = [s for s in self.sites
+                 if s["st"] == st and (variants(norm_name(s["name"])) & mine)]
+        return loose[0] if len(loose) == 1 else None
 
 
 def elevation_m(lat, lon, refresh=False):
@@ -730,15 +755,25 @@ def build(args):
     for r in parsed:                                   # 3b: the USGS names database
         if id(r) in placed:
             continue
+        bounds = area_of(r)
+        if bounds is None:
+            # No boundary to check a name against, and a centroid is not enough: the
+            # CAL FIRE command nets are statewide, and anchoring on their spread put
+            # Boucher Mountain in Calaveras County when the sheet has it in San
+            # Diego. A row like this attaches to a site another source already
+            # placed, or it is reported. A repeater in the wrong county is worse
+            # than a repeater missing.
+            unplaced.append((r["_label"], r["site"], r.get("net", ""),
+                             "no site by this name is on the map yet, and the row names no "
+                             "forest or park to look it up in"))
+            continue
         pts = anchor_pts.get(anchor_key(r)) or []
         if not pts:
             unplaced.append((r["_label"], r["site"], r.get("net", ""),
                              "no site of this forest is placed, so nothing to anchor on"))
             continue
         anchor = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
-        bounds = area_of(r)
-        hit = gnis(r["site"], r["_st"], anchor, args.refresh, bounds=bounds,
-                   max_km=None if bounds else NO_AREA_MAX_KM)
+        hit = gnis(r["site"], r["_st"], anchor, args.refresh, bounds=bounds)
         if hit is None:
             unplaced.append((r["_label"], r["site"], r.get("net", ""),
                              "the names database has no such place in %s"
