@@ -69,6 +69,17 @@ public final class SiteLayer {
     public static final double MAX_VIEWSHED_M = 100000;
     /** When the catalog does not say how tall the antenna is. */
     public static final double DEFAULT_ANTENNA_M = 10;
+    /**
+     * Labels draw from this resolution inward, in meters per pixel.
+     *
+     * <p>ATAK's own default is 10, which is several pinches closer than these markers
+     * appear at, so a screen of repeaters was a screen of anonymous diamonds. A fixed
+     * number rather than the marker threshold: that can be "always draw them", and
+     * handing the renderer a number that large is not worth finding out about in the
+     * field.
+     */
+    private static final double LABEL_RESOLUTION = 120;
+
     /** Resolution to fly to on Go to, in meters per pixel. */
     private static final double GOTO_RESOLUTION = 8;
 
@@ -292,6 +303,11 @@ public final class SiteLayer {
             Log.w(TAG, "could not attach the radial menu", e);
         }
         m.setMetaBoolean("adapt_marker_icon", false);
+        try {
+            m.setMaxLabelRenderResolution(LABEL_RESOLUTION);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not widen the label range", notThisBuild);
+        }
         applyIcon(m, s);
         return m;
     }
