@@ -1029,7 +1029,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         // list. Saying nothing reads as the plugin being broken; say what it is.
         if (named != null && named.portable && rows.isEmpty())
             b.append(" · ").append(netLabel(named.id))
-                    .append(" is an incident portable, set up at the incident, so it is on no site");
+                    .append(" is an incident portable, set up at the incident, so it has no site");
         if (meViewshedOn) {
             if (losPending)
                 b.append(" · checking line of sight…");
