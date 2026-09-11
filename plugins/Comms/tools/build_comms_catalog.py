@@ -289,6 +289,42 @@ def norm_name(s):
     return re.sub(r"\s+", " ", k).strip()
 
 
+# The words a call plan drops when it is short of room on a map sheet. "MOUNT" is
+# the spelling after norm_name, which folds MT, MTN and MOUNTAIN into it -- a
+# word listed here as "MOUNTAIN" would never match anything. Not to be confused
+# with GENERICS below, which is the title-case list the names-database lookup uses.
+DROPPED = ("MOUNT", "PEAK", "RIDGE", "HILL", "BUTTE", "SUMMIT", "POINT", "LOOKOUT")
+
+# Two records, two different names for one repeater: one names the pass a site sits
+# on, the other what is built there. No amount of loosening the letters joins a pair
+# like that, so each one is written down by hand after it has been checked as one
+# place -- same mountain, same tone on the same net.
+#
+# The pairs are data, not code, and they live with the rows they belong to and
+# outside this repo for the same reason the rows do: "<name> = <name>", one per
+# line, in comms-site-aliases.txt beside the first --rows file, or wherever
+# --same-site points. With no such file every site is filed under its own name.
+SAME_SITE = {}
+
+
+def load_same_site(path):
+    if not path or not os.path.exists(path):
+        return
+    for line in open(path):
+        line = line.split("#")[0].strip()
+        printed, _, filed = line.partition("=")
+        if line and filed.strip():
+            SAME_SITE[norm_name(printed)] = filed.strip()
+    if SAME_SITE:
+        print("site aliases: %d pairs of names that are one site" % len(SAME_SITE))
+
+
+def alias(name):
+    """The name this catalog files a site under, normalized."""
+    k = norm_name(name)
+    return norm_name(SAME_SITE[k]) if k in SAME_SITE else k
+
+
 def title_case(s):
     small = {"of", "the", "and", "at", "de", "la", "del"}
     words = []
@@ -319,15 +355,20 @@ class Sites:
 
     def __init__(self):
         self.sites = []
+        self.named = {}          # source -> the site names it lists, normalized
+
+    def lists(self, source, names):
+        """Record what one source calls its sites, for the guard in find()."""
+        self.named.setdefault(source, set()).update(alias(n) for n in names)
 
     def add(self, name, lat, lon, st, county="", elev_m=None, ant_m=None, manager="", source="", priority=9):
         key = norm_name(name)
         for s in self.sites:
             d = haversine(lat, lon, s["lat"], s["lon"])
             # One source listing two names is listing two sites, however close they
-            # sit. The BDC app has Oak Crest 13 m from Del Mar Heights, carrying the
-            # same three channels on a different tone, which is proof they are not
-            # the same repeater.
+            # sit. One of them has two names 13 m apart carrying the same three
+            # channels on a different tone, which is proof they are not the same
+            # repeater.
             if source and source in s["sources"] and norm_name(s["name"]) != key:
                 continue
             if d <= self.NEAR_M or (d <= self.SAME_NAME_M and norm_name(s["name"]) == key):
@@ -349,7 +390,7 @@ class Sites:
         self.sites.append(s)
         return s
 
-    def find(self, name, st, bounds=None):
+    def find(self, name, st, bounds=None, source=""):
         """
         A site already on the map by this name.
 
@@ -361,35 +402,88 @@ class Sites:
 
         <p>Call plans abbreviate, and they do not agree with each other: the CAL FIRE
         command sheets say "Bloomer" and "Hatchet" where the Cal OES layer says
-        Bloomer Mountain and Hatchet Mountain, and "Pierce" where it says Mount
-        Pierce. So a match may differ by a leading Mount or a trailing generic --
-        and only if exactly one site fits, because "Red Mountain" is two different
+        Bloomer Mountain and Hatchet Mountain, "Pierce" where it says Mount Pierce,
+        "Antelope Peak" where it says Antelope Mountain, and "Coldsprings" where it
+        says Cold Spring. So the name is tried four ways, loosest last, and each way
+        has to land on exactly one site -- because "Red Mountain" is two different
         mountains in this catalog and guessing between them would put a repeater in
         the wrong county.
+
+        <p>The one thing no amount of loosening reaches is a site two records call
+        by different names -- one by the pass, the other by what is built on it.
+        Those are in {@code SAME_SITE}, one line each, and there are very few.
+
+        <p>Loosening this far needs the guard the merger already has, or it undoes
+        it: one source listing two names is listing two sites. One of them gives
+        Six Rivers a Horse Mountain and a Horse Ridge on different tones, and with
+        the generic gone both read "HORSE", so Horse Ridge landed on Horse Mountain
+        and the same source appeared to contradict itself. {@code others} is what
+        that source's own list calls something else, and the two readings that strip
+        a generic may not reach one of those, however well the letters fit.
+
+        <p>And the last two readings are only safe with somewhere to stand. Taking
+        every generic off leaves words like PINE and BLACK that half the mountains
+        in the state answer to, so with no boundary at all they put the command
+        sheet's Pine Hill on Pine Mountain above Los Angeles and BLM's Blacks on
+        Black Peak in Arizona. A row inside a boundary may be read that loosely; a
+        row with none gets a leading Mount or a trailing generic and no more.
         """
         def ok(s):
             return s["st"] == st and (bounds is None or (
                 bounds[0] <= s["lat"] <= bounds[2] and bounds[1] <= s["lon"] <= bounds[3]))
 
-        key = norm_name(name)
-        exact = [s for s in self.sites if ok(s) and norm_name(s["name"]) == key]
-        if exact:
-            return exact[0]
+        key = alias(name)
+        others = self.named.get(source, set()) - {key}
+        here = [(s, alias(s["name"])) for s in self.sites if ok(s)]
+        reads = [lambda k: k, variants]
+        if bounds is not None:
+            reads += [base_name, squash_name]
 
-        def variants(k):
-            out = {k}
-            if k.startswith("MOUNT "):
-                out.add(k[6:])
-            else:
-                out.add("MOUNT " + k)
-            for g in ("MOUNTAIN", "PEAK", "RIDGE", "HILL", "BUTTE", "SUMMIT", "POINT", "LOOKOUT"):
-                out.add(k + " " + g)
-            return out
+        # Loosest last, and each reading has to land on exactly one site. The order
+        # matters: Red Mountain and Red Hill are both "RED" once the generic is gone,
+        # so the reading that tells them apart gets its answer first.
+        for n, read in enumerate(reads):
+            want = read(key)
+            # The guard belongs on the readings that can swap one generic for
+            # another, which is where two real places meet. It does not belong on
+            # the first two: an exact match is exact, and variants only ever adds or
+            # drops a generic, so it reaches Delilah Lookout from Delilah and never
+            # reaches Horse Ridge from Horse Mountain.
+            hit = [s for s, k in here if match(read(k), want) and (n < 2 or k not in others)]
+            if len(hit) == 1:
+                return hit[0]
+        return None
 
-        mine = variants(key)
-        loose = [s for s in self.sites
-                 if ok(s) and (variants(norm_name(s["name"])) & mine)]
-        return loose[0] if len(loose) == 1 else None
+
+def match(a, b):
+    """Two readings of a name agree: sets overlap, strings are equal."""
+    if isinstance(a, set):
+        return bool(a & b)
+    return a == b
+
+
+def variants(k):
+    """The name with a leading Mount, or a trailing generic, added."""
+    out = {k}
+    out.add(k[6:] if k.startswith("MOUNT ") else "MOUNT " + k)
+    for g in DROPPED:
+        out.add(k + " " + g)
+    return out
+
+
+def base_name(k):
+    """The name with a leading Mount and every trailing generic taken off."""
+    if k.startswith("MOUNT "):
+        k = k[6:]
+    w = k.split()
+    while len(w) > 1 and w[-1] in DROPPED:
+        w.pop()
+    return " ".join(w)
+
+
+def squash_name(k):
+    """The bare name with spaces and a plural ignored: Coldsprings is Cold Spring."""
+    return base_name(k).replace(" ", "").rstrip("S")
 
 
 def elevation_m(lat, lon, refresh=False):
@@ -434,7 +528,16 @@ def area_bounds(area, refresh=False):
     are converted rather than the geometry.
     """
     kind, _, name = area.partition(":")
-    if kind == "USFS":
+    pad_km = AREA_PAD_KM
+    if kind == "CO":
+        # A command sheet names no forest, only the county its dot sits in. That is
+        # boundary enough, and a tight one: 5 km of slack for a site on the line and
+        # for a dot printed a little off, not the 25 km a forest gets.
+        pad_km = 5
+        url = TIGER_COUNTY + "/query?" + urllib.parse.urlencode(dict(
+            where="NAME='%s County' AND STATE='06'" % name.replace("'", "''"),
+            returnExtentOnly="true", f="json"))
+    elif kind == "USFS":
         url = USFS_BOUNDARY + "/query?" + urllib.parse.urlencode(dict(
             where="forestname='%s'" % name.replace("'", "''"), returnExtentOnly="true", f="json"))
     elif kind == "NPS":
@@ -460,7 +563,7 @@ def area_bounds(area, refresh=False):
 
         s_lat, w_lon = unproject(e["xmin"], e["ymin"])
         n_lat, e_lon = unproject(e["xmax"], e["ymax"])
-        pad = AREA_PAD_KM / 111.0
+        pad = pad_km / 111.0
         return (s_lat - pad, w_lon - pad / max(0.2, math.cos(math.radians(s_lat))),
                 n_lat + pad, e_lon + pad / max(0.2, math.cos(math.radians(n_lat))))
     except Exception as ex:  # noqa: BLE001
@@ -513,16 +616,21 @@ def gnis(name, state, anchor, refresh=False, bounds=None, max_km=None):
             if got.lower() != base.lower() and (" " + tail) not in GENERICS:
                 continue
             for x, y in pts:
+                # The boundary is the first thing asked, with or without an anchor.
+                # It used to be asked only when there was one, so "unambiguous" meant
+                # unambiguous in the whole state even for a row that had named its
+                # county -- and a county is exactly the thing that makes a name like
+                # Seigler or Sonoma Mountain unambiguous.
+                if bounds is not None and not (bounds[0] <= y <= bounds[2]
+                                               and bounds[1] <= x <= bounds[3]):
+                    continue
                 if anchor is None:
-                    # Unambiguous or nothing: two places by this name and there is no
-                    # way to tell which one the guide meant.
+                    # Unambiguous or nothing: two places by this name inside the
+                    # boundary and there is no way to tell which one is meant.
                     here = (round(y, 3), round(x, 3))
                     if best is not None and best[5] != here:
                         return None
                     best = ((0, 0), y, x, got, (a.get("county_name") or "").strip(), here)
-                    continue
-                if bounds is not None and not (bounds[0] <= y <= bounds[2]
-                                               and bounds[1] <= x <= bounds[3]):
                     continue
                 d_km = haversine(anchor[0], anchor[1], y, x) / 1000.0
                 if d_km > (max_km or GNIS_MAX_KM):
@@ -710,6 +818,11 @@ def build(args):
                     r["_st"] = (r.get("state") or "CA").upper()
                     parsed.append(r)
 
+    # What each source calls its sites, so a loose name match cannot merge two
+    # places that source lists apart.
+    for r in parsed:
+        sites.lists(r.get("source") or r["_label"], [r["site"]])
+
     area_cache = {}
 
     def area_of(r):
@@ -745,7 +858,8 @@ def build(args):
     for r in parsed:                                   # 2: a name the GIS layers know
         if id(r) in placed:
             continue
-        site = sites.find(r["site"], r["_st"], area_of(r))
+        site = sites.find(r["site"], r["_st"], area_of(r),
+                          source=r.get("source") or r["_label"])
         if site is not None:
             remember(r, site)
 
@@ -770,6 +884,7 @@ def build(args):
     unplaced = []
     named = 0
     far = []
+    homeless = []
     for r in parsed:                                   # 3b: the USGS names database
         if id(r) in placed:
             continue
@@ -781,16 +896,27 @@ def build(args):
             # Diego. A row like this attaches to a site another source already
             # placed, or it is reported. A repeater in the wrong county is worse
             # than a repeater missing.
-            unplaced.append((r["_label"], r["site"], r.get("net", ""),
-                             "no site by this name is on the map yet, and the row names no "
-                             "forest or park to look it up in"))
+            #
+            # It waits until this pass is done before it gives up, though: the names
+            # database is about to put a hundred more mountains on the map, and the
+            # command sheets name plenty of them. Asking before that ran is why
+            # Command 1's Pine Hill reached for Pine Mountain above Los Angeles when
+            # Eldorado's own Pine Hill was one pass away.
+            homeless.append(r)
             continue
-        pts = anchor_pts.get(anchor_key(r)) or []
-        if not pts:
-            unplaced.append((r["_label"], r["site"], r.get("net", ""),
-                             "no site of this forest is placed, so nothing to anchor on"))
-            continue
-        anchor = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
+        if (r.get("area") or "").startswith("CO:"):
+            # A county is the whole constraint. Ranking candidates by distance from
+            # the rest of the net would be meaningless here -- a command net is the
+            # length of the state -- so this asks for the one place in the county by
+            # that name, and takes nothing if there are two.
+            anchor = None
+        else:
+            pts = anchor_pts.get(anchor_key(r)) or []
+            if not pts:
+                unplaced.append((r["_label"], r["site"], r.get("net", ""),
+                                 "no site of this forest is placed, so nothing to anchor on"))
+                continue
+            anchor = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
         hit = gnis(r["site"], r["_st"], anchor, args.refresh, bounds=bounds)
         if hit is None:
             unplaced.append((r["_label"], r["site"], r.get("net", ""),
@@ -808,6 +934,25 @@ def build(args):
         print("USGS geographic names: placed %d rows the GIS layers did not have" % named)
         sources.append(S(id="gnis", title="USGS Geographic Names (GNIS)", url=GNIS, as_of=today,
                          kind="sites"))
+    for r in homeless:                                 # 4: by name, with the map fuller
+        site = sites.find(r["site"], r["_st"], None,
+                          source=r.get("source") or r["_label"])
+        # Looking the name up in the names database instead was tried and taken out.
+        # The rule 3a bootstraps a forest on -- exactly one place in the state
+        # answers to it -- is not safe with no boundary at all, because the site the
+        # sheet means may simply not be in the database under the sheet's name, and
+        # the one match offered is then somewhere else entirely. It put Command 1's
+        # Soda Ridge in Plumas when the sheet has it in Siskiyou, Antelope Peak in
+        # Alpine when the sheet has Siskiyou, and Boucher
+        # Mountain in Calaveras when the sheet has San Diego -- five wrong out of
+        # twenty. A county on the row is what these need, and the sheets print one.
+        if site is not None:
+            remember(r, site)
+        else:
+            unplaced.append((r["_label"], r["site"], r.get("net", ""),
+                             "no site by this name is on the map, and the row names no "
+                             "forest, park or county to look one up in"))
+
     if far:
         print("  %d landed more than %d km from the rest of their forest; check these by eye:"
               % (len(far), GNIS_REVIEW_KM), file=sys.stderr)
@@ -1013,9 +1158,15 @@ def main():
     ap.add_argument("--refresh", action="store_true", help="ignore the download cache")
     ap.add_argument("--rows", action="append", metavar="CSV",
                     help="another site/net row file, repeatable; may live outside the repo")
+    ap.add_argument("--same-site", metavar="TXT", default="",
+                    help="names that are one site, '<name> = <name>' per line (default: "
+                         "comms-site-aliases.txt beside the first --rows file)")
     args = ap.parse_args()
     if not args.out and not args.dry_run:
         ap.error("--out or --dry-run")
+    load_same_site(args.same_site or (
+        os.path.join(os.path.dirname(os.path.abspath(args.rows[0])), "comms-site-aliases.txt")
+        if args.rows else ""))
     catalog = build(args)
     if args.dry_run:
         return
