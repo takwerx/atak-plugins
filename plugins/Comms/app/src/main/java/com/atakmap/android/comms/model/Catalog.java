@@ -103,6 +103,21 @@ public final class Catalog {
         public boolean hasNets() {
             return !channels.isEmpty();
         }
+
+        /**
+         * The name to show, without the qualifier a source hung on the end of it.
+         *
+         * <p>Sources disambiguate their own duplicates in the name -- "Sierra Peak
+         * (Corona)", "Black Mtn (RVC)", "Bertha Pk (Big Bear)" -- and the qualifier
+         * is a nearby town, a landmark or a unit code rather than where the mountain
+         * is. Sierra Peak is not in Corona. On a map that already answers where it
+         * is, the words are noise. {@link #name} keeps the full form, so two
+         * mountains sharing one name stay two sites.
+         */
+        public String label() {
+            final int p = name.lastIndexOf(" (");
+            return p > 0 && name.endsWith(")") ? name.substring(0, p) : name;
+        }
     }
 
     /** One net on one site. */

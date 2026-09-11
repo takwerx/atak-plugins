@@ -326,8 +326,12 @@ public final class SiteLayer {
     }
 
     private void update(Marker m, Site s) {
-        m.setTitle(s.name);
-        m.setMetaString("callsign", s.name);
+        // The label on the map drops a source's own qualifier: the map is already
+        // showing where the mountain is, so "(Corona)" after Sierra Peak is noise,
+        // and Sierra Peak is not in Corona anyway.
+        final String label = s.label();
+        m.setTitle(label);
+        m.setMetaString("callsign", label);
         m.setMetaString("remarks", remarks(s));
         m.setMetaBoolean(META_VIEWSHED, viewsheds.contains(s.id));
         applyIcon(m, s);

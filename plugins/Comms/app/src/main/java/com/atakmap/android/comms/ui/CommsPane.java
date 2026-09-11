@@ -1108,6 +1108,38 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         return b.toString();
     }
 
+    /**
+     * A channel as it should read: the designator, with the abbreviations a call plan
+     * uses for a net spelled out.
+     *
+     * <p>"OES V4" is what that channel is called and stays as it is. "ANF FN" is not
+     * a name, it is "ANF Forest Net" with the words taken out, so they go back in.
+     * Only these tokens are touched; nothing else about a designator is guessed at.
+     */
+    static String netLabel(String designator) {
+        final String[] parts = designator.split(" ");
+        final StringBuilder b = new StringBuilder();
+        for (String p : parts) {
+            if (b.length() > 0)
+                b.append(' ');
+            if ("FN".equals(p))
+                b.append("Forest Net");
+            else if ("AN".equals(p))
+                b.append("Admin Net");
+            else if ("SVC".equals(p))
+                b.append("Service Net");
+            else if ("FCSN".equals(p))
+                b.append("Fire Camp Service Net");
+            else if ("OPS".equals(p))
+                b.append("Operations Net");
+            else if ("EN".equals(p))
+                b.append("Emergency Net");
+            else
+                b.append(p);
+        }
+        return b.toString();
+    }
+
     private static String elevation(Site s) {
         double m = s.elevM;
         if (Double.isNaN(m)) {
@@ -1135,10 +1167,12 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         // The designator alone: it is what the channel is called and what the radio
         // display says. The plans' descriptive column ("OES Fire V4 (Previously OES
         // 2B)") is kept for the search to match on and is not put on screen.
-        b.append(c.net.id);
-        b.append(" · ").append(toneLine(c.effectiveRxTone(), c.net.rxToneText, c.effectiveTxTone(), c.net.txToneText));
-        if (!c.callsign.isEmpty())
-            b.append(" · ").append(c.callsign);
+        b.append(netLabel(c.net.id));
+        // Designator and the tone that opens it. The FCC callsign is the licence
+        // identifier for the station, not anything an operator sets on a radio, so it
+        // stays in the catalog and off the screen.
+        b.append(" · ").append(toneLine(c.effectiveRxTone(), c.net.rxToneText,
+                c.effectiveTxTone(), c.net.txToneText));
         return b.toString();
     }
 
@@ -1182,7 +1216,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         final Button viewshed = v.findViewById(R.id.viewshed);
 
         final StringBuilder b = new StringBuilder();
-        b.append(s.name).append('\n');
+        b.append(s.label()).append('\n');
         if (!s.county.isEmpty())
             b.append(s.county).append(" County, ");
         b.append(s.st);
@@ -1214,10 +1248,10 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         for (Channel c : s.channels) {
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.net_row, null);
             ((TextView) row.findViewById(R.id.title)).setText(
-                    c.net.id);
+                    netLabel(c.net.id));
             ((TextView) row.findViewById(R.id.line)).setText(
-                    toneLine(c.effectiveRxTone(), c.net.rxToneText, c.effectiveTxTone(), c.net.txToneText)
-                    + (c.callsign.isEmpty() ? "" : " · " + c.callsign));
+                    toneLine(c.effectiveRxTone(), c.net.rxToneText,
+                            c.effectiveTxTone(), c.net.txToneText));
             // Designator, tone, callsign, and nothing else. The plans' prose about
             // what a site covers is what the viewshed answers, and where a row came
             // from is not ours to put on screen. Both are kept in the catalog and
@@ -1332,7 +1366,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                 if (v == null)
                     v = PluginLayoutInflater.inflate(pluginContext, R.layout.net_row, null);
                 final Net n = r.net;
-                ((TextView) v.findViewById(R.id.title)).setText(n.id);
+                ((TextView) v.findViewById(R.id.title)).setText(netLabel(n.id));
                 ((TextView) v.findViewById(R.id.line)).setText(netLine(n));
                 final TextView note = v.findViewById(R.id.note);
                 note.setText(n.portable ? "portable repeater, deployed per incident"
@@ -1344,7 +1378,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             if (v == null)
                 v = PluginLayoutInflater.inflate(pluginContext, R.layout.site_row, null);
             final Site s = r.site;
-            ((TextView) v.findViewById(R.id.name)).setText(s.name);
+            ((TextView) v.findViewById(R.id.name)).setText(s.label());
             final StringBuilder d = new StringBuilder();
             final String dist = distanceLine(r);
             if (!dist.isEmpty())
