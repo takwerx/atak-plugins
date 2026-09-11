@@ -52,7 +52,8 @@ allows it.
 _________________________________________________________________
 POINT OF CONTACTS
 
-takwerx. Bug reports and requests: https://github.com/takwerx/comms/issues
+Andreas Johansson, takwerx
+https://github.com/takwerx/comms/issues
 
 _________________________________________________________________
 PORTS REQUIRED
