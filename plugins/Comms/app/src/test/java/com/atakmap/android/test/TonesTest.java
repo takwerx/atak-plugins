@@ -30,29 +30,27 @@ public class TonesTest {
 
     @Test
     public void aForestRepeaterShowsTheSiteToneAlone() {
-        // Angeles forest net at Frazier Mountain: transmit Tone 8, no receive tone.
-        assertEquals("Tone 8 (103.5)", Tones.line(NONE, "", 103.5, ""));
+        // Angeles forest net at Frazier Mountain: dial Tone 8 to open it.
+        assertEquals("Tone 8 (103.5)", Tones.line(103.5, "", NONE, ""));
     }
 
     @Test
-    public void aCalFireCommandNetShowsBothSides() {
-        // Every CDF command net receives on Tone 8 and transmits the site's own tone.
-        assertEquals("TX Tone 3 (131.8) · RX Tone 8 (103.5)",
-                Tones.line(103.5, "", 131.8, ""));
+    public void onlyTheAccessToneIsShown() {
+        // A CDF command net site: Tone 3 opens this mountain, and the net's own
+        // 103.5 is the same at every site on Command 1, so it is not shown.
+        assertEquals("Tone 3 (131.8)", Tones.line(131.8, "", 103.5, ""));
     }
 
     @Test
-    public void oneToneBothWaysIsPrintedOnce() {
-        // VFIRE 21, simplex, Tone 6 each way.
-        assertEquals("Tone 6 (156.7)", Tones.line(156.7, "", 156.7, ""));
+    public void theNetsToneStandsInWhenTheSiteHasNone() {
+        // VFIRE 21 is simplex on Tone 6; there is no per-site tone to prefer.
+        assertEquals("Tone 6 (156.7)", Tones.line(NONE, "", 156.7, ""));
     }
 
     @Test
     public void anOperatorSelectedToneSaysSo() {
-        // NIFC command nets: carrier squelch in, operator picks the tone out.
-        assertEquals("site tone", Tones.line(NONE, "", NONE, "OST"));
-        // A CDF command net with no site: tone protected in, operator selects out.
-        assertEquals("RX Tone 8 (103.5) · TX site tone", Tones.line(103.5, "", NONE, "OST"));
+        // The plans' OST: the net fixes no tone, the site does, and we do not know it.
+        assertEquals("site tone", Tones.line(NONE, "OST", NONE, ""));
     }
 
     @Test

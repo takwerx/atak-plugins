@@ -71,32 +71,29 @@ public final class Tones {
     }
 
     /**
-     * The tone line for a channel or a net, as an operator reads it off a call plan.
+     * The one tone an operator needs: what you transmit to open this repeater.
      *
-     * <p>Almost always one tone: what you transmit to open the repeater, "Tone 8
-     * (103.5)". Both sides appear only when the receive side is tone protected on a
-     * different tone, which is how CAL FIRE runs its command nets: every site
-     * receives on Tone 8 and answers to the site's own tone on transmit.
+     * <p>A call plan prints two. The access tone is the site's own and is the number
+     * you dial to key that mountain; the other is the net's, identical at every site
+     * on the net, so it can never tell you which repeater to use. Only the access
+     * tone is shown (operator, 2026-09-10: "just need the tone to access the
+     * repeater").
      *
-     * <p>"site tone" is the plans' OST, operator selectable tone: the net does not
-     * fix one, the site does.
+     * <p>"site tone" is the plans' OST, operator selectable tone: the net fixes no
+     * tone, the site does, and this catalog does not know it.
      *
-     * @param rxHz   receive tone in Hz, or NaN
-     * @param rxText what the plan printed when there is no fixed receive tone
-     * @param txHz   transmit tone in Hz, or NaN
-     * @param txText what the plan printed when there is no fixed transmit tone
+     * @param accessHz   the site's own tone in Hz, or NaN
+     * @param accessText what the plan printed when the site fixes no tone
+     * @param netHz      the net-wide tone in Hz, used only when the site has none
+     * @param netText    what the plan printed for the net
      */
-    public static String line(double rxHz, String rxText, double txHz, String txText) {
-        final String r = describe(rxHz, rxText);
-        final String t = describe(txHz, txText);
-        final boolean txKnown = !Double.isNaN(txHz);
-        final boolean rxKnown = !Double.isNaN(rxHz);
-        if (txKnown && rxKnown && !r.equals(t))
-            return "TX " + t + " · RX " + r;
-        if (txKnown)
-            return t;
-        if (rxKnown)
-            return "RX " + r + (txText == null || txText.isEmpty() ? "" : " · TX " + t);
+    public static String line(double accessHz, String accessText, double netHz, String netText) {
+        if (!Double.isNaN(accessHz))
+            return describe(accessHz, accessText);
+        if (!Double.isNaN(netHz))
+            return describe(netHz, netText);
+        final String t = describe(Double.NaN, accessText != null && !accessText.isEmpty()
+                ? accessText : netText);
         return "none".equals(t) ? "no tone" : t;
     }
 

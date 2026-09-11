@@ -1143,9 +1143,14 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         return toneLine(n.rxTone, n.rxToneText, n.txTone, n.txToneText);
     }
 
-    /** The tone line, formatted where the tone table lives so a test can reach it. */
+    /**
+     * The tone that opens this repeater, formatted where the tone table lives so a
+     * test can reach it. The access tone is the one a mobile transmits, which is the
+     * site's own; the receive tone belongs to the net and is the same everywhere on
+     * it, so it is not shown.
+     */
     static String toneLine(double rx, String rxText, double tx, String txText) {
-        return Tones.line(rx, rxText, tx, txText);
+        return Tones.line(tx, txText, rx, rxText);
     }
 
     private static String netsSummary(Site s) {
