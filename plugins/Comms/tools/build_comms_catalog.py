@@ -162,6 +162,21 @@ def net_agency(designator):
     return "Local"
 
 
+# The two nets that are deliberately on no site.
+#
+# Everything else in this catalog exists because a mountain carries it, and a net
+# with no site is dropped. These two are not a gap in the data: CDF Command 5 and
+# Command 11 are incident portables, carried to the fire and set up there, so there
+# is no mountain to name and there never will be. Searching for the plugin's own
+# headline question -- "closest Command 5" -- and getting silence reads as broken,
+# so they are kept, flagged, and never listed or drawn: the pane answers in a line
+# of status text instead.
+PORTABLE_NETS = [
+    dict(id="CDF C5", name="CDF Command 5", agency="CAL FIRE"),
+    dict(id="CDF C11", name="CDF Command 11", agency="CAL FIRE"),
+]
+
+
 def slug(s):
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
@@ -1032,11 +1047,17 @@ def build(args):
     if siteless:
         print("  %d nets dropped: on no site" % len(siteless))
     nets = [n for n in nets if n["id"] in used]
+    for pn in PORTABLE_NETS:
+        if pn["id"] not in used:
+            nets.append(S(id=pn["id"], name=pn["name"], agency=pn["agency"], rx="", tx="",
+                          rx_tone=None, tx_tone="OST", band="N", power="L", mode="A",
+                          config="Mobile-Portable", usage="", remarks=pn["name"], portable=True))
+    print("  %d incident portables kept, flagged, never listed" % len(PORTABLE_NETS))
     catalog = S(format=FORMAT, generated=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 sources=sources, tones={str(k): v for k, v in TONES.items()}, nets=nets, sites=out_sites,
                 channels=channels)
-    print("catalog: %d nets, %d sites, %d channels -- every net on a site, every site with a net"
-          % (len(nets), len(out_sites), len(channels)))
+    print("catalog: %d nets, %d sites, %d channels -- every site with a net, and every net on a"
+          " site bar the %d portables" % (len(nets), len(out_sites), len(channels), len(PORTABLE_NETS)))
     with_nets = len({c["site"] for c in channels})
     print("  sites carrying a net: %d; where-only: %d" % (with_nets, len(out_sites) - with_nets))
     for c in channels:

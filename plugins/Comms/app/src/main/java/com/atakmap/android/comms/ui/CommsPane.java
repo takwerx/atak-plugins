@@ -963,12 +963,19 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
 
         // Every net in the catalog is on a site, so a query that matches a net
         // always has sites to show. There is nothing to list that cannot be gone to.
+        // The net the query names, preferring a portable: those are the only nets in
+        // the catalog with no site, and a search that finds one has nothing to list,
+        // so the status line is the whole answer.
         Net named = null;
         if (!q.isEmpty())
             for (Net n : c.nets)
                 if (netMatches(n, q)) {
-                    named = n;
-                    break;
+                    if (named == null)
+                        named = n;
+                    if (n.portable) {
+                        named = n;
+                        break;
+                    }
                 }
 
         final List<Site> forMap = new ArrayList<>();
@@ -1018,6 +1025,11 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             b.append(" within ").append(radiusLabel((int) radiusBig));
         if (!q.isEmpty())
             b.append(" match “").append(search.getText().toString().trim()).append("”");
+        // An incident portable is carried to the fire, so there is no mountain to
+        // list. Saying nothing reads as the plugin being broken; say what it is.
+        if (named != null && named.portable && rows.isEmpty())
+            b.append(" · ").append(netLabel(named.id))
+                    .append(" is an incident portable, set up at the incident, so it is on no site");
         if (meViewshedOn) {
             if (losPending)
                 b.append(" · checking line of sight…");
