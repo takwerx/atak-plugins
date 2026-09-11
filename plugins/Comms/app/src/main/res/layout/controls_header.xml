@@ -6,41 +6,14 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <TextView
+    <!-- Re-reads the catalog from the depot now rather than once a day. -->
+    <Button
+        style="@style/TakwerxButton"
+        android:id="@+id/sync"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Find a site, net, frequency or tone"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="2dp"
-        android:alpha="0.6" />
-
-    <!-- Clear sits beside the box and is disabled while it is empty, so a live Clear
-         button is the pane saying a search is filtering the list. -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:baselineAligned="false">
-
-        <EditText
-            android:id="@+id/search"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:hint="@string/search_hint"
-            android:inputType="text"
-            android:maxLines="1"
-            android:textSize="14sp" />
-
-        <Button
-            style="@style/TakwerxButton"
-            android:id="@+id/search_clear"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:text="@string/clear" />
-    </LinearLayout>
+        android:layout_marginTop="4dp"
+        android:text="@string/resync" />
 
     <TextView
         android:layout_width="match_parent"
@@ -190,14 +163,41 @@
         android:textSize="11sp"
         android:alpha="0.8" />
 
-    <!-- Re-reads the catalog from the depot now rather than once a day. -->
-    <Button
-        style="@style/TakwerxButton"
-        android:id="@+id/sync"
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/resync" />
+        android:text="Find a site, net, frequency or tone"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:paddingTop="2dp"
+        android:alpha="0.6" />
+
+    <!-- Clear sits beside the box and is disabled while it is empty, so a live Clear
+         button is the pane saying a search is filtering the list. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <EditText
+            android:id="@+id/search"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:hint="@string/search_hint"
+            android:inputType="text"
+            android:maxLines="1"
+            android:textSize="14sp" />
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/search_clear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:text="@string/clear" />
+    </LinearLayout>
 
     <TextView
         android:layout_width="match_parent"
