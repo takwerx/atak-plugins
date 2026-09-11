@@ -189,7 +189,28 @@ public final class SiteLayer {
     /** @param metersPerPixel sites draw at or below this; larger means zoomed out */
     public void setMaxResolution(double metersPerPixel) {
         maxResolution = metersPerPixel;
+        for (Marker m : markers.values())
+            labelWithTheIcon(m);
         applyZoomGate();
+    }
+
+    /**
+     * Show a site's name whenever its marker is drawn.
+     *
+     * <p>ATAK labels a marker only from 10 m per pixel inward, which is several
+     * pinches closer than the zoom these markers appear at, so a screen of repeaters
+     * was a screen of anonymous diamonds. The label window is therefore the same
+     * threshold the markers themselves use: if the dot is on the map its name is
+     * readable, and the operator moves both together with the zoom presets.
+     */
+    private void labelWithTheIcon(Marker m) {
+        try {
+            m.setMaxLabelRenderResolution(maxResolution >= Float.MAX_VALUE / 2
+                    ? Double.MAX_VALUE : maxResolution);
+            m.setMinLabelRenderResolution(Marker.DEFAULT_MIN_LABEL_RENDER_RESOLUTION);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not widen the label range", notThisBuild);
+        }
     }
 
     public double getMaxResolution() {
@@ -292,6 +313,7 @@ public final class SiteLayer {
             Log.w(TAG, "could not attach the radial menu", e);
         }
         m.setMetaBoolean("adapt_marker_icon", false);
+        labelWithTheIcon(m);
         applyIcon(m, s);
         return m;
     }
