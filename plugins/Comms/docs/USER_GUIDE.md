@@ -1,14 +1,14 @@
 # Comms — user guide
 
-**Download Comms 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Comms 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.1/ATAK-Plugin-Comms-0.1--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.1/ATAK-Plugin-Comms-0.1--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.1/ATAK-Plugin-Comms-0.1--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.2/ATAK-Plugin-Comms-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.2/ATAK-Plugin-Comms-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.2/ATAK-Plugin-Comms-0.2--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/comms/releases
 
-**Version 0.1** — first build. Screenshots follow once a signed build exists.
+**Version 0.2** — screenshots follow once a signed build exists.
 
 ## Before you start
 
