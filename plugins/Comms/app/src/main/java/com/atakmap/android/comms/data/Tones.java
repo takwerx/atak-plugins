@@ -58,17 +58,25 @@ public final class Tones {
         return d == null ? Double.NaN : d;
     }
 
-    /** "Tone 8 (103.5)", "103.5" for one outside the table, "none" for carrier squelch, or the text ("OST") as given. */
+    /** "Tone 8 (103.5)", "103.5" for one outside the table, or the text as given. */
     public static String describe(double hz, String text) {
         if (!Double.isNaN(hz)) {
             final int n = numberOf(hz);
             final String v = String.format(Locale.US, "%.1f", hz);
             return n > 0 ? "Tone " + n + " (" + v + ")" : v;
         }
+        // OST is a property of a frequency, never of a repeater: the plan leaves the
+        // tone to the operator. The repeater still has one fixed tone that opens it,
+        // and if this catalog does not carry it, the honest answer is that it does not
+        // (operator, 2026-09-11: "a frequency can be OST, a site can never be OST, a
+        // site has a fixed tone").
         if (text != null && !text.isEmpty())
-            return "OST".equals(text) ? "site tone" : text;
+            return "OST".equals(text) ? NOT_LISTED : text;
         return "none";
     }
+
+    /** What a site's tone line says when the catalog does not carry the tone. */
+    private static final String NOT_LISTED = "tone not listed";
 
     /**
      * The one tone an operator needs: what you transmit to open this repeater.
@@ -79,11 +87,14 @@ public final class Tones {
      * tone is shown (operator, 2026-09-10: "just need the tone to access the
      * repeater").
      *
-     * <p>"site tone" is the plans' OST, operator selectable tone: the net fixes no
-     * tone, the site does, and this catalog does not know it.
+     * <p>Every repeater has one fixed tone. When this catalog does not carry it the
+     * line says so rather than implying the operator picks it: "tone not listed", or
+     * the reason when a source gives one ("trunked" for a digital trunked channel,
+     * which has no CTCSS tone at all, "tone not published" where the plan withholds
+     * it). Never "site tone" -- a site's tone is never operator selectable.
      *
      * @param accessHz   the site's own tone in Hz, or NaN
-     * @param accessText what the plan printed when the site fixes no tone
+     * @param accessText what the plan printed in place of the site's tone
      * @param netHz      the net-wide tone in Hz, used only when the site has none
      * @param netText    what the plan printed for the net
      */
@@ -94,7 +105,11 @@ public final class Tones {
             return describe(netHz, netText);
         final String t = describe(Double.NaN, accessText != null && !accessText.isEmpty()
                 ? accessText : netText);
-        return "none".equals(t) ? "no tone" : t;
+        if ("none".equals(t))
+            return NOT_LISTED;
+        // A trunked channel carries no CTCSS tone at all, which is a different fact
+        // from one this catalog is missing, so it is said in full.
+        return "trunked".equals(t) ? "trunked, no tone" : t;
     }
 
     /**

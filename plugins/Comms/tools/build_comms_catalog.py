@@ -89,6 +89,23 @@ S = lambda **k: k  # noqa: E731
 
 # ---- fetching ----------------------------------------------------------------------
 
+
+def net_tone_note(row):
+    """Why a net carries no tone, in words, or None when the source does not say.
+
+    A repeater always has one fixed tone. Where this catalog has none, the line has
+    to say which kind of nothing it is: a digital trunked channel has no CTCSS tone
+    at all, and a plan that withholds one is a tone we do not hold. OST is never the
+    answer -- it is a property of a frequency, and a site is not a frequency
+    (operator, 2026-09-11).
+    """
+    note = (row.get("notes") or "").lower()
+    if "trunked" in note:
+        return "trunked"
+    if "not published" in note:
+        return "tone not published"
+    return None
+
 def cached(key, fetch, refresh=False, binary=False):
     """Run fetch() once and keep its result under the cache directory."""
     os.makedirs(CACHE, exist_ok=True)
@@ -637,7 +654,7 @@ def build(args):
             if net and net not in by_id:
                 rep_tx, rep_rx = (a.get("TX_FREQ") or "").strip(), (a.get("RX_FREQ") or "").strip()
                 by_id[net] = S(id=net, name=net, agency="Cal OES", rx=rep_tx, tx=rep_rx, rx_tone=None,
-                               tx_tone="OST", band="N", power="H", mode="A", config="Base-Fixed-Mobile",
+                               tx_tone=None, band="N", power="H", mode="A", config="Base-Fixed-Mobile",
                                usage="", remarks=title, portable=False)
                 nets.append(by_id[net])
             if net:
@@ -890,7 +907,7 @@ def build(args):
             by_id[net] = S(id=net, name=r.get("net_name") or r.get("net"),
                            agency=r.get("agency") or "Local", rx=r["rx"], tx=r["tx"],
                            rx_tone=tone_value(r.get("net_rx_tone")),
-                           tx_tone=tone_value(r.get("net_tx_tone") or "OST"),
+                           tx_tone=tone_value(r.get("net_tx_tone")) or net_tone_note(r),
                            band="N", power="", mode="A", config="", usage="",
                            remarks=r.get("net_name", ""), portable=False)
             nets.append(by_id[net])
@@ -1050,7 +1067,7 @@ def build(args):
     for pn in PORTABLE_NETS:
         if pn["id"] not in used:
             nets.append(S(id=pn["id"], name=pn["name"], agency=pn["agency"], rx="", tx="",
-                          rx_tone=None, tx_tone="OST", band="N", power="L", mode="A",
+                          rx_tone=None, tx_tone=None, band="N", power="L", mode="A",
                           config="Mobile-Portable", usage="", remarks=pn["name"], portable=True))
     print("  %d incident portables kept, flagged, never listed" % len(PORTABLE_NETS))
     catalog = S(format=FORMAT, generated=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
