@@ -324,6 +324,12 @@ class Sites:
         key = norm_name(name)
         for s in self.sites:
             d = haversine(lat, lon, s["lat"], s["lon"])
+            # One source listing two names is listing two sites, however close they
+            # sit. The BDC app has Oak Crest 13 m from Del Mar Heights, carrying the
+            # same three channels on a different tone, which is proof they are not
+            # the same repeater.
+            if source and source in s["sources"] and norm_name(s["name"]) != key:
+                continue
             if d <= self.NEAR_M or (d <= self.SAME_NAME_M and norm_name(s["name"]) == key):
                 if priority < s["_prio"]:
                     s["name"], s["lat"], s["lon"], s["_prio"] = name, lat, lon, priority
@@ -799,6 +805,8 @@ def build(args):
 
     n_rows = 0
     per_file = {}
+    seen_channels = {}
+    conflicts = []
     for r in parsed:                                   # every placed row becomes a channel
         site = placed.get(id(r))
         if site is None:
@@ -811,9 +819,10 @@ def build(args):
         if not net:
             continue
         if net not in by_id:
-            if not (r.get("rx") and r.get("tx")):
-                raise SystemExit("%s: net %r is not in the plan and the row has no rx/tx"
-                                 % (r["_label"], net))
+            # A row file may carry no frequencies at all -- one source gives sites,
+            # channels and tones and nothing else, by the operator's instruction. Such
+            # a net exists for its name and its tone per site; the pane shows a tone on
+            # a site either way.
             # The net's own tones, NOT this row's: a repeater net has one pair and a
             # different tone at every site, and the first site's tone is not the net's.
             by_id[net] = S(id=net, name=r.get("net_name") or r.get("net"),
@@ -825,19 +834,39 @@ def build(args):
             nets.append(by_id[net])
         rxt = tone_value(r.get("rx_tone"))
         txt_ = tone_value(r.get("tx_tone"))
-        channels.append(S(site=site, net=net, callsign=r.get("callsign", ""),
-                          tx_tone=txt_ if isinstance(txt_, float) else None,
-                          tx_tone_num=TONE_NUMBER.get(txt_) if isinstance(txt_, float) else None,
-                          rx_tone=rxt if isinstance(rxt, float) else None,
-                          rx_tone_num=TONE_NUMBER.get(rxt) if isinstance(rxt, float) else None,
-                          notes=r.get("notes", ""), source=r.get("source") or r["_label"],
-                          as_of=r.get("as_of") or today))
+        # One site carries one net once, however many sources describe it. The first
+        # row file named wins; a second source agreeing is silent and a second source
+        # disagreeing about the tone is reported, because that is a fact one of them
+        # has wrong and a person has to settle.
+        key = (id(site), net)
+        if key in seen_channels:
+            first = seen_channels[key]
+            if isinstance(txt_, float) and isinstance(first["tx_tone"], float) \
+                    and abs(txt_ - first["tx_tone"]) > 0.05:
+                conflicts.append((site["name"], net, first["source"], first["tx_tone"],
+                                  r.get("source") or r["_label"], txt_))
+            continue
+        ch = S(site=site, net=net, callsign=r.get("callsign", ""),
+               tx_tone=txt_ if isinstance(txt_, float) else None,
+               tx_tone_num=TONE_NUMBER.get(txt_) if isinstance(txt_, float) else None,
+               rx_tone=rxt if isinstance(rxt, float) else None,
+               rx_tone_num=TONE_NUMBER.get(rxt) if isinstance(rxt, float) else None,
+               notes=r.get("notes", ""), source=r.get("source") or r["_label"],
+               as_of=r.get("as_of") or today)
+        seen_channels[key] = ch
+        channels.append(ch)
         n_rows += 1
         per_file[r["_label"]] = per_file.get(r["_label"], 0) + 1
     for label, n in sorted(per_file.items()):
         print("%s: %d net rows" % (label, n))
         sources.append(S(id=slug(label), title="Operator rows (" + label + ")", url="",
                          as_of=today, kind="sites+channels"))
+    if conflicts:
+        print("  %d site/net pairs where the sources disagree about the tone:" % len(conflicts),
+              file=sys.stderr)
+        for site, net, s1, t1, s2, t2 in sorted(set(conflicts)):
+            print("    %-22s %-12s %s says %.1f, %s says %.1f"
+                  % (site, net, s1, t1, s2, t2), file=sys.stderr)
     if unplaced:
         print("  %d rows could not be placed:" % len(unplaced), file=sys.stderr)
         for label, name, net, why in sorted(set(unplaced)):
@@ -855,6 +884,25 @@ def build(args):
             s["elev_m"] = elevation_m(s["lat"], s["lon"], args.refresh)
 
     # ---- ids, agencies, output --------------------------------------------------------------
+    # One site carries one net once, whatever mix of sources described it: the GIS
+    # layers add channels directly and the row files add more, and Santiago Peak was
+    # listing OES V4 twice because of it. First wins; a real disagreement about the
+    # tone is reported rather than quietly dropped.
+    deduped, seen = [], {}
+    for ch in channels:
+        key = (id(ch["site"]), ch["net"])
+        if key in seen:
+            a, b = seen[key].get("tx_tone"), ch.get("tx_tone")
+            if isinstance(a, float) and isinstance(b, float) and abs(a - b) > 0.05:
+                conflicts.append((ch["site"]["name"], ch["net"], seen[key]["source"], a,
+                                  ch["source"], b))
+            continue
+        seen[key] = ch
+        deduped.append(ch)
+    if len(deduped) != len(channels):
+        print("  %d duplicate site/net rows folded together" % (len(channels) - len(deduped)))
+    channels = deduped
+
     ids = set()
     for s in sites.sites:
         base = s["st"].lower() + "-" + slug(s["name"])
