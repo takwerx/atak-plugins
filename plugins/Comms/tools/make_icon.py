@@ -28,7 +28,7 @@ MARKER = 48
 SEEN = (0x3D, 0xDC, 0x61, 255)
 
 
-def outline_diamond(px):
+def outline_diamond(px, margin=0.0):
     """
     The operator's own icon, 2026-09-11: the diamond as an outline on black, with
     the standard's white dot and arcs inside it.
@@ -37,12 +37,18 @@ def outline_diamond(px):
     GeoOps symbology and heavy as an app icon -- at launcher size it reads as a
     blue blob. Drawn as a stroke the shape is still the repeater symbol and the
     marks inside it are what the eye lands on.
+
+    <p>{@code margin} is the empty border as a fraction of the square, and the
+    default of none is deliberate: ATAK draws every toolbar icon in the same
+    square, so a glyph with padding reads smaller than its neighbours. The
+    toolbar copy spans the full 256 edge to edge, the way PLSS's grid does, and
+    the launcher glyph is sized instead by the tile it sits on.
     """
     s = px * SS
     im = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     c = s / 2
-    m = 0.10 * s
+    m = margin * s
     w = 0.055 * s
     # Two polygons rather than a stroked line: a stroke closes with a joint at the
     # top vertex and leaves a nick there. Filling the outer diamond and clearing an
@@ -117,8 +123,9 @@ def main():
 
     tile = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     ImageDraw.Draw(tile).rounded_rectangle([0, 0, SIZE - 1, SIZE - 1], radius=48, fill=(0, 0, 0, 255))
-    g = outline_diamond(220)
-    tile.alpha_composite(g, ((SIZE - 220) // 2, (SIZE - 220) // 2))
+    # 196 of 256 on the tile, the size every takwerx launcher glyph uses.
+    g = outline_diamond(196)
+    tile.alpha_composite(g, ((SIZE - 196) // 2, (SIZE - 196) // 2))
     tile.save(os.path.join(OUT, "ic_launcher.png"))
     tile.save(os.path.join(HERE, "..", "docs", "user_manual", "plugin_icon.png"))
     print("wrote ic_marker.png (%dx%d), ic_marker_seen.png (%dx%d), ic_toolbar.png, ic_launcher.png"
