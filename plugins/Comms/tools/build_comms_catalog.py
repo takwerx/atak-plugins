@@ -8,9 +8,9 @@ a net is a row in a source below, never a plugin release.
 
 Two tables, joined by net designator:
 
-  nets      one row per channel in FIRESCOPE MACS 441-1 (the statewide plan): the
-            designator ("CDF C5"), its name, RX/TX as programmed in a mobile, default
-            tones, and remarks. Parsed out of the PDF, so a plan update is a re-run.
+  nets      one row per net that is on at least one site: the
+            designator ("CDF C5"), its name and its agency. A net exists here
+            only because a site carries it.
   sites     where: name, coordinates, county, ground elevation, manager.
   channels  one net on one site: designator, site, callsign, the tone used AT THAT
             SITE, notes, source, as-of date. A channel never restates a frequency.
@@ -28,7 +28,7 @@ Usage:
     ./build_comms_catalog.py --dry-run                 # fetch, parse, report only
     ./build_comms_catalog.py --out catalog.json --upload   # and rclone to R2
 
-Needs pdftotext (poppler) for the MACS plan. Network fetches are cached under
+Network fetches are cached under
 ~/.cache/takwerx-comms/ ; --refresh throws the cache away.
 """
 
@@ -51,8 +51,6 @@ CACHE = os.path.expanduser("~/.cache/takwerx-comms")
 HERE = os.path.dirname(os.path.abspath(__file__))
 FORMAT = 1
 
-MACS_URL = "https://firescope.caloes.ca.gov/ICS%20Documents/MACS%20441-1.pdf"
-MACS_SOURCE = "FIRESCOPE MACS 441-1"
 
 CALOES = "https://services.arcgis.com/BLN4oKB0N1YSgvY8/arcgis/rest/services"
 FIRENET_RELAYS = CALOES + "/FIRENET_Mobile_Relays/FeatureServer/0"
@@ -133,22 +131,7 @@ def arcgis_all(layer, where="1=1", fields="*", refresh=False):
         offset += len(feats)
 
 
-# ---- MACS 441-1: the nets dictionary -------------------------------------------------
-
-FREQ = re.compile(r"^\d{3}\.\d{3,4}$")
-USAGE = re.compile(r"^[\d, ]+,?$")
-CONFIG = re.compile(r"^\s*(Base-Fixed-|Mobile-|Base-|Fixed-)\s*(.*)$")
-
-
-def macs_text(refresh=False):
-    pdf = cached(MACS_URL, lambda: get(MACS_URL), refresh, binary=True)
-    path = os.path.join(CACHE, "macs441-1.pdf")
-    with open(path, "wb") as f:
-        f.write(pdf)
-    txt = subprocess.run(["pdftotext", "-layout", path, "-"], check=True, capture_output=True, text=True).stdout
-    m = re.search(r"^\s*([A-Z][a-z]+ 20\d\d)\s+MACS 441-1\s*$", txt, re.M)
-    return txt, (m.group(1) if m else "")
-
+# ---- sites ------------------------------------------------------------------------------
 
 def tone_value(s):
     """
@@ -178,102 +161,6 @@ def net_agency(designator):
             return agency
     return "Local"
 
-
-def parse_macs(txt):
-    """
-    The ICS 217A tables as pdftotext -layout lays them out: a row is a config line
-    ("Base-Fixed-", sometimes with the usage notes' first half and a remark
-    fragment), the channel number, "Mobile"/"Portable", then the data line. The name
-    lives on the data line, or on its own line above it when the usage notes are long
-    (every NIFC row). A remark can run onto the next line.
-    """
-    nets, seen = [], {}
-    lines = txt.split("\n")
-    pending_name = None
-    config = ""
-    usage_prefix = ""
-    remark_prefix = ""
-    for i, raw in enumerate(lines):
-        line = raw.rstrip()
-        if not line.strip():
-            continue
-        m = CONFIG.match(line)
-        if m:
-            config = m.group(1).rstrip("-")
-            rest = m.group(2).strip()
-            usage_prefix = rest if USAGE.match(rest) else ""
-            remark_prefix = rest if rest and not USAGE.match(rest) else ""
-            continue
-        s = line.strip()
-        if s in ("Mobile", "Portable", "Fixed", "Base"):
-            config = config + "-" + s if config else s
-            continue
-        if re.fullmatch(r"\d{1,3}", s):
-            continue  # the channel number
-        fields = re.split(r"\s{2,}", s)
-        fi = next((k for k, f in enumerate(fields) if FREQ.match(f)), None)
-        if fi is None:
-            # A name on its own line, waiting for its data line below.
-            if len(fields) == 1 and len(s) <= 24 and line.startswith(" " * 20) and not line.startswith(" " * 34):
-                pending_name = s
-            continue
-        if len(fields) < fi + 6:
-            continue
-        before = fields[:fi]
-        name, usage = None, ""
-        for f in before:
-            if USAGE.match(f):
-                usage = f
-            elif name is None:
-                name = f
-        if name is None:
-            name = pending_name
-        pending_name = None
-        if not name:
-            continue
-        rx, rxt, tx, txt_ = fields[fi], fields[fi + 1], fields[fi + 2], fields[fi + 3]
-        if not FREQ.match(tx):
-            continue
-        tail = fields[fi + 4:]
-        band = tail[0] if tail else ""
-        power = tail[1] if len(tail) > 1 else ""
-        mode, remarks = "", ""
-        if len(tail) > 2:
-            rest = " ".join(tail[2:])
-            mm = re.match(r"^([ADM])\s+(.*)$", rest)
-            if mm:
-                mode, remarks = mm.group(1), mm.group(2).strip()
-            else:
-                remarks = rest.strip()
-        # A remark that continued onto the next line, far right and without numbers.
-        nxt = lines[i + 1].rstrip() if i + 1 < len(lines) else ""
-        if nxt.startswith(" " * 100) and nxt.strip() and not re.search(r"\d{3}\.\d{3}", nxt) \
-                and not CONFIG.match(nxt) and nxt.strip() not in ("Mobile", "Portable"):
-            remarks = (remarks + " " + nxt.strip()).strip()
-        if remark_prefix:
-            remarks = (remark_prefix + " " + remarks).strip()
-        usage = (usage_prefix + " " + usage).strip(" ,") if usage_prefix else usage.strip(" ,")
-        designator = re.sub(r"\s+", " ", name).strip()
-        portable = "(Portable)" in remarks
-        # The remark is the net's descriptive name ("CDF Command 5") unless it is a
-        # site-and-tone list spilling over from the config line ("T-7 Chino Hills,
-        # T-3 Barstow, T-5 Big Bear"); then the designator is the name.
-        pretty = re.sub(r"\s*\(Portable\)", "", remarks).strip() or designator
-        if remark_prefix or re.search(r"\bT-?\d+\b", pretty):
-            pretty = designator
-        pretty = re.sub(r"Command(\d)", r"Command \1", pretty)
-        rec = S(id=designator, name=pretty, agency=net_agency(designator), rx=rx, tx=tx,
-                rx_tone=tone_value(rxt), tx_tone=tone_value(txt_), band=band, power=power,
-                mode=mode, config=config, usage=usage, remarks=remarks, portable=portable)
-        if designator in seen:
-            continue  # the plan repeats a few channels across bands; the first row is the VHF one
-        seen[designator] = rec
-        nets.append(rec)
-        usage_prefix = remark_prefix = ""
-    return nets
-
-
-# ---- sites ------------------------------------------------------------------------------
 
 def slug(s):
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
@@ -669,15 +556,29 @@ def build(args):
     today = datetime.date.today().isoformat()
     sources = []
 
-    # ---- nets: the plan ------------------------------------------------------------
-    txt, edition = macs_text(args.refresh)
-    nets = parse_macs(txt)
-    print("MACS 441-1 %s: %d channels" % (edition, len(nets)))
-    by_id = {n["id"]: n for n in nets}
-    for must in ("CDF C1", "CDF C5", "CDF C11", "OES V1", "OES V4", "CESRS", "NIFC C1", "VFIRE 21"):
-        if must not in by_id:
-            raise SystemExit("MACS parse lost %s; the layout changed, fix parse_macs()" % must)
-    sources.append(S(id="macs", title=MACS_SOURCE + " (" + edition + ")", url=MACS_URL, as_of=today, kind="nets"))
+    # ---- nets --------------------------------------------------------------------
+    # Every net in this catalog arrives attached to a site. There is no separate
+    # dictionary to start from.
+    #
+    # MACS 441-1 used to be that dictionary and it was the wrong shape for this
+    # plugin. It is the whole California channel plan, so most of what it carries
+    # has no repeater location and never will: of the 522 nets it produced, 152
+    # were simplex -- car to car, there is no repeater to stand anywhere -- 2 were
+    # incident portables, and 140 were repeater pairs whose mountain we do not
+    # know. Only 210 were on a site.
+    #
+    # It also put the same net in twice. The plan writes "RRU 2" where the record
+    # that knows the sites writes "RRU2 R", so a search for the plan's spelling
+    # found an entry with nine sites hiding behind an identical one with none.
+    # Eighteen pairs like that. And its table parse was bleeding the config column
+    # into the name ("10 Simplex", "294 Base-Fixed-Mob"), so some rows were not
+    # even data.
+    #
+    # The operator, 2026-09-11: "this is for fixed sites ok? everything needs a
+    # site", and then "just get rid of the macs 441 as useful". A net is now
+    # whatever a source that places sites says is on one.
+    nets = []
+    by_id = {}
 
     def net_key(s):
         """'OES-V1' in the Cal OES layers is 'OES V1' in the plan."""
@@ -714,22 +615,11 @@ def build(args):
                 notes.append("DTMF " + dtmf)
             if a.get("LAYER"):
                 notes.append({"MR-State": "state mobile relay", "MR-Area": "area mobile relay"}.get(a["LAYER"], a["LAYER"]))
-            # Cross-check the layer's pair against the plan rather than copying it in:
-            # a channel row never restates a frequency, and a disagreement is a finding.
+            # The layer names the net and gives its pair. There is no plan to check it
+            # against any more, so the first source to name a net defines it and the
+            # rest attach to it.
             override = {}
-            if net in by_id:
-                n = by_id[net]
-                rep_tx, rep_rx = (a.get("TX_FREQ") or "").strip(), (a.get("RX_FREQ") or "").strip()
-                if rep_tx and float(rep_tx) != float(n["rx"]) or rep_rx and float(rep_rx) != float(n["tx"]):
-                    # The site's pair disagrees with the plan. Neither is silently
-                    # trusted: the row carries the layer's pair as an override and
-                    # says so, and the operator sees both.
-                    print("  WARNING %s at %s: layer says rx %s / tx %s, plan says %s / %s" %
-                          (net, name, rep_tx, rep_rx, n["rx"], n["tx"]), file=sys.stderr)
-                    override = dict(rx=rep_tx, tx=rep_rx)
-                    notes.append("Cal OES lists this site as %s / %s, the plan has %s / %s" % (rep_tx, rep_rx, n["rx"], n["tx"]))
-            elif net:
-                print("  WARNING %s at %s is not in the plan; row kept with its own pair" % (net, name), file=sys.stderr)
+            if net and net not in by_id:
                 rep_tx, rep_rx = (a.get("TX_FREQ") or "").strip(), (a.get("RX_FREQ") or "").strip()
                 by_id[net] = S(id=net, name=net, agency="Cal OES", rx=rep_tx, tx=rep_rx, rx_tone=None,
                                tx_tone="OST", band="N", power="H", mode="A", config="Base-Fixed-Mobile",
@@ -1134,11 +1024,19 @@ def build(args):
     out_sites.sort(key=lambda s: (s["st"], s["label"].lower()))
     if dropped:
         print("  %d sites left out: a name and a coordinate, no channel on them" % dropped)
+    # A net on no site does not belong in a catalog of sites: it cannot be gone to,
+    # it cannot be checked for line of sight, and it has no tone that opens anything
+    # here. It would only ever be a row that answers nothing.
     used = {c["net"] for c in channels}
+    siteless = [n for n in nets if n["id"] not in used]
+    if siteless:
+        print("  %d nets dropped: on no site" % len(siteless))
+    nets = [n for n in nets if n["id"] in used]
     catalog = S(format=FORMAT, generated=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 sources=sources, tones={str(k): v for k, v in TONES.items()}, nets=nets, sites=out_sites,
                 channels=channels)
-    print("catalog: %d nets (%d on a site), %d sites, %d channels" % (len(nets), len(used), len(out_sites), len(channels)))
+    print("catalog: %d nets, %d sites, %d channels -- every net on a site, every site with a net"
+          % (len(nets), len(out_sites), len(channels)))
     with_nets = len({c["site"] for c in channels})
     print("  sites carrying a net: %d; where-only: %d" % (with_nets, len(out_sites) - with_nets))
     for c in channels:

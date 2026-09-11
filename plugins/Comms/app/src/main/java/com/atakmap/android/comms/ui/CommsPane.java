@@ -60,9 +60,11 @@ import java.util.Set;
  * and distances follow ATAK's own range unit.
  *
  * <p>When the search names a net, each row's subtitle is that net's line at that
- * site, so "closest Command 5" is answered by the list itself. A net with no fixed
- * site (CDF C5 and C11 are incident portables) is shown as its own card rather than
- * as an empty list.
+ * site, so "closest Command 1" is answered by the list itself.
+ *
+ * <p>Everything in here has a location. The catalog carries no net that is on no
+ * site, so there is never a row that cannot be gone to -- no cards for incident
+ * portables, no channels that exist only in a plan.
  */
 public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listener {
 
@@ -81,7 +83,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
      * one-state catalog should ever meet.
      */
     private static final int MAX_MAP = 1000;
-    private static final int MAX_NET_CARDS = 12;
 
     // Standing preferences: where you work and what you care to see. The search box
     // and the radius are per-task and deliberately not remembered.
@@ -184,22 +185,43 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         }
     };
 
-    /** Following the operator: re-sort when they have moved a useful distance. */
+    /**
+     * Following the operator: re-sort when the self marker moves.
+     *
+     * <p>This was a 20 second poll with a 250 m threshold, which is invisible to
+     * someone who has just dragged their own marker to see the list change -- the
+     * operator did exactly that with GPS off and read it as broken. ATAK tells us
+     * when the marker moves, so there is nothing to poll for; 50 m is enough to
+     * absorb a fix jittering in place without churning the list.
+     *
+     * <p>The callback does not arrive on the main thread. Touching a View from it
+     * is a native SIGSEGV with no Java stack trace, the same trap as
+     * {@code onMapMoved}, so it posts and coalesces.
+     */
     private GeoPoint lastFrom;
+    private static final double FOLLOW_M = 50;
     private final Runnable selfTick = new Runnable() {
         @Override
         public void run() {
-            if (!fromMapCenter) {
-                final GeoPoint me = selfPoint();
-                if (me != null && (lastFrom == null || distance(me, lastFrom) > 250)) {
-                    apply();
-                    if (meViewshedOn)
-                        refreshMeViewshed();
-                }
-            }
-            handler.postDelayed(this, 20_000);
+            if (fromMapCenter)
+                return;
+            final GeoPoint me = selfPoint();
+            if (me == null || (lastFrom != null && distance(me, lastFrom) <= FOLLOW_M))
+                return;
+            apply();
+            if (meViewshedOn)
+                refreshMeViewshed();
         }
     };
+
+    private final com.atakmap.android.maps.PointMapItem.OnPointChangedListener selfWatch =
+            new com.atakmap.android.maps.PointMapItem.OnPointChangedListener() {
+                @Override
+                public void onPointChanged(com.atakmap.android.maps.PointMapItem item) {
+                    handler.removeCallbacks(selfTick);
+                    handler.postDelayed(selfTick, 300);
+                }
+            };
 
     public CommsPane(Context pluginContext, MapView mapView) {
         this.pluginContext = pluginContext;
@@ -246,7 +268,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         updateButtons();
         updateZoomLabel();
         mapView.addOnMapMovedListener(mapWatch);
-        handler.postDelayed(selfTick, 20_000);
+        watchSelf(true);
         busy("Loading catalog…");
         store.load();
     }
@@ -262,6 +284,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     public void dispose() {
         handler.removeCallbacks(mapTick);
         handler.removeCallbacks(selfTick);
+        watchSelf(false);
         mapView.removeOnMapMovedListener(mapWatch);
         losWorker.shutdownNow();
         layer.dispose();
@@ -738,6 +761,33 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     // ---- where from -------------------------------------------------------------
 
     /** Where the device is, or null without a fix. */
+    /**
+     * Attach to or detach from the self marker's point.
+     *
+     * <p>ATAK replaces the self marker when the device identity changes, so the
+     * listener is attached to whatever marker is there now and re-attached on the
+     * next start rather than held for the plugin's life.
+     */
+    private com.atakmap.android.maps.PointMapItem watched;
+
+    private void watchSelf(boolean on) {
+        try {
+            if (watched != null) {
+                watched.removeOnPointChangedListener(selfWatch);
+                watched = null;
+            }
+            if (!on)
+                return;
+            final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
+            if (self != null) {
+                self.addOnPointChangedListener(selfWatch);
+                watched = self;
+            }
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "could not follow the self marker; the list will not re-sort as you move", e);
+        }
+    }
+
     private GeoPoint selfPoint() {
         try {
             final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
@@ -807,8 +857,34 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         return s == null ? "" : s.toLowerCase(Locale.US).replace('-', ' ').replaceAll("\\s+", " ").trim();
     }
 
+    /**
+     * A designator with the shorthand taken out, for matching what people type.
+     *
+     * <p>"CDF C5" is written a dozen ways out loud and every one of them should find
+     * it: CDF 5, cdf command 5, command 5, c5, CDF-C5. So the spoken words drop
+     * ("command", "net", "channel", "repeater"), the C that prefixes a channel
+     * number drops, and every space and dash goes. All three become "cdf5".
+     *
+     * <p>The operator, 2026-09-11: "we are not focusing on super strict if it
+     * sounds like cdf command 5 list it".
+     */
+    static String spoken(String s) {
+        String k = norm(s);
+        k = k.replaceAll("\\b(command|comand|cmd|channel|chan|net|repeater|tac|tactical)\\b", " ");
+        k = k.replaceAll("[^a-z0-9]", "");
+        // After the spaces and dashes go, not before: the plan writes "VNC C-5" and
+        // the record that has the sites writes "VNC C5 R", and only a C sitting
+        // directly on a digit can be dropped without eating a letter of a name.
+        return k.replaceAll("c(\\d)", "$1");
+    }
+
     private static boolean netMatches(Net n, String q) {
         if (norm(n.id).contains(q) || norm(n.name).contains(q) || norm(n.remarks).contains(q))
+            return true;
+        // Loosely, the way it is said rather than the way it is printed. Only when
+        // the query has something in it: an empty spoken form matches everything.
+        final String sq = spoken(q);
+        if (sq.length() >= 2 && (spoken(n.id).contains(sq) || spoken(n.name).contains(sq)))
             return true;
         if (q.matches("\\d{3}(\\.\\d*)?") && (n.rx.startsWith(q) || n.tx.startsWith(q)))
             return true;
@@ -885,26 +961,15 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             }
         });
 
-        // Nets the query names that have no fixed site here: the answer is the net
-        // itself, with its pair and tone, rather than an empty list.
-        final List<Row> cards = new ArrayList<>();
+        // Every net in the catalog is on a site, so a query that matches a net
+        // always has sites to show. There is nothing to list that cannot be gone to.
         Net named = null;
-        if (!q.isEmpty()) {
-            for (Net n : c.nets) {
-                if (!netMatches(n, q))
-                    continue;
-                if (named == null)
+        if (!q.isEmpty())
+            for (Net n : c.nets)
+                if (netMatches(n, q)) {
                     named = n;
-                boolean sited = false;
-                for (Site s : n.sites)
-                    if (state == null || s.st.equals(state)) {
-                        sited = true;
-                        break;
-                    }
-                if (!sited && cards.size() < MAX_NET_CARDS)
-                    cards.add(new Row(n));
-            }
-        }
+                    break;
+                }
 
         final List<Site> forMap = new ArrayList<>();
         for (Row r : rows) {
@@ -914,11 +979,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         }
         layer.show(forMap);
 
-        final List<Object> listRows = new ArrayList<>(cards.size() + rows.size() + 4);
-        if (!cards.isEmpty()) {
-            listRows.add(String.format(Locale.US, "Nets with no fixed site here (%,d)", cards.size()));
-            listRows.addAll(cards);
-        }
+        final List<Object> listRows = new ArrayList<>(rows.size() + 4);
         int seen = 0;
         if (meViewshedOn && !losPending) {
             // Three sections: what you can see, what you cannot, what is out of range.
@@ -945,8 +1006,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                 listRows.addAll(far);
             }
         } else {
-            if (!cards.isEmpty())
-                listRows.add(String.format(Locale.US, "Sites (%,d)", rows.size()));
             listRows.addAll(rows);
         }
         adapter.set(listRows);
@@ -959,9 +1018,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             b.append(" within ").append(radiusLabel((int) radiusBig));
         if (!q.isEmpty())
             b.append(" match “").append(search.getText().toString().trim()).append("”");
-        if (!cards.isEmpty())
-            b.append(String.format(Locale.US, " · %d net%s with no fixed site here, listed first",
-                    cards.size(), cards.size() == 1 ? "" : "s"));
         if (meViewshedOn) {
             if (losPending)
                 b.append(" · checking line of sight…");
@@ -1283,7 +1339,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
 
         private static final int TYPE_HEADING = 0;
         private static final int TYPE_SITE = 1;
-        private static final int TYPE_NET = 2;
 
         /** Each entry is a heading String, a site Row or a net Row. */
         private List<Object> rows = new ArrayList<>();
@@ -1318,7 +1373,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             final Object o = rows.get(i);
             if (o instanceof String)
                 return TYPE_HEADING;
-            return ((Row) o).site != null ? TYPE_SITE : TYPE_NET;
+            return TYPE_SITE;
         }
 
         @Override
@@ -1342,19 +1397,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                 return h;
             }
             final Row r = (Row) rows.get(position);
-            if (type == TYPE_NET) {
-                View v = convertView;
-                if (v == null)
-                    v = PluginLayoutInflater.inflate(pluginContext, R.layout.net_row, null);
-                final Net n = r.net;
-                ((TextView) v.findViewById(R.id.title)).setText(netLabel(n.id));
-                ((TextView) v.findViewById(R.id.line)).setText(netLine(n));
-                final TextView note = v.findViewById(R.id.note);
-                note.setText(n.portable ? "portable repeater, deployed per incident"
-                        : (n.simplex() ? "simplex, no repeater site" : "no site recorded for this net yet"));
-                note.setVisibility(View.VISIBLE);
-                return v;
-            }
             View v = convertView;
             if (v == null)
                 v = PluginLayoutInflater.inflate(pluginContext, R.layout.site_row, null);
