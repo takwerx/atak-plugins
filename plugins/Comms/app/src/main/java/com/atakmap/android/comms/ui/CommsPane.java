@@ -68,8 +68,19 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
 
     private static final String TAG = "CommsPane";
 
-    /** The map draws this many of the nearest sites; the status line says when it stopped. */
-    private static final int MAX_MAP = 300;
+    /**
+     * The map draws this many of the nearest sites; the status line says when it
+     * stopped.
+     *
+     * <p>It was 300, set when the catalog was expected to run to thousands. A
+     * California catalog is 387, so the cap was quietly discarding the farthest 87 --
+     * and "farthest" from anywhere in the middle of the state means the far north and
+     * the far south. Red Mtn in Del Norte was in the discarded tail while its row sat
+     * in the list, which reads as a missing site rather than a trimmed one. The cap
+     * is a guard against a catalog that grows several states wide, not something a
+     * one-state catalog should ever meet.
+     */
+    private static final int MAX_MAP = 1000;
     private static final int MAX_NET_CARDS = 12;
 
     // Standing preferences: where you work and what you care to see. The search box
