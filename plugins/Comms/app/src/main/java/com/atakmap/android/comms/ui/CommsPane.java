@@ -123,7 +123,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     private final Button stateButton, fromButton, radiusButton;
     private final LinearLayout agencyBox;
     private final TextView zoomLabel;
-    private final Button viewshedsOff, viewshedRange, meViewshed, meHeight, sync;
+    private final Button viewshedRange, meViewshed, meHeight, sync;
     private final TextView viewshedNote;
     private final RowAdapter adapter;
     private DetailHost detailHost;
@@ -212,7 +212,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         radiusButton = controls.findViewById(R.id.radius);
         agencyBox = controls.findViewById(R.id.agencies);
         zoomLabel = controls.findViewById(R.id.zoom_label);
-        viewshedsOff = controls.findViewById(R.id.viewsheds_off);
         viewshedRange = controls.findViewById(R.id.viewshed_range);
         meViewshed = controls.findViewById(R.id.me_viewshed);
         meHeight = controls.findViewById(R.id.me_height);
@@ -374,15 +373,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                                 setThreshold(Units.bigToMeters(ZOOM_PRESET_BIG[i]) / scaleBarPixels());
                     }
                 });
-            }
-        });
-
-        viewshedsOff.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                final int n = layer.hideAllViewsheds();
-                updateButtons();
-                toast(n == 1 ? "Viewshed off" : String.format(Locale.US, "%d viewsheds off", n));
             }
         });
 
@@ -560,10 +550,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         stateButton.setText(state == null ? "All states" : "State: " + state);
         fromButton.setText(fromMapCenter ? "From: Map center" : "From: Me");
         radiusButton.setText(radiusBig > 0 ? "Within " + radiusLabel((int) radiusBig) : "Within: whole state");
-        final int n = layer.viewshedCount();
-        viewshedsOff.setEnabled(n > 0);
-        viewshedsOff.setText(n == 0 ? "No viewsheds shown"
-                : String.format(Locale.US, "Turn off %d viewshed%s", n, n == 1 ? "" : "s"));
         viewshedRange.setText("Range: " + Math.round(prefs().getFloat(PREF_VIEWSHED_RANGE, 20)) + " " + Units.bigLabel());
         meViewshed.setText((fromMapCenter ? "From map center " : "From me ") + (meViewshedOn ? "ON" : "OFF"));
         meHeight.setText("Height: " + heightLabel(operatorHeightM()));
@@ -1092,11 +1078,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         showDetail(site);
     }
 
-    @Override
-    public void onViewshedChanged() {
-        updateButtons();
-    }
-
     // ---- formatting ----------------------------------------------------------------
 
     private static String distanceLine(Row r) {
@@ -1223,7 +1204,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         final View v = PluginLayoutInflater.inflate(pluginContext, R.layout.site_detail, null);
         final TextView info = v.findViewById(R.id.info);
         final LinearLayout nets = v.findViewById(R.id.nets);
-        final Button viewshed = v.findViewById(R.id.viewshed);
 
         final StringBuilder b = new StringBuilder();
         b.append(s.label()).append('\n');
@@ -1263,27 +1243,13 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                     toneLine(c.effectiveRxTone(), c.net.rxToneText,
                             c.effectiveTxTone(), c.net.txToneText));
             // Designator, tone, callsign, and nothing else. The plans' prose about
-            // what a site covers is what the viewshed answers, and where a row came
-            // from is not ours to put on screen. Both are kept in the catalog and
-            // neither is shown.
+            // what a site covers is not something this plugin can stand behind, and
+            // where a row came from is not ours to put on screen. Both are kept in
+            // the catalog and neither is shown.
             row.findViewById(R.id.note).setVisibility(View.GONE);
             nets.addView(row);
         }
 
-        final TextView vsNote = v.findViewById(R.id.viewshed_note);
-        vsNote.setText("Line of sight from the antenna, not radio coverage.");
-
-        styleViewshedButton(viewshed, s);
-        viewshed.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View bv) {
-                layer.toggleViewshed(s);
-                styleViewshedButton(viewshed, s);
-                updateButtons();
-                if (layer.isViewshedOn(s))
-                    layer.goTo(s);
-            }
-        });
         v.findViewById(R.id.goto_site).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View bv) {
@@ -1298,12 +1264,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             }
         });
         detailHost.showDetailPane(v);
-    }
-
-    private void styleViewshedButton(Button b, Site s) {
-        final boolean on = layer.isViewshedOn(s);
-        b.setText(on ? "Viewshed ON" : "Viewshed OFF");
-        b.setTextColor(on ? 0xFF3DDC61 : 0xFFFF5B52);
     }
 
     // ---- list ---------------------------------------------------------------------

@@ -18,7 +18,7 @@
  Comms puts mountaintop radio sites on the ATAK map, nearest first, with the nets
  that live on each one: name, frequencies, tone and callsign. It answers "what is
  the closest Command 5 repeater, what mountain is it on and what tone does it use"
- from a side pane, and draws ATAK's own viewshed from the site's antenna.
+ from a side pane, and draws ATAK's own viewshed from where you are standing.
 ]
 
 = Finding a site or a net
@@ -39,21 +39,19 @@ Tap a row, or Details on a site's radial menu, for county, elevation, distance
 and bearing, and every net on the site with its frequencies, tones as Hz and as
 California tone numbers, callsign and notes.
 
-= Viewshed
-*Viewshed ON* in a site's details, or the eye on its radial menu, draws ATAK's
-viewshed from the site's antenna. It is line of sight from the antenna, not radio
-coverage: terrain that can see the antenna is painted, terrain that cannot is
-not. It needs elevation data on the device (Map Depot's DTED packs provide it).
-*Range* sets how far the next viewshed reaches; *Turn off viewsheds* removes them
-all. Viewsheds are removed when the plugin is unloaded.
-
 = Which repeaters can I reach from here
-*From me ON* draws the viewshed from your own position, at the height ATAK's
-viewshed tool is set to, out to the chosen range, and checks every site in that
-range for line of sight to its antenna over the elevation data on the device.
-Sites you can see turn green on the map and list first; the rest list under
-"No line of sight". With a search running, the top row is the nearest matching
-site you can see. It follows you as you move.
+*From me ON* draws ATAK's viewshed from your own position, at the height set
+under *Height*, out to the chosen *Range*, and checks every site in that range
+for line of sight to its antenna over the elevation data on the device (Map
+Depot's DTED packs provide it). Sites you can see turn green on the map and list
+first; the rest list under "No line of sight". With a search running, the top
+row is the nearest matching site you can see. It follows you as you move. The
+viewshed is removed when the plugin is unloaded.
+
+It is line of sight, not radio coverage. Nothing here draws coverage from a
+repeater: from that end such a picture reads as a coverage map and is not one,
+and the honest answer to "can I work this site" is the check above, made from
+where you are actually standing.
 
 = The catalog
 Sites and nets come from a catalog refreshed from the depot host once a day and

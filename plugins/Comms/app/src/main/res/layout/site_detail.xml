@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One site, in a side pane. The content scrolls and the buttons are pinned below
-     it, so a site with many nets never pushes Viewshed off the bottom of the pane. -->
+     it, so a site with many nets never pushes them off the bottom of the pane. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -39,14 +39,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
-
-            <TextView
-                android:id="@+id/viewshed_note"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="11sp"
-                android:alpha="0.8"
-                android:paddingTop="8dp" />
         </LinearLayout>
     </ScrollView>
 
@@ -60,23 +52,15 @@
             style="@style/TakwerxButton"
             android:id="@+id/goto_site"
             android:layout_width="0dp"
-            android:layout_weight="0.8"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="@string/go_to" />
 
         <Button
             style="@style/TakwerxButton"
-            android:id="@+id/viewshed"
-            android:layout_width="0dp"
-            android:layout_weight="1.5"
-            android:layout_height="wrap_content"
-            android:text="Viewshed" />
-
-        <Button
-            style="@style/TakwerxButton"
             android:id="@+id/close_pane"
             android:layout_width="0dp"
-            android:layout_weight="0.8"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="Close" />
     </LinearLayout>

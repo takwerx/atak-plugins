@@ -12,7 +12,7 @@ All releases: https://github.com/takwerx/comms/releases
 
 ## Before you start
 
-Published builds exist for ATAK-CIV 5.6, 5.7 and 5.8. The viewshed needs
+Published builds exist for ATAK-CIV 5.6, 5.7 and 5.8. The line-of-sight check needs
 elevation data on the device; Map Depot's DTED packs provide it.
 
 ## What it does
@@ -32,21 +32,14 @@ it, with that net's line under the site name.
 - **Show** is one checkbox per agency, with the number of sites it would show.
 - **Draw on the map** sets the zoom at which sites are drawn, quoted as what the
   scale bar reads.
-- **Viewshed** turns every viewshed off at once and sets the range for the next
-  one.
-
-## Viewshed
-
-Viewshed ON in a site's details draws ATAK's viewshed from that site's antenna.
-It is line of sight from the antenna, not radio coverage: terrain that can see
-the antenna is painted, terrain that cannot is not. It needs elevation data on
-the device. Viewsheds are removed when the plugin is unloaded.
+- **Viewshed from you** draws the viewshed from your own position and sets the
+  height you are at and how far to reach.
 
 ## Which repeaters can I reach from here
 
 **From me ON** in the pane's Viewshed section draws the viewshed from your own
-position (or from the map center when you have chosen that), at the height
-ATAK's viewshed tool is set to, out to the Range you picked. Every site within
+position (or from the map center when you have chosen that), at the height you
+set under **Height**, out to the Range you picked. Every site within
 that range is then checked for line of sight to its antenna over the elevation
 data on the device: sites you can see turn green on the map and list first
 under "Line of sight from you", the rest under "No line of sight", and sites

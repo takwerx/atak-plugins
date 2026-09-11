@@ -107,7 +107,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Viewshed"
+        android:text="Viewshed from you"
         android:textSize="10sp"
         android:textAllCaps="true"
         android:paddingTop="6dp"
@@ -119,7 +119,8 @@
         android:orientation="horizontal">
 
         <!-- The operator's own viewshed, and the sites inside it. ON in green, OFF
-             in red, the way Traffic's toggles read. -->
+             in red, the way Traffic's toggles read. There is no viewshed from a
+             site: drawn from a repeater it reads as a coverage map and is not one. -->
         <Button
             style="@style/TakwerxButton"
             android:id="@+id/me_viewshed"
@@ -139,17 +140,12 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <!-- How high the operator's own antenna is: handheld, vehicle, mast. -->
+        <!-- How high the operator's own antenna is: handheld, vehicle, mast. The one
+             variable in the operator's hands, and the link that decides the contact:
+             the repeater is on a peak with power, the operator is a handheld. -->
         <Button
             style="@style/TakwerxButton"
             android:id="@+id/me_height"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
-
-        <!-- Turns off every site viewshed at once, carrying the count; disabled at zero. -->
-        <Button
-            style="@style/TakwerxButton"
-            android:id="@+id/viewsheds_off"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content" />

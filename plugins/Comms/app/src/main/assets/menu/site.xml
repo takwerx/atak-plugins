@@ -1,6 +1,5 @@
-<menu buttonRadius='65' buttonSpan='90' buttonWidth='90' buttonBg='bgs/button.xml'>
+<menu buttonRadius='65' buttonSpan='120' buttonWidth='90' buttonBg='bgs/button.xml'>
     <button icon='icons/details.png' onClick='actions/site_details.xml' />
-    <button icon='icons/viewshed_eye.png' onClick='actions/site_viewshed.xml' selected='${commsViewshed}' />
     <button icon='icons/pairing_line.png' onClick='actions/pairingline.xml' />
     <button icon='icons/polar_coord.png' onClick='actions/polarCoords.xml' />
 </menu>

@@ -20,16 +20,15 @@ import com.atakmap.map.AtakMapView;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
  * The sites on the map: one marker per site, a zoom gate, and ATAK's own viewshed
- * drawn from the antenna.
+ * drawn from the operator's position.
  *
- * <h3>Viewshed</h3>
+ * <h3>Viewshed, and only from the operator</h3>
  *
  * ATAK's {@code com.atakmap.android.elev.ViewShedReceiver} takes a local broadcast:
  * {@code SHOW_VIEWSHED} with the marker's {@code uid}, a {@code point}, a
@@ -42,11 +41,17 @@ import java.util.Set;
  * an AGL altitude and nothing here looks up terrain; the DTED on the device is the
  * ground, as it is for ATAK's tool.
  *
- * <p>The viewshed is line of sight from the antenna, not radio coverage, and the
+ * <p>There is no viewshed from a site. Drawn from a repeater it reads as a coverage
+ * map and is not one: optical line of sight on bare earth, pessimistic wherever a
+ * signal would diffract into a valley and optimistic about whether a handheld can
+ * make the uplink back. The viewshed here is drawn from the operator's own position,
+ * which is the link that decides the contact, and {@link LineOfSight} answers which
+ * sites can actually be reached.
+ *
+ * <p>It is line of sight, not radio coverage, and the
  * pane says so beside the button.
  *
- * <p>Markers are only ever created and mutated in place; a site whose viewshed is on
- * is pinned, so filtering it out of the list does not tear the viewshed's marker out
+ * <p>Markers are only ever created and mutated in place
  * from under ATAK.
  */
 public final class SiteLayer {
@@ -54,11 +59,8 @@ public final class SiteLayer {
     private static final String TAG = "CommsLayer";
     private static final String GROUP = "Comms";
     private static final String UID_PREFIX = "comms.";
-    /** The marker metadata the radial reads to light the viewshed button. */
-    private static final String META_VIEWSHED = "commsViewshed";
 
     public static final String ACTION_DETAILS = "com.atakmap.android.comms.SITE_DETAILS";
-    public static final String ACTION_VIEWSHED = "com.atakmap.android.comms.SITE_VIEWSHED";
 
     // ViewShedReceiver's own action and extra names, as string literals so a build of
     // ATAK without the class costs the viewshed and not the plugin.
@@ -85,9 +87,6 @@ public final class SiteLayer {
 
     public interface Listener {
         void onDetails(Site site);
-
-        /** A viewshed was switched on or off, from the pane or from the radial. */
-        void onViewshedChanged();
     }
 
     private final MapView mapView;
@@ -95,15 +94,6 @@ public final class SiteLayer {
     private final MapGroup group;
     private final Map<String, Marker> markers = new HashMap<>();
     private final Map<String, Site> shown = new HashMap<>();
-    private final Set<String> viewsheds = new LinkedHashSet<>();
-    /**
-     * When each viewshed was asked for. The show intent is a local broadcast and is
-     * delivered after this call returns, so a registry check made in the same tap
-     * finds nothing and would dismiss what was just requested (measured on the
-     * XCover, 2026-09-09). Young requests are trusted until ATAK has had time.
-     */
-    private final Map<String, Long> requestedAt = new HashMap<>();
-    private static final long SETTLE_MS = 8000;
     private final List<Site> selected = new ArrayList<>();
     private final Handler main = new Handler(Looper.getMainLooper());
     private Listener listener;
@@ -139,7 +129,7 @@ public final class SiteLayer {
         }
     };
 
-    /** The radial's Details and Viewshed buttons arrive here. */
+    /** The radial's Details button arrives here. */
     private final BroadcastReceiver radial = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -152,8 +142,6 @@ public final class SiteLayer {
             if (ACTION_DETAILS.equals(intent.getAction())) {
                 if (listener != null)
                     listener.onDetails(s);
-            } else if (ACTION_VIEWSHED.equals(intent.getAction())) {
-                toggleViewshed(s);
             }
         }
     };
@@ -169,8 +157,7 @@ public final class SiteLayer {
         try {
             final AtakBroadcast.DocumentedIntentFilter f = new AtakBroadcast.DocumentedIntentFilter();
             f.addAction(ACTION_DETAILS);
-            f.addAction(ACTION_VIEWSHED);
-            AtakBroadcast.getInstance().registerReceiver(radial, f);
+                AtakBroadcast.getInstance().registerReceiver(radial, f);
         } catch (LinkageError | RuntimeException e) {
             Log.w(TAG, "radial actions unavailable", e);
         }
@@ -188,7 +175,6 @@ public final class SiteLayer {
         } catch (LinkageError | RuntimeException ignored) {
         }
         // ATAK would otherwise keep the viewshed layers alive with nothing owning them.
-        hideAllViewsheds();
         hideMeViewshed();
         for (String id : new ArrayList<>(markers.keySet()))
             remove(id);
@@ -223,17 +209,14 @@ public final class SiteLayer {
     private void applyZoomGate() {
         final boolean visible = isWithinZoom();
         for (Map.Entry<String, Marker> e : markers.entrySet()) {
-            // A site with its viewshed on stays visible at any zoom: the viewshed is
-            // there, and a marker vanishing from under it reads as a bug.
-            final boolean want = visible || viewsheds.contains(e.getKey());
-            if (e.getValue().getVisible() != want)
-                e.getValue().setVisible(want);
+            if (e.getValue().getVisible() != visible)
+                e.getValue().setVisible(visible);
         }
     }
 
     // ---- markers --------------------------------------------------------------
 
-    /** Make the map show exactly these sites (plus any whose viewshed is on). */
+    /** Make the map show exactly these sites. */
     public void show(List<Site> sites) {
         selected.clear();
         selected.addAll(sites);
@@ -241,7 +224,6 @@ public final class SiteLayer {
         if (mapOn)
             for (Site s : sites)
                 wanted.add(s.id);
-        wanted.addAll(viewsheds);
         for (String id : new ArrayList<>(markers.keySet()))
             if (!wanted.contains(id))
                 remove(id);
@@ -259,7 +241,7 @@ public final class SiteLayer {
         }
         update(m, s);
         shown.put(s.id, s);
-        m.setVisible(isWithinZoom() || viewsheds.contains(s.id));
+        m.setVisible(isWithinZoom());
         return m;
     }
 
@@ -294,7 +276,6 @@ public final class SiteLayer {
         m.setMetaString("how", "m-g");
         m.setMovable(false);
         m.setClickable(true);
-        m.setMetaBoolean(META_VIEWSHED, viewsheds.contains(s.id));
         try {
             if (menu == null)
                 menu = PluginMenuParser.getMenu(pluginContext, "menu/site.xml");
@@ -349,7 +330,6 @@ public final class SiteLayer {
         m.setTitle(label);
         m.setMetaString("callsign", label);
         m.setMetaString("remarks", remarks(s));
-        m.setMetaBoolean(META_VIEWSHED, viewsheds.contains(s.id));
         applyIcon(m, s);
     }
 
@@ -373,7 +353,7 @@ public final class SiteLayer {
 
     /**
      * Draw ATAK's viewshed from the operator, {@code aboveGround} meters up, out to
-     * the same range the site viewsheds use. Re-issuing with a new point moves it:
+     * the chosen range. Re-issuing with a new point moves it:
      * the receiver updates the layer it already holds for the uid.
      */
     public boolean showMeViewshed(GeoPoint at, double aboveGround) {
@@ -453,7 +433,7 @@ public final class SiteLayer {
         return uid != null && uid.startsWith(UID_PREFIX) ? shown.get(uid.substring(UID_PREFIX.length())) : null;
     }
 
-    // ---- viewshed -------------------------------------------------------------
+    // ---- range and antenna height ----------------------------------------------
 
     public void setViewshedRangeMeters(double m) {
         viewshedRangeM = Math.max(500, Math.min(MAX_VIEWSHED_M, m));
@@ -463,121 +443,9 @@ public final class SiteLayer {
         return viewshedRangeM;
     }
 
-    /** The antenna height the viewshed is drawn from, in meters above ground. */
+    /** A site's antenna height in meters above ground, as {@link LineOfSight} uses it. */
     public static double antennaHeight(Site s) {
         return Double.isNaN(s.antM) || s.antM <= 0 ? DEFAULT_ANTENNA_M : s.antM;
-    }
-
-    public boolean isViewshedOn(Site s) {
-        syncViewsheds();
-        return viewsheds.contains(s.id);
-    }
-
-    public int viewshedCount() {
-        syncViewsheds();
-        return viewsheds.size();
-    }
-
-    public void toggleViewshed(Site s) {
-        if (isViewshedOn(s))
-            hideViewshed(s);
-        else
-            showViewshed(s);
-    }
-
-    public boolean showViewshed(Site s) {
-        // The marker must exist for ATAK to hang the viewshed on; a site that is
-        // filtered out or zoom-gated gets one now, and stays until the viewshed goes.
-        final Marker m = put(s);
-        try {
-            final Intent i = new Intent(VS_SHOW);
-            i.putExtra("uid", UID_PREFIX + s.id);
-            i.putExtra("point", new GeoPoint(s.lat, s.lon, antennaHeight(s), GeoPoint.AltitudeReference.AGL));
-            i.putExtra("radius", viewshedRangeM);
-            i.putExtra("circle", true);
-            i.putExtra("title", s.name);
-            AtakBroadcast.getInstance().sendBroadcast(i);
-            viewsheds.add(s.id);
-            requestedAt.put(s.id, System.currentTimeMillis());
-            m.setMetaBoolean(META_VIEWSHED, true);
-            m.setVisible(true);
-            Log.d(TAG, "viewshed on: " + s.id + " antenna " + antennaHeight(s) + " m, radius " + viewshedRangeM + " m");
-            if (listener != null)
-                listener.onViewshedChanged();
-            return true;
-        } catch (LinkageError | RuntimeException e) {
-            Log.w(TAG, "viewshed request failed for " + s.id, e);
-            return false;
-        }
-    }
-
-    public void hideViewshed(Site s) {
-        hideViewshedById(s.id);
-        if (listener != null)
-            listener.onViewshedChanged();
-    }
-
-    private void hideViewshedById(String id) {
-        viewsheds.remove(id);
-        requestedAt.remove(id);
-        Log.d(TAG, "viewshed off: " + id);
-        try {
-            final Intent i = new Intent(VS_DISMISS);
-            i.putExtra("uid", UID_PREFIX + id);
-            AtakBroadcast.getInstance().sendBroadcast(i);
-        } catch (LinkageError | RuntimeException e) {
-            Log.w(TAG, "viewshed dismiss failed for " + id, e);
-        }
-        final Marker m = markers.get(id);
-        if (m != null) {
-            m.setMetaBoolean(META_VIEWSHED, false);
-            // Pinned only for the viewshed: if the filters no longer want it, it goes.
-            boolean wanted = false;
-            for (Site s : selected)
-                if (s.id.equals(id)) {
-                    wanted = true;
-                    break;
-                }
-            if (!wanted || !mapOn)
-                remove(id);
-            else
-                m.setVisible(isWithinZoom());
-        }
-    }
-
-    public int hideAllViewsheds() {
-        final int n = viewsheds.size();
-        for (String id : new ArrayList<>(viewsheds))
-            hideViewshedById(id);
-        if (n > 0 && listener != null)
-            listener.onViewshedChanged();
-        return n;
-    }
-
-    /**
-     * ATAK can drop a viewshed without telling the plugin (its Overlay Manager, its
-     * own tool taking the slot). The receiver keeps a public map of live viewsheds by
-     * uid; read it when it is there, and keep our own record when it is not.
-     */
-    private void syncViewsheds() {
-        try {
-            final Map<String, ?> live = com.atakmap.android.elev.ViewShedReceiver.getSingleVsdLayerMap();
-            if (live == null)
-                return;
-            final long now = System.currentTimeMillis();
-            for (String id : new ArrayList<>(viewsheds)) {
-                final Long at = requestedAt.get(id);
-                if (at != null && now - at < SETTLE_MS)
-                    continue;
-                final Object layers = live.get(UID_PREFIX + id);
-                final boolean present = layers instanceof java.util.Collection
-                        && !((java.util.Collection<?>) layers).isEmpty();
-                if (!present)
-                    hideViewshedById(id);
-            }
-        } catch (LinkageError | RuntimeException ignored) {
-            // Not this ATAK build; our own record stands.
-        }
     }
 
     // ---- navigation -----------------------------------------------------------

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Comms</string>
-    <string name="app_desc">Radio sites on the map, nearest first: which nets are on each mountaintop, their frequencies and tones, and a viewshed from the antenna.</string>
+    <string name="app_desc">Radio sites on the map, nearest first: which nets are on each mountaintop, their frequencies and tones, and which ones you have line of sight to.</string>
     <string name="loading_catalog">Loading catalog…</string>
     <string name="search_hint">Santiago, Command 5, 151.3175, tone 8</string>
     <string name="clear">Clear</string>
@@ -9,8 +9,8 @@
     <string name="resync">Sync catalog</string>
     <string name="toggle_on">ON</string>
     <string name="toggle_off">OFF</string>
-    <string name="viewshed_note">Line of sight, not radio coverage. Needs elevation data on the device (Map Depot has it). Sites you can see turn green on the map and list first.</string>
+    <string name="viewshed_note">Drawn from where you are: line of sight, not radio coverage. Needs elevation data on the device (Map Depot has it). Sites you can see turn green on the map and list first.</string>
     <string name="manual_title">Plugin Documentation</string>
-    <string name="manual_summary">Open the Comms user guide: finding the nearest site or net, reading tones, and what the viewshed means</string>
+    <string name="manual_summary">Open the Comms user guide: finding the nearest site or net, reading tones, and which repeaters you can reach</string>
     <string name="prefs_summary">Radio sites and nets on the map</string>
 </resources>

@@ -17,7 +17,7 @@ PURPOSE AND CAPABILITIES
 Mountaintop radio sites on the ATAK map, nearest first, with the nets that live on
 each one: name, frequencies, tone and callsign. Answers "what is the closest
 Command 5 repeater, what mountain is it on, and what tone does it use" from a
-side pane, and draws ATAK's own viewshed from the site's antenna.
+side pane, and draws ATAK's own viewshed from where you are standing.
 
 Capabilities:
 
@@ -33,11 +33,12 @@ Capabilities:
   - Nearest first, measured from the device or from the map center, within a
     chosen radius, filtered by agency with counts.
   - Site details: county, elevation, distance and bearing, and every net on it.
-  - Viewshed from a site's antenna through ATAK's own viewshed layer, and a
-    viewshed from the operator with the sites inside it: each site in range gets
-    a line-of-sight check over the device's elevation data, turns green on the
-    map when it can be seen, and lists first. Line of sight, not radio coverage,
-    and labeled as such.
+  - Viewshed from the operator's own position, with the sites inside it: each
+    site in range gets a line-of-sight check over the device's elevation data,
+    turns green on the map when it can be seen, and lists first. Line of sight,
+    not radio coverage, and labeled as such. There is deliberately no viewshed
+    drawn from a repeater: from that end it reads as a coverage map and is not
+    one.
   - Catalog refreshed from the depot host once a day and on demand, with the
     built-in copy and the last download as fallbacks. Adding a site or a net is
     a catalog change, not a plugin release.
@@ -65,7 +66,7 @@ _________________________________________________________________
 EQUIPMENT REQUIRED
 
 An Android device running ATAK-CIV 5.6, 5.7 or 5.8. Elevation data on the
-device (DTED, for example from Map Depot) for the viewshed.
+device (DTED, for example from Map Depot) for the line-of-sight check.
 
 _________________________________________________________________
 EQUIPMENT SUPPORTED
@@ -91,6 +92,10 @@ what you transmit on. The Cal OES layers name them from the repeater's side and
 are swapped on the way in. A channel row never restates a frequency; when a
 source disagrees with the plan the row carries the source's pair and says so.
 
-The viewshed is ATAK's ViewShedReceiver, handed the antenna height as an AGL
-altitude; ATAK's own viewshed tool does the same. Every viewshed the plugin
-draws is dismissed when the plugin stops.
+The viewshed is ATAK's ViewShedReceiver, handed the operator's antenna height
+as an AGL altitude; ATAK's own viewshed tool does the same. It is only ever
+drawn from the operator: ATAK's viewshed grid is capped at 501 x 501 samples
+whatever the radius, so at radio ranges it is far coarser than the terrain data
+under it, and drawn from a repeater a picture that coarse reads as coverage.
+Which sites can be reached is answered by the plugin's own line-of-sight test
+instead. Every viewshed the plugin draws is dismissed when the plugin stops.
