@@ -1132,7 +1132,10 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
      */
     static String channelLine(Channel c) {
         final StringBuilder b = new StringBuilder();
-        b.append(c.net.name.equals(c.net.id) ? c.net.id : c.net.id + " · " + c.net.name);
+        // The designator alone: it is what the channel is called and what the radio
+        // display says. The plans' descriptive column ("OES Fire V4 (Previously OES
+        // 2B)") is kept for the search to match on and is not put on screen.
+        b.append(c.net.id);
         b.append(" · ").append(toneLine(c.effectiveRxTone(), c.net.rxToneText, c.effectiveTxTone(), c.net.txToneText));
         if (!c.callsign.isEmpty())
             b.append(" · ").append(c.callsign);
@@ -1215,7 +1218,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         for (Channel c : s.channels) {
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.net_row, null);
             ((TextView) row.findViewById(R.id.title)).setText(
-                    c.net.name.equals(c.net.id) ? c.net.id : c.net.id + " · " + c.net.name);
+                    c.net.id);
             ((TextView) row.findViewById(R.id.line)).setText(
                     toneLine(c.effectiveRxTone(), c.net.rxToneText, c.effectiveTxTone(), c.net.txToneText)
                     + (c.callsign.isEmpty() ? "" : " · " + c.callsign));
@@ -1224,9 +1227,11 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                 n.append("portable repeater, deployed per incident");
             if (!c.notes.isEmpty())
                 n.append(n.length() > 0 ? " · " : "").append(c.notes);
-            if (!c.source.isEmpty())
-                n.append(n.length() > 0 ? " · " : "").append(c.source)
-                        .append(c.asOf.isEmpty() ? "" : " (" + c.asOf + ")");
+            // Where a row came from is NOT shown. Some of this catalog is built from
+            // material that is not ours to point at, and naming it on screen puts it
+            // in every screenshot. The catalog carries the source per channel so a
+            // disagreement between two of them can be traced off the device; the
+            // operator on the map wants the mountain and the tone.
             final TextView note = row.findViewById(R.id.note);
             note.setText(n.toString());
             note.setVisibility(n.length() == 0 ? View.GONE : View.VISIBLE);
@@ -1341,7 +1346,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                 if (v == null)
                     v = PluginLayoutInflater.inflate(pluginContext, R.layout.net_row, null);
                 final Net n = r.net;
-                ((TextView) v.findViewById(R.id.title)).setText(n.name.equals(n.id) ? n.id : n.id + " · " + n.name);
+                ((TextView) v.findViewById(R.id.title)).setText(n.id);
                 ((TextView) v.findViewById(R.id.line)).setText(netLine(n));
                 final TextView note = v.findViewById(R.id.note);
                 note.setText(n.portable ? "portable repeater, deployed per incident"

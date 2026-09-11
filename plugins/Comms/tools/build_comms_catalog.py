@@ -917,7 +917,17 @@ def build(args):
     for c in channels:
         site_nets.setdefault(c["site"], []).append(c["net"])
     out_sites = []
+    dropped = 0
     for s in sites.sites:
+        # A site with no channel is not a repeater site, it is a place name. The USFS
+        # special-uses layer lists every communications site permitted on forest land
+        # -- Modjeska, Pleasants Peak and 148 others -- and says nothing about what is
+        # on them. It earns its place by giving a name a coordinate so the call plans
+        # can be placed against it, and that is all: an operator asking which repeater
+        # to use is not served by a list of mountains that might have one.
+        if not site_nets.get(s["id"]):
+            dropped += 1
+            continue
         agencies = []
         for m in s["managers"]:
             a = m.split(" · ")[0]
@@ -931,6 +941,8 @@ def build(args):
                            elev_m=s["elev_m"], ant_m=s["ant_m"], managers=s["managers"], agencies=agencies,
                            sources=s["sources"]))
     out_sites.sort(key=lambda s: (s["st"], s["name"].lower()))
+    if dropped:
+        print("  %d sites left out: a name and a coordinate, no channel on them" % dropped)
     used = {c["net"] for c in channels}
     catalog = S(format=FORMAT, generated=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 sources=sources, tones={str(k): v for k, v in TONES.items()}, nets=nets, sites=out_sites,
