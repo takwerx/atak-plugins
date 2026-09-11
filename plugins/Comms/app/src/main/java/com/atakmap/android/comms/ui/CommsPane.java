@@ -1115,11 +1115,18 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
      * <p>"OES V4" is what that channel is called and stays as it is. "ANF FN" is not
      * a name, it is "ANF Forest Net" with the words taken out, so they go back in.
      * Only these tokens are touched; nothing else about a designator is guessed at.
+     *
+     * <p>A trailing "R" for repeater is dropped rather than spelled out. Every site
+     * in this plugin is a repeater, so the letter says nothing the pane is not
+     * already saying, and "SHU R" reads better as "SHU". Only the whole word: the R
+     * in a channel name like "XSD C11R" is part of the channel, not a suffix.
      */
     static String netLabel(String designator) {
         final String[] parts = designator.split(" ");
         final StringBuilder b = new StringBuilder();
         for (String p : parts) {
+            if ("R".equals(p))
+                continue;
             if (b.length() > 0)
                 b.append(' ');
             if ("FN".equals(p))
@@ -1134,10 +1141,13 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                 b.append("Operations Net");
             else if ("EN".equals(p))
                 b.append("Emergency Net");
+            else if ("L".equals(p))
+                b.append("Local");
             else
                 b.append(p);
         }
-        return b.toString();
+        // A designator that was nothing but the suffix keeps its own name.
+        return b.length() > 0 ? b.toString() : designator;
     }
 
     private static String elevation(Site s) {
