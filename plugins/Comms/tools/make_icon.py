@@ -28,6 +28,41 @@ MARKER = 48
 SEEN = (0x3D, 0xDC, 0x61, 255)
 
 
+def outline_diamond(px):
+    """
+    The operator's own icon, 2026-09-11: the diamond as an outline on black, with
+    the standard's white dot and arcs inside it.
+
+    <p>The NWCG symbol is a solid navy diamond, which is right on a map full of
+    GeoOps symbology and heavy as an app icon -- at launcher size it reads as a
+    blue blob. Drawn as a stroke the shape is still the repeater symbol and the
+    marks inside it are what the eye lands on.
+    """
+    s = px * SS
+    im = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    c = s / 2
+    m = 0.10 * s
+    w = 0.055 * s
+    # Two polygons rather than a stroked line: a stroke closes with a joint at the
+    # top vertex and leaves a nick there. Filling the outer diamond and clearing an
+    # inner one mitres every corner exactly.
+    outer = [(c, m), (s - m, c), (c, s - m), (m, c)]
+    k = w * 1.4142                       # inward offset along both axes for a 90 deg corner
+    inner = [(c, m + k), (s - m - k, c), (c, s - m - k), (m + k, c)]
+    d.polygon(outer, fill=(255, 255, 255, 255))
+    d.polygon(inner, fill=(0, 0, 0, 0))
+    # The dot and arcs keep the standard's proportions, measured off its 60 px
+    # original and scaled to the space inside the stroke.
+    r = 5 / 60 * s * 0.92
+    d.ellipse([c - r, c - r, c + r, c + r], fill=(255, 255, 255, 255))
+    ra, aw = 14.5 / 60 * s * 0.92, 6 / 60 * s * 0.92
+    box = [c - ra, c - ra, c + ra, c + ra]
+    d.arc(box, 140, 220, fill=(255, 255, 255, 255), width=int(aw))
+    d.arc(box, 320, 400, fill=(255, 255, 255, 255), width=int(aw))
+    return im.resize((px, px), Image.LANCZOS)
+
+
 def diamond(px, edge=True):
     """The NWCG repeater symbol, measured off the 60 px original: navy diamond,
     white dot of radius 5/60, two white arcs of radius 14.5/60 and stroke 6/60
@@ -75,21 +110,15 @@ def main():
     # the navy diamond came out a solid white lozenge in the Tools list. The
     # toolbar copy is therefore shaped by alpha alone: a diamond with the dot and
     # arcs punched through, which the mask renders as the symbol in white.
-    tb = diamond(SIZE, edge=False)
-    px = tb.load()
-    for y in range(SIZE):
-        for x in range(SIZE):
-            r, g, b, a = px[x, y]
-            if a and r > 128 and g > 128 and b > 128:
-                px[x, y] = (255, 255, 255, 0)      # the white marks become holes
-            elif a:
-                px[x, y] = (255, 255, 255, a)      # the navy body becomes white
-    tb.save(os.path.join(OUT, "ic_toolbar.png"))
+    # ATAK draws plugin toolbar icons as white masks: only the alpha survives. The
+    # outline glyph is already white marks on nothing, so it is its own mask -- no
+    # punching holes in a filled body, which is what the navy diamond needed.
+    outline_diamond(SIZE).save(os.path.join(OUT, "ic_toolbar.png"))
 
     tile = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    ImageDraw.Draw(tile).rounded_rectangle([0, 0, SIZE - 1, SIZE - 1], radius=48, fill=(0x12, 0x12, 0x12, 255))
-    g = diamond(196)
-    tile.alpha_composite(g, ((SIZE - 196) // 2, (SIZE - 196) // 2))
+    ImageDraw.Draw(tile).rounded_rectangle([0, 0, SIZE - 1, SIZE - 1], radius=48, fill=(0, 0, 0, 255))
+    g = outline_diamond(220)
+    tile.alpha_composite(g, ((SIZE - 220) // 2, (SIZE - 220) // 2))
     tile.save(os.path.join(OUT, "ic_launcher.png"))
     tile.save(os.path.join(HERE, "..", "docs", "user_manual", "plugin_icon.png"))
     print("wrote ic_marker.png (%dx%d), ic_marker_seen.png (%dx%d), ic_toolbar.png, ic_launcher.png"
