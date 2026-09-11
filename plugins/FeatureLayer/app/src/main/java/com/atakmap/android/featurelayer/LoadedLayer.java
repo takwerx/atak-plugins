@@ -986,7 +986,13 @@ public class LoadedLayer {
         final boolean nwcg = spec.profile == LayerSpec.Profile.NWCG;
         final boolean isPointLayer = info.geometryType.contains("Point");
         final boolean isLineLayer = info.geometryType.contains("Polyline");
-        spec.setKind.put(info.name, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
+        // Only when the source layer is itself the type. A layer that splits by a field
+        // (CA Air Intel by source) names its types from the data, and the layer's own name
+        // listed a seventh type nothing was ever in.
+        if (spec.setField == null)
+            spec.setKind.put(info.name, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
+        else
+            spec.setKind.remove(info.name);
         final int fill = spec.fillFor(info.name);
         final EsriRenderer generic = nwcg ? null : new EsriRenderer(info.drawingInfo, info.geometryType, iconDir, fill);
         final double gsd = isPointLayer ? GSD_POINTS : isLineLayer ? GSD_LINES : GSD_ALWAYS;
@@ -1059,8 +1065,15 @@ public class LoadedLayer {
                             }
                         } else {
                             final String labelKey = spec.labelField != null ? spec.labelField : displayField;
-                            final String disp = labelKey == null || props.isNull(labelKey)
+                            String disp = labelKey == null || props.isNull(labelKey)
                                     ? null : Esri.firstNonEmpty(props.optString(labelKey, null));
+                            // A chosen label field is empty on some rows - a FIRIS flight carries a
+                            // mission and no incident_name - and the fallback below is the renderer's
+                            // class, which on CA Air Intel is the displayStatus: every perimeter read
+                            // "Active". The service's own display field is the name to fall back to.
+                            if (disp == null && displayField != null && !displayField.equals(labelKey)
+                                    && !props.isNull(displayField))
+                                disp = Esri.firstNonEmpty(props.optString(displayField, null));
                             final String cls = generic.labelFor(props);
                             // Map label: the display field's value, unless that is the very code
                             // the renderer classifies on ("other_haz"): then the class's own name
@@ -1116,6 +1129,16 @@ public class LoadedLayer {
                                     hue = h;
                             }
                             attrs.setAttribute("_fill", String.valueOf(hue));
+                            // The renderer bakes in the fill it was built with, which is the
+                            // source layer's. A layer that splits its types by a field has a
+                            // fill per type, and without this it came back at the layer's
+                            // default on every refresh.
+                            final int want = spec.fillFor(target);
+                            if (want != fill && hue != 0) {
+                                style = refilled(style, hue & 0x00FFFFFF, want);
+                                if (alt != null)
+                                    alt = refilled(alt, hue & 0x00FFFFFF, want);
+                            }
                         }
                         // Only the fire perimeter says what is burned; an IR flight area or cloud
                         // cover polygon covers everything and put every tick on the default side.
@@ -1123,8 +1146,13 @@ public class LoadedLayer {
                             collectRings(g);
                         Geometry shown = g;
                         if (at != null) {
+                            // Flat, not nested: an Esri multipolygon is already a collection.
                             final GeometryCollection withCenter = new GeometryCollection(2);
-                            withCenter.addGeometry(g);
+                            if (g instanceof GeometryCollection)
+                                for (Geometry c : ((GeometryCollection) g).getGeometries())
+                                    withCenter.addGeometry(c);
+                            else
+                                withCenter.addGeometry(g);
                             withCenter.addGeometry(at);
                             shown = withCenter;
                         }
@@ -1266,11 +1294,7 @@ public class LoadedLayer {
                         if (raw == null)
                             continue;
                         final int rgb = (int) Long.parseLong(raw) & 0x00FFFFFF;
-                        Style stroke = strokeOf(f.getStyle());
-                        if (stroke == null)
-                            stroke = NwcgStyles.solid(0xFF000000 | rgb, 2f);
-                        final Style s = alpha <= 0 ? stroke : new com.atakmap.map.layer.feature.style.CompositeStyle(
-                                new Style[] { new com.atakmap.map.layer.feature.style.BasicFillStyle((Math.min(255, alpha) << 24) | rgb), stroke });
+                        final Style s = refilled(f.getStyle(), rgb, alpha);
                         ids.add(new long[] { f.getId() });
                         styles.add(s);
                     }
@@ -1302,12 +1326,8 @@ public class LoadedLayer {
                         continue;
                     }
                     final int rgb = (int) Long.parseLong(raw) & 0x00FFFFFF;
-                    Style stroke = strokeOf(pf.style);
-                    if (stroke == null)
-                        stroke = NwcgStyles.solid(0xFF000000 | rgb, 2f);
-                    final Style s = alpha <= 0 ? stroke : new com.atakmap.map.layer.feature.style.CompositeStyle(
-                            new Style[] { new com.atakmap.map.layer.feature.style.BasicFillStyle((Math.min(255, alpha) << 24) | rgb), stroke });
-                    updated.add(new Pending(pf.setName, pf.minGsd, pf.name, pf.geometry, s, pf.attrs));
+                    updated.add(new Pending(pf.setName, pf.minGsd, pf.name, pf.geometry,
+                            refilled(pf.style, rgb, alpha), pf.attrs));
                 }
                 cache = updated;
                 Log.d(TAG, spec.id + ": restyled " + ids.size() + " " + setName + " at alpha " + alpha);
@@ -1315,6 +1335,41 @@ public class LoadedLayer {
                 Log.w(TAG, "restyle failed", e);
             }
         }
+    }
+
+    /**
+     * An area's style at a new fill opacity: the hue the service served, the stroke it
+     * already carries, and its label kept. Rebuilt from the stroke alone, a fill change
+     * quietly stripped the name pill off every area until the layer was reloaded.
+     */
+    private static Style refilled(Style base, int rgb, int alpha) {
+        Style stroke = strokeOf(base);
+        if (stroke == null)
+            stroke = NwcgStyles.solid(0xFF000000 | rgb, 2f);
+        final List<Style> parts = new ArrayList<>();
+        if (alpha > 0)
+            parts.add(new com.atakmap.map.layer.feature.style.BasicFillStyle((Math.min(255, alpha) << 24) | rgb));
+        parts.add(stroke);
+        final Style label = labelOf(base);
+        if (label != null)
+            parts.add(label);
+        return parts.size() == 1 ? parts.get(0)
+                : new com.atakmap.map.layer.feature.style.CompositeStyle(parts.toArray(new Style[0]));
+    }
+
+    /** The label style inside a style, or null: what a rebuild has to carry over. */
+    private static Style labelOf(Style s) {
+        if (s instanceof com.atakmap.map.layer.feature.style.LabelPointStyle)
+            return s;
+        if (s instanceof com.atakmap.map.layer.feature.style.CompositeStyle) {
+            final com.atakmap.map.layer.feature.style.CompositeStyle cs = (com.atakmap.map.layer.feature.style.CompositeStyle) s;
+            for (int i = 0; i < cs.getNumStyles(); i++) {
+                final Style child = labelOf(cs.getStyle(i));
+                if (child != null)
+                    return child;
+            }
+        }
+        return null;
     }
 
     private static Style strokeOf(Style s) {

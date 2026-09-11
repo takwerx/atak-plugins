@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.4/ATAK-Plugin-FeatureLayer-0.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.4/ATAK-Plugin-FeatureLayer-0.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.4/ATAK-Plugin-FeatureLayer-0.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -45,11 +45,16 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 _________________________________________________________________
 STATUS
 
-0.4, first release for feedback, with the illustrated guide (0.1 could not sign
-in, its OAuth client ID was empty; 0.2 lost cached features on the first toggle
-after a restart; 0.3 searched all of ArcGIS Online instead of your own
-organization for Find layer). Tested on ATAK-CIV 5.8 with live NIFS incidents,
-the SARCOP training sandbox and CA Air Intel. SARCOP Live is not wired yet.
+0.5, correct multi-part areas: an Esri service sends every ring of a feature in
+one list and only the winding order separates them, so a fire perimeter of
+several separate burn islands drew as one island full of holes - no fill, and
+the shape fell apart on zoom-in. A CA Air Intel flight is also labeled by its
+mission now, and a feature type's fill setting survives a refresh (0.1 could not
+sign in, its OAuth client ID was empty; 0.2 lost cached features on the first
+toggle after a restart; 0.3 searched all of ArcGIS Online instead of your own
+organization for Find layer; 0.4 was the first release for feedback, with the
+illustrated guide). Tested on ATAK-CIV 5.8 with live NIFS incidents, the SARCOP
+training sandbox and CA Air Intel. SARCOP Live is not wired yet.
 
 _________________________________________________________________
 POINT OF CONTACTS
