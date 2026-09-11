@@ -41,15 +41,13 @@ import java.util.Set;
  * an AGL altitude and nothing here looks up terrain; the DTED on the device is the
  * ground, as it is for ATAK's tool.
  *
- * <p>There is no viewshed from a site. Drawn from a repeater it reads as a coverage
- * map and is not one: optical line of sight on bare earth, pessimistic wherever a
- * signal would diffract into a valley and optimistic about whether a handheld can
- * make the uplink back. The viewshed here is drawn from the operator's own position,
- * which is the link that decides the contact, and {@link LineOfSight} answers which
- * sites can actually be reached.
- *
- * <p>It is line of sight, not radio coverage, and the
- * pane says so beside the button.
+ * <p>There is no viewshed here at all, from a site or from the operator. Both were
+ * tried and both were removed: drawn from a repeater a viewshed reads as a coverage
+ * map and is not one, and drawn from the operator it changed its answer about a
+ * five-mile mountain depending on the range the operator had picked, because ATAK
+ * samples it on a fixed grid however far it reaches. {@link Reach} answers the
+ * question instead, from the terrain profile and a handheld's link budget, and it
+ * gives the same answer at any range.
  *
  * <p>Markers are only ever created and mutated in place
  * from under ATAK.
@@ -62,13 +60,8 @@ public final class SiteLayer {
 
     public static final String ACTION_DETAILS = "com.atakmap.android.comms.SITE_DETAILS";
 
-    // ViewShedReceiver's own action and extra names, as string literals so a build of
-    // ATAK without the class costs the viewshed and not the plugin.
-    private static final String VS_SHOW = "com.atakmap.android.elev.ViewShedReceiver.SHOW_VIEWSHED";
-    private static final String VS_DISMISS = "com.atakmap.android.elev.ViewShedReceiver.DISMISS_VIEWSHED";
-
-    /** ATAK's own tool caps its slider here; the receiver takes any radius. */
-    public static final double MAX_VIEWSHED_M = 100000;
+    /** As far out as sites are ever checked against the operator's position. */
+    public static final double MAX_CHECK_M = 100000;
     /** When the catalog does not say how tall the antenna is. */
     public static final double DEFAULT_ANTENNA_M = 10;
     /**
@@ -99,15 +92,11 @@ public final class SiteLayer {
     private Listener listener;
     private Icon icon, iconSeen;
     private String menu;
-    /** The invisible marker the operator's own viewshed hangs on. */
-    private static final String ME_UID = UID_PREFIX + "me";
-    private Marker me;
-    private boolean meViewshed;
-    /** Site id to whether it has line of sight from the operator; absent means not checked. */
-    private final Map<String, Boolean> lineOfSight = new HashMap<>();
+    /** Site id to how likely it is to answer a handheld here; absent means not checked. */
+    private final Map<String, Reach.State> reach = new HashMap<>();
     private double maxResolution = 500;
     private boolean mapOn = true;
-    private double viewshedRangeM = 30000;
+    private double checkRangeM = 30000;
 
     /**
      * Runs on the GL render thread, not the UI thread. Mutating map items from inside
@@ -174,8 +163,6 @@ public final class SiteLayer {
             AtakBroadcast.getInstance().unregisterReceiver(radial);
         } catch (LinkageError | RuntimeException ignored) {
         }
-        // ATAK would otherwise keep the viewshed layers alive with nothing owning them.
-        hideMeViewshed();
         for (String id : new ArrayList<>(markers.keySet()))
             remove(id);
         mapView.getRootGroup().removeGroup(group);
@@ -304,8 +291,8 @@ public final class SiteLayer {
     }
 
     /**
-     * The NWCG GeoOps repeater symbol, as Feature Layer draws it, or the same on a
-     * green ring when the site has line of sight from the operator.
+     * The NWCG GeoOps repeater symbol, as Feature Layer draws it, with its marks lit
+     * green when a handheld where the operator is standing is likely to open it.
      */
     private void applyIcon(Marker m, Site s) {
         try {
@@ -313,8 +300,9 @@ public final class SiteLayer {
                 icon = buildIcon(com.atakmap.android.comms.plugin.R.drawable.ic_marker);
             if (iconSeen == null)
                 iconSeen = buildIcon(com.atakmap.android.comms.plugin.R.drawable.ic_marker_seen);
-            final Boolean seen = lineOfSight.get(s.id);
-            final Icon want = seen != null && seen ? iconSeen : icon;
+            // Green is "go for it", so only a likely path lights the symbol up.
+            // Marginal is left plain rather than half-promised.
+            final Icon want = reach.get(s.id) == Reach.State.LIKELY ? iconSeen : icon;
             if (m.getIcon() != want)
                 m.setIcon(want);
         } catch (LinkageError | RuntimeException e) {
@@ -333,84 +321,16 @@ public final class SiteLayer {
         applyIcon(m, s);
     }
 
-    /** Take the line-of-sight answers and repaint; an empty map clears the tint. */
-    public void setLineOfSight(Map<String, Boolean> los) {
-        lineOfSight.clear();
-        if (los != null)
-            lineOfSight.putAll(los);
+    /** Take the reach answers and repaint; an empty map puts every site back to plain. */
+    public void setReach(Map<String, Reach.State> states) {
+        reach.clear();
+        if (states != null)
+            reach.putAll(states);
         for (Map.Entry<String, Marker> e : markers.entrySet()) {
             final Site s = shown.get(e.getKey());
             if (s != null)
                 applyIcon(e.getValue(), s);
         }
-    }
-
-    // ---- the operator's own viewshed --------------------------------------------
-
-    public boolean isMeViewshedOn() {
-        return meViewshed;
-    }
-
-    /**
-     * Draw ATAK's viewshed from the operator, {@code aboveGround} meters up, out to
-     * the chosen range. Re-issuing with a new point moves it:
-     * the receiver updates the layer it already holds for the uid.
-     */
-    public boolean showMeViewshed(GeoPoint at, double aboveGround) {
-        try {
-            final GeoPoint p = new GeoPoint(at.getLatitude(), at.getLongitude(), aboveGround,
-                    GeoPoint.AltitudeReference.AGL);
-            if (me == null) {
-                // Invisible and unclickable: the self marker is already on the map, and
-                // this one exists only so the viewshed has a uid to hang on.
-                me = new Marker(p, ME_UID);
-                me.setType("b-m-p-w");
-                me.setTitle("Viewshed from you");
-                me.setMetaBoolean("addToObjList", false);
-                me.setMetaBoolean("removable", false);
-                me.setMetaBoolean("editable", false);
-                me.setMetaBoolean("archive", false);
-                me.setMovable(false);
-                me.setClickable(false);
-                me.setVisible(false);
-                group.addItem(me);
-            } else {
-                me.setPoint(p);
-            }
-            final Intent i = new Intent(VS_SHOW);
-            i.putExtra("uid", ME_UID);
-            i.putExtra("point", p);
-            i.putExtra("radius", viewshedRangeM);
-            i.putExtra("circle", true);
-            i.putExtra("show_icon", false);
-            i.putExtra("title", "Viewshed from you");
-            AtakBroadcast.getInstance().sendBroadcast(i);
-            meViewshed = true;
-            Log.d(TAG, String.format(java.util.Locale.US, "viewshed from operator: %.5f, %.5f %.1f m up, radius %.0f m",
-                    at.getLatitude(), at.getLongitude(), aboveGround, viewshedRangeM));
-            return true;
-        } catch (LinkageError | RuntimeException e) {
-            Log.w(TAG, "viewshed from the operator failed", e);
-            return false;
-        }
-    }
-
-    public void hideMeViewshed() {
-        if (!meViewshed && me == null)
-            return;
-        meViewshed = false;
-        try {
-            final Intent i = new Intent(VS_DISMISS);
-            i.putExtra("uid", ME_UID);
-            AtakBroadcast.getInstance().sendBroadcast(i);
-        } catch (LinkageError | RuntimeException e) {
-            Log.w(TAG, "viewshed dismiss failed for the operator", e);
-        }
-        if (me != null) {
-            group.removeItem(me);
-            me = null;
-        }
-        Log.d(TAG, "viewshed from operator off");
     }
 
     private static String remarks(Site s) {
@@ -435,15 +355,16 @@ public final class SiteLayer {
 
     // ---- range and antenna height ----------------------------------------------
 
-    public void setViewshedRangeMeters(double m) {
-        viewshedRangeM = Math.max(500, Math.min(MAX_VIEWSHED_M, m));
+    /** How far out sites are checked against the operator's position. */
+    public void setCheckRangeMeters(double m) {
+        checkRangeM = Math.max(500, Math.min(MAX_CHECK_M, m));
     }
 
-    public double getViewshedRangeMeters() {
-        return viewshedRangeM;
+    public double getCheckRangeMeters() {
+        return checkRangeM;
     }
 
-    /** A site's antenna height in meters above ground, as {@link LineOfSight} uses it. */
+    /** A site's antenna height in meters above ground, as {@link Reach} uses it. */
     public static double antennaHeight(Site s) {
         return Double.isNaN(s.antM) || s.antM <= 0 ? DEFAULT_ANTENNA_M : s.antM;
     }

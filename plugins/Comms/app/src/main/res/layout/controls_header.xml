@@ -107,7 +107,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Viewshed from you"
+        android:text="Reach from here"
         android:textSize="10sp"
         android:textAllCaps="true"
         android:paddingTop="6dp"
@@ -118,7 +118,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <!-- The operator's own viewshed, and the sites inside it. ON in green, OFF
+        <!-- Which sites a handheld here is likely to open. ON in green, OFF
              in red, the way Traffic's toggles read. There is no viewshed from a
              site: drawn from a repeater it reads as a coverage map and is not one. -->
         <Button
