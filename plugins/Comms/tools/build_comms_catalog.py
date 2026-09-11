@@ -540,7 +540,9 @@ def county_of(lat, lon, refresh=False):
                                     spatialRel="esriSpatialRelIntersects", outFields="NAME,STATE",
                                     returnGeometry="false", f="json"))
     try:
-        d = getj(TIGER_COUNTY + "?" + q, refresh)
+        # "/query?", not "?": without it this asks the layer to describe itself, which
+        # answers 200 with no features, so every county came back empty and silent.
+        d = getj(TIGER_COUNTY + "/query?" + q, refresh)
         f = d.get("features") or []
         if not f:
             return "", ""
@@ -950,7 +952,41 @@ def build(args):
         out_sites.append(S(id=s["id"], name=s["name"], st=s["st"], county=s["county"], lat=s["lat"], lon=s["lon"],
                            elev_m=s["elev_m"], ant_m=s["ant_m"], managers=s["managers"], agencies=agencies,
                            sources=s["sources"]))
-    out_sites.sort(key=lambda s: (s["st"], s["name"].lower()))
+    # What a site is called on screen. A source hangs its own disambiguator on a
+    # name -- "Sierra Peak (Corona)", "Black Mtn (RVC)" -- and it is a nearby town or
+    # a unit code rather than where the mountain is; Sierra Peak is not in Corona. So
+    # the bare name is the label, and where two sites share one, the county tells
+    # them apart, because that is a fact about the mountain: Strawberry Peak
+    # (San Bernardino) and Strawberry Peak (Tuolumne).
+    def spell_out(n):
+        """Pk and Mtn are the same words as Peak and Mountain, written shorter."""
+        n = re.sub(r"\bMtn\.?\b", "Mountain", n)
+        n = re.sub(r"\bPk\.?\b", "Peak", n)
+        n = re.sub(r"\bMt\.?\b", "Mount", n)
+        n = re.sub(r"\bLkt\.?\b|\bLO\b", "Lookout", n)
+        return re.sub(r"\s+", " ", n).strip()
+
+    bare = {}
+    for s in out_sites:
+        s["label"] = spell_out(re.sub(r"\s*\([^)]*\)$", "", s["name"]).strip() or s["name"])
+        # Group on the normalized form: one source writes Strawberry Pk and another
+        # Strawberry Peak, and they are one name for the purpose of telling two
+        # mountains apart.
+        bare.setdefault(norm_name(s["label"]), []).append(s)
+    for _key, group in bare.items():
+        if len(group) < 2:
+            continue
+        counties = [s["county"] for s in group]
+        for s in group:
+            label = s["label"]
+            # The county only helps when it is known and not shared by the pair; if
+            # two sites of one name sit in one county, the source's own words are all
+            # there is to tell them apart.
+            if s["county"] and counties.count(s["county"]) == 1:
+                s["label"] = "%s (%s)" % (label, s["county"])
+            elif s["name"] != label:
+                s["label"] = s["name"]
+    out_sites.sort(key=lambda s: (s["st"], s["label"].lower()))
     if dropped:
         print("  %d sites left out: a name and a coordinate, no channel on them" % dropped)
     used = {c["net"] for c in channels}

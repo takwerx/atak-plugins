@@ -75,6 +75,8 @@ public final class Catalog {
 
     public static final class Site {
         public final String id, name, st, county;
+        /** What to show: see {@link #label()}. Empty in a catalog built before it existed. */
+        private final String label;
         public final double lat, lon;
         /** Ground elevation in meters, or NaN. */
         public final double elevM;
@@ -89,6 +91,7 @@ public final class Catalog {
         Site(JSONObject o) throws JSONException {
             id = o.getString("id");
             name = o.optString("name", id);
+            label = o.optString("label", "");
             st = o.optString("st", "").toUpperCase(Locale.US);
             county = o.optString("county", "");
             lat = o.getDouble("lat");
@@ -105,16 +108,21 @@ public final class Catalog {
         }
 
         /**
-         * The name to show, without the qualifier a source hung on the end of it.
+         * What the site is called on screen.
          *
-         * <p>Sources disambiguate their own duplicates in the name -- "Sierra Peak
-         * (Corona)", "Black Mtn (RVC)", "Bertha Pk (Big Bear)" -- and the qualifier
-         * is a nearby town, a landmark or a unit code rather than where the mountain
-         * is. Sierra Peak is not in Corona. On a map that already answers where it
-         * is, the words are noise. {@link #name} keeps the full form, so two
-         * mountains sharing one name stay two sites.
+         * <p>The catalog works it out: the bare mountain name, with a county after it
+         * only where two sites share one name. A source hangs its own disambiguator
+         * on a name -- "Sierra Peak (Corona)", "Black Mtn (RVC)" -- and that is a
+         * nearby town or a unit code rather than where the mountain is; Sierra Peak
+         * is not in Corona. The county is a fact about the mountain, so Strawberry
+         * Peak is two sites, San Bernardino and Tuolumne, and Sierra Peak is just
+         * Sierra Peak. {@link #name} keeps the source's own form.
+         *
+         * <p>An older catalog has no label, so the qualifier is trimmed here instead.
          */
         public String label() {
+            if (!label.isEmpty())
+                return label;
             final int p = name.lastIndexOf(" (");
             return p > 0 && name.endsWith(")") ? name.substring(0, p) : name;
         }
