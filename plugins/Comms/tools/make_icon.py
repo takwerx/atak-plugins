@@ -4,8 +4,8 @@
 The map marker is the standard's own 60 px "Repeater" point symbol (PMS 936,
 tools/nwcg_repeater.png, from nwcg.gov), used verbatim so a repeater reads the same
 here as in Feature Layer and on every GeoOps map. A site with line of sight from
-the operator gets the same symbol on a green ring (ic_marker_seen.png), the way
-Feature Layer marks repair status, because tinting a navy symbol green makes mud.
+the operator gets the same symbol with its white dot and arcs lit green
+(ic_marker_seen.png), so the marker changes state without changing size.
 
 The toolbar glyph and the launcher tile are the same diamond redrawn at 256 px
 (the 60 px PNG would blur) with a thin white edge, so it stands out on ATAK's dark
@@ -101,15 +101,27 @@ def main():
     src = Image.open(SRC).convert("RGBA").resize((MARKER, MARKER), Image.LANCZOS)
     src.save(os.path.join(OUT, "ic_marker.png"))
 
-    # The seen variant: the symbol on a green ring, as Feature Layer rings status.
-    ring = 7
-    size = src.size[0] + 2 * ring
-    seen = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    big = Image.new("RGBA", (size * SS, size * SS), (0, 0, 0, 0))
-    d = ImageDraw.Draw(big)
-    d.ellipse([2 * SS, 2 * SS, size * SS - 2 * SS, size * SS - 2 * SS], outline=SEEN, width=4 * SS)
-    seen.alpha_composite(big.resize((size, size), Image.LANCZOS))
-    seen.alpha_composite(src, (ring, ring))
+    # The seen variant: the same symbol with its marks lit green, no ring. The
+    # operator's own call, 2026-09-11 -- "instead of a halo its the white part green
+    # on the icon lets you know this is possibly a good repeater site". A ring is a
+    # second object to read at marker size; a symbol that lights up is one. Only the
+    # white dot and arcs move, so the diamond stays the NWCG symbol and the footprint
+    # is identical whether a site is seen or not.
+    seen = Image.new("RGBA", src.size, (0, 0, 0, 0))
+    sp, dp = src.load(), seen.load()
+    for y in range(src.size[1]):
+        for x in range(src.size[0]):
+            r, g, b, a = sp[x, y]
+            if a == 0:
+                continue
+            # The source is navy and white with antialiasing between; red rises from
+            # 0 in the diamond to 255 in the marks, so it measures how white a pixel
+            # is. Carry each one the same distance towards the green.
+            t = r / 255.0
+            dp[x, y] = (round(NAVY[0] + (SEEN[0] - NAVY[0]) * t),
+                        round(NAVY[1] + (SEEN[1] - NAVY[1]) * t),
+                        round(NAVY[2] + (SEEN[2] - NAVY[2]) * t), a)
+    size = seen.size[0]
     seen.save(os.path.join(OUT, "ic_marker_seen.png"))
 
     # ATAK draws plugin toolbar icons as white masks: only the alpha survives, so
