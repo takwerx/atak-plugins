@@ -349,9 +349,15 @@ class Sites:
         self.sites.append(s)
         return s
 
-    def find(self, name, st):
+    def find(self, name, st, bounds=None):
         """
         A site already on the map by this name.
+
+        <p>{@code bounds} is the forest or park the row belongs to. Without it a name
+        match reaches across the whole state and lands on the wrong mountain:
+        Stanislaus and San Bernardino both have a Strawberry Peak, and the Stanislaus
+        row attached itself to the San Bernardino site 400 km away. A candidate
+        outside the row's own boundary is a different place with the same name.
 
         <p>Call plans abbreviate, and they do not agree with each other: the CAL FIRE
         command sheets say "Bloomer" and "Hatchet" where the Cal OES layer says
@@ -361,8 +367,12 @@ class Sites:
         mountains in this catalog and guessing between them would put a repeater in
         the wrong county.
         """
+        def ok(s):
+            return s["st"] == st and (bounds is None or (
+                bounds[0] <= s["lat"] <= bounds[2] and bounds[1] <= s["lon"] <= bounds[3]))
+
         key = norm_name(name)
-        exact = [s for s in self.sites if s["st"] == st and norm_name(s["name"]) == key]
+        exact = [s for s in self.sites if ok(s) and norm_name(s["name"]) == key]
         if exact:
             return exact[0]
 
@@ -378,7 +388,7 @@ class Sites:
 
         mine = variants(key)
         loose = [s for s in self.sites
-                 if s["st"] == st and (variants(norm_name(s["name"])) & mine)]
+                 if ok(s) and (variants(norm_name(s["name"])) & mine)]
         return loose[0] if len(loose) == 1 else None
 
 
@@ -733,7 +743,7 @@ def build(args):
     for r in parsed:                                   # 2: a name the GIS layers know
         if id(r) in placed:
             continue
-        site = sites.find(r["site"], r["_st"])
+        site = sites.find(r["site"], r["_st"], area_of(r))
         if site is not None:
             remember(r, site)
 
