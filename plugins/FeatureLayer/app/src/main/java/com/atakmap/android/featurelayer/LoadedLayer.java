@@ -1059,8 +1059,15 @@ public class LoadedLayer {
                             }
                         } else {
                             final String labelKey = spec.labelField != null ? spec.labelField : displayField;
-                            final String disp = labelKey == null || props.isNull(labelKey)
+                            String disp = labelKey == null || props.isNull(labelKey)
                                     ? null : Esri.firstNonEmpty(props.optString(labelKey, null));
+                            // A chosen label field is empty on some rows - a FIRIS flight carries a
+                            // mission and no incident_name - and the fallback below is the renderer's
+                            // class, which on CA Air Intel is the displayStatus: every perimeter read
+                            // "Active". The service's own display field is the name to fall back to.
+                            if (disp == null && displayField != null && !displayField.equals(labelKey)
+                                    && !props.isNull(displayField))
+                                disp = Esri.firstNonEmpty(props.optString(displayField, null));
                             final String cls = generic.labelFor(props);
                             // Map label: the display field's value, unless that is the very code
                             // the renderer classifies on ("other_haz"): then the class's own name
@@ -1123,8 +1130,13 @@ public class LoadedLayer {
                             collectRings(g);
                         Geometry shown = g;
                         if (at != null) {
+                            // Flat, not nested: an Esri multipolygon is already a collection.
                             final GeometryCollection withCenter = new GeometryCollection(2);
-                            withCenter.addGeometry(g);
+                            if (g instanceof GeometryCollection)
+                                for (Geometry c : ((GeometryCollection) g).getGeometries())
+                                    withCenter.addGeometry(c);
+                            else
+                                withCenter.addGeometry(g);
                             withCenter.addGeometry(at);
                             shown = withCenter;
                         }

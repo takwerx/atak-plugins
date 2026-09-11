@@ -268,7 +268,7 @@ public final class Esri {
             return gc;
         }
         if (g.has("rings"))
-            return polygon(g.getJSONArray("rings"));
+            return esriRings(g.getJSONArray("rings"));
         return null;
     }
 
@@ -286,6 +286,44 @@ public final class Esri {
         for (int i = 0; i < rings.length(); i++)
             poly.addRing(line(rings.getJSONArray(i)));
         return poly;
+    }
+
+    /**
+     * Esri JSON has no multipolygon: every ring of a feature sits in one "rings" list and
+     * only the winding order says what it is - clockwise opens a new outer ring, counter-
+     * clockwise is a hole in the outer ring before it. GeoJSON says the first ring is the
+     * outer one and the rest are holes, which is what this used to assume, so a FIRIS heat
+     * perimeter of thirteen separate burn islands became one island with twelve bogus
+     * holes: the fill tessellated to nothing and the shape dropped out on zoom-in.
+     */
+    private static Geometry esriRings(JSONArray rings) throws Exception {
+        final java.util.List<Polygon> parts = new java.util.ArrayList<>();
+        for (int i = 0; i < rings.length(); i++) {
+            final JSONArray r = rings.getJSONArray(i);
+            if (parts.isEmpty() || ringArea(r) < 0)
+                parts.add(new Polygon(2));
+            parts.get(parts.size() - 1).addRing(line(r));
+        }
+        if (parts.isEmpty())
+            return null;
+        if (parts.size() == 1)
+            return parts.get(0);
+        final GeometryCollection gc = new GeometryCollection(2);
+        for (Polygon p : parts)
+            gc.addGeometry(p);
+        return gc;
+    }
+
+    /** Shoelace area of a ring in lon/lat, y up: negative is clockwise, an outer ring. */
+    private static double ringArea(JSONArray ring) throws Exception {
+        final int n = ring.length();
+        double a = 0d;
+        for (int i = 0; i < n; i++) {
+            final JSONArray p0 = ring.getJSONArray(i);
+            final JSONArray p1 = ring.getJSONArray((i + 1) % n);
+            a += p0.getDouble(0) * p1.getDouble(1) - p1.getDouble(0) * p0.getDouble(1);
+        }
+        return a / 2d;
     }
 
     /** Every non-null property as a string; dates formatted from epoch ms. */
