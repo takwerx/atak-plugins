@@ -1196,11 +1196,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                     .append(String.format(Locale.US, " · %03.0f°", bearing(from, p)))
                     .append(fromMapCenter || selfPoint() == null ? " from the map center" : " from you");
         }
-        if (!s.managers.isEmpty()) {
-            b.append('\n');
-            for (int i = 0; i < s.managers.size(); i++)
-                b.append(i > 0 ? " · " : "").append(s.managers.get(i));
-        }
+        // Who runs equipment on the mountain is not why an operator opened this.
         final String losWord = lineOfSightWord(s);
         if (losWord != null)
             b.append("\nLine of sight from ").append(fromMapCenter ? "the map center: " : "you: ").append(losWord);
@@ -1222,26 +1218,16 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             ((TextView) row.findViewById(R.id.line)).setText(
                     toneLine(c.effectiveRxTone(), c.net.rxToneText, c.effectiveTxTone(), c.net.txToneText)
                     + (c.callsign.isEmpty() ? "" : " · " + c.callsign));
-            final StringBuilder n = new StringBuilder();
-            if (c.net.portable)
-                n.append("portable repeater, deployed per incident");
-            if (!c.notes.isEmpty())
-                n.append(n.length() > 0 ? " · " : "").append(c.notes);
-            // Where a row came from is NOT shown. Some of this catalog is built from
-            // material that is not ours to point at, and naming it on screen puts it
-            // in every screenshot. The catalog carries the source per channel so a
-            // disagreement between two of them can be traced off the device; the
-            // operator on the map wants the mountain and the tone.
-            final TextView note = row.findViewById(R.id.note);
-            note.setText(n.toString());
-            note.setVisibility(n.length() == 0 ? View.GONE : View.VISIBLE);
+            // Designator, tone, callsign, and nothing else. The plans' prose about
+            // what a site covers is what the viewshed answers, and where a row came
+            // from is not ours to put on screen. Both are kept in the catalog and
+            // neither is shown.
+            row.findViewById(R.id.note).setVisibility(View.GONE);
             nets.addView(row);
         }
 
         final TextView vsNote = v.findViewById(R.id.viewshed_note);
-        vsNote.setText(String.format(Locale.US,
-                "Viewshed is line of sight from the antenna (%.0f m above ground, %s range), not radio coverage. Needs elevation data on the device.",
-                SiteLayer.antennaHeight(s), Units.formatBig(layer.getViewshedRangeMeters())));
+        vsNote.setText("Line of sight from the antenna, not radio coverage.");
 
         styleViewshedButton(viewshed, s);
         viewshed.setOnClickListener(new View.OnClickListener() {
