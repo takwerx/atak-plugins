@@ -544,6 +544,42 @@ clean-extract test validates that target rather than re-testing one SDK three
 times. Full write-up:
 `../atak-plugins-notes/docs/NOTES-takgov-build-failures-typst-download.md`.
 
+### What comes back from tak.gov — take it in, do not just grab the APK
+
+tak.gov returns one zip per build, and the APK is the least interesting thing in
+it. The zip also carries a Fortify static analysis of our own source, an OWASP
+Dependency-Check report, a CycloneDX SBOM and the build log. Every file in it has
+the same name whatever the target, so two targets dropped in one folder overwrite
+each other, and before 2026-09-12 the scans were read only when somebody thought
+to.
+
+Drop every return zip in `~/atak-dist/inbox/` (reachable as `dist/inbox/` from
+inside any worktree) and run:
+
+```bash
+./scripts/takgov-intake.sh          # everything in the inbox
+```
+
+It reads the plugin, version and ATAK target off the APK name inside, files the
+APK and AAB under `dist/signed/` and the scans under
+`dist/scans/<Plugin>/<version>/<target>/`, and then gates on what decides whether
+a build is fit to publish: the signer is the TAK Product Center, the versionCode
+is `MAJOR*10000+MINOR*100+PATCH`, the versionName agrees with the file name, the
+package id and signing certificate match the last signed release, and Fortify
+rendered zero results. It exits non-zero on a real finding.
+
+**Dependency-Check needs a human's eye and the script gives it one.** The scanner
+opens every archive in the build, including Android assets the packager has
+renamed with a `.jar` suffix, and fuzzy-matches them against the CVE database. On
+Comms 0.6 it reported `CVE-2025-54057`, an XSS in Apache SkyWalking, against
+`catalog.json.jar` -- which is the plugin's own site catalog. So each CVE is
+checked against the SBOM: a product the SBOM does not list is reported as a
+misidentified artifact and does not fail the gate, and one the SBOM *does* list
+fails it and has to be updated.
+
+`/ship` runs this before it will publish anything, and the scans stay on disk as
+the record of what was checked.
+
 ### Point of contact — recorded once, injected automatically
 
 tak.gov requires a contact address in the submission README. The public repo must
