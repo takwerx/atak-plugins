@@ -44,3 +44,7 @@ docs/screenshots/raw/
 
 # Built by gradle/typst.gradle (ATAK_CI=1 or -PbuildManual); never tracked, never in the zip.
 app/src/main/assets/usermanual.pdf
+
+# Python leaves these beside the tools; a stale one carried a private source name.
+__pycache__/
+*.pyc
