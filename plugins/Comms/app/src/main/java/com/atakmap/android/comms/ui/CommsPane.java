@@ -1127,18 +1127,25 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                     b.append(String.format(Locale.US, ", %d unknown (no elevation data)", reachUnknown));
             }
         }
+        // When nothing at all is on the map, say so first and in the warning colour.
+        // Trailing it in grey after the counts is how the operator spent a while
+        // looking at an empty map on 2026-09-11: "i have use this zoom and they arent
+        // rendering" -- the pane had been saying "· map OFF" at the end of the line.
+        // Running out of room to draw is different from being turned off, so each
+        // says which it is and where the control for it lives.
+        String blocking = null;
         if (!mapOn)
-            b.append(" · map OFF");
+            blocking = "Map is OFF, nothing is drawn. The toggle is at the top of this pane";
+        else if (!layer.isWithinZoom())
+            blocking = "Zoomed out too far to draw them. Use this zoom sets the limit";
         else if (rows.size() > MAX_MAP)
             b.append(String.format(Locale.US, " · map shows nearest %,d, zoom in or narrow the search", MAX_MAP));
-        else if (!layer.isWithinZoom())
-            b.append(" · zoom in to see them on the map");
         if (noFix && from != null)
             b.append(" · no GPS fix, measured from the map center");
         else if (from == null)
             b.append(" · nowhere to measure from, sorted by name");
-        status.setTextColor(noFix ? STATUS_WARN : statusColor);
-        status.setText(b.toString());
+        status.setTextColor(blocking != null || noFix ? STATUS_WARN : statusColor);
+        status.setText(blocking == null ? b.toString() : blocking + " · " + b);
     }
 
     private void updateStatus() {
