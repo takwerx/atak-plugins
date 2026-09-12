@@ -4,7 +4,7 @@
 
 #show: userguide.with(
    plugin-name: "Comms",
-   plugin-version: "0.3",
+   plugin-version: "0.4",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -41,18 +41,34 @@ and bearing, and every net on the site with the tone that opens that repeater,
 as Hz and as the California tone number, plus callsign and notes.
 
 = Which repeaters can I reach from here
-*From me ON* draws ATAK's viewshed from your own position, at the height set
-under *Height*, out to the chosen *Range*, and checks every site in that range
-for line of sight to its antenna over the elevation data on the device (Map
-Depot's DTED packs provide it). Sites you can see turn green on the map and list
-first; the rest list under "No line of sight". With a search running, the top
-row is the nearest matching site you can see. It follows you as you move. The
-viewshed is removed when the plugin is unloaded.
+*From me ON* works out, for every site within *Range*, whether a handheld where
+you are standing is likely to open it. It walks the terrain between you and the
+antenna over the elevation data on the device (Map Depot's DTED packs provide
+it), scores the worst ridge in the way for the loss a signal takes bending over
+it, and weighs that against what a handheld into a mountaintop repeater can
+afford. *Height* says how high your antenna is, from handheld to tower.
 
-It is line of sight, not radio coverage. Nothing here draws coverage from a
-repeater: from that end such a picture reads as a coverage map and is not one,
-and the honest answer to "can I work this site" is the check above, made from
-where you are actually standing.
+Sites come back *likely*, *marginal* or *unlikely*. A likely site lights its
+symbol green on the map and heads the list; the rest follow under their own
+headings. *Only likely* puts everything else away, map and list together, when
+you just want the ones worth trying. With a search running, the top row is the
+nearest matching site you are likely to reach. It follows you as you move, and
+the status line counts the sites off while it works.
+
+#block(inset: (left: 6pt), stroke: (left: 2pt + gray))[
+*This is a guide, not a prediction.* It is bare earth: it knows nothing about
+trees, buildings, vehicles or weather, it assumes one ridge rather than a range
+of them, and it assumes a handheld rather than the radio in your hand. A site it
+calls unlikely is still worth a try, and a site it calls likely can still fail.
+Confirm on the radio.
+]
+
+Nothing here draws a coverage picture on the map, and that is deliberate. Drawn
+from a repeater, a viewshed reads as coverage and is not one. Drawn from you, the
+one ATAK provides changed its answer about the same five-mile mountain depending
+on how far out you had asked it to reach, because it samples on a fixed grid
+however large an area it covers. The answer above is worked out per site and does
+not move with a display setting.
 
 = The catalog
 Sites and nets come from a catalog refreshed from the depot host once a day and

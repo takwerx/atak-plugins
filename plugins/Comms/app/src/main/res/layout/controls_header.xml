@@ -118,11 +118,13 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <!-- Four buttons on an even two by two grid: From me over Height on the
-             left, Range over Only likely on the right. Every one is 0dp with a
-             weight of 1, the same as Use this zoom and Presets above, because a
-             wrap_content button makes each row a different shape and the block
-             reads as unfinished (operator, 2026-09-11: "it needs to look pro").
+        <!-- Four buttons on an even two by two grid. The two switches share the
+             top row and the two settings share the one under it, so the green and
+             red faces read as a pair rather than sitting diagonally from each other
+             (operator, 2026-09-11: "lets keep from me and only likely ON on the
+             same row"). Every one is 0dp with a weight of 1, the same as Use this
+             zoom and Presets above, because a wrap_content button makes each row a
+             different shape and the block reads as unfinished.
 
              Which sites a handheld here is likely to open. ON in green, OFF
              in red, the way Traffic's toggles read. There is no viewshed from a
@@ -136,7 +138,7 @@
 
         <Button
             style="@style/TakwerxButton"
-            android:id="@+id/viewshed_range"
+            android:id="@+id/only_likely"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content" />
@@ -147,9 +149,9 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <!-- How high the operator's own antenna is: handheld, vehicle, mast. The one
-             variable in the operator's hands, and the link that decides the contact:
-             the repeater is on a peak with power, the operator is a handheld. -->
+        <!-- Height is the one variable in the operator's hands, and the link that
+             decides the contact: the repeater is on a peak with power, the operator
+             is a handheld. -->
         <Button
             style="@style/TakwerxButton"
             android:id="@+id/me_height"
@@ -157,12 +159,11 @@
             android:layout_weight="1"
             android:layout_height="wrap_content" />
 
-        <!-- Put the unreachable ones away. Once the check has run, a screen of
-             repeaters that mostly cannot be worked from here is in the way of the
-             handful that can. -->
+        <!-- How far out to look, and how high the operator's own antenna is:
+             handheld, vehicle, mast. The two settings, under the two switches. -->
         <Button
             style="@style/TakwerxButton"
-            android:id="@+id/only_likely"
+            android:id="@+id/viewshed_range"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content" />
