@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.atakmap.android.comms.data.Nets;
 import com.atakmap.android.comms.model.Catalog.Site;
 import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.maps.MapGroup;
@@ -343,7 +344,7 @@ public final class SiteLayer {
             for (int i = 0; i < s.channels.size(); i++) {
                 if (i > 0)
                     b.append(" · ");
-                b.append(s.channels.get(i).netId);
+                b.append(Nets.noRepeaterSuffix(s.channels.get(i).netId));
             }
         }
         return b.toString();

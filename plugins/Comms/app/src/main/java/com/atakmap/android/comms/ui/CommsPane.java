@@ -25,6 +25,7 @@ import android.widget.Toast;
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.comms.data.CatalogStore;
 import com.atakmap.android.comms.data.ScaleBar;
+import com.atakmap.android.comms.data.Nets;
 import com.atakmap.android.comms.data.Tones;
 import com.atakmap.android.comms.data.Units;
 import com.atakmap.android.comms.map.Reach;
@@ -1305,7 +1306,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
      * in a channel name like "XSD C11R" is part of the channel, not a suffix.
      */
     static String netLabel(String designator) {
-        final String[] parts = designator.split(" ");
+        final String[] parts = Nets.noRepeaterSuffix(designator).split(" ");
         final StringBuilder b = new StringBuilder();
         for (String p : parts) {
             if ("R".equals(p))
@@ -1390,7 +1391,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         for (int i = 0; i < s.channels.size() && i < 6; i++) {
             if (i > 0)
                 b.append(" · ");
-            b.append(s.channels.get(i).netId);
+            b.append(Nets.noRepeaterSuffix(s.channels.get(i).netId));
         }
         if (s.channels.size() > 6)
             b.append(String.format(Locale.US, " +%d", s.channels.size() - 6));
