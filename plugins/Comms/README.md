@@ -50,9 +50,12 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-In progress. 0.1 is the first build: California sites and the statewide plan.
-More states follow as their site data is added; the catalog format already
-allows it.
+0.7 is the first public release: 387 California sites, 212 nets and 1,024
+channels, each site carrying at least one net and the tone that opens it, with
+the reach check that says which of them a handheld where you are standing is
+likely to open. More states follow as their site data is added; the catalog
+format already allows it, and adding a site is a catalog change rather than a
+plugin release.
 
 _________________________________________________________________
 POINT OF CONTACTS
