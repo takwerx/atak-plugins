@@ -4,4 +4,7 @@
     <string name="app_name">Fire Cast</string>
     <!-- description -->
     <string name="app_desc">Fire Cast</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the Fire Cast user guide: the feeds, what a heat detection footprint means, and the filters</string>
+    <string name="prefs_summary">Satellite heat detections drawn at the ground they actually cover</string>
 </resources>

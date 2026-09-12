@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="4dp">
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
+        android:textColor="#FFFFFF"
+        android:paddingBottom="2dp" />
+
+    <TextView
+        android:id="@+id/status_detail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="#BBBBBB"
+        android:paddingBottom="6dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Feeds"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:alpha="0.6"
+        android:textColor="#FFFFFF" />
+
+    <!-- One button per feed, each carrying its own count: a control says what it costs
+         before it is used. Filled in by the pane, because the feed list is code. -->
+    <LinearLayout
+        android:id="@+id/source_buttons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="2dp"
+        android:paddingBottom="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Filters"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:alpha="0.6"
+        android:textColor="#FFFFFF"
+        android:paddingTop="4dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="2dp">
+        <Button
+            android:id="@+id/btn_window"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Last 24 h" />
+        <Button
+            android:id="@+id/btn_confidence"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Any confidence" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="6dp">
+        <Button
+            android:id="@+id/btn_industrial"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Industrial flagged" />
+        <Button
+            android:id="@+id/btn_refresh_every"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Refresh: 10 min" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btn_refresh"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Refresh now" />
+
+    <TextView
+        android:id="@+id/legend"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="#BBBBBB"
+        android:paddingTop="8dp"
+        android:paddingBottom="2dp" />
+
+    <TextView
+        android:id="@+id/list_heading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:alpha="0.6"
+        android:textColor="#FFFFFF"
+        android:paddingTop="8dp"
+        android:paddingBottom="2dp"
+        android:text="In view" />
+</LinearLayout>

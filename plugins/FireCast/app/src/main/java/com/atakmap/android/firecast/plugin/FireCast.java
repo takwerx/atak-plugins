@@ -1,10 +1,12 @@
-
 package com.atakmap.android.firecast.plugin;
 
 import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
-import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.firecast.DetectionFeed;
+import com.atakmap.android.firecast.DetectionPane;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.log.Log;
 
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
@@ -15,31 +17,36 @@ import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
+/**
+ * Fire Cast: satellite heat detections drawn at the ground they actually cover.
+ *
+ * <p>This class is lifecycle and nothing else. The detections live in
+ * {@link DetectionFeed}, which runs for as long as the plugin is loaded - not inside a
+ * {@code Tool}, and not inside the pane - so closing the pane, opening another tool,
+ * switching base maps or backgrounding ATAK leaves the map and the refresh alone.
+ */
 public class FireCast implements IPlugin {
+
+    private static final String TAG = "FireCast";
+    private static final String PREFS_KEY = "firecastPreference";
 
     IServiceController serviceController;
     Context pluginContext;
     IHostUIService uiService;
     ToolbarItem toolbarItem;
-    Pane templatePane;
+    Pane pane;
+    MapView mapView;
+    DetectionFeed feed;
+    DetectionPane paneView;
 
     public FireCast(IServiceController serviceController) {
         this.serviceController = serviceController;
-        final PluginContextProvider ctxProvider = serviceController
-                .getService(PluginContextProvider.class);
+        final PluginContextProvider ctxProvider = serviceController.getService(PluginContextProvider.class);
         if (ctxProvider != null) {
             pluginContext = ctxProvider.getPluginContext();
             pluginContext.setTheme(R.style.ATAKPluginTheme);
         }
-
-        // obtain the UI service
         uiService = serviceController.getService(IHostUIService.class);
-
-        // initialize the toolbar button for the plugin
-
-        // create the button and set the identifier to be well known
-        // if you fail to do this, the toolbar configuration will never
-        // be able to find it again after the user moves the icon.
         toolbarItem = new ToolbarItem.Builder(
                 pluginContext.getString(R.string.app_name),
                 MarshalManager.marshal(
@@ -57,44 +64,76 @@ public class FireCast implements IPlugin {
 
     @Override
     public void onStart() {
-        // the plugin is starting, add the button to the toolbar
-        if (uiService == null)
-            return;
-
-        uiService.addToolbarItem(toolbarItem);
+        if (uiService != null)
+            uiService.addToolbarItem(toolbarItem);
+        registerPreferences();
+        mapView = MapView.getMapView();
+        if (mapView != null && feed == null) {
+            feed = new DetectionFeed(mapView, pluginContext);
+            feed.start();
+        }
     }
 
     @Override
     public void onStop() {
-        // the plugin is stopping, remove the button from the toolbar
-        if (uiService == null)
-            return;
-
-        uiService.removeToolbarItem(toolbarItem);
+        // ATAK keeps a plugin's pane on screen across a reload, and a pane whose buttons
+        // point at a stopped instance does nothing when tapped.
+        if (pane != null && uiService != null) {
+            try {
+                if (uiService.isPaneVisible(pane))
+                    uiService.closePane(pane);
+            } catch (Exception ignored) {
+            }
+        }
+        pane = null;
+        paneView = null;
+        if (feed != null) {
+            feed.stop();
+            feed = null;
+        }
+        if (uiService != null)
+            uiService.removeToolbarItem(toolbarItem);
+        unregisterPreferences();
     }
 
     private void showPane() {
-        // instantiate the plugin view if necessary
-        if(templatePane == null) {
-            // Remember to use the PluginLayoutInflator if you are actually inflating a custom view
-            // In this case, using it is not necessary - but I am putting it here to remind
-            // developers to look at this Inflator
-
-            templatePane = new PaneBuilder(PluginLayoutInflater.inflate(pluginContext,
-                    R.layout.main_layout, null))
-                    // relative location is set to default; pane will switch location dependent on
-                    // current orientation of device screen
+        if (uiService == null || feed == null)
+            return;
+        if (pane == null) {
+            paneView = new DetectionPane(mapView, pluginContext, feed);
+            feed.setListener(paneView);
+            pane = new PaneBuilder(paneView.view())
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
-                    // pane will take up 50% of screen width in landscape mode
                     .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
-                    // pane will take up 50% of screen height in portrait mode
                     .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
                     .build();
         }
+        if (!uiService.isPaneVisible(pane)) {
+            uiService.showPane(pane, null);
+            paneView.refreshUi();
+        }
+    }
 
-        // if the plugin pane is not visible, show it!
-        if(!uiService.isPaneVisible(templatePane)) {
-            uiService.showPane(templatePane, null);
+    /** The Tool Preferences entry the manual is reached through; a build without the class costs the manual, not the plugin. */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new FireCastPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
         }
     }
 }

@@ -1,0 +1,121 @@
+package com.atakmap.android.firecast;
+
+import android.content.SharedPreferences;
+
+import java.util.HashSet;
+import java.util.Set;
+
+/**
+ * What the operator has asked to see, remembered across restarts.
+ *
+ * <p>Every filter here is one an operator can state a reason for, and each one says on
+ * its button what it will cost before it is used - the count goes on the control, not
+ * in a status line somewhere else, so nobody has to toggle a thing and watch a total
+ * move to learn what it does.
+ */
+public class Filters {
+
+    /** What to do with a detection the industrial mask or the feed's own class flags. */
+    public static final int INDUSTRIAL_HIDE = 0, INDUSTRIAL_FLAG = 1;
+
+    private final SharedPreferences prefs;
+
+    private final Set<String> sourcesOn = new HashSet<>();
+    /** How far back to ask for, hours. */
+    public int windowHours = 24;
+    /** 0 everything, 1 nominal and high, 2 high only. */
+    public int minConfidence = 0;
+    public int industrial = INDUSTRIAL_FLAG;
+    /** Draw the mask areas themselves, so the operator can see what is being flagged. */
+    public boolean showMaskAreas = false;
+    /** Minutes between automatic refreshes; 0 is manual only. */
+    public int refreshMinutes = 10;
+
+    public static final int[] WINDOW_CHOICES = { 3, 6, 12, 24, 48, 72 };
+    public static final int[] REFRESH_CHOICES = { 0, 5, 10, 15, 30, 60 };
+
+    public Filters(SharedPreferences prefs) {
+        this.prefs = prefs;
+        for (DetectionSource s : Sources.all())
+            if (prefs.getBoolean("src." + s.id(), s.defaultOn()))
+                sourcesOn.add(s.id());
+        windowHours = prefs.getInt("windowHours", 24);
+        minConfidence = prefs.getInt("minConfidence", 0);
+        industrial = prefs.getInt("industrial", INDUSTRIAL_FLAG);
+        showMaskAreas = prefs.getBoolean("showMaskAreas", false);
+        refreshMinutes = prefs.getInt("refreshMinutes", 10);
+    }
+
+    public boolean isOn(String sourceId) {
+        return sourcesOn.contains(sourceId);
+    }
+
+    public void setOn(String sourceId, boolean on) {
+        if (on)
+            sourcesOn.add(sourceId);
+        else
+            sourcesOn.remove(sourceId);
+        prefs.edit().putBoolean("src." + sourceId, on).apply();
+    }
+
+    public void save() {
+        prefs.edit()
+                .putInt("windowHours", windowHours)
+                .putInt("minConfidence", minConfidence)
+                .putInt("industrial", industrial)
+                .putBoolean("showMaskAreas", showMaskAreas)
+                .putInt("refreshMinutes", refreshMinutes)
+                .apply();
+    }
+
+    public long windowMillis() {
+        return windowHours * 3600000L;
+    }
+
+    /** The moment the window starts. */
+    public long since(long now) {
+        return now - windowMillis();
+    }
+
+    /** Whether a fetched detection should be on the map right now. */
+    public boolean shows(HeatDetection d, long now) {
+        if (!isOn(d.sourceId))
+            return false;
+        if (d.acquired > 0 && d.ageMillis(now) > windowMillis())
+            return false;
+        if (industrial == INDUSTRIAL_HIDE && d.suspect())
+            return false;
+        if (minConfidence == 0)
+            return true;
+        // An unknown confidence is never filtered out by a confidence gate: RADR states
+        // none at all, and dropping those would quietly remove a whole feed from a
+        // control that does not mention it.
+        switch (d.confidence) {
+            case HIGH:
+                return true;
+            case NOMINAL:
+                return minConfidence <= 1;
+            case LOW:
+                return false;
+            default:
+                return true;
+        }
+    }
+
+    public String windowLabel() {
+        return windowHours >= 48 ? (windowHours / 24) + " days" : windowHours + " h";
+    }
+
+    public String confidenceLabel() {
+        return minConfidence == 0 ? "Any confidence"
+                : minConfidence == 1 ? "Nominal and high" : "High only";
+    }
+
+    public String industrialLabel() {
+        return industrial == INDUSTRIAL_HIDE ? "Industrial hidden" : "Industrial flagged";
+    }
+
+    public String refreshLabel() {
+        return refreshMinutes == 0 ? "Refresh: manual" : "Refresh: " + refreshMinutes + " min";
+    }
+}
