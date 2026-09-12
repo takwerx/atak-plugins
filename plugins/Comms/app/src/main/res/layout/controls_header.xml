@@ -118,7 +118,13 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <!-- Which sites a handheld here is likely to open. ON in green, OFF
+        <!-- Four buttons on an even two by two grid: From me over Height on the
+             left, Range over Only likely on the right. Every one is 0dp with a
+             weight of 1, the same as Use this zoom and Presets above, because a
+             wrap_content button makes each row a different shape and the block
+             reads as unfinished (operator, 2026-09-11: "it needs to look pro").
+
+             Which sites a handheld here is likely to open. ON in green, OFF
              in red, the way Traffic's toggles read. There is no viewshed from a
              site: drawn from a repeater it reads as a coverage map and is not one. -->
         <Button
@@ -131,7 +137,8 @@
         <Button
             style="@style/TakwerxButton"
             android:id="@+id/viewshed_range"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content" />
     </LinearLayout>
 
@@ -156,7 +163,8 @@
         <Button
             style="@style/TakwerxButton"
             android:id="@+id/only_likely"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content" />
     </LinearLayout>
 
