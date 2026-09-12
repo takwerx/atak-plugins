@@ -238,6 +238,34 @@ def load_same_site(path):
         print("site aliases: %d pairs of names that are one site" % len(SAME_SITE))
 
 
+# A coordinate the operator has corrected by standing at the site, or by knowing
+# the mountain better than the source did. A source's own position is taken on
+# trust everywhere else, but a source can be a little off and only somebody local
+# can say so: the BDC guide puts Jurupa Hill about 160 m south of where it is.
+#
+# These are data, not code, and live beside the rows for the same reason the rows
+# do: "<site name>,<lat>,<lon>,<why>" per line in comms-site-fixes.csv beside the
+# first --rows file, or wherever --site-fixes points. A fix is matched on the
+# filed name, so it lands whichever source supplied the site and it survives the
+# row files being regenerated from their sources.
+SITE_FIXES = {}
+
+
+def load_site_fixes(path):
+    if not path or not os.path.exists(path):
+        return
+    with open(path) as f:
+        for row in csv.reader(f):
+            if not row or row[0].lstrip().startswith("#") or len(row) < 3:
+                continue
+            try:
+                SITE_FIXES[alias(row[0])] = (float(row[1]), float(row[2]))
+            except ValueError:
+                continue
+    if SITE_FIXES:
+        print("site fixes: %d coordinates corrected by hand" % len(SITE_FIXES))
+
+
 def alias(name):
     """The name this catalog files a site under, normalized."""
     k = norm_name(name)
@@ -1016,7 +1044,16 @@ def build(args):
             a = by_id[n]["agency"] if n in by_id else "Local"
             if a not in agencies:
                 agencies.append(a)
-        out_sites.append(S(id=s["id"], name=s["name"], st=s["st"], county=s["county"], lat=s["lat"], lon=s["lon"],
+        lat, lon = s["lat"], s["lon"]
+        fix = SITE_FIXES.get(alias(s["name"]))
+        if fix:
+            # The elevation came from the old position, so it is dropped and looked
+            # up again for the new one rather than quietly describing the wrong hill.
+            moved = haversine(lat, lon, fix[0], fix[1])
+            lat, lon = fix
+            s["elev_m"] = elevation_m(lat, lon)
+            print("  fixed %s: moved %.0f m" % (s["name"], moved))
+        out_sites.append(S(id=s["id"], name=s["name"], st=s["st"], county=s["county"], lat=lat, lon=lon,
                            elev_m=s["elev_m"], ant_m=s["ant_m"], managers=s["managers"], agencies=agencies,
                            sources=s["sources"]))
     # What a site is called on screen. A source hangs its own disambiguator on a
@@ -1094,6 +1131,9 @@ def main():
     ap.add_argument("--refresh", action="store_true", help="ignore the download cache")
     ap.add_argument("--rows", action="append", metavar="CSV",
                     help="another site/net row file, repeatable; may live outside the repo")
+    ap.add_argument("--site-fixes", metavar="CSV", default="",
+                    help="coordinates corrected by hand, '<site>,<lat>,<lon>,<why>' per line "
+                         "(default: comms-site-fixes.csv beside the first --rows file)")
     ap.add_argument("--same-site", metavar="TXT", default="",
                     help="names that are one site, '<name> = <name>' per line (default: "
                          "comms-site-aliases.txt beside the first --rows file)")
@@ -1102,6 +1142,9 @@ def main():
         ap.error("--out or --dry-run")
     load_same_site(args.same_site or (
         os.path.join(os.path.dirname(os.path.abspath(args.rows[0])), "comms-site-aliases.txt")
+        if args.rows else ""))
+    load_site_fixes(args.site_fixes or (
+        os.path.join(os.path.dirname(os.path.abspath(args.rows[0])), "comms-site-fixes.csv")
         if args.rows else ""))
     catalog = build(args)
     if args.dry_run:
