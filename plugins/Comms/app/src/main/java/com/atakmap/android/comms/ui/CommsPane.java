@@ -165,6 +165,25 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     private final Map<String, Reach.State> reach = new java.util.HashMap<>();
     private boolean reachPending;
     private int reachUnknown, reachChecked;
+    /**
+     * How the check is getting on, for the status line. A minute of "working it
+     * out..." with nothing moving is indistinguishable from a hang, and the operator
+     * asked to be able to tell the difference (2026-09-11). Written by the worker,
+     * read by the ticker, so both are volatile.
+     */
+    private volatile int reachDone, reachTotal;
+    private volatile long reachStarted;
+    /** Repaints the counter while the check runs, and stops itself when it ends. */
+    private final Runnable reachTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!reachPending)
+                return;
+            status.setTextColor(STATUS_BUSY);
+            status.setText(reachProgress());
+            handler.postDelayed(this, 500);
+        }
+    };
     private int reachGeneration;
     private final java.util.concurrent.ExecutorService losWorker =
             java.util.concurrent.Executors.newSingleThreadExecutor();
@@ -292,6 +311,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     public void dispose() {
         handler.removeCallbacks(mapTick);
         handler.removeCallbacks(selfTick);
+        handler.removeCallbacks(reachTick);
         watchSelf(false);
         mapView.removeOnMapMovedListener(mapWatch);
         losWorker.shutdownNow();
@@ -688,7 +708,12 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                 candidates.add(s);
         }
         reachPending = true;
+        reachDone = 0;
+        reachTotal = candidates.size();
+        reachStarted = System.currentTimeMillis();
         apply();
+        handler.removeCallbacks(reachTick);
+        handler.post(reachTick);
         losWorker.execute(new Runnable() {
             @Override
             public void run() {
@@ -698,6 +723,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                 for (Site s : candidates) {
                     if (generation != reachGeneration)
                         return;         // superseded by a newer request
+                    reachDone++;
                     final GeoPoint to = new GeoPoint(s.lat, s.lon);
                     final Reach.State r = Reach.to(from, h0, to, SiteLayer.antennaHeight(s),
                             distance(from, to));
@@ -723,12 +749,23 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                         reachUnknown = finalUnknown;
                         reachChecked = candidates.size();
                         reachPending = false;
+                        handler.removeCallbacks(reachTick);
                         layer.setReach(reach);
                         apply();
                     }
                 });
             }
         });
+    }
+
+    /** "working out what you can reach... 23 of 46, 12s" while the check runs. */
+    private String reachProgress() {
+        final long secs = (System.currentTimeMillis() - reachStarted) / 1000;
+        final int total = reachTotal;
+        if (total <= 0)
+            return String.format(Locale.US, "Working out what you can reach\u2026 %ds", secs);
+        return String.format(Locale.US, "Working out what you can reach\u2026 %d of %d, %ds",
+                Math.min(reachDone, total), total, secs);
     }
 
     /** How one site reads on the details pane while the check is on, or null when it is off. */
@@ -1081,7 +1118,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             b.append(String.format(Locale.US, " · %,d more hidden by Only likely", hiddenByOnlyLikely));
         if (meReachOn) {
             if (reachPending)
-                b.append(" · working out what you can reach…");
+                b.append(" · ").append(reachProgress());
             else {
                 b.append(String.format(Locale.US, " · %d of %d within %s look likely from %s",
                         seen, reachChecked, Units.formatBig(layer.getCheckRangeMeters()),
