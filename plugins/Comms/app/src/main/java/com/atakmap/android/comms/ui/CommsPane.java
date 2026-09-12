@@ -630,7 +630,11 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         meReach.setTextColor(meReachOn ? 0xFF3DDC61 : 0xFFFF5B52);
         onlyLikelyButton.setText("Only likely " + (onlyLikely ? "ON" : "OFF"));
         onlyLikelyButton.setTextColor(onlyLikely ? 0xFF3DDC61 : 0xFFFF5B52);
-        onlyLikelyButton.setEnabled(meReachOn);
+        // Never disabled. Greying it out while the check is off trapped the operator
+        // with it stuck ON and no way back (2026-09-11: "if i turn from me off and
+        // only likely is still on i want to be able to turn that off. right now i
+        // cant"). A control that can be turned on has to be turnable off from the
+        // same place, whatever else is switched.
         reachNote.setText(meReachOn
                 ? String.format(Locale.US, "Worked out for a handheld %s above the ground where you are, over the terrain in between. A guide, not a promise \u2014 try the radio.",
                         heightLabel(operatorHeightM()))
