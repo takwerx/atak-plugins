@@ -1,8 +1,14 @@
 package com.atakmap.android.comms.map;
 
 import com.atakmap.coremap.log.Log;
+import com.atakmap.coremap.maps.coords.GeoBounds;
 import com.atakmap.coremap.maps.coords.GeoPoint;
+import com.atakmap.map.elevation.ElevationData;
 import com.atakmap.map.elevation.ElevationManager;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Whether a handheld here is likely to open a repeater there, over the elevation
@@ -101,6 +107,43 @@ public final class Reach {
     }
 
     /**
+     * The ground along a path, in one call.
+     *
+     * <p>Asking for a point at a time is what made a check over fifty sites take a
+     * hundred seconds on an XCover: each call finds the source, opens the tile and
+     * reads one post. ATAK carries a bulk form that takes the whole profile at once,
+     * and it is in 5.6, 5.7 and 5.8 alike. The path's bounding box goes with it so the
+     * right tile is found once rather than per point.
+     *
+     * @return one elevation per point, NaN where there is no data, or null if the
+     *         bulk call is not usable on this build
+     */
+    private static double[] profile(List<GeoPoint> points) {
+        try {
+            final double[] out = new double[points.size()];
+            Arrays.fill(out, Double.NaN);
+            final ElevationData.Hints hints = new ElevationData.Hints();
+            hints.interpolate = true;
+            double south = 90, north = -90, west = 180, east = -180;
+            for (GeoPoint p : points) {
+                south = Math.min(south, p.getLatitude());
+                north = Math.max(north, p.getLatitude());
+                west = Math.min(west, p.getLongitude());
+                east = Math.max(east, p.getLongitude());
+            }
+            hints.bounds = new GeoBounds(south, west, north, east);
+            ElevationManager.getElevation(points.iterator(), out, null, hints);
+            for (int i = 0; i < out.length; i++)
+                if (!GeoPoint.isAltitudeValid(out[i]))
+                    out[i] = Double.NaN;
+            return out;
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "bulk elevation read unavailable; falling back to one point at a time", e);
+            return null;
+        }
+    }
+
+    /**
      * How likely the repeater at {@code to}, {@code toAbove} meters up its mast, is to
      * hear a handheld at {@code from}, {@code fromAbove} meters above the ground there.
      *
@@ -141,16 +184,31 @@ public final class Reach {
         // Anything past this is unreachable however the rest of the profile looks, so
         // the walk can stop: the loss only grows as a bigger obstruction turns up.
         final double hopeless = BUDGET_DB - free;
-        double worstV = Double.NEGATIVE_INFINITY;
-        int missing = 0, tested = 0;
+        // Where along the path to look, worked out first so the ground under all of
+        // them can be read in one call.
+        final List<GeoPoint> points = new ArrayList<>();
+        final List<Double> fractions = new ArrayList<>();
         for (int i = 1; i < n; i++) {
             final double t = (double) i / n;
             final double d1 = distanceM * t;
-            final double d2 = distanceM - d1;
-            if (d1 < SKIP_END_M || d2 < SKIP_END_M)
+            if (d1 < SKIP_END_M || distanceM - d1 < SKIP_END_M)
                 continue;
-            tested++;
-            final double e = ground(lat0 + dLat * t, lon0 + dLon * t);
+            points.add(new GeoPoint(lat0 + dLat * t, lon0 + dLon * t));
+            fractions.add(t);
+        }
+        if (points.isEmpty())
+            return free;
+        final double[] bulk = profile(points);
+
+        double worstV = Double.NEGATIVE_INFINITY;
+        int missing = 0;
+        final int tested = points.size();
+        for (int i = 0; i < tested; i++) {
+            final double t = fractions.get(i);
+            final double d1 = distanceM * t;
+            final double d2 = distanceM - d1;
+            final double e = bulk != null ? bulk[i]
+                    : ground(points.get(i).getLatitude(), points.get(i).getLongitude());
             if (Double.isNaN(e)) {
                 missing++;
                 continue;
@@ -171,7 +229,7 @@ public final class Reach {
             }
         }
         // A path with most of its samples unknown is not a clear path, it is an unknown one.
-        if (tested == 0 || missing > tested / 2)
+        if (missing > tested / 2)
             return Double.NaN;
         return free + knifeEdgeLossDb(worstV);
     }
