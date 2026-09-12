@@ -91,6 +91,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     private static final String PREF_AGENCIES_OFF = "comms_agencies_off";
     private static final String PREF_ZOOM = "comms_zoom_threshold";
     private static final String PREF_CHECK_RANGE = "comms_viewshed_range_big";
+    private static final String PREF_ONLY_LIKELY = "comms_only_likely";
     private static final String PREF_MAP_ON = "comms_map_on";
     /** The operator's own antenna height above ground, meters. A standing preference: what you carry. */
     private static final String PREF_ME_HEIGHT = "comms_operator_height_m";
@@ -135,7 +136,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     private final Button stateButton, fromButton, radiusButton;
     private final LinearLayout agencyBox;
     private final TextView zoomLabel;
-    private final Button checkRange, meReach, meHeight, sync;
+    private final Button checkRange, meReach, meHeight, onlyLikelyButton, sync;
     private final TextView reachNote;
     private final RowAdapter adapter;
     private DetailHost detailHost;
@@ -154,6 +155,12 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
      * answer for where you stood yesterday is not one you asked for.
      */
     private boolean meReachOn;
+    /**
+     * Show only the sites worth trying. Off by default, and it does nothing until the
+     * check has run: the operator asked for it looking at a screen of repeaters where
+     * a handful were green (2026-09-11).
+     */
+    private boolean onlyLikely;
     private GeoPoint meFrom;          // where the answers were worked out from
     private final Map<String, Reach.State> reach = new java.util.HashMap<>();
     private boolean reachPending;
@@ -247,6 +254,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         zoomLabel = controls.findViewById(R.id.zoom_label);
         checkRange = controls.findViewById(R.id.viewshed_range);
         meReach = controls.findViewById(R.id.me_viewshed);
+        onlyLikelyButton = controls.findViewById(R.id.only_likely);
         meHeight = controls.findViewById(R.id.me_height);
         reachNote = controls.findViewById(R.id.viewshed_note);
         sync = controls.findViewById(R.id.sync);
@@ -457,6 +465,18 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             }
         });
 
+        onlyLikelyButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onlyLikely = !onlyLikely;
+                prefs().edit().putBoolean(PREF_ONLY_LIKELY, onlyLikely).apply();
+                if (onlyLikely && !meReachOn)
+                    toast("Turn the check on and this hides everything it does not like");
+                updateButtons();
+                apply();
+            }
+        });
+
         meHeight.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -551,6 +571,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         final String st = prefs().getString(PREF_STATE, "CA");
         state = st == null || st.isEmpty() ? null : st;
         fromMapCenter = prefs().getBoolean(PREF_FROM_MAP, false);
+        onlyLikely = prefs().getBoolean(PREF_ONLY_LIKELY, false);
         mapOn = prefs().getBoolean(PREF_MAP_ON, true);
         agenciesOff.clear();
         for (String a : prefs().getString(PREF_AGENCIES_OFF, "").split("\\|"))
@@ -587,6 +608,9 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         meReach.setText((fromMapCenter ? "From map center " : "From me ") + (meReachOn ? "ON" : "OFF"));
         meHeight.setText("Height: " + heightLabel(operatorHeightM()));
         meReach.setTextColor(meReachOn ? 0xFF3DDC61 : 0xFFFF5B52);
+        onlyLikelyButton.setText("Only likely " + (onlyLikely ? "ON" : "OFF"));
+        onlyLikelyButton.setTextColor(onlyLikely ? 0xFF3DDC61 : 0xFFFF5B52);
+        onlyLikelyButton.setEnabled(meReachOn);
         reachNote.setText(meReachOn
                 ? String.format(Locale.US, "Worked out for a handheld %s above the ground where you are, over the terrain in between. A guide, not a promise \u2014 try the radio.",
                         heightLabel(operatorHeightM()))
@@ -977,6 +1001,21 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                     }
                 }
 
+        // Only likely: once the check has run, put the rest away entirely, map and
+        // list both. A marker for a repeater that cannot be worked from here is in
+        // the way in either place. Nothing is hidden while the check is still running
+        // or turned off, so the control can never empty the pane on its own.
+        final int beforeOnlyLikely = rows.size();
+        if (onlyLikely && meReachOn && !reachPending) {
+            final List<Row> keep = new ArrayList<>();
+            for (Row r : rows)
+                if (reach.get(r.site.id) == Reach.State.LIKELY)
+                    keep.add(r);
+            rows.clear();
+            rows.addAll(keep);
+        }
+        final int hiddenByOnlyLikely = beforeOnlyLikely - rows.size();
+
         final List<Site> forMap = new ArrayList<>();
         for (Row r : rows) {
             if (forMap.size() >= MAX_MAP)
@@ -1038,6 +1077,8 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         if (named != null && named.portable && rows.isEmpty())
             b.append(" · ").append(netLabel(named.id))
                     .append(" is an incident portable, set up at the incident, so it has no site");
+        if (hiddenByOnlyLikely > 0)
+            b.append(String.format(Locale.US, " · %,d more hidden by Only likely", hiddenByOnlyLikely));
         if (meReachOn) {
             if (reachPending)
                 b.append(" · working out what you can reach…");

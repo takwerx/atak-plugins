@@ -149,6 +149,15 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content" />
+
+        <!-- Put the unreachable ones away. Once the check has run, a screen of
+             repeaters that mostly cannot be worked from here is in the way of the
+             handful that can. -->
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/only_likely"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 
     <TextView
