@@ -695,6 +695,17 @@ def build(args):
     title = "Cal OES CESRS Relay Stations"
     print("%s: %d" % (title, len(feats)))
     sources.append(S(id="cesrs", title=title, url=CESRS, as_of=today, kind="sites+channels"))
+    # This layer names its net but never describes it, and until MACS 441-1 was
+    # dropped the plan supplied the description. Nothing did afterwards, so a build
+    # from the public sources alone died on its own consistency check while a build
+    # with the operator's rows survived by accident, those rows happening to mention
+    # CESRS. The layer defines its own net now, as the FIRENET blocks already do.
+    if "CESRS" not in by_id:
+        by_id["CESRS"] = S(id="CESRS", name="CESRS", agency="Cal OES", rx="", tx="",
+                           rx_tone=None, tx_tone=None, band="N", power="H", mode="A",
+                           config="Base-Fixed-Mobile", usage="",
+                           remarks="California Emergency Services Radio System", portable=False)
+        nets.append(by_id["CESRS"])
     for f in feats:
         a, g = f["attributes"], f["geometry"]
         name = (a.get("MOUNTAIN") or "").strip()
