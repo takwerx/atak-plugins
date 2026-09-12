@@ -282,8 +282,10 @@ public class DetectionPane implements DetectionFeed.Listener {
         status.setTextColor(Color.WHITE);
 
         final StringBuilder d = new StringBuilder();
-        if (feed.lastRefresh > 0)
-            d.append("Fetched ").append(elapsed(now - feed.lastRefresh)).append(" ago");
+        if (feed.lastRefresh > 0) {
+            final String age = elapsed(now - feed.lastRefresh);
+            d.append("Fetched ").append(age).append("just now".equals(age) ? "" : " ago");
+        }
         if (feed.box != null)
             d.append(d.length() == 0 ? "For " : ", for ").append("the area on screen");
         if (feed.clamped)

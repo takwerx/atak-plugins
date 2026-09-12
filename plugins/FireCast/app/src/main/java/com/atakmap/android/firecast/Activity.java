@@ -64,6 +64,24 @@ public class Activity {
             return peakMw >= 100 ? String.format(Locale.US, "%.0f MW", peakMw)
                     : String.format(Locale.US, "%.1f MW", peakMw);
         }
+
+        /**
+         * Whether this looks like a fire rather than a moment.
+         *
+         * <p>A fire the feed has named, or has watched for half an hour, or has caught
+         * more than once, is something that is happening. A single hot scan with no name
+         * is as likely to be a burn pile, a flare or a harvest fire, and over a three-day
+         * window there are a great many of those: the strongest reading in the whole of
+         * the lower 48 on the first run of this panel was 866 MW, seen once, in Arkansas
+         * in September - almost certainly agricultural, and it was sitting at the top of
+         * a list whose entire job is to tell an operator where to go.
+         *
+         * <p>So it is not dropped - it is real data and it might be the start of
+         * something - it just does not outrank the fires somebody is already working.
+         */
+        public boolean established() {
+            return (name != null && !name.trim().isEmpty()) || durationHours >= 0.5d || hits > 1;
+        }
     }
 
     private static final String STATS =
@@ -106,9 +124,13 @@ public class Activity {
         // groups by the id GOES follows it with.
         out.addAll(grouped(scope + " AND known_incident_name IS NOT NULL", "known_incident_name,state"));
         out.addAll(grouped(scope + " AND known_incident_name IS NULL", "feature_tracking_id,state"));
+        // Established fires first, then by power. Sorting on power alone put a single
+        // hot scan above every named incident in the country.
         Collections.sort(out, new Comparator<Fire>() {
             @Override
             public int compare(Fire a, Fire b) {
+                if (a.established() != b.established())
+                    return a.established() ? -1 : 1;
                 return Double.compare(b.peakMw, a.peakMw);
             }
         });

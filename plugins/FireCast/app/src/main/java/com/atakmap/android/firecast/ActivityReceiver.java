@@ -196,9 +196,21 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         }
         // The limit goes on the panel, not in a manual nobody has open: this is GOES, and
         // GOES here is CONUS, so an empty list is not the same as empty ground.
-        status(fires.size() + " active in " + where + ", last " + feed.filters.windowLabel()
-                + ". From GOES, which covers the lower 48 only — Alaska, Hawaii and outside"
+        int established = 0;
+        for (Activity.Fire f : fires)
+            if (f.established())
+                established++;
+        final int onceOnly = fires.size() - established;
+        final StringBuilder sb = new StringBuilder();
+        sb.append(established).append(established == 1 ? " fire in " : " fires in ").append(where)
+                .append(", last ").append(feed.filters.windowLabel()).append('.');
+        if (onceOnly > 0)
+            sb.append(" Then ").append(onceOnly)
+                    .append(onceOnly == 1 ? " place seen hot once" : " places seen hot once")
+                    .append(", which at this time of year is often a burn pile or a harvest fire.");
+        sb.append(" From GOES, which covers the lower 48 only — Alaska, Hawaii and outside"
                 + " the US will not appear here.");
+        status(sb.toString());
     }
 
     private void status(String s) {
@@ -233,9 +245,14 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                 sb.append(f.state).append(" · ");
             if (f.durationHours >= 0.5)
                 sb.append(String.format(Locale.US, "burning %.1f h", f.durationHours));
+            else if (f.hits > 1)
+                sb.append(f.hits).append(" detections");
             else
-                sb.append("seen once");
-            sb.append(" · ").append(f.hits).append(f.hits == 1 ? " detection" : " detections");
+                // Said plainly, because it is the row's biggest caveat: one scan is not a
+                // fire yet, and in farm country most of them are not fires at all.
+                sb.append("one scan only");
+            if (f.durationHours >= 0.5 && f.hits > 1)
+                sb.append(" · ").append(f.hits).append(" detections");
             if (f.last > 0)
                 sb.append(" · last ").append(ago(f.last));
             ((TextView) v.findViewById(R.id.fire_detail)).setText(sb.toString());
