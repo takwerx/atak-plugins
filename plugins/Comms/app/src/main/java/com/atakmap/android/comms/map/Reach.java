@@ -40,9 +40,15 @@ public final class Reach {
 
     /** Effective earth radius with standard refraction, meters. */
     private static final double EFFECTIVE_RADIUS = 6371008.8 * 4 / 3;
-    /** Sample spacing along the path, roughly a DTED level 1 post. */
+    /** Closest sample spacing along the path, roughly a DTED level 1 post. */
     private static final double STEP_M = 80;
-    private static final int MAX_SAMPLES = 800;
+    /**
+     * The most samples any one path gets. A check runs over every site in range on
+     * the phone's own processor, so this is a budget, not a preference: at 300 a
+     * fifty-mile path steps about 270 m, which is coarse but is the long path where
+     * a single ridge decides nothing anyway.
+     */
+    private static final int MAX_SAMPLES = 300;
     /** The ends are not tested: a DEM post under the mast is the mast's own hill. */
     private static final double SKIP_END_M = 120;
 
@@ -65,6 +71,22 @@ public final class Reach {
     private static final double LIKELY_MARGIN_DB = 15;
 
     private Reach() {
+    }
+
+    /**
+     * The observer's own ground, remembered across a run. A check over every site in
+     * range asks for the same standing spot once per site otherwise, and only that
+     * one point repeats -- no sample along a profile is ever asked for twice.
+     */
+    private static double obsLat = Double.NaN, obsLon = Double.NaN, obsGround = Double.NaN;
+
+    private static synchronized double observerGround(double lat, double lon) {
+        if (lat != obsLat || lon != obsLon) {
+            obsLat = lat;
+            obsLon = lon;
+            obsGround = ground(lat, lon);
+        }
+        return obsGround;
     }
 
     /** Ground height above the ellipsoid at a point, or NaN with no elevation data there. */
@@ -101,7 +123,7 @@ public final class Reach {
      */
     public static double pathLossDb(GeoPoint from, double fromAbove, GeoPoint to,
             double toAbove, double distanceM) {
-        final double g0 = ground(from.getLatitude(), from.getLongitude());
+        final double g0 = observerGround(from.getLatitude(), from.getLongitude());
         final double g1 = ground(to.getLatitude(), to.getLongitude());
         if (Double.isNaN(g0) || Double.isNaN(g1) || distanceM <= 0)
             return Double.NaN;
@@ -116,6 +138,9 @@ public final class Reach {
         final double lat0 = from.getLatitude(), lon0 = from.getLongitude();
         final double dLat = to.getLatitude() - lat0, dLon = to.getLongitude() - lon0;
 
+        // Anything past this is unreachable however the rest of the profile looks, so
+        // the walk can stop: the loss only grows as a bigger obstruction turns up.
+        final double hopeless = BUDGET_DB - free;
         double worstV = Double.NEGATIVE_INFINITY;
         int missing = 0, tested = 0;
         for (int i = 1; i < n; i++) {
@@ -139,8 +164,11 @@ public final class Reach {
             // Fresnel-Kirchhoff diffraction parameter. Negative means the edge is
             // below the line with the first Fresnel zone still clear.
             final double v = h * Math.sqrt(2 * distanceM / (WAVELENGTH_M * d1 * d2));
-            if (v > worstV)
+            if (v > worstV) {
                 worstV = v;
+                if (knifeEdgeLossDb(worstV) > hopeless)
+                    return free + knifeEdgeLossDb(worstV);
+            }
         }
         // A path with most of its samples unknown is not a clear path, it is an unknown one.
         if (tested == 0 || missing > tested / 2)

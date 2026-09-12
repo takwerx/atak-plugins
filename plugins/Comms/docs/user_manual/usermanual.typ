@@ -16,15 +16,16 @@
 #image("plugin_icon.png", width: 70%)
 ][
  Comms puts mountaintop radio sites on the ATAK map, nearest first, with the nets
- that live on each one: name, frequencies, tone and callsign. It answers "what is
+ that live on each one and the tone that opens each repeater. It answers "what is
  the closest Command 5 repeater, what mountain is it on and what tone does it use"
- from a side pane, and draws ATAK's own viewshed from where you are standing.
+ from a side pane, and works out which of those sites a handheld where you are
+ standing is likely to reach.
 ]
 
 = Finding a site or a net
 The pane opens from the Comms toolbar button. Type in the search box: a site
-name ("Santiago"), a net name or designator ("Command 5", "CDF C5"), a frequency
-("151.3175"), a tone ("103.5" or "tone 8") or a callsign. The list shows the
+name ("Santiago"), a net name or designator ("Command 5", "CDF C5", "cdf 5"), a
+tone ("103.5" or "tone 8") or a callsign. The list shows the
 nearest sites first. When the search names a net, each row shows that net's line
 at that site, so the nearest one is readable without opening anything. A net with
 no fixed site, such as an incident portable repeater, is shown as its own card.
@@ -36,8 +37,8 @@ as what the scale bar reads.
 
 = Site details
 Tap a row, or Details on a site's radial menu, for county, elevation, distance
-and bearing, and every net on the site with its frequencies, tones as Hz and as
-California tone numbers, callsign and notes.
+and bearing, and every net on the site with the tone that opens that repeater,
+as Hz and as the California tone number, plus callsign and notes.
 
 = Which repeaters can I reach from here
 *From me ON* draws ATAK's viewshed from your own position, at the height set

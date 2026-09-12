@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Comms</string>
-    <string name="app_desc">Radio sites on the map, nearest first: which nets are on each mountaintop, their frequencies and tones, and which ones you have line of sight to.</string>
+    <string name="app_desc">Radio sites on the map, nearest first: which nets are on each mountaintop, the tone that opens each repeater, and which ones a handheld here is likely to reach.</string>
     <string name="loading_catalog">Loading catalog…</string>
     <string name="search_hint">Santiago, Command 5, tone 8</string>
     <string name="clear">Clear</string>

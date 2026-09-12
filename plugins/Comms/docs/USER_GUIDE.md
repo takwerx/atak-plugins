@@ -17,16 +17,16 @@ elevation data on the device; Map Depot's DTED packs provide it.
 
 ## What it does
 
-Radio sites on the map, nearest first. Tap a site for the nets on it, their
-frequencies, tones and callsigns. Search for a net ("Command 5"), a frequency
-("151.3175") or a tone ("tone 8") and the list shows the nearest site carrying
-it, with that net's line under the site name.
+Radio sites on the map, nearest first. Tap a site for the nets on it and the tone
+that opens each repeater. Search for a net ("Command 5", "CDF C5" or "cdf 5"), a
+site ("Santiago") or a tone ("tone 8") and the list shows the nearest site
+carrying it, with that net's line under the site name.
 
 ## The pane
 
-- **Find** matches site names, net names and designators, frequencies, tones
-  (Hz or California tone number) and callsigns. Clear is live while a search is
-  filtering the list.
+- **Find** matches site names, net names and designators, tones (Hz or
+  California tone number) and callsigns, and is loose about how a net is typed.
+  Clear is live while a search is filtering the list.
 - **Where** picks the state, whether distances are measured from you or from the
   map center, and a radius.
 - **Show** is one checkbox per agency, with the number of sites it would show.
