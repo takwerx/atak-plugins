@@ -90,6 +90,32 @@ S = lambda **k: k  # noqa: E731
 # ---- fetching ----------------------------------------------------------------------
 
 
+def credit_rows(catalog, name):
+    """Put one credit on everything that came from a --rows file.
+
+    The operator's instruction, 2026-09-12: the source material stays out of the
+    public repo, but the data read from it can be published. A catalog that names
+    the books channel by channel would carry those names into the repo, the zip and
+    the depot, so a published build credits the rows once, under a name of the
+    operator's choosing, and the web services keep their own titles and URLs
+    because those are public and worth citing.
+    """
+    from_rows = {s["id"] for s in catalog["sources"] if s["title"].startswith("Operator rows (")}
+    titles = {s["title"] for s in catalog["sources"] if s["id"] in from_rows}
+    old = {t[len("Operator rows ("):-1] for t in titles}
+    seen = 0
+    for c in catalog["channels"]:
+        if c.get("source") in old or c.get("source") not in {s["title"] for s in catalog["sources"]}:
+            c["source"] = name
+            seen += 1
+    catalog["sources"] = [s for s in catalog["sources"] if s["id"] not in from_rows]
+    catalog["sources"].append(S(id=slug(name), title=name, url="",
+                               as_of=datetime.date.today().isoformat(),
+                               kind="sites+channels"))
+    print("credited %d channels to %r; %d row sources dropped from the source list"
+          % (seen, name, len(from_rows)))
+
+
 def net_tone_note(row):
     """Why a net carries no tone, in words, or None when the source does not say.
 
@@ -1142,6 +1168,10 @@ def main():
     ap.add_argument("--refresh", action="store_true", help="ignore the download cache")
     ap.add_argument("--rows", action="append", metavar="CSV",
                     help="another site/net row file, repeatable; may live outside the repo")
+    ap.add_argument("--credit", metavar="NAME", default="",
+                    help="replace the source named on every row-file channel with this, so a "
+                         "catalog can be published without naming the books it was read from "
+                         "(the rows themselves never belong in a public repo)")
     ap.add_argument("--site-fixes", metavar="CSV", default="",
                     help="coordinates corrected by hand, '<site>,<lat>,<lon>,<why>' per line "
                          "(default: comms-site-fixes.csv beside the first --rows file)")
@@ -1158,6 +1188,8 @@ def main():
         os.path.join(os.path.dirname(os.path.abspath(args.rows[0])), "comms-site-fixes.csv")
         if args.rows else ""))
     catalog = build(args)
+    if args.credit:
+        credit_rows(catalog, args.credit)
     if args.dry_run:
         return
     with open(args.out, "w") as f:
