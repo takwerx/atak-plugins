@@ -1,0 +1,14 @@
+# Comms: the operator's own sites and nets, one row per site and net.
+#
+# Lines starting with # are ignored. lat/lon may be blank when `site` matches a
+# name in the GIS layers (FIRENET, CESRS, USFS); the builder fills them in and
+# refuses a row it cannot place. `net` is a MACS 441-1 designator when one exists
+# ("CDF C1"); a net that is not in the plan carries its own rx/tx on the row.
+# Frequencies are the mobile's view: rx is what you listen on, tx is what you
+# transmit on. Tones are Hz ("103.5") or blank; the builder adds the tone number.
+# elev_m is ground elevation, ant_m the antenna height above ground (10 m is
+# assumed when blank); both drive the viewshed.
+#
+# Example (not a real row):
+# Santiago Peak,CA,Orange,,,,30,CDF C1,,,,103.5,KMF695,CAL FIRE,"south zone",operator,2026-09-09
+site,state,county,lat,lon,elev_m,ant_m,net,rx,tx,rx_tone,tx_tone,callsign,agency,notes,source,as_of

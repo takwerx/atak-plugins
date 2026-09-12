@@ -1,0 +1,50 @@
+# ATAK SDK artifacts — never commit (SDK license forbids redistribution)
+main.jar
+atak.apk
+atak-javadoc.jar
+atak-gradle-takdev.jar
+android_keystore
+
+# Signing material
+*.jks
+*.keystore
+*.p12
+keystore.properties
+
+# Machine-local paths and credentials
+local.properties
+
+# Unpacked by the takdev Gradle plugin at build time
+.takdev/
+
+# Build output
+.gradle/
+build/
+app/libs/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+
+# Submission zips
+dist/
+*.zip
+
+# Raw phone frames carry the callsign box and coordinates. Only reviewed crops under
+# docs/screenshots/ are tracked; the raw folder never is.
+docs/screenshots/raw/
+
+# Built by gradle/typst.gradle (ATAK_CI=1 or -PbuildManual); never tracked, never in the zip.
+app/src/main/assets/usermanual.pdf
+
+# Python leaves these beside the tools; a stale one carried a private source name.
+__pycache__/
+*.pyc
