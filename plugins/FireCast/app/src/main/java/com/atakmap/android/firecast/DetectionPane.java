@@ -124,6 +124,13 @@ public class DetectionPane implements DetectionFeed.Listener {
     }
 
     private void wireFilters() {
+        header.findViewById(R.id.btn_activity).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                com.atakmap.android.ipc.AtakBroadcast.getInstance()
+                        .sendBroadcast(new android.content.Intent(ActivityReceiver.ACTION));
+            }
+        });
         header.findViewById(R.id.btn_window).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

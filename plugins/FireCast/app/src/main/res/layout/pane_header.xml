@@ -21,6 +21,16 @@
         android:textColor="#BBBBBB"
         android:paddingBottom="6dp" />
 
+    <!-- The first thing to reach for when the map is not already on the fire: the rest
+         of the pane describes what is in front of you, this finds what is not. -->
+    <Button
+        android:id="@+id/btn_activity"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Where is it burning?" />
+
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

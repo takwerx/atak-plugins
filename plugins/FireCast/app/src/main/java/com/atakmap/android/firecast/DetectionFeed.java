@@ -88,6 +88,7 @@ public class DetectionFeed {
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
     private DetectionDetailsReceiver details;
+    private ActivityReceiver activity;
     private Listener listener;
     private boolean started;
 
@@ -150,6 +151,10 @@ public class DetectionFeed {
         final DocumentedIntentFilter f = new DocumentedIntentFilter();
         f.addAction(ACTION_DETAILS, "show what a heat detection does and does not mean");
         AtakBroadcast.getInstance().registerReceiver(details, f);
+        activity = new ActivityReceiver(mapView, pluginContext, this);
+        final DocumentedIntentFilter af = new DocumentedIntentFilter();
+        af.addAction(ActivityReceiver.ACTION, "list where fires are burning, beyond the map extent");
+        AtakBroadcast.getInstance().registerReceiver(activity, af);
         main.postDelayed(timer, TICK_MS);
         refresh();
     }
@@ -164,6 +169,14 @@ public class DetectionFeed {
             }
             details.dispose();
             details = null;
+        }
+        if (activity != null) {
+            try {
+                AtakBroadcast.getInstance().unregisterReceiver(activity);
+            } catch (Exception ignored) {
+            }
+            activity.dispose();
+            activity = null;
         }
         synchronized (lock) {
             detachLocked();
