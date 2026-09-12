@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Comms</string>
+    <string name="app_desc">Radio sites on the map, nearest first: which nets are on each mountaintop, the tone that opens each repeater, and which ones a handheld here is likely to reach.</string>
+    <string name="loading_catalog">Loading catalog…</string>
+    <string name="search_hint">Santiago, Command 5, tone 8</string>
+    <string name="clear">Clear</string>
+    <string name="go_to">Go to</string>
+    <string name="resync">Sync catalog</string>
+    <string name="toggle_on">ON</string>
+    <string name="toggle_off">OFF</string>
+    <string name="viewshed_note">Which repeaters a handheld here is likely to open, over the terrain on the device (Map Depot has the elevation data). Likely sites turn green on the map and list first. A guide, not a promise: bare earth only, no trees or buildings.</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the Comms user guide: finding the nearest site or net, reading tones, and which repeaters you can reach</string>
+    <string name="prefs_summary">Radio sites and nets on the map</string>
+</resources>

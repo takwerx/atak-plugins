@@ -267,7 +267,21 @@ Shell state does not persist between Bash calls: export `ADB_SERVER_SOCKET`
 in every adb-touching command. With it set, only the MacBook's devices are
 visible (the Studio's emulator disappears); unset it for emulator work.
 
-## Creating a plugin
+## Creating a plugin — `/new-plugin`, on the first message about it
+
+**`/new-plugin` is the only way a plugin starts.** Invoke it on the message
+that first proposes one, *before* any design conversation: it settles the name,
+makes the worktree, scaffolds inside it, removes the template manual, opens the
+PLAN, and hands the session over to the new worktree. This is a skill for the
+same reason `/ship` is: the rule was prose and prose lost to momentum. Comms
+and Feature Layer both got their folder late, because a session that starts
+talking about an idea keeps working in whatever directory it is already in.
+
+`.claude/hooks/new-plugin-guard.sh` holds the line mechanically: in the **main
+checkout** it blocks `new-plugin.sh` and any edit under `plugins/` — the Write
+and Edit tools, and shell edits (`sed -i`, a heredoc, a redirect) too. Every
+worktree is untouched and `worktree.sh new` is never blocked, so there is
+always a way forward and never a reason to work around it.
 
 A new plugin gets its worktree first and is scaffolded inside it, so it never
 touches the main checkout or another plugin's worktree. Run the first line from
@@ -278,6 +292,7 @@ anywhere (`worktree.sh` reads `main` for what exists; a name with no plugin on
 ~/GitHub/atak-plugins/scripts/worktree.sh new <Name> <name>-v0.1
 cd ~/GitHub/atak-plugins-<name>
 ./scripts/new-plugin.sh <Name> "Display Name"    # name: letters/digits only
+git rm -r plugins/<Name>/docs/user_manual        # the template's placeholder manual
 git add plugins/<Name> && git commit
 ```
 
@@ -528,6 +543,42 @@ its own SDK (retarget `sdk.path` alongside `ext.ATAK_VERSION`) so the
 clean-extract test validates that target rather than re-testing one SDK three
 times. Full write-up:
 `../atak-plugins-notes/docs/NOTES-takgov-build-failures-typst-download.md`.
+
+### What comes back from tak.gov — take it in, do not just grab the APK
+
+tak.gov returns one zip per build, and the APK is the least interesting thing in
+it. The zip also carries a Fortify static analysis of our own source, an OWASP
+Dependency-Check report, a CycloneDX SBOM and the build log. Every file in it has
+the same name whatever the target, so two targets dropped in one folder overwrite
+each other, and before 2026-09-12 the scans were read only when somebody thought
+to.
+
+Drop every return zip in `~/atak-dist/inbox/` (reachable as `dist/inbox/` from
+inside any worktree) and run:
+
+```bash
+./scripts/takgov-intake.sh          # everything in the inbox
+```
+
+It reads the plugin, version and ATAK target off the APK name inside, files the
+APK and AAB under `dist/signed/` and the scans under
+`dist/scans/<Plugin>/<version>/<target>/`, and then gates on what decides whether
+a build is fit to publish: the signer is the TAK Product Center, the versionCode
+is `MAJOR*10000+MINOR*100+PATCH`, the versionName agrees with the file name, the
+package id and signing certificate match the last signed release, and Fortify
+rendered zero results. It exits non-zero on a real finding.
+
+**Dependency-Check needs a human's eye and the script gives it one.** The scanner
+opens every archive in the build, including Android assets the packager has
+renamed with a `.jar` suffix, and fuzzy-matches them against the CVE database. On
+Comms 0.6 it reported `CVE-2025-54057`, an XSS in Apache SkyWalking, against
+`catalog.json.jar` -- which is the plugin's own site catalog. So each CVE is
+checked against the SBOM: a product the SBOM does not list is reported as a
+misidentified artifact and does not fail the gate, and one the SBOM *does* list
+fails it and has to be updated.
+
+`/ship` runs this before it will publish anything, and the scans stay on disk as
+the record of what was checked.
 
 ### Point of contact — recorded once, injected automatically
 
@@ -805,6 +856,8 @@ catalog.
   bump of vendored third-party code. Record the result (date, commit, outcome) in
   `../atak-plugins-notes/docs/`. `/ship` then cites that record instead of
   discovering things when the APKs are already signed.
+- **`/new-plugin` is the ONLY way a new plugin starts**, invoked on the first
+  message that proposes one — see "Creating a plugin".
 - **`/ship` is the ONLY path to `main`, a tag, or a GitHub Release.** The
   PreToolUse hook `.claude/hooks/git-guard.sh` mechanically blocks merge-to-main,
   `git tag`, pushes of main/tags, and `gh release create`; `/ship` runs pre-flight

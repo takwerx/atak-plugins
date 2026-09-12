@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <!-- Pinned above the list: the state picker is the one control an operator must
+         reach without scrolling. Top-aligned, not center_vertical (a bottom margin
+         under centering lifts a button off its own top edge). -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+        <Button
+            android:id="@+id/btn_state"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="@string/pick_state" />
+        <Button
+            android:id="@+id/btn_refresh_all"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="@string/refresh_all" />
+        <!-- ON / OFF for everything drawn, the way Cam Depot's map switch reads. -->
+        <Button
+            android:id="@+id/btn_all"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="@string/toggle_on" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="4dp"
+        android:textSize="12sp"
+        android:textColor="#BBBBBB"
+        android:text="@string/loading_catalog" />
+
+    <TextView
+        android:id="@+id/legend"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:paddingBottom="2dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Cam Depot's visibility tools, the same words in the same order. -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/section_radius"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6"
+                android:textColor="#FFFFFF"
+                android:paddingTop="4dp" />
+            <TextView
+                android:id="@+id/radius_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#FFFFFF" />
+            <!-- Full width, one unit a step, to 50: past that the state is what selects. -->
+            <SeekBar
+                android:id="@+id/radius"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="50" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+                <Button
+                    android:id="@+id/radius_extent"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/use_this_extent" />
+                <Button
+                    android:id="@+id/radius_preset"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="@string/presets" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/section_zoom"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6"
+                android:textColor="#FFFFFF"
+                android:paddingTop="10dp" />
+            <TextView
+                android:id="@+id/zoom_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#FFFFFF" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+                <Button
+                    android:id="@+id/zoom_set"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/use_this_zoom" />
+                <Button
+                    android:id="@+id/zoom_preset"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="@string/presets" />
+            </LinearLayout>
+
+            <!-- The state's feed rows, one per feed; no heading, the state button is the heading. -->
+            <LinearLayout
+                android:id="@+id/statewide_container"
+                android:paddingTop="10dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+            <TextView
+                android:id="@+id/statewide_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#BBBBBB"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:visibility="gone" />
+
+            <!-- County sources: the picked counties stay listed here. -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/section_counties"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6"
+                android:textColor="#FFFFFF"
+                android:paddingTop="10dp" />
+            <Button
+                android:id="@+id/btn_counties"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/pick_counties" />
+            <TextView
+                android:id="@+id/county_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#BBBBBB"
+                android:paddingTop="4dp"
+                android:text="@string/county_hint"
+                android:visibility="gone" />
+            <LinearLayout
+                android:id="@+id/county_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- The zone list, like Cam Depot's camera list: search and the status
+                 filter sit directly above it, because they change what the next few
+                 inches of screen contain. -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/section_zones"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6"
+                android:textColor="#FFFFFF"
+                android:paddingTop="10dp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+                <EditText
+                    android:id="@+id/search"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/search_hint"
+                    android:inputType="text"
+                    android:imeOptions="actionSearch|flagNoExtractUi|flagNoFullscreen"
+                    android:maxLines="1"
+                    android:textSize="14sp"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#888888" />
+                <Button
+                    android:id="@+id/search_clear"
+                    style="@style/TakwerxButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="6dp"
+                    android:text="@string/clear" />
+            </LinearLayout>
+            <Button
+                android:id="@+id/status_filter"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/status_all" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/nearest_to"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6"
+                android:textColor="#FFFFFF"
+                android:paddingTop="6dp" />
+            <!-- Where nearest is measured from; the chosen one reads green. The radius
+                 up top follows the same choice. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+                <Button
+                    android:id="@+id/nearest_map"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/nearest_map" />
+                <Button
+                    android:id="@+id/nearest_me"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="@string/nearest_me" />
+            </LinearLayout>
+            <!-- Follows the map the way ATAK's Overlay Manager does. -->
+            <CheckBox
+                android:id="@+id/in_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/in_view" />
+            <TextView
+                android:id="@+id/zones_summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="#BBBBBB"
+                android:paddingTop="4dp" />
+            <LinearLayout
+                android:id="@+id/zones_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
