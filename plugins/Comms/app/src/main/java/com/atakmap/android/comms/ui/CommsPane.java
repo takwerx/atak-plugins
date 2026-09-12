@@ -308,7 +308,18 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         detailHost = h;
     }
 
+    /**
+     * Set the moment the pane is torn down. ATAK can leave the view on screen after
+     * that -- reloading a plugin is the everyday way it happens -- and a tap on a
+     * dead pane then reaches a shut down worker. On 2026-09-11 that took ATAK down
+     * with a RejectedExecutionException from the From me button, because the plugin
+     * had just been reinstalled underneath an open pane. Nothing that outlives
+     * dispose may do work; it may only do nothing quietly.
+     */
+    private volatile boolean disposed;
+
     public void dispose() {
+        disposed = true;
         handler.removeCallbacks(mapTick);
         handler.removeCallbacks(selfTick);
         handler.removeCallbacks(reachTick);
@@ -683,6 +694,8 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
 
     /** Work out which sites a handheld here is likely to open. */
     private void refreshReach() {
+        if (disposed)
+            return;
         final GeoPoint from = originPoint();
         if (from == null) {
             toast("No position to check from");
@@ -699,7 +712,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
      */
     private void runReachCheck(final GeoPoint from) {
         final Catalog c = store.catalog();
-        if (c == null)
+        if (c == null || disposed)
             return;
         final int generation = ++reachGeneration;
         final double range = layer.getCheckRangeMeters();
@@ -718,7 +731,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         apply();
         handler.removeCallbacks(reachTick);
         handler.post(reachTick);
-        losWorker.execute(new Runnable() {
+        final Runnable work = new Runnable() {
             @Override
             public void run() {
                 final Map<String, Reach.State> out = new java.util.HashMap<>();
@@ -759,7 +772,16 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                     }
                 });
             }
-        });
+        };
+        try {
+            losWorker.execute(work);
+        } catch (java.util.concurrent.RejectedExecutionException shuttingDown) {
+            // The pool is gone, so the check cannot run and must not look as if it is.
+            Log.w(TAG, "reach check not started: the worker is shut down", shuttingDown);
+            reachPending = false;
+            handler.removeCallbacks(reachTick);
+            apply();
+        }
     }
 
     /** "working out what you can reach... 23 of 46, 12s" while the check runs. */
@@ -986,6 +1008,10 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     }
 
     private void apply() {
+        // Every control ends up here, so one check covers a tap that arrives after
+        // the pane has been torn down but before ATAK has taken the view away.
+        if (disposed)
+            return;
         final Catalog c = store.catalog();
         if (c == null)
             return;
