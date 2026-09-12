@@ -54,22 +54,6 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Show"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
-
-    <!-- One checkbox per agency in the catalog, with its site count, built at run time. -->
-    <LinearLayout
-        android:id="@+id/agencies"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
         android:text="Draw on the map"
         android:textSize="10sp"
         android:textAllCaps="true"

@@ -89,7 +89,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     // and the radius are per-task and deliberately not remembered.
     private static final String PREF_STATE = "comms_state";
     private static final String PREF_FROM_MAP = "comms_from_map";
-    private static final String PREF_AGENCIES_OFF = "comms_agencies_off";
     private static final String PREF_ZOOM = "comms_zoom_threshold";
     private static final String PREF_CHECK_RANGE = "comms_viewshed_range_big";
     private static final String PREF_ONLY_LIKELY = "comms_only_likely";
@@ -135,7 +134,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     private final EditText search;
     private final Button searchClear;
     private final Button stateButton, fromButton, radiusButton;
-    private final LinearLayout agencyBox;
     private final TextView zoomLabel;
     private final Button checkRange, meReach, meHeight, onlyLikelyButton, sync;
     private final TextView reachNote;
@@ -145,9 +143,7 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
     private String state;            // null means every state in the catalog
     private boolean fromMapCenter;
     private double radiusBig;        // 0 is off
-    private final Set<String> agenciesOff = new HashSet<>();
     private boolean mapOn = true;
-    private final Map<String, CheckBox> agencyBoxes = new LinkedHashMap<>();
     private Site openSite;           // the site whose detail pane is up, if any
     private boolean syncPressed;     // the operator asked for a refresh; say how it went
 
@@ -270,7 +266,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         stateButton = controls.findViewById(R.id.state);
         fromButton = controls.findViewById(R.id.from);
         radiusButton = controls.findViewById(R.id.radius);
-        agencyBox = controls.findViewById(R.id.agencies);
         zoomLabel = controls.findViewById(R.id.zoom_label);
         checkRange = controls.findViewById(R.id.viewshed_range);
         meReach = controls.findViewById(R.id.me_viewshed);
@@ -605,20 +600,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         fromMapCenter = prefs().getBoolean(PREF_FROM_MAP, false);
         onlyLikely = prefs().getBoolean(PREF_ONLY_LIKELY, false);
         mapOn = prefs().getBoolean(PREF_MAP_ON, true);
-        agenciesOff.clear();
-        for (String a : prefs().getString(PREF_AGENCIES_OFF, "").split("\\|"))
-            if (!a.isEmpty())
-                agenciesOff.add(a);
-    }
-
-    private void rememberAgencies() {
-        final StringBuilder b = new StringBuilder();
-        for (String a : agenciesOff) {
-            if (b.length() > 0)
-                b.append('|');
-            b.append(a);
-        }
-        prefs().edit().putString(PREF_AGENCIES_OFF, b.toString()).apply();
     }
 
     private static String radiusLabel(int r) {
@@ -999,15 +980,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
         return false;
     }
 
-    private boolean agencyOn(Site s) {
-        if (agenciesOff.isEmpty())
-            return true;
-        for (String a : s.agencies)
-            if (!agenciesOff.contains(a))
-                return true;
-        return s.agencies.isEmpty();
-    }
-
     private void apply() {
         // Every control ends up here, so one check covers a tap that arrives after
         // the pane has been torn down but before ATAK has taken the view away.
@@ -1029,8 +1001,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             if (state != null && !s.st.equals(state))
                 continue;
             inState++;
-            if (!agencyOn(s))
-                continue;
             final double d = from == null ? Double.NaN : distance(from, new GeoPoint(s.lat, s.lon));
             if (radiusM > 0 && !Double.isNaN(d) && d > radiusM)
                 continue;
@@ -1131,7 +1101,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
             listRows.addAll(rows);
         }
         adapter.set(listRows);
-        updateAgencyCounts(c, inState);
 
         // Say what is and is not being shown.
         final StringBuilder b = new StringBuilder();
@@ -1181,61 +1150,6 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
 
     private void updateStatus() {
         apply();
-    }
-
-    /** One checkbox per agency the catalog knows, carrying how many sites it would show. */
-    private void updateAgencyCounts(Catalog c, int inState) {
-        final Map<String, Integer> counts = new LinkedHashMap<>();
-        for (Site s : c.sites) {
-            if (state != null && !s.st.equals(state))
-                continue;
-            for (String a : s.agencies)
-                counts.put(a, counts.containsKey(a) ? counts.get(a) + 1 : 1);
-        }
-        final List<String> names = new ArrayList<>(counts.keySet());
-        Collections.sort(names, new Comparator<String>() {
-            @Override
-            public int compare(String a, String b) {
-                final int d = counts.get(b) - counts.get(a);
-                return d != 0 ? d : a.compareToIgnoreCase(b);
-            }
-        });
-        boolean rebuild = names.size() != agencyBoxes.size();
-        for (String n : names)
-            if (!agencyBoxes.containsKey(n))
-                rebuild = true;
-        if (rebuild) {
-            agencyBox.removeAllViews();
-            agencyBoxes.clear();
-            LinearLayout rowView = null;
-            for (final String a : names) {
-                if (rowView == null || rowView.getChildCount() == 2) {
-                    rowView = new LinearLayout(mapView.getContext());
-                    rowView.setOrientation(LinearLayout.HORIZONTAL);
-                    agencyBox.addView(rowView, new LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                }
-                final CheckBox cb = new CheckBox(mapView.getContext());
-                cb.setChecked(!agenciesOff.contains(a));
-                cb.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-                    @Override
-                    public void onCheckedChanged(CompoundButton b, boolean checked) {
-                        if (checked)
-                            agenciesOff.remove(a);
-                        else
-                            agenciesOff.add(a);
-                        rememberAgencies();
-                        apply();
-                    }
-                });
-                rowView.addView(cb, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-                agencyBoxes.put(a, cb);
-            }
-        }
-        for (Map.Entry<String, CheckBox> e : agencyBoxes.entrySet()) {
-            final Integer n = counts.get(e.getKey());
-            e.getValue().setText(String.format(Locale.US, "%s (%,d)", e.getKey(), n == null ? 0 : n));
-        }
     }
 
     private void busy(String message) {
