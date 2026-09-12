@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Comms",
-   plugin-version: "0.6",
+   plugin-version: "0.7",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -35,8 +35,7 @@ A net with no mountain at all -- an incident portable, carried to the fire and s
 up there -- says so rather than showing an empty list.
 
 *Where* picks the state, whether distances are measured from you or from the map
-center, and a radius. *Show* is one checkbox per agency, carrying the number of
-sites it would add.
+center, and a radius.
 ][
 #image("1.png", width: 100%)
 ]

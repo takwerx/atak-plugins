@@ -462,7 +462,13 @@ public final class CommsPane implements CatalogStore.Listener, SiteLayer.Listene
                         if (meReachOn)
                             refreshReach();
                         else
-                            toast("Applies the next time you turn it on");
+                            // Name the control and the setting. "Applies the next time
+                            // you turn it on" said neither, so it read as a reply to
+                            // whatever had just been tapped -- the operator spent a
+                            // while on 2026-09-12 hunting a bug in a different button
+                            // because a queued toast from this one landed next to it.
+                            toast(String.format(Locale.US, "Range %d %s takes effect when you turn the check on",
+                                    r, Units.bigLabel()));
                     }
                 });
             }
