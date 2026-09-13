@@ -95,6 +95,17 @@ public class DozerCountry implements IPlugin {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
 
+        // Close the pane, do not just drop the reference. ATAK keeps showing a pane
+        // whose plugin has been unloaded, and every control on it still points at the
+        // overlay this method is about to stop -- which is how a plugin update leaves
+        // a live-looking panel driving a dead object.
+        if (templatePane != null && uiService != null) {
+            try {
+                uiService.closePane(templatePane);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "could not close the pane on stop", e);
+            }
+        }
         if (pane != null) {
             pane.onClosed();
             pane = null;

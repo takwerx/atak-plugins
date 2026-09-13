@@ -150,6 +150,15 @@ public final class SlopeOverlay {
      * the main thread when the work is done.
      */
     public void computeFor(final GeoBounds bounds) {
+        // A pane left on screen by a plugin reload still holds a reference to the
+        // overlay that was stopped underneath it. Its worker is shut down, so handing
+        // it work would throw RejectedExecutionException straight out of a click
+        // handler and take ATAK with it.
+        if (!started) {
+            fail("Dozer Country was reloaded. Close this panel and open it again.");
+            return;
+        }
+
         final DozerStandard standard = Standards.active(pluginContext);
         if (standard == null) {
             fail("The slope standard could not be read. dozer_data.json is missing or invalid.");
