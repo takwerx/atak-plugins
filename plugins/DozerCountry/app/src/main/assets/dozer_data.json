@@ -37,6 +37,30 @@
     ]
   },
 
+  "waterMask": {
+    "minAreaAcres": 5,
+    "_comment": [
+      "Water is left unpainted rather than classed. There is no hydrography in ATAK",
+      "for a plugin to ask -- not one water, coastline or bathymetry class in",
+      "main.jar -- so water is found in the elevation itself: a connected run of",
+      "cells all holding PRECISELY the same value, covering at least this area.",
+      "",
+      "Real terrain always varies, even at DTED's one metre quantisation. A water",
+      "surface is rendered dead flat because that is what it is. The ocean is one",
+      "enormous such region at zero; a reservoir is a smaller one at its own level,",
+      "which is why this finds lakes as well as sea without knowing where sea level",
+      "is.",
+      "",
+      "It is NOT the same as 'low slope'. Low slope would swallow the Oxnard plain,",
+      "which is exactly the good dozer ground this overlay exists to find.",
+      "",
+      "What it gets wrong: a dry lake bed is dead flat too and will be masked, which",
+      "removes genuinely workable ground. The pane reports how much was masked so",
+      "that is visible rather than silent. Raise this number if it is over-masking",
+      "ground you know; set it to 0 to turn the mask off entirely."
+    ]
+  },
+
   "standards": [
     {
       "id": "nwcg",

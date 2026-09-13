@@ -167,13 +167,14 @@ public final class SlopeOverlay {
 
         final int mine = generation.incrementAndGet();
         final double windowM = Standards.workingWindowMeters(pluginContext);
+        final double waterM2 = Standards.waterMinAreaM2(pluginContext);
 
         worker.execute(new Runnable() {
             @Override
             public void run() {
                 final SlopeField field;
                 try {
-                    field = TerrainSampler.sample(bounds, windowM);
+                    field = TerrainSampler.sample(bounds, windowM, waterM2);
                 } catch (RuntimeException e) {
                     Log.e(TAG, "slope computation failed", e);
                     postFail(mine, "The slope could not be computed for that area.");
@@ -182,6 +183,12 @@ public final class SlopeOverlay {
 
                 if (mine != generation.get())
                     return;
+
+                if (field.isNothingToClass() && !field.isEmpty()) {
+                    postFail(mine, "That area is all water. Draw one that covers "
+                            + "ground.");
+                    return;
+                }
 
                 if (field.isEmpty()) {
                     // The honest failure mode: the plugin has no elevation of its own

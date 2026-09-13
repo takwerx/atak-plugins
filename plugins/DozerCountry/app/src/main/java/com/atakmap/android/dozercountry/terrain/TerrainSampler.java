@@ -61,9 +61,11 @@ public final class TerrainSampler {
      *
      * @param aoi     the area of interest. Not tested across the antimeridian.
      * @param windowM the working window, metres across
+     * @param waterMinAreaM2 smallest dead-flat region to treat as water
      * @return the field, never null; check {@link SlopeField#isEmpty()}
      */
-    public static SlopeField sample(GeoBounds aoi, double windowM) {
+    public static SlopeField sample(GeoBounds aoi, double windowM,
+            double waterMinAreaM2) {
         final GeoPoint nw = new GeoPoint(aoi.getNorth(), aoi.getWest());
         final GeoPoint ne = new GeoPoint(aoi.getNorth(), aoi.getEast());
         final GeoPoint sw = new GeoPoint(aoi.getSouth(), aoi.getWest());
@@ -117,7 +119,7 @@ public final class TerrainSampler {
         }
 
         return SlopeField.compute(elevations, width, height,
-                cellEastM, cellNorthM, windowM);
+                cellEastM, cellNorthM, windowM, waterMinAreaM2);
     }
 
     private static int dim(double spanM) {

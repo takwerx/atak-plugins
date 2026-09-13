@@ -312,11 +312,20 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
                     .append(Units.format(field.windowMeters)).append(".");
         }
 
+        final double cells = field.width * (double) field.height;
         if (field.unknownCells > 0) {
-            final double pct = 100d * field.unknownCells / (field.width * field.height);
             sb.append(String.format(Locale.US,
                     "\n%.0f%% of the area has no elevation data and is not painted.",
-                    pct));
+                    100d * field.unknownCells / cells));
+        }
+        // Water and missing data are both unpainted, and an operator cannot tell them
+        // apart by looking at a hole. Counting them separately is the only way to say
+        // which is which -- and it is also how an over-eager water mask gets noticed,
+        // because a dry lake bed is as flat as a real one.
+        if (field.waterCells > 0) {
+            sb.append(String.format(Locale.US,
+                    "\n%.0f%% is water and is not classed.",
+                    100d * field.waterCells / cells));
         }
         status.setText(sb.toString());
     }

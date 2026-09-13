@@ -35,9 +35,13 @@ public final class Standards {
     /** Fallback if the asset is missing or unreadable, in metres. One chain. */
     private static final double DEFAULT_WINDOW_M = 20d;
 
+    private static final double DEFAULT_WATER_ACRES = 5d;
+    private static final double SQ_M_PER_ACRE = 4046.8564224d;
+
     private static List<DozerStandard> cached;
     private static double cachedWindowMeters = DEFAULT_WINDOW_M;
     private static String cachedWindowLabel = "one chain (66 ft)";
+    private static double cachedWaterMinAreaM2 = DEFAULT_WATER_ACRES * SQ_M_PER_ACRE;
 
     private Standards() {
     }
@@ -70,6 +74,15 @@ public final class Standards {
         return cachedWindowMeters;
     }
 
+    /**
+     * Smallest dead-flat region to call water, in square metres. Zero turns the water
+     * mask off.
+     */
+    public static synchronized double waterMinAreaM2(Context pluginContext) {
+        all(pluginContext);
+        return cachedWaterMinAreaM2;
+    }
+
     /** The working window in the words the operator uses, for the pane. */
     public static synchronized String workingWindowLabel(Context pluginContext) {
         all(pluginContext);
@@ -84,6 +97,12 @@ public final class Standards {
 
         try {
             final JSONObject root = new JSONObject(text);
+
+            final JSONObject wm = root.optJSONObject("waterMask");
+            if (wm != null) {
+                cachedWaterMinAreaM2 = Math.max(0d,
+                        wm.optDouble("minAreaAcres", DEFAULT_WATER_ACRES)) * SQ_M_PER_ACRE;
+            }
 
             final JSONObject window = root.optJSONObject("workingWindow");
             if (window != null) {

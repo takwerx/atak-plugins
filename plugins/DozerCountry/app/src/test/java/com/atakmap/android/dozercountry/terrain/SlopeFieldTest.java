@@ -71,7 +71,7 @@ public class SlopeFieldTest {
             for (int x = 0; x < w; x++)
                 z[y * w + x] = x * 5d;
 
-        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d);
+        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d, 0d);
         assertEquals(0, f.unknownCells);
         // Interior cells only; the edges use a one-sided difference.
         for (int y = 1; y < h - 1; y++)
@@ -84,7 +84,7 @@ public class SlopeFieldTest {
     public void flatGroundIsZero() {
         final int w = 5, h = 5;
         final double[] z = new double[w * h];
-        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d);
+        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d, 0d);
         for (double v : f.percent)
             assertEquals(0d, v, 1e-9);
     }
@@ -100,7 +100,7 @@ public class SlopeFieldTest {
         for (int i = 0; i < z.length; i++)
             z[i] = Double.NaN;
 
-        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d);
+        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d, 0d);
         assertEquals(w * h, f.unknownCells);
         assertTrue(f.isEmpty());
         for (double v : f.percent)
@@ -124,11 +124,142 @@ public class SlopeFieldTest {
         for (int y = 0; y < h; y++)
             z[y * w + 4] = z[y * w + 3];
 
-        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d);
+        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d, 0d);
         assertTrue("window should span more than one cell here",
                 f.windowMeters > f.cellMeters);
         // The flattened cell must still report the steep ground around it.
         assertTrue("flat step inside steep ground read as " + f.percent[1 * w + 4],
                 f.percent[1 * w + 4] > 25d);
+    }
+
+    /* ----- the water mask ----- */
+
+    private static int countWater(boolean[] w) {
+        int n = 0;
+        for (boolean b : w)
+            if (b) n++;
+        return n;
+    }
+
+    /**
+     * A lake: a big patch of exactly one value inside terrain that varies. It is found
+     * at its own level, not at sea level, which is the whole reason the test uses 300 m.
+     */
+    @Test
+    public void aFlatPatchAtAnyLevelIsWater() {
+        final int w = 40, h = 40;
+        final double[] z = new double[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                z[y * w + x] = 300 + x * 3 + y * 2;   // varying ground
+        for (int y = 10; y < 30; y++)
+            for (int x = 10; x < 30; x++)
+                z[y * w + x] = 300d;                  // a lake, dead flat, 400 cells
+
+        // 10 m cells = 100 m2 each; ask for anything over 1000 m2.
+        final boolean[] water = SlopeField.findWater(z, w, h, 100d, 1000d);
+        assertEquals(400, countWater(water));
+        assertTrue(water[20 * w + 20]);
+        assertTrue("ground must not be masked", !water[2 * w + 2]);
+    }
+
+    /**
+     * The case that matters most: gently sloping farmland is NOT water. Low slope would
+     * swallow it; equality does not, because the values still change.
+     */
+    @Test
+    public void gentlySlopingGroundIsNotWater() {
+        final int w = 40, h = 40;
+        final double[] z = new double[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                z[y * w + x] = x * 0.4d;   // about a 4% grade, very flat farmland
+
+        final boolean[] water = SlopeField.findWater(z, w, h, 100d, 1000d);
+        assertEquals(0, countWater(water));
+    }
+
+    /** A puddle smaller than the threshold is left alone. */
+    @Test
+    public void aPatchBelowTheAreaThresholdIsNotWater() {
+        final int w = 30, h = 30;
+        final double[] z = new double[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                z[y * w + x] = 100 + x + y;
+        for (int y = 5; y < 7; y++)
+            for (int x = 5; x < 7; x++)
+                z[y * w + x] = 100d;       // 4 cells = 400 m2
+
+        assertEquals(0, countWater(SlopeField.findWater(z, w, h, 100d, 1000d)));
+    }
+
+    /** Threshold of zero turns the mask off entirely, as the asset documents. */
+    @Test
+    public void zeroThresholdDisablesTheMask() {
+        final int w = 20, h = 20;
+        final double[] z = new double[w * h];   // entirely flat: maximally water-like
+        assertEquals(0, countWater(SlopeField.findWater(z, w, h, 100d, 0d)));
+    }
+
+    /** Water is left unpainted, and counted apart from missing data. */
+    @Test
+    public void waterIsTransparentAndCountedSeparately() {
+        final int w = 20, h = 20;
+        final double[] z = new double[w * h];   // all one level -> all water
+        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d, 1000d);
+        assertEquals(w * h, f.waterCells);
+        assertEquals(0, f.unknownCells);
+        assertTrue(f.isNothingToClass());
+        assertTrue("all water is not the same as no elevation data", !f.isEmpty());
+    }
+
+    /** A hole in the DTED is not water: NaN has no level to be flat at. */
+    @Test
+    public void missingDataIsNotMistakenForWater() {
+        final int w = 20, h = 20;
+        final double[] z = new double[w * h];
+        for (int i = 0; i < z.length; i++)
+            z[i] = Double.NaN;
+        assertEquals(0, countWater(SlopeField.findWater(z, w, h, 100d, 1000d)));
+    }
+
+    /**
+     * The failure this nearly shipped with. DTED is whole metres, so a smooth gentle
+     * hillside comes back as terraces: long bands of constant elevation following the
+     * contours. They are huge in area and would mask a mountainside as a lake. A band
+     * three cells wide is a ribbon, not a body of water, however long it runs.
+     */
+    @Test
+    public void aLongThinContourTerraceIsNotWater() {
+        final int w = 60, h = 60;
+        final double[] z = new double[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                z[y * w + x] = 500 + y;           // one metre per row
+        // a terrace: three rows all at exactly 520, running the full width
+        for (int y = 20; y < 23; y++)
+            for (int x = 0; x < w; x++)
+                z[y * w + x] = 520d;
+
+        // 180 cells at 100 m2 = 18,000 m2 - far over the area threshold
+        final boolean[] water = SlopeField.findWater(z, w, h, 100d, 1000d);
+        assertEquals("a 3-cell-wide terrace is a ribbon, not a lake",
+                0, countWater(water));
+    }
+
+    /** But widen the same band into a blob and it is water again. */
+    @Test
+    public void thickeningTheSameRegionMakesItWater() {
+        final int w = 60, h = 60;
+        final double[] z = new double[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                z[y * w + x] = 500 + y;
+        for (int y = 20; y < 32; y++)
+            for (int x = 10; x < 40; x++)
+                z[y * w + x] = 520d;             // 12 x 30, thick enough
+
+        assertTrue(countWater(SlopeField.findWater(z, w, h, 100d, 1000d)) > 300);
     }
 }

@@ -41,20 +41,31 @@ public final class SlopeField {
     public final double windowMeters;
     /** Cells whose elevation could not be resolved. Zero means full coverage. */
     public final int unknownCells;
+    /** Cells taken to be water and left unpainted. */
+    public final int waterCells;
+    /** Per cell, true where {@link #findWater} judged the surface to be water. */
+    public final boolean[] water;
 
     private SlopeField(double[] percent, int width, int height, double cellMeters,
-            double windowMeters, int unknownCells) {
+            double windowMeters, int unknownCells, boolean[] water, int waterCells) {
         this.percent = percent;
         this.width = width;
         this.height = height;
         this.cellMeters = cellMeters;
         this.windowMeters = windowMeters;
         this.unknownCells = unknownCells;
+        this.water = water;
+        this.waterCells = waterCells;
     }
 
     /** True when not one cell resolved — no elevation data for this ground. */
     public boolean isEmpty() {
         return unknownCells >= width * height;
+    }
+
+    /** True when everything in the area is either water or unresolved. */
+    public boolean isNothingToClass() {
+        return unknownCells + waterCells >= width * height;
     }
 
     /**
@@ -66,9 +77,18 @@ public final class SlopeField {
      * @param cellEastM    ground metres between columns
      * @param cellNorthM   ground metres between rows
      * @param windowM      requested working window across, in metres
+     * @param waterMinAreaM2 a dead-flat region at least this large is taken to be
+     *                       water and left unpainted; zero disables the mask
      */
     public static SlopeField compute(double[] elevations, int width, int height,
-            double cellEastM, double cellNorthM, double windowM) {
+            double cellEastM, double cellNorthM, double windowM,
+            double waterMinAreaM2) {
+
+        final boolean[] water = findWater(elevations, width, height,
+                cellEastM * cellNorthM, waterMinAreaM2);
+        int waterCount = 0;
+        for (boolean b : water)
+            if (b) waterCount++;
 
         final double[] raw = new double[width * height];
         int unknown = 0;
@@ -92,7 +112,127 @@ public final class SlopeField {
         // nothing to widen and the raw slope is the answer.
         final double[] worst = (r == 0) ? raw : windowMax(raw, width, height, r);
 
-        return new SlopeField(worst, width, height, cellM, effectiveWindow, unknown);
+        return new SlopeField(worst, width, height, cellM, effectiveWindow, unknown,
+                water, waterCount);
+    }
+
+    /**
+     * Finds water: connected regions of <em>identical</em> elevation big enough to be
+     * a body of water rather than a coincidence.
+     *
+     * <h3>Why identical, and not merely flat</h3>
+     *
+     * ATAK ships no hydrography a plugin can query — there is not one water, coastline
+     * or bathymetry class in {@code main.jar} — so the only thing available is the
+     * elevation itself. "Low slope" would be hopeless: it would swallow the Oxnard
+     * plain, which is exactly the good dozer ground the overlay exists to find.
+     *
+     * <p>Equality is much tighter. Real terrain always varies, even at DTED's one metre
+     * quantisation; a water surface is rendered dead flat, because that is what it is.
+     * So a run of cells all holding precisely the same value, over an area larger than
+     * terrain would plausibly do by accident, is water. The ocean is one enormous such
+     * region at zero; a reservoir is a smaller one at its own level, which is why this
+     * catches lakes as well as sea and why it does not need to know where sea level is.
+     *
+     * <h3>What it gets wrong</h3>
+     *
+     * A dry lake bed is dead flat too, and will be masked. That is a real false
+     * positive and it removes genuinely workable ground, so the area masked is counted
+     * and reported in the pane rather than quietly disappearing, and the threshold
+     * lives in {@code dozer_data.json} where it can be raised. The proper fix is a land
+     * cover layer — ESA WorldCover has a permanent-water class and is free — and that
+     * is a later version's job.
+     *
+     * @param cellAreaM2     ground area one cell covers
+     * @param minAreaM2      smallest region to call water; zero disables the mask
+     */
+    static boolean[] findWater(double[] z, int w, int h, double cellAreaM2,
+            double minAreaM2) {
+        final boolean[] water = new boolean[w * h];
+        if (!(minAreaM2 > 0d) || !(cellAreaM2 > 0d))
+            return water;
+
+        final int minCells = Math.max(2, (int) Math.ceil(minAreaM2 / cellAreaM2));
+        final int[] id = new int[w * h];        // 0 = not yet assigned
+        final int[] stack = new int[w * h];
+        final int[] region = new int[w * h];
+        int nextId = 0;
+
+        for (int start = 0; start < z.length; start++) {
+            if (id[start] != 0 || Double.isNaN(z[start]))
+                continue;
+
+            final double level = z[start];
+            final int mine = ++nextId;
+            int sp = 0, n = 0;
+            stack[sp++] = start;
+            id[start] = mine;
+
+            // Iterative flood fill: a recursive one would blow the stack on an ocean.
+            while (sp > 0) {
+                final int i = stack[--sp];
+                region[n++] = i;
+                final int x = i % w, y = i / w;
+                sp = maybePush(stack, sp, id, z, level, mine, x > 0 ? i - 1 : -1);
+                sp = maybePush(stack, sp, id, z, level, mine, x < w - 1 ? i + 1 : -1);
+                sp = maybePush(stack, sp, id, z, level, mine, y > 0 ? i - w : -1);
+                sp = maybePush(stack, sp, id, z, level, mine, y < h - 1 ? i + w : -1);
+            }
+
+            if (n >= minCells && isWideEnough(id, w, h, region, n, mine)) {
+                for (int k = 0; k < n; k++)
+                    water[region[k]] = true;
+            }
+        }
+        return water;
+    }
+
+    private static int maybePush(int[] stack, int sp, int[] id, double[] z,
+            double level, int mine, int i) {
+        if (i < 0 || id[i] != 0 || z[i] != level)
+            return sp;
+        id[i] = mine;
+        stack[sp++] = i;
+        return sp;
+    }
+
+    /**
+     * Is the region genuinely two-dimensional, or is it a thin ribbon?
+     *
+     * <p>This is the check that keeps the water mask honest, and leaving it out is a
+     * mistake that looks fine until it is tested. <b>Quantised elevation terraces.</b>
+     * DTED is whole metres, so a smooth gentle hillside does not come back smooth — it
+     * comes back as bands of constant elevation following the contours, one band per
+     * metre of fall. Those bands are connected regions of exactly equal value and they
+     * can be enormous in area, so an area threshold alone masks a hillside as a lake.
+     * A unit test over ground falling 0.4 m per cell masked all of it.
+     *
+     * <p>Water bodies are blobs; contour terraces are ribbons. So require the region to
+     * be at least five cells across somewhere — that is, to contain a cell whose whole
+     * 5 x 5 neighbourhood is also in the region. A terrace a few cells wide fails it
+     * however long it runs, and anything narrower than five cells is below the
+     * resolution at which calling something a lake means much anyway.
+     */
+    private static boolean isWideEnough(int[] id, int w, int h, int[] region, int n,
+            int mine) {
+        for (int k = 0; k < n; k++) {
+            final int i = region[k];
+            final int x = i % w, y = i / w;
+            if (x < 2 || y < 2 || x > w - 3 || y > h - 3)
+                continue;
+            boolean solid = true;
+            for (int dy = -2; dy <= 2 && solid; dy++) {
+                for (int dx = -2; dx <= 2; dx++) {
+                    if (id[(y + dy) * w + (x + dx)] != mine) {
+                        solid = false;
+                        break;
+                    }
+                }
+            }
+            if (solid)
+                return true;
+        }
+        return false;
     }
 
     /**
@@ -231,14 +371,15 @@ public final class SlopeField {
     /**
      * The ARGB raster to hand the layer, one int per cell, row 0 northmost.
      *
-     * <p>Unknown cells come out fully transparent so the map shows through. The pane is
-     * what tells the operator how much of the area that was; a transparent hole on its
-     * own reads as "nothing steep here", which is the opposite of the truth.
+     * <p>Unknown cells and water both come out fully transparent so the map shows
+     * through. The pane is what tells the operator how much of the area each was, and
+     * keeps them apart; a transparent hole on its own reads as "nothing steep here",
+     * which is the opposite of the truth.
      */
     public int[] toArgb(DozerStandard standard) {
         final int[] argb = new int[percent.length];
         for (int i = 0; i < percent.length; i++)
-            argb[i] = standard.colorFor(percent[i]);
+            argb[i] = water[i] ? 0 : standard.colorFor(percent[i]);
         return argb;
     }
 }
