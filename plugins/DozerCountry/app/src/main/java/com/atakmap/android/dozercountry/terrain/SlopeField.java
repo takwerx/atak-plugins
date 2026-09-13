@@ -85,14 +85,53 @@ public final class SlopeField {
         }
 
         final double cellM = (cellEastM + cellNorthM) / 2d;
-        // Window radius in whole cells. At least 1: a window narrower than a cell is
-        // not a window, and claiming one would overstate what the data resolves.
-        final int r = Math.max(1, (int) Math.round(windowM / (2d * cellM)));
+        final int r = windowRadiusCells(windowM, cellM);
         final double effectiveWindow = (2 * r + 1) * cellM;
 
-        final double[] worst = windowMax(raw, width, height, r);
+        // r == 0 means the cell is already about as wide as the window, so there is
+        // nothing to widen and the raw slope is the answer.
+        final double[] worst = (r == 0) ? raw : windowMax(raw, width, height, r);
 
         return new SlopeField(worst, width, height, cellM, effectiveWindow, unknown);
+    }
+
+    /**
+     * The window radius in whole cells: the odd cell count whose span is closest to
+     * the requested window.
+     *
+     * <p>A window is always an odd number of cells so it is centred on the cell it
+     * classifies, which means the only spans available are one cell, three cells, five
+     * and so on. Picking the nearest of those matters more than it looks. Forcing a
+     * minimum of one cell <em>radius</em> — a three cell window — is what the first
+     * version did, and over an area large enough to push cells out to 30 m it turned a
+     * one chain window into 93 m: every cell within ninety metres of anything steep
+     * came out steep, and dissected country painted almost solid red. That is the safe
+     * direction to be wrong in, but it is not the standard, and an overlay that
+     * over-reports is one an operator learns to discount.
+     *
+     * <p>So a radius of zero is allowed. When the cells are already as wide as the
+     * working window, the cell <em>is</em> the window, and widening it would claim a
+     * neighbourhood the elevation data cannot resolve in the first place.
+     *
+     * <p>Ties go to the larger window. Over-reporting steep ground is the direction to
+     * err in for something that says where a machine can work.
+     */
+    static int windowRadiusCells(double windowM, double cellM) {
+        if (!(cellM > 0d) || !(windowM > 0d))
+            return 0;
+
+        // span(r) = (2r + 1) * cellM, which only grows with r. Find the first span
+        // that reaches the window, then take whichever of it and the one below is
+        // closer.
+        int hi = 0;
+        while ((2 * hi + 1) * cellM < windowM && hi < 4096)
+            hi++;
+        if (hi == 0)
+            return 0;
+
+        final double spanHi = (2 * hi + 1) * cellM;
+        final double spanLo = (2 * (hi - 1) + 1) * cellM;
+        return (windowM - spanLo) >= (spanHi - windowM) ? hi : hi - 1;
     }
 
     /**

@@ -296,8 +296,21 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
         final StringBuilder sb = new StringBuilder();
         sb.append(field.width).append(" x ").append(field.height)
                 .append(" cells of ").append(Units.format(field.cellMeters))
-                .append(", worst slope within ")
-                .append(Units.format(field.windowMeters)).append(".");
+                .append(". ");
+
+        // When the area is large enough that a cell is already wider than the working
+        // window, there is no neighbourhood left to take a worst case over. Say that,
+        // and say what to do about it -- silently showing per-cell slope under a label
+        // that promises a window would be the overlay quietly changing its meaning.
+        if (field.windowMeters <= field.cellMeters * 1.01d) {
+            sb.append("A cell is already wider than ")
+                    .append(Standards.workingWindowLabel(pluginContext))
+                    .append(", so each shows its own slope. Draw a smaller area for a ")
+                    .append("finer read.");
+        } else {
+            sb.append("Each cell shows the worst slope within ")
+                    .append(Units.format(field.windowMeters)).append(".");
+        }
 
         if (field.unknownCells > 0) {
             final double pct = 100d * field.unknownCells / (field.width * field.height);
