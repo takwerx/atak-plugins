@@ -1,0 +1,128 @@
+{
+  "_comment": [
+    "The slope standard Dozer Country paints by. Everything here is data on purpose:",
+    "a colored overlay that says 'you can cut here' is a safety claim, and a safety",
+    "claim has to be auditable by the person whose ground it is. Nothing here is",
+    "compiled into the plugin: read it, check it against the tables, and if a number",
+    "is wrong say so. Changing it takes a rebuild -- the plugin deliberately reads",
+    "ONLY this asset from inside its own signed APK, and never an override from",
+    "shared storage, because a colour table that decides where a dozer can work must",
+    "not be editable by anything else on the phone.",
+    "",
+    "Two different things live in each standard, and they are NOT the same axis:",
+    "  bands  - production classes. Slope MAGNITUDE only. From the NWCG production",
+    "           rate tables, which are measured for line built UP or DOWN the slope",
+    "           and have no sideslope column at all.",
+    "  limits - safety refusal points, DIRECTIONAL. From the S-232 Dozer Boss course.",
+    "           A 50% slope is production class 3 and at the same time over the 45%",
+    "           sidehill limit. Which one applies depends on the way the line runs.",
+    "",
+    "The AOI overlay knows magnitude only, so it paints bands. The line profile knows",
+    "direction, so it can also check limits.",
+    "",
+    "To add a second standard (e.g. CAL FIRE), append another object to 'standards'.",
+    "The plugin shows a picker as soon as there is more than one."
+  ],
+
+  "workingWindow": {
+    "meters": 20,
+    "label": "one chain (66 ft)",
+    "_comment": [
+      "A patch of good ground smaller than this is not called workable. A single",
+      "cell at 20% inside a 60% face is not dozer country, so each cell is",
+      "classified by the WORST slope within this distance of it.",
+      "One chain is the unit the production tables already count in (chains per",
+      "hour), and it is about the limit of what 30 m DTED2 posts can honestly",
+      "resolve. Anything smaller is made up."
+    ]
+  },
+
+  "standards": [
+    {
+      "id": "nwcg",
+      "name": "NWCG",
+      "legend": "NWCG dozer production classes",
+      "sources": [
+        "NWCG Fire Line Production Rate Tables (2021), table 'Dozer Fireline Construction Rates (Single Pass) in Chains per Hour', carried forward from the Fireline Handbook PMS 410-1. Public domain.",
+        "USFS/NWCG S-232 Dozer Boss, Pre-Course Work, Appendix D, for the directional limits."
+      ],
+      "bands": [
+        {
+          "class": 1,
+          "minPercent": 0,
+          "maxPercent": 25,
+          "label": "0-25%",
+          "meaning": "Dozer country",
+          "argb": "#961E8C28"
+        },
+        {
+          "class": 2,
+          "minPercent": 26,
+          "maxPercent": 40,
+          "label": "26-40%",
+          "meaning": "Production falls off",
+          "argb": "#96D7C31E"
+        },
+        {
+          "class": 3,
+          "minPercent": 41,
+          "maxPercent": 55,
+          "label": "41-55%",
+          "meaning": "Marginal; most fuel models near zero",
+          "argb": "#96E07818"
+        },
+        {
+          "class": 4,
+          "minPercent": 56,
+          "maxPercent": 74,
+          "label": "56-74%",
+          "meaning": "Off the table for most of the book",
+          "argb": "#96C81E1E"
+        }
+      ],
+      "aboveStandard": {
+        "label": "Over 74%",
+        "meaning": "Past where the standard goes at all",
+        "argb": "#A0500A28",
+        "_comment": "The production table stops at 74%. This is not 'very steep class 4' -- it is unmeasured ground, and it is colored so it does not read as a band."
+      },
+      "limits": {
+        "sidehillPercent": 45,
+        "uphillPercent": 55,
+        "downhillPercent": 75,
+        "_comment": [
+          "S-232 Dozer Boss, Appendix D, verbatim: 'As with any piece of specialized",
+          "equipment, the dozer has limitations. As a general guideline, dozers should",
+          "not be operated across slopes (sidehill) greater than 45 percent, uphill",
+          "slopes greater than 55 percent or downhill on slopes greater than 75",
+          "percent.'",
+          "Corroborated by the S-232 supplement 'Mechanized Equipment for Fire and",
+          "Fuels Operations': 'According to the Fireline Handbook, dozers are limited",
+          "to <75% favorable slopes.'",
+          "These are GENERAL GUIDELINES. Type and size of dozer, terrain, weather and",
+          "operator experience all move them, and the standard says so."
+        ]
+      },
+      "machines": [
+        {
+          "type": "1",
+          "name": "Type 1 - heavy",
+          "minHorsepower": 200,
+          "examples": "D-7, D-8, JD-950"
+        },
+        {
+          "type": "2",
+          "name": "Type 2 - medium",
+          "minHorsepower": 100,
+          "examples": "D-5N, D-6N, JD-750"
+        },
+        {
+          "type": "3",
+          "name": "Type 3 - light",
+          "minHorsepower": 50,
+          "examples": "D-3, D-4, JD-450, JD-550"
+        }
+      ]
+    }
+  ]
+}
