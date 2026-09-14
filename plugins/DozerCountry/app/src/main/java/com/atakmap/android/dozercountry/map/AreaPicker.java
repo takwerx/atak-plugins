@@ -3,9 +3,11 @@ package com.atakmap.android.dozercountry.map;
 import android.content.Intent;
 import android.os.Bundle;
 
+import com.atakmap.android.drawing.DrawingPreferences;
 import com.atakmap.android.drawing.DrawingToolsMapComponent;
 import com.atakmap.android.drawing.DrawingToolsToolbar;
 import com.atakmap.android.drawing.mapItems.DrawingRectangle;
+import com.atakmap.android.drawing.mapItems.DrawingShape;
 import com.atakmap.android.drawing.tools.DrawingRectangleCreationTool;
 import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.maps.MapItem;
@@ -16,8 +18,11 @@ import com.atakmap.android.toolbar.ToolManagerBroadcastReceiver;
 import com.atakmap.android.toolbar.ToolbarBroadcastReceiver;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoBounds;
+import com.atakmap.coremap.maps.coords.GeoPoint;
+import com.atakmap.coremap.maps.coords.GeoPointMetaData;
 
 import java.util.HashSet;
+import java.util.UUID;
 import java.util.Set;
 
 /**
@@ -57,6 +62,32 @@ public final class AreaPicker implements ToolListener {
     /** ATAK delivers SET_TOOLBAR as a broadcast; give it time to land. From FOBS. */
     private static final long TOOLBAR_SETTLE_MS = 400L;
 
+    /**
+     * The colour the area is drawn in while it is being drawn.
+     *
+     * <p>ATAK's rectangle tool paints in whatever colour the operator last left the
+     * drawing tools set to, which means the box could come up in anything — including
+     * a colour that vanishes into the basemap under it. Orange is the operator's
+     * choice and the reason is the right one: it holds up on snow, on timber, on bare
+     * desert and on dark relief, which no single bright colour manages as reliably.
+     */
+    private static final int DRAW_COLOR = 0xFFFFA500;
+
+    /** ATAK's setting, borrowed for the duration and put straight back. */
+    private int savedColor;
+    private boolean colorSaved;
+
+    /**
+     * The rectangle the operator drew, kept on the map as the boundary of the area.
+     *
+     * <p>An earlier version removed it the instant its bounds were read, on the
+     * reasoning that the painted overlay is the area. That was wrong in two ways: the
+     * overlay can be switched off, and with it gone there is nothing at all to show
+     * what ground was computed — and for the whole moment it takes to compute, the
+     * screen shows no sign that anything was drawn.
+     */
+    private DrawingShape drawn;
+
     public interface Callback {
         /** An area was drawn. */
         void onAreaPicked(GeoBounds bounds);
@@ -82,6 +113,37 @@ public final class AreaPicker implements ToolListener {
     /** Must be called when the plugin stops, or the listener outlives the plugin. */
     public void dispose() {
         ToolManagerBroadcastReceiver.getInstance().unregisterListener(this);
+        restoreColor();
+        clearDrawn();
+    }
+
+    /**
+     * Lend ATAK's drawing tools our colour. Every exit path puts it back — a plugin
+     * that quietly repaints the operator's drawing preference is a plugin they will
+     * curse three days later when their own shapes come out the wrong colour.
+     */
+    private void borrowColor() {
+        if (colorSaved)
+            return;
+        try {
+            final DrawingPreferences prefs = new DrawingPreferences(mapView);
+            savedColor = prefs.getShapeColor();
+            colorSaved = true;
+            prefs.setShapeColor(DRAW_COLOR);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not set the drawing colour", e);
+        }
+    }
+
+    private void restoreColor() {
+        if (!colorSaved)
+            return;
+        colorSaved = false;
+        try {
+            new DrawingPreferences(mapView).setShapeColor(savedColor);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not restore the drawing colour", e);
+        }
     }
 
     public boolean isActive() {
@@ -93,6 +155,7 @@ public final class AreaPicker implements ToolListener {
             return;
         active = true;
         before = rectanglesNow();
+        borrowColor();
 
         final Intent open = new Intent(ToolbarBroadcastReceiver.SET_TOOLBAR);
         open.putExtra("toolbar", DrawingToolsToolbar.TOOLBAR_IDENTIFIER);
@@ -114,6 +177,7 @@ public final class AreaPicker implements ToolListener {
         if (!active)
             return;
         active = false;
+        restoreColor();
         final Tool t = ToolManagerBroadcastReceiver.getInstance().getActiveTool();
         if (t != null && DrawingRectangleCreationTool.TOOL_IDENTIFIER
                 .equals(t.getIdentifier()))
@@ -143,6 +207,7 @@ public final class AreaPicker implements ToolListener {
     }
 
     private void collect() {
+        restoreColor();
         closeToolbar();
 
         DrawingRectangle made = null;
@@ -157,16 +222,56 @@ public final class AreaPicker implements ToolListener {
         }
 
         final GeoBounds bounds = GeoBounds.createFromPoints(made.getPoints());
-        // The overlay is the area from here on; do not leave a second shape behind.
-        made.removeFromGroup();
 
         if (bounds.getNorth() == bounds.getSouth()
                 || bounds.getEast() == bounds.getWest()) {
+            made.removeFromGroup();
             callback.onCancelled();
             return;
         }
+
+        // ATAK's rectangle tool is three point entry, so what the operator drew can be
+        // ROTATED, while the overlay samples a north-up lat/lon grid and therefore
+        // computes the rotated rectangle's bounding box. Keeping their rectangle as the
+        // boundary would draw a line around one area and paint a slightly larger one —
+        // visibly so at the corners. The boundary has to be the ground that was
+        // actually computed, so the drawn rectangle is replaced by an outline of the
+        // bounds themselves.
+        made.removeFromGroup();
+
+        // One area at a time: the previous boundary goes when a new one is drawn.
+        clearDrawn();
+        drawn = new DrawingShape(mapView, DrawingToolsMapComponent.getGroup(),
+                UUID.randomUUID().toString());
+        drawn.setTitle("Dozer Country area");
+        drawn.setPoints(GeoPointMetaData.wrap(new GeoPoint[] {
+                new GeoPoint(bounds.getNorth(), bounds.getWest()),
+                new GeoPoint(bounds.getNorth(), bounds.getEast()),
+                new GeoPoint(bounds.getSouth(), bounds.getEast()),
+                new GeoPoint(bounds.getSouth(), bounds.getWest())
+        }));
+        drawn.setClosed(true);
+        // Orange, and set on the item rather than left to the drawing preference: the
+        // preference only governs what the tool paints while it is running, and this
+        // outline has to stay readable over snow, timber, bare desert and dark relief
+        // for as long as the area is up.
+        drawn.setStrokeColor(DRAW_COLOR);
+        drawn.setStrokeWeight(3d);
+        // Outline only; a fill would sit on top of the very thing it bounds.
+        drawn.setFillColor(0x00000000);
+        DrawingToolsMapComponent.getGroup().addItem(drawn);
+
         Log.d(TAG, "area picked " + bounds);
         callback.onAreaPicked(bounds);
+    }
+
+    /** Takes the boundary off the map. Called when the overlay is cleared. */
+    public void clearDrawn() {
+        if (drawn == null)
+            return;
+        if (drawn.getGroup() != null)
+            drawn.removeFromGroup();
+        drawn = null;
     }
 
     private void closeToolbar() {

@@ -92,6 +92,8 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
             public void onClick(View v) {
                 if (picker.isActive())
                     picker.cancel();
+                // Clear means clear: the painting and the boundary that bounds it.
+                picker.clearDrawn();
                 overlay.clear();
             }
         });
