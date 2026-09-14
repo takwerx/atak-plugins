@@ -16,6 +16,7 @@ import com.atakmap.coremap.maps.coords.GeoBounds;
 import com.atakmap.map.layer.opengl.GLLayerFactory;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -172,6 +173,17 @@ public final class SlopeOverlay {
         worker.execute(new Runnable() {
             @Override
             public void run() {
+                // Check the data BEFORE computing anything from it. getElevation will
+                // happily return a number off DTED0 at a kilometre per post, and that
+                // number would paint confident safety bands over terrain nothing can
+                // actually see.
+                final TerrainSampler.Coverage coverage =
+                        TerrainSampler.surveyCoverage(bounds);
+                if (!coverage.meetsDted2()) {
+                    postFail(mine, noDted2Message(coverage));
+                    return;
+                }
+
                 final SlopeField field;
                 try {
                     field = TerrainSampler.sample(bounds, windowM, waterM2);
@@ -190,11 +202,16 @@ public final class SlopeOverlay {
                     return;
                 }
 
-                if (field.isEmpty()) {
-                    // The honest failure mode: the plugin has no elevation of its own
-                    // and this device has none for this ground.
-                    postFail(mine, "No elevation data loaded for that area. "
-                            + "Load DTED covering it, then draw the area again.");
+                // A source can cover the area and still have holes, and a hole is not
+                // a slope of zero. Anything short of full coverage is refused rather
+                // than painted with gaps: an operator reading a safety overlay should
+                // not have to notice which parts of it are missing.
+                if (field.unknownCells > 0) {
+                    final double pct = 100d * field.unknownCells
+                            / (field.width * (double) field.height);
+                    postFail(mine, String.format(Locale.US,
+                            "%.0f%% of that area has no elevation data. %s",
+                            Math.max(1d, pct), LOAD_DTED2));
                     return;
                 }
 
@@ -235,6 +252,39 @@ public final class SlopeOverlay {
         hideLegend();
         if (listener != null)
             listener.onComputeFailed(reason);
+    }
+
+    /**
+     * What to do about it, in the operator's terms and naming the tool that does it.
+     * "Load DTED" on its own is a fact about the world, not an instruction.
+     */
+    private static final String LOAD_DTED2 =
+            "Load DTED2 covering it \u2014 the Map Depot plugin can download it \u2014 "
+                    + "then draw the area again.";
+
+    /**
+     * Says what is actually there as well as what is missing.
+     *
+     * <p>"No elevation data" is wrong and unhelpful when the device has DTED1: the
+     * operator will look at the map, see terrain shading, and conclude the plugin is
+     * broken. Naming the resolution that was found is what makes the refusal
+     * believable.
+     */
+    private static String noDted2Message(TerrainSampler.Coverage coverage) {
+        if (coverage.isEmpty()) {
+            return "No elevation data for that area. Dozer Country needs DTED2 "
+                    + "(30 m posts) or better to say where a dozer can work. "
+                    + LOAD_DTED2;
+        }
+        if (coverage.good == 0) {
+            return "That area is only covered by " + coverage.describe()
+                    + ". That is too coarse to say where a dozer can work \u2014 Dozer "
+                    + "Country needs DTED2 (30 m posts) or better. " + LOAD_DTED2;
+        }
+        // Mixed: some of it is fine and some is not, which is the case an operator is
+        // most likely to misread, because the map looks the same either way.
+        return "Only part of that area has DTED2 or better; the rest is "
+                + coverage.describe() + ". " + LOAD_DTED2;
     }
 
     /* ----- the legend ----- */

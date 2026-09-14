@@ -4,10 +4,14 @@ import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoBounds;
 import com.atakmap.coremap.maps.coords.GeoCalculations;
 import com.atakmap.coremap.maps.coords.GeoPoint;
+import com.atakmap.coremap.maps.coords.GeoPointMetaData;
 import com.atakmap.map.elevation.ElevationData;
 import com.atakmap.map.elevation.ElevationManager;
 
+
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 /**
@@ -53,7 +57,129 @@ public final class TerrainSampler {
      */
     public static final int MAX_DIM = 512;
 
+    /**
+     * DTED2's post spacing in metres, as ATAK itself defines it.
+     *
+     * <p>Read out of {@code Dt2ElevationData.DtedFormat}, which carries DTED0 = 1000,
+     * DTED1 = 100, DTED2 = 30, DTED3 = 10. The number is copied rather than referenced
+     * because that class is {@code com.atakmap.android.elev.dt2} internals and classes
+     * in there come and go between ATAK releases; a constant that breaks the build in
+     * three years is worse than one with its provenance written down.
+     */
+    public static final double DTED2_RESOLUTION_M = 30d;
+
     private TerrainSampler() {
+    }
+
+    /**
+     * Sources that are good enough to class dozer ground: 30 m posts or finer.
+     *
+     * <p>DTED2 is 30 m, DTED3 is 10 m, SRTM1 is one arc-second which is also about
+     * 30 m, and LIDAR is finer than any of them. DTED1 (100 m) and DTED0 (1000 m) are
+     * not on this list and never should be: a 45% boundary decided from thousand-metre
+     * posts is a number with no ground under it.
+     */
+    private static final java.util.Set<String> GOOD_ENOUGH = new java.util.HashSet<>(
+            java.util.Arrays.asList(
+                    GeoPointMetaData.DTED2,
+                    GeoPointMetaData.DTED3,
+                    GeoPointMetaData.SRTM1,
+                    GeoPointMetaData.LIDAR));
+
+    /** What elevation actually covers an area, and how good it is. */
+    public static final class Coverage {
+        /** Every altitude source seen across the probe grid, in the order first seen. */
+        public final List<String> sources;
+        /** Probe points whose source is 30 m or finer. */
+        public final int good;
+        /** Probe points total. */
+        public final int probes;
+
+        Coverage(List<String> sources, int good, int probes) {
+            this.sources = sources;
+            this.good = good;
+            this.probes = probes;
+        }
+
+        /** True only when every probe came back from data fine enough to trust. */
+        public boolean meetsDted2() {
+            return probes > 0 && good == probes;
+        }
+
+        /** True when nothing at all answered — no elevation loaded for this ground. */
+        public boolean isEmpty() {
+            return sources.isEmpty();
+        }
+
+        /** "DTED1" or "DTED1, DTED0" — for telling the operator what IS there. */
+        public String describe() {
+            final StringBuilder sb = new StringBuilder();
+            for (String src : sources) {
+                if (sb.length() > 0)
+                    sb.append(", ");
+                sb.append(src);
+            }
+            return sb.toString();
+        }
+    }
+
+    /**
+     * Asks what elevation the area would actually be read from, before reading it.
+     *
+     * <p>Sampling alone cannot answer this. {@code getElevation} returns a number from
+     * whatever source it can find, so DTED0 at a kilometre per post comes back as a
+     * perfectly valid elevation and the overlay would paint confident safety bands off
+     * terrain nothing can actually see. The question is not "did a number come back"
+     * but "did it come back from data fine enough to mean anything".
+     *
+     * <p>This asks ATAK directly rather than inferring: {@code getElevationMetadata}
+     * returns a {@link GeoPointMetaData} whose altitude source is one of ATAK's own
+     * constants — DTED0..DTED3, SRTM1, LIDAR — so the answer is what was really used
+     * at that point, not what happens to be installed somewhere nearby.
+     *
+     * <p>Probed on a coarse grid rather than every cell. A DTED tile is a degree
+     * across; a probe every fifth of the area catches a missing tile or a change of
+     * source, and the per-cell check that follows catches holes inside one.
+     */
+    public static Coverage surveyCoverage(GeoBounds aoi) {
+        final int n = 6;
+        final List<String> sources = new ArrayList<>();
+        int good = 0, probes = 0;
+
+        final ElevationManager.QueryParameters params = new ElevationManager.QueryParameters();
+        params.elevationModel = ElevationData.MODEL_TERRAIN;
+
+        final double latStep = (aoi.getNorth() - aoi.getSouth()) / (n - 1);
+        final double lonStep = (aoi.getEast() - aoi.getWest()) / (n - 1);
+
+        for (int y = 0; y < n; y++) {
+            for (int x = 0; x < n; x++) {
+                final double lat = aoi.getSouth() + y * latStep;
+                final double lon = aoi.getWest() + x * lonStep;
+
+                String src = null;
+                try {
+                    final GeoPointMetaData md =
+                            ElevationManager.getElevationMetadata(lat, lon, params);
+                    if (md != null && md.get() != null && md.get().isAltitudeValid())
+                        src = md.getAltitudeSource();
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "elevation metadata query failed", e);
+                }
+
+                if (src == null || src.isEmpty() || GeoPointMetaData.UNKNOWN.equals(src))
+                    continue;       // nothing here; counted by absence, named by nothing
+
+                probes++;
+                if (GOOD_ENOUGH.contains(src))
+                    good++;
+                if (!sources.contains(src))
+                    sources.add(src);
+            }
+        }
+
+        Log.d(TAG, "coverage: " + good + "/" + probes + " probes good, sources " + sources);
+        return new Coverage(sources, good, probes);
     }
 
     /**
