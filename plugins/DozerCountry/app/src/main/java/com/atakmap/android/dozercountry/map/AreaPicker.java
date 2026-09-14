@@ -244,6 +244,12 @@ public final class AreaPicker implements ToolListener {
         drawn = new DrawingShape(mapView, DrawingToolsMapComponent.getGroup(),
                 UUID.randomUUID().toString());
         drawn.setTitle("Dozer Country area");
+        // The boundary is a boundary, not an annotation. ATAK gives a drawn shape a
+        // centre dot and a floating name by default, and over an overlay whose whole
+        // job is to be read they are two more things in the way.
+        drawn.setCenterPointVisible(false);
+        drawn.setCenterPointLabelVisible(false);
+        drawn.hideLabels(true);
         drawn.setPoints(GeoPointMetaData.wrap(new GeoPoint[] {
                 new GeoPoint(bounds.getNorth(), bounds.getWest()),
                 new GeoPoint(bounds.getNorth(), bounds.getEast()),
