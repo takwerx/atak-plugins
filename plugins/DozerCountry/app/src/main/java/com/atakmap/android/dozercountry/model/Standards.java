@@ -144,6 +144,13 @@ public final class Standards {
                 sources.add(src.optString(i, ""));
         }
 
+        final List<String> caveat = new ArrayList<>();
+        final JSONArray cv = o.optJSONArray("caveat");
+        if (cv != null) {
+            for (int i = 0; i < cv.length(); i++)
+                caveat.add(cv.optString(i, ""));
+        }
+
         final List<SlopeBand> bands = new ArrayList<>();
         final JSONArray ba = o.getJSONArray("bands");
         for (int i = 0; i < ba.length(); i++) {
@@ -198,7 +205,7 @@ public final class Standards {
         return new DozerStandard(
                 o.optString("id", "standard"), o.optString("name", "Standard"),
                 o.optString("legend", o.optString("name", "Standard")),
-                sources, bands, above, limits, machines);
+                sources, caveat, bands, above, limits, machines);
     }
 
     /**

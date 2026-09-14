@@ -3,12 +3,12 @@
     <!-- App -->
     <string name="app_name">Dozer Country</string>
     <!-- description -->
-    <string name="app_desc">Slope classed for dozer line, over an area you draw</string>
+    <string name="app_desc">Where a dozer can work safely, over an area you draw</string>
 
     <!-- Sections -->
     <string name="section_area">Area of interest</string>
     <string name="section_overlay">Overlay</string>
-    <string name="section_classes">Slope classes</string>
+    <string name="section_classes">Can a dozer work it</string>
 
     <!-- Controls -->
     <string name="draw_area">Draw area</string>
@@ -19,7 +19,7 @@
     <string name="opacity">Opacity</string>
 
     <!-- Status line. Says what is happening, or why nothing is drawn. -->
-    <string name="status_idle">Draw an area to see the slope in it.</string>
+    <string name="status_idle">Draw an area to see where a dozer can work.</string>
     <string name="status_pick_first">Tap one corner of the area.</string>
     <string name="status_pick_second">Tap the opposite corner.</string>
     <string name="status_working">Reading the terrain…</string>

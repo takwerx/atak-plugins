@@ -97,6 +97,18 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
+        <!-- What the overlay does not account for. Deliberately brighter and above
+             the provenance line: an operator needs to know what is missing from the
+             picture before they need to know whose table it came from. -->
+        <TextView
+            android:id="@+id/standard_caveat"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textColor="#FFD37A"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/standard_source"
             android:layout_width="match_parent"

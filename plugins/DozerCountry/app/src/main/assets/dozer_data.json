@@ -63,70 +63,85 @@
 
   "standards": [
     {
-      "id": "nwcg",
-      "name": "NWCG",
-      "legend": "NWCG dozer production classes",
+      "id": "s232",
+      "name": "Dozer safety limits",
+      "legend": "USFS/NWCG S-232 Dozer Boss limits",
       "sources": [
-        "NWCG Fire Line Production Rate Tables (2021), table 'Dozer Fireline Construction Rates (Single Pass) in Chains per Hour', carried forward from the Fireline Handbook PMS 410-1. Public domain.",
-        "USFS/NWCG S-232 Dozer Boss, Pre-Course Work, Appendix D, for the directional limits."
+        "USFS/NWCG S-232 Dozer Boss, Pre-Course Work, Appendix D: 'As with any piece of specialized equipment, the dozer has limitations. As a general guideline, dozers should not be operated across slopes (sidehill) greater than 45 percent, uphill slopes greater than 55 percent or downhill on slopes greater than 75 percent.'",
+        "Corroborated by the S-232 supplement 'Mechanized Equipment for Fire and Fuels Operations': 'According to the Fireline Handbook, dozers are limited to <75% favorable slopes.'"
       ],
+
+      "_comment": [
+        "These bands answer ONE question: can a dozer work this ground safely.",
+        "",
+        "They are NOT the NWCG production classes (0-25/26-40/41-55/56-74), which",
+        "measure chains per hour and are a different thing. An earlier version painted",
+        "those and it was the wrong axis: a production class tells you how fast line",
+        "goes in, not whether the machine stays upright.",
+        "",
+        "The three boundaries are the three refusal points in the guide, and each one",
+        "is a direction: 45 across, 55 up, 75 down. The overlay knows how steep the",
+        "ground is but not which way the machine will sit on it, so it reads them as",
+        "worst case -- see 'caveat'. That is the safe direction to be wrong in."
+      ],
+
+      "caveat": [
+        "Slope steepness only, read as worst case.",
+        "The 45% line is the SIDEHILL limit, so green is ground that is under every",
+        "limit whichever way the machine sits. Yellow is over the cross-slope limit",
+        "but may still be workable straight up and down. This does not know your line",
+        "direction, and it does not know soil, rock, moisture or fuel.",
+        "",
+        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
+        "terrain, weather and operator experience all move these numbers, and S-232",
+        "says so in the same paragraph."
+      ],
+
       "bands": [
         {
           "class": 1,
           "minPercent": 0,
-          "maxPercent": 25,
-          "label": "0-25%",
-          "meaning": "Dozer country",
+          "maxPercent": 45,
+          "label": "0-45%",
+          "meaning": "Within all three limits",
           "argb": "#961E8C28"
         },
         {
           "class": 2,
-          "minPercent": 26,
-          "maxPercent": 40,
-          "label": "26-40%",
-          "meaning": "Production falls off",
+          "minPercent": 46,
+          "maxPercent": 55,
+          "label": "46-55%",
+          "meaning": "Over the 45% sidehill limit. Up and down only, not across",
           "argb": "#96D7C31E"
         },
         {
           "class": 3,
-          "minPercent": 41,
-          "maxPercent": 55,
-          "label": "41-55%",
-          "meaning": "Marginal; most fuel models near zero",
-          "argb": "#96E07818"
-        },
-        {
-          "class": 4,
           "minPercent": 56,
-          "maxPercent": 74,
-          "label": "56-74%",
-          "meaning": "Off the table for most of the book",
-          "argb": "#96C81E1E"
+          "maxPercent": 75,
+          "label": "56-75%",
+          "meaning": "Over the 55% uphill limit. Downhill only, at the last limit",
+          "argb": "#96E07818"
         }
       ],
       "aboveStandard": {
-        "label": "Over 74%",
-        "meaning": "Past where the standard goes at all",
-        "argb": "#A0500A28",
-        "_comment": "The production table stops at 74%. This is not 'very steep class 4' -- it is unmeasured ground, and it is colored so it does not read as a band."
+        "label": "Over 75%",
+        "meaning": "Over every limit in the guide",
+        "argb": "#96C81E1E",
+        "_comment": "75% is the downhill limit and also where the production tables stop. Past it the guide has nothing to say, which is not the same as 'very steep'."
       },
+
       "limits": {
         "sidehillPercent": 45,
         "uphillPercent": 55,
         "downhillPercent": 75,
         "_comment": [
-          "S-232 Dozer Boss, Appendix D, verbatim: 'As with any piece of specialized",
-          "equipment, the dozer has limitations. As a general guideline, dozers should",
-          "not be operated across slopes (sidehill) greater than 45 percent, uphill",
-          "slopes greater than 55 percent or downhill on slopes greater than 75",
-          "percent.'",
-          "Corroborated by the S-232 supplement 'Mechanized Equipment for Fire and",
-          "Fuels Operations': 'According to the Fireline Handbook, dozers are limited",
-          "to <75% favorable slopes.'",
-          "These are GENERAL GUIDELINES. Type and size of dozer, terrain, weather and",
-          "operator experience all move them, and the standard says so."
+          "The same three numbers the bands are built from, kept separately because",
+          "the line profile needs them as directional limits: once a line direction is",
+          "known, the correct limit for each segment can be chosen instead of assuming",
+          "the worst case."
         ]
       },
+
       "machines": [
         {
           "type": "1",

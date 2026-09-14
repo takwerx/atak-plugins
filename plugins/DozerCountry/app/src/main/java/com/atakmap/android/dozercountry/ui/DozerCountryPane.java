@@ -51,6 +51,7 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
     private final SeekBar opacity;
     private final LinearLayout bandList;
     private final TextView standardSource;
+    private final TextView caveatView;
 
     public DozerCountryPane(View root, Context pluginContext, MapView mapView,
             SlopeOverlay overlay) {
@@ -68,6 +69,7 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
         opacity = root.findViewById(R.id.opacity);
         bandList = root.findViewById(R.id.band_list);
         standardSource = root.findViewById(R.id.standard_source);
+        caveatView = root.findViewById(R.id.standard_caveat);
 
         overlay.setListener(this);
         wire();
@@ -177,32 +179,44 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
         if (standard == null) {
             standardSource.setText(
                     "The slope standard could not be read from dozer_data.json.");
+            caveatView.setVisibility(View.GONE);
             return;
         }
 
+        // Steepest first, and that means the above-standard row goes at the TOP, not
+        // appended at the end. It was appended, which put "over every limit" below
+        // "within all three" and broke the one thing a severity list has to do.
+        if (standard.aboveStandard != null)
+            bandList.addView(bandRow(standard.aboveStandard));
         final List<SlopeBand> bands = standard.bands;
         for (int i = bands.size() - 1; i >= 0; i--)
             bandList.addView(bandRow(bands.get(i)));
-        if (standard.aboveStandard != null)
-            bandList.addView(bandRow(standard.aboveStandard));
 
-        final StringBuilder sb = new StringBuilder(standard.legend);
-        if (standard.limits != null
-                && !Double.isNaN(standard.limits.sidehillPercent)) {
-            sb.append("\nSafety limits, S-232 Dozer Boss: sidehill ")
-                    .append(fmtPercent(standard.limits.sidehillPercent))
-                    .append(", uphill ")
-                    .append(fmtPercent(standard.limits.uphillPercent))
-                    .append(", downhill ")
-                    .append(fmtPercent(standard.limits.downhillPercent))
-                    .append(". Those are directional; the colors above are the "
-                            + "production classes and are slope size only.");
+        // The caveat goes FIRST and on its own, before the provenance. What the
+        // overlay leaves out matters more to someone about to act on it than whose
+        // table it came from.
+        final StringBuilder sb = new StringBuilder();
+        if (!standard.caveat.isEmpty()) {
+            final StringBuilder c = new StringBuilder();
+            for (String line : standard.caveat) {
+                if (line.isEmpty())
+                    break;          // the rest is the note explaining why this exists
+                if (c.length() > 0)
+                    c.append(' ');
+                c.append(line);
+            }
+            caveatView.setText(c.toString());
+            caveatView.setVisibility(View.VISIBLE);
+        } else {
+            caveatView.setVisibility(View.GONE);
         }
-        standardSource.setText(sb.toString());
-    }
 
-    private static String fmtPercent(double v) {
-        return Double.isNaN(v) ? "—" : (Math.round(v) + "%");
+        // The bands ARE the limits now, so do not restate them underneath: the source
+        // line is provenance, nothing more. Whose guide this is, and that it is a
+        // guideline rather than a clearance, is what an operator needs from it.
+        sb.append(standard.legend);
+
+        standardSource.setText(sb.toString());
     }
 
     private View bandRow(SlopeBand band) {
