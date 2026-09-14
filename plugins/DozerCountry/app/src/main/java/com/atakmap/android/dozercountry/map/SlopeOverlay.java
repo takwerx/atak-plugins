@@ -150,7 +150,8 @@ public final class SlopeOverlay {
      * Samples the area and paints it. Returns immediately; the listener is called on
      * the main thread when the work is done.
      */
-    public void computeFor(final GeoBounds bounds) {
+    public void computeFor(final Area area) {
+        final GeoBounds bounds = area.bounds;
         // A pane left on screen by a plugin reload still holds a reference to the
         // overlay that was stopped underneath it. Its worker is shut down, so handing
         // it work would throw RejectedExecutionException straight out of a click
@@ -178,7 +179,7 @@ public final class SlopeOverlay {
                 // number would paint confident safety bands over terrain nothing can
                 // actually see.
                 final TerrainSampler.Coverage coverage =
-                        TerrainSampler.surveyCoverage(bounds);
+                        TerrainSampler.surveyCoverage(bounds, area.ring);
                 if (!coverage.meetsDted2()) {
                     postFail(mine, noDted2Message(coverage));
                     return;
@@ -186,7 +187,7 @@ public final class SlopeOverlay {
 
                 final SlopeField field;
                 try {
-                    field = TerrainSampler.sample(bounds, windowM, waterM2);
+                    field = TerrainSampler.sample(bounds, windowM, waterM2, area.ring);
                 } catch (RuntimeException e) {
                     Log.e(TAG, "slope computation failed", e);
                     postFail(mine, "The slope could not be computed for that area.");

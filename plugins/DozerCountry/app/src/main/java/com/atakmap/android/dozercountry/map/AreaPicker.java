@@ -6,9 +6,8 @@ import android.os.Bundle;
 import com.atakmap.android.drawing.DrawingPreferences;
 import com.atakmap.android.drawing.DrawingToolsMapComponent;
 import com.atakmap.android.drawing.DrawingToolsToolbar;
-import com.atakmap.android.drawing.mapItems.DrawingRectangle;
 import com.atakmap.android.drawing.mapItems.DrawingShape;
-import com.atakmap.android.drawing.tools.DrawingRectangleCreationTool;
+import com.atakmap.android.drawing.tools.ShapeCreationTool;
 import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
@@ -17,17 +16,13 @@ import com.atakmap.android.toolbar.ToolListener;
 import com.atakmap.android.toolbar.ToolManagerBroadcastReceiver;
 import com.atakmap.android.toolbar.ToolbarBroadcastReceiver;
 import com.atakmap.coremap.log.Log;
-import com.atakmap.coremap.maps.coords.GeoBounds;
-import com.atakmap.coremap.maps.coords.GeoPoint;
-import com.atakmap.coremap.maps.coords.GeoPointMetaData;
 
 import java.util.HashSet;
-import java.util.UUID;
 import java.util.Set;
 
 /**
- * Picking an area of interest: run ATAK's own rectangle drawing tool, then take the
- * rectangle it made as the area and remove it.
+ * Picking an area of interest: run ATAK's own polygon drawing tool, then take the
+ * shape it made as the area.
  *
  * <h3>Why not our own two taps</h3>
  *
@@ -35,8 +30,13 @@ import java.util.Set;
  * so the operator tapped twice into empty space with no sign either tap had landed and
  * no idea what shape was coming. Their words: "im not seeing my taps in the corners it
  * needs to be like using the polygon tool". They are right, and the answer is not to
- * reinvent the feedback — ATAK already has a rectangle tool with the rubber band, the
- * vertex handles, the prompt and the undo that an ATAK user has already learned.
+ * reinvent the feedback — ATAK already has a shape tool with the rubber band, the
+ * vertex handles, the prompt, the undo and the tap-the-first-marker-to-close that an
+ * ATAK user has already learned.
+ *
+ * <p>A rectangle came first and the operator replaced it: "i think this is better than
+ * square". They are right again — a division or a contingency line is not a box, and
+ * a box drawn round an irregular piece of ground claims ground nobody asked about.
  *
  * <p>The pattern is FOBS's {@code FreehandTrack}, which drives ATAK's telestration tool
  * the same way: snapshot what exists, start the tool, wait for it to end, take what is
@@ -90,7 +90,7 @@ public final class AreaPicker implements ToolListener {
 
     public interface Callback {
         /** An area was drawn. */
-        void onAreaPicked(GeoBounds bounds);
+        void onAreaPicked(Area area);
 
         /** The drawing tool started; the operator is drawing. */
         void onPickingStarted();
@@ -154,7 +154,7 @@ public final class AreaPicker implements ToolListener {
         if (active)
             return;
         active = true;
-        before = rectanglesNow();
+        before = shapesNow();
         borrowColor();
 
         final Intent open = new Intent(ToolbarBroadcastReceiver.SET_TOOLBAR);
@@ -167,7 +167,7 @@ public final class AreaPicker implements ToolListener {
                 if (!active)
                     return;
                 ToolManagerBroadcastReceiver.getInstance().startTool(
-                        DrawingRectangleCreationTool.TOOL_IDENTIFIER, new Bundle());
+                        ShapeCreationTool.TOOL_IDENTIFIER, new Bundle());
                 callback.onPickingStarted();
             }
         }, TOOLBAR_SETTLE_MS);
@@ -179,7 +179,7 @@ public final class AreaPicker implements ToolListener {
         active = false;
         restoreColor();
         final Tool t = ToolManagerBroadcastReceiver.getInstance().getActiveTool();
-        if (t != null && DrawingRectangleCreationTool.TOOL_IDENTIFIER
+        if (t != null && ShapeCreationTool.TOOL_IDENTIFIER
                 .equals(t.getIdentifier()))
             ToolManagerBroadcastReceiver.getInstance().endCurrentTool();
         closeToolbar();
@@ -192,7 +192,7 @@ public final class AreaPicker implements ToolListener {
 
     @Override
     public void onToolEnded(Tool tool) {
-        if (!active || tool == null || !DrawingRectangleCreationTool.TOOL_IDENTIFIER
+        if (!active || tool == null || !ShapeCreationTool.TOOL_IDENTIFIER
                 .equals(tool.getIdentifier()))
             return;
         active = false;
@@ -210,39 +210,27 @@ public final class AreaPicker implements ToolListener {
         restoreColor();
         closeToolbar();
 
-        DrawingRectangle made = null;
+        DrawingShape made = null;
         for (MapItem i : DrawingToolsMapComponent.getGroup().getItems()) {
-            if (i instanceof DrawingRectangle && !before.contains(i.getUID()))
-                made = (DrawingRectangle) i;
+            if (i instanceof DrawingShape && !before.contains(i.getUID()))
+                made = (DrawingShape) i;
         }
         if (made == null) {
-            // Backed out without completing a rectangle.
+            // Backed out without closing a shape.
             callback.onCancelled();
             return;
         }
 
-        final GeoBounds bounds = GeoBounds.createFromPoints(made.getPoints());
-
-        if (bounds.getNorth() == bounds.getSouth()
-                || bounds.getEast() == bounds.getWest()) {
+        final Area area = new Area(made.getPoints());
+        if (!area.isUsable()) {
             made.removeFromGroup();
             callback.onCancelled();
             return;
         }
 
-        // ATAK's rectangle tool is three point entry, so what the operator drew can be
-        // ROTATED, while the overlay samples a north-up lat/lon grid and therefore
-        // computes the rotated rectangle's bounding box. Keeping their rectangle as the
-        // boundary would draw a line around one area and paint a slightly larger one —
-        // visibly so at the corners. The boundary has to be the ground that was
-        // actually computed, so the drawn rectangle is replaced by an outline of the
-        // bounds themselves.
-        made.removeFromGroup();
-
         // One area at a time: the previous boundary goes when a new one is drawn.
         clearDrawn();
-        drawn = new DrawingShape(mapView, DrawingToolsMapComponent.getGroup(),
-                UUID.randomUUID().toString());
+        drawn = made;
         drawn.setTitle("Dozer Country area");
         // The boundary is a boundary, not an annotation. ATAK gives a drawn shape a
         // centre dot and a floating name by default, and over an overlay whose whole
@@ -250,25 +238,22 @@ public final class AreaPicker implements ToolListener {
         drawn.setCenterPointVisible(false);
         drawn.setCenterPointLabelVisible(false);
         drawn.hideLabels(true);
-        drawn.setPoints(GeoPointMetaData.wrap(new GeoPoint[] {
-                new GeoPoint(bounds.getNorth(), bounds.getWest()),
-                new GeoPoint(bounds.getNorth(), bounds.getEast()),
-                new GeoPoint(bounds.getSouth(), bounds.getEast()),
-                new GeoPoint(bounds.getSouth(), bounds.getWest())
-        }));
-        drawn.setClosed(true);
-        // Orange, and set on the item rather than left to the drawing preference: the
-        // preference only governs what the tool paints while it is running, and this
-        // outline has to stay readable over snow, timber, bare desert and dark relief
-        // for as long as the area is up.
+        // Orange on the item, not just via the drawing preference: the preference only
+        // governs what the tool paints while it is running, and this outline has to
+        // stay readable over snow, timber, bare desert and dark relief for as long as
+        // the area is up.
+        // Clamp it to the ground. The overlay is draped on terrain, and a shape left
+        // at its own altitude drifts away from the paint the moment the map is tilted
+        // -- on a 3D view the outline and the colour it bounds visibly disagree, which
+        // is the same lie as before wearing a different hat.
+        drawn.setAltitudeMode(com.atakmap.map.layer.feature.Feature.AltitudeMode.ClampToGround);
         drawn.setStrokeColor(DRAW_COLOR);
         drawn.setStrokeWeight(3d);
         // Outline only; a fill would sit on top of the very thing it bounds.
         drawn.setFillColor(0x00000000);
-        DrawingToolsMapComponent.getGroup().addItem(drawn);
 
-        Log.d(TAG, "area picked " + bounds);
-        callback.onAreaPicked(bounds);
+        Log.d(TAG, "area picked, " + area.ring.size() + " vertices, " + area.bounds);
+        callback.onAreaPicked(area);
     }
 
     /** Takes the boundary off the map. Called when the overlay is cleared. */
@@ -285,10 +270,11 @@ public final class AreaPicker implements ToolListener {
                 new Intent(ToolbarBroadcastReceiver.UNSET_TOOLBAR));
     }
 
-    private Set<String> rectanglesNow() {
+    /** Every shape already in the drawing group, so the new one can be told apart. */
+    private Set<String> shapesNow() {
         final Set<String> uids = new HashSet<>();
         for (MapItem i : DrawingToolsMapComponent.getGroup().getItems())
-            if (i instanceof DrawingRectangle)
+            if (i instanceof DrawingShape)
                 uids.add(i.getUID());
         return uids;
     }

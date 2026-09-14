@@ -3,6 +3,9 @@ package com.atakmap.android.dozercountry.terrain;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.atakmap.android.dozercountry.model.DozerStandard;
+import com.atakmap.android.dozercountry.model.SlopeBand;
+
 import org.junit.Test;
 
 /**
@@ -261,5 +264,71 @@ public class SlopeFieldTest {
                 z[y * w + x] = 520d;             // 12 x 30, thick enough
 
         assertTrue(countWater(SlopeField.findWater(z, w, h, 100d, 1000d)) > 300);
+    }
+
+    /* ----- masking to the ring the operator drew ----- */
+
+    /**
+     * The paint must stop where the line is drawn. The sampler works a north-up
+     * rectangle because a lat/lon grid is one, so without this the colour would fill
+     * the bounding box and claim ground nobody asked about.
+     */
+    @Test
+    public void onlyCellsInsideTheRingArePainted() {
+        final int w = 20, h = 20;
+        final double[] z = new double[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                z[y * w + x] = x * 4d;                // a 40% grade, all of it class 1..2
+
+        // Grid spans lon 0..19, lat 19..0 (row 0 is north), one degree per cell.
+        // The ring runs BETWEEN cell centres on purpose: ray casting is half-open, so
+        // a centre sitting exactly on an edge is deliberately excluded, and a test
+        // that put the edge through the centres would be measuring that tie-break
+        // rather than the masking. Encloses lon 6..13 and lat 6..13, so 8 x 8.
+        final Polygon ring = new Polygon(
+                new double[] { 5.5, 13.5, 13.5, 5.5 },
+                new double[] { 5.5, 5.5, 13.5, 13.5 });
+
+        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d, 0d,
+                ring, /*north*/ 19d, /*west*/ 0d, /*latStep*/ 1d, /*lonStep*/ 1d);
+
+        assertEquals(8 * 8, f.areaCells);
+        assertTrue("a cell in the middle is inside", f.inArea[10 * w + 10]);
+        assertTrue("a corner cell is outside", !f.inArea[0]);
+
+        final DozerStandard std = standard();
+        final int[] argb = f.toArgb(std);
+        assertEquals("outside the ring must be fully transparent", 0, argb[0]);
+        assertTrue("inside the ring must be painted", (argb[10 * w + 10] >>> 24) != 0);
+    }
+
+    /** Counts reported to the operator are out of the ring, not the box around it. */
+    @Test
+    public void unknownCellsOutsideTheRingAreNotCounted() {
+        final int w = 20, h = 20;
+        final double[] z = new double[w * h];
+        for (int i = 0; i < z.length; i++)
+            z[i] = Double.NaN;                        // no elevation anywhere
+
+        final Polygon ring = new Polygon(
+                new double[] { 5.5, 13.5, 13.5, 5.5 },
+                new double[] { 5.5, 5.5, 13.5, 13.5 });
+        final SlopeField f = SlopeField.compute(z, w, h, 10d, 10d, 20d, 0d,
+                ring, 19d, 0d, 1d, 1d);
+
+        assertEquals("only the ring's own cells count as missing", 8 * 8, f.unknownCells);
+        assertTrue("all of the drawn area is unresolved", f.isEmpty());
+    }
+
+    /** A minimal standard, so the paint test does not depend on the shipped asset. */
+    private static DozerStandard standard() {
+        final java.util.List<SlopeBand> bands = new java.util.ArrayList<>();
+        bands.add(new SlopeBand(1, 0, 45, "0-45%", "ok", 0x961E8C28));
+        return new DozerStandard("t", "t", "t",
+                new java.util.ArrayList<String>(), new java.util.ArrayList<String>(),
+                bands, new SlopeBand(0, Double.NaN, Double.POSITIVE_INFINITY,
+                        "over", "over", 0x96C81E1E),
+                null, new java.util.ArrayList<DozerStandard.Machine>());
     }
 }

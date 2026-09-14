@@ -43,11 +43,22 @@ public final class SlopeField {
     public final int unknownCells;
     /** Cells taken to be water and left unpainted. */
     public final int waterCells;
+    /**
+     * Per cell, true where the cell is inside the area the operator drew.
+     *
+     * <p>The sampler works a north-up rectangle because that is what a lat/lon grid is,
+     * but the operator draws a polygon. Cells outside it are computed and then left
+     * unpainted, so the paint stops exactly where the boundary is drawn.
+     */
+    public final boolean[] inArea;
+    /** Cells inside the drawn area. Everything reported to the operator is out of these. */
+    public final int areaCells;
     /** Per cell, true where {@link #findWater} judged the surface to be water. */
     public final boolean[] water;
 
     private SlopeField(double[] percent, int width, int height, double cellMeters,
-            double windowMeters, int unknownCells, boolean[] water, int waterCells) {
+            double windowMeters, int unknownCells, boolean[] water, int waterCells,
+            boolean[] inArea, int areaCells) {
         this.percent = percent;
         this.width = width;
         this.height = height;
@@ -56,16 +67,18 @@ public final class SlopeField {
         this.unknownCells = unknownCells;
         this.water = water;
         this.waterCells = waterCells;
+        this.inArea = inArea;
+        this.areaCells = areaCells;
     }
 
-    /** True when not one cell resolved — no elevation data for this ground. */
+    /** True when not one cell in the area resolved — no elevation data for this ground. */
     public boolean isEmpty() {
-        return unknownCells >= width * height;
+        return areaCells > 0 && unknownCells >= areaCells;
     }
 
     /** True when everything in the area is either water or unresolved. */
     public boolean isNothingToClass() {
-        return unknownCells + waterCells >= width * height;
+        return areaCells > 0 && unknownCells + waterCells >= areaCells;
     }
 
     /**
@@ -83,12 +96,36 @@ public final class SlopeField {
     public static SlopeField compute(double[] elevations, int width, int height,
             double cellEastM, double cellNorthM, double windowM,
             double waterMinAreaM2) {
+        return compute(elevations, width, height, cellEastM, cellNorthM, windowM,
+                waterMinAreaM2, null, 0d, 0d, 0d, 0d);
+    }
+
+    /**
+     * @param area       the ring the operator drew, or null for the whole grid
+     * @param north,west grid origin in degrees; {@code latStep}/{@code lonStep} the
+     *                   spacing, so a cell can be tested against the ring
+     */
+    public static SlopeField compute(double[] elevations, int width, int height,
+            double cellEastM, double cellNorthM, double windowM,
+            double waterMinAreaM2, Polygon area,
+            double north, double west, double latStep, double lonStep) {
+
+        final boolean[] inArea = new boolean[width * height];
+        int areaCount = 0;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                final boolean in = area == null
+                        || area.contains(west + x * lonStep, north - y * latStep);
+                inArea[y * width + x] = in;
+                if (in) areaCount++;
+            }
+        }
 
         final boolean[] water = findWater(elevations, width, height,
                 cellEastM * cellNorthM, waterMinAreaM2);
         int waterCount = 0;
-        for (boolean b : water)
-            if (b) waterCount++;
+        for (int i = 0; i < water.length; i++)
+            if (water[i] && inArea[i]) waterCount++;
 
         final double[] raw = new double[width * height];
         int unknown = 0;
@@ -99,7 +136,7 @@ public final class SlopeField {
                 final double s = slopeAt(elevations, width, height, x, y,
                         cellEastM, cellNorthM);
                 raw[i] = s;
-                if (Double.isNaN(s))
+                if (Double.isNaN(s) && inArea[i])
                     unknown++;
             }
         }
@@ -113,7 +150,7 @@ public final class SlopeField {
         final double[] worst = (r == 0) ? raw : windowMax(raw, width, height, r);
 
         return new SlopeField(worst, width, height, cellM, effectiveWindow, unknown,
-                water, waterCount);
+                water, waterCount, inArea, areaCount);
     }
 
     /**
@@ -379,7 +416,7 @@ public final class SlopeField {
     public int[] toArgb(DozerStandard standard) {
         final int[] argb = new int[percent.length];
         for (int i = 0; i < percent.length; i++)
-            argb[i] = water[i] ? 0 : standard.colorFor(percent[i]);
+            argb[i] = (!inArea[i] || water[i]) ? 0 : standard.colorFor(percent[i]);
         return argb;
     }
 }

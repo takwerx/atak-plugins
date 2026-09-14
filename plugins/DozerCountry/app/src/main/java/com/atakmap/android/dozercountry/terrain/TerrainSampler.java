@@ -142,7 +142,17 @@ public final class TerrainSampler {
      * source, and the per-cell check that follows catches holes inside one.
      */
     public static Coverage surveyCoverage(GeoBounds aoi) {
-        final int n = 6;
+        return surveyCoverage(aoi, null);
+    }
+
+    /**
+     * @param area probe only inside the ring. A polygon can leave whole corners of its
+     *             bounding box outside the area, and refusing because ground the
+     *             operator did not draw has no DTED2 would be refusing the wrong
+     *             question.
+     */
+    public static Coverage surveyCoverage(GeoBounds aoi, Polygon area) {
+        final int n = 12;
         final List<String> sources = new ArrayList<>();
         int good = 0, probes = 0;
 
@@ -156,6 +166,8 @@ public final class TerrainSampler {
             for (int x = 0; x < n; x++) {
                 final double lat = aoi.getSouth() + y * latStep;
                 final double lon = aoi.getWest() + x * lonStep;
+                if (area != null && !area.contains(lon, lat))
+                    continue;
 
                 String src = null;
                 try {
@@ -192,6 +204,17 @@ public final class TerrainSampler {
      */
     public static SlopeField sample(GeoBounds aoi, double windowM,
             double waterMinAreaM2) {
+        return sample(aoi, windowM, waterMinAreaM2, null);
+    }
+
+    /**
+     * @param area the ring the operator drew, or null to use the whole rectangle.
+     *             Sampling still works the bounding box — a lat/lon grid is a
+     *             rectangle — but everything outside the ring is left unpainted and
+     *             excluded from every count reported to the operator.
+     */
+    public static SlopeField sample(GeoBounds aoi, double windowM,
+            double waterMinAreaM2, Polygon area) {
         final GeoPoint nw = new GeoPoint(aoi.getNorth(), aoi.getWest());
         final GeoPoint ne = new GeoPoint(aoi.getNorth(), aoi.getEast());
         final GeoPoint sw = new GeoPoint(aoi.getSouth(), aoi.getWest());
@@ -244,8 +267,12 @@ public final class TerrainSampler {
                 elevations[i] = Double.NaN;
         }
 
+        final double latStep = (aoi.getNorth() - aoi.getSouth()) / Math.max(1, height - 1);
+        final double lonStep = (aoi.getEast() - aoi.getWest()) / Math.max(1, width - 1);
+
         return SlopeField.compute(elevations, width, height,
-                cellEastM, cellNorthM, windowM, waterMinAreaM2);
+                cellEastM, cellNorthM, windowM, waterMinAreaM2,
+                area, aoi.getNorth(), aoi.getWest(), latStep, lonStep);
     }
 
     private static int dim(double spanM) {

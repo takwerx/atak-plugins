@@ -19,7 +19,6 @@ import com.atakmap.android.dozercountry.model.Standards;
 import com.atakmap.android.dozercountry.plugin.R;
 import com.atakmap.android.dozercountry.terrain.SlopeField;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.coremap.maps.coords.GeoBounds;
 
 import java.util.List;
 import java.util.Locale;
@@ -268,10 +267,10 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
     }
 
     @Override
-    public void onAreaPicked(GeoBounds bounds) {
+    public void onAreaPicked(com.atakmap.android.dozercountry.map.Area area) {
         drawButton.setText(R.string.draw_area);
         status.setText(R.string.status_working);
-        overlay.computeFor(bounds);
+        overlay.computeFor(area);
     }
 
     @Override
@@ -334,7 +333,10 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
                     .append(Units.format(field.windowMeters)).append(".");
         }
 
-        final double cells = field.width * (double) field.height;
+        // Out of the ground the operator drew, not the box around it: a polygon can
+        // leave half its bounding box outside the area, and a percentage of the box
+        // would be a percentage of ground nobody asked about.
+        final double cells = Math.max(1, field.areaCells);
         if (field.unknownCells > 0) {
             sb.append(String.format(Locale.US,
                     "\n%.0f%% of the area has no elevation data and is not painted.",
