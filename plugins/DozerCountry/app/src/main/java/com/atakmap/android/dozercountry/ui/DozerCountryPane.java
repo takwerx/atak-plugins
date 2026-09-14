@@ -312,15 +312,22 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
                 .append(" cells of ").append(Units.format(field.cellMeters))
                 .append(". ");
 
-        // When the area is large enough that a cell is already wider than the working
-        // window, there is no neighbourhood left to take a worst case over. Say that,
-        // and say what to do about it -- silently showing per-cell slope under a label
-        // that promises a window would be the overlay quietly changing its meaning.
+        // Say what window was actually used, and never claim more than is true.
+        //
+        // A window is always an odd number of cells, so only certain spans exist. When
+        // the nearest one is a single cell, each cell reports its own slope. That can
+        // happen two ways and they are NOT the same sentence: the cells can be wider
+        // than a chain, or they can be narrower than a chain while three of them
+        // overshoot it further than one undershoots. The first draft of this text
+        // assumed the first case and told an operator a 33 ft cell was "wider than one
+        // chain (66 ft)", in the same breath as printing 33 ft.
+        final double chainM = Standards.workingWindowMeters(pluginContext);
         if (field.windowMeters <= field.cellMeters * 1.01d) {
-            sb.append("A cell is already wider than ")
+            sb.append("Each cell shows its own slope \u2014 that is as close to ")
                     .append(Standards.workingWindowLabel(pluginContext))
-                    .append(", so each shows its own slope. Draw a smaller area for a ")
-                    .append("finer read.");
+                    .append(" as this area gets.");
+            if (field.cellMeters > chainM)
+                sb.append(" Draw a smaller area for a finer read.");
         } else {
             sb.append("Each cell shows the worst slope within ")
                     .append(Units.format(field.windowMeters)).append(".");
