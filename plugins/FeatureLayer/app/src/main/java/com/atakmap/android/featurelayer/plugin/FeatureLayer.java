@@ -109,6 +109,7 @@ public class FeatureLayer implements IPlugin {
             manager = new LayerManager(mapView, pluginContext, BuildConfig.ARCGIS_CLIENT_ID);
             manager.start();
         }
+        followMap(true);
     }
 
     @Override
@@ -124,6 +125,7 @@ public class FeatureLayer implements IPlugin {
             pane = null;
             paneView = null;
         }
+        followMap(false);
         if (manager != null) {
             manager.stop();
             manager = null;
@@ -510,6 +512,118 @@ public class FeatureLayer implements IPlugin {
     private LoadedLayer scope;      // opened from a layer's Features: only that layer, Back returns there
     private boolean fromMapCenter;  // distances from where the map is now, instead of from the device
     private int sortMode;           // index into SORT_LABELS
+    private List<Object[]> shownHits;  // the rows on screen now, in their drawn order; null on the type list
+
+    // ---- the list follows what it is measured from -----------------------------------
+
+    /**
+     * "From: Map center" is where the map is now and "From: Me" is where the device is;
+     * neither stands still. Until 0.6 a distance was worked out once, when the list was
+     * drawn, so panning the map left every row reading its distance from wherever the map
+     * used to be -- worse than no distance, because it still looks right.
+     *
+     * <p>Neither callback arrives on the main thread: {@code onMapMoved} runs on the GL
+     * render thread, where touching a View is a native SIGSEGV with no Java stack trace.
+     * Each one posts onto the main looper and coalesces, so a drag redraws once when it
+     * settles rather than on every frame.
+     */
+    private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private com.atakmap.coremap.maps.coords.GeoPoint lastFrom;
+    private static final double FOLLOW_M = 10; // a move shorter than this changes no row
+
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener mapWatch =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView v, boolean animate) {
+                    handler.removeCallbacks(followTick);
+                    handler.postDelayed(followTick, 300);
+                }
+            };
+
+    private final com.atakmap.android.maps.PointMapItem.OnPointChangedListener selfWatch =
+            new com.atakmap.android.maps.PointMapItem.OnPointChangedListener() {
+                @Override
+                public void onPointChanged(com.atakmap.android.maps.PointMapItem item) {
+                    handler.removeCallbacks(followTick);
+                    handler.postDelayed(followTick, 300);
+                }
+            };
+
+    private final Runnable followTick = new Runnable() {
+        @Override
+        public void run() {
+            refreshDistances();
+        }
+    };
+
+    private com.atakmap.android.maps.PointMapItem watched;
+
+    /**
+     * ATAK replaces the self marker when the device identity changes, so the listener goes
+     * on whatever marker is there now and is re-attached when the search pane opens,
+     * rather than being held for the plugin's life.
+     */
+    private void followMap(boolean on) {
+        try {
+            if (watched != null) {
+                watched.removeOnPointChangedListener(selfWatch);
+                watched = null;
+            }
+            if (mapView == null)
+                return;
+            handler.removeCallbacks(followTick);
+            mapView.removeOnMapMovedListener(mapWatch);
+            if (!on)
+                return;
+            mapView.addOnMapMovedListener(mapWatch);
+            final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
+            if (self != null) {
+                self.addOnPointChangedListener(selfWatch);
+                watched = self;
+            }
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "could not follow the map; distances will not update as it moves", e);
+        }
+    }
+
+    /** Where distances are measured from right now: the device, or the map's center. */
+    private com.atakmap.coremap.maps.coords.GeoPoint measureFrom() {
+        final com.atakmap.coremap.maps.coords.GeoPoint me = fromMapCenter ? null : selfPoint();
+        return me != null ? me : mapCenter();
+    }
+
+    /**
+     * Redraws the distances after a move. Sorting by distance reorders the list, so that
+     * one redraws the list; every other sort keeps its order and only the numbers change,
+     * which leaves the operator's scroll position where they put it.
+     */
+    private void refreshDistances() {
+        if (paneView == null || manager == null || shownHits == null)
+            return;
+        final View searchPanel = paneView.findViewById(R.id.search_panel);
+        if (searchPanel == null || searchPanel.getVisibility() != View.VISIBLE)
+            return;
+        final com.atakmap.coremap.maps.coords.GeoPoint from = measureFrom();
+        if (from == null)
+            return;
+        if (lastFrom != null
+                && com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(from, lastFrom) < FOLLOW_M)
+            return;
+        if (sortMode == 0) {
+            renderResults();
+            return;
+        }
+        lastFrom = from;
+        final LinearLayout container = paneView.findViewById(R.id.results_container);
+        final int n = Math.min(shownHits.size(), container.getChildCount());
+        for (int i = 0; i < n; i++) {
+            final LoadedLayer.Hit h = (LoadedLayer.Hit) shownHits.get(i)[1];
+            ((TextView) container.getChildAt(i).findViewById(R.id.result_dist))
+                    .setText(com.atakmap.android.featurelayer.Units.format(
+                            com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(from,
+                                    new com.atakmap.coremap.maps.coords.GeoPoint(h.lat, h.lon))));
+        }
+    }
 
     // ---- zoom gate helpers (Cam Depot's scale-bar language) --------------------------
 
@@ -626,6 +740,7 @@ public class FeatureLayer implements IPlugin {
         featuresPanel.setVisibility(View.GONE);
         header.setVisibility(View.VISIBLE);
         searchPanel.setVisibility(View.VISIBLE);
+        followMap(true);   // onto the self marker that is there now
         renderResults();
     }
 
@@ -714,6 +829,7 @@ public class FeatureLayer implements IPlugin {
                 counts.put(t, counts.containsKey(t) ? counts.get(t) + 1 : 1);
             }
             status.setText(counts.size() + " types, " + all.size() + " features \u00b7 tap a type, or type a name");
+            shownHits = null;   // the type list carries counts, not distances
             container.removeAllViews();
             for (final java.util.Map.Entry<String, Integer> e : counts.entrySet()) {
                 final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.result_row, null);
@@ -740,6 +856,7 @@ public class FeatureLayer implements IPlugin {
         final com.atakmap.coremap.maps.coords.GeoPoint me = fromMapCenter ? null : selfPoint();
         final boolean noFix = !fromMapCenter && me == null;
         final com.atakmap.coremap.maps.coords.GeoPoint from = me != null ? me : mapCenter();
+        lastFrom = from;
         final java.util.Map<Object[], Double> dist = new java.util.HashMap<>();
         if (from != null)
             for (Object[] o : hits) {
@@ -774,11 +891,13 @@ public class FeatureLayer implements IPlugin {
             st.append(" \u00b7 nowhere to measure from, sorted by name");
         status.setText(st.toString());
         container.removeAllViews();
+        shownHits = new java.util.ArrayList<>();
         final java.text.SimpleDateFormat when = new java.text.SimpleDateFormat("MMM d HH:mm", java.util.Locale.US);
         int shown = 0;
         for (final Object[] o : hits) {
             if (shown++ >= RESULT_CAP)
                 break;
+            shownHits.add(o);
             final LoadedLayer l = (LoadedLayer) o[0];
             final LoadedLayer.Hit h = (LoadedLayer.Hit) o[1];
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.result_row, null);

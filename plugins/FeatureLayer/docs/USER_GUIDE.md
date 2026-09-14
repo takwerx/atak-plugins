@@ -1,10 +1,10 @@
 # Feature Layer — User Guide
 
-**Download Feature Layer 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.6/ATAK-Plugin-FeatureLayer-0.6--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.6/ATAK-Plugin-FeatureLayer-0.6--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.6/ATAK-Plugin-FeatureLayer-0.6--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -140,7 +140,8 @@ layer holds with a count. Tap one to list its features.
 Type a name, a number or a type for a free search across names and every
 attribute. Each row shows what it is, when it was collected, and how far away, in
 your ATAK units, with **tap to go there**. **From: Me** or **From: Map center**
-says where distances are measured from.
+says where distances are measured from, and the list follows it: pan the map on
+**Map center**, or walk on **Me**, and the distances keep up.
 
 ![Sort by](screenshots/17_sort_picker.png)
 

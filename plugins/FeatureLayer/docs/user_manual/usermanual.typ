@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Feature Layer",
-   plugin-version: "0.5",
+   plugin-version: "0.6",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -207,7 +207,8 @@ takes any ArcGIS Online organization you sign in to.
 ][
   #image("17.png", width: 100%)
 
-  *From: Me* or *From: Map center* says where distances are measured from.
+  *From: Me* or *From: Map center* says where distances are measured from, and
+  the list follows it as you pan or walk.
   Sort by *Nearest*, *Newest*, *Oldest* or *Name*. *Clear* empties the box and
   brings the list of types back.
 ]
