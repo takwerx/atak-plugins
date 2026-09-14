@@ -138,7 +138,23 @@ public class DozerCountry implements IPlugin {
                     .build();
         }
 
-        if (!uiService.isPaneVisible(templatePane))
-            uiService.showPane(templatePane, null);
+        if (!uiService.isPaneVisible(templatePane)) {
+            // The lifecycle listener is not optional. AreaPicker takes ATAK's map
+            // event listeners exclusively while it waits for two taps; if the pane is
+            // closed with the X mid-pick, nothing else ever pops them and the map goes
+            // deaf to ATAK's own handlers until the plugin is reloaded. Passing null
+            // here, which the SDK template does, is what leaves that hole.
+            uiService.showPane(templatePane, new IHostUIService.IPaneLifecycleListener() {
+                @Override
+                public void onPaneVisible(boolean visible) {
+                }
+
+                @Override
+                public void onPaneClose() {
+                    if (pane != null)
+                        pane.onPaneClosed();
+                }
+            });
+        }
     }
 }

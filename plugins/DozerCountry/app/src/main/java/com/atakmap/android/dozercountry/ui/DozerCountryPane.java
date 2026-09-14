@@ -352,12 +352,27 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
     }
 
     /**
-     * Called when the pane goes away. Only the transient picker is torn down; the
-     * overlay keeps painting, which is the whole point of it living in the plugin.
+     * The pane was closed by the user. Cancels a pick in progress and leaves
+     * everything else alone.
+     *
+     * <p>Separate from {@link #onClosed()} because the two are not the same event. The
+     * pane closing is routine and the overlay must survive it — that is the whole
+     * point of the overlay living in the plugin rather than here. What must NOT
+     * survive it is a half-finished pick: {@link AreaPicker} holds ATAK's map event
+     * listeners exclusively while it waits for the second tap, and if nothing pops
+     * them the map stops responding to ATAK's own handlers.
      */
-    public void onClosed() {
+    public void onPaneClosed() {
         if (picker.isActive())
             picker.cancel();
+    }
+
+    /**
+     * Called when the plugin itself is stopping. Tears down the picker and drops the
+     * overlay listener; the overlay is stopped by its owner, not here.
+     */
+    public void onClosed() {
+        onPaneClosed();
         overlay.setListener(null);
     }
 
