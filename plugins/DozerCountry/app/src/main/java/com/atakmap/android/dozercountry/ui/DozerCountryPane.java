@@ -20,7 +20,6 @@ import com.atakmap.android.dozercountry.plugin.R;
 import com.atakmap.android.dozercountry.terrain.SlopeField;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.maps.coords.GeoBounds;
-import com.atakmap.coremap.maps.coords.GeoPoint;
 
 import java.util.List;
 import java.util.Locale;
@@ -126,7 +125,7 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
     private void startPicking() {
         picker.start();
         drawButton.setText(R.string.cancel_draw);
-        status.setText(R.string.status_pick_first);
+        status.setText(R.string.status_drawing);
     }
 
     /**
@@ -262,8 +261,8 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
     /* ----- AreaPicker.Callback ----- */
 
     @Override
-    public void onFirstCorner(GeoPoint corner) {
-        status.setText(R.string.status_pick_second);
+    public void onPickingStarted() {
+        status.setText(R.string.status_drawing);
     }
 
     @Override
@@ -373,6 +372,7 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
      */
     public void onClosed() {
         onPaneClosed();
+        picker.dispose();
         overlay.setListener(null);
     }
 

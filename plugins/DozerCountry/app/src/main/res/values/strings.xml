@@ -20,8 +20,7 @@
 
     <!-- Status line. Says what is happening, or why nothing is drawn. -->
     <string name="status_idle">Draw an area to see where a dozer can work.</string>
-    <string name="status_pick_first">Tap one corner of the area.</string>
-    <string name="status_pick_second">Tap the opposite corner.</string>
+    <string name="status_drawing">Draw the box on the map. ATAK\'s rectangle tool is up \u2014 its own Undo and Done buttons are on the drawing toolbar.</string>
     <string name="status_working">Reading the terrain…</string>
     <string name="status_cancelled">Area not drawn.</string>
 </resources>
