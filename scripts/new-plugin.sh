@@ -226,6 +226,13 @@ echo "==> writing local.properties (gitignored — machine-local paths)"
 
 sed -i '' "1s/.*/$DISPLAY/" "$DEST/README.md"
 
+# Every plugin directory becomes its own public repo, and a repo with no license
+# is all rights reserved: two people offered work on takwerx/comms in September
+# 2026 and neither could open a pull request. A plugin gets its license when it
+# is created, not when somebody asks.
+echo "==> writing LICENSE, LICENSE-EXCEPTION, CONTRIBUTING and CLA (AGPL-3.0-or-later)"
+"$REPO_ROOT/scripts/add-license.sh" "$NAME"
+
 echo
 echo "created plugins/$NAME"
 echo "  entry class: com.atakmap.android.$PKG.plugin.$CLASS"

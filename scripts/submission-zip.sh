@@ -79,6 +79,13 @@ CANDIDATES=(
     "$NAME/app/src/gov/"
     "$NAME/template.local.properties"
     "$NAME/README.md"
+    # The submission is a source tree, and a source drop with no license is the
+    # same problem as a public repo with none. LICENSE is the verbatim AGPL;
+    # LICENSE-EXCEPTION.md carries the §7 permission for the TAK Software that
+    # makes an ATAK plugin distributable under it at all, and the provenance
+    # list naming what came from the SDK template.
+    "$NAME/LICENSE"
+    "$NAME/LICENSE-EXCEPTION.md"
     "$NAME/docs/user_manual/"
     "$NAME/gradle/"
     "$NAME/gradlew"
