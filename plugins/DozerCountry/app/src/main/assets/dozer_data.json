@@ -87,10 +87,11 @@
 
       "caveat": [
         "Slope steepness only, read as worst case.",
-        "The 45% line is the SIDEHILL limit, so unshaded ground is under every",
-        "limit whichever way the machine sits. Yellow is over the cross-slope limit",
-        "but may still be workable straight up and down. This does not know your line",
-        "direction, and it does not know soil, rock, moisture or fuel.",
+        "The 45% line is the SIDEHILL limit, so anything not shaded yellow, orange",
+        "or red is under every limit whichever way the machine sits. Yellow is over",
+        "the cross-slope limit but may still be workable straight up and down. This",
+        "does not know your line direction, and it does not know soil, rock,",
+        "moisture or fuel.",
         "",
         "It is a guideline from the guide, not a clearance. Type and size of dozer,",
         "terrain, weather and operator experience all move these numbers, and S-232",
