@@ -309,22 +309,25 @@ public final class SlopeOverlay {
             legend.setPadding(8f, 8f, 8f, 8f);
         }
 
-        final List<SlopeBand> bands = standard.bands;
-        final boolean above = standard.aboveStandard != null;
-        final int n = bands.size() + (above ? 1 : 0);
-        final int[] colors = new int[n];
-        final String[] labels = new String[n];
-
-        // Steepest at the top, the way a legend of severity reads.
-        for (int i = 0; i < bands.size(); i++) {
-            final SlopeBand b = bands.get(bands.size() - 1 - i);
-            final int at = above ? i + 1 : i;
-            colors[at] = opaque(b.argb);
-            labels[at] = b.label;
+        // Only the bands that are actually shaded. A colour key for something the map
+        // never draws is worse than no key: it invites the operator to go looking for
+        // a green that is deliberately not there.
+        final List<SlopeBand> painted = new java.util.ArrayList<>();
+        if (standard.aboveStandard != null && standard.aboveStandard.paint)
+            painted.add(standard.aboveStandard);
+        for (int i = standard.bands.size() - 1; i >= 0; i--) {
+            final SlopeBand b = standard.bands.get(i);
+            if (b.paint)
+                painted.add(b);
         }
-        if (above) {
-            colors[0] = opaque(standard.aboveStandard.argb);
-            labels[0] = standard.aboveStandard.label;
+        if (painted.isEmpty())
+            return;
+
+        final int[] colors = new int[painted.size()];
+        final String[] labels = new String[painted.size()];
+        for (int i = 0; i < painted.size(); i++) {
+            colors[i] = opaque(painted.get(i).argb);
+            labels[i] = painted.get(i).label;
         }
 
         legend.setLegend(colors, labels);

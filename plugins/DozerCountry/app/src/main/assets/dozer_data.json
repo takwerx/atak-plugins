@@ -104,7 +104,23 @@
           "maxPercent": 45,
           "label": "0-45%",
           "meaning": "Within all three limits",
-          "argb": "#961E8C28"
+          "argb": "#961E8C28",
+          "paint": false,
+          "_comment": [
+            "NOT painted, on purpose. This is the band that says 'fine', and an",
+            "overlay should not spend the screen saying fine: on a 3D view a solid",
+            "green wash over everything workable buried the basemap the operator was",
+            "trying to read the ground from.",
+            "",
+            "So the overlay is exceptions only. Unshaded means under every limit.",
+            "That reading is only safe because the plugin refuses to paint at all",
+            "when it cannot see the ground -- no DTED2, or any cell missing -- so",
+            "unshaded can never quietly mean 'no data'. If that gate is ever",
+            "loosened, this has to be revisited in the same breath.",
+            "",
+            "Set paint to true to shade it again; the colour is kept either way so",
+            "the legend can show what the band is."
+          ]
         },
         {
           "class": 2,

@@ -227,8 +227,16 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
 
         final View swatch = new View(pluginContext);
         final GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xFF000000 | (band.argb & 0x00FFFFFF));
-        bg.setStroke(dp(1), 0x66FFFFFF);
+        if (band.paint) {
+            bg.setColor(0xFF000000 | (band.argb & 0x00FFFFFF));
+            bg.setStroke(dp(1), 0x66FFFFFF);
+        } else {
+            // Hollow, in the band's own colour. It has to be obvious at a glance that
+            // this one is not drawn on the map, or the operator hunts for a green that
+            // was never going to be there.
+            bg.setColor(0x00000000);
+            bg.setStroke(dp(2), 0xFF000000 | (band.argb & 0x00FFFFFF));
+        }
         bg.setCornerRadius(dp(2));
         swatch.setBackground(bg);
         final LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(22), dp(22));
@@ -247,7 +255,7 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
         meaning.setTextColor(Color.WHITE);
         meaning.setAlpha(0.75f);
         meaning.setTextSize(12f);
-        meaning.setText(band.meaning);
+        meaning.setText(band.paint ? band.meaning : band.meaning + " \u2014 not shaded");
         row.addView(meaning, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
@@ -350,6 +358,18 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
             sb.append(String.format(Locale.US,
                     "\n%.0f%% is water and is not classed.",
                     100d * field.waterCells / cells));
+        }
+        // The overlay is exceptions only, so the absence of colour carries meaning and
+        // is therefore stated rather than left to be worked out.
+        final DozerStandard standard = Standards.active(pluginContext);
+        if (standard != null) {
+            for (SlopeBand b : standard.bands) {
+                if (!b.paint) {
+                    sb.append("\nGround at ").append(b.label)
+                            .append(" is left unshaded so the map shows through.");
+                    break;
+                }
+            }
         }
         status.setText(sb.toString());
     }

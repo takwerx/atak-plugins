@@ -106,9 +106,18 @@ public final class DozerStandard {
         return aboveStandard;
     }
 
-    /** The ARGB to paint a cell, or 0 (fully transparent) where the terrain is unknown. */
+    /**
+     * The ARGB to paint a cell: 0 (fully transparent) where the terrain is unknown, and
+     * also where the band it falls in is not shaded at all.
+     *
+     * <p>The overlay is exceptions only. Unshaded ground is ground under every limit,
+     * and that reading is only safe because the plugin refuses to paint anything when
+     * it cannot see the terrain — so unshaded can never quietly mean "no data".
+     */
     public int colorFor(double percentSlope) {
         final SlopeBand b = bandFor(percentSlope);
-        return b == null ? 0 : b.argb;
+        if (b == null || !b.paint)
+            return 0;
+        return b.argb;
     }
 }

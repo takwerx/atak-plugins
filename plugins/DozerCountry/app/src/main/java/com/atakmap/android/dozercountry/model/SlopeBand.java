@@ -25,14 +25,29 @@ public final class SlopeBand {
     /** What the class means in the field, e.g. "Production falls off". */
     public final String meaning;
     public final int argb;
+    /**
+     * Whether this band is shaded on the map.
+     *
+     * <p>The band that means "fine" is not, because an overlay should not spend the
+     * operator's screen saying fine — a solid wash over every workable acre buries the
+     * basemap they are reading the ground from. The colour is still carried so the
+     * legend can show what the band is.
+     */
+    public final boolean paint;
 
     public SlopeBand(int classNumber, double minPercent, double maxPercent,
             String label, String meaning, int argb) {
+        this(classNumber, minPercent, maxPercent, label, meaning, argb, true);
+    }
+
+    public SlopeBand(int classNumber, double minPercent, double maxPercent,
+            String label, String meaning, int argb, boolean paint) {
         this.classNumber = classNumber;
         this.minPercent = minPercent;
         this.maxPercent = maxPercent;
         this.label = label;
         this.meaning = meaning;
         this.argb = argb;
+        this.paint = paint;
     }
 }

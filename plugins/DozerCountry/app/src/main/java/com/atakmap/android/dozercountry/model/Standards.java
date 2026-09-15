@@ -161,7 +161,8 @@ public final class Standards {
                     b.getDouble("maxPercent"),
                     b.optString("label", ""),
                     b.optString("meaning", ""),
-                    argb(b.optString("argb", null), Color.GRAY)));
+                    argb(b.optString("argb", null), Color.GRAY),
+                    b.optBoolean("paint", true)));
         }
         // The bands are compared in order by bandFor(), so a hand-edited file that
         // lists them out of order would classify wrongly and silently.
