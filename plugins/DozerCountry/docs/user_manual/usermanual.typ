@@ -192,5 +192,5 @@ ATAK user already knows. The panel says the same thing on its own side, and
   the person whose ground it is.
 
 #v(10pt)
-This manual is reached from ATAK's *Settings → Tool Preferences → Dozer Country*.
+This manual is reached from ATAK's *Settings* → *Tool Preferences* → *Dozer Country*.
 ]
