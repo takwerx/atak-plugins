@@ -282,9 +282,12 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
     }
 
     @Override
-    public void onCancelled() {
+    public void onCancelled(String reason) {
         drawButton.setText(R.string.draw_area);
-        status.setText(R.string.status_cancelled);
+        if (reason == null)
+            status.setText(R.string.status_cancelled);
+        else
+            status.setText(reason);
     }
 
     /* ----- SlopeOverlay.Listener ----- */

@@ -95,7 +95,7 @@ public final class AreaPicker implements ToolListener {
         /** The drawing tool started; the operator is drawing. */
         void onPickingStarted();
 
-        void onCancelled();
+        void onCancelled(String reason);
     }
 
     private final MapView mapView;
@@ -183,7 +183,7 @@ public final class AreaPicker implements ToolListener {
                 .equals(t.getIdentifier()))
             ToolManagerBroadcastReceiver.getInstance().endCurrentTool();
         closeToolbar();
-        callback.onCancelled();
+        callback.onCancelled(null);
     }
 
     @Override
@@ -216,15 +216,23 @@ public final class AreaPicker implements ToolListener {
                 made = (DrawingShape) i;
         }
         if (made == null) {
-            // Backed out without closing a shape.
-            callback.onCancelled();
+            // Backed out without drawing anything.
+            callback.onCancelled(null);
             return;
         }
 
+        // ATAK's shape tool can finish two ways: tap the first marker and get a closed
+        // shape, or press End Shape and get an open line. Only the first is an area.
+        // An open line left behind became a stray orange streak across the operator's
+        // map with nothing to clear it, because the pane's Clear only knows about the
+        // boundary the plugin adopted.
         final Area area = new Area(made.getPoints());
-        if (!area.isUsable()) {
+        if (!made.isClosed() || !area.isUsable()) {
             made.removeFromGroup();
-            callback.onCancelled();
+            callback.onCancelled(made.isClosed()
+                    ? null
+                    : "That is a line, not an area. Tap the first marker to close the "
+                            + "shape.");
             return;
         }
 
