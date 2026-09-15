@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Dozer Country",
-   plugin-version: "0.2",
+   plugin-version: "0.3",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -51,15 +51,13 @@ Color means something needs looking at.
 #tak-slide[
 = ATAK's own shape tool
 
-#toolbox.side-by-side(columns: (7fr, 5fr))[
-  #image("3.png", width: 100%)
-][
-  Dozer Country does not invent a drawing tool. ATAK's own takes over, with the
-  prompt, the rubber band, the vertex handles and the Undo and End Shape buttons
-  an ATAK user already knows.
+Dozer Country does not invent a drawing tool. ATAK's own takes over, with the
+prompt, the rubber band, the vertex handles and the Undo and End Shape buttons an
+ATAK user already knows. The panel says the same thing on its own side, and
+*Draw area* becomes *Cancel* while the tool is up.
 
-  Tap the map to place each corner.
-]
+#v(6pt)
+#image("3.png", width: 100%)
 ]
 
 #tak-slide[
@@ -87,6 +85,12 @@ Color means something needs looking at.
   Unshaded ground is under every limit — a machine can work it whichever way it
   sits. That is most of a good piece of country, and leaving it bare is what lets
   you still read the terrain underneath.
+
+  #v(4pt)
+  #image("11.png", width: 62%)
+
+  #text(size: 0.85em)[The key sits bottom left, and lists only the bands that are
+  actually painted.]
 ]
 ]
 
