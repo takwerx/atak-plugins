@@ -30,7 +30,7 @@ public final class SlopeBand {
      *
      * <p>The band that means "fine" is not, because an overlay should not spend the
      * operator's screen saying fine — a solid wash over every workable acre buries the
-     * basemap they are reading the ground from. The colour is still carried so the
+     * basemap they are reading the ground from. The color is still carried so the
      * legend can show what the band is.
      */
     public final boolean paint;

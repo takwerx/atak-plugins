@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Dozer Country has no settings. The standard it paints by lives in
-    assets/dozer_data.json where it can be audited, and every other choice -- the
-    area, the overlay, the opacity -- is made on the panel, next to the thing it
+    assets/dozer_data.json where it can be audited, and every other choice (the
+    area, the overlay, the opacity) is made on the panel, next to the thing it
     affects.
 
     This screen exists so the manual has somewhere to be reached from. ATAK

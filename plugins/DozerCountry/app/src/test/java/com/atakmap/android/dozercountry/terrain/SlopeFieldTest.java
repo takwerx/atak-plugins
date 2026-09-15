@@ -12,7 +12,7 @@ import org.junit.Test;
  * The slope arithmetic, checked without a device.
  *
  * <p>Worth having as unit tests rather than only on hardware: this is the code that
- * decides what colour a piece of ground is, the inputs are plain numbers, and the
+ * decides what color a piece of ground is, the inputs are plain numbers, and the
  * window rounding below was wrong in the first build in a way that painted dissected
  * country almost solid red on the phone and looked plausible while doing it.
  */
@@ -270,7 +270,7 @@ public class SlopeFieldTest {
 
     /**
      * The paint must stop where the line is drawn. The sampler works a north-up
-     * rectangle because a lat/lon grid is one, so without this the colour would fill
+     * rectangle because a lat/lon grid is one, so without this the color would fill
      * the bounding box and claim ground nobody asked about.
      */
     @Test

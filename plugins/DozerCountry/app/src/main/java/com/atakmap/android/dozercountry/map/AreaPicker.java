@@ -51,9 +51,9 @@ import java.util.Set;
  * 2026-09-05. Hence the delay before starting.</li>
  * </ul>
  *
- * <p>The rectangle is removed once its bounds are taken: the painted overlay is the
- * area, and leaving a duplicate shape behind would clutter the operator's drawing
- * objects and Overlay Manager with something they did not mean to create.
+ * <p>The shape stays on the map once its bounds are taken. It is the boundary of the
+ * area, and it is the only thing on screen while the overlay is computing or switched
+ * off.
  */
 public final class AreaPicker implements ToolListener {
 
@@ -63,13 +63,13 @@ public final class AreaPicker implements ToolListener {
     private static final long TOOLBAR_SETTLE_MS = 400L;
 
     /**
-     * The colour the area is drawn in while it is being drawn.
+     * The color the area is drawn in while it is being drawn.
      *
-     * <p>ATAK's rectangle tool paints in whatever colour the operator last left the
-     * drawing tools set to, which means the box could come up in anything — including
-     * a colour that vanishes into the basemap under it. Orange is the operator's
+     * <p>ATAK's shape tool paints in whatever color the operator last left the
+     * drawing tools set to, which means the area could come up in anything — including
+     * a color that vanishes into the basemap under it. Orange is the operator's
      * choice and the reason is the right one: it holds up on snow, on timber, on bare
-     * desert and on dark relief, which no single bright colour manages as reliably.
+     * desert and on dark relief, which no single bright color manages as reliably.
      */
     private static final int DRAW_COLOR = 0xFFFFA500;
 
@@ -78,7 +78,7 @@ public final class AreaPicker implements ToolListener {
     private boolean colorSaved;
 
     /**
-     * The rectangle the operator drew, kept on the map as the boundary of the area.
+     * The shape the operator drew, kept on the map as the boundary of the area.
      *
      * <p>An earlier version removed it the instant its bounds were read, on the
      * reasoning that the painted overlay is the area. That was wrong in two ways: the
@@ -118,9 +118,9 @@ public final class AreaPicker implements ToolListener {
     }
 
     /**
-     * Lend ATAK's drawing tools our colour. Every exit path puts it back — a plugin
+     * Lend ATAK's drawing tools our color. Every exit path puts it back — a plugin
      * that quietly repaints the operator's drawing preference is a plugin they will
-     * curse three days later when their own shapes come out the wrong colour.
+     * curse three days later when their own shapes come out the wrong color.
      */
     private void borrowColor() {
         if (colorSaved)
@@ -131,7 +131,7 @@ public final class AreaPicker implements ToolListener {
             colorSaved = true;
             prefs.setShapeColor(DRAW_COLOR);
         } catch (RuntimeException e) {
-            Log.w(TAG, "could not set the drawing colour", e);
+            Log.w(TAG, "could not set the drawing color", e);
         }
     }
 
@@ -142,7 +142,7 @@ public final class AreaPicker implements ToolListener {
         try {
             new DrawingPreferences(mapView).setShapeColor(savedColor);
         } catch (RuntimeException e) {
-            Log.w(TAG, "could not restore the drawing colour", e);
+            Log.w(TAG, "could not restore the drawing color", e);
         }
     }
 
@@ -196,7 +196,7 @@ public final class AreaPicker implements ToolListener {
                 .equals(tool.getIdentifier()))
             return;
         active = false;
-        // The tool adds its rectangle to the group during onToolEnd; take it on the
+        // The tool adds its shape to the group during onToolEnd; take it on the
         // next loop, once it is actually there.
         mapView.post(new Runnable() {
             @Override
@@ -252,7 +252,7 @@ public final class AreaPicker implements ToolListener {
         // the area is up.
         // Clamp it to the ground. The overlay is draped on terrain, and a shape left
         // at its own altitude drifts away from the paint the moment the map is tilted
-        // -- on a 3D view the outline and the colour it bounds visibly disagree, which
+        // -- on a 3D view the outline and the color it bounds visibly disagree, which
         // is the same lie as before wearing a different hat.
         drawn.setAltitudeMode(com.atakmap.map.layer.feature.Feature.AltitudeMode.ClampToGround);
         drawn.setStrokeColor(DRAW_COLOR);

@@ -66,6 +66,17 @@ public final class SlopeOverlay {
     private final AtomicInteger generation = new AtomicInteger();
 
     private GradientWidget legend;
+
+    /**
+     * A dark plate behind the legend.
+     *
+     * <p>{@link GradientWidget} draws its labels straight onto whatever is under them,
+     * which is fine over ATAK's elevation overlay and not fine here: the legend sits
+     * bottom-left over a basemap that is mostly white, and on the first manual shot
+     * "Over 75%" was unreadable behind a creek name. The plate is the same dark the
+     * coordinate readout uses, so the corner reads as one of ATAK's own boxes.
+     */
+    private LinearLayoutWidget legendPlate;
     private boolean started;
     private SlopeField lastField;
     private Listener listener;
@@ -308,8 +319,14 @@ public final class SlopeOverlay {
             legend.setBarSize(26f, 26f);
             legend.setPadding(8f, 8f, 8f, 8f);
         }
+        if (legendPlate == null) {
+            legendPlate = new LinearLayoutWidget();
+            legendPlate.setOrientation(LinearLayoutWidget.VERTICAL);
+            legendPlate.setBackingColor(LEGEND_PLATE_COLOR);
+            legendPlate.addChildWidget(legend);
+        }
 
-        // Only the bands that are actually shaded. A colour key for something the map
+        // Only the bands that are actually shaded. A color key for something the map
         // never draws is worse than no key: it invites the operator to go looking for
         // a green that is deliberately not there.
         final List<SlopeBand> painted = new java.util.ArrayList<>();
@@ -331,8 +348,8 @@ public final class SlopeOverlay {
         }
 
         legend.setLegend(colors, labels);
-        if (legend.getParent() == null)
-            root.addChildWidget(legend);
+        if (legendPlate.getParent() == null)
+            root.addChildWidget(legendPlate);
     }
 
     /**
@@ -340,16 +357,19 @@ public final class SlopeOverlay {
      * A legend at the overlay's own alpha washes out against whatever is behind it,
      * and the operator is matching hue, not transparency.
      */
+    /** ATAK's own readout plate: black at about 70%, dark enough for white text. */
+    private static final int LEGEND_PLATE_COLOR = 0xB3000000;
+
     private static int opaque(int argb) {
         return 0xFF000000 | (argb & 0x00FFFFFF);
     }
 
     private void hideLegend() {
-        if (legend == null)
+        if (legendPlate == null)
             return;
         final LinearLayoutWidget root = legendRoot();
         if (root != null)
-            root.removeChildWidget(legend);
+            root.removeChildWidget(legendPlate);
     }
 
     private LinearLayoutWidget legendRoot() {

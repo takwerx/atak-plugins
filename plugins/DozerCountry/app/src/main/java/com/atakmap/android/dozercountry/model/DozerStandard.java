@@ -31,7 +31,7 @@ public final class DozerStandard {
      *
      * <p>This is not decoration. The band labels used to read "most fuel models near
      * zero", which told an operator that fuel had been considered; it has not been.
-     * A coloured overlay that implies an input it does not have is worse than one that
+     * A colored overlay that implies an input it does not have is worse than one that
      * says plainly what it leaves out.
      */
     public final List<String> caveat;

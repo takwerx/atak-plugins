@@ -6,7 +6,7 @@
     "compiled into the plugin: read it, check it against the tables, and if a number",
     "is wrong say so. Changing it takes a rebuild -- the plugin deliberately reads",
     "ONLY this asset from inside its own signed APK, and never an override from",
-    "shared storage, because a colour table that decides where a dozer can work must",
+    "shared storage, because a color table that decides where a dozer can work must",
     "not be editable by anything else on the phone.",
     "",
     "Two different things live in each standard, and they are NOT the same axis:",
@@ -87,7 +87,7 @@
 
       "caveat": [
         "Slope steepness only, read as worst case.",
-        "The 45% line is the SIDEHILL limit, so green is ground that is under every",
+        "The 45% line is the SIDEHILL limit, so unshaded ground is under every",
         "limit whichever way the machine sits. Yellow is over the cross-slope limit",
         "but may still be workable straight up and down. This does not know your line",
         "direction, and it does not know soil, rock, moisture or fuel.",
@@ -97,10 +97,10 @@
         "says so in the same paragraph."
       ],
 
-      "_colours": [
-        "The three painted colours are measured, not chosen by eye, because they have",
+      "_colors": [
+        "The three painted colors are measured, not chosen by eye, because they have",
         "to hold up on basemaps that run from near-white to near-black. Backdrop",
-        "colours were sampled off real screenshots -- USFS vector (#E0E0E0 white,",
+        "colors were sampled off real screenshots -- USFS vector (#E0E0E0 white,",
         "#A09060 tan, #909060 olive), Google Terrain (#A0C0B0 sage), Google Hybrid",
         "imagery (#203020 and #102010 dark) -- then each candidate was composited at",
         "its own alpha over every one of them and scored in CIE Lab on two things:",
@@ -110,9 +110,9 @@
         "What shipped first scored a worst case of dE 29 for separation and 31 for",
         "visibility, both on the pale USFS tan. These score 38 and 51. The gain comes",
         "mostly from opacity: now that the 0-45% band is not painted at all, the",
-        "colour that remains covers only the exception ground, so it can afford to be",
+        "color that remains covers only the exception ground, so it can afford to be",
         "75-82% opaque instead of 59% and stop borrowing so much of the basemap's",
-        "own colour. Terrain texture still reads through it.",
+        "own color. Terrain texture still reads through it.",
         "",
         "A magenta top band scored better still (dE 47) because no terrain is ever",
         "magenta -- but green-yellow-orange-red is what a dozer boss reads without",
@@ -143,7 +143,7 @@
             "unshaded can never quietly mean 'no data'. If that gate is ever",
             "loosened, this has to be revisited in the same breath.",
             "",
-            "Set paint to true to shade it again; the colour is kept either way so",
+            "Set paint to true to shade it again; the color is kept either way so",
             "the legend can show what the band is."
           ]
         },

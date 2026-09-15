@@ -231,7 +231,7 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
             bg.setColor(0xFF000000 | (band.argb & 0x00FFFFFF));
             bg.setStroke(dp(1), 0x66FFFFFF);
         } else {
-            // Hollow, in the band's own colour. It has to be obvious at a glance that
+            // Hollow, in the band's own color. It has to be obvious at a glance that
             // this one is not drawn on the map, or the operator hunts for a green that
             // was never going to be there.
             bg.setColor(0x00000000);
@@ -362,7 +362,7 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
                     "\n%.0f%% is water and is not classed.",
                     100d * field.waterCells / cells));
         }
-        // The overlay is exceptions only, so the absence of colour carries meaning and
+        // The overlay is exceptions only, so the absence of color carries meaning and
         // is therefore stated rather than left to be worked out.
         final DozerStandard standard = Standards.active(pluginContext);
         if (standard != null) {

@@ -1,5 +1,15 @@
-Dozer Country
+ATAK Plugin — Dozer Country
 
+**Download Dozer Country 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+
+- **ATAK-CIV 5.6:** https://github.com/takwerx/dozer-country/releases/download/v0.2/ATAK-Plugin-DozerCountry-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/dozer-country/releases/download/v0.2/ATAK-Plugin-DozerCountry-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/dozer-country/releases/download/v0.2/ATAK-Plugin-DozerCountry-0.2--5.8.0-civ-release.apk
+
+All releases: https://github.com/takwerx/dozer-country/releases
+
+**User guide with screenshots: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)**
+(https://github.com/takwerx/dozer-country/blob/main/docs/USER_GUIDE.md)
 
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
@@ -21,7 +31,7 @@ over 55 percent, or downhill over 75 percent.
 Capabilities:
 
   - Draw an area of interest with ATAK's own polygon tool and get the slope
-    inside it classed against the standard. The colour stops at the ring you
+    inside it classed against the standard. The color stops at the ring you
     drew, not at a box around it.
   - Exceptions only: ground inside every limit is left unshaded so the basemap
     shows through, because an overlay should not spend the screen saying "fine".
@@ -34,7 +44,7 @@ Capabilities:
     every part of the area it declines, and says what it found and what to load.
   - Water is left unclassed rather than painted as workable ground.
   - The standard ships as a readable JSON asset, not as constants, so the numbers
-    a colour is claiming can be audited by the person whose ground it is.
+    a color is claiming can be audited by the person whose ground it is.
   - An on-screen legend using ATAK's own gradient widget, and a panel that states
     the cell size, the window actually used, and anything it could not class.
 
@@ -100,7 +110,7 @@ DEVELOPER NOTES
 The overlay is a plain ARGB raster on an AbstractLayer with four corner points,
 drawn by a GLAbstractLayer as one GLTexture, following the SDK's own helloworld
 SimpleHeatMapLayer sample. ATAK's HeatMapOverlay and ElevationHeatmapLayer cannot
-be used for this: both colour by HSV across an elevation range with no hook for a
+be used for this: both color by HSV across an elevation range with no hook for a
 classifier, and GLHeatMap's constructor and parameter object are package-private.
 
 Elevation comes from one bulk ElevationManager.getElevation(Iterator, double[],
@@ -138,10 +148,10 @@ and the people you pass it to are owed the complete corresponding source of your
 version under the same license. Nobody can take this, close it, and sell it back
 to the emergency-services community.
 
-**If you only install and use DozerCountry, this obligation never touches you.**
+**If you only install and use Dozer Country, this obligation never touches you.**
 Running it, in any agency, on any number of devices, triggers nothing.
 
-**Scope.** The AGPL covers DozerCountry's own code. It does not change the license
+**Scope.** The AGPL covers Dozer Country's own code. It does not change the license
 of the TAK Software, which stays under the TAK Software License Agreement, and it
 does not cover the parts of this repository scaffolded from the TAK-SDK plugin
 template -- those are listed under Provenance in

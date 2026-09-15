@@ -9,7 +9,7 @@ import com.atakmap.coremap.maps.coords.GeoPoint;
  *
  * <p>Both are needed and they are not interchangeable. Elevation is sampled on a
  * lat/lon grid, which is a rectangle, so the bounding box is what gets sampled; the
- * ring is what gets painted, so the colour stops exactly where the line is drawn.
+ * ring is what gets painted, so the color stops exactly where the line is drawn.
  */
 public final class Area {
 

@@ -23,7 +23,7 @@ dozers should not be operated across slopes over 45 percent, uphill over 55
 percent, or downhill over 75 percent.
 
 Ground inside every limit is left unshaded on purpose, so the map shows through.
-Colour means something needs looking at.
+Color means something needs looking at.
 
 #v(6pt)
 #toolbox.side-by-side(columns: (8fr, 4fr))[
@@ -42,22 +42,37 @@ Colour means something needs looking at.
 ][
   Press *Draw area*. Nothing is computed until you have drawn one, and the panel
   says so.
+
+  *Clear* takes the area and its outline back off the map when you are done with
+  it.
+]
 ]
 
-#v(6pt)
-#toolbox.side-by-side(columns: (6fr, 6fr))[
+#tak-slide[
+= ATAK's own shape tool
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
   #image("3.png", width: 100%)
 ][
-  ATAK's own shape tool takes over, with its prompt and its Undo and End Shape
-  buttons. Tap to place each corner.
+  Dozer Country does not invent a drawing tool. ATAK's own takes over, with the
+  prompt, the rubber band, the vertex handles and the Undo and End Shape buttons
+  an ATAK user already knows.
+
+  Tap the map to place each corner.
+]
 ]
 
-#v(6pt)
-#toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("4.png", width: 100%)
+#tak-slide[
+= Closing the shape
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("4.jpg", width: 100%)
 ][
-  *Tap the first marker to close the shape.* Pressing End Shape gives a line
-  rather than an area, and Dozer Country will say so and ask you to close it.
+  *Tap the first marker to close the shape.*
+
+  Pressing End Shape instead gives a line rather than an area. Dozer Country will
+  say so and ask you to close it, because there is no inside to a line and
+  nothing to shade.
 ]
 ]
 
@@ -65,27 +80,43 @@ Colour means something needs looking at.
 = Reading the overlay
 
 #toolbox.side-by-side(columns: (7fr, 5fr))[
-  #image("5.png", width: 100%)
+  #image("5.jpg", height: 290pt)
 ][
-  The orange outline is the area you drew, and the colour stops exactly there.
+  The orange outline is the area you drew, and the color stops exactly there.
 
   Unshaded ground is under every limit — a machine can work it whichever way it
   sits. That is most of a good piece of country, and leaving it bare is what lets
   you still read the terrain underneath.
 ]
+]
 
-#v(6pt)
-#toolbox.side-by-side(columns: (4fr, 8fr))[
-  #image("6.png", width: 100%)
+#tak-slide[
+= What the colors mean
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("8.png", width: 100%)
 ][
-  #text(size: 0.9em)[
-  *46-55%* — over the 45 percent sidehill limit. Up and down only, not across.
+  The classes, in the words of the standard. The hollow swatch is the band that
+  is deliberately not drawn.
 
-  *56-75%* — over the 55 percent uphill limit as well. Downhill only, and that is
-  the last limit in the guide.
+  The amber paragraph is worth reading twice: this is *slope steepness only*,
+  read as worst case. It does not know which way your line will run, nor soil,
+  rock, moisture or fuel.
+]
+]
 
-  *Over 75%* — over every limit. The guide has nothing to say past here.
-  ]
+#tak-slide[
+= The same ground in 3D
+
+#toolbox.side-by-side(columns: (8fr, 4fr))[
+  #image("6.jpg", height: 290pt)
+][
+  Tilting the map is where the overlay earns its keep. The drainages come up
+  unshaded, the sidehills yellow and orange, and the noses of the ridges dark
+  red — which is the shape of the problem, not a list of percentages.
+
+  Nothing extra is needed. The shading is an ordinary map layer and follows
+  ATAK's own terrain.
 ]
 ]
 
@@ -95,24 +126,23 @@ Colour means something needs looking at.
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   #image("7.png", width: 100%)
 ][
-  The cell size and the window actually used. Each cell is classed by the *worst
-  slope within one chain*, not by its own value, so an isolated flat spot inside
-  a steep face is never called workable.
+  The cell size actually used, and the working window. Each cell is classed by
+  the *worst slope within one chain*, not by its own value, so an isolated flat
+  spot inside a steep face is never called workable.
 
-  *Overlay* hides and shows the shading without recomputing. *Clear* removes the
-  area and its outline.
+  A large area gives coarse cells. The panel says the size it managed and says to
+  draw a smaller area for a finer read.
+]
 ]
 
-#v(6pt)
-#toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("8.png", width: 100%)
-][
-  The classes, in the words of the standard. The hollow swatch is the band that
-  is deliberately not drawn.
+#tak-slide[
+= Turning the shading off
 
-  The amber line is the part worth reading twice: this is *slope steepness only*,
-  read as worst case. It does not know which way your line will run, nor soil,
-  rock, moisture or fuel.
+#toolbox.side-by-side(columns: (8fr, 4fr))[
+  #image("10.jpg", width: 100%)
+][
+  *Overlay* hides and shows the shading without recomputing it, and the outline
+  stays behind so you can still see which ground was worked out.
 ]
 ]
 
@@ -145,15 +175,17 @@ Colour means something needs looking at.
   the overlay cannot know which way a line will run. Ground shown at 46-55% may
   be perfectly workable straight up and down.
 
-- *Water is left unclassed* rather than painted as workable ground.
+- *Water is left unclassed* rather than painted as workable ground. It is found
+  by looking for dead-flat ground, so water that ATAK's elevation does not render
+  flat can be missed.
 
 - *Nothing leaves the device.* No network, no account, no server. Slope is
   computed from the elevation already on the phone.
 
 - *The standard is a readable file*, not numbers buried in code:
   `assets/dozer_data.json` inside the plugin carries the bands, the limits and
-  the source they came from, so the numbers a colour is claiming can be checked
-  by the person whose ground it is.
+  the source they came from, so the numbers a color is claiming can be checked by
+  the person whose ground it is.
 
 #v(10pt)
 This manual is reached from ATAK's *Settings → Tool Preferences → Dozer Country*.
