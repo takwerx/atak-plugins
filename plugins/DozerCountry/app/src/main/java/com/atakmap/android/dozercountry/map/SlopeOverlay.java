@@ -7,6 +7,7 @@ import com.atakmap.android.dozercountry.model.SlopeBand;
 import com.atakmap.android.dozercountry.model.Standards;
 import com.atakmap.android.dozercountry.terrain.SlopeField;
 import com.atakmap.android.dozercountry.terrain.TerrainSampler;
+import com.atakmap.android.maps.MapTextFormat;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.widgets.GradientWidget;
 import com.atakmap.android.widgets.LinearLayoutWidget;
@@ -317,7 +318,7 @@ public final class SlopeOverlay {
         if (legend == null) {
             legend = new GradientWidget();
             legend.setBarSize(26f, 26f);
-            legend.setPadding(8f, 8f, 8f, 8f);
+            legend.setPadding(8f, 0f, 8f, 8f);
         }
         if (legendPlate == null) {
             legendPlate = new LinearLayoutWidget();
@@ -348,6 +349,7 @@ public final class SlopeOverlay {
         }
 
         legend.setLegend(colors, labels);
+        sizePlate(labels);
         if (legendPlate.getParent() == null)
             root.addChildWidget(legendPlate);
     }
@@ -359,6 +361,60 @@ public final class SlopeOverlay {
      */
     /** ATAK's own readout plate: black at about 70%, dark enough for white text. */
     private static final int LEGEND_PLATE_COLOR = 0xB3000000;
+
+    /** Space {@link GradientWidget} leaves between its bar and its labels. */
+    private static final float LEGEND_LABEL_GAP = 8f;
+
+    /**
+     * A little plate below the legend, so the bottom row never sits on the edge.
+     *
+     * <p>Measured on the XCover: the legend draws its bar and labels starting exactly
+     * one top-padding above the plate's own top edge, whatever the plate's height, so
+     * the strip hung out in the open until the top padding went to zero -- the
+     * operator, watching: "vertical side look box not big enough". With the top flush
+     * the only slack that can be added lands at the bottom, which is where it is
+     * wanted anyway.
+     */
+    private static final float LEGEND_PLATE_SLACK = 10f;
+
+    /**
+     * Size the plate to the text, because the legend does not.
+     *
+     * <p>{@link GradientWidget} reports a width covering its bar and its padding but
+     * not its labels, so a backing drawn at the widget's own size stops part way
+     * through the longest one and its tail sits on the bare map — which is the whole
+     * thing the plate is there to prevent. The operator caught it on the first build
+     * that had a plate at all: "its not completely covering all the text".
+     *
+     * <p>The labels are measured with the widget's own {@link MapTextFormat}, so this
+     * is the width it will really draw rather than an estimate, and the result is
+     * never allowed to shrink the widget's own reported size.
+     */
+    private void sizePlate(String[] labels) {
+        try {
+            final MapTextFormat tf = legend.getTextFormat();
+            final float[] bar = legend.getBarSize();
+            final float[] pad = legend.getPadding();
+            if (tf == null || bar == null || bar.length < 2 || pad == null || pad.length < 4)
+                return;
+
+            int widest = 0;
+            for (int i = 0; i < labels.length; i++) {
+                final int w = tf.measureTextWidth(labels[i]);
+                if (w > widest)
+                    widest = w;
+            }
+
+            final float width = Math.max(legend.getWidth(),
+                    pad[0] + bar[0] + LEGEND_LABEL_GAP + widest + pad[2]);
+            final float height = legend.getHeight() + LEGEND_PLATE_SLACK;
+            if (width > 0f && height > 0f)
+                legendPlate.setLayoutParams((int) Math.ceil(width), (int) Math.ceil(height));
+        } catch (RuntimeException e) {
+            // A legend a little too narrow is worth far less than a crash.
+            Log.w(TAG, "could not size the legend plate", e);
+        }
+    }
 
     private static int opaque(int argb) {
         return 0xFF000000 | (argb & 0x00FFFFFF);
