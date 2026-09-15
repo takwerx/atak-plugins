@@ -53,8 +53,8 @@ Version 0.1, first release. Built and tested against ATAK-CIV 5.6, 5.7 and 5.8.
 _________________________________________________________________
 POINT OF CONTACTS
 
-takwerx
-Issues and bug reports: https://github.com/takwerx/dozer-country/issues
+Andreas Johansson, takwerx
+https://github.com/takwerx/dozer-country/issues
 
 _________________________________________________________________
 PORTS REQUIRED
