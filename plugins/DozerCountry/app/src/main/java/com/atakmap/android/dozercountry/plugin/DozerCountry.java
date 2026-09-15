@@ -42,6 +42,8 @@ public class DozerCountry implements IPlugin {
     ToolbarItem toolbarItem;
     Pane templatePane;
 
+    private static final String PREFS_KEY = "dozercountryPreference";
+
     private SlopeOverlay overlay;
     private DozerCountryPane pane;
 
@@ -78,6 +80,7 @@ public class DozerCountry implements IPlugin {
             return;
 
         uiService.addToolbarItem(toolbarItem);
+        registerPreferences();
 
         final MapView mapView = MapView.getMapView();
         if (mapView != null) {
@@ -90,10 +93,53 @@ public class DozerCountry implements IPlugin {
         }
     }
 
+    /**
+     * Put the plugin in ATAK's Tool Preferences, which is the only way an operator
+     * can reach the user manual.
+     *
+     * <p>The manual is compiled into {@code assets/usermanual.pdf}, and an asset is
+     * not reachable by anyone — without this entry it ships inside the APK with no
+     * way to open it. That has already happened once in this repo, undetected,
+     * because the PDF genuinely was in the APK.
+     *
+     * <p>Guarded rather than assumed: this reaches into ATAK's own preferences
+     * classes, so a build that does not expose them costs the manual entry and
+     * nothing else.
+     */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment
+                            .ToolPreference(
+                                    pluginContext.getString(R.string.app_name),
+                                    pluginContext.getString(R.string.prefs_summary),
+                                    PREFS_KEY,
+                                    // ic_toolbar, not ic_launcher: this row sits on
+                                    // ATAK's dark UI and wants the bare glyph. The
+                                    // tiled launcher icon is for Android's light
+                                    // backgrounds.
+                                    pluginContext.getResources().getDrawable(
+                                            R.drawable.ic_toolbar),
+                                    new DozerCountryPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment
+                    .unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
+    }
+
     @Override
     public void onStop() {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+        unregisterPreferences();
 
         // Close the pane, do not just drop the reference. ATAK keeps showing a pane
         // whose plugin has been unloaded, and every control on it still points at the
