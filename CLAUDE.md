@@ -867,3 +867,14 @@ catalog.
   `/ship`. General approval given before the prompt does not count. Shared
   files (scripts, hooks, this file) go to `main` with `/ship tooling` the same
   day they change: merge and push, nothing published anywhere.
+- **A file that cannot change the APK is published with `/ship <Plugin> docs`,
+  not with a version.** A README, a guide, a screenshot, a LICENSE. Until
+  2026-09-14 the only route to a plugin's public repo was the subtree push
+  inside a release, and a release refuses a version already signed -- so the
+  LICENSE two contributors were waiting on (takwerx/comms#1 and #2) could only
+  be published by inventing a version: a new tak.gov submission, three fresh
+  signed APKs and a Market refresh, to ship a text file. `docs` merges to main
+  and subtree-pushes, and stops: no tag, no release, no catalog, no version
+  bump. `scripts/check-docs-only.sh <Plugin>` is the gate and refuses any change
+  under `app/`, `gradle/` or the build files, so a docs ship can never quietly
+  publish a different plugin than the one already signed.
