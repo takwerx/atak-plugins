@@ -112,3 +112,38 @@ approximation. That plus free-space loss is weighed against what a 5 W handheld
 into a mountaintop repeater can afford, and the site comes back likely, marginal
 or unlikely. It is a guide: bare earth, one obstruction, a nominal VHF
 wavelength and a nominal handheld.
+
+LICENSE
+
+Copyright (C) 2026 Andreas Johansson (TAKWERX).
+
+Comms is free software, licensed under the
+**[GNU Affero General Public License v3.0 or later](LICENSE)**
+(AGPL-3.0-or-later), with an
+**[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
+this plugin may be built against the TAK SDK, loaded into ATAK and distributed
+without the AGPL reaching into ATAK itself.
+
+You may run it, study it, modify it, and share it -- for any purpose, commercial
+or not, with no fee and no per-seat license. What the AGPL adds over a permissive
+license is a guarantee that it **stays** free: modify Comms and pass it on, and
+the people you pass it to are owed the complete corresponding source of your
+version under the same license. Nobody can take this, close it, and sell it back
+to the emergency-services community.
+
+**If you only install and use Comms, this obligation never touches you.**
+Running it, in any agency, on any number of devices, triggers nothing.
+
+**Scope.** The AGPL covers Comms's own code. It does not change the license of
+the TAK Software, which stays under the TAK Software License Agreement, and it
+does not cover the parts of this repository scaffolded from the TAK-SDK plugin
+template -- those are listed under Provenance in
+[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md). No SDK binary is distributed here.
+
+The catalog's data comes from public records published by Cal OES, the USDA
+Forest Service and the USGS, each named in `catalog.json` and on the plugin's
+About screen.
+
+Contributions are welcome -- see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+contribution terms, the row-file format for adding sites and nets, and the
+[Contributor License Agreement](CLA.md).
