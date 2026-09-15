@@ -114,6 +114,29 @@ finished until all of this matches:
 4. The SDK template headings, unchanged and in template order: PURPOSE AND
    CAPABILITIES, STATUS, POINT OF CONTACTS, PORTS REQUIRED, EQUIPMENT REQUIRED,
    EQUIPMENT SUPPORTED, COMPILATION, DEVELOPER NOTES
+5. A `LICENSE` section, last, after DEVELOPER NOTES
+
+**Every plugin carries its license.** `LICENSE` (AGPL-3.0-or-later, verbatim, so
+GitHub detects it), `LICENSE-EXCEPTION.md`, `CONTRIBUTING.md` and `CLA.md`, plus
+that README section. `scripts/add-license.sh <Plugin>` writes them and
+`new-plugin.sh` runs it, so a new plugin has them from the first commit; it is
+idempotent and never overwrites a file a plugin has grown its own version of
+(Comms documents its catalog row-file format in CONTRIBUTING.md). A repository
+with no license is not permissive by default, it is all rights reserved: two
+people offered work on takwerx/comms in September 2026 and neither could open a
+pull request, and the same question sat unanswered on takwerx/map-depot for a
+week.
+
+The exception matters and is not boilerplate. A plugin's classes load into
+ATAK's process and call its API directly, so the AGPL needs an additional
+permission under §7 for the TAK Software; and `new-plugin.sh` copies the SDK's
+`plugintemplate` wholesale, so `LICENSE-EXCEPTION.md` lists the files that came
+from the TAK Product Center rather than stamping AGPL on them — the SDK license
+grants the right to derive new works, not to sublicense the SDK. That list is
+generated from what is actually on disk, because the class names do not follow
+the plugin name (`PlssPreferenceFragment`, `FobsPreferenceFragment`, and
+TakwerxMarket has none); a provenance statement naming files that do not exist
+is worse than none.
 
 Check it mechanically before shipping — this compares a plugin against the
 reference and should print only the plugin's own name:
