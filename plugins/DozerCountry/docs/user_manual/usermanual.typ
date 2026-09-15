@@ -82,7 +82,7 @@ ATAK user already knows. The panel says the same thing on its own side, and
 ][
   The orange outline is the area you drew, and the color stops exactly there.
 
-  Unshaded ground is under every limit — a machine can work it whichever way it
+  Unshaded ground is under every limit - a machine can work it whichever way it
   sits. That is most of a good piece of country, and leaving it bare is what lets
   you still read the terrain underneath.
 
@@ -117,7 +117,7 @@ ATAK user already knows. The panel says the same thing on its own side, and
 ][
   Tilting the map is where the overlay earns its keep. The drainages come up
   unshaded, the sidehills yellow and orange, and the noses of the ridges dark
-  red — which is the shape of the problem, not a list of percentages.
+  red - which is the shape of the problem, not a list of percentages.
 
   Nothing extra is needed. The shading is an ordinary map layer and follows
   ATAK's own terrain.
@@ -156,7 +156,7 @@ ATAK user already knows. The panel says the same thing on its own side, and
 #toolbox.side-by-side(columns: (7fr, 5fr))[
   #image("9.png", width: 100%)
 ][
-  Dozer Country will not guess. It needs DTED2 — 30 metre posts — or better over
+  Dozer Country will not guess. It needs DTED2 - 30 metre posts - or better over
   every part of the area, and if it has not got it, it declines and tells you
   what it found and what to load.
 
@@ -192,5 +192,5 @@ ATAK user already knows. The panel says the same thing on its own side, and
   the person whose ground it is.
 
 #v(10pt)
-This manual is reached from ATAK's *Settings* → *Tool Preferences* → *Dozer Country*.
+This manual is reached from ATAK's *Settings* > *Tool Preferences* > *Dozer Country*.
 ]
