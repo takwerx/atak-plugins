@@ -1,6 +1,8 @@
 package com.atakmap.android.dozercountry.ui;
 
 import android.content.Context;
+import android.content.DialogInterface;
+import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
@@ -11,6 +13,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 
 import com.atakmap.android.dozercountry.data.Units;
+import com.atakmap.android.dozercountry.map.Area;
 import com.atakmap.android.dozercountry.map.AreaPicker;
 import com.atakmap.android.dozercountry.map.SlopeOverlay;
 import com.atakmap.android.dozercountry.model.DozerStandard;
@@ -40,6 +43,8 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
     private final MapView mapView;
     private final SlopeOverlay overlay;
     private final AreaPicker picker;
+    private final Button machineButton;
+    private final TextView classesHeading;
 
     private final Button drawButton;
     private final Button clearButton;
@@ -59,6 +64,8 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
         this.overlay = overlay;
         this.picker = new AreaPicker(mapView, this);
 
+        machineButton = root.findViewById(R.id.pick_machine);
+        classesHeading = root.findViewById(R.id.section_classes);
         drawButton = root.findViewById(R.id.draw_area);
         clearButton = root.findViewById(R.id.clear_area);
         toggleButton = root.findViewById(R.id.toggle_overlay);
@@ -73,9 +80,17 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
         wire();
         buildBandList();
         syncFromOverlay();
+        syncMachine();
     }
 
     private void wire() {
+        machineButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                askWhichMachine();
+            }
+        });
+
         drawButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -121,6 +136,83 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
             public void onStopTrackingTouch(SeekBar bar) {
             }
         });
+    }
+
+    /**
+     * Ask which machine, and paint by that machine's limits.
+     *
+     * <p>S-236 tables every machine separately and they are far apart: a dozer is held
+     * to 45 percent sidehill, a feller buncher to 30, a forwarder to 12. Nothing is
+     * painted until this is answered — see {@link Standards#active}.
+     *
+     * <p>The dialog is built on the MapView context, never the plugin context, which
+     * is a BadTokenException that takes ATAK down with it.
+     */
+    private void askWhichMachine() {
+        final List<DozerStandard> all = Standards.all(pluginContext);
+        if (all.isEmpty()) {
+            status.setText("The slope standard could not be read from dozer_data.json.");
+            return;
+        }
+
+        final String[] names = new String[all.size()];
+        int checked = -1;
+        final DozerStandard current = Standards.active(pluginContext);
+        for (int i = 0; i < all.size(); i++) {
+            names[i] = all.get(i).name;
+            if (current != null && current.id.equals(all.get(i).id))
+                checked = i;
+        }
+
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("What are you working with?")
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        chooseMachine(all.get(which));
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /**
+     * Take the choice, and repaint ground already drawn rather than making the
+     * operator draw it again — the machine is what changed, not the area.
+     */
+    private void chooseMachine(DozerStandard standard) {
+        Standards.choose(standard.id);
+        syncMachine();
+        buildBandList();
+
+        final Area area = overlay.getLastArea();
+        if (area != null)
+            overlay.computeFor(area);
+        else if (overlay.getLastField() == null)
+            status.setText(R.string.status_idle);
+    }
+
+    /**
+     * The button says which machine, and everything downstream waits on it.
+     *
+     * <p>Drawing an area before the machine is known would compute a field that has to
+     * be thrown away, and would put a number on screen the operator never chose.
+     */
+    private void syncMachine() {
+        final DozerStandard standard = Standards.active(pluginContext);
+        final boolean picked = standard != null;
+        machineButton.setText(picked ? standard.name
+                : pluginContext.getString(R.string.pick_machine));
+        // The heading names the machine, because "can a dozer work it" over a
+        // grader's limits would be the wrong question with the right colors.
+        classesHeading.setText(picked
+                ? "Can a " + standard.name.toLowerCase(Locale.US) + " work it"
+                : pluginContext.getString(R.string.section_classes));
+        drawButton.setEnabled(picked);
+        drawButton.setAlpha(picked ? 1f : 0.5f);
+        if (!picked)
+            status.setText(R.string.status_pick_machine);
     }
 
     private void startPicking() {
@@ -177,11 +269,15 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
         bandList.removeAllViews();
         final DozerStandard standard = Standards.active(pluginContext);
         if (standard == null) {
-            standardSource.setText(
-                    "The slope standard could not be read from dozer_data.json.");
+            // Before a machine is chosen there are no classes to list, and that is the
+            // normal opening state rather than a broken asset.
+            standardSource.setText(Standards.all(pluginContext).isEmpty()
+                    ? "The slope standard could not be read from dozer_data.json."
+                    : "Pick the machine to see the limits it is held to.");
             caveatView.setVisibility(View.GONE);
             return;
         }
+        caveatView.setVisibility(View.VISIBLE);
 
         // Steepest first, and that means the above-standard row goes at the TOP, not
         // appended at the end. It was appended, which put "over every limit" below
@@ -280,6 +376,21 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
         status.setText(R.string.status_working);
         overlay.computeFor(area);
     }
+
+    @Override
+
+    public void onAreaRemoved() {
+
+        // The boundary is gone, so the painting must go with it: shading with
+
+        // nothing around it says nothing about which ground was worked out.
+
+        overlay.clear();
+
+        status.setText(R.string.status_area_removed);
+
+    }
+
 
     @Override
     public void onCancelled(String reason) {
