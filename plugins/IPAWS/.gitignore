@@ -17,6 +17,11 @@ local.properties
 # Unpacked by the takdev Gradle plugin at build time
 .takdev/
 
+# The manual PDF is built from docs/user_manual by typst -- tak.gov builds its own
+# from the source in the zip, and a committed one would go stale the moment the
+# manual changed.
+app/src/main/assets/usermanual.pdf
+
 # Build output
 .gradle/
 build/
