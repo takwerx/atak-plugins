@@ -43,13 +43,18 @@ public final class GeoJson {
         if (c == null)
             return null;
         switch (type) {
-            case "Point":
-                return new Point(c.getDouble(0), c.getDouble(1));
+            case "Point": {
+                final double lon = c.getDouble(0), lat = c.getDouble(1);
+                return isSane(lon, lat) ? new Point(lon, lat) : null;
+            }
             case "MultiPoint": {
                 final GeometryCollection gc = new GeometryCollection(2);
-                for (int i = 0; i < c.length(); i++)
-                    gc.addGeometry(new Point(c.getJSONArray(i).getDouble(0),
-                            c.getJSONArray(i).getDouble(1)));
+                for (int i = 0; i < c.length(); i++) {
+                    final double lon = c.getJSONArray(i).getDouble(0);
+                    final double lat = c.getJSONArray(i).getDouble(1);
+                    if (isSane(lon, lat))
+                        gc.addGeometry(new Point(lon, lat));
+                }
                 return gc;
             }
             case "LineString":
@@ -75,11 +80,37 @@ public final class GeoJson {
 
     private static LineString line(JSONArray coords) throws Exception {
         final LineString ls = new LineString(2);
+        int kept = 0;
         for (int i = 0; i < coords.length(); i++) {
             final JSONArray p = coords.getJSONArray(i);
-            ls.addPoint(p.getDouble(0), p.getDouble(1));
+            final double lon = p.getDouble(0);
+            final double lat = p.getDouble(1);
+            if (!isSane(lon, lat))
+                continue;
+            ls.addPoint(lon, lat);
+            kept++;
         }
+        // A ring that lost points is not a ring. Better to drop the shape than to
+        // hand the renderer a two-point polygon and draw a lie.
+        if (kept < coords.length())
+            throw new IllegalArgumentException("geometry had " + (coords.length() - kept)
+                    + " unusable coordinates");
         return ls;
+    }
+
+    /**
+     * Coordinates are checked before they reach ATAK's geometry, which is native.
+     *
+     * <p>A NaN, an infinity or a longitude of 4e9 arriving from the feed goes into
+     * {@code LineString.addPoint} and from there into native code, and a native crash
+     * in a plugin gives no Java stack trace and looks like ATAK falling over on its
+     * own. That is a bad enough failure mode to be worth four comparisons per point,
+     * whatever the odds of the feed sending one.
+     */
+    private static boolean isSane(double lon, double lat) {
+        return !Double.isNaN(lon) && !Double.isNaN(lat)
+                && !Double.isInfinite(lon) && !Double.isInfinite(lat)
+                && lon >= -180d && lon <= 180d && lat >= -90d && lat <= 90d;
     }
 
     private static Polygon polygon(JSONArray rings) throws Exception {
