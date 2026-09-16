@@ -1,0 +1,209 @@
+{
+  "_comment": [
+    "The slope standard Dozer Country paints by. Everything here is data on purpose:",
+    "a colored overlay that says 'you can cut here' is a safety claim, and a safety",
+    "claim has to be auditable by the person whose ground it is. Nothing here is",
+    "compiled into the plugin: read it, check it against the tables, and if a number",
+    "is wrong say so. Changing it takes a rebuild -- the plugin deliberately reads",
+    "ONLY this asset from inside its own signed APK, and never an override from",
+    "shared storage, because a color table that decides where a dozer can work must",
+    "not be editable by anything else on the phone.",
+    "",
+    "Two different things live in each standard, and they are NOT the same axis:",
+    "  bands  - production classes. Slope MAGNITUDE only. From the NWCG production",
+    "           rate tables, which are measured for line built UP or DOWN the slope",
+    "           and have no sideslope column at all.",
+    "  limits - safety refusal points, DIRECTIONAL. From the S-232 Dozer Boss course.",
+    "           A 50% slope is production class 3 and at the same time over the 45%",
+    "           sidehill limit. Which one applies depends on the way the line runs.",
+    "",
+    "The AOI overlay knows magnitude only, so it paints bands. The line profile knows",
+    "direction, so it can also check limits.",
+    "",
+    "To add a second standard (e.g. CAL FIRE), append another object to 'standards'.",
+    "The plugin shows a picker as soon as there is more than one."
+  ],
+
+  "workingWindow": {
+    "meters": 20,
+    "label": "one chain (66 ft)",
+    "_comment": [
+      "A patch of good ground smaller than this is not called workable. A single",
+      "cell at 20% inside a 60% face is not dozer country, so each cell is",
+      "classified by the WORST slope within this distance of it.",
+      "One chain is the unit the production tables already count in (chains per",
+      "hour), and it is about the limit of what 30 m DTED2 posts can honestly",
+      "resolve. Anything smaller is made up."
+    ]
+  },
+
+  "waterMask": {
+    "minAreaAcres": 5,
+    "_comment": [
+      "Water is left unpainted rather than classed. There is no hydrography in ATAK",
+      "for a plugin to ask -- not one water, coastline or bathymetry class in",
+      "main.jar -- so water is found in the elevation itself: a connected run of",
+      "cells all holding PRECISELY the same value, covering at least this area.",
+      "",
+      "Real terrain always varies, even at DTED's one metre quantisation. A water",
+      "surface is rendered dead flat because that is what it is. The ocean is one",
+      "enormous such region at zero; a reservoir is a smaller one at its own level,",
+      "which is why this finds lakes as well as sea without knowing where sea level",
+      "is.",
+      "",
+      "It is NOT the same as 'low slope'. Low slope would swallow the Oxnard plain,",
+      "which is exactly the good dozer ground this overlay exists to find.",
+      "",
+      "What it gets wrong: a dry lake bed is dead flat too and will be masked, which",
+      "removes genuinely workable ground. The pane reports how much was masked so",
+      "that is visible rather than silent. Raise this number if it is over-masking",
+      "ground you know; set it to 0 to turn the mask off entirely."
+    ]
+  },
+
+  "standards": [
+    {
+      "id": "s232",
+      "name": "Dozer safety limits",
+      "legend": "USFS/NWCG S-232 Dozer Boss limits",
+      "sources": [
+        "USFS/NWCG S-232 Dozer Boss, Pre-Course Work, Appendix D: 'As with any piece of specialized equipment, the dozer has limitations. As a general guideline, dozers should not be operated across slopes (sidehill) greater than 45 percent, uphill slopes greater than 55 percent or downhill on slopes greater than 75 percent.'",
+        "Corroborated by the S-232 supplement 'Mechanized Equipment for Fire and Fuels Operations': 'According to the Fireline Handbook, dozers are limited to <75% favorable slopes.'"
+      ],
+
+      "_comment": [
+        "These bands answer ONE question: can a dozer work this ground safely.",
+        "",
+        "They are NOT the NWCG production classes (0-25/26-40/41-55/56-74), which",
+        "measure chains per hour and are a different thing. An earlier version painted",
+        "those and it was the wrong axis: a production class tells you how fast line",
+        "goes in, not whether the machine stays upright.",
+        "",
+        "The three boundaries are the three refusal points in the guide, and each one",
+        "is a direction: 45 across, 55 up, 75 down. The overlay knows how steep the",
+        "ground is but not which way the machine will sit on it, so it reads them as",
+        "worst case -- see 'caveat'. That is the safe direction to be wrong in."
+      ],
+
+      "caveat": [
+        "Slope steepness only, read as worst case.",
+        "The 45% line is the SIDEHILL limit, so anything not shaded yellow, orange",
+        "or red is under every limit whichever way the machine sits. Yellow is over",
+        "the cross-slope limit but may still be workable straight up and down. This",
+        "does not know your line direction, and it does not know soil, rock,",
+        "moisture or fuel.",
+        "",
+        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
+        "terrain, weather and operator experience all move these numbers, and S-232",
+        "says so in the same paragraph."
+      ],
+
+      "_colors": [
+        "The three painted colors are measured, not chosen by eye, because they have",
+        "to hold up on basemaps that run from near-white to near-black. Backdrop",
+        "colors were sampled off real screenshots -- USFS vector (#E0E0E0 white,",
+        "#A09060 tan, #909060 olive), Google Terrain (#A0C0B0 sage), Google Hybrid",
+        "imagery (#203020 and #102010 dark) -- then each candidate was composited at",
+        "its own alpha over every one of them and scored in CIE Lab on two things:",
+        "how far each band sits from the backdrop (can you see it) and how far",
+        "adjacent bands sit from each other (can you tell them apart).",
+        "",
+        "What shipped first scored a worst case of dE 29 for separation and 31 for",
+        "visibility, both on the pale USFS tan. These score 38 and 51. The gain comes",
+        "mostly from opacity: now that the 0-45% band is not painted at all, the",
+        "color that remains covers only the exception ground, so it can afford to be",
+        "75-82% opaque instead of 59% and stop borrowing so much of the basemap's",
+        "own color. Terrain texture still reads through it.",
+        "",
+        "A magenta top band scored better still (dE 47) because no terrain is ever",
+        "magenta -- but green-yellow-orange-red is what a dozer boss reads without",
+        "thinking, and that is worth more than the last few points.",
+        "",
+        "If these are ever retuned, sample the backdrops again rather than guessing:",
+        "the numbers above are only true for the basemaps they were measured on."
+      ],
+
+      "bands": [
+        {
+          "class": 1,
+          "minPercent": 0,
+          "maxPercent": 45,
+          "label": "0-45%",
+          "meaning": "Within all three limits",
+          "argb": "#961E8C28",
+          "paint": false,
+          "_comment": [
+            "NOT painted, on purpose. This is the band that says 'fine', and an",
+            "overlay should not spend the screen saying fine: on a 3D view a solid",
+            "green wash over everything workable buried the basemap the operator was",
+            "trying to read the ground from.",
+            "",
+            "So the overlay is exceptions only. Unshaded means under every limit.",
+            "That reading is only safe because the plugin refuses to paint at all",
+            "when it cannot see the ground -- no DTED2, or any cell missing -- so",
+            "unshaded can never quietly mean 'no data'. If that gate is ever",
+            "loosened, this has to be revisited in the same breath.",
+            "",
+            "Set paint to true to shade it again; the color is kept either way so",
+            "the legend can show what the band is."
+          ]
+        },
+        {
+          "class": 2,
+          "minPercent": 46,
+          "maxPercent": 55,
+          "label": "46-55%",
+          "meaning": "Over the 45% sidehill limit. Up and down only, not across",
+          "argb": "#BEFFD414"
+        },
+        {
+          "class": 3,
+          "minPercent": 56,
+          "maxPercent": 75,
+          "label": "56-75%",
+          "meaning": "Over the 55% uphill limit. Downhill only, at the last limit",
+          "argb": "#C6F05A0A"
+        }
+      ],
+      "aboveStandard": {
+        "label": "Over 75%",
+        "meaning": "Over every limit in the guide",
+        "argb": "#D2A8002A",
+        "_comment": "75% is the downhill limit and also where the production tables stop. Past it the guide has nothing to say, which is not the same as 'very steep'."
+      },
+
+      "limits": {
+        "sidehillPercent": 45,
+        "uphillPercent": 55,
+        "downhillPercent": 75,
+        "_comment": [
+          "The same three numbers the bands are built from, kept separately because",
+          "the line profile needs them as directional limits: once a line direction is",
+          "known, the correct limit for each segment can be chosen instead of assuming",
+          "the worst case."
+        ]
+      },
+
+      "machines": [
+        {
+          "type": "1",
+          "name": "Type 1 - heavy",
+          "minHorsepower": 200,
+          "examples": "D-7, D-8, JD-950"
+        },
+        {
+          "type": "2",
+          "name": "Type 2 - medium",
+          "minHorsepower": 100,
+          "examples": "D-5N, D-6N, JD-750"
+        },
+        {
+          "type": "3",
+          "name": "Type 3 - light",
+          "minHorsepower": 50,
+          "examples": "D-3, D-4, JD-450, JD-550"
+        }
+      ]
+    }
+  ]
+}
