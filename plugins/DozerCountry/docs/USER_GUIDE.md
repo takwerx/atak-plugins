@@ -19,11 +19,17 @@ ground. It works fully offline, from the elevation already on the device.
 
 ## 1. The limits it paints
 
-The bands are the refusal points in the NWCG/USFS **S-232 Dozer Boss** course,
-Appendix D. (S-232 is the legacy designation. The current course is **S-236,
-Heavy Equipment Boss (Single Resource)**, which widened the scope from dozers to
-all heavy equipment; the limits below are cited to the S-232 material they were
-read in.) Dozers should not be operated:
+The bands are the dozer slope limits in the NWCG/USFS **S-236 Heavy Equipment
+Boss** Student Workbook (June 2013, NFES 002690), Unit 2 — *"Maximum slope: 75%
+downhill, 55% uphill, 45% sidehill"*. The same three numbers appear as prose in
+the legacy **S-232 Dozer Boss**, Appendix D, which S-236 replaced.
+
+**S-236 gives a different table for every machine, and this overlay paints the
+dozer row only** — a Pumper Cat is 40% sidehill, an excavator 35–50%, a
+feller buncher 30%, a rubber-tired skidder 22%, a grader 15%, a forwarder 12%.
+Do not read this map for anything but a dozer.
+
+Dozers should not be operated:
 
 - **across** slopes over **45 percent** (sidehill)
 - **uphill** on slopes over **55 percent**

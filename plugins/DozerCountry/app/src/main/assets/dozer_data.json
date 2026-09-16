@@ -65,11 +65,14 @@
     {
       "id": "s232",
       "name": "Dozer safety limits",
-      "legend": "USFS/NWCG S-232 Dozer Boss (now S-236) limits",
+      "legend": "USFS/NWCG S-236 Heavy Equipment Boss limits",
       "sources": [
-        "USFS/NWCG S-232 Dozer Boss, Pre-Course Work, Appendix D: 'As with any piece of specialized equipment, the dozer has limitations. As a general guideline, dozers should not be operated across slopes (sidehill) greater than 45 percent, uphill slopes greater than 55 percent or downhill on slopes greater than 75 percent.'",
+        "USFS/NWCG S-236 Heavy Equipment Boss, Student Workbook, June 2013, NFES 002690, Unit 2, under Dozer -- Limitations: 'Maximum slope: 75% downhill, 55% uphill, 45% sidehill'. This is the CURRENT course and it is where these three numbers now come from. Read 2026-09-15.",
+        "S-236 gives a different table for every machine, and Dozer Country paints the plain dozer row only: Pumper Cat 40% sidehill, dozer/track skidder 40%, excavator 35-50%, feller buncher 30%, rubber-tired skidder 22%, grader 15%, forwarder 12%. A masticator or a skidder is NOT covered by this overlay.",
+        "The same three numbers appear as prose in the legacy USFS/NWCG S-232 Dozer Boss, Pre-Course Work, Appendix D: 'As with any piece of specialized equipment, the dozer has limitations. As a general guideline, dozers should not be operated across slopes (sidehill) greater than 45 percent, uphill slopes greater than 55 percent or downhill on slopes greater than 75 percent.'",
         "Corroborated by the S-232 supplement 'Mechanized Equipment for Fire and Fuels Operations': 'According to the Fireline Handbook, dozers are limited to <75% favorable slopes.'",
-        "S-232 Dozer Boss is the legacy NWCG designation. The current course is S-236, Heavy Equipment Boss (Single Resource), which widened the scope from dozers to all heavy equipment. Confirmed against the NWCG training catalog 2026-09-15. The quote above is from the S-232 material, and whether S-236 carries the same three numbers has NOT been verified -- so the limits are cited to the document they were actually read in."
+        "S-232 Dozer Boss is the legacy NWCG designation; S-236, Heavy Equipment Boss (Single Resource) replaced it and widened the scope from dozers to all heavy equipment. Both carry the same three numbers for a dozer, which is the point of citing both.",
+        "The NWCG host returned HTTP 522 for days, so the S-236 workbook was read through the Internet Archive rather than training.nwcg.gov. The document is unchanged: title 'S-236, Heavy Equipment Boss', 198 pages, NFES 002690, June 2013."
       ],
 
       "_comment": [

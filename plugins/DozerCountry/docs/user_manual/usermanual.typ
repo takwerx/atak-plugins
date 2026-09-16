@@ -18,8 +18,11 @@ is held to, so the call can be made from the map rather than from memory of the
 ground. It is for the person picking where a line goes before the machine gets
 there.
 
-The limits are the refusal points in the Dozer Boss guide, S-232 Appendix D
-(now S-236, Heavy Equipment Boss):
+The limits are the dozer slope limits in NWCG S-236 Heavy Equipment Boss,
+Student Workbook, Unit 2 - "Maximum slope: 75% downhill, 55% uphill, 45%
+sidehill" - the same three numbers the legacy S-232 Dozer Boss carried in
+Appendix D. S-236 tables every machine separately and this paints the dozer row
+only:
 dozers should not be operated across slopes over 45 percent, uphill over 55
 percent, or downhill over 75 percent.
 
