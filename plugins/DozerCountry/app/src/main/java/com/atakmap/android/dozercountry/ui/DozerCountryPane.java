@@ -293,12 +293,24 @@ public final class DozerCountryPane implements SlopeOverlay.Listener,
         // table it came from.
         final StringBuilder sb = new StringBuilder();
         if (!standard.caveat.isEmpty()) {
+            // Every paragraph, not just the first. A blank line separates paragraphs
+            // and used to end the loop, which was harmless while the rest was
+            // provenance prose -- and then stopped being harmless: the machine notes
+            // and the "this cannot see a road" warning live back there, and the
+            // operator was reading a panel that had silently dropped both.
             final StringBuilder c = new StringBuilder();
+            boolean breakPending = false;
             for (String line : standard.caveat) {
-                if (line.isEmpty())
-                    break;          // the rest is the note explaining why this exists
-                if (c.length() > 0)
+                if (line.isEmpty()) {
+                    breakPending = c.length() > 0;
+                    continue;
+                }
+                if (breakPending) {
+                    c.append("\n\n");
+                    breakPending = false;
+                } else if (c.length() > 0) {
                     c.append(' ');
+                }
                 c.append(line);
             }
             caveatView.setText(c.toString());

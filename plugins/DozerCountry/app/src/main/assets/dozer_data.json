@@ -76,12 +76,7 @@
         "The 45% sidehill limit is the one that decides the colors, because the",
         "overlay cannot know which way your line runs. Anything not shaded is under",
         "every limit whichever way the machine sits. This does not know soil, rock,",
-        "moisture or fuel.",
-        "",
-        "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
-        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
-        "terrain, weather and operator experience all move these numbers, and S-232",
-        "says so in the same paragraph."
+        "moisture or fuel."
       ],
       "bands": [
         {
@@ -139,6 +134,12 @@
           "minHorsepower": 50,
           "examples": "D-3, D-4, JD-450, JD-550"
         }
+      ],
+      "_background": [
+        "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
+        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
+        "terrain, weather and operator experience all move these numbers, and S-232",
+        "says so in the same paragraph."
       ]
     },
     {
@@ -158,12 +159,7 @@
         "The 40% sidehill limit is the one that decides the colors, because the",
         "overlay cannot know which way your line runs. Anything not shaded is under",
         "every limit whichever way the machine sits. This does not know soil, rock,",
-        "moisture or fuel.",
-        "",
-        "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
-        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
-        "terrain, weather and operator experience all move these numbers, and S-232",
-        "says so in the same paragraph."
+        "moisture or fuel."
       ],
       "bands": [
         {
@@ -201,7 +197,13 @@
         "sidehillPercent": 40,
         "uphillPercent": 55,
         "downhillPercent": 75
-      }
+      },
+      "_background": [
+        "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
+        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
+        "terrain, weather and operator experience all move these numbers, and S-232",
+        "says so in the same paragraph."
+      ]
     },
     {
       "id": "trackskidder",
@@ -223,11 +225,7 @@
         "moisture or fuel.",
         "",
         "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
-        "S-236 gives 40-50% up and down; the overlay paints 40%.",
-        "",
-        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
-        "terrain, weather and operator experience all move these numbers, and S-232",
-        "says so in the same paragraph."
+        "S-236 gives 40-50% up and down; the overlay paints 40%."
       ],
       "bands": [
         {
@@ -249,7 +247,12 @@
         "sidehillPercent": 40,
         "uphillPercent": 40,
         "downhillPercent": 40
-      }
+      },
+      "_background": [
+        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
+        "terrain, weather and operator experience all move these numbers, and S-232",
+        "says so in the same paragraph."
+      ]
     },
     {
       "id": "excavator",
@@ -271,11 +274,7 @@
         "moisture or fuel.",
         "",
         "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
-        "S-236 gives 35-50% sidehill; the overlay paints 35%.",
-        "",
-        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
-        "terrain, weather and operator experience all move these numbers, and S-232",
-        "says so in the same paragraph."
+        "S-236 gives 35-50% sidehill; the overlay paints 35%."
       ],
       "bands": [
         {
@@ -305,7 +304,12 @@
         "sidehillPercent": 35,
         "uphillPercent": 70,
         "downhillPercent": 70
-      }
+      },
+      "_background": [
+        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
+        "terrain, weather and operator experience all move these numbers, and S-232",
+        "says so in the same paragraph."
+      ]
     },
     {
       "id": "fellerbuncher",
@@ -327,11 +331,7 @@
         "moisture or fuel.",
         "",
         "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
-        "S-236 gives 40-55% up and down; the overlay paints 40%.",
-        "",
-        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
-        "terrain, weather and operator experience all move these numbers, and S-232",
-        "says so in the same paragraph."
+        "S-236 gives 40-55% up and down; the overlay paints 40%."
       ],
       "bands": [
         {
@@ -361,7 +361,12 @@
         "sidehillPercent": 30,
         "uphillPercent": 40,
         "downhillPercent": 40
-      }
+      },
+      "_background": [
+        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
+        "terrain, weather and operator experience all move these numbers, and S-232",
+        "says so in the same paragraph."
+      ]
     },
     {
       "id": "skidder",
@@ -384,12 +389,7 @@
         "",
         "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
         "S-236 has no separate skid steer: it lists 'Small rubber tired skidders with various attachments (bobcat)', so a skid steer or Bobcat is this row.",
-        "S-236 gives 30-45% up and down, depending on soils; the overlay paints 30%.",
-        "",
-        "",
-        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
-        "terrain, weather and operator experience all move these numbers, and S-232",
-        "says so in the same paragraph."
+        "S-236 gives 30-45% up and down, depending on soils; the overlay paints 30%."
       ],
       "bands": [
         {
@@ -419,7 +419,12 @@
         "sidehillPercent": 22,
         "uphillPercent": 30,
         "downhillPercent": 30
-      }
+      },
+      "_background": [
+        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
+        "terrain, weather and operator experience all move these numbers, and S-232",
+        "says so in the same paragraph."
+      ]
     },
     {
       "id": "masticator",
@@ -442,11 +447,7 @@
         "",
         "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
         "A masticator may be tracked or on tires, and either way it can be out on a dozer line rather than working off a road -- which is the reason for the conservative sidehill above.",
-        "S-236 publishes no sidehill limit for a masticator or harvester, so the 12% used here is the most conservative sidehill in the whole guide, taken deliberately: do not put this machine across a steep sidehill. Up and down is the 35% end of S-236's 35-55% range.",
-        "",
-        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
-        "terrain, weather and operator experience all move these numbers, and S-232",
-        "says so in the same paragraph."
+        "S-236 publishes no sidehill limit for a masticator or harvester, so the 12% used here is the most conservative sidehill in the whole guide, taken deliberately: do not put this machine across a steep sidehill. Up and down is the 35% end of S-236's 35-55% range."
       ],
       "bands": [
         {
@@ -477,7 +478,12 @@
         "uphillPercent": 35,
         "downhillPercent": 35
       },
-      "_sidehillIsConservative": true
+      "_sidehillIsConservative": true,
+      "_background": [
+        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
+        "terrain, weather and operator experience all move these numbers, and S-232",
+        "says so in the same paragraph."
+      ]
     },
     {
       "id": "tractorplow",
@@ -498,11 +504,7 @@
         "sits. This does not know soil, rock, moisture or fuel.",
         "",
         "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
-        "S-236 gives a tractor plow no slope numbers at all -- its Limitations say only 'Not used in steep terrain.' So these are the most conservative figures anywhere in the guide: 12% sidehill, 30% up and down. Words, not numbers, are what the guide offers here; your judgement decides this one.",
-        "",
-        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
-        "terrain, weather and operator experience all move these numbers, and S-232",
-        "says so in the same paragraph."
+        "S-236 gives a tractor plow no slope numbers at all -- its Limitations say only 'Not used in steep terrain.' So these are the most conservative figures anywhere in the guide: 12% sidehill, 30% up and down. Words, not numbers, are what the guide offers here; your judgement decides this one."
       ],
       "bands": [
         {
@@ -533,7 +535,12 @@
         "uphillPercent": 30,
         "downhillPercent": 30
       },
-      "_sidehillIsConservative": true
+      "_sidehillIsConservative": true,
+      "_background": [
+        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
+        "terrain, weather and operator experience all move these numbers, and S-232",
+        "says so in the same paragraph."
+      ]
     }
   ]
 }
