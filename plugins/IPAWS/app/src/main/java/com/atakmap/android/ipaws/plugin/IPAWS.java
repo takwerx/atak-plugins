@@ -5,6 +5,9 @@ import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.ipaws.AlertManager;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.log.Log;
 
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
@@ -15,7 +18,18 @@ import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
+/**
+ * Public emergency alerts on the ATAK map, filtered on this device.
+ *
+ * <p>The manager lives for the plugin's life; the pane is only its controls. Nothing
+ * here is a {@code Tool}, so nothing stops when the user switches base maps.
+ */
 public class IPAWS implements IPlugin {
+
+    private static final String TAG = "IPAWS";
+
+    AlertManager manager;
+    MapView mapView;
 
     IServiceController serviceController;
     Context pluginContext;
@@ -57,20 +71,36 @@ public class IPAWS implements IPlugin {
 
     @Override
     public void onStart() {
-        // the plugin is starting, add the button to the toolbar
-        if (uiService == null)
-            return;
-
-        uiService.addToolbarItem(toolbarItem);
+        if (uiService != null)
+            uiService.addToolbarItem(toolbarItem);
+        mapView = MapView.getMapView();
+        if (mapView != null && manager == null) {
+            manager = new AlertManager(mapView, pluginContext);
+            manager.start();
+        } else if (mapView == null) {
+            Log.w(TAG, "no map view at start; the overlay cannot be attached");
+        }
     }
 
     @Override
     public void onStop() {
-        // the plugin is stopping, remove the button from the toolbar
-        if (uiService == null)
-            return;
-
-        uiService.removeToolbarItem(toolbarItem);
+        // ATAK keeps a plugin's pane on screen across a reload, and a pane whose
+        // buttons point at a stopped instance does nothing when tapped.
+        if (templatePane != null && uiService != null) {
+            try {
+                if (uiService.isPaneVisible(templatePane))
+                    uiService.closePane(templatePane);
+            } catch (Exception ignored) {
+                // Already gone, which is the state we wanted.
+            }
+            templatePane = null;
+        }
+        if (manager != null) {
+            manager.stop();
+            manager = null;
+        }
+        if (uiService != null)
+            uiService.removeToolbarItem(toolbarItem);
     }
 
     private void showPane() {
