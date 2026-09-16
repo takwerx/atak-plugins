@@ -65,10 +65,11 @@
     {
       "id": "s232",
       "name": "Dozer safety limits",
-      "legend": "USFS/NWCG S-232 Dozer Boss limits",
+      "legend": "USFS/NWCG S-232 Dozer Boss (now S-236) limits",
       "sources": [
         "USFS/NWCG S-232 Dozer Boss, Pre-Course Work, Appendix D: 'As with any piece of specialized equipment, the dozer has limitations. As a general guideline, dozers should not be operated across slopes (sidehill) greater than 45 percent, uphill slopes greater than 55 percent or downhill on slopes greater than 75 percent.'",
-        "Corroborated by the S-232 supplement 'Mechanized Equipment for Fire and Fuels Operations': 'According to the Fireline Handbook, dozers are limited to <75% favorable slopes.'"
+        "Corroborated by the S-232 supplement 'Mechanized Equipment for Fire and Fuels Operations': 'According to the Fireline Handbook, dozers are limited to <75% favorable slopes.'",
+        "S-232 Dozer Boss is the legacy NWCG designation. The current course is S-236, Heavy Equipment Boss (Single Resource), which widened the scope from dozers to all heavy equipment. Confirmed against the NWCG training catalog 2026-09-15. The quote above is from the S-232 material, and whether S-236 carries the same three numbers has NOT been verified -- so the limits are cited to the document they were actually read in."
       ],
 
       "_comment": [

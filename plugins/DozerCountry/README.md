@@ -19,7 +19,9 @@ it is shaded by the slope limits a dozer is held to, so a Division Supervisor,
 dozer boss or plans chief can answer "can we put a cat in there" from the map
 rather than from memory of the ground.
 
-The bands are the refusal points in USFS/NWCG S-232 Dozer Boss, Appendix D:
+The bands are the refusal points in USFS/NWCG S-232 Dozer Boss, Appendix D
+(S-232 is the legacy designation; the current course is S-236, Heavy Equipment
+Boss (Single Resource)):
 dozers should not be operated across slopes (sidehill) over 45 percent, uphill
 over 55 percent, or downhill over 75 percent.
 

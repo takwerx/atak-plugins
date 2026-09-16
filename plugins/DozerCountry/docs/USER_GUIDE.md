@@ -20,7 +20,10 @@ ground. It works fully offline, from the elevation already on the device.
 ## 1. The limits it paints
 
 The bands are the refusal points in the NWCG/USFS **S-232 Dozer Boss** course,
-Appendix D. Dozers should not be operated:
+Appendix D. (S-232 is the legacy designation. The current course is **S-236,
+Heavy Equipment Boss (Single Resource)**, which widened the scope from dozers to
+all heavy equipment; the limits below are cited to the S-232 material they were
+read in.) Dozers should not be operated:
 
 - **across** slopes over **45 percent** (sidehill)
 - **uphill** on slopes over **55 percent**
