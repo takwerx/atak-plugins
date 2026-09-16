@@ -5,8 +5,10 @@ import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 
 import com.atakmap.android.ipaws.data.Alert;
+import com.atakmap.android.ipaws.data.Areas;
 import com.atakmap.android.ipaws.data.AlertSource;
 import com.atakmap.android.ipaws.data.Filter;
+import com.atakmap.android.ipaws.data.Geo;
 import com.atakmap.android.ipaws.data.GeoJson;
 import com.atakmap.android.ipaws.data.MainThread;
 import com.atakmap.android.ipaws.data.NwsSource;
@@ -224,35 +226,12 @@ public class AlertManager {
         synchronized (this) {
             raw = parsed;
         }
-        final List<Alert> kept = applyFilter(parsed);
-        synchronized (this) {
-            alerts = kept;
-        }
         lastGoodAt = System.currentTimeMillis();
         lastError = null;
-        Log.d(TAG, "poll ok: " + parsed.size() + " returned, " + kept.size() + " kept");
+        Log.d(TAG, "poll ok: " + parsed.size() + " returned");
+        // rebuild does the filtering, because the county half of it needs the
+        // assembled alert areas and those only exist in there.
         rebuild(0, Integer.MAX_VALUE);
-    }
-
-    /** The filter applied to a set, most severe first. */
-    private List<Alert> applyFilter(List<Alert> in) {
-        final List<Alert> kept = new ArrayList<>();
-        for (Alert a : in)
-            if (filter.accepts(a))
-                kept.add(a);
-        Collections.sort(kept, new Comparator<Alert>() {
-            @Override
-            public int compare(Alert a, Alert b) {
-                final int s = a.severityRank() - b.severityRank();
-                if (s != 0)
-                    return s;
-                // Then the one that ends soonest, with "no end given" last.
-                final long ea = a.until() == 0 ? Long.MAX_VALUE : a.until();
-                final long eb = b.until() == 0 ? Long.MAX_VALUE : b.until();
-                return Long.compare(ea, eb);
-            }
-        });
-        return kept;
     }
 
     /**
@@ -267,21 +246,16 @@ public class AlertManager {
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                final List<Alert> in;
+                final boolean haveAnything;
                 synchronized (AlertManager.this) {
-                    in = new ArrayList<>(raw);
+                    haveAnything = !raw.isEmpty();
                 }
-                if (in.isEmpty()) {
+                if (!haveAnything) {
                     // Nothing has come back yet, so there is nothing to re-filter and
                     // the overlay must not be emptied on the strength of it.
                     changed();
                     return;
                 }
-                final List<Alert> kept = applyFilter(in);
-                synchronized (AlertManager.this) {
-                    alerts = kept;
-                }
-                Log.d(TAG, "filter reapplied: " + kept.size() + " of " + in.size() + " kept");
                 rebuild(0, Integer.MAX_VALUE);
             }
         });
@@ -309,16 +283,27 @@ public class AlertManager {
      * empty for as long as the fetching takes. What is known goes up immediately and
      * the rest fills in.
      *
+     * <p>This is also where the county filter is finally settled, because deciding
+     * whether an alert <b>touches</b> a county needs the assembled area, and that only
+     * exists here.
+     *
      * @param round         how many times this poll has already been back for zones
      * @param missingBefore what was still outstanding when the previous round started
      */
     private void rebuild(final int round, final int missingBefore) {
-        final List<Alert> current = snapshot();
+        final List<Alert> current;
+        synchronized (this) {
+            current = new ArrayList<>(raw);
+        }
         final List<AlertOverlay.Drawn> drawn = new ArrayList<>();
+        final List<Alert> kept = new ArrayList<>();
         final Set<String> missing = new LinkedHashSet<>();
+        final List<Geometry> selectedCounties = countyShapes(missing);
         int undrawable = 0;
 
         for (Alert a : current) {
+            if (!filter.accepts(a))
+                continue;
             Geometry g = null;
             if (a.hasOwnGeometry()) {
                 try {
@@ -329,6 +314,11 @@ public class AlertManager {
             }
             if (g == null)
                 g = fromZones(a, missing);
+
+            if (!countyAccepts(a, g, selectedCounties))
+                continue;
+            kept.add(a);
+
             if (g == null) {
                 undrawable++;
                 continue;
@@ -337,6 +327,10 @@ public class AlertManager {
                     g, AlertStyles.area(a.severity, a.event), attributesOf(a)));
         }
 
+        Collections.sort(kept, BY_SEVERITY_THEN_SOONEST);
+        synchronized (this) {
+            alerts = kept;
+        }
         overlay.rewrite(drawn);
         zonesPending = missing.size();
         this.undrawable = undrawable;
@@ -370,6 +364,79 @@ public class AlertManager {
             Log.d(TAG, "fetching " + requested + " zones (round " + (round + 1) + " of "
                     + MAX_ZONE_ROUNDS + ", " + outstanding + " outstanding)");
     }
+
+    /**
+     * The polygons of every county the operator picked, fetching any we do not hold.
+     *
+     * <p>These come through the same zone cache as everything else: a county zone URL
+     * is an api.weather.gov URL like any other, so it passes the same origin gate and
+     * is keyed the same way. A handful of counties is a handful of small polygons.
+     */
+    private List<Geometry> countyShapes(Set<String> missing) {
+        final List<Geometry> out = new ArrayList<>();
+        if (filter.counties.isEmpty())
+            return out;
+        for (String same : filter.counties) {
+            final String url = Areas.countyZoneUrl(same);
+            if (url == null)
+                continue;
+            final JSONObject geom = zones.geometry(url);
+            if (geom == null) {
+                if (!zones.isKnownAbsent(url))
+                    missing.add(url);
+                continue;
+            }
+            try {
+                final Geometry g = GeoJson.parse(geom);
+                if (g != null)
+                    out.add(g);
+            } catch (Exception e) {
+                Log.w(TAG, "unreadable county shape for " + same, e);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The operator's rule: an alert is kept when it touches a selected county, whether
+     * or not NWS attributed it to one.
+     *
+     * <p>NWS attribution settles most of it -- {@link Filter#acceptsCounties} answers
+     * YES for an alert in a state taken whole or in a county that was asked for. What
+     * it cannot settle is the case the operator actually raised: a <b>marine</b> zone,
+     * which names no county at all, and a forecast zone lapping a county line that NWS
+     * chose not to attribute. Those come back MAYBE and are settled on the ground, by
+     * intersecting the assembled alert area with the county polygons.
+     *
+     * <p>When the county shapes have not arrived yet, a MAYBE is kept rather than
+     * dropped. The alternative is hiding an alert because a fetch is outstanding.
+     */
+    private boolean countyAccepts(Alert a, Geometry area, List<Geometry> countyShapes) {
+        final Filter.Verdict v = filter.acceptsCounties(a);
+        if (v != Filter.Verdict.MAYBE)
+            return v == Filter.Verdict.YES;
+        if (countyShapes.isEmpty())
+            return true;   // nothing to test against yet
+        if (area == null)
+            return true;   // no area yet either; decide when there is one
+        for (Geometry county : countyShapes)
+            if (Geo.intersects(area, county))
+                return true;
+        return false;
+    }
+
+    private static final Comparator<Alert> BY_SEVERITY_THEN_SOONEST = new Comparator<Alert>() {
+        @Override
+        public int compare(Alert a, Alert b) {
+            final int s = a.severityRank() - b.severityRank();
+            if (s != 0)
+                return s;
+            // Then the one that ends soonest, with "no end given" last.
+            final long ea = a.until() == 0 ? Long.MAX_VALUE : a.until();
+            final long eb = b.until() == 0 ? Long.MAX_VALUE : b.until();
+            return Long.compare(ea, eb);
+        }
+    };
 
     /**
      * An alert's area assembled from whichever of its zones are cached. Zone URLs that

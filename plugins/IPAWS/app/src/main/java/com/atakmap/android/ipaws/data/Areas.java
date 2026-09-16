@@ -156,6 +156,23 @@ public final class Areas {
         return same == null || same.length() != 6 ? null : same.substring(0, 3);
     }
 
+    /**
+     * The county zone URL for a SAME code: {@code 006059} to
+     * {@code https://api.weather.gov/zones/county/CAC059}.
+     *
+     * <p>This is the one place the plugin builds a zone URL rather than using one the
+     * feed handed it, because there is no alert to take it from -- the operator picked
+     * the county, not the weather. It is built from the shipped FIPS table, which the
+     * verifier gates, and it goes through the same origin allowlist as every other
+     * zone fetch.
+     */
+    public static String countyZoneUrl(String same) {
+        final String state = stateOfSame(same);
+        if (state == null)
+            return null;
+        return "https://api.weather.gov/zones/county/" + state + "C" + same.substring(3);
+    }
+
     /** The same prefix, for a state code. */
     public static String statePrefix(String code) {
         final String fips = code == null ? null

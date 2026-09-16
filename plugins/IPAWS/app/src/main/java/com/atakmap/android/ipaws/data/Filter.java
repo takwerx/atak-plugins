@@ -37,7 +37,16 @@ public class Filter {
     public final Set<String> areas = new LinkedHashSet<>();
     /** CAP severities. Empty means the feed's own default, which is all of them. */
     public final Set<String> severities = new LinkedHashSet<>();
-    /** Event names. Empty means every event -- the usual case. */
+    /**
+     * Categories switched off entirely. Empty means every category is on, which is
+     * the default: "if i dont care about marine i dont want marine".
+     */
+    public final Set<String> offCategories = new LinkedHashSet<>();
+    /**
+     * Event names narrowing the categories that are on, exactly the way counties
+     * narrow states: a category with none of its events chosen means the whole
+     * category, and one with events chosen means only those.
+     */
     public final Set<String> events = new LinkedHashSet<>();
     /**
      * Counties, as SAME codes, narrowing the states above.
@@ -92,35 +101,101 @@ public class Filter {
 
     /** Whether an alert the feed returned should be shown. */
     public boolean accepts(Alert a) {
-        if (!events.isEmpty() && !events.contains(a.event))
+        if (!acceptsType(a.event))
             return false;
         // Severity is a server-side filter too, but a cached set outlives a filter
         // change, so it is applied here as well rather than trusted from the query.
-        if (!severities.isEmpty() && !severities.contains(a.severity))
-            return false;
-        return acceptsCounties(a);
+        return severities.isEmpty() || severities.contains(a.severity);
     }
 
     /**
-     * Counties are narrowing, per state, never subtracting.
+     * Category first, then the event names inside it.
      *
-     * <p>An alert is kept when it touches any county the user chose, or when it
-     * touches a selected state they did not narrow at all. An alert that names no
-     * counties is kept whatever is selected: the feed has always named them, but a
-     * spare alert on the map is a far better failure than a missing one.
+     * <p>An event type this build has never heard of lands in Other &amp; Outlooks
+     * and is therefore on unless that category was switched off. That is deliberate:
+     * a hazard NWS invented last week showing up unasked is a far better failure than
+     * one that silently never appears.
      */
-    private boolean acceptsCounties(Alert a) {
-        if (counties.isEmpty() || a.counties.isEmpty())
-            return true;
+    public boolean acceptsType(String event) {
+        final String category = Events.categoryOf(event);
+        if (offCategories.contains(category))
+            return false;
+        final Set<String> chosen = eventsIn(category);
+        return chosen.isEmpty() || chosen.contains(event);
+    }
+
+    /** The events chosen within one category; empty means the whole category. */
+    public Set<String> eventsIn(String category) {
+        final Set<String> out = new LinkedHashSet<>();
+        for (String e : events)
+            if (Events.categoryOf(e).equals(category))
+                out.add(e);
+        return out;
+    }
+
+    /** Replaces the event selection for one category, leaving the others alone. */
+    public void setEventsIn(String category, Set<String> chosen) {
+        final java.util.Iterator<String> it = events.iterator();
+        while (it.hasNext())
+            if (Events.categoryOf(it.next()).equals(category))
+                it.remove();
+        events.addAll(chosen);
+    }
+
+    /** The categories that are on and narrowed to particular events. */
+    public Set<String> narrowedCategories() {
+        final Set<String> out = new LinkedHashSet<>();
+        for (String e : events) {
+            final String c = Events.categoryOf(e);
+            if (!offCategories.contains(c))
+                out.add(c);
+        }
+        return out;
+    }
+
+    /**
+     * Drops event selections inside categories that are now off, for the same reason
+     * county selections are dropped with their state: a category switched off and back
+     * on must not return silently narrowed to a choice made a week ago.
+     */
+    public void dropOrphanedEvents() {
+        final java.util.Iterator<String> it = events.iterator();
+        while (it.hasNext())
+            if (offCategories.contains(Events.categoryOf(it.next())))
+                it.remove();
+    }
+
+    /**
+     * The half of the county rule that can be decided from the alert's own text.
+     *
+     * <p>Returns YES when the alert is in, NO when the alert is out on attribution
+     * alone, and MAYBE when only geometry can settle it. The geometric half lives in
+     * the manager, because that is where the assembled alert area is.
+     *
+     * <p>Counties narrow, per state, and never subtract: an alert touching a selected
+     * state the user did <b>not</b> narrow is always in, so picking three counties in
+     * Nevada cannot switch California off.
+     */
+    public enum Verdict {
+        YES, NO, MAYBE
+    }
+
+    public Verdict acceptsCounties(Alert a) {
+        if (counties.isEmpty())
+            return Verdict.YES;
         final Set<String> narrowed = narrowedStates();
         for (String same : a.counties) {
             final String state = Areas.statePrefixOfSame(same);
             if (state == null || !narrowed.contains(state))
-                return true;  // this state was taken whole
+                return Verdict.YES;   // a selected state, taken whole
             if (counties.contains(same))
-                return true;  // and this is one of the counties asked for
+                return Verdict.YES;   // one of the counties asked for
         }
-        return false;
+        // Either the alert names no counties at all -- which is every marine zone --
+        // or it names only counties in a narrowed state that were not chosen. Both
+        // can still be a touch on the ground, and the operator's rule is that a
+        // touch counts, so this is not a refusal yet.
+        return Verdict.MAYBE;
     }
 
     /** The state prefixes ("006") that have at least one county selected. */
@@ -168,6 +243,7 @@ public class Filter {
         o.put("severities", new JSONArray(severities));
         o.put("events", new JSONArray(events));
         o.put("counties", new JSONArray(counties));
+        o.put("offCategories", new JSONArray(offCategories));
         o.put("pollMinutes", pollMinutes);
         o.put("notify", notify);
         o.put("notifySeverities", new JSONArray(notifySeverities));
@@ -183,6 +259,7 @@ public class Filter {
         readInto(o.optJSONArray("severities"), f.severities);
         readInto(o.optJSONArray("events"), f.events);
         readInto(o.optJSONArray("counties"), f.counties);
+        readInto(o.optJSONArray("offCategories"), f.offCategories);
         readInto(o.optJSONArray("notifySeverities"), f.notifySeverities);
         f.pollMinutes = Math.max(1, o.optInt("pollMinutes", DEFAULT_POLL_MINUTES));
         f.notify = o.optBoolean("notify", false);

@@ -13,6 +13,7 @@ import com.atakmap.android.ipaws.AlertManager;
 import com.atakmap.android.ipaws.data.Alert;
 import com.atakmap.android.ipaws.data.Areas;
 import com.atakmap.android.ipaws.data.Counties;
+import com.atakmap.android.ipaws.data.Events;
 import com.atakmap.android.ipaws.data.Filter;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.ipaws.plugin.R;
@@ -48,6 +49,8 @@ public class IpawsPane {
     private final TextView status;
     private final Button statesButton;
     private final Button countiesButton;
+    private final Button categoriesButton;
+    private final Button eventsButton;
     private final Button severityButton;
 
     public IpawsPane(MapView mapView, Context pluginContext, AlertManager manager,
@@ -61,6 +64,8 @@ public class IpawsPane {
         status = root.findViewById(R.id.status);
         statesButton = root.findViewById(R.id.btn_states);
         countiesButton = root.findViewById(R.id.btn_counties);
+        categoriesButton = root.findViewById(R.id.btn_categories);
+        eventsButton = root.findViewById(R.id.btn_events);
         severityButton = root.findViewById(R.id.btn_severity);
 
         statesButton.setOnClickListener(new View.OnClickListener() {
@@ -73,6 +78,18 @@ public class IpawsPane {
             @Override
             public void onClick(View v) {
                 chooseCountyState();
+            }
+        });
+        categoriesButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseCategories();
+            }
+        });
+        eventsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseEventCategory();
             }
         });
         severityButton.setOnClickListener(new View.OnClickListener() {
@@ -111,6 +128,8 @@ public class IpawsPane {
         status.setText(manager.statusLine());
         statesButton.setText(statesLabel(f));
         countiesButton.setText(countiesLabel(f));
+        categoriesButton.setText(categoriesLabel(f));
+        eventsButton.setText(eventsLabel(f));
         severityButton.setText(severityLabel(f));
     }
 
@@ -294,6 +313,162 @@ public class IpawsPane {
         // Counties are filtered here, not asked of the server, so the map can be
         // redrawn from the set already in hand -- no request, no waiting.
         manager.reapplyFilter();
+    }
+
+    // ---- types ----------------------------------------------------------------------
+
+    private String categoriesLabel(Filter f) {
+        final int all = Events.categories().size();
+        final int on = all - f.offCategories.size();
+        if (f.offCategories.isEmpty())
+            return pluginContext.getString(R.string.all_categories);
+        if (on == 1) {
+            for (String c : Events.categories())
+                if (!f.offCategories.contains(c))
+                    return c;
+        }
+        return String.format(Locale.US, "%d of %d categories", on, all);
+    }
+
+    /**
+     * The whole categories, on or off. Switching Marine off takes its twenty event
+     * types with it, which is the control the operator asked for first.
+     */
+    private void chooseCategories() {
+        final List<String> cats = Events.categories();
+        final String[] names = cats.toArray(new String[0]);
+        final boolean[] ticked = new boolean[names.length];
+        final Filter f = manager.getFilter();
+        for (int i = 0; i < names.length; i++)
+            ticked[i] = !f.offCategories.contains(names[i]);
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Categories")
+                .setMultiChoiceItems(names, ticked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which, boolean isChecked) {
+                                ticked[which] = isChecked;
+                            }
+                        })
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        f.offCategories.clear();
+                        for (int i = 0; i < ticked.length; i++)
+                            if (!ticked[i])
+                                f.offCategories.add(names[i]);
+                        // An event choice inside a category now off is dead weight,
+                        // and would silently narrow it if it were ever switched back on.
+                        f.dropOrphanedEvents();
+                        manager.saveFilter();
+                        refresh();
+                        manager.reapplyFilter();
+                    }
+                })
+                // All of them on is the default, so "Clear" here means exactly that.
+                .setNeutralButton("All on", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        f.offCategories.clear();
+                        manager.saveFilter();
+                        refresh();
+                        manager.reapplyFilter();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private String eventsLabel(Filter f) {
+        if (f.events.isEmpty())
+            return pluginContext.getString(R.string.all_types);
+        final int cats = f.narrowedCategories().size();
+        if (f.events.size() == 1)
+            return f.events.iterator().next();
+        if (cats <= 1)
+            return String.format(Locale.US, "%d types", f.events.size());
+        return String.format(Locale.US, "%d types in %d categories", f.events.size(), cats);
+    }
+
+    /** Which category to get specific in; skipped when only one is left on. */
+    private void chooseEventCategory() {
+        final Filter f = manager.getFilter();
+        final List<String> on = new ArrayList<>();
+        for (String c : Events.categories())
+            if (!f.offCategories.contains(c))
+                on.add(c);
+        if (on.isEmpty()) {
+            toast("Every category is switched off");
+            return;
+        }
+        if (on.size() == 1) {
+            chooseEvents(on.get(0));
+            return;
+        }
+        final String[] names = new String[on.size()];
+        for (int i = 0; i < on.size(); i++) {
+            final int n = f.eventsIn(on.get(i)).size();
+            names[i] = n == 0 ? on.get(i) : on.get(i) + "  -  " + n + " chosen";
+        }
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Types in which category?")
+                .setItems(names, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        d.dismiss();
+                        chooseEvents(on.get(w));
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void chooseEvents(final String category) {
+        final Filter f = manager.getFilter();
+        final List<String> all = Events.eventsIn(category);
+        final Set<String> already = f.eventsIn(category);
+        final String[] names = all.toArray(new String[0]);
+        final boolean[] ticked = new boolean[names.length];
+        for (int i = 0; i < names.length; i++)
+            ticked[i] = already.contains(names[i]);
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle(category)
+                .setMultiChoiceItems(names, ticked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which, boolean isChecked) {
+                                ticked[which] = isChecked;
+                            }
+                        })
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        final Set<String> chosen = new LinkedHashSet<>();
+                        for (int i = 0; i < ticked.length; i++)
+                            if (ticked[i])
+                                chosen.add(names[i]);
+                        // Everything ticked is the same as the whole category, and
+                        // storing it as the whole category means a type NWS adds later
+                        // is included rather than silently missing.
+                        f.setEventsIn(category,
+                                chosen.size() == names.length
+                                        ? new LinkedHashSet<String>() : chosen);
+                        manager.saveFilter();
+                        refresh();
+                        manager.reapplyFilter();
+                    }
+                })
+                .setNeutralButton("Whole category", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        f.setEventsIn(category, new LinkedHashSet<String>());
+                        manager.saveFilter();
+                        refresh();
+                        manager.reapplyFilter();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     // ---- severity -------------------------------------------------------------------

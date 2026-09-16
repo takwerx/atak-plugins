@@ -53,6 +53,26 @@
                 style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:text="@string/heading_types" />
+
+            <Button
+                android:id="@+id/btn_categories"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp" />
+
+            <Button
+                android:id="@+id/btn_events"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                style="@style/TakwerxSectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:text="@string/heading_severity" />
 
             <Button
