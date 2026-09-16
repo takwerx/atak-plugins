@@ -1,22 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- The whole pane is one ListView. A ListView cannot live inside a ScrollView, so the controls
+     go in the list's own header instead of above it: that way the panel scrolls as one thing
+     on a phone in portrait, where the controls alone are taller than the pane. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:fadeScrollbars="false"
-    android:layout_marginLeft="3dp"
-    android:layout_marginRight="3dp">
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingLeft="6dp"
+    android:paddingRight="6dp">
 
-    <LinearLayout
+    <ListView
+        android:id="@+id/tfr_list"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical" >
+        android:layout_height="match_parent"
+        android:divider="#2a2a2a"
+        android:dividerHeight="1dp"
+        android:fadeScrollbars="false"
+        android:scrollbarStyle="outsideOverlay" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/app_name" />
-
-    </LinearLayout>
-</ScrollView>
+</LinearLayout>

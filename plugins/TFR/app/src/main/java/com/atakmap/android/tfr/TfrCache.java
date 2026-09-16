@@ -62,7 +62,7 @@ public final class TfrCache {
     /**
      * Drop every cached detail whose NOTAM is no longer in the list.
      *
-     * <p>This is the disk half of reconcile. A TFR that has been cancelled has to leave the map,
+     * <p>This is the disk half of reconcile. A TFR that has been canceled has to leave the map,
      * and it has to leave the cache too, or the next start draws it again from here.
      */
     public void prune(Collection<String> keepNotamIds) {

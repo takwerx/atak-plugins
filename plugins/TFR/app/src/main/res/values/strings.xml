@@ -4,4 +4,7 @@
     <string name="app_name">TFR</string>
     <!-- description -->
     <string name="app_desc">TFR</string>
+
+    <string name="state_on_label">ON</string>
+    <string name="state_off_label">OFF</string>
 </resources>

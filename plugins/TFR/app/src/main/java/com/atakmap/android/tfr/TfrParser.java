@@ -31,7 +31,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
  *       104</b>: the FAA publishes every shape pre-expanded in {@code abdMergedArea}, whose
  *       vertices are 100% great-circle. There is one geometry path and no arc or radius math.</li>
  *   <li>It reads {@code valDistVerUpper} as feet. {@code uomDistVerUpper} is {@code FL} on 14
- *       areas, where 180 means 18,000 ft — so an 18,000 ft shelf is labelled "180", a number a
+ *       areas, where 180 means 18,000 ft — so an 18,000 ft shelf is labeled "180", a number a
  *       UAS operator would read as clear air.</li>
  *   <li>It reads {@code dateEffective} as UTC. {@code codeTimeZone} is a local zone on 37 of
  *       104 (EDT, PDT, CDT, MDT, AKDT, PST, Guam), so those windows are wrong by up to ten
@@ -47,7 +47,7 @@ public final class TfrParser {
      * Zone abbreviation to offset in hours.
      *
      * <p>Fixed offsets rather than {@code TimeZone.getTimeZone(id)}, for two reasons: that call
-     * answers "GMT" for anything it does not recognise, which is a silent ten-hour error on a
+     * answers "GMT" for anything it does not recognize, which is a silent ten-hour error on a
      * Guam TFR; and the abbreviation already says whether daylight time is in effect, so EDT is
      * -4 whatever the date is.
      */
@@ -155,7 +155,7 @@ public final class TfrParser {
     }
 
     /**
-     * Normalise one vertical limit to feet, remembering how it was written.
+     * Normalize one vertical limit to feet, remembering how it was written.
      *
      * <p>{@code isFloor} decides what a zero means, and the two answers are not the same. A
      * floor of 0 is the ground however it is coded — the Wawona fire writes its floor as 0 ALT

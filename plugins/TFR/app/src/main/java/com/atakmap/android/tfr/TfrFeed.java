@@ -30,12 +30,19 @@ public final class TfrFeed {
     private TfrFeed() {
     }
 
+    /** The list body, straight off the wire, so the caller can cache exactly what it parsed. */
+    public static byte[] listBytes() throws IOException {
+        return Http.get(LIST_URL);
+    }
+
     /**
      * The national list. Each row carries only what the list API has; the geometry, the
      * vertical limits and the effective window arrive with {@link #detail}.
+     *
+     * <p>Takes bytes rather than fetching, because the same parsing has to serve the cached copy
+     * at start-up: the map has to come back without the network.
      */
-    public static List<Tfr> list() throws IOException {
-        byte[] body = Http.get(LIST_URL);
+    public static List<Tfr> parseList(byte[] body) throws IOException {
         List<Tfr> out = new ArrayList<>();
         try {
             JSONArray rows = new JSONArray(new String(body, Charset.forName("UTF-8")));
