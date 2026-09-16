@@ -8,7 +8,7 @@
     <!-- Sections -->
     <string name="section_area">Area of interest</string>
     <string name="section_overlay">Overlay</string>
-    <string name="section_classes">Can a dozer work it</string>
+    <string name="section_classes">Can it work it</string>
 
     <!-- Controls -->
     <string name="draw_area">Draw area</string>
@@ -25,6 +25,10 @@
 
     <!-- Status line. Says what is happening, or why nothing is drawn. -->
     <string name="status_idle">Draw an area to see where a dozer can work.</string>
+    <string name="section_machine">MACHINE</string>
+    <string name="pick_machine">Pick the machine</string>
+    <string name="status_area_removed">That area was deleted, so the shading went with it. Draw another.</string>
+    <string name="status_pick_machine">Pick the machine first. S-236 holds each one to different slope limits, and a dozer is the most capable of them.</string>
     <string name="status_drawing">Tap the map to place each corner, then tap the first marker to close the shape. Undo and End Shape are on ATAK\'s drawing toolbar.</string>
     <string name="status_working">Reading the terrain…</string>
     <string name="status_cancelled">Area not drawn.</string>

@@ -1,10 +1,10 @@
 ATAK Plugin — Dozer Country
 
-**Download Dozer Country 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Dozer Country 0.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/dozer-country/releases/download/v0.5/ATAK-Plugin-DozerCountry-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/dozer-country/releases/download/v0.5/ATAK-Plugin-DozerCountry-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/dozer-country/releases/download/v0.5/ATAK-Plugin-DozerCountry-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/dozer-country/releases/download/v0.7/ATAK-Plugin-DozerCountry-0.7--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/dozer-country/releases/download/v0.7/ATAK-Plugin-DozerCountry-0.7--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/dozer-country/releases/download/v0.7/ATAK-Plugin-DozerCountry-0.7--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/dozer-country/releases
 
@@ -19,7 +19,11 @@ it is shaded by the slope limits a dozer is held to, so a Division Supervisor,
 dozer boss or plans chief can answer "can we put a cat in there" from the map
 rather than from memory of the ground.
 
-The bands are the refusal points in USFS/NWCG S-232 Dozer Boss, Appendix D:
+You pick what you are working with FIRST -- nothing is painted until you do --
+and the bands are that machine's slope limits from the per-machine table in
+USFS/NWCG S-236 Heavy Equipment Boss, Student Workbook (June 2013, NFES 002690),
+Unit 2. A dozer is the most capable machine in that table and everything else is
+held tighter. For a dozer:
 dozers should not be operated across slopes (sidehill) over 45 percent, uphill
 over 55 percent, or downhill over 75 percent.
 
@@ -58,7 +62,7 @@ clearance.
 _________________________________________________________________
 STATUS
 
-Version 0.5, first public release. Built and tested against ATAK-CIV 5.6, 5.7
+Version 0.7. First public release was 0.5, 2026-09-15. Built and tested against ATAK-CIV 5.6, 5.7
 and 5.8.
 
 0.2 through 0.5 were submission rounds against this same code: 0.2 and 0.3
