@@ -109,7 +109,25 @@ public class AlertOverlay {
                     };
             overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
                     title, "file://asset/nothing", query, null, null);
-            mapView.getMapOverlayManager().addFilesOverlay(overlay);
+            // addOverlay, not addFilesOverlay. With addFilesOverlay (which is what
+            // samples/hello3d uses) this overlay never appeared anywhere in the
+            // Overlay Manager on the XCover -- the whole list was swept twice with
+            // Show All on, while the polygons were drawing on the map perfectly well.
+            // With addOverlay it is at the root as "IPAWS Alerts", with one child per
+            // severity and a visibility toggle on each, which is where someone looking
+            // to switch alerts off would actually look. These alerts are the plugin's
+            // own overlay, not something a user imported from a file, so the root is
+            // also where they belong.
+            //
+            // The add reports whether it took, so ask rather than assume: the symptom
+            // of getting this wrong is an absence from a list, which looks like
+            // nothing at all and is easy to read as "ATAK does not show plugin
+            // overlays".
+            final boolean added = mapView.getMapOverlayManager().addOverlay(overlay);
+            final String id = overlay.getIdentifier();
+            final boolean listed = mapView.getMapOverlayManager().getOverlay(id) != null;
+            Log.d(TAG, "overlay registration: added=" + added + " identifier='" + id
+                    + "' findable=" + listed);
             mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             count = countFeatures();
             Log.d(TAG, "overlay attached, " + count + " features from the last session");
@@ -201,9 +219,18 @@ public class AlertOverlay {
      * plugin having lost the alert.
      */
     private long newSet(String name) throws Exception {
-        // 0, 0: no resolution gate. An alert area is a county or bigger and has to be
-        // visible at the scale someone looks at a state from.
-        final long id = store.insertFeatureSet(new FeatureSet("IPAWS", "alerts", name, 0d, 0d));
+        // Double.MAX_VALUE, 0d is the SDK's own idiom for "no resolution gate" -- see
+        // samples/customtiles, CustomTilesFeatureExtractor. minResolution is the
+        // COARSEST resolution at which the set draws, so a huge value means it is
+        // visible however far out you are, and maxResolution 0 means no limit going in.
+        //
+        // Passing 0d for minResolution, which reads like "no minimum", is how this was
+        // written first, and it is exactly wrong: it stores min_lod = max_lod =
+        // 2147483647, a level of detail no map ever reaches, so nothing draws at any
+        // zoom. The store fills up, the log says the overlay was rewritten, and the
+        // map stays empty.
+        final long id = store.insertFeatureSet(
+                new FeatureSet("IPAWS", "alerts", name, Double.MAX_VALUE, 0d));
         store.setFeatureSetVisible(id, true);
         return id;
     }
