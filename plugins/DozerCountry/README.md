@@ -58,7 +58,13 @@ clearance.
 _________________________________________________________________
 STATUS
 
-Version 0.1, first release. Built and tested against ATAK-CIV 5.6, 5.7 and 5.8.
+Version 0.5, first public release. Built and tested against ATAK-CIV 5.6, 5.7
+and 5.8.
+
+0.2 through 0.5 were submission rounds against this same code: 0.2 and 0.3
+carried corrections found while photographing the manual, and 0.4 and 0.5 the
+manual itself. The plugin's behavior has not changed since 0.3, which was
+verified on hardware.
 
 _________________________________________________________________
 POINT OF CONTACTS
