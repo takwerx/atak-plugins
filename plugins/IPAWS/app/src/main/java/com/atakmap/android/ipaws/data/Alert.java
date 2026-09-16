@@ -40,6 +40,15 @@ public class Alert {
     public final long ends;
     /** Full URLs, used verbatim -- never rebuilt, so the zone type is never guessed. */
     public final List<String> zoneUrls;
+    /**
+     * The counties this alert covers, as SAME codes ({@code 006025}). Present on every
+     * one of 310 active alerts when the feed was measured on 2026-09-16, which is why
+     * the county filter is applied to these rather than asked of the server: the
+     * alerts are issued against forecast zones, not counties -- 1146 Z zones to 63 C
+     * zones, and 280 of the 310 named no county zone at all -- so a county query would
+     * be a second request per toggle to learn what the response already says.
+     */
+    public final List<String> counties;
     /** The alert's own geometry when it has one, else null and {@link #zoneUrls} applies. */
     public final JSONObject geometry;
 
@@ -73,6 +82,17 @@ public class Alert {
                     zones.add(u);
             }
         zoneUrls = zones;
+
+        final List<String> same = new ArrayList<>();
+        final JSONObject geocode = props.optJSONObject("geocode");
+        final JSONArray sameCodes = geocode == null ? null : geocode.optJSONArray("SAME");
+        if (sameCodes != null)
+            for (int i = 0; i < sameCodes.length(); i++) {
+                final String c = sameCodes.optString(i, null);
+                if (c != null && c.length() == 6)
+                    same.add(c);
+            }
+        counties = same;
     }
 
     /** Every feature of an {@code /alerts/active} FeatureCollection, in feed order. */

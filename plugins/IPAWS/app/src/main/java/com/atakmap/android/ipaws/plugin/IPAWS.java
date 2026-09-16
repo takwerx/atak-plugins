@@ -6,6 +6,7 @@ import android.content.Context;
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.ipaws.AlertManager;
+import com.atakmap.android.ipaws.ui.IpawsPane;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 
@@ -29,6 +30,7 @@ public class IPAWS implements IPlugin {
     private static final String TAG = "IPAWS";
 
     AlertManager manager;
+    IpawsPane paneUi;
     MapView mapView;
 
     IServiceController serviceController;
@@ -95,6 +97,10 @@ public class IPAWS implements IPlugin {
             }
             templatePane = null;
         }
+        if (paneUi != null) {
+            paneUi.dispose();
+            paneUi = null;
+        }
         if (manager != null) {
             manager.stop();
             manager = null;
@@ -104,26 +110,22 @@ public class IPAWS implements IPlugin {
     }
 
     private void showPane() {
-        // instantiate the plugin view if necessary
-        if(templatePane == null) {
-            // Remember to use the PluginLayoutInflator if you are actually inflating a custom view
-            // In this case, using it is not necessary - but I am putting it here to remind
-            // developers to look at this Inflator
-
-            templatePane = new PaneBuilder(PluginLayoutInflater.inflate(pluginContext,
-                    R.layout.main_layout, null))
-                    // relative location is set to default; pane will switch location dependent on
-                    // current orientation of device screen
+        if (manager == null || mapView == null) {
+            Log.w(TAG, "no manager yet; the pane has nothing to show");
+            return;
+        }
+        if (templatePane == null) {
+            paneUi = new IpawsPane(mapView, pluginContext, manager, manager.getCounties());
+            templatePane = new PaneBuilder(paneUi.getView())
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
-                    // pane will take up 50% of screen width in landscape mode
                     .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
-                    // pane will take up 50% of screen height in portrait mode
                     .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
                     .build();
         }
-
-        // if the plugin pane is not visible, show it!
-        if(!uiService.isPaneVisible(templatePane)) {
+        // Reopening shows the current state, including whatever arrived while it was
+        // closed: the poll never stopped, only this view did.
+        paneUi.refresh();
+        if (!uiService.isPaneVisible(templatePane)) {
             uiService.showPane(templatePane, null);
         }
     }

@@ -64,6 +64,7 @@ public class AlertManager {
     private final Context pluginContext;
     private final AlertSource source = new NwsSource();
     private final ZoneCache zones;
+    private final com.atakmap.android.ipaws.data.Counties countyLists;
     private final AlertOverlay overlay;
     private final SharedPreferences prefs;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(
@@ -81,7 +82,13 @@ public class AlertManager {
     private boolean started;
     private boolean polling;
 
-    /** The last set the feed actually gave us. Never cleared by a failure. */
+    /**
+     * Everything the last successful poll returned, before the filter. Kept so that a
+     * change the server was not asked about -- counties, event types -- can be applied
+     * to what is already in hand instead of costing a request and a wait.
+     */
+    private List<Alert> raw = new ArrayList<>();
+    /** The last set the feed actually gave us, filtered. Never cleared by a failure. */
     private List<Alert> alerts = new ArrayList<>();
     private long lastGoodAt;
     private long lastPollAttempt;
@@ -108,6 +115,7 @@ public class AlertManager {
         if (!root.isDirectory() && !root.mkdirs())
             Log.w(TAG, "could not create " + root);
         zones = new ZoneCache(root, source);
+        countyLists = new com.atakmap.android.ipaws.data.Counties(root);
         overlay = new AlertOverlay(mapView, pluginContext, new File(root, "alerts.db"),
                 "IPAWS Alerts");
         prefs = PreferenceManager.getDefaultSharedPreferences(mapView.getContext());
@@ -165,6 +173,7 @@ public class AlertManager {
         if (url == null) {
             // Nothing selected is a valid answer, not a failure: show nothing and say so.
             synchronized (this) {
+                raw = new ArrayList<>();
                 alerts = new ArrayList<>();
             }
             lastError = null;
@@ -212,8 +221,23 @@ public class AlertManager {
 
     /** A successful poll. Everything below runs on the worker. */
     private void accept(List<Alert> parsed) {
+        synchronized (this) {
+            raw = parsed;
+        }
+        final List<Alert> kept = applyFilter(parsed);
+        synchronized (this) {
+            alerts = kept;
+        }
+        lastGoodAt = System.currentTimeMillis();
+        lastError = null;
+        Log.d(TAG, "poll ok: " + parsed.size() + " returned, " + kept.size() + " kept");
+        rebuild(0, Integer.MAX_VALUE);
+    }
+
+    /** The filter applied to a set, most severe first. */
+    private List<Alert> applyFilter(List<Alert> in) {
         final List<Alert> kept = new ArrayList<>();
-        for (Alert a : parsed)
+        for (Alert a : in)
             if (filter.accepts(a))
                 kept.add(a);
         Collections.sort(kept, new Comparator<Alert>() {
@@ -228,13 +252,44 @@ public class AlertManager {
                 return Long.compare(ea, eb);
             }
         });
-        synchronized (this) {
-            alerts = kept;
-        }
-        lastGoodAt = System.currentTimeMillis();
-        lastError = null;
-        Log.d(TAG, "poll ok: " + parsed.size() + " returned, " + kept.size() + " kept");
-        rebuild(0, Integer.MAX_VALUE);
+        return kept;
+    }
+
+    /**
+     * Redraws from the set already in hand, for a filter change the server was never
+     * asked about -- counties and event types are applied here, not in the query.
+     *
+     * <p>This is why they are: the response is reused across filter changes, so
+     * narrowing to three counties is instant and costs nothing, where a server-side
+     * county filter would be a request and a wait on every tick of a checkbox.
+     */
+    public void reapplyFilter() {
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                final List<Alert> in;
+                synchronized (AlertManager.this) {
+                    in = new ArrayList<>(raw);
+                }
+                if (in.isEmpty()) {
+                    // Nothing has come back yet, so there is nothing to re-filter and
+                    // the overlay must not be emptied on the strength of it.
+                    changed();
+                    return;
+                }
+                final List<Alert> kept = applyFilter(in);
+                synchronized (AlertManager.this) {
+                    alerts = kept;
+                }
+                Log.d(TAG, "filter reapplied: " + kept.size() + " of " + in.size() + " kept");
+                rebuild(0, Integer.MAX_VALUE);
+            }
+        });
+    }
+
+    /** The county lists behind the picker; shared so the cache is opened once. */
+    public com.atakmap.android.ipaws.data.Counties getCounties() {
+        return countyLists;
     }
 
     private void fail(final String error) {
