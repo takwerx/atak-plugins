@@ -422,63 +422,6 @@
       }
     },
     {
-      "id": "forwarder",
-      "name": "Forwarder",
-      "legend": "USFS/NWCG S-236 Forwarder limits",
-      "sources": [
-        "USFS/NWCG S-236 Heavy Equipment Boss, Student Workbook, June 2013, NFES 002690, Unit 2, under Dozer -- Limitations: 'Maximum slope: 75% downhill, 55% uphill, 45% sidehill'. This is the CURRENT course and it is where these three numbers now come from. Read 2026-09-15.",
-        "S-236 gives a different table for every machine, and Dozer Country paints the plain dozer row only: Pumper Cat 40% sidehill, dozer/track skidder 40%, excavator 35-50%, feller buncher 30%, rubber-tired skidder 22%, grader 15%, forwarder 12%. A masticator or a skidder is NOT covered by this overlay.",
-        "The same three numbers appear as prose in the legacy USFS/NWCG S-232 Dozer Boss, Pre-Course Work, Appendix D: 'As with any piece of specialized equipment, the dozer has limitations. As a general guideline, dozers should not be operated across slopes (sidehill) greater than 45 percent, uphill slopes greater than 55 percent or downhill on slopes greater than 75 percent.'",
-        "Corroborated by the S-232 supplement 'Mechanized Equipment for Fire and Fuels Operations': 'According to the Fireline Handbook, dozers are limited to <75% favorable slopes.'",
-        "S-236's own front matter, verbatim: 'Previous editions: this product replaces S-232, Dozer Boss (March 2006) and S-233, Tractor Plow Boss (August 2005)'. That is the supersession stated by the document itself, not inferred from a catalog.",
-        "The NWCG host returned HTTP 522 for days, so the S-236 workbook was read through the Internet Archive rather than training.nwcg.gov. The document is unchanged: title 'S-236, Heavy Equipment Boss', 198 pages, NFES 002690, June 2013."
-      ],
-      "caveat": [
-        "Slope steepness only, read as worst case.",
-        "The 12% sidehill limit is the one that decides the colors, because the",
-        "overlay cannot know which way your line runs. Anything not shaded is under",
-        "every limit whichever way the machine sits. This does not know soil, rock,",
-        "moisture or fuel.",
-        "",
-        "DTED2 is 30 metre posts and a road bench is a few metres wide, so this overlay cannot see a road at all -- it reads the hillside the road is cut into. A graded USFS road across a steep face paints the same red as the face. Read this for open ground, never for road work.",
-        "S-236's 50% up and down is with the track band option fitted.",
-        "",
-        "",
-        "It is a guideline from the guide, not a clearance. Type and size of dozer,",
-        "terrain, weather and operator experience all move these numbers, and S-232",
-        "says so in the same paragraph."
-      ],
-      "bands": [
-        {
-          "class": 1,
-          "minPercent": 0,
-          "maxPercent": 12,
-          "label": "0-12%",
-          "meaning": "Within every limit",
-          "argb": "#961E8C28",
-          "paint": false
-        },
-        {
-          "class": 2,
-          "minPercent": 13,
-          "maxPercent": 50,
-          "label": "13-50%",
-          "meaning": "Over the 12% sidehill limit. Up and down only, and only to 50%",
-          "argb": "#BEFFD414"
-        }
-      ],
-      "aboveStandard": {
-        "label": "Over 50%",
-        "meaning": "Over the 50% up and down limit as well",
-        "argb": "#D2A8002A"
-      },
-      "limits": {
-        "sidehillPercent": 12,
-        "uphillPercent": 50,
-        "downhillPercent": 50
-      }
-    },
-    {
       "id": "masticator",
       "name": "Masticator / harvester",
       "legend": "S-236 limits, conservative sidehill",
