@@ -6,6 +6,7 @@ import android.content.Context;
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.ipaws.AlertManager;
+import com.atakmap.android.ipaws.ui.AlertDetails;
 import com.atakmap.android.ipaws.ui.IpawsPane;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
@@ -31,6 +32,7 @@ public class IPAWS implements IPlugin {
 
     AlertManager manager;
     IpawsPane paneUi;
+    AlertDetails details;
     MapView mapView;
 
     IServiceController serviceController;
@@ -71,14 +73,41 @@ public class IPAWS implements IPlugin {
                 .build();
     }
 
+    private static final String PREFS_KEY = "ipawsPreference";
+
+    /** The Tool Preferences entry the manual is reached through; a build without the class costs the manual, not the plugin. */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new IpawsPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
+    }
+
     @Override
     public void onStart() {
         if (uiService != null)
             uiService.addToolbarItem(toolbarItem);
+        registerPreferences();
         mapView = MapView.getMapView();
         if (mapView != null && manager == null) {
             manager = new AlertManager(mapView, pluginContext);
             manager.start();
+            details = new AlertDetails(mapView, pluginContext, manager);
         } else if (mapView == null) {
             Log.w(TAG, "no map view at start; the overlay cannot be attached");
         }
@@ -101,12 +130,17 @@ public class IPAWS implements IPlugin {
             paneUi.dispose();
             paneUi = null;
         }
+        if (details != null) {
+            details.dispose();
+            details = null;
+        }
         if (manager != null) {
             manager.stop();
             manager = null;
         }
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+        unregisterPreferences();
     }
 
     private void showPane() {
@@ -115,7 +149,7 @@ public class IPAWS implements IPlugin {
             return;
         }
         if (templatePane == null) {
-            paneUi = new IpawsPane(mapView, pluginContext, manager, manager.getCounties());
+            paneUi = new IpawsPane(mapView, pluginContext, manager, manager.getCounties(), details);
             templatePane = new PaneBuilder(paneUi.getView())
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
                     .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)

@@ -6,8 +6,8 @@
     android:paddingLeft="6dp"
     android:paddingRight="6dp">
 
-    <!-- Pinned in the pane root, not inside a scroller: the status line is the one
-         thing that must be readable without scrolling to it. -->
+    <!-- Pinned in the pane root, not inside the list: how old the picture is has to
+         be readable without scrolling to it. -->
     <TextView
         android:id="@+id/status"
         android:layout_width="match_parent"
@@ -18,79 +18,18 @@
         android:textColor="@color/white"
         android:text="@string/status_waiting" />
 
-    <ScrollView
+    <!-- The controls live in this list's header rather than in a ScrollView above
+         it: a ListView inside a ScrollView gets one line of height, so the whole
+         panel has to be one scroller. Click positions are offset by
+         getHeaderViewsCount() because of it. -->
+    <ListView
+        android:id="@+id/alerts"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fadeScrollbars="false">
+        android:divider="#20FFFFFF"
+        android:dividerHeight="1dp"
+        android:fadeScrollbars="false"
+        android:listSelector="@android:color/transparent" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <TextView
-                style="@style/TakwerxSectionHeading"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/heading_where" />
-
-            <Button
-                android:id="@+id/btn_states"
-                style="@style/TakwerxButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp" />
-
-            <Button
-                android:id="@+id/btn_counties"
-                style="@style/TakwerxButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp" />
-
-            <TextView
-                style="@style/TakwerxSectionHeading"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/heading_types" />
-
-            <Button
-                android:id="@+id/btn_categories"
-                style="@style/TakwerxButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp" />
-
-            <Button
-                android:id="@+id/btn_events"
-                style="@style/TakwerxButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp" />
-
-            <TextView
-                style="@style/TakwerxSectionHeading"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/heading_severity" />
-
-            <Button
-                android:id="@+id/btn_severity"
-                style="@style/TakwerxButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp" />
-
-            <Button
-                android:id="@+id/btn_refresh"
-                style="@style/TakwerxButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:layout_marginBottom="10dp"
-                android:text="@string/refresh_now" />
-
-        </LinearLayout>
-    </ScrollView>
 </LinearLayout>

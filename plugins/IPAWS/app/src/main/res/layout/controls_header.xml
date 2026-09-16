@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The filter controls. This is the alert list's header view, not a panel above
+     it: a ListView inside a ScrollView collapses to one row, so the whole pane has
+     to be a single scroller. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/heading_where" />
+
+    <Button
+        android:id="@+id/btn_states"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
+
+    <Button
+        android:id="@+id/btn_counties"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
+
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/heading_types" />
+
+    <Button
+        android:id="@+id/btn_categories"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
+
+    <Button
+        android:id="@+id/btn_events"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
+
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/heading_severity" />
+
+    <Button
+        android:id="@+id/btn_severity"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
+
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/heading_updates" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_interval"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="3dp" />
+
+        <Button
+            android:id="@+id/btn_notify"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="3dp" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btn_refresh"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="@string/refresh_now" />
+
+    <TextView
+        android:id="@+id/alerts_heading"
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="14dp"
+        android:text="@string/heading_alerts" />
+
+</LinearLayout>

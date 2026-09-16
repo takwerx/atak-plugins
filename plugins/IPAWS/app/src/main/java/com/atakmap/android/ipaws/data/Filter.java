@@ -3,7 +3,6 @@ package com.atakmap.android.ipaws.data;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -15,15 +14,7 @@ import java.util.Set;
  */
 public class Filter {
 
-    /**
-     * The default until the picker exists.
-     *
-     * <p>The operator's answer for a fresh install is "the state the phone is in, at
-     * Extreme + Severe". That needs the self marker and a state lookup, which lands
-     * with the picker; until then these three are the hardcoded filter the first
-     * build polls with, at every severity so there is something to look at.
-     */
-    private static final String[] DEFAULT_AREAS = { "CA", "NV", "OR" };
+
 
     /**
      * Minutes between polls. The box polls every minute for everyone; a phone doing
@@ -66,9 +57,19 @@ public class Filter {
     public boolean notify = false;
     public final Set<String> notifySeverities = new LinkedHashSet<>();
 
+    /**
+     * A fresh install: the state the phone is in, at Extreme and Severe.
+     *
+     * <p>The state is not known here -- it is resolved once from the self marker when
+     * the plugin starts, so this leaves it empty and the pane says "Choose states"
+     * until either that lookup lands or the operator picks. A phone with no position
+     * therefore shows nothing rather than guessing a state, which is the right way
+     * round: an empty map that says so beats a map full of another state's weather.
+     */
     public static Filter defaults() {
         final Filter f = new Filter();
-        f.areas.addAll(Arrays.asList(DEFAULT_AREAS));
+        f.severities.add("Extreme");
+        f.severities.add("Severe");
         f.notifySeverities.add("Extreme");
         f.notifySeverities.add("Severe");
         return f;

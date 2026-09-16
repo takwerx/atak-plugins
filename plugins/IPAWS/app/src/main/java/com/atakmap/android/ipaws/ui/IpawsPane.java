@@ -4,7 +4,9 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,27 +48,53 @@ public class IpawsPane {
     private final Counties counties;
     private final View root;
 
+    private final ListView list;
+    private final AlertRows rows;
+    private final AlertDetails details;
     private final TextView status;
     private final Button statesButton;
     private final Button countiesButton;
     private final Button categoriesButton;
     private final Button eventsButton;
     private final Button severityButton;
+    private final Button intervalButton;
+    private final Button notifyButton;
 
     public IpawsPane(MapView mapView, Context pluginContext, AlertManager manager,
-            Counties counties) {
+            Counties counties, AlertDetails details) {
         this.mapView = mapView;
         this.pluginContext = pluginContext;
         this.manager = manager;
         this.counties = counties;
+        this.details = details;
         this.root = PluginLayoutInflater.inflate(pluginContext, R.layout.main_layout, null);
 
         status = root.findViewById(R.id.status);
-        statesButton = root.findViewById(R.id.btn_states);
-        countiesButton = root.findViewById(R.id.btn_counties);
-        categoriesButton = root.findViewById(R.id.btn_categories);
-        eventsButton = root.findViewById(R.id.btn_events);
-        severityButton = root.findViewById(R.id.btn_severity);
+        list = root.findViewById(R.id.alerts);
+        // The controls are the list's header, so the whole pane is one scroller. A
+        // ListView inside a ScrollView would render one row tall.
+        final View header = PluginLayoutInflater.inflate(pluginContext,
+                R.layout.controls_header, null);
+        list.addHeaderView(header, null, false);
+        rows = new AlertRows(pluginContext);
+        list.setAdapter(rows);
+        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
+                // Header rows count in this position, so take them back off again.
+                final Alert a = rows.getItem(position - list.getHeaderViewsCount());
+                if (a != null)
+                    IpawsPane.this.details.show(a);
+            }
+        });
+
+        statesButton = header.findViewById(R.id.btn_states);
+        countiesButton = header.findViewById(R.id.btn_counties);
+        categoriesButton = header.findViewById(R.id.btn_categories);
+        eventsButton = header.findViewById(R.id.btn_events);
+        severityButton = header.findViewById(R.id.btn_severity);
+        intervalButton = header.findViewById(R.id.btn_interval);
+        notifyButton = header.findViewById(R.id.btn_notify);
 
         statesButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -98,7 +126,7 @@ public class IpawsPane {
                 chooseSeverities();
             }
         });
-        root.findViewById(R.id.btn_refresh).setOnClickListener(new View.OnClickListener() {
+        header.findViewById(R.id.btn_refresh).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 manager.poll();
@@ -131,6 +159,95 @@ public class IpawsPane {
         categoriesButton.setText(categoriesLabel(f));
         eventsButton.setText(eventsLabel(f));
         severityButton.setText(severityLabel(f));
+        intervalButton.setText(intervalLabel(f));
+        setNotifyLabel(f);
+        rows.set(manager.snapshot());
+    }
+
+    // ---- updates --------------------------------------------------------------------
+
+    private static final int[] INTERVALS = { 1, 2, 5, 10, 15, 30 };
+
+    private String intervalLabel(Filter f) {
+        return f.pollMinutes == 1 ? "Every minute"
+                : String.format(Locale.US, "Every %d min", f.pollMinutes);
+    }
+
+    private void chooseInterval() {
+        final Filter f = manager.getFilter();
+        final String[] names = new String[INTERVALS.length];
+        int checked = -1;
+        for (int i = 0; i < INTERVALS.length; i++) {
+            names[i] = INTERVALS[i] == 1 ? "Every minute" : "Every " + INTERVALS[i] + " minutes";
+            if (INTERVALS[i] == f.pollMinutes)
+                checked = i;
+        }
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Check for alerts")
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        d.dismiss();
+                        f.pollMinutes = INTERVALS[w];
+                        manager.saveFilter();
+                        refresh();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /** ON green, OFF red, on a plain button -- the same toggle every takwerx plugin has. */
+    private void setNotifyLabel(Filter f) {
+        notifyButton.setText(pluginContext.getString(
+                f.notify ? R.string.notify_on : R.string.notify_off));
+        notifyButton.setTextColor(f.notify ? 0xFF40D040 : 0xFFE05050);
+    }
+
+    /**
+     * Off, or on at the severities the operator picks. Defaulting to Extreme and
+     * Severe is the whole reason this is usable: a notification for a Winter Weather
+     * Advisory in the next county gets the plugin switched off within a day.
+     */
+    private void chooseNotify() {
+        final Filter f = manager.getFilter();
+        final String[] names = Alert.SEVERITIES;
+        final boolean[] ticked = new boolean[names.length];
+        for (int i = 0; i < names.length; i++)
+            ticked[i] = f.notifySeverities.contains(names[i]);
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Notify me about")
+                .setMultiChoiceItems(names, ticked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which, boolean isChecked) {
+                                ticked[which] = isChecked;
+                            }
+                        })
+                .setPositiveButton("Notify me", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        f.notifySeverities.clear();
+                        for (int i = 0; i < ticked.length; i++)
+                            if (ticked[i])
+                                f.notifySeverities.add(names[i]);
+                        // Nothing ticked and notifications on would be a control that
+                        // does nothing, so that is off.
+                        f.notify = !f.notifySeverities.isEmpty();
+                        manager.saveFilter();
+                        refresh();
+                    }
+                })
+                .setNeutralButton("Turn off", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        f.notify = false;
+                        manager.saveFilter();
+                        refresh();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     // ---- states ---------------------------------------------------------------------

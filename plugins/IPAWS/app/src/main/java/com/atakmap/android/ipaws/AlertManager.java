@@ -97,6 +97,13 @@ public class AlertManager {
     private String lastError;
     private int zonesPending;
     private int undrawable;
+    /**
+     * Alert ids seen on a previous poll. Notifications fire for what is new to this,
+     * never for what was already active when the filter changed -- switching a state
+     * on must not set off a dozen notifications for weather that was there all along.
+     */
+    private final Set<String> announced = new java.util.HashSet<>();
+    private boolean primed;
 
     private final Runnable timer = new Runnable() {
         @Override
@@ -154,8 +161,32 @@ public class AlertManager {
                 zones.sweep();
             }
         });
+        resolveHomeStateIfUnset();
         poll();
         MainThread.postDelayed(timer, TICK_MS);
+    }
+
+    /**
+     * A fresh install has no states, so ask once where the phone is. Only ever when
+     * nothing is selected, so it can never move a filter the operator set.
+     */
+    private void resolveHomeStateIfUnset() {
+        if (!filter.areas.isEmpty())
+            return;
+        com.atakmap.android.ipaws.data.HomeState.resolve(
+                mapView.getSelfMarker() == null ? null : mapView.getSelfMarker().getPoint(),
+                new com.atakmap.android.ipaws.data.HomeState.Found() {
+                    @Override
+                    public void onState(String stateCode) {
+                        // Checked again: the operator may have picked while we asked.
+                        if (!filter.areas.isEmpty())
+                            return;
+                        filter.areas.add(stateCode);
+                        saveFilter();
+                        Log.d(TAG, "fresh install homed to " + stateCode);
+                        poll();
+                    }
+                });
     }
 
     public void stop() {
@@ -331,6 +362,7 @@ public class AlertManager {
         synchronized (this) {
             alerts = kept;
         }
+        announce(kept);
         overlay.rewrite(drawn);
         zonesPending = missing.size();
         this.undrawable = undrawable;
@@ -363,6 +395,99 @@ public class AlertManager {
         if (requested > 0)
             Log.d(TAG, "fetching " + requested + " zones (round " + (round + 1) + " of "
                     + MAX_ZONE_ROUNDS + ", " + outstanding + " outstanding)");
+    }
+
+    /**
+     * Notifies for alerts that are new, at the severities the operator chose.
+     *
+     * <p>Off by default. A plugin that pops a system notification for a Winter Weather
+     * Advisory in the next county is switched off within a day, so when it is on it
+     * fires only for Extreme and Severe unless that is changed.
+     *
+     * <p>The first pass after start only records what is already there. Otherwise
+     * every alert in the current filter would announce itself the moment ATAK opens,
+     * which is noise, not news.
+     */
+    private void announce(List<Alert> current) {
+        final List<Alert> fresh = new ArrayList<>();
+        for (Alert a : current)
+            if (announced.add(a.id) && primed && filter.shouldNotify(a))
+                fresh.add(a);
+        primed = true;
+        // Ids of alerts that have gone are forgotten, or the set grows all day; one
+        // that comes back after expiring is genuinely new again.
+        final Set<String> live = new java.util.HashSet<>();
+        for (Alert a : current)
+            live.add(a.id);
+        announced.retainAll(live);
+        if (fresh.isEmpty())
+            return;
+        final Alert worst = fresh.get(0);
+        final String msg = fresh.size() == 1
+                ? worst.event + " - " + worst.areaDesc
+                : fresh.size() + " new alerts, worst " + worst.severity + ": " + worst.event;
+        Log.d(TAG, "notify: " + msg);
+        MainThread.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    com.atakmap.android.util.NotificationUtil.getInstance().postNotification(
+                            NOTIFY_ID,
+                            com.atakmap.android.util.NotificationUtil.GeneralIcon.STATUS_RED.getID(),
+                            "IPAWS Alerts", msg, msg);
+                } catch (LinkageError | RuntimeException notThisBuild) {
+                    // A build without the notification helper still gets the overlay
+                    // and the list; it just does not chime.
+                    Log.w(TAG, "could not post a notification: " + notThisBuild);
+                }
+            }
+        });
+    }
+
+    /** One id, so a second notification replaces the first rather than stacking up. */
+    private static final int NOTIFY_ID = 94651;
+
+    /** Frames one alert's area on the map, or pans to it when it has no extent. */
+    public void panTo(Alert a) {
+        if (a == null)
+            return;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                Geometry g = null;
+                try {
+                    if (a.hasOwnGeometry())
+                        g = GeoJson.parse(a.geometry);
+                } catch (Exception ignored) {
+                    // Fall through to the zones.
+                }
+                if (g == null)
+                    g = fromZones(a, new LinkedHashSet<String>());
+                if (g == null) {
+                    Log.d(TAG, "no area to zoom to for " + a.event);
+                    return;
+                }
+                final com.atakmap.map.layer.feature.geometry.Envelope e = g.getEnvelope();
+                if (e == null)
+                    return;
+                MainThread.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            final double padLat = Math.max(0.01, (e.maxY - e.minY) * 0.15);
+                            final double padLon = Math.max(0.01, (e.maxX - e.minX) * 0.15);
+                            final com.atakmap.coremap.maps.coords.GeoPoint[] corners = {
+                                    new com.atakmap.coremap.maps.coords.GeoPoint(e.minY - padLat, e.minX - padLon),
+                                    new com.atakmap.coremap.maps.coords.GeoPoint(e.maxY + padLat, e.maxX + padLon) };
+                            com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, corners, 0d,
+                                    mapView.getWidth(), mapView.getHeight());
+                        } catch (Exception ex) {
+                            Log.w(TAG, "zoom to failed", ex);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     /**

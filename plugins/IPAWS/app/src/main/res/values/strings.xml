@@ -15,4 +15,16 @@
     <string name="heading_types">Types</string>
     <string name="all_categories">All categories</string>
     <string name="all_types">All types</string>
+    <string name="back">Back</string>
+    <string name="zoom_to">Zoom to</string>
+    <string name="d_headline">Headline</string>
+    <string name="d_what">What is happening</string>
+    <string name="d_do">What to do</string>
+    <string name="heading_alerts">Alerts</string>
+    <string name="heading_updates">Updates</string>
+    <string name="notify_off">Notify: OFF</string>
+    <string name="notify_on">Notify: ON</string>
+    <string name="manual_title">IPAWS Alerts user manual</string>
+    <string name="manual_summary">How to choose states, counties and alert types</string>
+    <string name="prefs_summary">Public alerts on the map, filtered on this device</string>
 </resources>
