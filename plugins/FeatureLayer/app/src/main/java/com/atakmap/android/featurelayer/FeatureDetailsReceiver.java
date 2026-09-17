@@ -88,7 +88,8 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
             }
             if (k.startsWith("_"))
                 continue; // the plugin's own bookkeeping, not the feature's data
-            sb.append(k).append(": ").append(v).append('\n');
+            final String ago = Esri.ago(v);
+            sb.append(k).append(": ").append(v).append(ago == null ? "" : "  (" + ago + ")").append('\n');
         }
         ((TextView) view.findViewById(R.id.details_title)).setText(title);
         ((TextView) view.findViewById(R.id.details_subtitle))

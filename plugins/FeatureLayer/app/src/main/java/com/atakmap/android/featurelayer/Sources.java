@@ -123,8 +123,8 @@ public final class Sources {
     /** Default scope: what is within this of the operator, until they pick an area. */
     static final double DART_DEFAULT_RADIUS_M = 40000;
 
-    private static LayerSpec dart(String id, String title, String base, String labelField, String setField,
-            String timeField) {
+    private static LayerSpec dart(String id, String title, String layerTitle, String base, String labelField,
+            String setField, String timeField) {
         final LayerSpec s = new LayerSpec();
         s.id = id;
         s.title = title;
@@ -137,6 +137,7 @@ public final class Sources {
         s.geojson = false;
         s.profile = LayerSpec.Profile.GENERIC;
         s.labelField = labelField;
+        s.layerTitle = layerTitle;
         s.setField = setField;
         s.timeField = timeField;
         s.live = true;
@@ -160,13 +161,14 @@ public final class Sources {
      * field that carries IHC / ENG / OPS. Not `category`, which holds a cohort code.
      */
     public static LayerSpec dartPersonnel() {
-        return dart("dart-personnel", "DART Personnel", DART_PERSONNEL, "call_sign", "resource_type",
-                "location_timestamp");
+        return dart("dart-personnel", "Personnel", "Personnel", DART_PERSONNEL, "call_sign",
+                "resource_type", "location_timestamp");
     }
 
     /** USFS and DOI fire vehicles, every row inside 24 hours and most inside the hour. */
     public static LayerSpec dartVehicles() {
-        return dart("dart-vehicles", "DART Vehicles", DART_VEHICLES, "ResourceName", "ResourceType", "DateTime");
+        return dart("dart-vehicles", "Vehicles", "Vehicle", DART_VEHICLES, "ResourceName", "ResourceType",
+                "DateTime");
     }
 
     /** A whole feature service from a user's own org: every layer, generic symbology, capped. */

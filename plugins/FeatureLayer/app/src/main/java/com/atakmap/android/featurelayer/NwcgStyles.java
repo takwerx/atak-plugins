@@ -343,7 +343,21 @@ public final class NwcgStyles {
      * text, stays silent. One feature, one label, at the center (Evac Zone's rule).
      */
     public static Style withNameLabel(Style s) {
-        final Style pill = new LabelPointStyle("", WHITE, 0xA0000000, LabelPointStyle.ScrollMode.OFF, 0f, 0, 100, 0f, false);
+        return withNameLabel(s, false);
+    }
+
+    /**
+     * @param underIcon true for a point that also draws an icon. The area form centres the
+     *        text on the label point, which is right when the point is invisible and wrong
+     *        when a marker sits there: a DART callsign rendered straight through its own
+     *        pin, with the pin occluding the middle of the text (2026-09-17). A point
+     *        pushes the text clear of the marker and asks for a real text size, because
+     *        the area form's 0f leaves ATAK to pick one.
+     */
+    public static Style withNameLabel(Style s, boolean underIcon) {
+        final Style pill = underIcon
+                ? new LabelPointStyle("", WHITE, 0xC0000000, LabelPointStyle.ScrollMode.OFF, 14f, 0, -160, 0f, false)
+                : new LabelPointStyle("", WHITE, 0xA0000000, LabelPointStyle.ScrollMode.OFF, 0f, 0, 100, 0f, false);
         if (s instanceof CompositeStyle) {
             final CompositeStyle cs = (CompositeStyle) s;
             final Style[] all = new Style[cs.getNumStyles() + 1];

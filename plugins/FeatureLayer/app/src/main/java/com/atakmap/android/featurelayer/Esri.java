@@ -394,10 +394,45 @@ public final class Esri {
         return a / 2d;
     }
 
+    /** The format {@link #toAttributes} writes date fields in. */
+    private static final String STORED_DATE = "yyyy-MM-dd HH:mm";
+
+    /**
+     * "4 min ago" for a stored date string, or null when the value is not one. Worked out
+     * when it is shown, never when it is stored: a last known location is only as good as
+     * its age, and an age written into the cache would keep saying "2 min ago" for hours.
+     */
+    public static String ago(String stored) {
+        if (stored == null || stored.length() != STORED_DATE.length())
+            return null;
+        final long then;
+        try {
+            final SimpleDateFormat f = new SimpleDateFormat(STORED_DATE, Locale.US);
+            final Date d = f.parse(stored);
+            if (d == null)
+                return null;
+            then = d.getTime();
+        } catch (Exception e) {
+            return null;
+        }
+        final long secs = (System.currentTimeMillis() - then) / 1000L;
+        if (secs < -90)
+            return "in the future";
+        if (secs < 90)
+            return "just now";
+        final long mins = (secs + 30) / 60;
+        if (mins < 90)
+            return mins + " min ago";
+        final long hours = (mins + 30) / 60;
+        if (hours < 36)
+            return hours + (hours == 1 ? " hour ago" : " hours ago");
+        return ((hours + 12) / 24) + " days ago";
+    }
+
     /** Every non-null property as a string; dates formatted from epoch ms. */
     public static AttributeSet toAttributes(JSONObject props, Set<String> dateFields) {
         final AttributeSet a = new AttributeSet();
-        final SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US);
+        final SimpleDateFormat fmt = new SimpleDateFormat(STORED_DATE, Locale.US);
         final Iterator<String> keys = props.keys();
         while (keys.hasNext()) {
             final String k = keys.next();

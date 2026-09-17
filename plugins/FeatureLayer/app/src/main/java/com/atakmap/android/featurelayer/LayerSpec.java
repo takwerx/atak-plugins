@@ -52,6 +52,8 @@ public class LayerSpec {
     public String setField;
     /** The field drawn as the map label, when the service's own display field is not the one people know. */
     public String labelField;
+    /** What to call the service's layer to a person, when its own name is a table name. */
+    public String layerTitle;
     /**
      * Keep only the newest feature (by {@link #timeField}) per key: each entry is a field,
      * or fields separated by "|" tried in turn ("incident_name|mission"). Null = keep all.
@@ -102,16 +104,27 @@ public class LayerSpec {
         return v == null ? fillAlpha : v;
     }
 
+    /**
+     * A number JSON will accept, or null. {@code lat}/{@code lon} default to NaN and
+     * org.json refuses NaN outright ("Forbidden numeric value: NaN"), which threw from
+     * toJson and took the **whole layer list** down with it: DART has no centre point of
+     * its own, so nothing the operator added was ever saved (2026-09-17).
+     */
+    private static Object finite(double d) {
+        return Double.isNaN(d) || Double.isInfinite(d) ? JSONObject.NULL : (Object) d;
+    }
+
     public JSONObject toJson() throws Exception {
         final JSONObject o = new JSONObject();
         o.put("id", id).put("title", title).put("subtitle", subtitle).put("portal", portal)
                 .put("base", base).put("where", where).put("geojson", geojson)
-                .put("profile", profile.name()).put("lat", lat).put("lon", lon).put("live", live).put("maxFeatures", maxFeatures).put("iconSet", iconSet).put("fillAlpha", fillAlpha).put("refreshMinutes", refreshMinutes).put("repairStatus", repairStatus).put("labels", labels)
+                .put("profile", profile.name()).put("lat", finite(lat)).put("lon", finite(lon)).put("live", live).put("maxFeatures", maxFeatures).put("iconSet", iconSet).put("fillAlpha", fillAlpha).put("refreshMinutes", refreshMinutes).put("repairStatus", repairStatus).put("labels", labels)
                 .put("timeField", timeField).put("sinceHours", sinceHours).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName);
         final JSONArray ids = new JSONArray();
         for (int i : layerIds)
             ids.put(i);
         o.put("layerIds", ids);
+        o.put("layerTitle", layerTitle);
         o.put("scopeKind", scopeKind).put("scopeRadiusM", scopeRadiusM).put("scopeRings", scopeRings);
         if (scopeBox != null)
             o.put("scopeBox", new JSONArray(
@@ -154,6 +167,7 @@ public class LayerSpec {
         s.layerIds = new int[ids.length()];
         for (int i = 0; i < ids.length(); i++)
             s.layerIds[i] = ids.getInt(i);
+        s.layerTitle = o.isNull("layerTitle") ? null : o.optString("layerTitle", null);
         s.scopeKind = o.isNull("scopeKind") ? null : o.optString("scopeKind", null);
         s.scopeRadiusM = o.optDouble("scopeRadiusM", 40000);
         s.scopeRings = o.isNull("scopeRings") ? null : o.optString("scopeRings", null);

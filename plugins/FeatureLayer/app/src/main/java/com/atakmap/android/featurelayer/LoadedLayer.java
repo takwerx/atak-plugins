@@ -1031,7 +1031,10 @@ public class LoadedLayer {
         final Set<String> dates = info.dateFields;
         final String displayField = info.displayField != null && info.fields.contains(info.displayField)
                 ? info.displayField : null;
-        final String layerName = info.name;
+        // The service's own layer name is a table name to the operator ("DART_AVLs"), so a
+        // source that knows better says so. One layer per service, so one title is enough.
+        final String layerName = spec.layerTitle != null && !spec.layerTitle.isEmpty()
+                ? spec.layerTitle : info.name;
 
         final int firstOfLayer = out.size();
         Esri.query(spec.base, layerId, spec.whereNow(), scope(), token, spec.geojson,
@@ -1139,6 +1142,13 @@ public class LoadedLayer {
                             style = NwcgStyles.silentLabel(style);
                             if (alt != null)
                                 alt = NwcgStyles.silentLabel(alt);
+                        } else if (!nwcg && spec.labels && name != null && !name.isEmpty()) {
+                            // A point's name was drawn in ATAK's default white, which disappears
+                            // over pale ground and snow: a callsign over a dry grass basemap was
+                            // unreadable. Same dark pill the areas use.
+                            style = NwcgStyles.withNameLabel(style, true);
+                            if (alt != null)
+                                alt = NwcgStyles.withNameLabel(alt, true);
                         }
                         final AttributeSet attrs = Esri.toAttributes(props, dates);
                         attrs.setAttribute("_title", title);
