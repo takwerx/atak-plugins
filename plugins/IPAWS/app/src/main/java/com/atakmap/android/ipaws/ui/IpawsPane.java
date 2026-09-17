@@ -82,7 +82,9 @@ public class IpawsPane {
             @Override
             public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
                 // Header rows count in this position, so take them back off again.
-                final Alert a = rows.getItem(position - list.getHeaderViewsCount());
+                final Alert a = rows.onTap(position - list.getHeaderViewsCount());
+                // A group with more than one alert opens instead of navigating, and
+                // says so by returning nothing.
                 if (a != null)
                     IpawsPane.this.details.show(a);
             }

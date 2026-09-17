@@ -48,16 +48,20 @@ public final class AlertStyles {
         return UNKNOWN;
     }
 
-    /** Fill under edge under label. */
-    public static Style area(String severity, String label) {
+    /**
+     * Fill under edge. <b>No label</b>: ATAK renders a label on a polygon along its
+     * boundary, rotated with the edge, which reads as a name for a line rather than
+     * for the area. The label is a separate point feature at the middle of the shape
+     * -- see {@link #label} and {@code Geo.labelPoint}.
+     */
+    public static Style area(String severity) {
         final int c = color(severity);
         final int fill = (FILL_ALPHA << 24) | (c & 0x00FFFFFF);
         final float width = "Extreme".equalsIgnoreCase(severity)
                 || "Severe".equalsIgnoreCase(severity) ? 4f : 3f;
         return new CompositeStyle(new Style[] {
                 new BasicFillStyle(fill),
-                new BasicStrokeStyle(c, width),
-                label(label) });
+                new BasicStrokeStyle(c, width) });
     }
 
     /**
@@ -71,7 +75,8 @@ public final class AlertStyles {
                 label(label) });
     }
 
-    private static Style label(String text) {
+    /** The label alone, for the point at an area's middle. No dot: just the words. */
+    public static Style label(String text) {
         // Scroll OFF: an alert name scrolling along a county border is unreadable on
         // a vehicle mount. 0f rotation, no rotate-with-map.
         return new LabelPointStyle(text == null ? "" : text, LABEL_TEXT, LABEL_BACKING,

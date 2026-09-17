@@ -13,6 +13,8 @@ import com.atakmap.coremap.log.Log;
 
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
+import android.view.View;
+
 import gov.tak.api.ui.IHostUIService;
 import gov.tak.api.ui.Pane;
 import gov.tak.api.ui.PaneBuilder;
@@ -33,6 +35,9 @@ public class IPAWS implements IPlugin {
     AlertManager manager;
     IpawsPane paneUi;
     AlertDetails details;
+    Pane detailPane;
+    /** True while one detail pane is being replaced by another, so its close is ignored. */
+    boolean swappingDetail;
     MapView mapView;
 
     IServiceController serviceController;
@@ -107,7 +112,6 @@ public class IPAWS implements IPlugin {
         if (mapView != null && manager == null) {
             manager = new AlertManager(mapView, pluginContext);
             manager.start();
-            details = new AlertDetails(mapView, pluginContext, manager);
         } else if (mapView == null) {
             Log.w(TAG, "no map view at start; the overlay cannot be attached");
         }
@@ -126,6 +130,15 @@ public class IPAWS implements IPlugin {
             }
             templatePane = null;
         }
+        if (detailPane != null) {
+            try {
+                if (uiService != null && uiService.isPaneVisible(detailPane))
+                    uiService.closePane(detailPane);
+            } catch (Exception ignored) {
+                // Already gone, which is the state we wanted.
+            }
+            detailPane = null;
+        }
         if (paneUi != null) {
             paneUi.dispose();
             paneUi = null;
@@ -143,12 +156,64 @@ public class IPAWS implements IPlugin {
         unregisterPreferences();
     }
 
+    /**
+     * Somewhere to put an alert's details, and the thing that puts the list back.
+     *
+     * <p>Both panes live in the same slot, so opening an alert REPLACES the list
+     * rather than sitting beside it. Closing the details therefore has to bring the
+     * list back, or the plugin simply disappears -- which is exactly what the back key
+     * did: it closed the details and left a bare map with no way back except the
+     * toolbar. This listens for the pane CLOSING rather than doing it in the Back
+     * button's handler, because the back key never goes through that button.
+     */
+    private AlertDetails.Host detailHost() {
+        return new AlertDetails.Host() {
+            @Override
+            public void showDetailPane(View v) {
+                if (uiService == null)
+                    return;
+                if (detailPane != null && uiService.isPaneVisible(detailPane)) {
+                    swappingDetail = true;
+                    uiService.closePane(detailPane);
+                }
+                final Pane opened = new PaneBuilder(v)
+                        .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
+                        .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
+                        .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
+                        .build();
+                detailPane = opened;
+                uiService.showPane(opened, new IHostUIService.IPaneLifecycleListener() {
+                    @Override
+                    public void onPaneVisible(boolean visible) {
+                    }
+
+                    @Override
+                    public void onPaneClose() {
+                        if (swappingDetail || detailPane != opened)
+                            return;   // a newer alert took its place
+                        if (templatePane != null && !uiService.isPaneVisible(templatePane))
+                            uiService.showPane(templatePane, null);
+                    }
+                });
+                swappingDetail = false;
+            }
+
+            @Override
+            public void hideDetailPane() {
+                if (uiService != null && detailPane != null
+                        && uiService.isPaneVisible(detailPane))
+                    uiService.closePane(detailPane);
+            }
+        };
+    }
+
     private void showPane() {
         if (manager == null || mapView == null) {
             Log.w(TAG, "no manager yet; the pane has nothing to show");
             return;
         }
         if (templatePane == null) {
+            details = new AlertDetails(pluginContext, manager, detailHost());
             paneUi = new IpawsPane(mapView, pluginContext, manager, manager.getCounties(), details);
             templatePane = new PaneBuilder(paneUi.getView())
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)

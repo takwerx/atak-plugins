@@ -1,16 +1,12 @@
 package com.atakmap.android.ipaws.ui;
 
 import android.content.Context;
-import android.content.Intent;
 import android.view.View;
 import android.widget.TextView;
 
 import com.atak.plugins.impl.PluginLayoutInflater;
-import com.atakmap.android.dropdown.DropDown.OnStateListener;
-import com.atakmap.android.dropdown.DropDownReceiver;
 import com.atakmap.android.ipaws.AlertManager;
 import com.atakmap.android.ipaws.data.Alert;
-import com.atakmap.android.maps.MapView;
 import com.atakmap.android.ipaws.plugin.R;
 import com.atakmap.coremap.log.Log;
 
@@ -19,31 +15,43 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * One alert, in full: the CAP headline, what is happening, and what to do.
+ * One alert in full: the CAP headline, what is happening, and what to do.
  *
- * <p>A {@code DropDownReceiver} rather than an {@code AlertDialog}, because a dialog
- * blocks the map -- you could read the alert or look at where it is, not both, and the
- * whole point of putting this on a map is the second one.
+ * <p>A view in a pane rather than a dialog, because a dialog blocks the map -- you
+ * could read the alert or look at where it is, not both, and the second one is the
+ * point of putting this on a map at all.
+ *
+ * <p>It is a <b>second Pane</b>, not a DropDownReceiver. A drop-down closes the plugin
+ * pane underneath it, so the back key left the operator on a bare map with the whole
+ * list gone. Cam Depot hit the same thing: both panes live in the same slot, so opening
+ * an alert REPLACES the list, and closing it has to put the list back. That is done by
+ * listening for the pane closing rather than in the Back button's handler, because the
+ * back key never goes through that button.
  */
-public class AlertDetails extends DropDownReceiver implements OnStateListener {
+public class AlertDetails {
 
     private static final String TAG = "IPAWS";
-    public static final String ACTION = "com.atakmap.android.ipaws.DETAILS";
+
+    /** Where the details view is put, and what puts the list back. */
+    public interface Host {
+        void showDetailPane(View v);
+
+        void hideDetailPane();
+    }
 
     private final View view;
     private final AlertManager manager;
+    private final Host host;
     private Alert showing;
 
-    public AlertDetails(MapView mapView, Context pluginContext, AlertManager manager) {
-        super(mapView);
+    public AlertDetails(Context pluginContext, AlertManager manager, Host host) {
         this.manager = manager;
+        this.host = host;
         this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.alert_details, null);
-        // Back closes the details and leaves the map where it is; ATAK's own close is
-        // otherwise the only way out, and it is not where a thumb expects it.
         view.findViewById(R.id.btn_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                closeDropDown();
+                host.hideDetailPane();
             }
         });
         view.findViewById(R.id.btn_zoom).setOnClickListener(new View.OnClickListener() {
@@ -55,18 +63,18 @@ public class AlertDetails extends DropDownReceiver implements OnStateListener {
         });
     }
 
-    /** Shown from the list, so the alert comes straight in rather than by uid. */
     public void show(Alert a) {
         showing = a;
         bind(a);
-        if (!isVisible())
-            showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
+        host.showDetailPane(view);
     }
 
-    @Override
-    public void onReceive(Context context, Intent intent) {
-        // Nothing arrives by intent yet; the list calls show() directly. Kept so a
-        // radial menu entry can be added without moving anything.
+    public View getView() {
+        return view;
+    }
+
+    public void dispose() {
+        showing = null;
     }
 
     private void bind(Alert a) {
@@ -117,27 +125,5 @@ public class AlertDetails extends DropDownReceiver implements OnStateListener {
         final boolean has = s != null && !s.trim().isEmpty();
         view.findViewById(headingId).setVisibility(has ? View.VISIBLE : View.GONE);
         text(bodyId, has ? s.trim() : null);
-    }
-
-    @Override
-    protected void disposeImpl() {
-        showing = null;
-    }
-
-    @Override
-    public void onDropDownSelectionRemoved() {
-    }
-
-    @Override
-    public void onDropDownVisible(boolean v) {
-    }
-
-    @Override
-    public void onDropDownSizeChanged(double width, double height) {
-    }
-
-    @Override
-    public void onDropDownClose() {
-        showing = null;
     }
 }

@@ -355,7 +355,15 @@ public class AlertManager {
                 continue;
             }
             drawn.add(new AlertOverlay.Drawn(a.severity, a.event,
-                    g, AlertStyles.area(a.severity, a.event), attributesOf(a)));
+                    g, AlertStyles.area(a.severity), attributesOf(a)));
+            // The name goes on a point in the middle of the area, because a label on
+            // the polygon itself renders along its edge and reads as a name for a
+            // line. Same attributes, so tapping the words opens the same alert.
+            final double[] at = Geo.labelPoint(g);
+            if (at != null)
+                drawn.add(new AlertOverlay.Drawn(a.severity, a.event,
+                        new com.atakmap.map.layer.feature.geometry.Point(at[0], at[1]),
+                        AlertStyles.label(a.event), attributesOf(a)));
         }
 
         Collections.sort(kept, BY_SEVERITY_THEN_SOONEST);

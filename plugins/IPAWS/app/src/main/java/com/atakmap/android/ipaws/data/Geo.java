@@ -38,6 +38,112 @@ public final class Geo {
     private Geo() {
     }
 
+    /**
+     * Where to put an area's label: inside it, and near the middle.
+     *
+     * <p>ATAK labels a polygon along its <b>boundary</b> -- a LabelPointStyle on a
+     * polygon renders down the edge, rotated with it, which reads as a label on a line
+     * rather than a name for the area. There is no placement flag on the style to
+     * change that ({@code LabelPointStyle$Style} is only bold and italic), so the label
+     * goes on a point of its own and this works out where that point should be.
+     *
+     * <p>The centroid of the largest ring is the answer for almost every zone. It is
+     * not for a crescent or a C -- a coastal marine zone wrapping a headland has its
+     * centroid on dry land outside itself -- so a centroid that falls outside is
+     * replaced by the middle of the widest run of interior along that latitude, which
+     * is cheap and lands inside by construction.
+     *
+     * @return {@code {lon, lat}}, or null when there is nothing to label
+     */
+    public static double[] labelPoint(Geometry g) {
+        if (g == null)
+            return null;
+        final List<double[][]> all = rings(g);
+        double[][] biggest = null;
+        double biggestArea = -1;
+        for (double[][] r : all) {
+            final double a = Math.abs(signedArea(r));
+            if (a > biggestArea) {
+                biggestArea = a;
+                biggest = r;
+            }
+        }
+        if (biggest == null || biggest.length < 3)
+            return envelopeCenter(g);
+
+        final double[] c = centroid(biggest);
+        if (c != null && contains(biggest, c))
+            return c;
+        final double[] scan = widestSpanAt(biggest, c == null ? midLat(biggest) : c[1]);
+        if (scan != null)
+            return scan;
+        return c != null ? c : envelopeCenter(g);
+    }
+
+    private static double[] envelopeCenter(Geometry g) {
+        final Envelope e = g.getEnvelope();
+        return e == null ? null : new double[] { (e.minX + e.maxX) / 2d, (e.minY + e.maxY) / 2d };
+    }
+
+    private static double midLat(double[][] ring) {
+        double lo = Double.MAX_VALUE, hi = -Double.MAX_VALUE;
+        for (double[] p : ring) {
+            lo = Math.min(lo, p[1]);
+            hi = Math.max(hi, p[1]);
+        }
+        return (lo + hi) / 2d;
+    }
+
+    /** Shoelace. Sign tells winding; the magnitude is twice the area. */
+    private static double signedArea(double[][] r) {
+        double a = 0;
+        for (int i = 0, j = r.length - 1; i < r.length; j = i++)
+            a += (r[j][0] * r[i][1]) - (r[i][0] * r[j][1]);
+        return a / 2d;
+    }
+
+    /** Area-weighted centroid of a ring; null for a degenerate one. */
+    private static double[] centroid(double[][] r) {
+        double a = 0, cx = 0, cy = 0;
+        for (int i = 0, j = r.length - 1; i < r.length; j = i++) {
+            final double cross = (r[j][0] * r[i][1]) - (r[i][0] * r[j][1]);
+            a += cross;
+            cx += (r[j][0] + r[i][0]) * cross;
+            cy += (r[j][1] + r[i][1]) * cross;
+        }
+        if (Math.abs(a) < 1e-12)
+            return null;
+        return new double[] { cx / (3d * a), cy / (3d * a) };
+    }
+
+    /**
+     * The midpoint of the widest stretch of interior along one latitude. Used when the
+     * centroid falls outside the shape, which is what a crescent does.
+     */
+    private static double[] widestSpanAt(double[][] r, double lat) {
+        final List<Double> xs = new ArrayList<>();
+        for (int i = 0, j = r.length - 1; i < r.length; j = i++) {
+            final double y1 = r[j][1], y2 = r[i][1];
+            if ((y1 > lat) == (y2 > lat))
+                continue;
+            final double t = (lat - y1) / (y2 - y1);
+            xs.add(r[j][0] + t * (r[i][0] - r[j][0]));
+        }
+        if (xs.size() < 2)
+            return null;
+        java.util.Collections.sort(xs);
+        double best = -1, bestMid = 0;
+        // Crossings pair up into inside-outside-inside runs; every other gap is interior.
+        for (int i = 0; i + 1 < xs.size(); i += 2) {
+            final double w = xs.get(i + 1) - xs.get(i);
+            if (w > best) {
+                best = w;
+                bestMid = (xs.get(i) + xs.get(i + 1)) / 2d;
+            }
+        }
+        return best <= 0 ? null : new double[] { bestMid, lat };
+    }
+
     /** True when the two areas touch at all. Null geometry never touches anything. */
     public static boolean intersects(Geometry a, Geometry b) {
         if (a == null || b == null)
