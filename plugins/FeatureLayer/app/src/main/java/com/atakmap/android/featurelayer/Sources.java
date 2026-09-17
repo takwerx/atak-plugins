@@ -147,7 +147,12 @@ public final class Sources {
         s.refreshMinutes = 1;
         s.sinceHours = 24; // both services are 24-hour views; asking for more returns nothing
         s.iconSet = "dart"; // EGP's glyphs; see DartStyles
-        s.scopeKind = "me";
+        // What is in view, not what is around the operator. A phone with no fix has no
+        // position -- the XCover sat over a fire with DART on and fetched nothing, because
+        // the self marker had nothing to give -- and the thing being asked about is the
+        // part of the map being looked at. "me" stays available for locking to your own
+        // surroundings while scanning elsewhere.
+        s.scopeKind = "view";
         s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
         // Nationally 387 people and 3,981 vehicles, measured 2026-09-17. A scope keeps a
         // fetch in the tens, and the cap is what stops a wide area drawing the country.
@@ -203,6 +208,11 @@ public final class Sources {
         s.timeField = now.timeField;
         s.sinceHours = now.sinceHours;
         s.maxFeatures = now.maxFeatures;
+        // The scope is the operator's choice, except that there is no picker yet, so the
+        // only scope any saved layer carries is a default this code chose. Stop migrating
+        // it the moment the picker ships.
+        if (s.scopeKind == null || "me".equals(s.scopeKind))
+            s.scopeKind = now.scopeKind;
     }
 
     /** A whole feature service from a user's own org: every layer, generic symbology, capped. */

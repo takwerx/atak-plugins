@@ -46,9 +46,23 @@ final class DartStyles {
      */
     private static final float PX = 32f;
     /** Bumped when the composite itself changes, so cached ones are not reused. */
-    private static final int MARK_V = 2;
-    /** Composite canvas, larger than PX so the glyph stays sharp on a dense screen. */
-    private static final int CANVAS = 96;
+    private static final int MARK_V = 3;
+    /**
+     * The composite is a tall transparent canvas with the disc in the top square, so the
+     * marker is drawn <b>above</b> its position and a label centred on that position
+     * cannot land behind it.
+     *
+     * <p>Three attempts at positioning the label with {@code LabelPointStyle}'s alignment
+     * arguments all left the callsign drawn through the marker. The alignment units are
+     * not documented in the SDK's javadoc, which does not cover the map engine, and the
+     * one worked example in {@code samples/hello3d} passes a bare 100 with no explanation.
+     * Geometry in a PNG needs no documentation: the icon is 1:3, the disc occupies the top
+     * third, and the drawn height puts the disc's lower edge sixteen pixels clear of the
+     * point. Same trick as an ATAK pin, whose tip is the position and whose head is above.
+     */
+    private static final int CANVAS = 96, CANVAS_H = 288;
+    /** Drawn height, keeping the 1:3 aspect so the disc lands at PX across. */
+    private static final float PX_H = PX * 3f;
     private static final int DISC = 0xD9101010, RING = 0xFFE6E6E6;
 
     private DartStyles() {
@@ -70,7 +84,7 @@ final class DartStyles {
         final File marker = marker(glyph, iconDir);
         if (marker == null)
             return null;
-        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX, 0, 0, 0f, true);
+        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX_H, 0, 0, 0f, true);
     }
 
     /**
@@ -161,7 +175,7 @@ final class DartStyles {
             final Bitmap in = BitmapFactory.decodeFile(src.getAbsolutePath());
             if (in == null)
                 return null;
-            final Bitmap bmp = Bitmap.createBitmap(CANVAS, CANVAS, Bitmap.Config.ARGB_8888);
+            final Bitmap bmp = Bitmap.createBitmap(CANVAS, CANVAS_H, Bitmap.Config.ARGB_8888);
             final Canvas c = new Canvas(bmp);
             final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
             p.setStyle(Paint.Style.FILL);

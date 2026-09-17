@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 7;
+    private static final int STYLE_VERSION = 8;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -795,6 +795,12 @@ public class LoadedLayer {
     String scopeLabel() {
         if (spec.scopeKind == null)
             return "everything";
+        if ("view".equals(spec.scopeKind)) {
+            final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+            return b == null ? "what is in view"
+                    : String.format(java.util.Locale.US, "what is in view (%.3f..%.3f, %.3f..%.3f)",
+                            b.getSouth(), b.getNorth(), b.getWest(), b.getEast());
+        }
         if ("box".equals(spec.scopeKind))
             return "an area";
         if ("shape".equals(spec.scopeKind))
@@ -810,6 +816,19 @@ public class LoadedLayer {
     private Esri.Scope scope() {
         if (spec.scopeKind == null)
             return null;
+        if ("view".equals(spec.scopeKind)) {
+            // What the operator is looking at, which is what they are asking about. The map
+            // always has an extent; the self marker does not, and a phone with no fix
+            // refused to fetch anything at all while the map sat over a fire.
+            final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+            if (b == null)
+                throw new IllegalStateException("the map has no extent yet");
+            // A margin, so a small pan still has features under it before the next fetch.
+            final double padLat = Math.max(0.01, (b.getNorth() - b.getSouth()) * 0.2);
+            final double padLon = Math.max(0.01, (b.getEast() - b.getWest()) * 0.2);
+            return Esri.Scope.box(b.getSouth() - padLat, b.getWest() - padLon,
+                    b.getNorth() + padLat, b.getEast() + padLon);
+        }
         if ("box".equals(spec.scopeKind)) {
             if (spec.scopeBox == null)
                 throw new IllegalStateException("no area set for " + spec.title);
@@ -1084,6 +1103,8 @@ public class LoadedLayer {
         final String layerName = spec.layerTitle != null && !spec.layerTitle.isEmpty()
                 ? spec.layerTitle : info.name;
 
+        Log.d(TAG, spec.id + ": layer " + layerId + " iconSet=" + spec.iconSet + " dart=" + DartStyles.handles(spec)
+                + " point=" + isPointLayer + " profile=" + spec.profile + " nwcg=" + nwcg);
         final int firstOfLayer = out.size();
         Esri.query(spec.base, layerId, spec.whereNow(), scope(), token, spec.geojson,
                 Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, new Esri.FeatureSink() {
