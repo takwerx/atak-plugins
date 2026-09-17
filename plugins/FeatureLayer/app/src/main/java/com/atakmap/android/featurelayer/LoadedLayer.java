@@ -1118,6 +1118,14 @@ public class LoadedLayer {
                                     + (cls != null && disp != null && !codeOnly && !cls.equals(disp) ? " " + disp : "")
                                     + " (" + layerName + ")";
                             style = generic.styleFor(props);
+                            if (DartStyles.handles(spec) && isPointLayer) {
+                                // EGP's symbology, not the services' own: personnel declare a
+                                // 22.5 pt marker and vehicles an esriSMS dot of size 4, which
+                                // is a speck nobody can see over imagery.
+                                final Style d = DartStyles.style(props, spec.id.contains("personnel"), iconDir);
+                                if (d != null)
+                                    style = d;
+                            }
                             if ("sarcop".equals(spec.iconSet)) {
                                 // NAPSG's own symbology, not the service's placeholder renderer.
                                 final Style s = SarcopStyles.style(layerName, props, isPointLayer, isLineLayer,

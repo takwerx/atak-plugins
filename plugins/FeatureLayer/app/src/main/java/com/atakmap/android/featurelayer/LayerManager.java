@@ -547,6 +547,18 @@ public class LayerManager {
         } catch (Exception e) {
             Log.w(TAG, "SARCOP icons unavailable", e);
         }
+        try {
+            // EGP's own DART glyphs; DartStyles reads them out of the icon directory by
+            // name, so there is no map to carry around.
+            final JSONObject didx = new JSONObject(readAsset("dart/index.json"));
+            final Iterator<String> dk = didx.keys();
+            while (dk.hasNext()) {
+                final String file = didx.getString(dk.next());
+                copyAsset("dart/" + file, new File(iconDir, "dart_" + file));
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "DART icons unavailable", e);
+        }
         for (String g : new String[] { "line", "polygon" }) {
             final File png = new File(iconDir, "glyph_" + g + ".png");
             copyAsset("glyphs/" + g + ".png", png);

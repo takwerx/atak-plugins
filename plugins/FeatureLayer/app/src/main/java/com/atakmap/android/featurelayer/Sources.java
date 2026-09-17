@@ -146,6 +146,7 @@ public final class Sources {
         // change, so this is cheap even on a thin link.
         s.refreshMinutes = 1;
         s.sinceHours = 24; // both services are 24-hour views; asking for more returns nothing
+        s.iconSet = "dart"; // EGP's glyphs; see DartStyles
         s.scopeKind = "me";
         s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
         // Nationally 387 people and 3,981 vehicles, measured 2026-09-17. A scope keeps a
