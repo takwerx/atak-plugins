@@ -173,6 +173,7 @@ public class LayerManager {
 
     /** Adds (or, if already loaded, refreshes) a layer, pans to it, and saves the list. */
     public void add(LayerSpec spec) {
+        final long t0 = System.currentTimeMillis();
         LoadedLayer existing = find(spec.id);
         if (existing == null) {
             existing = new LoadedLayer(spec, mapView, pluginContext, new File(layersDir, spec.fileKey() + ".sqlite"),
@@ -191,6 +192,9 @@ public class LayerManager {
         existing.panTo();
         refresh(existing);
         changed();
+        // add() runs on the main thread and opens a store, so how long it takes decides
+        // whether ATAK stutters or ANRs. Measured, not assumed.
+        Log.d(TAG, "add " + spec.id + " took " + (System.currentTimeMillis() - t0) + " ms on the main thread");
     }
 
     public void remove(LoadedLayer l) {

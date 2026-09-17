@@ -938,12 +938,26 @@ public class FeatureLayer implements IPlugin {
         final Button find = paneView.findViewById(R.id.btn_find);
         final EditText search = paneView.findViewById(R.id.search_text);
         final View searchRow = paneView.findViewById(R.id.search_row);
+        // DART is not a source of its own: NIFC is the source, and DART is a choice
+        // inside it that appears once the operator is signed in. It shares NIFC's
+        // portal, so there is never a second sign-in.
+        final View dartRow = paneView.findViewById(R.id.dart_row);
+        final Button dart = paneView.findViewById(R.id.btn_dart);
+        dartRow.setVisibility(View.GONE);
+        dart.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickDart();
+            }
+        });
         if (org == null) {
             orgButton.setText("Pick a source");
             signin.setVisibility(View.GONE);
             searchRow.setVisibility(View.GONE);
             return;
         }
+        if ("nifc".equals(org.id) && manager != null && manager.auth(Sources.NIFC_PORTAL).isSignedIn())
+            dartRow.setVisibility(View.VISIBLE);
         orgButton.setText(org.title);
         searchRow.setVisibility(View.VISIBLE);
         find.setText(org.findLabel);
@@ -1382,6 +1396,32 @@ public class FeatureLayer implements IPlugin {
         if (s < 86400)
             return (s / 3600) + " h";
         return (s / 86400) + " d";
+    }
+
+    /**
+     * What to draw from DART. Two services, so two layers: each is turned off or removed
+     * on its own, which is the toggle. Vehicles is the denser half by a factor of ten
+     * (3,981 nationally against 387 people), so it is added first and personnel draws
+     * over the top of it.
+     */
+    private void pickDart() {
+        if (manager == null)
+            return;
+        final String[] labels = { "Personnel and vehicles", "Personnel only", "Vehicles only" };
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Add DART")
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (which != 1)
+                            manager.add(Sources.dartVehicles());
+                        if (which != 2)
+                            manager.add(Sources.dartPersonnel());
+                        d.dismiss();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void pickFire(final List<Sources.Fire> fires) {

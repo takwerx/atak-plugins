@@ -108,6 +108,67 @@ public final class Sources {
         return s;
     }
 
+    // ---- DART: NIFC personnel and vehicle last known locations ----------------------
+
+    /**
+     * The two DART feeds, both shared to the whole NIFC org. `Dart_AVLs` (no `_view`) is
+     * the Parent service, whose own item says it must not be shared beyond the DART
+     * Group; these are the internal views NIFC shares to the org and to EGP's WildFireSA
+     * Advanced. Read-only, and never republished as CoT: they are internal-to-NIFC
+     * positions of people, and a CoT reaches every EUD on the server.
+     */
+    static final String DART_PERSONNEL = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/DART_Personnel_EGP/FeatureServer";
+    static final String DART_VEHICLES = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/Dart_AVLs_view/FeatureServer";
+
+    /** Default scope: what is within this of the operator, until they pick an area. */
+    static final double DART_DEFAULT_RADIUS_M = 40000;
+
+    private static LayerSpec dart(String id, String title, String base, String labelField, String setField,
+            String timeField) {
+        final LayerSpec s = new LayerSpec();
+        s.id = id;
+        s.title = title;
+        s.subtitle = "DART";
+        s.portal = NIFC_PORTAL; // the same portal as NIFS live, so one sign-in covers both
+        s.orgName = "NIFC";
+        s.base = base;
+        s.layerIds = new int[] { 0 };
+        s.where = "1=1";
+        s.geojson = false;
+        s.profile = LayerSpec.Profile.GENERIC;
+        s.labelField = labelField;
+        s.setField = setField;
+        s.timeField = timeField;
+        s.live = true;
+        // A last known location moves about every 60 s, so a slower refresh draws the
+        // past. The change check is a few hundred bytes and the fetch only follows a
+        // change, so this is cheap even on a thin link.
+        s.refreshMinutes = 1;
+        s.sinceHours = 24; // both services are 24-hour views; asking for more returns nothing
+        s.scopeKind = "me";
+        s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
+        // Nationally 387 people and 3,981 vehicles, measured 2026-09-17. A scope keeps a
+        // fetch in the tens, and the cap is what stops a wide area drawing the country.
+        s.maxFeatures = 300;
+        return s;
+    }
+
+    /**
+     * People sharing a last known location: Field Maps "My Tracks", WFTAK and Garmin
+     * inReach, deduplicated by NIFC into one 24-hour view. Labeled by callsign, which
+     * only about a quarter of them have submitted; typed by resource_type, which is the
+     * field that carries IHC / ENG / OPS. Not `category`, which holds a cohort code.
+     */
+    public static LayerSpec dartPersonnel() {
+        return dart("dart-personnel", "DART Personnel", DART_PERSONNEL, "call_sign", "resource_type",
+                "location_timestamp");
+    }
+
+    /** USFS and DOI fire vehicles, every row inside 24 hours and most inside the hour. */
+    public static LayerSpec dartVehicles() {
+        return dart("dart-vehicles", "DART Vehicles", DART_VEHICLES, "ResourceName", "ResourceType", "DateTime");
+    }
+
     /** A whole feature service from a user's own org: every layer, generic symbology, capped. */
     /** CA Air Intel: statewide fire perimeters from FIRIS, CAL FIRE intel flights, USFS, NIFC and WFIGS, public. */
     static final String CA_AIR_INTEL = "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/CA_Perimeters_NIFC_FIRIS_public_view/FeatureServer";

@@ -35,6 +35,16 @@ public class LayerSpec {
      */
     public double gateGsd = Double.MAX_VALUE;
     public int maxFeatures;    // per source layer, 0 = no cap
+    /**
+     * Spatial scope, for a feed that is too large to draw nationally. Null is the whole
+     * layer, as every source before DART. "me" is resolved against the self marker at
+     * every fetch rather than stored, so the scope follows the operator instead of
+     * freezing where they stood when they switched it on.
+     */
+    public String scopeKind;            // "me", "box", "shape"; null = no spatial filter
+    public double scopeRadiusM = 40000; // "me"
+    public double[] scopeBox;           // "box": south, west, north, east
+    public String scopeRings;           // "shape": the Esri JSON rings of a drawn shape
     /** A date field to window on, and how far back: "poly_DateCurrent", 72 h. 0 = everything. */
     public String timeField;
     public int sinceHours;
@@ -102,6 +112,10 @@ public class LayerSpec {
         for (int i : layerIds)
             ids.put(i);
         o.put("layerIds", ids);
+        o.put("scopeKind", scopeKind).put("scopeRadiusM", scopeRadiusM).put("scopeRings", scopeRings);
+        if (scopeBox != null)
+            o.put("scopeBox", new JSONArray(
+                    java.util.Arrays.asList(scopeBox[0], scopeBox[1], scopeBox[2], scopeBox[3])));
         o.put("setFill", new JSONObject(setFill));
         o.put("setKind", new JSONObject(setKind));
         o.put("setOn", new JSONObject(setOn));
@@ -140,6 +154,12 @@ public class LayerSpec {
         s.layerIds = new int[ids.length()];
         for (int i = 0; i < ids.length(); i++)
             s.layerIds[i] = ids.getInt(i);
+        s.scopeKind = o.isNull("scopeKind") ? null : o.optString("scopeKind", null);
+        s.scopeRadiusM = o.optDouble("scopeRadiusM", 40000);
+        s.scopeRings = o.isNull("scopeRings") ? null : o.optString("scopeRings", null);
+        final JSONArray sbx = o.optJSONArray("scopeBox");
+        if (sbx != null && sbx.length() == 4)
+            s.scopeBox = new double[] { sbx.getDouble(0), sbx.getDouble(1), sbx.getDouble(2), sbx.getDouble(3) };
         final JSONObject sf = o.optJSONObject("setFill");
         if (sf != null) {
             final java.util.Iterator<String> k = sf.keys();

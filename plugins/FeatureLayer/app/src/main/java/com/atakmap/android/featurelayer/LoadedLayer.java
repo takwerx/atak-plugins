@@ -764,6 +764,35 @@ public class LoadedLayer {
      * previous ones. The layer object is never recreated: ATAK keeps labels of layers that
      * are thrown away, and a recreated layer forgets it was hidden.
      */
+    /**
+     * The spec's scope as a query filter, resolved now. "me" reads the self marker every
+     * time, so a layer left on while the operator drives keeps showing what is around
+     * them; a spec with no scope returns null and the query is unfiltered, as every
+     * source before DART.
+     *
+     * <p>Throws with words the operator can act on when the scope cannot be resolved:
+     * there is no own position yet, or the drawn shape the layer was scoped to is gone.
+     */
+    private Esri.Scope scope() {
+        if (spec.scopeKind == null)
+            return null;
+        if ("box".equals(spec.scopeKind)) {
+            if (spec.scopeBox == null)
+                throw new IllegalStateException("no area set for " + spec.title);
+            return Esri.Scope.box(spec.scopeBox[0], spec.scopeBox[1], spec.scopeBox[2], spec.scopeBox[3]);
+        }
+        if ("shape".equals(spec.scopeKind)) {
+            if (spec.scopeRings == null || spec.scopeRings.isEmpty())
+                throw new IllegalStateException("the shape " + spec.title + " was scoped to is gone; pick another");
+            return Esri.Scope.polygon(spec.scopeRings);
+        }
+        final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
+        final com.atakmap.coremap.maps.coords.GeoPoint p = self == null ? null : self.getPoint();
+        if (p == null || !p.isValid())
+            throw new IllegalStateException("no own position yet; wait for GPS or pick an area");
+        return Esri.Scope.circle(p.getLatitude(), p.getLongitude(), spec.scopeRadiusM);
+    }
+
     public void refresh(String token, Runnable progress) {
         if (store == null || closed || refreshing)
             return;
@@ -780,7 +809,8 @@ public class LoadedLayer {
             if (spec.timeField != null && spec.live && !cache.isEmpty()) {
                 final StringBuilder now = new StringBuilder();
                 for (int layerId : spec.layerIds)
-                    now.append(Esri.stamp(spec.base, layerId, spec.whereNow(), token, spec.timeField)).append(';');
+                    now.append(Esri.stamp(spec.base, layerId, spec.whereNow(), scope(), token, spec.timeField))
+                            .append(';');
                 if (now.toString().equals(lastStamp) && !lastStampWhere.equals(spec.whereNow().replaceAll("'[^']*'", ""))) {
                     // the where changed shape (a new window), so fetch anyway
                 } else if (now.toString().equals(lastStamp)) {
@@ -1004,7 +1034,7 @@ public class LoadedLayer {
         final String layerName = info.name;
 
         final int firstOfLayer = out.size();
-        Esri.query(spec.base, layerId, spec.whereNow(), token, spec.geojson,
+        Esri.query(spec.base, layerId, spec.whereNow(), scope(), token, spec.geojson,
                 Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
