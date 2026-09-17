@@ -46,23 +46,22 @@ final class DartStyles {
      */
     private static final float PX = 32f;
     /** Bumped when the composite itself changes, so cached ones are not reused. */
-    private static final int MARK_V = 3;
+    private static final int MARK_V = 4;
     /**
-     * The composite is a tall transparent canvas with the disc in the top square, so the
-     * marker is drawn <b>above</b> its position and a label centred on that position
-     * cannot land behind it.
+     * A square canvas. The disc is not centered on the position: {@link #style} draws it
+     * above, with its lower edge on the point, and the callsign hangs below from the same
+     * point. See there for why.
      *
-     * <p>Three attempts at positioning the label with {@code LabelPointStyle}'s alignment
-     * arguments all left the callsign drawn through the marker. The alignment units are
-     * not documented in the SDK's javadoc, which does not cover the map engine, and the
-     * one worked example in {@code samples/hello3d} passes a bare 100 with no explanation.
-     * Geometry in a PNG needs no documentation: the icon is 1:3, the disc occupies the top
-     * third, and the drawn height puts the disc's lower edge sixteen pixels clear of the
-     * point. Same trick as an ATAK pin, whose tip is the position and whose head is above.
+     * <p>It was briefly 96x288, the disc in the top square, to lift the marker off the
+     * point by geometry baked into the PNG, because the alignment arguments looked
+     * undocumented and unusable. They are neither, they are just not offsets: the
+     * constructor collapses {@code alignX}/{@code alignY} to a three-way enum <b>by
+     * sign</b> and discards the number, which is why an invented -160 behaved exactly like
+     * -1. A tall canvas is the wrong tool anyway -- the drawn size comes from the style, so
+     * a 1:3 PNG has to be asked for at 1:3 or the glyph is stretched, and the empty two
+     * thirds still scale with it.
      */
-    private static final int CANVAS = 96, CANVAS_H = 288;
-    /** Drawn height, keeping the 1:3 aspect so the disc lands at PX across. */
-    private static final float PX_H = PX * 3f;
+    private static final int CANVAS = 96;
     private static final int DISC = 0xD9101010, RING = 0xFFE6E6E6;
 
     private DartStyles() {
@@ -84,7 +83,18 @@ final class DartStyles {
         final File marker = marker(glyph, iconDir);
         if (marker == null)
             return null;
-        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX_H, 0, 0, 0f, true);
+        // Arguments five and six are alignX/alignY, not offsets -- the same sign-only enum
+        // the label uses. The -1 draws the disc ABOVE the position with its lower edge on
+        // it, like a pin's head over its tip, and that is what makes the callsign readable.
+        //
+        // A label set BELOW does not sit below the icon; measured on 2026-09-17, it puts
+        // its own top edge on the point. So with the disc centered on the point the disc
+        // covers the label's upper half and eats its leading characters: "CA-ANF-E325"
+        // rendered as "E325", which is what four rounds of "cut off and behind icon" were.
+        // Lifting the disc clear of the point leaves the point for the label, and the two
+        // meet there instead of overlapping. Both halves of the pairing are load bearing:
+        // center this icon again and the callsign is clipped again.
+        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX, 0, -1, 0f, true);
     }
 
     /**
@@ -175,7 +185,7 @@ final class DartStyles {
             final Bitmap in = BitmapFactory.decodeFile(src.getAbsolutePath());
             if (in == null)
                 return null;
-            final Bitmap bmp = Bitmap.createBitmap(CANVAS, CANVAS_H, Bitmap.Config.ARGB_8888);
+            final Bitmap bmp = Bitmap.createBitmap(CANVAS, CANVAS, Bitmap.Config.ARGB_8888);
             final Canvas c = new Canvas(bmp);
             final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
             p.setStyle(Paint.Style.FILL);

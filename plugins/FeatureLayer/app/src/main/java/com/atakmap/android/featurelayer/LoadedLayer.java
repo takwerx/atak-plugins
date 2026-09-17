@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 8;
+    private static final int STYLE_VERSION = 17;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -1223,9 +1223,13 @@ public class LoadedLayer {
                             // A point's name was drawn in ATAK's default white, which disappears
                             // over pale ground and snow: a callsign over a dry grass basemap was
                             // unreadable. Same dark pill the areas use.
-                            style = NwcgStyles.withNameLabel(style, true);
+                            // DART lifts its disc off the position, so its label hangs
+                            // below it; every other point layer keeps a centered icon and
+                            // the alignment that goes with one.
+                            final boolean lifted = DartStyles.handles(spec);
+                            style = NwcgStyles.withNameLabel(style, true, lifted);
                             if (alt != null)
-                                alt = NwcgStyles.withNameLabel(alt, true);
+                                alt = NwcgStyles.withNameLabel(alt, true, lifted);
                         }
                         final AttributeSet attrs = Esri.toAttributes(props, dates);
                         attrs.setAttribute("_title", title);
