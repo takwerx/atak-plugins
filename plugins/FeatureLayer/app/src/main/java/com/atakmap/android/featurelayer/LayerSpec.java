@@ -54,6 +54,8 @@ public class LayerSpec {
     public String labelField;
     /** What to call the service's layer to a person, when its own name is a table name. */
     public String layerTitle;
+    /** Which of this plugin's symbology versions the store was last written with. */
+    public int styleVersion;
     /**
      * Keep only the newest feature (by {@link #timeField}) per key: each entry is a field,
      * or fields separated by "|" tried in turn ("incident_name|mission"). Null = keep all.
@@ -124,7 +126,7 @@ public class LayerSpec {
         for (int i : layerIds)
             ids.put(i);
         o.put("layerIds", ids);
-        o.put("layerTitle", layerTitle);
+        o.put("layerTitle", layerTitle).put("styleVersion", styleVersion);
         o.put("scopeKind", scopeKind).put("scopeRadiusM", scopeRadiusM).put("scopeRings", scopeRings);
         if (scopeBox != null)
             o.put("scopeBox", new JSONArray(
@@ -168,6 +170,7 @@ public class LayerSpec {
         for (int i = 0; i < ids.length(); i++)
             s.layerIds[i] = ids.getInt(i);
         s.layerTitle = o.isNull("layerTitle") ? null : o.optString("layerTitle", null);
+        s.styleVersion = o.optInt("styleVersion", 0);
         s.scopeKind = o.isNull("scopeKind") ? null : o.optString("scopeKind", null);
         s.scopeRadiusM = o.optDouble("scopeRadiusM", 40000);
         s.scopeRings = o.isNull("scopeRings") ? null : o.optString("scopeRings", null);

@@ -37,8 +37,14 @@ import java.util.Locale;
 final class DartStyles {
     private static final String TAG = "FeatureLayer";
 
-    /** The marker's edge in pixels: a gloved tap target that does not swamp the map. */
-    private static final float PX = 34f;
+    /**
+     * The marker's edge in pixels. 44 to match the gloved touch target the takwerx button
+     * style uses: 34 still read as "tiny, can't see them" on a 2340x1080 phone held at
+     * arm's length in a vehicle.
+     */
+    private static final float PX = 44f;
+    /** Bumped when the composite itself changes, so cached ones are not reused. */
+    private static final int MARK_V = 2;
     /** Composite canvas, larger than PX so the glyph stays sharp on a dense screen. */
     private static final int CANVAS = 96;
     private static final int DISC = 0xD9101010, RING = 0xFFE6E6E6;
@@ -141,7 +147,7 @@ final class DartStyles {
      * unpacked, so a caller falls back rather than drawing nothing.
      */
     private static synchronized File marker(String glyph, File iconDir) {
-        final File out = new File(iconDir, "dartm_" + glyph.replace('-', '_') + ".png");
+        final File out = new File(iconDir, "dartm" + MARK_V + "_" + glyph.replace('-', '_') + ".png");
         if (out.isFile())
             return out;
         final File src = new File(iconDir, "dart_egp-dart-" + glyph + ".png");
@@ -165,7 +171,7 @@ final class DartStyles {
             c.drawCircle(CANVAS / 2f, CANVAS / 2f, CANVAS / 2f - 3f, p);
             // Fit inside the disc, aspect kept: EGP's vehicles are wide (130x88) and its
             // personnel glyphs are square, and a squashed fire engine reads as a smudge.
-            final float fit = CANVAS * 0.66f;
+            final float fit = CANVAS * 0.74f;
             final float scale = Math.min(fit / in.getWidth(), fit / in.getHeight());
             final float w = in.getWidth() * scale, h = in.getHeight() * scale;
             final RectF dst = new RectF((CANVAS - w) / 2f, (CANVAS - h) / 2f, (CANVAS + w) / 2f, (CANVAS + h) / 2f);

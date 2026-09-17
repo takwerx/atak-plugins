@@ -41,6 +41,12 @@ import java.util.Set;
 public class LoadedLayer {
 
     private static final String TAG = "FeatureLayer";
+    /**
+     * Bumped whenever this plugin changes how it draws anything. A layer whose store was
+     * written under an older number is fully rewritten on its next refresh, because the
+     * style travels with the feature into the store.
+     */
+    private static final int STYLE_VERSION = 4;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -488,7 +494,19 @@ public class LoadedLayer {
      * the previous ones out. Lock held.
      */
     private void rewriteStore() {
-        if (cache.isEmpty()) {
+        rewriteStore(false);
+    }
+
+    /**
+     * @param allowEmpty true only when a fetch has just succeeded and genuinely returned
+     *        nothing. Refusing an empty write protects the map from a failed fetch, but on
+     *        a scoped layer it also kept the last place's features drawn forever: DART
+     *        showed 27 vehicles from a previous scope, with the styles of an older build,
+     *        while every fetch came back with nothing in range (2026-09-17). An empty
+     *        answer from a server that answered is an answer.
+     */
+    private void rewriteStore(boolean allowEmpty) {
+        if (cache.isEmpty() && !allowEmpty) {
             // Never trade a full store for an empty memory copy.
             Log.w(TAG, spec.id + ": rewrite skipped, nothing in memory to write");
             return;
@@ -773,6 +791,22 @@ public class LoadedLayer {
      * <p>Throws with words the operator can act on when the scope cannot be resolved:
      * there is no own position yet, or the drawn shape the layer was scoped to is gone.
      */
+    /** Where this layer is looking, for the log and the panel. */
+    String scopeLabel() {
+        if (spec.scopeKind == null)
+            return "everything";
+        if ("box".equals(spec.scopeKind))
+            return "an area";
+        if ("shape".equals(spec.scopeKind))
+            return "a drawn shape";
+        final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
+        final com.atakmap.coremap.maps.coords.GeoPoint p = self == null ? null : self.getPoint();
+        if (p == null)
+            return "around you (no position)";
+        return String.format(java.util.Locale.US, "within %.0f km of %.4f, %.4f",
+                spec.scopeRadiusM / 1000d, p.getLatitude(), p.getLongitude());
+    }
+
     private Esri.Scope scope() {
         if (spec.scopeKind == null)
             return null;
@@ -788,8 +822,12 @@ public class LoadedLayer {
         }
         final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
         final com.atakmap.coremap.maps.coords.GeoPoint p = self == null ? null : self.getPoint();
-        if (p == null || !p.isValid())
-            throw new IllegalStateException("no own position yet; wait for GPS or pick an area");
+        // GeoPoint.isValid() is true at 0,0, which is not a position -- it is what the self
+        // marker reads before a fix. Scoping to it put a 25 mile circle in the Gulf of
+        // Guinea, so every fetch came back empty while the map still showed the last
+        // place's features (2026-09-17).
+        if (p == null || !p.isValid() || (Math.abs(p.getLatitude()) < 0.01 && Math.abs(p.getLongitude()) < 0.01))
+            throw new IllegalStateException("no own position yet; wait for GPS or set your location in ATAK");
         return Esri.Scope.circle(p.getLatitude(), p.getLongitude(), spec.scopeRadiusM);
     }
 
@@ -806,7 +844,14 @@ public class LoadedLayer {
         try {
             // A windowed live layer asks "anything new?" first: count and newest time per
             // source layer. Same answer as last time and something already drawn: done.
-            if (spec.timeField != null && spec.live && !cache.isEmpty()) {
+            // Styles are written into the store with the features, so a build that changes
+            // symbology never reaches rows already cached: DART's new EGP glyphs did not
+            // show up because the stamp said "no change" and the old tiny dots stayed
+            // (2026-09-17). A version bump forces one full rewrite.
+            final boolean restyle = spec.styleVersion != STYLE_VERSION;
+            if (restyle)
+                Log.d(TAG, spec.id + ": symbology changed since this store was written, rewriting");
+            if (!restyle && spec.timeField != null && spec.live && !cache.isEmpty()) {
                 final StringBuilder now = new StringBuilder();
                 for (int layerId : spec.layerIds)
                     now.append(Esri.stamp(spec.base, layerId, spec.whereNow(), scope(), token, spec.timeField))
@@ -822,6 +867,8 @@ public class LoadedLayer {
                 lastStamp = now.toString();
                 lastStampWhere = spec.whereNow().replaceAll("'[^']*'", "");
             }
+            if (spec.scopeKind != null)
+                Log.d(TAG, spec.id + ": fetching " + scopeLabel());
             perimeterRings.clear();
             perimeterHoles.clear();
             for (int layerId : spec.layerIds) {
@@ -845,7 +892,8 @@ public class LoadedLayer {
                     throw new IllegalStateException("layer closed");
                 cache = pending;
                 spec.bounds = extentOf(pending);
-                rewriteStore();
+                rewriteStore(true);
+                spec.styleVersion = STYLE_VERSION;
                 Log.d(TAG, spec.id + ": refresh done, " + pending.size() + " fetched, store holds " + count);
             }
             lastRefresh = System.currentTimeMillis();

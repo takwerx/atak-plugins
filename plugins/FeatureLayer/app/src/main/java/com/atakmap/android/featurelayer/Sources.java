@@ -172,6 +172,39 @@ public final class Sources {
                 "DateTime");
     }
 
+    /**
+     * Re-applies what the plugin owns to a restored layer. A saved layer carries the
+     * definition it was added with, so a built-in source that gains a field in a new
+     * build keeps drawing the old way: DART's EGP symbology never appeared because
+     * {@code iconSet} was null in JSON saved before that field existed, so the styling
+     * code was never even asked (2026-09-17).
+     *
+     * <p>Only fields the plugin decides are touched. The operator's own choices -- the
+     * scope, which types are switched on, whether labels show -- are left alone.
+     */
+    public static void migrate(LayerSpec s) {
+        if (s == null || s.id == null)
+            return;
+        final LayerSpec now = "dart-personnel".equals(s.id) ? dartPersonnel()
+                : "dart-vehicles".equals(s.id) ? dartVehicles() : null;
+        if (now == null)
+            return;
+        s.base = now.base;
+        s.layerIds = now.layerIds;
+        s.title = now.title;
+        s.subtitle = now.subtitle;
+        s.layerTitle = now.layerTitle;
+        s.portal = now.portal;
+        s.orgName = now.orgName;
+        s.profile = now.profile;
+        s.iconSet = now.iconSet;
+        s.labelField = now.labelField;
+        s.setField = now.setField;
+        s.timeField = now.timeField;
+        s.sinceHours = now.sinceHours;
+        s.maxFeatures = now.maxFeatures;
+    }
+
     /** A whole feature service from a user's own org: every layer, generic symbology, capped. */
     /** CA Air Intel: statewide fire perimeters from FIRIS, CAL FIRE intel flights, USFS, NIFC and WFIGS, public. */
     static final String CA_AIR_INTEL = "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/CA_Perimeters_NIFC_FIRIS_public_view/FeatureServer";

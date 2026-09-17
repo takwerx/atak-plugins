@@ -472,6 +472,8 @@ public class LayerManager {
                         if (!spec.setKind.containsKey(n))
                             spec.setKind.put(n, "polygon");
                 }
+                // A built-in source's own definition wins over what was saved with it.
+                Sources.migrate(spec);
                 // Live NIFS layers saved with the four Event layers: give them all eight.
                 if (spec.id.startsWith("nifs-live:") && spec.layerIds.length < Sources.NIFS_LIVE_LAYERS.length)
                     spec.layerIds = Sources.NIFS_LIVE_LAYERS;
