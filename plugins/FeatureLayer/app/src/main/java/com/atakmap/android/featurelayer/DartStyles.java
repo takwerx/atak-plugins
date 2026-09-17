@@ -38,11 +38,13 @@ final class DartStyles {
     private static final String TAG = "FeatureLayer";
 
     /**
-     * The marker's edge in pixels. 44 to match the gloved touch target the takwerx button
-     * style uses: 34 still read as "tiny, can't see them" on a 2340x1080 phone held at
-     * arm's length in a vehicle.
+     * The marker's edge in pixels: 32, which is what ATAK draws its own markers at. Every
+     * icon in ATAK's iconsets.sqlite is a 32x32 PNG -- all 77 fire icons across its
+     * GeoOps and FEMA sets included -- so a DART marker sits beside an ATAK fire engine
+     * at the same size instead of shouting over it. Do not raise this without a reason
+     * that beats "it matches ATAK".
      */
-    private static final float PX = 44f;
+    private static final float PX = 32f;
     /** Bumped when the composite itself changes, so cached ones are not reused. */
     private static final int MARK_V = 2;
     /** Composite canvas, larger than PX so the glyph stays sharp on a dense screen. */

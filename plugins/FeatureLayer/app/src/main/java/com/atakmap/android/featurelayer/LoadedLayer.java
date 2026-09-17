@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 4;
+    private static final int STYLE_VERSION = 5;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
