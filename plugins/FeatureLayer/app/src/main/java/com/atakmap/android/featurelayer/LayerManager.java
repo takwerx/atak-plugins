@@ -319,8 +319,25 @@ public class LayerManager {
                 public void onMapMoved(com.atakmap.map.AtakMapView v, boolean animate) {
                     main.removeCallbacks(moveTick);
                     main.postDelayed(moveTick, MOVE_SETTLE_MS);
+                    // The label check is cheap and the wait for it was the whole delay
+                    // an operator saw crossing the level: its own, much shorter settle.
+                    main.removeCallbacks(labelTick);
+                    main.postDelayed(labelTick, LABEL_SETTLE_MS);
                 }
             };
+
+    private static final long LABEL_SETTLE_MS = 150;
+
+    private final Runnable labelTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!started)
+                return;
+            final double res = mapView.getMapResolution();
+            for (LoadedLayer l : snapshot())
+                l.onMapResolution(res);
+        }
+    };
     private final com.atakmap.android.maps.PointMapItem.OnPointChangedListener selfWatch =
             new com.atakmap.android.maps.PointMapItem.OnPointChangedListener() {
                 @Override
@@ -384,6 +401,7 @@ public class LayerManager {
         } finally {
             selfWatched = null;
             main.removeCallbacks(moveTick);
+            main.removeCallbacks(labelTick);
         }
     }
 

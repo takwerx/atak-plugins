@@ -138,6 +138,21 @@ final class DartMarkers {
         final List<Row> rows = lastRows;
         if (rows.isEmpty())
             return;
+        // Every bitmap already in hand, which is the usual case after a refresh: apply
+        // now, on this thread, and skip the hand-off.
+        boolean ready = true;
+        for (Row r : rows) {
+            final String uri = r.iconUri == null || r.iconUri.isEmpty() ? fallbackUri : r.iconUri;
+            if (!icons.containsKey(uri + "|" + (show || DartStyles.sos(r.callsign) ? (r.callsign == null ? "" : r.callsign) : ""))) {
+                ready = false;
+                break;
+            }
+        }
+        if (ready) {
+            ++swapGen;
+            applyOnMain(rows, show);
+            return;
+        }
         final int gen = ++swapGen;
         new Thread(new Runnable() {
             @Override
@@ -170,8 +185,12 @@ final class DartMarkers {
         // several hundred callsigns -- decode, draw, PNG-encode each -- inside the main
         // thread's marker update, and ATAK "struggled to start" (2026-09-17). Cached on
         // disk and in memory, so a callsign already seen costs nothing here.
-        for (Row r : copy)
-            icon(r.iconUri, shown ? r.callsign : "");
+        // Both forms, so a zoom across the label level never composes anything: the
+        // labelled one is the cost, paid here on the refresh thread once per callsign.
+        for (Row r : copy) {
+            icon(r.iconUri, r.callsign);
+            icon(r.iconUri, "");
+        }
         mapView.post(new Runnable() {
             @Override
             public void run() {
