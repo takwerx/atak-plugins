@@ -49,8 +49,8 @@ final class DartStyles {
     private static final int MARK_V = 4;
     /**
      * A square canvas. The disc is not centered on the position: {@link #style} draws it
-     * above, with its lower edge on the point, and the callsign hangs below from the same
-     * point. See there for why.
+     * just below, with its top edge on the point, and the callsign sits above it. See
+     * there for why.
      *
      * <p>It was briefly 96x288, the disc in the top square, to lift the marker off the
      * point by geometry baked into the PNG, because the alignment arguments looked
@@ -84,17 +84,18 @@ final class DartStyles {
         if (marker == null)
             return null;
         // Arguments five and six are alignX/alignY, not offsets -- the same sign-only enum
-        // the label uses. The -1 draws the disc ABOVE the position with its lower edge on
-        // it, like a pin's head over its tip, and that is what makes the callsign readable.
+        // the label uses. The 1 draws the disc just BELOW the position, its top edge on the
+        // point, so the callsign sits centered above it: the arrangement ATAK uses for its
+        // own markers, which is what the operator asked for.
         //
-        // A label set BELOW does not sit below the icon; measured on 2026-09-17, it puts
-        // its own top edge on the point. So with the disc centered on the point the disc
-        // covers the label's upper half and eats its leading characters: "CA-ANF-E325"
-        // rendered as "E325", which is what four rounds of "cut off and behind icon" were.
-        // Lifting the disc clear of the point leaves the point for the label, and the two
-        // meet there instead of overlapping. Both halves of the pairing are load bearing:
-        // center this icon again and the callsign is clipped again.
-        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX, 0, -1, 0f, true);
+        // Neither label direction clears an icon centered on the point, and that is the
+        // whole bug. Measured on 2026-09-17: BELOW puts the label's top edge on the point,
+        // and ABOVE pins its top about 40 px up and then grows it back down -- roughly
+        // 24 px of overlap either way. With the disc centered it covered the callsign's
+        // leading characters and "CA-ANF-E325" reached the operator as "E325", which is
+        // what four rounds of "cut off and behind icon" were. So the icon moves, not the
+        // label. Center this icon again and the callsign is clipped again.
+        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX, 0, 1, 0f, true);
     }
 
     /**

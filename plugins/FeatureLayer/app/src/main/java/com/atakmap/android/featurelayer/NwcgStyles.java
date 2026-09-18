@@ -359,48 +359,58 @@ public final class NwcgStyles {
      * {@code FeatureLayer3}, which renders natively and not through {@code GLBatchPoint}:
      *
      * <ul>
-     * <li>{@code Y_BELOW} puts the label's <b>top edge on the point</b> -- not below the
-     * icon. A centered icon therefore covers the label's upper half, and a wide icon clips
-     * the callsign's first characters: "CA-ANF-E325" read as "E325" on 2026-09-17, which
-     * is what "cut off and behind icon" was.
-     * <li>{@code Y_ABOVE} is not its mirror. It pins the label's top edge about 42 px above
-     * the point and lets the label grow down into the icon, so a full-height pill overlaps
-     * anyway. Only BELOW is predictable.
-     * <li>{@code X_AT_POINT} puts the label's left edge on the point, running rightwards.
-     * Nothing centers a label on a point: the label is far wider than the icon and no
-     * alignment value offers it. Do not "improve" this to 0, which aligns the label to the
-     * icon's left edge instead and, for reasons the native renderer does not expose,
-     * truncates the text to what fits the icon's width -- "CA-ANF-E325" came back as
-     * "NF-E325", measured both ways on 2026-09-17.
+     * <li>{@code alignY > 0} (BELOW) puts the label's <b>top edge on the point</b>, not
+     * below the icon. A centered icon therefore covers the label's upper half and clips the
+     * callsign's first characters: "CA-ANF-E325" read as "E325" on 2026-09-17, which is
+     * what "cut off and behind icon" was.
+     * <li>{@code Y_ABOVE} is not its mirror. It pins the label's <b>top</b> edge about 40 px
+     * above the point and lets the label grow downwards from there, so it also overlaps an
+     * icon centered on the point -- by about 24 px, measured. Neither direction clears a
+     * centered icon; the icon has to move.
+     * <li>{@code X_CENTERED} (0) centers the label on the point, which is what ATAK does
+     * with every other marker label. {@code 1} puts its left edge on the point instead and
+     * {@code -1} its right edge, both of which hang the callsign off to one side.
      * </ul>
      *
-     * <p>The pairing that follows from this is in {@link DartStyles}: the icon is drawn
-     * above the point, the label below it, and the two meet on the position. All of it was
-     * measured on one vehicle on ATAK 5.8.0.3; labels in a cluster, where ATAK's own
-     * collision handling has a say, are not covered by any of it.
+     * <p>One thing here is ATAK's and is <b>not fixed</b>: it trims a feature label where
+     * it collides with a basemap label, on whichever side the neighbor is. `CA-ANF-E325`
+     * drew as "ANF-E325" against a road label on its left and `CA-ANF-WT225` as
+     * "CA-ANF-WT2" against a place label on its right, with the full names confirmed in
+     * the sqlite store, so the trim is the renderer's. Not reachable from a plugin: tried
+     * every {@code alignX}/{@code alignY}, both other {@code ScrollMode}s, clearing
+     * {@code HINT_WEIGHTED_FLOAT}, clearing {@code labelHints} outright, and a 4x wider
+     * transparent icon box. None changed it. Centering makes it likelier than hanging the
+     * label to one side, because a centered label reaches across the marker into whatever
+     * is on both sides -- that is the cost of matching ATAK's own look, and the operator
+     * chose the look. The real lever is crowding: fewer markers drawn at once. Callsigns
+     * are never shortened by this plugin to buy room; that was proposed and rejected
+     * (commit d3a5548), because the state and unit are the point of a callsign.
+     *
+     * <p>Two earlier readings of the alignment were wrong, both from measuring a dark pill
+     * against a dark marker disc, which read as one shape: that the alignment arguments did
+     * nothing, and that {@code alignX = 0} truncated the text by itself. Set the backing to
+     * opaque red, measure the box against the icon's ring, then put the color back -- do
+     * not judge any of this by eye.
+     *
+     * <p>The pairing that follows is in {@link DartStyles}: the icon is drawn below the
+     * point so its top edge is on it, and the label sits above, centered, clearing the
+     * icon by about 3 px. That is the arrangement ATAK uses for its own markers, which is
+     * what the operator asked for. Measured on ATAK 5.8.0.3; labels in a cluster, where
+     * ATAK's own collision handling has a say, are not covered by any of it.
      */
-    private static final int LABEL_X_AT_POINT = 1, LABEL_Y_BELOW = 1, LABEL_Y_ABOVE = -1;
+    private static final int LABEL_X_CENTERED = 0, LABEL_Y_ABOVE = -1;
 
     /**
-     * @param underIcon true for a point that also draws an icon, which needs the alignment
-     *        worked out above and a darker backing, being read against a marker rather than
-     *        open ground. The area form is left exactly as it shipped: its label point
-     *        carries no icon, so none of the clipping applies to it, and it has looked
-     *        right for as long as it has existed. Its {@code 100} is BELOW, same as 1.
+     * @param underIcon true for a point that also draws an icon: centered above it, and on
+     *        a darker backing, being read against a marker rather than open ground. Every
+     *        point layer gets the same label; only DART's icon is moved out from under it
+     *        (see {@link DartStyles}), so on a layer whose icon is still centered on its
+     *        point the label overlaps the icon's top by about 24 px, as it always has.
+     *        <p>The area form is left exactly as it shipped: its label point carries no
+     *        icon, so none of this applies to it, and it has looked right for as long as it
+     *        has existed. Its {@code 100} is BELOW, same as 1.
      */
     public static Style withNameLabel(Style s, boolean underIcon) {
-        return withNameLabel(s, underIcon, false);
-    }
-
-    /**
-     * @param iconAbovePoint true when this point's icon is drawn above the position rather
-     *        than centered on it, which is what frees the position for a label hung below
-     *        (DART, see {@link DartStyles}). Only that pairing was measured, so a layer
-     *        whose icon is still centered keeps the alignment it has always had: hanging its
-     *        label below a centered icon would put the icon over the label's top half and
-     *        clip the first characters, which is the bug this pairing exists to fix.
-     */
-    public static Style withNameLabel(Style s, boolean underIcon, boolean iconAbovePoint) {
         // The empty text is not an oversight: the renderer draws the feature's own name and
         // ignores a label style's text, so passing the callsign in here changes nothing --
         // measured with a ">>" prefix that never appeared and a pill whose width never
@@ -408,15 +418,10 @@ public final class NwcgStyles {
         // alignment. The 0f is a fix for every point layer, not just DART: the 14f it
         // replaces drew the text larger than the pill sized itself for, and that was the
         // other half of the clipping.
-        final Style pill;
-        if (!underIcon)
-            pill = new LabelPointStyle("", WHITE, 0xA0000000, LabelPointStyle.ScrollMode.OFF, 0f, 0, 100, 0f, false);
-        else if (iconAbovePoint)
-            pill = new LabelPointStyle("", WHITE, 0xC0000000, LabelPointStyle.ScrollMode.OFF, 0f,
-                    LABEL_X_AT_POINT, LABEL_Y_BELOW, 0f, false);
-        else
-            pill = new LabelPointStyle("", WHITE, 0xC0000000, LabelPointStyle.ScrollMode.OFF, 0f,
-                    0, LABEL_Y_ABOVE, 0f, false);
+        final Style pill = underIcon
+                ? new LabelPointStyle("", WHITE, 0xC0000000, LabelPointStyle.ScrollMode.OFF, 0f,
+                        LABEL_X_CENTERED, LABEL_Y_ABOVE, 0f, false)
+                : new LabelPointStyle("", WHITE, 0xA0000000, LabelPointStyle.ScrollMode.OFF, 0f, 0, 100, 0f, false);
         if (s instanceof CompositeStyle) {
             final CompositeStyle cs = (CompositeStyle) s;
             final Style[] all = new Style[cs.getNumStyles() + 1];
