@@ -199,13 +199,16 @@ final class DartMarkers {
         if (i != null)
             return i;
         try {
-            // setSize, but never setAnchor. The composite is 96x96; with an anchor set
-            // ATAK dropped the icon and substituted its own green default, and with no
-            // size at all it drew the image at 96 px, three times the size of every other
-            // marker on the map. Both were seen on the XCover on 2026-09-17.
+            // Size AND anchor, both in dp, both required. GLMarker2 pushes the label clear
+            // of the icon by (height - anchorY), so with no anchor the label sat centered on
+            // the point and the disc drew a bite out of the middle of every callsign --
+            // "CA-ANF-WT225" read as "CA-AN  T225", with the missing letters exactly under
+            // the disc (2026-09-17). Without setSize the composite draws at its full 96 px.
+            final int px = (int) DartStyles.markerPx();
             i = new Icon.Builder()
                     .setImageUri(Icon.STATE_DEFAULT, uri)
-                    .setSize((int) DartStyles.markerPx(), (int) DartStyles.markerPx())
+                    .setSize(px, px)
+                    .setAnchor(px / 2, px / 2)
                     .build();
             icons.put(uri, i);
             return i;
@@ -227,8 +230,22 @@ final class DartMarkers {
             }
             final MapGroup root = mapView.getRootGroup();
             MapGroup g = root.findMapGroup(groupName);
-            if (g == null)
+            if (g == null) {
                 g = root.addGroup(groupName);
+            } else {
+                // The group outlives the plugin instance that made it: a reinstall
+                // unloads the old instance, whose dispose() is a posted Runnable that
+                // may never run once its context is gone, and the new instance then
+                // finds the old group still full. Its markers are stale copies of ours
+                // at the same positions, drawn underneath, which is what kept biting a
+                // disc-shaped hole out of every callsign even with our own icon gone
+                // (2026-09-17). Start from an empty group.
+                for (com.atakmap.android.maps.MapItem it : new ArrayList<>(g.getItems()))
+                    try {
+                        g.removeItem(it);
+                    } catch (Exception ignored) {
+                    }
+            }
             g.setMetaBoolean("addToObjList", false);
             group = g;
         }

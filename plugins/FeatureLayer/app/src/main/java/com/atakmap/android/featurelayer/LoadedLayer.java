@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 38;
+    private static final int STYLE_VERSION = 40;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -247,7 +247,13 @@ public class LoadedLayer {
         dedupeSets();
         pruneHidden();
         mapView.getMapOverlayManager().addFilesOverlay(overlay);
-        mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+        // A DART layer is drawn by its markers (see DartMarkers) and its feature layer
+        // never goes on the render stack. Gating the sets to 0 was supposed to do this and
+        // did not: the features still drew, disc and trimmed name label, on top of the
+        // markers -- with the marker icon hidden, the feature's disc still bit a circle
+        // out of the callsign (2026-09-17). The store stays for details, search and counts.
+        if (dartLabels == null)
+            mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
         count = countFeatures();
         status = count > 0 ? "cached" : "empty";
     }
@@ -292,9 +298,10 @@ public class LoadedLayer {
 
     private void detachLocked() {
         try {
+            final boolean drawnByMarkers = dartLabels != null;
             if (dartLabels != null)
                 dartLabels.dispose();
-            if (layer != null)
+            if (layer != null && !drawnByMarkers)
                 mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             if (overlay != null)
                 mapView.getMapOverlayManager().removeOverlay(overlay);
@@ -541,11 +548,7 @@ public class LoadedLayer {
                 Long fsid = sets.get(pf.setName);
                 if (fsid == null) {
                     // The kind's own gate (points 120 m/px, lines 400) capped by the layer's.
-                    // A DART set gets 0, which never draws: its markers do the drawing and a
-                    // feature drawn as well would put a second disc under every callsign.
-                    // The row is still here for the details pane, the search and the counts.
-                    fsid = dartLabels != null ? newSet(store, pf.setName, 0d)
-                            : newSet(store, pf.setName, Math.min(pf.minGsd, spec.gateGsd));
+                    fsid = newSet(store, pf.setName, Math.min(pf.minGsd, spec.gateGsd));
                     sets.put(pf.setName, fsid);
                 }
                 Style drawn = spec.repairStatus && pf.alt != null ? pf.alt : pf.style;
