@@ -46,7 +46,7 @@ final class DartStyles {
      */
     private static final float PX = 32f;
     /** Bumped when the composite itself changes, so cached ones are not reused. */
-    private static final int MARK_V = 4;
+    private static final int MARK_V = 5;
     /**
      * A square canvas, and the disc is centered on the position.
      *
@@ -60,6 +60,18 @@ final class DartStyles {
      * thirds still scale with it.
      */
     private static final int CANVAS = 96;
+    /**
+     * Transparent padding below the disc, as a fraction of the disc. GLMarker2 places a
+     * marker's label at (icon height - anchorY) from the point, on the side opposite the
+     * icon's bottom; with a square icon and a centered anchor that is exactly touching,
+     * and a label that touches its icon's rectangle gets trimmed to the icon's width --
+     * "CA-ANF-E327" drew as "-E3", while a neighbour whose label ATAK had floated clear
+     * drew whole (2026-09-17). Padding below the disc, with the anchor still on the disc's
+     * center, keeps the disc on the position and lifts the label clear of it. The cost is
+     * a touch target that extends this far below the disc.
+     */
+    static final float PAD = 0.5f;
+    private static final int CANVAS_H = CANVAS + (int) (CANVAS * PAD);
     private static final int DISC = 0xD9101010, RING = 0xFFE6E6E6;
 
     private DartStyles() {
@@ -68,6 +80,11 @@ final class DartStyles {
     /** The disc's drawn edge, so a marker drawing it can ask for the same size. */
     static float markerPx() {
         return PX;
+    }
+
+    /** The composite's drawn height: the disc plus the padding below it. */
+    static float markerPxH() {
+        return PX * (1f + PAD);
     }
 
     /**
@@ -191,7 +208,7 @@ final class DartStyles {
             final Bitmap in = BitmapFactory.decodeFile(src.getAbsolutePath());
             if (in == null)
                 return null;
-            final Bitmap bmp = Bitmap.createBitmap(CANVAS, CANVAS, Bitmap.Config.ARGB_8888);
+            final Bitmap bmp = Bitmap.createBitmap(CANVAS, CANVAS_H, Bitmap.Config.ARGB_8888);
             final Canvas c = new Canvas(bmp);
             final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
             p.setStyle(Paint.Style.FILL);

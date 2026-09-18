@@ -204,10 +204,14 @@ final class DartMarkers {
             // the point and the disc drew a bite out of the middle of every callsign --
             // "CA-ANF-WT225" read as "CA-AN  T225", with the missing letters exactly under
             // the disc (2026-09-17). Without setSize the composite draws at its full 96 px.
+            // The composite is the disc plus transparent padding below it (DartStyles.PAD).
+            // The anchor stays on the disc's center so the disc sits on the position; the
+            // padding is what GLMarker2 turns into the label's clearance above the disc.
             final int px = (int) DartStyles.markerPx();
+            final int ph = (int) DartStyles.markerPxH();
             i = new Icon.Builder()
                     .setImageUri(Icon.STATE_DEFAULT, uri)
-                    .setSize(px, px)
+                    .setSize(px, ph)
                     .setAnchor(px / 2, px / 2)
                     .build();
             icons.put(uri, i);
