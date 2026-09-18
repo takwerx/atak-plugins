@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 47;
+    private static final int STYLE_VERSION = 48;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -1256,16 +1256,26 @@ public class LoadedLayer {
                             style = NwcgStyles.silentLabel(style);
                             if (alt != null)
                                 alt = NwcgStyles.silentLabel(alt);
-                        } else if (!nwcg && spec.labels && name != null && !name.isEmpty()) {
-                            // A point's name was drawn in ATAK's default white, which disappears
-                            // over pale ground and snow: a callsign over a dry grass basemap was
-                            // unreadable. Same dark pill the areas use.
-                            if (DartStyles.handles(spec)) {
-                                // The callsign is a marker label now; a feature label here
-                                // would be a second, trimmed copy of it under the disc.
-                                style = NwcgStyles.withoutLabel(style);
-                                if (alt != null)
-                                    alt = NwcgStyles.withoutLabel(alt);
+                        } else if (isPointLayer && DartStyles.handles(spec)) {
+                            // The callsign is a marker label now; a feature label here would
+                            // be a second, trimmed copy of it under the disc.
+                            style = NwcgStyles.withoutLabel(style);
+                            if (alt != null)
+                                alt = NwcgStyles.withoutLabel(alt);
+                        } else if (isPointLayer && spec.labels && name != null && !name.isEmpty()
+                                && !(style instanceof com.atakmap.map.layer.feature.style.LabelPointStyle)) {
+                            // A point's name is pixels in its icon (LabelledIcons), not a label.
+                            // ATAK's label engine drew NWCG point names in white with no backing
+                            // and trimmed them -- "Value at Risk" as "Va", "Hazard" as "ard" over
+                            // red terrain on the Timber fire (2026-09-17) -- and trimmed the
+                            // pill on every other layer's points the same way. A transparent
+                            // empty label then keeps the engine from drawing the name itself.
+                            // (A Label Point layer is text only and keeps its own style.)
+                            final Style ls = labelledPoint(style, name);
+                            if (ls != null) {
+                                style = ls;
+                                final Style la = alt == null ? null : labelledPoint(alt, name);
+                                alt = la != null ? la : alt;
                             } else {
                                 style = NwcgStyles.withNameLabel(style, true, name);
                                 if (alt != null)
@@ -1343,6 +1353,58 @@ public class LoadedLayer {
                 });
         if (spec.latestBy != null && spec.latestBy.length > 0)
             keepLatest(out, firstOfLayer);
+    }
+
+    /**
+     * A point style with its name composed into the icon and its label made transparent,
+     * or null when the style has no file-backed icon to build from. The symbol keeps the
+     * size it has on screen today: a scale-form icon draws at its PNG's own pixels times
+     * the scale, a size-form one at its dp times ATAK's display scaling.
+     */
+    private Style labelledPoint(Style s, String text) {
+        final com.atakmap.map.layer.feature.style.IconPointStyle ip;
+        if (s instanceof com.atakmap.map.layer.feature.style.IconPointStyle)
+            ip = (com.atakmap.map.layer.feature.style.IconPointStyle) s;
+        else if (s instanceof com.atakmap.map.layer.feature.style.CompositeStyle)
+            ip = (com.atakmap.map.layer.feature.style.IconPointStyle) com.atakmap.map.layer.feature.style.CompositeStyle
+                    .find((com.atakmap.map.layer.feature.style.CompositeStyle) s,
+                            com.atakmap.map.layer.feature.style.IconPointStyle.class);
+        else
+            ip = null;
+        if (ip == null || ip.getIconUri() == null || !ip.getIconUri().startsWith("file://"))
+            return null;
+        try {
+            final File symbol = new File(ip.getIconUri().substring("file://".length()));
+            final float scale = gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling();
+            int symW, symH;
+            final float sc = ip.getIconScaling();
+            if (sc != 0f) {
+                final android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+                o.inJustDecodeBounds = true;
+                android.graphics.BitmapFactory.decodeFile(symbol.getAbsolutePath(), o);
+                if (o.outWidth <= 0)
+                    return null;
+                symW = Math.round(o.outWidth * sc);
+                symH = Math.round(o.outHeight * sc);
+            } else {
+                symW = Math.round(ip.getIconWidth() * scale);
+                symH = Math.round(ip.getIconHeight() * scale);
+            }
+            final com.atakmap.android.maps.MapTextFormat tf = MapView.getDefaultTextFormat();
+            float textPx = tf.getDensityAdjustedFontSize();
+            if (textPx <= 0f)
+                textPx = tf.getFontSize() * scale;
+            final int[] dim = new int[2];
+            final File f = LabelledIcons.compose(symbol, symW, symH, text, tf.getTypeface(), textPx, iconDir, dim);
+            if (f == null)
+                return null;
+            final Style icon = new com.atakmap.map.layer.feature.style.IconPointStyle(0xFFFFFFFF,
+                    "file://" + f.getAbsolutePath(), dim[0] / scale, dim[1] / scale, 0, 0, 0f, true);
+            return NwcgStyles.withoutLabel(icon);
+        } catch (Exception e) {
+            Log.w(TAG, "labelled point \"" + text + "\"", e);
+            return null;
+        }
     }
 
     /** The icon a point style draws, so a marker can draw the same one. */
