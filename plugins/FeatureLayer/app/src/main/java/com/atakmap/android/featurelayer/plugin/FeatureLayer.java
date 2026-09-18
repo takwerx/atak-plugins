@@ -435,9 +435,18 @@ public class FeatureLayer implements IPlugin {
                         renderRows();
                         // The Features panel of a live layer follows its fetches too, in
                         // place: new vehicle types appear and counts move as the map pans.
+                        // Only while it is the panel on screen: with Find open on top of it
+                        // this re-showed the type list under the results every minute, and
+                        // the results "reverted" (2026-09-18). Find refreshes its own rows.
                         final LoadedLayer showing = featuresFor;
-                        if (showing != null && !showing.refreshing && !showing.busy)
-                            pickSets(showing, true);
+                        final View search = paneView == null ? null : paneView.findViewById(R.id.search_panel);
+                        final boolean finding = search != null && search.getVisibility() == View.VISIBLE;
+                        if (showing != null && !showing.refreshing && !showing.busy) {
+                            if (finding)
+                                refreshResultsInPlace();
+                            else
+                                pickSets(showing, true);
+                        }
                     }
                 });
             refreshOrgUi();
@@ -1188,6 +1197,26 @@ public class FeatureLayer implements IPlugin {
                 sv.scrollTo(0, 0);
             }
         });
+    }
+
+    /**
+     * Re-run the current find after its layer fetched, keeping the scroll where it was:
+     * a vehicle's last-reported time moves, a vehicle arrives or leaves, the list does
+     * not jump and does not revert to the type list.
+     */
+    private void refreshResultsInPlace() {
+        if (paneView == null || scope == null)
+            return;
+        final android.widget.ScrollView sv = paneView.findViewById(R.id.pane_scroll);
+        final int keepY = sv == null ? 0 : sv.getScrollY();
+        renderResults();
+        if (sv != null)
+            sv.post(new Runnable() {
+                @Override
+                public void run() {
+                    sv.scrollTo(0, keepY);
+                }
+            });
     }
 
     /** The radius a layer gets when the operator asks for a point without naming one. */
