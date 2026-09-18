@@ -163,10 +163,11 @@ public class LoadedLayer {
         final FeatureDataStore2.FeatureQueryParameters visibleOnly = new FeatureDataStore2.FeatureQueryParameters();
         visibleOnly.visibleOnly = true;
         layer = new FeatureLayer3(displayName(), store, visibleOnly);
-        if (DartStyles.handles(spec))
+        if (DartStyles.handles(spec)) {
             dartLabels = new DartMarkers(mapView, pluginContext, spec.id,
                     DartStyles.genericMarkerUri(iconDir), iconDir);
             dartLabels.setLabelGsd(spec.labelGsd);
+        }
         final FeatureDataStoreDeepMapItemQuery query = new FeatureDataStoreDeepMapItemQuery(layer) {
             @Override
             protected MapItem featureToMapItem(Feature feature) {

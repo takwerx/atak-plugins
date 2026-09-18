@@ -205,6 +205,22 @@ public class LayerManager {
                 existing.attach();
             } catch (Exception e) {
                 Log.e(TAG, "attach failed for " + spec.id, e);
+                // Say so: a layer that silently fails to appear reads as "I tapped it and
+                // nothing happened" (FireGuard, 2026-09-18). The trace goes to a file too,
+                // because this phone's logcat never carries ATAK's log.
+                try {
+                    android.widget.Toast.makeText(mapView.getContext(),
+                            "Could not add " + spec.title + ": " + e, android.widget.Toast.LENGTH_LONG).show();
+                    final java.io.StringWriter sw = new java.io.StringWriter();
+                    e.printStackTrace(new java.io.PrintWriter(sw));
+                    final java.io.FileWriter w = new java.io.FileWriter(new File(layersDir.getParentFile(), "add-failed.txt"), true);
+                    try {
+                        w.write(new java.util.Date() + " " + spec.id + "\n" + sw + "\n");
+                    } finally {
+                        w.close();
+                    }
+                } catch (Exception ignored) {
+                }
                 return;
             }
             synchronized (layers) {
