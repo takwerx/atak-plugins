@@ -189,6 +189,16 @@ public class LoadedLayer {
                     title = feature.getName();
                 item.setMetaString("title", title);
                 item.setMetaString("callsign", title);
+                // A point whose icon is a labelled composite shows the chooser the bare
+                // symbol, not the pill: the chooser draws into a small box and the whole
+                // composite there made every symbol a speck (2026-09-18).
+                if (EsriRenderer.isPoint(feature.getGeometry())) {
+                    final String sym = LabelledIcons.symbolUriOf(iconUriOf(feature.getStyle()), iconDir);
+                    if (sym != null) {
+                        item.setMetaString("iconUri", sym);
+                        item.setMetaInteger("iconColor", 0xFFFFFFFF);
+                    }
+                }
                 // Lines and polygons have no icon of their own; give the tap chooser one.
                 // A line gets a drawn glyph in its own color, dashed when it is, with three
                 // of its NWCG marks; a polygon the plain outline glyph tinted. Dark colors
@@ -890,9 +900,14 @@ public class LoadedLayer {
                     ? mapView.getPoint().get() : ownPosition();
             if (now == null)
                 return false;
-            // Half the radius: far enough that the edge of the circle has moved a lot,
-            // not so far that a slow drive re-fetches every minute anyway.
-            return distanceM(now.getLatitude(), now.getLongitude(), fetchedLat, fetchedLon) > fetchedRadiusM * 0.5;
+            // A fifth of the radius, and never less than 250 m: "Map Center" is where the
+            // map is now, and the operator panning half a screen expects the circle to
+            // have come along. Half the radius was 800 m on a 1 mi radius -- most of the
+            // screen at that zoom -- and read as "panning does nothing" (2026-09-18). The
+            // 20 s minimum gap in LayerManager is what keeps a slow drive from fetching
+            // every second.
+            return distanceM(now.getLatitude(), now.getLongitude(), fetchedLat, fetchedLon)
+                    > Math.max(250d, fetchedRadiusM * 0.2);
         } catch (RuntimeException e) {
             return false;
         }

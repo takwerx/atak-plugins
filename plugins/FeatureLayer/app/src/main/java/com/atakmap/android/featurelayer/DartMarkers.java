@@ -151,6 +151,8 @@ final class DartMarkers {
                     // composite changes -- a new MARK_V, or a vehicle changing kind -- the
                     // uri changes, and a marker left holding the old file drew the previous
                     // build's image for as long as it lived (2026-09-17).
+                    if (r.iconUri != null)
+                        m.setMetaString("iconUri", r.iconUri);
                     final String had = m.getMetaString("dart_icon", "");
                     final String want = iconKey(r);
                     if (!had.equals(want)) {
@@ -198,6 +200,9 @@ final class DartMarkers {
         // FeatureDataStoreDeepMapItemQuery puts on a feature's map item, so the radial and
         // the details pane work off it unchanged.
         m.setMetaString("menu", PluginMenuParser.getMenu(pluginContext, "menu/feature.xml"));
+        // The chooser shows the disc, not the disc with its callsign squeezed beside it.
+        if (r.iconUri != null)
+            m.setMetaString("iconUri", r.iconUri);
         m.setMetaLong("featureid", r.featureId);
         m.setMetaString("nifs_layer", layerId);
         m.setClickable(true);

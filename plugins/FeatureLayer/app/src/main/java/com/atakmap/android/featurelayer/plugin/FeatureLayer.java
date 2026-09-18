@@ -433,6 +433,11 @@ public class FeatureLayer implements IPlugin {
                     @Override
                     public void onChanged() {
                         renderRows();
+                        // The Features panel of a live layer follows its fetches too, in
+                        // place: new vehicle types appear and counts move as the map pans.
+                        final LoadedLayer showing = featuresFor;
+                        if (showing != null && !showing.refreshing && !showing.busy)
+                            pickSets(showing, true);
                     }
                 });
             refreshOrgUi();
@@ -1295,7 +1300,20 @@ public class FeatureLayer implements IPlugin {
      * Feature types of one layer, shown in the pane in place of the layer list so the map
      * stays visible: an ON/OFF button per type, a fill button for area types, Back on top.
      */
+    /** The layer whose Features panel is showing, or null; re-rendered in place on change. */
+    private LoadedLayer featuresFor;
+
     private void pickSets(final LoadedLayer l) {
+        pickSets(l, false);
+    }
+
+    /**
+     * @param inPlace true when the panel is already showing this layer and a fetch just
+     *        changed it: the rows are rebuilt where they are, without clearing the find
+     *        box or jumping to the top. A DART list that did not change as the map panned
+     *        read as "panning does nothing" (2026-09-18).
+     */
+    private void pickSets(final LoadedLayer l, final boolean inPlace) {
         final List<LoadedLayer.SetInfo> sets = l.types();
         if (sets.isEmpty()) {
             toast("Nothing loaded in this layer yet");
@@ -1307,7 +1325,8 @@ public class FeatureLayer implements IPlugin {
         final LinearLayout container = paneView.findViewById(R.id.features_container);
         ((TextView) paneView.findViewById(R.id.features_title)).setText(l.spec.title);
         final EditText layerSearch = paneView.findViewById(R.id.layer_search_text);
-        layerSearch.setText("");
+        if (!inPlace)
+            layerSearch.setText("");
         final View.OnClickListener doFind = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1472,6 +1491,7 @@ public class FeatureLayer implements IPlugin {
         paneView.findViewById(R.id.btn_features_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                featuresFor = null;
                 featuresPanel.setVisibility(View.GONE);
                 featuresHeader.setVisibility(View.GONE);
                 mainPanel.setVisibility(View.VISIBLE);
@@ -1479,13 +1499,15 @@ public class FeatureLayer implements IPlugin {
                 scrollPaneToTop();
             }
         });
+        featuresFor = l;
         mainPanel.setVisibility(View.GONE);
         featuresHeader.setVisibility(View.VISIBLE);
         featuresPanel.setVisibility(View.VISIBLE);
         // The panels swap inside one ScrollView, which keeps its offset: from a layer row
         // halfway down the list, Features opened halfway down the feature list, with the
         // find box scrolled off the top (2026-09-18). Start every panel at its top.
-        scrollPaneToTop();
+        if (!inPlace)
+            scrollPaneToTop();
     }
 
     private static String autoLabel(int minutes) {

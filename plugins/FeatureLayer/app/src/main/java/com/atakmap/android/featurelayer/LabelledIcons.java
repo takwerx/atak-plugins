@@ -43,6 +43,36 @@ final class LabelledIcons {
     }
 
     /**
+     * The bare symbol a composite was made from, as a file:// uri, or null for a
+     * text-only pill or a uri that is not a composite. Read off the file name --
+     * {@code lbl_<symbol>_<hash>_<w>x<h>_f<px>_v<n>.png}, or a DART
+     * {@code dartl_<disc>_<hash>_v<n>_s<scale>_f<px>.png} -- so it works for a layer
+     * restored from disk, whose composites were never made in this process.
+     *
+     * <p>For the tap chooser: it draws a point's icon into a small box, and the whole
+     * composite there -- pill and all -- made every symbol a speck (2026-09-18).
+     */
+    static String symbolUriOf(String iconUri, File iconDir) {
+        if (iconUri == null || !iconUri.startsWith("file://"))
+            return null;
+        final String name = new File(iconUri.substring("file://".length())).getName();
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^lbl_(.+)_[0-9a-f]+_\\d+x\\d+_f\\d+_v\\d+\\.png$").matcher(name);
+        String symbol = null;
+        if (m.matches())
+            symbol = "text".equals(m.group(1)) ? null : m.group(1);
+        else {
+            m = java.util.regex.Pattern.compile("^dartl_(.+)_[0-9a-f]+_v\\d+_s\\d+_f\\d+\\.png$").matcher(name);
+            if (m.matches())
+                symbol = m.group(1);
+        }
+        if (symbol == null)
+            return null;
+        final File f = new File(iconDir, symbol + ".png");
+        return f.isFile() ? "file://" + f.getAbsolutePath() : null;
+    }
+
+    /**
      * @param symbol  the symbol's PNG on disk, or null for a text-only pill (a Label Point).
      * @param symW    the width the symbol is drawn at on screen, in device px.
      * @param symH    the height, in device px.
