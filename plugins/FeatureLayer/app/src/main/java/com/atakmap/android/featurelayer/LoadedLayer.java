@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 51;
+    private static final int STYLE_VERSION = 52;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -599,7 +599,8 @@ public class LoadedLayer {
                 // twin set that starts there. ATAK switches between them by resolution, so
                 // a zoom costs nothing, and the pane never lists the twin.
                 final boolean named = dartLabels == null && pf.name != null && !pf.name.isEmpty()
-                        && pf.geometry instanceof com.atakmap.map.layer.feature.geometry.Point;
+                        && (pf.geometry instanceof com.atakmap.map.layer.feature.geometry.Point
+                                || centerLabelled(pf.geometry));
                 final boolean split = named && spec.labels && spec.labelGsd != Double.MAX_VALUE;
                 // The kind's own gate (points 120 m/px, lines 400) capped by the layer's.
                 final double gate = Math.min(pf.minGsd, spec.gateGsd);
@@ -1528,6 +1529,24 @@ public class LoadedLayer {
                                     shown = drawn;
                             }
                         }
+                        if (at != null && dartLabels == null && name != null && !name.isEmpty()) {
+                            // The bare form (fill settled, engine label still in it) rides in the
+                            // attributes for the labels toggle, as for points; then the name
+                            // becomes a pill on the center point.
+                            final String b = packStyle(style), ba = alt == null ? null : packStyle(alt);
+                            if (b != null)
+                                attrs.setAttribute(ATTR_BARE, b);
+                            if (ba != null)
+                                attrs.setAttribute(ATTR_BARE_ALT, ba);
+                            if (spec.labels) {
+                                final Style ls = pillOnArea(style, name);
+                                if (ls != null)
+                                    style = ls;
+                                final Style la = alt == null ? null : pillOnArea(alt, name);
+                                if (la != null)
+                                    alt = la;
+                            }
+                        }
                         final Pending p = new Pending(target, targetGsd, name, shown, style, attrs);
                         p.alt = alt;
                         out.add(p);
@@ -1587,7 +1606,7 @@ public class LoadedLayer {
             final Style base = bareStyle(pf, spec.repairStatus);
             if (base != null) {
                 if (labelled) {
-                    final Style ls = labelledPoint(base, pf.name);
+                    final Style ls = centerLabelled(pf.geometry) ? pillOnArea(base, pf.name) : labelledPoint(base, pf.name);
                     drawn = ls != null ? ls : NwcgStyles.withNameLabel(base, true, pf.name);
                 } else {
                     drawn = base;
@@ -1597,6 +1616,62 @@ public class LoadedLayer {
         if (!labelled && !(pf.geometry instanceof LineString))
             drawn = NwcgStyles.withoutLabel(drawn); // a transparent label beats the name
         return drawn;
+    }
+
+    /** The icon style inside a style, or null. */
+    private static Style iconOf(Style s) {
+        if (s instanceof com.atakmap.map.layer.feature.style.IconPointStyle)
+            return s;
+        if (s instanceof com.atakmap.map.layer.feature.style.CompositeStyle)
+            return com.atakmap.map.layer.feature.style.CompositeStyle.find(
+                    (com.atakmap.map.layer.feature.style.CompositeStyle) s,
+                    com.atakmap.map.layer.feature.style.IconPointStyle.class);
+        return null;
+    }
+
+    /** An area written with its center point as a second geometry, the one its name sits on. */
+    static boolean centerLabelled(Geometry g) {
+        if (!(g instanceof GeometryCollection))
+            return false;
+        final GeometryCollection c = (GeometryCollection) g;
+        final java.util.Collection<Geometry> kids = c.getGeometries();
+        if (kids.size() < 2)
+            return false;
+        Geometry last = null;
+        for (Geometry k : kids)
+            last = k;
+        return last instanceof com.atakmap.map.layer.feature.geometry.Point;
+    }
+
+    /**
+     * An area's name as pixels on its center point, in place of the engine's label, which
+     * trimmed "Dome \u00b7 12 ac" to "Dome \u00b7 1" on FireGuard (2026-09-18). The fill and
+     * stroke draw on the area, the pill on the point; the transparent label keeps the
+     * engine off both. Null when the pill could not be composed.
+     */
+    private Style pillOnArea(Style area, String text) {
+        final Style pill = labelledPoint(new com.atakmap.map.layer.feature.style.LabelPointStyle(text, 0xFFFFFFFF,
+                0xFF000000, com.atakmap.map.layer.feature.style.LabelPointStyle.ScrollMode.OFF), text);
+        final Style icon = pill == null ? null : iconOf(pill);
+        if (icon == null)
+            return null;
+        final List<Style> parts = new ArrayList<>();
+        if (area instanceof com.atakmap.map.layer.feature.style.CompositeStyle) {
+            final com.atakmap.map.layer.feature.style.CompositeStyle cs = (com.atakmap.map.layer.feature.style.CompositeStyle) area;
+            for (int i = 0; i < cs.getNumStyles(); i++) {
+                final Style k = cs.getStyle(i);
+                if (!(k instanceof com.atakmap.map.layer.feature.style.LabelPointStyle)
+                        && !(k instanceof com.atakmap.map.layer.feature.style.IconPointStyle))
+                    parts.add(k);
+            }
+        } else if (!(area instanceof com.atakmap.map.layer.feature.style.LabelPointStyle)
+                && !(area instanceof com.atakmap.map.layer.feature.style.IconPointStyle)) {
+            parts.add(area);
+        }
+        parts.add(icon);
+        parts.add(new com.atakmap.map.layer.feature.style.LabelPointStyle("", 0, 0,
+                com.atakmap.map.layer.feature.style.LabelPointStyle.ScrollMode.OFF));
+        return new com.atakmap.map.layer.feature.style.CompositeStyle(parts.toArray(new Style[0]));
     }
 
     private Style labelledPoint(Style s, String text) {
@@ -1877,6 +1952,9 @@ public class LoadedLayer {
         if (alpha > 0)
             parts.add(new com.atakmap.map.layer.feature.style.BasicFillStyle((Math.min(255, alpha) << 24) | rgb));
         parts.add(stroke);
+        final Style icon = iconOf(base); // an area's name drawn as a pill on its center
+        if (icon != null)
+            parts.add(icon);
         final Style label = labelOf(base);
         if (label != null)
             parts.add(label);
