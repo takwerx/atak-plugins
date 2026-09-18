@@ -1313,8 +1313,28 @@ public class FeatureLayer implements IPlugin {
      *        box or jumping to the top. A DART list that did not change as the map panned
      *        read as "panning does nothing" (2026-09-18).
      */
+    /** What the Features panel last drew, so a fetch that changed nothing does not redraw it. */
+    private String featuresSig;
+
+    private static String featuresSignature(LoadedLayer l, List<LoadedLayer.SetInfo> sets) {
+        final StringBuilder sb = new StringBuilder(l.spec.id).append('|').append(l.count);
+        for (LoadedLayer.SetInfo si : sets)
+            sb.append('|').append(si.id).append(':').append(si.name).append(':').append(si.visible);
+        return sb.toString();
+    }
+
     private void pickSets(final LoadedLayer l, final boolean inPlace) {
         final List<LoadedLayer.SetInfo> sets = l.types();
+        // In place: redraw only when the types or counts moved, and keep the scroll
+        // where it was. Rebuilding the rows empties the list for a frame and the
+        // ScrollView snapped to the top on every pan (2026-09-18).
+        final String sig = featuresSignature(l, sets);
+        final android.widget.ScrollView sv = paneView == null ? null
+                : (android.widget.ScrollView) paneView.findViewById(R.id.pane_scroll);
+        final int keepY = inPlace && sv != null ? sv.getScrollY() : 0;
+        if (inPlace && sig.equals(featuresSig))
+            return;
+        featuresSig = sig;
         if (sets.isEmpty()) {
             toast("Nothing loaded in this layer yet");
             return;
@@ -1492,6 +1512,7 @@ public class FeatureLayer implements IPlugin {
             @Override
             public void onClick(View v) {
                 featuresFor = null;
+                featuresSig = null;
                 featuresPanel.setVisibility(View.GONE);
                 featuresHeader.setVisibility(View.GONE);
                 mainPanel.setVisibility(View.VISIBLE);
@@ -1505,9 +1526,18 @@ public class FeatureLayer implements IPlugin {
         featuresPanel.setVisibility(View.VISIBLE);
         // The panels swap inside one ScrollView, which keeps its offset: from a layer row
         // halfway down the list, Features opened halfway down the feature list, with the
-        // find box scrolled off the top (2026-09-18). Start every panel at its top.
-        if (!inPlace)
+        // find box scrolled off the top (2026-09-18). Start every panel at its top --
+        // unless this is a redraw in place, which goes back to where the operator was.
+        if (!inPlace) {
             scrollPaneToTop();
+        } else if (sv != null) {
+            sv.post(new Runnable() {
+                @Override
+                public void run() {
+                    sv.scrollTo(0, keepY);
+                }
+            });
+        }
     }
 
     private static String autoLabel(int minutes) {
