@@ -85,6 +85,20 @@ public class LayerManager {
         stateFile = new File(root, "layers.json");
     }
 
+    /** A line in tools/featurelayer/start-log.txt: the start sequence, which no log on this phone shows. */
+    void startLog(String line) {
+        try {
+            final java.io.FileWriter w = new java.io.FileWriter(new File(root, "start-log.txt"), true);
+            try {
+                w.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
+                        + " " + Thread.currentThread().getName() + " " + line + "\n");
+            } finally {
+                w.close();
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
     public void setListener(Listener l) {
         listener = l;
     }
@@ -145,6 +159,7 @@ public class LayerManager {
 
     public void start() {
         started = true;
+        startLog("start: begin");
         attachFollow();
         iconDir.mkdirs();
         layersDir.mkdirs();
@@ -161,7 +176,9 @@ public class LayerManager {
         worker.execute(new Runnable() {
             @Override
             public void run() {
+                startLog("purge: begin");
                 DartStyles.purgeStale(iconDir);
+                startLog("purge: done");
             }
         });
         try {
@@ -177,10 +194,13 @@ public class LayerManager {
         final DocumentedIntentFilter mh = new DocumentedIntentFilter();
         mh.addAction(MarkerHereReceiver.ACTION, "drop a marker at a loaded feature");
         AtakBroadcast.getInstance().registerReceiver(markerHere, mh);
+        startLog("start: restoring");
         restore();
+        startLog("start: restored " + snapshot().size() + " layers, queuing refreshes");
         for (LoadedLayer l : snapshot())
             refresh(l);
         main.postDelayed(timer, TICK_MS);
+        startLog("start: done");
     }
 
     public void stop() {
@@ -551,6 +571,7 @@ public class LayerManager {
 
     /** Fetches on the calling (worker) thread; waits out a refresh already running rather than skipping. */
     private void refreshNow(LoadedLayer l) {
+        startLog("refreshNow " + l.spec.id + " begin");
         for (int i = 0; i < 60 && l.refreshing; i++) {
             try {
                 Thread.sleep(500);
@@ -577,12 +598,14 @@ public class LayerManager {
                 return;
             }
         }
+        startLog("refreshNow " + l.spec.id + " token ok, fetching");
         l.refresh(token, new Runnable() {
             @Override
             public void run() {
                 changed();
             }
         });
+        startLog("refreshNow " + l.spec.id + " done: " + l.status);
         save();
     }
 
@@ -632,10 +655,19 @@ public class LayerManager {
     // ---- state --------------------------------------------------------------------
 
     private void restore() {
-        if (!stateFile.isFile())
+        final File bak = new File(stateFile.getPath() + ".bak");
+        if (!stateFile.isFile() && !bak.isFile())
             return;
         try {
-            final JSONArray arr = new JSONArray(readFile(stateFile));
+            JSONArray arr = stateFile.isFile() ? new JSONArray(readFile(stateFile)) : new JSONArray();
+            if (arr.length() == 0 && bak.isFile()) {
+                // An empty list where there was one is a lost list, not a choice.
+                final JSONArray prev = new JSONArray(readFile(bak));
+                if (prev.length() > 0) {
+                    startLog("restore: main list empty, using the backup (" + prev.length() + " layers)");
+                    arr = prev;
+                }
+            }
             for (int i = 0; i < arr.length(); i++) {
                 final JSONObject o = arr.getJSONObject(i);
                 final LayerSpec spec = LayerSpec.fromJson(o.getJSONObject("spec"));
@@ -664,7 +696,9 @@ public class LayerManager {
                         new File(layersDir, spec.fileKey() + ".sqlite"), iconDir, nwcgIcons, sarcopIcons,
                         lineGlyph, polygonGlyph, o.optLong("lastRefresh", 0));
                 try {
+                    startLog("restore: attaching " + spec.id);
                     l.attach();
+                    startLog("restore: attached " + spec.id);
                     l.setVisible(o.optBoolean("visible", true));
                     synchronized (layers) {
                         layers.add(l);
@@ -691,6 +725,13 @@ public class LayerManager {
     }
 
     private synchronized void save() {
+        // A save after stop() writes the cleared list: on 2026-09-18 a refresh that had
+        // waited two minutes for its markers came back after the plugin was unloaded and
+        // wrote "[]" over five layers. Stopped means nothing more is written.
+        if (!started) {
+            startLog("save skipped: stopped");
+            return;
+        }
         try {
             final JSONArray arr = new JSONArray();
             for (LoadedLayer l : snapshot()) {
@@ -704,6 +745,12 @@ public class LayerManager {
                 for (JSONObject o : unrestored)
                     arr.put(o);
             }
+            // The previous list survives one save as a backup, and restore() falls back to
+            // it when the main file has nothing in it.
+            final File bak = new File(stateFile.getPath() + ".bak");
+            if (stateFile.isFile() && stateFile.length() > 2)
+                //noinspection ResultOfMethodCallIgnored
+                stateFile.renameTo(bak);
             try (OutputStream out = new FileOutputStream(stateFile)) {
                 out.write(arr.toString(1).getBytes("UTF-8"));
             }
