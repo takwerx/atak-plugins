@@ -342,8 +342,10 @@ public class LayerManager {
                 return;
             final long now = System.currentTimeMillis();
             final double res = mapView.getMapResolution();
+            boolean followsView = false;
             for (LoadedLayer l : snapshot()) {
                 l.onMapResolution(res);
+                followsView |= "view".equals(l.spec.scopeKind);
                 if (!l.movedOutOfScope())
                     continue;
                 final Long last = lastMoveFetch.get(l.spec.id);
@@ -352,6 +354,10 @@ public class LayerManager {
                 lastMoveFetch.put(l.spec.id, now);
                 refresh(l);
             }
+            // A list scoped to the view is drawn from what is in view now, so the pane
+            // redraws in place after every settled move, fetch or no fetch.
+            if (followsView)
+                changed();
         }
     };
 

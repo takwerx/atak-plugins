@@ -785,8 +785,22 @@ public class FeatureLayer implements IPlugin {
         for (LoadedLayer l : manager.snapshot()) {
             if (scope != null && l != scope)
                 continue;
-            for (LoadedLayer.Hit h : l.find(text, 5000))
+            // "What is in view" means the view now, not the box the last fetch covered:
+            // zooming in stays inside that box, so nothing refetches, and the list kept
+            // every vehicle from the wider view (2026-09-18, "the list is not updating").
+            com.atakmap.coremap.maps.coords.GeoBounds view = null;
+            if ("view".equals(l.spec.scopeKind)) {
+                try {
+                    view = mapView.getBounds();
+                } catch (RuntimeException ignored) {
+                }
+            }
+            for (LoadedLayer.Hit h : l.find(text, 5000)) {
+                if (view != null && (h.lat < view.getSouth() || h.lat > view.getNorth()
+                        || h.lon < view.getWest() || h.lon > view.getEast()))
+                    continue;
                 hits.add(new Object[] { l, h });
+            }
         }
         return hits;
     }
@@ -849,7 +863,7 @@ public class FeatureLayer implements IPlugin {
                 final String t = ((LoadedLayer.Hit) o[1]).type;
                 counts.put(t, counts.containsKey(t) ? counts.get(t) + 1 : 1);
             }
-            status.setText(counts.size() + " types, " + all.size() + " features \u00b7 tap a type, or type a name");
+            status.setText(withLegend(counts.size() + " types, " + all.size() + " features \u00b7 tap a type, or type a name", scope));
             shownHits = null;   // the type list carries counts, not distances
             container.removeAllViews();
             for (final java.util.Map.Entry<String, Integer> e : counts.entrySet()) {
@@ -910,7 +924,7 @@ public class FeatureLayer implements IPlugin {
             st.append(" \u00b7 no GPS fix, measured from the map center");
         else if (from == null)
             st.append(" \u00b7 nowhere to measure from, sorted by name");
-        status.setText(st.toString());
+        status.setText(withLegend(st.toString(), scope));
         container.removeAllViews();
         shownHits = new java.util.ArrayList<>();
         final java.text.SimpleDateFormat when = new java.text.SimpleDateFormat("MMM d HH:mm", java.util.Locale.US);
@@ -1550,6 +1564,16 @@ public class FeatureLayer implements IPlugin {
             });
             container.addView(row);
         }
+        if (com.atakmap.android.featurelayer.DartStyles.handles(l.spec)) {
+            // What the ring colors mean, where the layer is set up; the list says it too.
+            final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.feature_row, null);
+            final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder("Reported ");
+            b.append(ageLegend(l.spec.id.contains("personnel")));
+            ((TextView) row.findViewById(R.id.feature_name)).setText(b);
+            row.findViewById(R.id.feature_toggle).setVisibility(View.GONE);
+            row.findViewById(R.id.feature_fill).setVisibility(View.GONE);
+            container.addView(row);
+        }
         if (l.spec.profile == LayerSpec.Profile.NWCG) {
             // NWCG's secondary symbology: off by default, as on NIFC's own incident map,
             // because its magenta "In Use" reads as a planned line.
@@ -1652,6 +1676,40 @@ public class FeatureLayer implements IPlugin {
 
     private static String fillLabel(int alpha) {
         return alpha == 0 ? "Outline" : alpha >= 0x80 ? "Fill 50%" : "Fill 25%";
+    }
+
+    /**
+     * The report-age colors spelled out: the ring on a DART marker and the age in its
+     * row. Asked for on 2026-09-18 ("could we display what the schema is somewhere"):
+     * under the layer's controls, and over its list.
+     */
+    private static CharSequence ageLegend(boolean personnel) {
+        final int[] cut = com.atakmap.android.featurelayer.DartStyles.ageCutoffs(personnel, false);
+        final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder();
+        legendDot(b, com.atakmap.android.featurelayer.DartStyles.ageColor(0), "under " + cut[0] + " min");
+        legendDot(b, com.atakmap.android.featurelayer.DartStyles.ageColor(1), "under " + cut[1] + " min");
+        legendDot(b, com.atakmap.android.featurelayer.DartStyles.ageColor(2), "older");
+        legendDot(b, 0xFFBBBBBB, "no time");
+        return b;
+    }
+
+    private static void legendDot(android.text.SpannableStringBuilder b, int color, String what) {
+        if (b.length() > 0)
+            b.append("   ");
+        final int at = b.length();
+        b.append("\u25cf ");
+        b.setSpan(new android.text.style.ForegroundColorSpan(color), at, at + 1,
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        b.append(what);
+    }
+
+    /** A status line with the legend under it when the list is one DART layer's. */
+    private static CharSequence withLegend(CharSequence line, LoadedLayer only) {
+        if (only == null || !com.atakmap.android.featurelayer.DartStyles.handles(only.spec))
+            return line;
+        final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(line);
+        b.append("\nReported ").append(ageLegend(only.spec.id.contains("personnel")));
+        return b;
     }
 
     private static String statusLine(LoadedLayer l) {
