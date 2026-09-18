@@ -372,31 +372,34 @@ public final class NwcgStyles {
      * {@code -1} its right edge, both of which hang the callsign off to one side.
      * </ul>
      *
-     * <p>One thing here is ATAK's and is <b>not fixed</b>: it trims a feature label where
-     * it collides with a basemap label, on whichever side the neighbor is. `CA-ANF-E325`
-     * drew as "ANF-E325" against a road label on its left and `CA-ANF-WT225` as
-     * "CA-ANF-WT2" against a place label on its right, with the full names confirmed in
-     * the sqlite store, so the trim is the renderer's. Not reachable from a plugin: tried
-     * every {@code alignX}/{@code alignY}, both other {@code ScrollMode}s, clearing
-     * {@code HINT_WEIGHTED_FLOAT}, clearing {@code labelHints} outright, and a 4x wider
-     * transparent icon box. None changed it. Centering makes it likelier than hanging the
-     * label to one side, because a centered label reaches across the marker into whatever
-     * is on both sides -- that is the cost of matching ATAK's own look, and the operator
-     * chose the look. The real lever is crowding: fewer markers drawn at once. Callsigns
-     * are never shortened by this plugin to buy room; that was proposed and rejected
-     * (commit d3a5548), because the state and unit are the point of a callsign.
+     * <p><b>Always pass the text.</b> With an empty label the renderer substitutes the
+     * feature's name and draws it trimmed of its leading characters -- every DART callsign
+     * lost its state prefix, "CA-ANF-E325" reading as "ANF-E325". Handing it the string
+     * explicitly draws it whole. There is no width cap: a 19-character label rendered at
+     * 305 px with nothing cut.
      *
-     * <p>Two earlier readings of the alignment were wrong, both from measuring a dark pill
-     * against a dark marker disc, which read as one shape: that the alignment arguments did
-     * nothing, and that {@code alignX = 0} truncated the text by itself. Set the backing to
-     * opaque red, measure the box against the icon's ring, then put the color back -- do
-     * not judge any of this by eye.
+     * <p>Still unexplained, and worth knowing before chasing it: a minority of labels lose
+     * the prefix even with explicit text, and it is positional -- "CA-ANF-E321" and
+     * "CA-ANF-E327" sat side by side on 2026-09-17, same length and same code path, and
+     * only E327 was trimmed. Both names were read out of the layer's sqlite to be sure the
+     * feed was not simply inconsistent. Ruled out already: every {@code alignX}/
+     * {@code alignY} pair, both other {@code ScrollMode}s, clearing
+     * {@code HINT_WEIGHTED_FLOAT}, clearing {@code labelHints} outright, and a 4x wider
+     * transparent icon box. Do not shorten callsigns to work around it -- that was proposed
+     * and rejected (commit d3a5548), because the state and unit are the point of a
+     * callsign.
+     *
+     * <p>Three earlier readings here were wrong, all from measuring a dark pill against a
+     * dark marker disc, which reads as one shape: that the alignment arguments did nothing,
+     * that {@code alignX = 0} truncated the text by itself, and that the style's text was
+     * ignored. Set the backing to opaque red, measure the box against the icon's ring, then
+     * put the color back -- and read the feature's real name out of
+     * {@code layers/<layer>.sqlite} before calling anything truncated.
      *
      * <p>The pairing that follows is in {@link DartStyles}: the icon is drawn below the
      * point so its top edge is on it, and the label sits above, centered, clearing the
      * icon by about 3 px. That is the arrangement ATAK uses for its own markers, which is
-     * what the operator asked for. Measured on ATAK 5.8.0.3; labels in a cluster, where
-     * ATAK's own collision handling has a say, are not covered by any of it.
+     * what the operator asked for. Measured on ATAK 5.8.0.3, with 26 vehicles in view.
      */
     private static final int LABEL_X_CENTERED = 0, LABEL_Y_ABOVE = -1;
 
@@ -411,6 +414,17 @@ public final class NwcgStyles {
      *        has existed. Its {@code 100} is BELOW, same as 1.
      */
     public static Style withNameLabel(Style s, boolean underIcon) {
+        return withNameLabel(s, underIcon, null);
+    }
+
+    /**
+     * @param text the callsign to draw, for a point that has one. Passing it matters: with
+     *        an empty label the renderer substitutes the feature's name and draws it
+     *        <b>trimmed</b>, which is where "CA-ANF-E325" became "ANF-E325". An explicit
+     *        string is drawn whole -- a 19-character test label rendered at 305 px with
+     *        nothing cut, so there is no width cap.
+     */
+    public static Style withNameLabel(Style s, boolean underIcon, String text) {
         // The empty text is not an oversight: the renderer draws the feature's own name and
         // ignores a label style's text, so passing the callsign in here changes nothing --
         // measured with a ">>" prefix that never appeared and a pill whose width never
@@ -419,8 +433,8 @@ public final class NwcgStyles {
         // replaces drew the text larger than the pill sized itself for, and that was the
         // other half of the clipping.
         final Style pill = underIcon
-                ? new LabelPointStyle("", WHITE, 0xC0000000, LabelPointStyle.ScrollMode.OFF, 0f,
-                        LABEL_X_CENTERED, LABEL_Y_ABOVE, 0f, false)
+                ? new LabelPointStyle(text == null ? "" : text, WHITE, 0xC0000000,
+                        LabelPointStyle.ScrollMode.OFF, 0f, LABEL_X_CENTERED, LABEL_Y_ABOVE, 0f, false)
                 : new LabelPointStyle("", WHITE, 0xA0000000, LabelPointStyle.ScrollMode.OFF, 0f, 0, 100, 0f, false);
         if (s instanceof CompositeStyle) {
             final CompositeStyle cs = (CompositeStyle) s;
