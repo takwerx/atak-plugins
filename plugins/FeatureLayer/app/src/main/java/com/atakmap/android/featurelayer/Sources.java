@@ -152,7 +152,7 @@ public final class Sources {
         // the self marker had nothing to give -- and the thing being asked about is the
         // part of the map being looked at. "me" stays available for locking to your own
         // surroundings while scanning elsewhere.
-        s.scopeKind = "me"; // the operator's default: around them, scopeRadiusM (25 mi)
+        s.scopeKind = "view";          // the operator's default: what is in view (2026-09-18)
         s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
         // Nationally 387 people and 3,981 vehicles, measured 2026-09-17. A scope keeps a
         // fetch in the tens, and the cap is what stops a wide area drawing the country.

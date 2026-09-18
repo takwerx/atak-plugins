@@ -1462,11 +1462,13 @@ public class LoadedLayer {
             try {
                 final float scale = gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling();
                 final com.atakmap.android.maps.MapTextFormat tf = MapView.getDefaultTextFormat();
-                float textPx = tf.getDensityAdjustedFontSize();
+                final android.graphics.Typeface face = tf == null || tf.getTypeface() == null
+                        ? android.graphics.Typeface.DEFAULT : tf.getTypeface();
+                float textPx = tf == null ? 0f : tf.getDensityAdjustedFontSize();
                 if (textPx <= 0f)
-                    textPx = tf.getFontSize() * scale;
+                    textPx = (tf == null ? 14f : tf.getFontSize()) * scale;
                 final int[] dim = new int[2];
-                final File f = LabelledIcons.compose(null, 0, 0, text, tf.getTypeface(), textPx, iconDir, dim);
+                final File f = LabelledIcons.compose(null, 0, 0, text, face, textPx, iconDir, dim);
                 if (f == null)
                     return null;
                 final Style icon = new com.atakmap.map.layer.feature.style.IconPointStyle(0xFFFFFFFF,
@@ -1505,11 +1507,13 @@ public class LoadedLayer {
                 symH = Math.round(ip.getIconHeight() * scale);
             }
             final com.atakmap.android.maps.MapTextFormat tf = MapView.getDefaultTextFormat();
-            float textPx = tf.getDensityAdjustedFontSize();
+            final android.graphics.Typeface face = tf == null || tf.getTypeface() == null
+                    ? android.graphics.Typeface.DEFAULT : tf.getTypeface();
+            float textPx = tf == null ? 0f : tf.getDensityAdjustedFontSize();
             if (textPx <= 0f)
-                textPx = tf.getFontSize() * scale;
+                textPx = (tf == null ? 14f : tf.getFontSize()) * scale;
             final int[] dim = new int[2];
-            final File f = LabelledIcons.compose(symbol, symW, symH, text, tf.getTypeface(), textPx, iconDir, dim);
+            final File f = LabelledIcons.compose(symbol, symW, symH, text, face, textPx, iconDir, dim);
             if (f == null)
                 return null;
             final Style icon = new com.atakmap.map.layer.feature.style.IconPointStyle(0xFFFFFFFF,

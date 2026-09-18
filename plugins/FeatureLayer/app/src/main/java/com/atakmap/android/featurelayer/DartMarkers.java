@@ -135,6 +135,14 @@ final class DartMarkers {
                 keep.add(r.uid);
                 final GeoPoint p = new GeoPoint(r.lat, r.lon);
                 Marker m = live.get(r.uid);
+                // A marker that exists but never got an icon is rebuilt from scratch rather
+                // than patched: a Marker that started iconless kept drawing the reference
+                // dot after setIcon on the XCover (2026-09-18).
+                if (m != null && m.getMetaString("dart_icon", "").isEmpty() && icon(r.iconUri, r.callsign) != null) {
+                    live.remove(r.uid);
+                    m.removeFromGroup();
+                    m = null;
+                }
                 if (m == null) {
                     m = create(r, p);
                     live.put(r.uid, m);
@@ -151,8 +159,6 @@ final class DartMarkers {
                     // composite changes -- a new MARK_V, or a vehicle changing kind -- the
                     // uri changes, and a marker left holding the old file drew the previous
                     // build's image for as long as it lived (2026-09-17).
-                    if (r.iconUri != null)
-                        m.setMetaString("iconUri", r.iconUri);
                     final String had = m.getMetaString("dart_icon", "");
                     final String want = iconKey(r);
                     if (!had.equals(want)) {
@@ -186,23 +192,24 @@ final class DartMarkers {
         // shortened when labels crowd. A callsign that has lost its state and unit is not
         // the resource anyone asked for.
         m.setLabelPriority(Marker.LabelPriority.High);
-        // Without this the label obeys maxLabelRenderResolution, which defaults to
-        // 10 m/px, so callsigns simply vanished when zoomed out past it.
-        m.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);  // the callsign is pixels in the icon
+        // The callsign is pixels in the icon (DartStyles.labelled); the engine's own label
+        // is off so it cannot draw a second, trimmed copy.
+        m.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);
         final Icon icon = icon(r.iconUri, r.callsign);
         if (icon != null) {
             m.setIcon(icon);
             m.setIconVisibility(Marker.ICON_VISIBLE);
             m.setMetaString("dart_icon", iconKey(r));
         }
-        // The tap target: the feature behind this marker is written with a gate that never
-        // draws, so this is what a finger finds. The metadata is the same set
+        // The tap target: the feature behind this marker is never on the render stack, so
+        // this is what a finger finds. The metadata is the same set
         // FeatureDataStoreDeepMapItemQuery puts on a feature's map item, so the radial and
         // the details pane work off it unchanged.
         m.setMetaString("menu", PluginMenuParser.getMenu(pluginContext, "menu/feature.xml"));
-        // The chooser shows the disc, not the disc with its callsign squeezed beside it.
-        if (r.iconUri != null)
-            m.setMetaString("iconUri", r.iconUri);
+        // Never set an "iconUri" meta on a Marker. ATAK treats it as an icon source and it
+        // replaced the labelled icon with its white reference dot, no callsign, on every
+        // vehicle (2026-09-18 07:54). The chooser shows the marker's own icon; the bare
+        // symbol for the chooser is a feature-item thing (LoadedLayer.featureToMapItem).
         m.setMetaLong("featureid", r.featureId);
         m.setMetaString("nifs_layer", layerId);
         m.setClickable(true);
@@ -234,14 +241,17 @@ final class DartMarkers {
             return i;
         try {
             final float scale = gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling();
+            // At ATAK start-up the plugin can be asked to draw before the map's default
+            // text format exists; with no fallback icon() returned null and the markers
+            // were created iconless. ATAK's own default is 14 at the display scaling.
             final com.atakmap.android.maps.MapTextFormat tf = MapView.getDefaultTextFormat();
-            final int[] anchor = new int[4]; // ax, ay, w, h
-            // ATAK's own label paint size is fontSize * relativeScaling; MapTextFormat
-            // exposes that product directly, so use it rather than recompute it.
-            float textPx = tf.getDensityAdjustedFontSize();
+            final android.graphics.Typeface face = tf == null || tf.getTypeface() == null
+                    ? android.graphics.Typeface.DEFAULT : tf.getTypeface();
+            float textPx = tf == null ? 0f : tf.getDensityAdjustedFontSize();
             if (textPx <= 0f)
-                textPx = tf.getFontSize() * scale;
-            final File f = DartStyles.labelled(uri, cs, tf.getTypeface(), textPx, scale, iconDir, anchor);
+                textPx = (tf == null ? 14f : tf.getFontSize()) * scale;
+            final int[] anchor = new int[4]; // ax, ay, w, h
+            final File f = DartStyles.labelled(uri, cs, face, textPx, scale, iconDir, anchor);
             if (f == null)
                 return null;
             // Composed at device px; ask for it back at the same px by dividing by ATAK's
