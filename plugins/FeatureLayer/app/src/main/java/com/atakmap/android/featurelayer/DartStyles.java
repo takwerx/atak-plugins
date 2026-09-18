@@ -54,7 +54,7 @@ public final class DartStyles {
      * vehicle drew at a third the size of its neighbors while everything about its code
      * path was identical (2026-09-17).
      */
-    private static final int MARK_V = 12;
+    private static final int MARK_V = 13;
     /**
      * A square canvas, and the disc is centered on the position.
      *
@@ -406,7 +406,38 @@ public final class DartStyles {
     }
 
     static boolean lightDisc(String glyph) {
-        return "wftak".equals(glyph) || "inreach".equals(glyph) || glyph.startsWith("doi-") || glyph.startsWith("other-");
+        return "wftak".equals(glyph) || "inreach".equals(glyph);
+    }
+
+    /**
+     * Fleet colors for the truck shapes EGP drew in pale grey and black. USFS is EGP's own
+     * green; USWFS and BLM rigs are lime yellow-green, the color of that fleet (operator,
+     * 2026-09-18: "USWFS is a yellow green for their resources"); a rig with no agency is
+     * a neutral light grey so it reads on the dark disc. NPS white waits for the feed to
+     * say NPS, which today it does not (USFS, USWFS, BLM, blank). The tint keeps the
+     * shape's own shading, so wheels and windows stay dark like the green ones.
+     */
+    private static final int TINT_USWFS = 0xFFC8E22A, TINT_GENERIC = 0xFFC9C9C9;
+
+    static int tintFor(String glyph) {
+        if (glyph.startsWith("doi-"))
+            return TINT_USWFS;
+        if (glyph.startsWith("other-") && !"other-other".equals(glyph))
+            return TINT_GENERIC;
+        return 0;
+    }
+
+    /** A paint that maps the source's luminance onto a tint, alpha untouched. */
+    private static Paint tintPaint(int tint) {
+        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        final float r = ((tint >> 16) & 0xFF) / 255f, g = ((tint >> 8) & 0xFF) / 255f, b = (tint & 0xFF) / 255f;
+        final float[] m = {
+                0.299f * r, 0.587f * r, 0.114f * r, 0, 0,
+                0.299f * g, 0.587f * g, 0.114f * g, 0, 0,
+                0.299f * b, 0.587f * b, 0.114f * b, 0, 0,
+                0, 0, 0, 1, 0 };
+        p.setColorFilter(new android.graphics.ColorMatrixColorFilter(new android.graphics.ColorMatrix(m)));
+        return p;
     }
 
     private static synchronized File marker(String glyph, int ageBucket, File iconDir) {
@@ -449,8 +480,9 @@ public final class DartStyles {
             final float scale = Math.min(fit / in.getWidth(), fit / in.getHeight());
             final float w = in.getWidth() * scale, h = in.getHeight() * scale;
             final RectF dst = new RectF((CANVAS - w) / 2f, (CANVAS - h) / 2f, (CANVAS + w) / 2f, (CANVAS + h) / 2f);
+            final int tint = tintFor(glyph);
             c.drawBitmap(in, new Rect(0, 0, in.getWidth(), in.getHeight()), dst,
-                    new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+                    tint != 0 ? tintPaint(tint) : new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
             // Written whole, then moved into place: a reader never sees a half file.
             final File tmp = new File(out.getPath() + ".tmp");
             final FileOutputStream o = new FileOutputStream(tmp);
