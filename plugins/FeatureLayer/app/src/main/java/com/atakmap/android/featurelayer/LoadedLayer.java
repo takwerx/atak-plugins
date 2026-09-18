@@ -1439,7 +1439,14 @@ public class LoadedLayer {
                             attrs.setAttribute(ATTR_BARE_ALT, bareAlt);
                         attrs.setAttribute("_title", title);
                         // For the search pane: what kind of thing it is, and when it was collected.
-                        attrs.setAttribute("_type", nwcg ? (cat != null ? cat : layerName)
+                        // A DART row's type is the feed's own resource type ("Engine Type 6",
+                        // "Pickup", "IHC"), so the picker lists kinds and a row says what it
+                        // is; the layer's name was standing in (operator, 2026-09-18: "when i
+                        // click on vehicle how come i dont get a sub type?").
+                        final String dartType = DartStyles.handles(spec) && spec.setField != null
+                                ? props.optString(spec.setField, "").trim() : "";
+                        attrs.setAttribute("_type", !dartType.isEmpty() && !"null".equalsIgnoreCase(dartType) ? dartType
+                                : nwcg ? (cat != null ? cat : layerName)
                                 : (generic.labelFor(props) != null ? generic.labelFor(props) : layerName));
                         final long when = spec.timeField != null && props.opt(spec.timeField) instanceof Number
                                 ? ((Number) props.opt(spec.timeField)).longValue() : collectedAt(props);
