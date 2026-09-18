@@ -52,7 +52,7 @@ public final class DartStyles {
      * vehicle drew at a third the size of its neighbors while everything about its code
      * path was identical (2026-09-17).
      */
-    private static final int MARK_V = 8;
+    private static final int MARK_V = 10;
     /**
      * A square canvas, and the disc is centered on the position.
      *
@@ -389,9 +389,11 @@ public final class DartStyles {
             final Canvas c = new Canvas(bmp);
             final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
             p.setStyle(Paint.Style.FILL);
-            // EGP's WFTAK badge is a 31 px dark green shield; on the near-black disc it
-            // is a smudge, so a TAK user sits on a light disc, which also sets them apart.
-            p.setColor("wftak".equals(glyph) ? DISC_LIGHT : DISC);
+            // EGP's WFTAK badge is a 31 px dark green shield and its inReach a 19 x 39 px
+            // render of the black handset; on the near-black disc each is a smudge, so both
+            // sit on a light disc, which also sets a person with a device apart from a crew
+            // (operator, 2026-09-18: "the background is white so you can tell what it is").
+            p.setColor("wftak".equals(glyph) || "inreach".equals(glyph) ? DISC_LIGHT : DISC);
             c.drawCircle(CANVAS / 2f, CANVAS / 2f, CANVAS / 2f - 3f, p);
             p.setStyle(Paint.Style.STROKE);
             // The ring is the report age when one is known: thicker so the color reads at
