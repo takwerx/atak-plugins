@@ -45,7 +45,9 @@ public class LayerSpec {
      * in, symbols alone further out (operator, 2026-09-18: "labels need to come on at
      * like 5 miles default", for every layer). Always is a choice, not the default.
      */
-    public static final double DEFAULT_LABEL_GSD = 5 * 1609.344 / ScaleBar.FALLBACK_BAR_PIXELS;
+    public static final double DEFAULT_LABEL_GSD = 1 * 1609.344 / ScaleBar.FALLBACK_BAR_PIXELS;
+    /** Five miles: the wider default DART and FireGuard keep, where a callsign at a mile is too late. */
+    public static final double DEFAULT_LABEL_GSD_WIDE = 5 * 1609.344 / ScaleBar.FALLBACK_BAR_PIXELS;
     public int maxFeatures;    // per source layer, 0 = no cap
     /**
      * Spatial scope, for a feed that is too large to draw nationally. Null is the whole
@@ -181,6 +183,16 @@ public class LayerSpec {
         // layer while Always was still the default). 0: Always, chosen. Else the level.
         final double lab = o.optDouble("labelGsd", -1);
         s.labelGsd = lab < 0 ? DEFAULT_LABEL_GSD : lab == 0 ? Double.MAX_VALUE : lab;
+        // The default for fires moved from five miles to one on 2026-09-18 (operator:
+        // "label on for fires like at 1 mile as the default, people can adjust"). A
+        // saved five-mile level equal to the old constant was never chosen, so it moves;
+        // a preset the operator picked is computed from the live scale bar and does not
+        // hit the constant exactly. DART and FireGuard keep five.
+        final boolean wide = "dart".equals(s.iconSet) || "fireguard".equals(s.iconSet);
+        if (!wide && Math.abs(s.labelGsd - DEFAULT_LABEL_GSD_WIDE) < 1e-9)
+            s.labelGsd = DEFAULT_LABEL_GSD;
+        if (wide && lab < 0)
+            s.labelGsd = DEFAULT_LABEL_GSD_WIDE;
         final JSONArray ids = o.getJSONArray("layerIds");
         s.layerIds = new int[ids.length()];
         for (int i = 0; i < ids.length(); i++)

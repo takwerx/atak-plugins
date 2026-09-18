@@ -147,6 +147,7 @@ public final class Sources {
         s.refreshMinutes = 1;
         s.sinceHours = 24; // both services are 24-hour views; asking for more returns nothing
         s.iconSet = "dart"; // EGP's glyphs; see DartStyles
+        s.labelGsd = LayerSpec.DEFAULT_LABEL_GSD_WIDE; // callsigns from five miles in; fires get one
         // What is in view, not what is around the operator. A phone with no fix has no
         // position -- the XCover sat over a fire with DART on and fetched nothing, because
         // the self marker had nothing to give -- and the thing being asked about is the
@@ -199,6 +200,7 @@ public final class Sources {
         s.live = true;
         s.refreshMinutes = 5;
         s.iconSet = "fireguard";
+        s.labelGsd = LayerSpec.DEFAULT_LABEL_GSD_WIDE;
         s.fillAlpha = 0x99; // the age ramp has to read; a quarter-alpha pale yellow does not
         return s;
     }
