@@ -80,6 +80,10 @@ final class DartStyles {
     private static final int CANVAS_H = CANVAS + (int) (CANVAS * PAD);
     private static final int DISC = 0xD9101010, RING = 0xFFE6E6E6;
 
+    /** Vehicle types already reported as having no glyph, so each is logged once. */
+    private static final java.util.Set<String> UNKNOWN_KINDS =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+
     private DartStyles() {
     }
 
@@ -130,7 +134,8 @@ final class DartStyles {
      *                {@code MapTextFormat.getDensityAdjustedFontSize()}.
      * @param scale   {@code DisplaySettings.getRelativeScaling()}: the px per dp ATAK draws
      *                marker icons at. The bitmap is composed at device px and drawn 1:1.
-     * @return the file, and the anchor (px) of the disc's center in {@code anchorOut}.
+     * @return the file; {@code anchorOut} gets the disc center (px) and, if it has room, the
+     *         bitmap's width and height, so no caller has to decode the file to learn them.
      */
     static File labelled(String glyphMarkerUri, String callsign, android.graphics.Typeface face, float textPx,
             float scale, File iconDir, int[] anchorOut) {
@@ -156,6 +161,10 @@ final class DartStyles {
         if (anchorOut != null && anchorOut.length >= 2) {
             anchorOut[0] = discCx;
             anchorOut[1] = discCy;
+            if (anchorOut.length >= 4) {
+                anchorOut[2] = w;
+                anchorOut[3] = h;
+            }
         }
         if (out.isFile())
             return out;
@@ -271,7 +280,10 @@ final class DartStyles {
         final String t = str(props, "ResourceType");
         final String u = t == null ? "" : t.toUpperCase(Locale.US);
         final String kind;
-        if (u.startsWith("ENGINE") || u.contains("WATER TENDER") || u.startsWith("WT"))
+        // EGP has no tender glyph and groups tenders with engines. The feed says just
+        // "Tender" -- not "Water Tender", not "WT" -- and CA-ANF-WT225 wore the USFS
+        // shield for a day because of it (2026-09-17).
+        if (u.startsWith("ENGINE") || u.contains("TENDER") || u.startsWith("WT"))
             kind = "engine";
         else if (u.contains("CREW CARRIER") || u.contains("BUGGY") || u.contains("CREW"))
             kind = "buggy";
@@ -280,8 +292,13 @@ final class DartStyles {
         else if (u.contains("TRUCK") || u.contains("SUV") || u.contains("COMMAND") || u.contains("PICKUP")
                 || u.contains("SEDAN") || u.contains("VAN") || u.contains("SUPT"))
             kind = "vehicle";
-        else
+        else {
             kind = "other";
+            // The agency logo is a fallback, not a symbol. Say which type fell through
+            // so the next gap is found in a log rather than on a screen.
+            if (t != null && UNKNOWN_KINDS.add(u))
+                Log.w(TAG, "DART vehicle type has no glyph, using the agency logo: \"" + t + "\"");
+        }
         return agency + "-" + kind;
     }
 

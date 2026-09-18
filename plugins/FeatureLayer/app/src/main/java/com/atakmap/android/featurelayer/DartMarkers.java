@@ -85,7 +85,7 @@ final class DartMarkers {
     private final String layerId;
     private final String groupName;
     private final Map<String, Marker> live = new HashMap<>();
-    private final Map<String, Icon> icons = new HashMap<>();
+    private final Map<String, Icon> icons = java.util.Collections.synchronizedMap(new HashMap<String, Icon>());
     private final File iconDir;
     /** The disc a row falls back to when its own glyph could not be composed. */
     private final String fallbackUri;
@@ -110,6 +110,13 @@ final class DartMarkers {
      */
     void update(final List<Row> rows) {
         final List<Row> copy = new ArrayList<>(rows);
+        // The bitmaps are composed here, on the refresh thread that called us, and only
+        // attached on the main thread. After an ATAK restart at a wide view this composed
+        // several hundred callsigns -- decode, draw, PNG-encode each -- inside the main
+        // thread's marker update, and ATAK "struggled to start" (2026-09-17). Cached on
+        // disk and in memory, so a callsign already seen costs nothing here.
+        for (Row r : copy)
+            icon(r.iconUri, r.callsign);
         mapView.post(new Runnable() {
             @Override
             public void run() {
@@ -223,7 +230,7 @@ final class DartMarkers {
         try {
             final float scale = gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling();
             final com.atakmap.android.maps.MapTextFormat tf = MapView.getDefaultTextFormat();
-            final int[] anchor = new int[2];
+            final int[] anchor = new int[4]; // ax, ay, w, h
             // ATAK's own label paint size is fontSize * relativeScaling; MapTextFormat
             // exposes that product directly, so use it rather than recompute it.
             float textPx = tf.getDensityAdjustedFontSize();
@@ -232,14 +239,11 @@ final class DartMarkers {
             final File f = DartStyles.labelled(uri, cs, tf.getTypeface(), textPx, scale, iconDir, anchor);
             if (f == null)
                 return null;
-            final android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
-            o.inJustDecodeBounds = true;
-            android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(), o);
             // Composed at device px; ask for it back at the same px by dividing by ATAK's
             // dp scaling, so nothing is resampled. Anchor on the disc's center.
             i = new Icon.Builder()
                     .setImageUri(Icon.STATE_DEFAULT, "file://" + f.getAbsolutePath())
-                    .setSize(Math.round(o.outWidth / scale), Math.round(o.outHeight / scale))
+                    .setSize(Math.round(anchor[2] / scale), Math.round(anchor[3] / scale))
                     .setAnchor(Math.round(anchor[0] / scale), Math.round(anchor[1] / scale))
                     .build();
             icons.put(key, i);
