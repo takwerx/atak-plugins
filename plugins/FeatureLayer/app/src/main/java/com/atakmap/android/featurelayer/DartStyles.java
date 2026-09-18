@@ -102,6 +102,99 @@ final class DartStyles {
         return f == null ? null : "file://" + f.getAbsolutePath();
     }
 
+    /** Bumped when the labelled composite's layout changes. */
+    private static final int LABEL_V = 1;
+    /** Gap between the callsign's pill and the disc, and the pill's padding, in device px. */
+    private static final int GAP = 4, PAD_X = 8, PAD_Y = 4, RADIUS = 6;
+    /** The backing ATAK draws behind its own marker labels: argb(153, 0, 0, 0). */
+    private static final int LABEL_BG = 0x99000000;
+
+    /**
+     * The disc with its callsign drawn above it as pixels, at device resolution, so a
+     * marker showing it needs no label from ATAK's label engine at all.
+     *
+     * <p>Why pixels: ATAK's native label manager trims a marker label to a fraction of its
+     * icon's width under conditions that could not be found from a plugin -- an isolated
+     * CA-ANF-E327 as "-E32", a stock marker titled BARETEST as "BARE", while identical
+     * neighbours drew whole (2026-09-17, XCover, dev ATAK 5.8.0.3). A callsign is the
+     * point of the marker; it cannot be left to a rule nobody can read. The text is drawn
+     * with ATAK's own typeface and default font size and on the same dark backing its own
+     * labels use, so it reads as part of the map rather than as a plugin.
+     *
+     * <p>Costs, stated: no deconfliction (two vehicles on one spot show two overlapping
+     * callsigns rather than one trimmed), the global labels switch does not hide these,
+     * and the touch target is as wide as the pill. One bitmap per distinct callsign and
+     * glyph, cached on disk.
+     *
+     * @param textPx  the paint size ATAK's own marker labels use, in device px:
+     *                {@code MapTextFormat.getDensityAdjustedFontSize()}.
+     * @param scale   {@code DisplaySettings.getRelativeScaling()}: the px per dp ATAK draws
+     *                marker icons at. The bitmap is composed at device px and drawn 1:1.
+     * @return the file, and the anchor (px) of the disc's center in {@code anchorOut}.
+     */
+    static File labelled(String glyphMarkerUri, String callsign, android.graphics.Typeface face, float textPx,
+            float scale, File iconDir, int[] anchorOut) {
+        if (glyphMarkerUri == null || callsign == null || callsign.isEmpty())
+            return null;
+        final String base = new File(glyphMarkerUri.replace("file://", "")).getName().replace(".png", "");
+        final String key = base + "_" + Integer.toHexString(callsign.hashCode()) + "_v" + LABEL_V + "_s"
+                + Math.round(scale * 100) + "_f" + Math.round(textPx * 10);
+        final File out = new File(iconDir, "dartl_" + key + ".png");
+        final int discPx = Math.round(PX * scale);
+        final Paint tp = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
+        tp.setTypeface(face);
+        tp.setTextSize(textPx);
+        tp.setColor(0xFFFFFFFF);
+        final Rect tb = new Rect();
+        tp.getTextBounds(callsign, 0, callsign.length(), tb);
+        final int textW = (int) Math.ceil(tp.measureText(callsign));
+        final Paint.FontMetricsInt fm = tp.getFontMetricsInt();
+        final int textH = fm.descent - fm.ascent;
+        final int pillW = textW + 2 * PAD_X, pillH = textH + 2 * PAD_Y;
+        final int w = Math.max(pillW, discPx) + 2, h = pillH + GAP + discPx + 2;
+        final int discCx = w / 2, discCy = pillH + GAP + discPx / 2;
+        if (anchorOut != null && anchorOut.length >= 2) {
+            anchorOut[0] = discCx;
+            anchorOut[1] = discCy;
+        }
+        if (out.isFile())
+            return out;
+        try {
+            final File src = new File(glyphMarkerUri.replace("file://", ""));
+            final Bitmap disc = BitmapFactory.decodeFile(src.getAbsolutePath());
+            if (disc == null)
+                return null;
+            final Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            final Canvas c = new Canvas(bmp);
+            final Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
+            bg.setColor(LABEL_BG);
+            final float pl = (w - pillW) / 2f;
+            c.drawRoundRect(new RectF(pl, 1, pl + pillW, 1 + pillH), RADIUS, RADIUS, bg);
+            c.drawText(callsign, pl + PAD_X, 1 + PAD_Y - fm.ascent, tp);
+            // The glyph composite is square-ish with the disc in its top PX x PX; draw
+            // just that square at disc size.
+            final int side = Math.min(disc.getWidth(), disc.getHeight());
+            c.drawBitmap(disc, new Rect(0, 0, side, side),
+                    new RectF(discCx - discPx / 2f, discCy - discPx / 2f, discCx + discPx / 2f, discCy + discPx / 2f),
+                    new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+            final File tmp = new File(out.getPath() + ".tmp");
+            final FileOutputStream o = new FileOutputStream(tmp);
+            try {
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, o);
+            } finally {
+                o.close();
+                bmp.recycle();
+                disc.recycle();
+            }
+            //noinspection ResultOfMethodCallIgnored
+            tmp.renameTo(out);
+            return out.isFile() ? out : null;
+        } catch (Exception e) {
+            Log.w(TAG, "DART labelled marker " + callsign, e);
+            return null;
+        }
+    }
+
     /** Whether a spec draws DART symbology at all. */
     static boolean handles(LayerSpec spec) {
         return "dart".equals(spec.iconSet);

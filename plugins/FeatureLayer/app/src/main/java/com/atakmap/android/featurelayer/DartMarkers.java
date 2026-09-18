@@ -3,6 +3,7 @@ package com.atakmap.android.featurelayer;
 import android.content.Context;
 
 import com.atakmap.coremap.maps.assets.Icon;
+import java.io.File;
 import com.atakmap.android.maps.MapGroup;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.maps.Marker;
@@ -85,13 +86,15 @@ final class DartMarkers {
     private final String groupName;
     private final Map<String, Marker> live = new HashMap<>();
     private final Map<String, Icon> icons = new HashMap<>();
+    private final File iconDir;
     /** The disc a row falls back to when its own glyph could not be composed. */
     private final String fallbackUri;
     private MapGroup group;
     private boolean visible = true;
 
-    DartMarkers(MapView mapView, Context pluginContext, String layerId, String fallback) {
+    DartMarkers(MapView mapView, Context pluginContext, String layerId, String fallback, File iconDir) {
         this.mapView = mapView;
+        this.iconDir = iconDir;
         this.pluginContext = pluginContext;
         this.layerId = layerId;
         this.groupName = "FeatureLayer DART " + layerId;
@@ -142,9 +145,9 @@ final class DartMarkers {
                     // uri changes, and a marker left holding the old file drew the previous
                     // build's image for as long as it lived (2026-09-17).
                     final String had = m.getMetaString("dart_icon", "");
-                    final String want = r.iconUri == null ? "" : r.iconUri;
+                    final String want = iconKey(r);
                     if (!had.equals(want)) {
-                        final Icon icon = icon(r.iconUri);
+                        final Icon icon = icon(r.iconUri, r.callsign);
                         if (icon != null) {
                             m.setIcon(icon);
                             m.setMetaString("dart_icon", want);
@@ -176,12 +179,12 @@ final class DartMarkers {
         m.setLabelPriority(Marker.LabelPriority.High);
         // Without this the label obeys maxLabelRenderResolution, which defaults to
         // 10 m/px, so callsigns simply vanished when zoomed out past it.
-        m.setTextRenderFlag(Marker.TEXT_STATE_ALWAYS_SHOW);
-        final Icon icon = icon(r.iconUri);
+        m.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);  // the callsign is pixels in the icon
+        final Icon icon = icon(r.iconUri, r.callsign);
         if (icon != null) {
             m.setIcon(icon);
             m.setIconVisibility(Marker.ICON_VISIBLE);
-            m.setMetaString("dart_icon", r.iconUri == null ? "" : r.iconUri);
+            m.setMetaString("dart_icon", iconKey(r));
         }
         // The tap target: the feature behind this marker is written with a gate that never
         // draws, so this is what a finger finds. The metadata is the same set
@@ -201,39 +204,54 @@ final class DartMarkers {
         return m;
     }
 
-    /** The disc the feature would have drawn, as a marker icon, built once per glyph. */
-    private Icon icon(String uri) {
+    /**
+     * The disc with its callsign drawn above it, as one marker icon: see
+     * {@link DartStyles#labelled}. Built once per glyph and callsign.
+     */
+    private Icon icon(String uri, String callsign) {
         // Never leave a DART point without a disc: with no icon ATAK draws its own default
         // green dot, which says nothing and does not read as one of ours.
         if (uri == null || uri.isEmpty())
             uri = fallbackUri;
         if (uri == null || uri.isEmpty())
             return null;
-        Icon i = icons.get(uri);
+        final String cs = callsign == null ? "" : callsign;
+        final String key = uri + "|" + cs;
+        Icon i = icons.get(key);
         if (i != null)
             return i;
         try {
-            // Size AND anchor, both in dp, both required. GLMarker2 pushes the label clear
-            // of the icon by (height - anchorY), so with no anchor the label sat centered on
-            // the point and the disc drew a bite out of the middle of every callsign --
-            // "CA-ANF-WT225" read as "CA-AN  T225", with the missing letters exactly under
-            // the disc (2026-09-17). Without setSize the composite draws at its full 96 px.
-            // The composite is the disc plus transparent padding below it (DartStyles.PAD).
-            // The anchor stays on the disc's center so the disc sits on the position; the
-            // padding is what GLMarker2 turns into the label's clearance above the disc.
-            final int px = (int) DartStyles.markerPx();
-            final int ph = (int) DartStyles.markerPxH();
+            final float scale = gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling();
+            final com.atakmap.android.maps.MapTextFormat tf = MapView.getDefaultTextFormat();
+            final int[] anchor = new int[2];
+            // ATAK's own label paint size is fontSize * relativeScaling; MapTextFormat
+            // exposes that product directly, so use it rather than recompute it.
+            float textPx = tf.getDensityAdjustedFontSize();
+            if (textPx <= 0f)
+                textPx = tf.getFontSize() * scale;
+            final File f = DartStyles.labelled(uri, cs, tf.getTypeface(), textPx, scale, iconDir, anchor);
+            if (f == null)
+                return null;
+            final android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+            // Composed at device px; ask for it back at the same px by dividing by ATAK's
+            // dp scaling, so nothing is resampled. Anchor on the disc's center.
             i = new Icon.Builder()
-                    .setImageUri(Icon.STATE_DEFAULT, uri)
-                    .setSize(px, ph)
-                    .setAnchor(px / 2, px / 2)
+                    .setImageUri(Icon.STATE_DEFAULT, "file://" + f.getAbsolutePath())
+                    .setSize(Math.round(o.outWidth / scale), Math.round(o.outHeight / scale))
+                    .setAnchor(Math.round(anchor[0] / scale), Math.round(anchor[1] / scale))
                     .build();
-            icons.put(uri, i);
+            icons.put(key, i);
             return i;
         } catch (Exception e) {
             Log.w(TAG, "DART icon " + uri, e);
             return null;
         }
+    }
+
+    private static String iconKey(Row r) {
+        return (r.iconUri == null ? "" : r.iconUri) + "|" + (r.callsign == null ? "" : r.callsign);
     }
 
     private MapGroup group() {

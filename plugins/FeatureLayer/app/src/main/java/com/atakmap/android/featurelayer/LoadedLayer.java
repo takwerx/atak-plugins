@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 44;
+    private static final int STYLE_VERSION = 45;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -155,7 +155,7 @@ public class LoadedLayer {
         layer = new FeatureLayer3(displayName(), store, visibleOnly);
         if (DartStyles.handles(spec))
             dartLabels = new DartMarkers(mapView, pluginContext, spec.id,
-                    DartStyles.genericMarkerUri(iconDir));
+                    DartStyles.genericMarkerUri(iconDir), iconDir);
         final FeatureDataStoreDeepMapItemQuery query = new FeatureDataStoreDeepMapItemQuery(layer) {
             @Override
             protected MapItem featureToMapItem(Feature feature) {
