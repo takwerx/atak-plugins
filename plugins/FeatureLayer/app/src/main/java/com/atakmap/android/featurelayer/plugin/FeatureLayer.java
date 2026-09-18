@@ -1508,25 +1508,39 @@ public class FeatureLayer implements IPlugin {
                     manager.setLabels(l, on[0]);
                 }
             });
-            // The level, in the zoom gate's language: names from this scale-bar reading and
-            // closer, symbols alone further out. "Always" is the way it was.
+            row.findViewById(R.id.feature_fill).setVisibility(View.INVISIBLE);
+            container.addView(row);
+        }
+        {
+            // Label zoom, the same shape as the zoom gate: set it by example ("Use this
+            // zoom") or pick a scale-bar reading. Names from there in, symbols alone
+            // further out; 5 mi unless changed. "Always" is a choice, not the default.
+            final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.feature_row, null);
+            ((TextView) row.findViewById(R.id.feature_name)).setText("Label zoom");
+            final Button useThis = row.findViewById(R.id.feature_toggle);
+            useThis.setText("Use this zoom");
+            useThis.setTextColor(Color.WHITE);
             final Button level = row.findViewById(R.id.feature_fill);
-            level.setVisibility(View.VISIBLE);
             level.setText(labelLevel(l));
+            useThis.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    manager.setLabelLevel(l, mapView.getMapResolution());
+                    level.setText(labelLevel(l));
+                }
+            });
             level.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    final String[] labels = new String[GATE_BIG.length + 2];
+                    final String[] labels = new String[GATE_BIG.length + 1];
                     for (int i = 0; i < GATE_BIG.length; i++)
                         labels[i] = gateName(GATE_BIG[i]);
                     labels[GATE_BIG.length] = "Always";
-                    labels[GATE_BIG.length + 1] = "Use this zoom";
                     new AlertDialog.Builder(mapView.getContext()).setTitle("Label when the scale bar reads")
                             .setItems(labels, new DialogInterface.OnClickListener() {
                                 @Override
                                 public void onClick(DialogInterface d, int which) {
                                     final double gsd = which == GATE_BIG.length ? Double.MAX_VALUE
-                                            : which == GATE_BIG.length + 1 ? mapView.getMapResolution()
                                             : com.atakmap.android.featurelayer.Units.bigToMeters(GATE_BIG[which]) / scaleBarPixels();
                                     manager.setLabelLevel(l, gsd);
                                     level.setText(labelLevel(l));

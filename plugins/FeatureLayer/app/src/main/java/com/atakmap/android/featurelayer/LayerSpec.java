@@ -39,7 +39,13 @@ public class LayerSpec {
      * zoom the layer draws. Symbols alone out wide, names once zoomed in past the level
      * (operator, 2026-09-18: "a separate zoom level for the labels, not just on and off").
      */
-    public double labelGsd = Double.MAX_VALUE;
+    public double labelGsd = DEFAULT_LABEL_GSD;
+    /**
+     * Five miles on the scale bar, at the bar's nominal length: names appear from there
+     * in, symbols alone further out (operator, 2026-09-18: "labels need to come on at
+     * like 5 miles default", for every layer). Always is a choice, not the default.
+     */
+    public static final double DEFAULT_LABEL_GSD = 5 * 1609.344 / ScaleBar.FALLBACK_BAR_PIXELS;
     public int maxFeatures;    // per source layer, 0 = no cap
     /**
      * Spatial scope, for a feed that is too large to draw nationally. Null is the whole
@@ -171,8 +177,9 @@ public class LayerSpec {
         s.orgName = o.isNull("orgName") ? null : o.optString("orgName", null);
         final double gate = o.optDouble("gateGsd", -1);
         s.gateGsd = gate <= 0 ? Double.MAX_VALUE : gate;
-        final double lab = o.optDouble("labelGsd", -1);
-        s.labelGsd = lab <= 0 ? Double.MAX_VALUE : lab;
+        // Absent: the default. -1: Always, chosen. Otherwise the level itself.
+        final double lab = o.optDouble("labelGsd", Double.NaN);
+        s.labelGsd = Double.isNaN(lab) ? DEFAULT_LABEL_GSD : lab <= 0 ? Double.MAX_VALUE : lab;
         final JSONArray ids = o.getJSONArray("layerIds");
         s.layerIds = new int[ids.length()];
         for (int i = 0; i < ids.length(); i++)
