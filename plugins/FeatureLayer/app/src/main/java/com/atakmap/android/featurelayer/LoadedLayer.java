@@ -956,6 +956,8 @@ public class LoadedLayer {
             return false;
         try {
             if ("view".equals(spec.scopeKind)) {
+                if (viewTooWide)
+                    return viewWidthM() <= MAX_VIEW_M; // refused for width: fetch once it is narrower
                 final double[] fb = fetchedBox;
                 final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
                 if (fb == null || b == null)
@@ -989,6 +991,26 @@ public class LoadedLayer {
         return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
+    /** The widest view a "What is in view" layer fetches for: 500 km, about 300 mi, across. */
+    static final double MAX_VIEW_M = 500_000;
+    /** Whether the last view-scoped fetch was refused for width; a narrower view fetches again. */
+    private volatile boolean viewTooWide;
+
+    /** The map view's width in meters at its middle latitude; MAX_VALUE when unknown. */
+    private double viewWidthM() {
+        try {
+            final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+            if (b == null)
+                return Double.MAX_VALUE;
+            final double mid = (b.getNorth() + b.getSouth()) / 2;
+            return com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(
+                    new com.atakmap.coremap.maps.coords.GeoPoint(mid, b.getWest()),
+                    new com.atakmap.coremap.maps.coords.GeoPoint(mid, b.getEast()));
+        } catch (RuntimeException e) {
+            return Double.MAX_VALUE;
+        }
+    }
+
     private Esri.Scope scope() {
         if (spec.scopeKind == null)
             return null;
@@ -999,6 +1021,14 @@ public class LoadedLayer {
             final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
             if (b == null)
                 throw new IllegalStateException("the map has no extent yet");
+            // A national view is not a view: it asked the feed for the whole country every
+            // minute and composed a thousand callsigns (2026-09-18, "1000 so far"). Past
+            // the ceiling the layer keeps what it has and says to zoom in.
+            final double width = viewWidthM();
+            viewTooWide = width > MAX_VIEW_M;
+            if (viewTooWide)
+                throw new IllegalStateException("zoom in to load: the view is " + Units.formatBig(width)
+                        + " across, the most is " + Units.formatBig(MAX_VIEW_M));
             // A margin, so a small pan still has features under it before the next fetch.
             final double padLat = Math.max(0.01, (b.getNorth() - b.getSouth()) * 0.2);
             final double padLon = Math.max(0.01, (b.getEast() - b.getWest()) * 0.2);

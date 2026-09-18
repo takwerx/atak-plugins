@@ -191,19 +191,38 @@ final class DartMarkers {
         }, "dart-labels-swap").start();
     }
 
-    void update(final List<Row> rows) {
-        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
-            // Called on the main thread (a rewrite at attach): compose off it. The diag
-            // caught this on 2026-09-18; at a wide view it is hundreds of PNGs on main.
-            new Thread(new Runnable() {
+    /** One thread for composing, so a rewrite never composes under the layer's lock. */
+    private final java.util.concurrent.ExecutorService composer =
+            java.util.concurrent.Executors.newSingleThreadExecutor(new java.util.concurrent.ThreadFactory() {
                 @Override
-                public void run() {
-                    update(rows);
+                public Thread newThread(Runnable r) {
+                    return new Thread(r, "dart-labels-compose");
                 }
-            }, "dart-labels-update").start();
-            return;
-        }
+            });
+    private final java.util.concurrent.atomic.AtomicInteger updateGen = new java.util.concurrent.atomic.AtomicInteger();
+
+    /**
+     * Replaces the markers on the map with exactly this set. Returns at once: the bitmaps
+     * are composed on the composer thread and attached on the main thread. Before
+     * 2026-09-18 this composed on the caller's thread, which was the refresh worker
+     * holding the layer's lock, and ATAK's unload of the plugin waited two minutes on
+     * the main thread for a thousand callsigns to finish (the 15:22 ANR). A newer set
+     * queued behind this one wins: this one stops composing and is never applied.
+     */
+    void update(final List<Row> rows) {
         final List<Row> copy = new ArrayList<>(rows);
+        final int gen = updateGen.incrementAndGet();
+        composer.execute(new Runnable() {
+            @Override
+            public void run() {
+                compose(copy, gen);
+            }
+        });
+    }
+
+    private void compose(final List<Row> copy, final int gen) {
+        if (gen != updateGen.get())
+            return;
         lastRows = copy;
         boolean show = labelsShown;
         try {
@@ -213,21 +232,22 @@ final class DartMarkers {
         }
         final boolean shown = show;
         diag(String.format(java.util.Locale.US, "update rows=%d show=%b level=%.3f", copy.size(), shown, labelGsd));
-        // The bitmaps are composed here, on the refresh thread that called us, and only
-        // attached on the main thread. After an ATAK restart at a wide view this composed
-        // several hundred callsigns -- decode, draw, PNG-encode each -- inside the main
-        // thread's marker update, and ATAK "struggled to start" (2026-09-17). Cached on
-        // disk and in memory, so a callsign already seen costs nothing here.
-        // Both forms, so a zoom across the label level never composes anything: the
-        // labelled one is the cost, paid here on the refresh thread once per callsign.
+        // The form that shows now; the other form too when the set is small, so a zoom
+        // across the label level never waits. A big set composes only what it draws.
+        final boolean both = copy.size() <= 150;
         for (Row r : copy) {
-            icon(r.iconUri, r.callsign);
-            icon(r.iconUri, "");
+            if (gen != updateGen.get() || Thread.currentThread().isInterrupted())
+                return;
+            final boolean labelled = shown || DartStyles.sos(r.callsign);
+            icon(r.iconUri, labelled ? r.callsign : "");
+            if (both)
+                icon(r.iconUri, labelled ? "" : r.callsign);
         }
         mapView.post(new Runnable() {
             @Override
             public void run() {
-                applyOnMain(copy, shown);
+                if (gen == updateGen.get())
+                    applyOnMain(copy, shown);
             }
         });
     }
@@ -448,6 +468,7 @@ final class DartMarkers {
 
     /** Takes every label off the map; safe to call when nothing was ever added. */
     void dispose() {
+        composer.shutdownNow();
         mapView.post(new Runnable() {
             @Override
             public void run() {

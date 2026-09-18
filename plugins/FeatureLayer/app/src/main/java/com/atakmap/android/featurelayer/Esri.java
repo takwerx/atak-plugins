@@ -239,6 +239,11 @@ public final class Esri {
     public static int query(String base, int layerId, String where, Scope scope, String token, boolean geojson,
             int pageSize, int maxFeatures, FeatureSink sink) throws Exception {
         int count = 0, offset = 0;
+        // The cap is a cap: a 1,000-row page for a 300-feature layer delivered 1,000
+        // (a national view of DART on 2026-09-18). Ask for no more than the cap, and
+        // stop handing rows to the sink at it.
+        if (maxFeatures > 0)
+            pageSize = Math.min(pageSize, maxFeatures);
         while (true) {
             if (maxFeatures > 0 && count >= maxFeatures)
                 break;
@@ -267,6 +272,8 @@ public final class Esri {
                     continue;
                 sink.feature(props, g);
                 count++;
+                if (maxFeatures > 0 && count >= maxFeatures)
+                    break;
             }
             final boolean more = page.optBoolean("exceededTransferLimit", false)
                     || (page.optJSONObject("properties") != null
