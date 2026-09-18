@@ -1170,6 +1170,21 @@ public class FeatureLayer implements IPlugin {
         }
     }
 
+    /** After a panel swap; posted so it runs once the new panel has been laid out. */
+    private void scrollPaneToTop() {
+        if (paneView == null)
+            return;
+        final android.widget.ScrollView sv = paneView.findViewById(R.id.pane_scroll);
+        if (sv == null)
+            return;
+        sv.post(new Runnable() {
+            @Override
+            public void run() {
+                sv.scrollTo(0, 0);
+            }
+        });
+    }
+
     /** The radius a layer gets when the operator asks for a point without naming one. */
     private static final int DEFAULT_SCOPE_BIG = 25;
     /** Radius choices, in the operator's own big unit. 0 is "what is in view". */
@@ -1461,11 +1476,16 @@ public class FeatureLayer implements IPlugin {
                 featuresHeader.setVisibility(View.GONE);
                 mainPanel.setVisibility(View.VISIBLE);
                 renderRows();
+                scrollPaneToTop();
             }
         });
         mainPanel.setVisibility(View.GONE);
         featuresHeader.setVisibility(View.VISIBLE);
         featuresPanel.setVisibility(View.VISIBLE);
+        // The panels swap inside one ScrollView, which keeps its offset: from a layer row
+        // halfway down the list, Features opened halfway down the feature list, with the
+        // find box scrolled off the top (2026-09-18). Start every panel at its top.
+        scrollPaneToTop();
     }
 
     private static String autoLabel(int minutes) {
