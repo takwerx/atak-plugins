@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 36;
+    private static final int STYLE_VERSION = 38;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -71,6 +71,12 @@ public class LoadedLayer {
     private FeatureSetDatabase2 store;
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
+    /**
+     * DART callsigns, drawn as ATAK marker labels. A feature label has no priority to set
+     * and gets shortened from the front when labels crowd, which ate the state and the
+     * unit off every crowded callsign; see {@link DartMarkers}.
+     */
+    private DartMarkers dartLabels;
 
     public volatile String status = "";
     public volatile long lastRefresh;
@@ -147,6 +153,9 @@ public class LoadedLayer {
         final FeatureDataStore2.FeatureQueryParameters visibleOnly = new FeatureDataStore2.FeatureQueryParameters();
         visibleOnly.visibleOnly = true;
         layer = new FeatureLayer3(displayName(), store, visibleOnly);
+        if (DartStyles.handles(spec))
+            dartLabels = new DartMarkers(mapView, pluginContext, spec.id,
+                    DartStyles.genericMarkerUri(iconDir));
         final FeatureDataStoreDeepMapItemQuery query = new FeatureDataStoreDeepMapItemQuery(layer) {
             @Override
             protected MapItem featureToMapItem(Feature feature) {
@@ -283,6 +292,8 @@ public class LoadedLayer {
 
     private void detachLocked() {
         try {
+            if (dartLabels != null)
+                dartLabels.dispose();
             if (layer != null)
                 mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             if (overlay != null)
@@ -295,6 +306,7 @@ public class LoadedLayer {
         layer = null;
         overlay = null;
         store = null;
+        dartLabels = null;
     }
 
     /** Detaches and deletes the store file. */
@@ -519,20 +531,36 @@ public class LoadedLayer {
             bulk = true;
             final List<Long> old = existingSets();
             final Map<String, Long> sets = new HashMap<>();
+            // Collected while writing so the labels and the discs can never disagree;
+            // null for every layer that is not DART.
+            final List<DartMarkers.Row> labels = dartLabels == null ? null
+                    : new ArrayList<DartMarkers.Row>();
             for (Pending pf : cache) {
                 if (!layerOn || !spec.isOn(pf.setName))
                     continue;
                 Long fsid = sets.get(pf.setName);
                 if (fsid == null) {
                     // The kind's own gate (points 120 m/px, lines 400) capped by the layer's.
-                    fsid = newSet(store, pf.setName, Math.min(pf.minGsd, spec.gateGsd));
+                    // A DART set gets 0, which never draws: its markers do the drawing and a
+                    // feature drawn as well would put a second disc under every callsign.
+                    // The row is still here for the details pane, the search and the counts.
+                    fsid = dartLabels != null ? newSet(store, pf.setName, 0d)
+                            : newSet(store, pf.setName, Math.min(pf.minGsd, spec.gateGsd));
                     sets.put(pf.setName, fsid);
                 }
                 Style drawn = spec.repairStatus && pf.alt != null ? pf.alt : pf.style;
                 if (!spec.labels && !(pf.geometry instanceof LineString))
                     drawn = NwcgStyles.withoutLabel(drawn); // a transparent label beats the name
-                store.insertFeature(new Feature(fsid, pf.name, pf.geometry, drawn, pf.attrs,
-                        Feature.AltitudeMode.ClampToGround, 0d));
+                final long fid = store.insertFeature(new Feature(fsid, pf.name, pf.geometry, drawn,
+                        pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                if (labels != null && pf.name != null && !pf.name.isEmpty()
+                        && pf.geometry instanceof com.atakmap.map.layer.feature.geometry.Point) {
+                    final com.atakmap.map.layer.feature.geometry.Point pt =
+                            (com.atakmap.map.layer.feature.geometry.Point) pf.geometry;
+                    labels.add(new DartMarkers.Row(spec.id + "." + pf.setName + "." + pf.name,
+                            spec.labels ? pf.name : "", iconUriOf(pf.style), fid,
+                            pt.getY(), pt.getX()));
+                }
             }
             int dropped = 0;
             for (Long id : old) {
@@ -544,8 +572,11 @@ public class LoadedLayer {
                 }
             }
             count = countFeatures();
+            if (dartLabels != null && labels != null)
+                dartLabels.update(labels);
             Log.d(TAG, spec.id + ": store rewritten, " + count + " shown of " + cache.size()
-                    + " (" + dropped + " old sets dropped)");
+                    + " (" + dropped + " old sets dropped)"
+                    + (labels == null ? "" : ", " + labels.size() + " callsigns"));
         } catch (Exception e) {
             Log.w(TAG, "store rewrite failed", e);
         } finally {
@@ -1223,9 +1254,17 @@ public class LoadedLayer {
                             // A point's name was drawn in ATAK's default white, which disappears
                             // over pale ground and snow: a callsign over a dry grass basemap was
                             // unreadable. Same dark pill the areas use.
-                            style = NwcgStyles.withNameLabel(style, true, name);
-                            if (alt != null)
-                                alt = NwcgStyles.withNameLabel(alt, true, name);
+                            if (DartStyles.handles(spec)) {
+                                // The callsign is a marker label now; a feature label here
+                                // would be a second, trimmed copy of it under the disc.
+                                style = NwcgStyles.withoutLabel(style);
+                                if (alt != null)
+                                    alt = NwcgStyles.withoutLabel(alt);
+                            } else {
+                                style = NwcgStyles.withNameLabel(style, true, name);
+                                if (alt != null)
+                                    alt = NwcgStyles.withNameLabel(alt, true, name);
+                            }
                         }
                         final AttributeSet attrs = Esri.toAttributes(props, dates);
                         attrs.setAttribute("_title", title);
@@ -1298,6 +1337,21 @@ public class LoadedLayer {
                 });
         if (spec.latestBy != null && spec.latestBy.length > 0)
             keepLatest(out, firstOfLayer);
+    }
+
+    /** The icon a point style draws, so a marker can draw the same one. */
+    private static String iconUriOf(Style s) {
+        if (s instanceof com.atakmap.map.layer.feature.style.IconPointStyle)
+            return ((com.atakmap.map.layer.feature.style.IconPointStyle) s).getIconUri();
+        if (s instanceof com.atakmap.map.layer.feature.style.CompositeStyle) {
+            final com.atakmap.map.layer.feature.style.IconPointStyle i =
+                    (com.atakmap.map.layer.feature.style.IconPointStyle) com.atakmap.map.layer.feature.style.CompositeStyle
+                            .find((com.atakmap.map.layer.feature.style.CompositeStyle) s,
+                                    com.atakmap.map.layer.feature.style.IconPointStyle.class);
+            if (i != null)
+                return i.getIconUri();
+        }
+        return null;
     }
 
     private long newSet(FeatureSetDatabase2 db, String name, double minGsd) throws Exception {

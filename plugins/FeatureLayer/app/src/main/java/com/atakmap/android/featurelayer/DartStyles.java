@@ -48,9 +48,7 @@ final class DartStyles {
     /** Bumped when the composite itself changes, so cached ones are not reused. */
     private static final int MARK_V = 4;
     /**
-     * A square canvas. The disc is not centered on the position: {@link #style} draws it
-     * just below, with its top edge on the point, and the callsign sits above it. See
-     * there for why.
+     * A square canvas, and the disc is centered on the position.
      *
      * <p>It was briefly 96x288, the disc in the top square, to lift the marker off the
      * point by geometry baked into the PNG, because the alignment arguments looked
@@ -65,6 +63,20 @@ final class DartStyles {
     private static final int DISC = 0xD9101010, RING = 0xFFE6E6E6;
 
     private DartStyles() {
+    }
+
+    /** The disc's drawn edge, so a marker drawing it can ask for the same size. */
+    static float markerPx() {
+        return PX;
+    }
+
+    /**
+     * The disc every DART point can fall back to, for a row whose own glyph would not
+     * compose. "other-other" is EGP's own generic resource symbol and is always bundled.
+     */
+    static String genericMarkerUri(File iconDir) {
+        final File f = marker("other-other", iconDir);
+        return f == null ? null : "file://" + f.getAbsolutePath();
     }
 
     /** Whether a spec draws DART symbology at all. */
@@ -83,19 +95,12 @@ final class DartStyles {
         final File marker = marker(glyph, iconDir);
         if (marker == null)
             return null;
-        // Arguments five and six are alignX/alignY, not offsets -- the same sign-only enum
-        // the label uses. The 1 draws the disc just BELOW the position, its top edge on the
-        // point, so the callsign sits centered above it: the arrangement ATAK uses for its
-        // own markers, which is what the operator asked for.
-        //
-        // Neither label direction clears an icon centered on the point, and that is the
-        // whole bug. Measured on 2026-09-17: BELOW puts the label's top edge on the point,
-        // and ABOVE pins its top about 40 px up and then grows it back down -- roughly
-        // 24 px of overlap either way. With the disc centered it covered the callsign's
-        // leading characters and "CA-ANF-E325" reached the operator as "E325", which is
-        // what four rounds of "cut off and behind icon" were. So the icon moves, not the
-        // label. Center this icon again and the callsign is clipped again.
-        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX, 0, 1, 0f, true);
+        // Arguments five and six are alignX/alignY, not offsets, and 0/0 centers the disc
+        // on the vehicle's own position -- where it belongs, and where every ATAK marker
+        // sits. It spent a few hours shoved above and then below the point to keep a
+        // feature label off it; the callsign is a marker label now (see DartMarkers), and
+        // ATAK lays that out clear of the icon by itself.
+        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX, 0, 0, 0f, true);
     }
 
     /**
