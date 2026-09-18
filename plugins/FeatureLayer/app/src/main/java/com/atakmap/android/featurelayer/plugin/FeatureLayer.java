@@ -1431,6 +1431,8 @@ public class FeatureLayer implements IPlugin {
     private LoadedLayer featuresFor;
 
     private void pickSets(final LoadedLayer l) {
+        if (paneView == null || manager == null)
+            return; // the pane is gone: a late notification after stop
         pickSets(l, false);
     }
 
@@ -1451,6 +1453,8 @@ public class FeatureLayer implements IPlugin {
     }
 
     private void pickSets(final LoadedLayer l, final boolean inPlace) {
+        if (paneView == null || manager == null)
+            return; // the pane is gone: a late notification after stop
         final List<LoadedLayer.SetInfo> sets = l.types();
         // In place: redraw only when the types or counts moved, and keep the scroll
         // where it was. Rebuilding the rows empties the list for a frame and the

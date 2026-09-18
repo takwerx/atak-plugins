@@ -760,10 +760,15 @@ public class LayerManager {
     }
 
     private void changed() {
+        if (!started)
+            return;
         main.post(new Runnable() {
             @Override
             public void run() {
-                if (listener != null)
+                // A notification queued before stop() and delivered after it reached a
+                // pane that no longer existed: NPE on the main thread, ATAK down
+                // (2026-09-18 16:03). Stopped means nothing more is delivered.
+                if (started && listener != null)
                     listener.onChanged();
             }
         });
