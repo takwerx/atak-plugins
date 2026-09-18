@@ -249,14 +249,35 @@ public class LoadedLayer {
                 return dedupe(super.deepHitTestItems(xpos, ypos, point, view));
             }
 
+            /** Where an item sits, coarsely, so two copies of one feature compare equal. */
+            private String placeOf(MapItem m) {
+                try {
+                    com.atakmap.coremap.maps.coords.GeoPoint p = null;
+                    if (m instanceof com.atakmap.android.maps.PointMapItem)
+                        p = ((com.atakmap.android.maps.PointMapItem) m).getPoint();
+                    else if (m instanceof com.atakmap.android.maps.Shape)
+                        p = ((com.atakmap.android.maps.Shape) m).getCenter().get();
+                    if (p != null)
+                        return String.format(java.util.Locale.US, "%.5f,%.5f", p.getLatitude(), p.getLongitude());
+                } catch (RuntimeException ignored) {
+                }
+                return "fid:" + m.getMetaLong("featureid", -1);
+            }
+
             private java.util.SortedSet<MapItem> dedupe(java.util.SortedSet<MapItem> hits) {
                 if (hits == null || hits.isEmpty())
                     return hits;
-                final java.util.Set<Long> seen = new java.util.HashSet<>();
+                final java.util.Set<String> seen = new java.util.HashSet<>();
                 final java.util.SortedSet<MapItem> out = new java.util.TreeSet<>(hits.comparator());
                 for (MapItem m : hits) {
                     final long fid = m.getMetaLong("featureid", -1);
-                    if (fid < 0 || seen.add(fid))
+                    // A feature with a label level is in the store twice, bare and named,
+                    // and the hit test ignores the zoom bounds that keep one of them off
+                    // the map: the same name at the same spot is one thing to the chooser
+                    // ("Dome \u00b7 95 ac" listed twice, 2026-09-18).
+                    final String key = fid < 0 ? "item:" + m.getUID()
+                            : m.getMetaString("title", "") + "@" + placeOf(m);
+                    if (seen.add(key))
                         out.add(m);
                 }
                 return out;
