@@ -148,6 +148,22 @@ public class LayerManager {
         attachFollow();
         iconDir.mkdirs();
         layersDir.mkdirs();
+        // Thousands of composed PNGs and a few sqlite stores are not media: without this
+        // Android's media scanner indexed every one and fought the plugin for the disk
+        // at load (75% of a core in the 2026-09-18 14:26 ANR dump).
+        for (File d : new File[] { iconDir, layersDir }) {
+            try {
+                //noinspection ResultOfMethodCallIgnored
+                new File(d, ".nomedia").createNewFile();
+            } catch (Exception ignored) {
+            }
+        }
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                DartStyles.purgeStale(iconDir);
+            }
+        });
         try {
             unpackIcons();
         } catch (Exception e) {

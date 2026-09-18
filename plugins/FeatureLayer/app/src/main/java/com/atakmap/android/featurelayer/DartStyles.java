@@ -386,6 +386,25 @@ public final class DartStyles {
         return "egp-dart-" + glyph;
     }
 
+    /**
+     * Removes composites from earlier MARK_V revisions. Every bump left its files behind:
+     * 4,207 files in the icon directory on 2026-09-18, 3,300 of them dead, and the media
+     * scanner and every directory listing paid for all of them. Background thread only.
+     */
+    public static void purgeStale(File iconDir) {
+        final File[] all = iconDir == null ? null : iconDir.listFiles();
+        if (all == null)
+            return;
+        final java.util.regex.Pattern p = java.util.regex.Pattern.compile("^(?:dartl_)?dartm(\\d*)_.*\\.png$");
+        int gone = 0;
+        for (File f : all) {
+            final java.util.regex.Matcher m = p.matcher(f.getName());
+            if (m.matches() && !String.valueOf(MARK_V).equals(m.group(1)) && f.delete())
+                gone++;
+        }
+        Log.d(TAG, "DART composites from earlier revisions removed: " + gone);
+    }
+
     private static synchronized File marker(String glyph, int ageBucket, File iconDir) {
         final File out = new File(iconDir, "dartm" + MARK_V + "_" + glyph.replace('-', '_')
                 + (ageBucket < 0 ? "" : "_a" + ageBucket) + ".png");
