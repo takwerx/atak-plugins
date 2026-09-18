@@ -54,7 +54,7 @@ public final class DartStyles {
      * vehicle drew at a third the size of its neighbors while everything about its code
      * path was identical (2026-09-17).
      */
-    private static final int MARK_V = 13;
+    private static final int MARK_V = 14;
     /**
      * A square canvas, and the disc is centered on the position.
      *
@@ -354,8 +354,11 @@ public final class DartStyles {
         }
         final String a = str(props, "Agency");
         final String al = a == null ? "" : a.toLowerCase(Locale.US);
+        // "USWFS" is W-F-S, not F-W-S: EGP's own 'fws' test misses it and draws the
+        // U.S. Wildland Fire Service as a generic black rig. It is the DOI fire fleet, so
+        // it is named here (operator, 2026-09-18, three black engines at Apple Valley).
         final String agency = al.contains("usfs") ? "usfs"
-                : has(al, "blm", "bia", "nps", "fws") ? "doi" : "other";
+                : has(al, "uswfs", "blm", "bia", "nps", "fws") ? "doi" : "other";
         return agency + "-" + kind;
     }
 
@@ -427,14 +430,20 @@ public final class DartStyles {
         return 0;
     }
 
-    /** A paint that maps the source's luminance onto a tint, alpha untouched. */
-    private static Paint tintPaint(int tint) {
+    /** EGP's generic rigs are black with a white edge: their luminance is inverted before tinting, so the body takes the color. */
+    static boolean invertFor(String glyph) {
+        return glyph.startsWith("other-");
+    }
+
+    /** A paint that maps the source's luminance (or its inverse) onto a tint, alpha untouched. */
+    private static Paint tintPaint(int tint, boolean invert) {
         final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         final float r = ((tint >> 16) & 0xFF) / 255f, g = ((tint >> 8) & 0xFF) / 255f, b = (tint & 0xFF) / 255f;
+        final float k = invert ? -1f : 1f, o = invert ? 255f : 0f;
         final float[] m = {
-                0.299f * r, 0.587f * r, 0.114f * r, 0, 0,
-                0.299f * g, 0.587f * g, 0.114f * g, 0, 0,
-                0.299f * b, 0.587f * b, 0.114f * b, 0, 0,
+                k * 0.299f * r, k * 0.587f * r, k * 0.114f * r, 0, o * r,
+                k * 0.299f * g, k * 0.587f * g, k * 0.114f * g, 0, o * g,
+                k * 0.299f * b, k * 0.587f * b, k * 0.114f * b, 0, o * b,
                 0, 0, 0, 1, 0 };
         p.setColorFilter(new android.graphics.ColorMatrixColorFilter(new android.graphics.ColorMatrix(m)));
         return p;
@@ -482,7 +491,7 @@ public final class DartStyles {
             final RectF dst = new RectF((CANVAS - w) / 2f, (CANVAS - h) / 2f, (CANVAS + w) / 2f, (CANVAS + h) / 2f);
             final int tint = tintFor(glyph);
             c.drawBitmap(in, new Rect(0, 0, in.getWidth(), in.getHeight()), dst,
-                    tint != 0 ? tintPaint(tint) : new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+                    tint != 0 ? tintPaint(tint, invertFor(glyph)) : new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
             // Written whole, then moved into place: a reader never sees a half file.
             final File tmp = new File(out.getPath() + ".tmp");
             final FileOutputStream o = new FileOutputStream(tmp);
