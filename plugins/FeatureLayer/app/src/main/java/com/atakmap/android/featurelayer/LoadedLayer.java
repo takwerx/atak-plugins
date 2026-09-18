@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 50;
+    private static final int STYLE_VERSION = 51;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -166,6 +166,7 @@ public class LoadedLayer {
         if (DartStyles.handles(spec))
             dartLabels = new DartMarkers(mapView, pluginContext, spec.id,
                     DartStyles.genericMarkerUri(iconDir), iconDir);
+            dartLabels.setLabelGsd(spec.labelGsd);
         final FeatureDataStoreDeepMapItemQuery query = new FeatureDataStoreDeepMapItemQuery(layer) {
             @Override
             protected MapItem featureToMapItem(Feature feature) {
@@ -288,7 +289,7 @@ public class LoadedLayer {
     private void dedupeSets() {
         final Map<String, Long> newest = new HashMap<>();
         final List<Long> drop = new ArrayList<>();
-        final List<SetInfo> all = setsLocked();
+        final List<SetInfo> all = rawSetsLocked();
         Log.d(TAG, spec.id + ": " + all.size() + " sets on open");
         for (SetInfo si : all) {
             final Long prev = newest.get(si.name);
@@ -395,8 +396,8 @@ public class LoadedLayer {
                 while (c.moveToNext()) {
                     final Feature f = c.get();
                     final String setName = names.get(f.getFeatureSetId());
-                    if (setName == null)
-                        continue;
+                    if (setName == null || isTwin(setName))
+                        continue; // the named twin is the same feature again
                     // The kind's own zoom default, never the store's number: the store holds
                     // the gate-capped value, and rebuilding from it made the cap permanent
                     // (Plaskett gated at level 14 on every type, perimeter included, 2026-09-09).
@@ -441,6 +442,28 @@ public class LoadedLayer {
             if (!cache.isEmpty())
                 rewriteStore();
         }
+    }
+
+    /** Labels from this resolution and closer. DART markers swap themselves; the store is rewritten for the rest. */
+    public void setLabelLevel(double metersPerPixel) {
+        spec.labelGsd = metersPerPixel;
+        if (dartLabels != null) {
+            dartLabels.setLabelGsd(metersPerPixel);
+            return;
+        }
+        synchronized (lock) {
+            if (store == null || closed)
+                return;
+            loadCacheLocked();
+            if (!cache.isEmpty())
+                rewriteStore();
+        }
+    }
+
+    /** The map's resolution after a move settled; DART markers show or hide their callsigns by it. Main thread. */
+    public void onMapResolution(double metersPerPixel) {
+        if (dartLabels != null)
+            dartLabels.onMapResolution(metersPerPixel);
     }
 
     /** Point labels on or off, from the memory copy; nothing is fetched. */
@@ -514,8 +537,8 @@ public class LoadedLayer {
         try {
             store.acquireModifyLock(true);
             bulk = true;
-            for (SetInfo si : setsLocked()) {
-                if (layerOn && spec.isOn(si.name))
+            for (SetInfo si : rawSetsLocked()) {
+                if (layerOn && spec.isOn(twinBase(si.name)))
                     continue;
                 try {
                     store.deleteFeatureSet(si.id);
@@ -565,20 +588,37 @@ public class LoadedLayer {
             // null for every layer that is not DART.
             final List<DartMarkers.Row> labels = dartLabels == null ? null
                     : new ArrayList<DartMarkers.Row>();
+            final Map<String, Long> twins = new HashMap<>();
+            int written = 0;
             for (Pending pf : cache) {
                 if (!layerOn || !spec.isOn(pf.setName))
                     continue;
+                // A named point with a label level is written twice: the bare symbol in the
+                // type's own set, which stops drawing at that level, and the named icon in a
+                // twin set that starts there. ATAK switches between them by resolution, so
+                // a zoom costs nothing, and the pane never lists the twin.
+                final boolean named = dartLabels == null && pf.name != null && !pf.name.isEmpty()
+                        && pf.geometry instanceof com.atakmap.map.layer.feature.geometry.Point;
+                final boolean split = named && spec.labels && spec.labelGsd != Double.MAX_VALUE;
+                // The kind's own gate (points 120 m/px, lines 400) capped by the layer's.
+                final double gate = Math.min(pf.minGsd, spec.gateGsd);
                 Long fsid = sets.get(pf.setName);
                 if (fsid == null) {
-                    // The kind's own gate (points 120 m/px, lines 400) capped by the layer's.
-                    fsid = newSet(store, pf.setName, Math.min(pf.minGsd, spec.gateGsd));
+                    fsid = newSet(store, pf.setName, gate, split ? Math.min(spec.labelGsd, gate) : 0d);
                     sets.put(pf.setName, fsid);
                 }
-                Style drawn = spec.repairStatus && pf.alt != null ? pf.alt : pf.style;
-                if (!spec.labels && !(pf.geometry instanceof LineString))
-                    drawn = NwcgStyles.withoutLabel(drawn); // a transparent label beats the name
-                final long fid = store.insertFeature(new Feature(fsid, pf.name, pf.geometry, drawn,
-                        pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                final long fid = store.insertFeature(new Feature(fsid, pf.name, pf.geometry,
+                        drawnForm(pf, named, spec.labels && !split), pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                written++;
+                if (split) {
+                    Long tid = twins.get(pf.setName);
+                    if (tid == null) {
+                        tid = newSet(store, pf.setName + LABEL_TWIN, Math.min(spec.labelGsd, gate), 0d);
+                        twins.put(pf.setName, tid);
+                    }
+                    store.insertFeature(new Feature(tid, pf.name, pf.geometry, drawnForm(pf, named, true),
+                            pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                }
                 if (labels != null && pf.name != null && !pf.name.isEmpty()
                         && pf.geometry instanceof com.atakmap.map.layer.feature.geometry.Point) {
                     final com.atakmap.map.layer.feature.geometry.Point pt =
@@ -589,6 +629,7 @@ public class LoadedLayer {
                 }
             }
             int dropped = 0;
+            count = written;
             for (Long id : old) {
                 try {
                     store.deleteFeatureSet(id);
@@ -1345,6 +1386,7 @@ public class LoadedLayer {
                         // child stays quiet. NWCG areas would only say "Wildfire Daily Fire
                         // Perimeter", so they get no name; lines never do (ATAK repeats a line's
                         // label along its length).
+                        String bare = null, bareAlt = null;
                         final com.atakmap.map.layer.feature.geometry.Point at = !nwcg && !isPointLayer && !isLineLayer
                                 && name != null && !name.isEmpty() ? labelPoint(g) : null;
                         if (at != null) {
@@ -1361,7 +1403,7 @@ public class LoadedLayer {
                             style = NwcgStyles.withoutLabel(style);
                             if (alt != null)
                                 alt = NwcgStyles.withoutLabel(alt);
-                        } else if (isPointLayer && spec.labels && name != null && !name.isEmpty()) {
+                        } else if (isPointLayer && name != null && !name.isEmpty()) {
                             // A point's name is pixels in its icon (LabelledIcons), not a label.
                             // ATAK's label engine drew NWCG point names in white with no backing
                             // and trimmed them -- "Value at Risk" as "Va", "Hazard" as "ard" over
@@ -1369,18 +1411,31 @@ public class LoadedLayer {
                             // pill on every other layer's points the same way. A transparent
                             // empty label then keeps the engine from drawing the name itself.
                             // A Label Point is text only: its pill is composed with no symbol.
-                            final Style ls = labelledPoint(style, name);
-                            if (ls != null) {
-                                style = ls;
-                                final Style la = alt == null ? null : labelledPoint(alt, name);
-                                alt = la != null ? la : alt;
-                            } else {
-                                style = NwcgStyles.withNameLabel(style, true, name);
-                                if (alt != null)
-                                    alt = NwcgStyles.withNameLabel(alt, true, name);
+                            // The bare style rides in the feature's attributes, because the
+                            // labels toggle has to rebuild either form later: after a restart
+                            // the cache is reloaded from the store, where the icon already
+                            // carries its name, and turning labels off changed nothing (Timber,
+                            // 2026-09-18).
+                            bare = packStyle(style);
+                            bareAlt = alt == null ? null : packStyle(alt);
+                            if (spec.labels) {
+                                final Style ls = labelledPoint(style, name);
+                                if (ls != null) {
+                                    style = ls;
+                                    final Style la = alt == null ? null : labelledPoint(alt, name);
+                                    alt = la != null ? la : alt;
+                                } else {
+                                    style = NwcgStyles.withNameLabel(style, true, name);
+                                    if (alt != null)
+                                        alt = NwcgStyles.withNameLabel(alt, true, name);
+                                }
                             }
                         }
                         final AttributeSet attrs = Esri.toAttributes(props, dates);
+                        if (bare != null)
+                            attrs.setAttribute(ATTR_BARE, bare);
+                        if (bareAlt != null)
+                            attrs.setAttribute(ATTR_BARE_ALT, bareAlt);
                         attrs.setAttribute("_title", title);
                         // For the search pane: what kind of thing it is, and when it was collected.
                         attrs.setAttribute("_type", nwcg ? (cat != null ? cat : layerName)
@@ -1459,6 +1514,61 @@ public class LoadedLayer {
      * size it has on screen today: a scale-form icon draws at its PNG's own pixels times
      * the scale, a size-form one at its dp times ATAK's display scaling.
      */
+    /** A point's style before its name was drawn into the icon, packed as ATAK's OGR style text. */
+    static final String ATTR_BARE = "_bare", ATTR_BARE_ALT = "_bare_alt";
+
+    private static String packStyle(Style s) {
+        try {
+            return s == null ? null : com.atakmap.map.layer.feature.ogr.style.FeatureStyleParser.pack(s);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** The bare style a point was fetched with, or null when the feature has none recorded. */
+    private Style bareStyle(Pending pf, boolean repair) {
+        if (pf.attrs == null)
+            return null;
+        try {
+            final String key = repair && pf.attrs.containsAttribute(ATTR_BARE_ALT) ? ATTR_BARE_ALT : ATTR_BARE;
+            if (!pf.attrs.containsAttribute(key))
+                return null;
+            return com.atakmap.map.layer.feature.ogr.style.FeatureStyleParser.parse2(pf.attrs.getStringAttribute(key));
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Whether the style's icon is a LabelledIcons composite, the name already pixels in it. */
+    private boolean isComposed(Style s) {
+        final String uri = iconUriOf(s);
+        return uri != null && uri.substring(uri.lastIndexOf('/') + 1).startsWith("lbl_");
+    }
+
+    /**
+     * The style a cached feature is written with: its name drawn into the icon or not.
+     * When the icon disagrees with what is wanted, it is rebuilt from the bare style the
+     * fetch recorded; a feature that is not a named point keeps its style, minus the
+     * engine's label when labels are off.
+     */
+    private Style drawnForm(Pending pf, boolean named, boolean labelled) {
+        Style drawn = spec.repairStatus && pf.alt != null ? pf.alt : pf.style;
+        if (named && labelled != isComposed(drawn)) {
+            final Style base = bareStyle(pf, spec.repairStatus);
+            if (base != null) {
+                if (labelled) {
+                    final Style ls = labelledPoint(base, pf.name);
+                    drawn = ls != null ? ls : NwcgStyles.withNameLabel(base, true, pf.name);
+                } else {
+                    drawn = base;
+                }
+            }
+        }
+        if (!labelled && !(pf.geometry instanceof LineString))
+            drawn = NwcgStyles.withoutLabel(drawn); // a transparent label beats the name
+        return drawn;
+    }
+
     private Style labelledPoint(Style s, String text) {
         final com.atakmap.map.layer.feature.style.IconPointStyle ip;
         if (s instanceof com.atakmap.map.layer.feature.style.LabelPointStyle) {
@@ -1591,7 +1701,28 @@ public class LoadedLayer {
         }
     }
 
+    /** Suffix of the set that holds the named form of a type's points when a label level is set. */
+    static final String LABEL_TWIN = " (labels)";
+
+    static boolean isTwin(String setName) {
+        return setName != null && setName.endsWith(LABEL_TWIN);
+    }
+
+    static String twinBase(String setName) {
+        return isTwin(setName) ? setName.substring(0, setName.length() - LABEL_TWIN.length()) : setName;
+    }
+
+    /** The sets the pane and the counts see: the twins left out. */
     private List<SetInfo> setsLocked() {
+        final List<SetInfo> out = new ArrayList<>();
+        for (SetInfo si : rawSetsLocked())
+            if (!isTwin(si.name))
+                out.add(si);
+        return out;
+    }
+
+    /** Every set in the store, twins included, visibility judged by the base name. */
+    private List<SetInfo> rawSetsLocked() {
         final List<SetInfo> out = new ArrayList<>();
         if (store == null)
             return out;
@@ -1599,7 +1730,7 @@ public class LoadedLayer {
             final FeatureSetCursor c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
             try {
                 while (c.moveToNext())
-                    out.add(new SetInfo(c.getId(), c.getName(), spec.isOn(c.getName())));
+                    out.add(new SetInfo(c.getId(), c.getName(), spec.isOn(twinBase(c.getName()))));
             } finally {
                 c.close();
             }
@@ -1614,8 +1745,12 @@ public class LoadedLayer {
         spec.setOn.put(si.name, v);
         synchronized (lock) {
             try {
-                if (store != null)
+                if (store != null) {
                     store.setFeatureSetVisible(si.id, layerOn && v);
+                    for (SetInfo t : rawSetsLocked())
+                        if (isTwin(t.name) && twinBase(t.name).equals(si.name))
+                            store.setFeatureSetVisible(t.id, layerOn && v);
+                }
             } catch (Exception e) {
                 Log.w(TAG, "set visibility failed", e);
             }
@@ -1765,9 +1900,17 @@ public class LoadedLayer {
         return ids;
     }
 
+    /** Features in the store, each counted once: the named twin of a point is not a second feature. */
     private int countFeatures() {
         try {
-            return store.queryFeaturesCount(new FeatureDataStore2.FeatureQueryParameters());
+            int n = 0;
+            for (SetInfo si : setsLocked()) {
+                final FeatureDataStore2.FeatureQueryParameters p = new FeatureDataStore2.FeatureQueryParameters();
+                p.featureSetFilter = new FeatureDataStore2.FeatureSetQueryParameters();
+                p.featureSetFilter.ids = java.util.Collections.singleton(si.id);
+                n += store.queryFeaturesCount(p);
+            }
+            return n;
         } catch (Exception e) {
             return 0;
         }

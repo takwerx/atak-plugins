@@ -34,6 +34,12 @@ public class LayerSpec {
      * further out than this (Cam Depot's "no further out than" limit). MAX = always.
      */
     public double gateGsd = Double.MAX_VALUE;
+    /**
+     * Labels from this resolution (m/px) and closer; {@code Double.MAX_VALUE} means at every
+     * zoom the layer draws. Symbols alone out wide, names once zoomed in past the level
+     * (operator, 2026-09-18: "a separate zoom level for the labels, not just on and off").
+     */
+    public double labelGsd = Double.MAX_VALUE;
     public int maxFeatures;    // per source layer, 0 = no cap
     /**
      * Spatial scope, for a feed that is too large to draw nationally. Null is the whole
@@ -121,7 +127,7 @@ public class LayerSpec {
         o.put("id", id).put("title", title).put("subtitle", subtitle).put("portal", portal)
                 .put("base", base).put("where", where).put("geojson", geojson)
                 .put("profile", profile.name()).put("lat", finite(lat)).put("lon", finite(lon)).put("live", live).put("maxFeatures", maxFeatures).put("iconSet", iconSet).put("fillAlpha", fillAlpha).put("refreshMinutes", refreshMinutes).put("repairStatus", repairStatus).put("labels", labels)
-                .put("timeField", timeField).put("sinceHours", sinceHours).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName);
+                .put("timeField", timeField).put("sinceHours", sinceHours).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName).put("labelGsd", labelGsd == Double.MAX_VALUE ? -1 : labelGsd);
         final JSONArray ids = new JSONArray();
         for (int i : layerIds)
             ids.put(i);
@@ -165,6 +171,8 @@ public class LayerSpec {
         s.orgName = o.isNull("orgName") ? null : o.optString("orgName", null);
         final double gate = o.optDouble("gateGsd", -1);
         s.gateGsd = gate <= 0 ? Double.MAX_VALUE : gate;
+        final double lab = o.optDouble("labelGsd", -1);
+        s.labelGsd = lab <= 0 ? Double.MAX_VALUE : lab;
         final JSONArray ids = o.getJSONArray("layerIds");
         s.layerIds = new int[ids.length()];
         for (int i = 0; i < ids.length(); i++)

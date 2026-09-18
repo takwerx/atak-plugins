@@ -91,6 +91,13 @@ final class DartMarkers {
     private final String fallbackUri;
     private MapGroup group;
     private boolean visible = true;
+    /** Callsigns from this resolution and closer; MAX_VALUE is always. */
+    private volatile double labelGsd = Double.MAX_VALUE;
+    /** Whether the callsigns are drawn right now, by the map's resolution against the level. */
+    private volatile boolean labelsShown = true;
+    /** The rows last applied, so a zoom across the level can redraw them the other way. */
+    private volatile List<Row> lastRows = new ArrayList<>();
+    private int swapGen;
 
     DartMarkers(MapView mapView, Context pluginContext, String layerId, String fallback, File iconDir) {
         this.mapView = mapView;
@@ -108,24 +115,72 @@ final class DartMarkers {
      * removed and re-added loses its label's place in the manager and flickers on every
      * one-minute refresh.
      */
+    void setLabelGsd(double metersPerPixel) {
+        labelGsd = metersPerPixel;
+        mapView.post(new Runnable() {
+            @Override
+            public void run() {
+                onMapResolution(mapView.getMapResolution());
+            }
+        });
+    }
+
+    /**
+     * Show or hide the callsigns for the map's resolution. Main thread. The other form's
+     * bitmaps are composed off the main thread first, the way {@link #update} does it,
+     * then the rows are applied again; a newer swap wins over one still composing.
+     */
+    void onMapResolution(double metersPerPixel) {
+        final boolean show = metersPerPixel <= labelGsd;
+        if (show == labelsShown)
+            return;
+        labelsShown = show;
+        final List<Row> rows = lastRows;
+        if (rows.isEmpty())
+            return;
+        final int gen = ++swapGen;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                for (Row r : rows)
+                    icon(r.iconUri, show ? r.callsign : "");
+                mapView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (gen == swapGen)
+                            applyOnMain(rows, show);
+                    }
+                });
+            }
+        }, "dart-labels-swap").start();
+    }
+
     void update(final List<Row> rows) {
         final List<Row> copy = new ArrayList<>(rows);
+        lastRows = copy;
+        boolean show = labelsShown;
+        try {
+            show = mapView.getMapResolution() <= labelGsd;
+            labelsShown = show;
+        } catch (RuntimeException ignored) {
+        }
+        final boolean shown = show;
         // The bitmaps are composed here, on the refresh thread that called us, and only
         // attached on the main thread. After an ATAK restart at a wide view this composed
         // several hundred callsigns -- decode, draw, PNG-encode each -- inside the main
         // thread's marker update, and ATAK "struggled to start" (2026-09-17). Cached on
         // disk and in memory, so a callsign already seen costs nothing here.
         for (Row r : copy)
-            icon(r.iconUri, r.callsign);
+            icon(r.iconUri, shown ? r.callsign : "");
         mapView.post(new Runnable() {
             @Override
             public void run() {
-                applyOnMain(copy);
+                applyOnMain(copy, shown);
             }
         });
     }
 
-    private void applyOnMain(List<Row> rows) {
+    private void applyOnMain(List<Row> rows, boolean show) {
         try {
             final MapGroup g = group();
             final Set<String> keep = new HashSet<>();
@@ -138,13 +193,13 @@ final class DartMarkers {
                 // A marker that exists but never got an icon is rebuilt from scratch rather
                 // than patched: a Marker that started iconless kept drawing the reference
                 // dot after setIcon on the XCover (2026-09-18).
-                if (m != null && m.getMetaString("dart_icon", "").isEmpty() && icon(r.iconUri, r.callsign) != null) {
+                if (m != null && m.getMetaString("dart_icon", "").isEmpty() && icon(r.iconUri, show ? r.callsign : "") != null) {
                     live.remove(r.uid);
                     m.removeFromGroup();
                     m = null;
                 }
                 if (m == null) {
-                    m = create(r, p);
+                    m = create(r, p, show);
                     live.put(r.uid, m);
                     g.addItem(m);
                 } else {
@@ -160,9 +215,9 @@ final class DartMarkers {
                     // uri changes, and a marker left holding the old file drew the previous
                     // build's image for as long as it lived (2026-09-17).
                     final String had = m.getMetaString("dart_icon", "");
-                    final String want = iconKey(r);
+                    final String want = iconKey(r, show);
                     if (!had.equals(want)) {
-                        final Icon icon = icon(r.iconUri, r.callsign);
+                        final Icon icon = icon(r.iconUri, show ? r.callsign : "");
                         if (icon != null) {
                             m.setIcon(icon);
                             m.setMetaString("dart_icon", want);
@@ -183,7 +238,7 @@ final class DartMarkers {
         }
     }
 
-    private Marker create(Row r, GeoPoint p) {
+    private Marker create(Row r, GeoPoint p, boolean show) {
         final Marker m = new Marker(p, r.uid);
         m.setTitle(r.callsign == null ? "" : r.callsign);
         m.setMetaString("callsign", r.callsign);
@@ -195,11 +250,11 @@ final class DartMarkers {
         // The callsign is pixels in the icon (DartStyles.labelled); the engine's own label
         // is off so it cannot draw a second, trimmed copy.
         m.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);
-        final Icon icon = icon(r.iconUri, r.callsign);
+        final Icon icon = icon(r.iconUri, show ? r.callsign : "");
         if (icon != null) {
             m.setIcon(icon);
             m.setIconVisibility(Marker.ICON_VISIBLE);
-            m.setMetaString("dart_icon", iconKey(r));
+            m.setMetaString("dart_icon", iconKey(r, show));
         }
         // The tap target: the feature behind this marker is never on the render stack, so
         // this is what a finger finds. The metadata is the same set
@@ -239,6 +294,18 @@ final class DartMarkers {
         Icon i = icons.get(key);
         if (i != null)
             return i;
+        if (cs.isEmpty()) {
+            // No callsign to draw: the disc alone, at the size the composite draws it, so a
+            // zoom across the label level changes nothing but the pill. The file carries its
+            // padding below the disc; anchor on the disc's center.
+            final int px = Math.round(DartStyles.markerPx());
+            i = new Icon.Builder().setImageUri(Icon.STATE_DEFAULT, uri)
+                    .setSize(px, Math.round(DartStyles.markerPxH()))
+                    .setAnchor(px / 2, px / 2)
+                    .build();
+            icons.put(key, i);
+            return i;
+        }
         try {
             final float scale = gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling();
             // At ATAK start-up the plugin can be asked to draw before the map's default
@@ -269,8 +336,8 @@ final class DartMarkers {
         }
     }
 
-    private static String iconKey(Row r) {
-        return (r.iconUri == null ? "" : r.iconUri) + "|" + (r.callsign == null ? "" : r.callsign);
+    private static String iconKey(Row r, boolean show) {
+        return (r.iconUri == null ? "" : r.iconUri) + "|" + (!show || r.callsign == null ? "" : r.callsign);
     }
 
     private MapGroup group() {

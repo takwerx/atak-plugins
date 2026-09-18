@@ -660,6 +660,12 @@ public class FeatureLayer implements IPlugin {
         return m > 0 ? m / res : 200;
     }
 
+    private String labelLevel(LoadedLayer l) {
+        if (l.spec.labelGsd == Double.MAX_VALUE)
+            return "Always";
+        return com.atakmap.android.featurelayer.ScaleBar.describe(l.spec.labelGsd * scaleBarPixels()) + " or closer";
+    }
+
     private String gateLabel(LoadedLayer l) {
         if (l.spec.gateGsd == Double.MAX_VALUE)
             return "Always";
@@ -1502,7 +1508,32 @@ public class FeatureLayer implements IPlugin {
                     manager.setLabels(l, on[0]);
                 }
             });
-            row.findViewById(R.id.feature_fill).setVisibility(View.INVISIBLE);
+            // The level, in the zoom gate's language: names from this scale-bar reading and
+            // closer, symbols alone further out. "Always" is the way it was.
+            final Button level = row.findViewById(R.id.feature_fill);
+            level.setVisibility(View.VISIBLE);
+            level.setText(labelLevel(l));
+            level.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final String[] labels = new String[GATE_BIG.length + 2];
+                    for (int i = 0; i < GATE_BIG.length; i++)
+                        labels[i] = gateName(GATE_BIG[i]);
+                    labels[GATE_BIG.length] = "Always";
+                    labels[GATE_BIG.length + 1] = "Use this zoom";
+                    new AlertDialog.Builder(mapView.getContext()).setTitle("Label when the scale bar reads")
+                            .setItems(labels, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface d, int which) {
+                                    final double gsd = which == GATE_BIG.length ? Double.MAX_VALUE
+                                            : which == GATE_BIG.length + 1 ? mapView.getMapResolution()
+                                            : com.atakmap.android.featurelayer.Units.bigToMeters(GATE_BIG[which]) / scaleBarPixels();
+                                    manager.setLabelLevel(l, gsd);
+                                    level.setText(labelLevel(l));
+                                }
+                            }).setNegativeButton("Cancel", null).show();
+                }
+            });
             container.addView(row);
         }
         if (l.spec.profile == LayerSpec.Profile.NWCG) {

@@ -87,10 +87,26 @@ public class LayerManager {
         listener = l;
     }
 
+    /**
+     * The loaded layers in the order the pane shows them: DART first, then everything
+     * else in the order it was added. Live positions are what an operator opens the pane
+     * for, and they were sinking under whichever fire layers happened to be added earlier
+     * (operator, 2026-09-18: "even if you did a fire first then chose dart, dart is on
+     * top"). The sort is stable, so nothing else changes place.
+     */
     public List<LoadedLayer> snapshot() {
+        final List<LoadedLayer> copy;
         synchronized (layers) {
-            return new ArrayList<>(layers);
+            copy = new ArrayList<>(layers);
         }
+        java.util.Collections.sort(copy, new java.util.Comparator<LoadedLayer>() {
+            @Override
+            public int compare(LoadedLayer a, LoadedLayer b) {
+                final boolean da = DartStyles.handles(a.spec), db = DartStyles.handles(b.spec);
+                return da == db ? 0 : (da ? -1 : 1);
+            }
+        });
+        return copy;
     }
 
     public ArcGisAuth auth(String portal) {
@@ -325,7 +341,9 @@ public class LayerManager {
             if (!started)
                 return;
             final long now = System.currentTimeMillis();
+            final double res = mapView.getMapResolution();
             for (LoadedLayer l : snapshot()) {
+                l.onMapResolution(res);
                 if (!l.movedOutOfScope())
                     continue;
                 final Long last = lastMoveFetch.get(l.spec.id);
@@ -364,6 +382,24 @@ public class LayerManager {
     }
 
     /** Point labels for one layer; a store rewrite from memory, no network. */
+    public void setLabelLevel(final LoadedLayer l, final double metersPerPixel) {
+        l.spec.labelGsd = metersPerPixel;
+        save();
+        l.busy = true;
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    l.setLabelLevel(metersPerPixel);
+                } finally {
+                    l.busy = false;
+                    changed();
+                }
+            }
+        });
+    }
+
     public void setLabels(final LoadedLayer l, final boolean on) {
         l.spec.labels = on;
         save();
