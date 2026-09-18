@@ -54,7 +54,7 @@ public final class DartStyles {
      * vehicle drew at a third the size of its neighbors while everything about its code
      * path was identical (2026-09-17).
      */
-    private static final int MARK_V = 11;
+    private static final int MARK_V = 12;
     /**
      * A square canvas, and the disc is centered on the position.
      *
@@ -405,6 +405,10 @@ public final class DartStyles {
         Log.d(TAG, "DART composites from earlier revisions removed: " + gone);
     }
 
+    static boolean lightDisc(String glyph) {
+        return "wftak".equals(glyph) || "inreach".equals(glyph) || glyph.startsWith("doi-") || glyph.startsWith("other-");
+    }
+
     private static synchronized File marker(String glyph, int ageBucket, File iconDir) {
         final File out = new File(iconDir, "dartm" + MARK_V + "_" + glyph.replace('-', '_')
                 + (ageBucket < 0 ? "" : "_a" + ageBucket) + ".png");
@@ -423,11 +427,14 @@ public final class DartStyles {
             final Canvas c = new Canvas(bmp);
             final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
             p.setStyle(Paint.Style.FILL);
-            // EGP's WFTAK badge is a 31 px dark green shield and its inReach a 19 x 39 px
-            // render of the black handset; on the near-black disc each is a smudge, so both
-            // sit on a light disc, which also sets a person with a device apart from a crew
-            // (operator, 2026-09-18: "the background is white so you can tell what it is").
-            p.setColor("wftak".equals(glyph) || "inreach".equals(glyph) ? DISC_LIGHT : DISC);
+            // EGP drew its set for a pale basemap: the WFTAK badge is a dark green shield,
+            // the inReach a render of the black handset, the DOI trucks pale grey with a
+            // white edge, the generic trucks black. On the near-black disc each is a smudge
+            // or a white outline, so they sit on a light disc; only the green USFS trucks
+            // and the yellow DART pin stay on the dark one. The disc shade is then the
+            // agency tell: dark is Forest Service, light is everyone else (operator,
+            // 2026-09-18: "light disk for USWFS, BLM makes sense").
+            p.setColor(lightDisc(glyph) ? DISC_LIGHT : DISC);
             c.drawCircle(CANVAS / 2f, CANVAS / 2f, CANVAS / 2f - 3f, p);
             p.setStyle(Paint.Style.STROKE);
             // The ring is the report age when one is known: thicker so the color reads at
