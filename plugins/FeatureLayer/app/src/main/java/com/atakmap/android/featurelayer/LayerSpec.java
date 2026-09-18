@@ -133,7 +133,7 @@ public class LayerSpec {
         o.put("id", id).put("title", title).put("subtitle", subtitle).put("portal", portal)
                 .put("base", base).put("where", where).put("geojson", geojson)
                 .put("profile", profile.name()).put("lat", finite(lat)).put("lon", finite(lon)).put("live", live).put("maxFeatures", maxFeatures).put("iconSet", iconSet).put("fillAlpha", fillAlpha).put("refreshMinutes", refreshMinutes).put("repairStatus", repairStatus).put("labels", labels)
-                .put("timeField", timeField).put("sinceHours", sinceHours).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName).put("labelGsd", labelGsd == Double.MAX_VALUE ? -1 : labelGsd);
+                .put("timeField", timeField).put("sinceHours", sinceHours).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName).put("labelGsd", labelGsd == Double.MAX_VALUE ? 0 : labelGsd);
         final JSONArray ids = new JSONArray();
         for (int i : layerIds)
             ids.put(i);
@@ -177,9 +177,10 @@ public class LayerSpec {
         s.orgName = o.isNull("orgName") ? null : o.optString("orgName", null);
         final double gate = o.optDouble("gateGsd", -1);
         s.gateGsd = gate <= 0 ? Double.MAX_VALUE : gate;
-        // Absent: the default. -1: Always, chosen. Otherwise the level itself.
-        final double lab = o.optDouble("labelGsd", Double.NaN);
-        s.labelGsd = Double.isNaN(lab) ? DEFAULT_LABEL_GSD : lab <= 0 ? Double.MAX_VALUE : lab;
+        // Absent or negative: the default (one build on 2026-09-18 wrote -1 for every
+        // layer while Always was still the default). 0: Always, chosen. Else the level.
+        final double lab = o.optDouble("labelGsd", -1);
+        s.labelGsd = lab < 0 ? DEFAULT_LABEL_GSD : lab == 0 ? Double.MAX_VALUE : lab;
         final JSONArray ids = o.getJSONArray("layerIds");
         s.layerIds = new int[ids.length()];
         for (int i = 0; i < ids.length(); i++)
