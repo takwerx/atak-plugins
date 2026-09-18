@@ -748,6 +748,7 @@ public class FeatureLayer implements IPlugin {
             @Override
             public void onClick(View v) {
                 searchPanel.setVisibility(View.GONE);
+                paneView.findViewById(R.id.details_panel).setVisibility(View.GONE);
                 header.setVisibility(View.GONE);
                 if (scope != null) {
                     pickSets(scope); // back to the layer's Features, where this came from
@@ -868,6 +869,7 @@ public class FeatureLayer implements IPlugin {
             container.removeAllViews();
             for (final java.util.Map.Entry<String, Integer> e : counts.entrySet()) {
                 final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.result_row, null);
+                row.findViewById(R.id.result_go).setVisibility(View.GONE); // a type row lists, it does not go
                 ((TextView) row.findViewById(R.id.result_title)).setText(e.getKey());
                 ((TextView) row.findViewById(R.id.result_sub)).setText("");
                 ((TextView) row.findViewById(R.id.result_goto)).setText("tap to list");
@@ -976,7 +978,14 @@ public class FeatureLayer implements IPlugin {
             }
             ((TextView) row.findViewById(R.id.result_dist)).setText(dist.containsKey(o)
                     ? com.atakmap.android.featurelayer.Units.format(dist.get(o)) : "");
+            // Cam Depot's shape: the row opens the details, the button goes there.
             row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showDetails(l, h);
+                }
+            });
+            row.findViewById(R.id.result_go).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     l.zoomTo(h);
@@ -984,6 +993,36 @@ public class FeatureLayer implements IPlugin {
             });
             container.addView(row);
         }
+    }
+
+    /** A hit's attributes in the pane, as the radial's Details shows them; Back returns to the list. */
+    private void showDetails(final LoadedLayer l, final LoadedLayer.Hit h) {
+        if (paneView == null)
+            return;
+        final View searchPanel = paneView.findViewById(R.id.search_panel);
+        final View panel = paneView.findViewById(R.id.details_panel);
+        final String[] title = { h.title };
+        final String body = com.atakmap.android.featurelayer.FeatureDetailsReceiver.render(h.attrs, title);
+        ((TextView) paneView.findViewById(R.id.pane_details_title)).setText(
+                com.atakmap.android.featurelayer.DartStyles.sosCallsign(title[0]) ? "S.O.S. " + title[0] : title[0]);
+        ((TextView) paneView.findViewById(R.id.pane_details_subtitle)).setText(l.displayName());
+        ((TextView) paneView.findViewById(R.id.pane_details_attributes)).setText(body);
+        paneView.findViewById(R.id.btn_details_back).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                panel.setVisibility(View.GONE);
+                searchPanel.setVisibility(View.VISIBLE);
+            }
+        });
+        paneView.findViewById(R.id.btn_details_goto).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                l.zoomTo(h);
+            }
+        });
+        searchPanel.setVisibility(View.GONE);
+        panel.setVisibility(View.VISIBLE);
+        scrollPaneToTop();
     }
 
     private void refreshOrgUi() {

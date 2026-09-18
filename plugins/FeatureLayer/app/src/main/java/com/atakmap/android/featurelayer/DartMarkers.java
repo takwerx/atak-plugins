@@ -115,6 +115,24 @@ final class DartMarkers {
      * removed and re-added loses its label's place in the manager and flickers on every
      * one-minute refresh.
      */
+    /** A line in the layer's diagnostic file, for what cannot be seen from the Mac (no logcat on the XCover). */
+    private void diag(String line) {
+        try {
+            final File f = new File(iconDir.getParentFile(), "dartdiag-" + layerId + ".txt");
+            if (f.length() > 200_000)
+                //noinspection ResultOfMethodCallIgnored
+                f.delete();
+            final java.io.FileWriter w = new java.io.FileWriter(f, true);
+            try {
+                w.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
+                        + " " + Thread.currentThread().getName() + " " + line + "\n");
+            } finally {
+                w.close();
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
     void setLabelGsd(double metersPerPixel) {
         labelGsd = metersPerPixel;
         mapView.post(new Runnable() {
@@ -136,6 +154,8 @@ final class DartMarkers {
             return;
         labelsShown = show;
         final List<Row> rows = lastRows;
+        diag(String.format(java.util.Locale.US, "swap res=%.3f level=%.3f show=%b rows=%d live=%d", metersPerPixel,
+                labelGsd, show, rows.size(), live.size()));
         if (rows.isEmpty())
             return;
         // Every bitmap already in hand, which is the usual case after a refresh: apply
@@ -148,6 +168,7 @@ final class DartMarkers {
                 break;
             }
         }
+        diag("swap ready=" + ready);
         if (ready) {
             ++swapGen;
             applyOnMain(rows, show);
@@ -171,6 +192,17 @@ final class DartMarkers {
     }
 
     void update(final List<Row> rows) {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            // Called on the main thread (a rewrite at attach): compose off it. The diag
+            // caught this on 2026-09-18; at a wide view it is hundreds of PNGs on main.
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    update(rows);
+                }
+            }, "dart-labels-update").start();
+            return;
+        }
         final List<Row> copy = new ArrayList<>(rows);
         lastRows = copy;
         boolean show = labelsShown;
@@ -180,6 +212,7 @@ final class DartMarkers {
         } catch (RuntimeException ignored) {
         }
         final boolean shown = show;
+        diag(String.format(java.util.Locale.US, "update rows=%d show=%b level=%.3f", copy.size(), shown, labelGsd));
         // The bitmaps are composed here, on the refresh thread that called us, and only
         // attached on the main thread. After an ATAK restart at a wide view this composed
         // several hundred callsigns -- decode, draw, PNG-encode each -- inside the main
@@ -200,6 +233,7 @@ final class DartMarkers {
     }
 
     private void applyOnMain(List<Row> rows, boolean show) {
+        int swapped = 0, noIcon = 0, created = 0;
         try {
             final MapGroup g = group();
             final Set<String> keep = new HashSet<>();
@@ -221,6 +255,7 @@ final class DartMarkers {
                     m = create(r, p, show);
                     live.put(r.uid, m);
                     g.addItem(m);
+                    created++;
                 } else {
                     m.setPoint(p);
                     if (r.callsign != null && !r.callsign.equals(m.getTitle())) {
@@ -240,6 +275,9 @@ final class DartMarkers {
                         if (icon != null) {
                             m.setIcon(icon);
                             m.setMetaString("dart_icon", want);
+                            swapped++;
+                        } else {
+                            noIcon++;
                         }
                     }
                 }
@@ -254,7 +292,10 @@ final class DartMarkers {
             }
         } catch (Exception e) {
             Log.w(TAG, "DART labels update failed", e);
+            diag("apply failed: " + e);
         }
+        diag(String.format(java.util.Locale.US, "apply show=%b rows=%d created=%d swapped=%d noIcon=%d live=%d", show,
+                rows.size(), created, swapped, noIcon, live.size()));
     }
 
     private Marker create(Row r, GeoPoint p, boolean show) {

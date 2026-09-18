@@ -43,6 +43,39 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         });
     }
 
+    /**
+     * The attributes as Details prints them: sorted, the plugin's own "_" keys left out,
+     * a "_title" handed back through {@code titleOut}. The pane's list uses the same
+     * rendering, so a row and the radial show one thing.
+     */
+    public static String render(AttributeSet attrs, String[] titleOut) {
+        final List<String> keys = new ArrayList<>();
+        if (attrs != null)
+            keys.addAll(attrs.getAttributeNames());
+        Collections.sort(keys, String.CASE_INSENSITIVE_ORDER);
+        final StringBuilder sb = new StringBuilder();
+        for (String k : keys) {
+            String v;
+            try {
+                v = attrs.getStringAttribute(k);
+            } catch (Exception e) {
+                v = "";
+            }
+            if (v == null || v.isEmpty())
+                continue;
+            if ("_title".equals(k)) {
+                if (titleOut != null && titleOut.length > 0)
+                    titleOut[0] = v;
+                continue;
+            }
+            if (k.startsWith("_"))
+                continue; // the plugin's own bookkeeping, not the feature's data
+            final String ago = Esri.ago(v);
+            sb.append(k).append(": ").append(v).append(ago == null ? "" : "  (" + ago + ")").append('\n');
+        }
+        return sb.toString().trim();
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         final String uid = intent.getStringExtra("targetUID");
@@ -66,35 +99,12 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
             return;
         }
         final LoadedLayer layer = manager.find(layerId);
-        final AttributeSet attrs = f.getAttributes();
-        final List<String> keys = new ArrayList<>();
-        if (attrs != null)
-            keys.addAll(attrs.getAttributeNames());
-        Collections.sort(keys, String.CASE_INSENSITIVE_ORDER);
-        final StringBuilder sb = new StringBuilder();
-        String title = f.getName();
-        for (String k : keys) {
-            String v;
-            try {
-                v = attrs.getStringAttribute(k);
-            } catch (Exception e) {
-                v = "";
-            }
-            if (v == null || v.isEmpty())
-                continue;
-            if ("_title".equals(k)) {
-                title = v;
-                continue;
-            }
-            if (k.startsWith("_"))
-                continue; // the plugin's own bookkeeping, not the feature's data
-            final String ago = Esri.ago(v);
-            sb.append(k).append(": ").append(v).append(ago == null ? "" : "  (" + ago + ")").append('\n');
-        }
-        ((TextView) view.findViewById(R.id.details_title)).setText(title);
+        final String[] title = { f.getName() };
+        final String body = render(f.getAttributes(), title);
+        ((TextView) view.findViewById(R.id.details_title)).setText(title[0]);
         ((TextView) view.findViewById(R.id.details_subtitle))
                 .setText(layer == null ? "" : layer.displayName());
-        ((TextView) view.findViewById(R.id.details_attributes)).setText(sb.toString().trim());
+        ((TextView) view.findViewById(R.id.details_attributes)).setText(body);
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
     }
 

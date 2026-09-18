@@ -778,8 +778,12 @@ public class LoadedLayer {
         public final double lat, lon, spanDeg;
         /** When the feature was collected or last edited, epoch ms; 0 when the data says nothing. */
         public final long time;
+        /** The feature's attributes, for a details view straight from the list; may be null. */
+        public final AttributeSet attrs;
 
-        Hit(String title, String layer, String layerId, String type, long time, double lat, double lon, double spanDeg) {
+        Hit(String title, String layer, String layerId, String type, long time, double lat, double lon, double spanDeg,
+                AttributeSet attrs) {
+            this.attrs = attrs;
             this.title = title;
             this.layer = layer;
             this.layerId = layerId;
@@ -833,7 +837,7 @@ public class LoadedLayer {
             if (e == null || Double.isNaN(e.minX))
                 continue;
             out.add(new Hit(title, spec.title, spec.id, type, time, (e.minY + e.maxY) / 2, (e.minX + e.maxX) / 2,
-                    Math.max(e.maxX - e.minX, e.maxY - e.minY)));
+                    Math.max(e.maxX - e.minX, e.maxY - e.minY), pf.attrs));
             if (out.size() >= max)
                 break;
         }
