@@ -922,9 +922,36 @@ public class FeatureLayer implements IPlugin {
                 sub.append(h.type);
             if (scope == null)
                 sub.append(sub.length() > 0 ? " \u00b7 " : "").append(h.layer);
-            if (h.time > 0)
+            // A DART row says how old its report is, in the bucket's color -- the same
+            // green / yellow / red as the ring on its marker. Other layers keep the date.
+            final boolean dart = com.atakmap.android.featurelayer.DartStyles.handles(l.spec);
+            String agoText = null;
+            int agoColor = 0;
+            if (h.time > 0 && dart) {
+                final int bucket = com.atakmap.android.featurelayer.DartStyles.ageBucket(h.time,
+                        // A hit does not carry its data source, so a person gets the Field
+                        // Maps cut-offs here; the marker's ring, built from the row, knows
+                        // an inReach when it sees one. Same numbers today.
+                        System.currentTimeMillis(), com.atakmap.android.featurelayer.DartStyles.ageCutoffs(
+                                l.spec.id.contains("personnel"), false));
+                agoColor = com.atakmap.android.featurelayer.DartStyles.ageColor(bucket);
+                final long min = Math.max(0, (System.currentTimeMillis() - h.time) / 60000L);
+                agoText = min < 1 ? "just now" : min < 60 ? min + " min ago"
+                        : min < 1440 ? (min / 60) + " h " + (min % 60) + " min ago" : (min / 1440) + " d ago";
+            }
+            if (h.time > 0 && !dart)
                 sub.append(sub.length() > 0 ? " \u00b7 " : "").append(when.format(new java.util.Date(h.time)));
-            ((TextView) row.findViewById(R.id.result_sub)).setText(sub.toString());
+            final TextView subView = row.findViewById(R.id.result_sub);
+            if (agoText != null) {
+                final String head = sub.length() > 0 ? sub + " \u00b7 " : "";
+                final android.text.SpannableString sp = new android.text.SpannableString(head + agoText);
+                if (agoColor != 0)
+                    sp.setSpan(new android.text.style.ForegroundColorSpan(agoColor), head.length(), sp.length(),
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                subView.setText(sp);
+            } else {
+                subView.setText(sub.toString());
+            }
             ((TextView) row.findViewById(R.id.result_dist)).setText(dist.containsKey(o)
                     ? com.atakmap.android.featurelayer.Units.format(dist.get(o)) : "");
             row.setOnClickListener(new View.OnClickListener() {

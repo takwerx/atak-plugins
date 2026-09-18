@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 49;
+    private static final int STYLE_VERSION = 50;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -1322,7 +1322,12 @@ public class LoadedLayer {
                                 // EGP's symbology, not the services' own: personnel declare a
                                 // 22.5 pt marker and vehicles an esriSMS dot of size 4, which
                                 // is a speck nobody can see over imagery.
-                                final Style d = DartStyles.style(props, spec.id.contains("personnel"), iconDir);
+                                final boolean person = spec.id.contains("personnel");
+                                final long reported = spec.timeField != null && props.opt(spec.timeField) instanceof Number
+                                        ? ((Number) props.opt(spec.timeField)).longValue() : 0L;
+                                final int age = DartStyles.ageBucket(reported, System.currentTimeMillis(),
+                                        DartStyles.ageCutoffs(props, person));
+                                final Style d = DartStyles.style(props, person, iconDir, age);
                                 if (d != null)
                                     style = d;
                             }

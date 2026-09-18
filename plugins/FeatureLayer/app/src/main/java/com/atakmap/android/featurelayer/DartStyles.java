@@ -34,7 +34,7 @@ import java.util.Locale;
  * uses for NWCG repair status. Composites are cached in the icon directory and drawn
  * once.
  */
-final class DartStyles {
+public final class DartStyles {
     private static final String TAG = "FeatureLayer";
 
     /**
@@ -52,7 +52,7 @@ final class DartStyles {
      * vehicle drew at a third the size of its neighbors while everything about its code
      * path was identical (2026-09-17).
      */
-    private static final int MARK_V = 6;
+    private static final int MARK_V = 8;
     /**
      * A square canvas, and the disc is centered on the position.
      *
@@ -78,7 +78,51 @@ final class DartStyles {
      */
     static final float PAD = 0.5f;
     private static final int CANVAS_H = CANVAS + (int) (CANVAS * PAD);
-    private static final int DISC = 0xD9101010, RING = 0xFFE6E6E6;
+    private static final int DISC = 0xD9101010, DISC_LIGHT = 0xE6F2F2F2, RING = 0xFFE6E6E6;
+
+    /** Report age buckets: how recent a DART position is. */
+    public static final int AGE_UNKNOWN = -1, AGE_LIVE = 0, AGE_ON_SCHEDULE = 1, AGE_STALE = 2;
+    /** Ring colors by bucket: the pane's ON green, its Loading amber, its OFF red. */
+    private static final int[] AGE_RING = { 0xFF4CAF50, 0xFFFFC107, 0xFFF44336 };
+    /**
+     * The two cut-offs per source, in minutes: green up to the first, yellow up to the
+     * second, red beyond. Measured on 2026-09-18 for the AVL boxes: a parked vehicle
+     * keeps reporting on a 30-minute timer, some on 60, and a moving one every minute or
+     * so -- so 10 means "live" and 70 means "has not missed a cycle". Phones (Field Maps)
+     * and Garmin inReach trackers are different systems with their own cadences and start
+     * on the same numbers until there is personnel data on a phone to measure; tune them
+     * here, not by hand in a bucket.
+     */
+    private static final int[] AGE_VEHICLE = { 10, 70 }, AGE_FIELDMAPS = { 10, 70 }, AGE_INREACH = { 10, 70 };
+
+    /** Which cut-offs a row gets: vehicles are AVL, a person is Field Maps unless the row says inReach. */
+    /** The cut-offs by source name, for a caller that has no row to look at. */
+    public static int[] ageCutoffs(boolean personnel, boolean inreach) {
+        return !personnel ? AGE_VEHICLE : inreach ? AGE_INREACH : AGE_FIELDMAPS;
+    }
+
+    static int[] ageCutoffs(JSONObject props, boolean personnel) {
+        if (!personnel)
+            return AGE_VEHICLE;
+        return "inreach".equalsIgnoreCase(str(props, "data_source")) ? AGE_INREACH : AGE_FIELDMAPS;
+    }
+
+    /** The bucket for a report time, or AGE_UNKNOWN when there is none. */
+    public static int ageBucket(long whenMs, long nowMs, int[] cutoffs) {
+        if (whenMs <= 0)
+            return AGE_UNKNOWN;
+        final long min = (nowMs - whenMs) / 60000L;
+        if (min <= cutoffs[0])
+            return AGE_LIVE;
+        if (min <= cutoffs[1])
+            return AGE_ON_SCHEDULE;
+        return AGE_STALE;
+    }
+
+    /** The bucket's color, for the list; the unknown bucket has none (0). */
+    public static int ageColor(int bucket) {
+        return bucket < 0 || bucket >= AGE_RING.length ? 0 : AGE_RING[bucket];
+    }
 
     /** Vehicle types already reported as having no glyph, so each is logged once. */
     private static final java.util.Set<String> UNKNOWN_KINDS =
@@ -102,7 +146,7 @@ final class DartStyles {
      * compose. "other-other" is EGP's own generic resource symbol and is always bundled.
      */
     static String genericMarkerUri(File iconDir) {
-        final File f = marker("other-other", iconDir);
+        final File f = marker("other-other", AGE_UNKNOWN, iconDir);
         return f == null ? null : "file://" + f.getAbsolutePath();
     }
 
@@ -205,7 +249,7 @@ final class DartStyles {
     }
 
     /** Whether a spec draws DART symbology at all. */
-    static boolean handles(LayerSpec spec) {
+    public static boolean handles(LayerSpec spec) {
         return "dart".equals(spec.iconSet);
     }
 
@@ -216,8 +260,16 @@ final class DartStyles {
      * @param personnel true for the personnel feed, false for vehicles.
      */
     static Style style(JSONObject props, boolean personnel, File iconDir) {
+        return style(props, personnel, iconDir, AGE_UNKNOWN);
+    }
+
+    /**
+     * @param ageBucket from {@link #ageBucket}: the ring takes the bucket's color, so a
+     *        glance says whether the position is live, on its schedule, or stale.
+     */
+    static Style style(JSONObject props, boolean personnel, File iconDir, int ageBucket) {
         final String glyph = personnel ? personGlyph(props) : vehicleGlyph(props);
-        final File marker = marker(glyph, iconDir);
+        final File marker = marker(glyph, ageBucket, iconDir);
         if (marker == null)
             return null;
         // Arguments five and six are alignX/alignY, not offsets, and 0/0 centers the disc
@@ -241,8 +293,14 @@ final class DartStyles {
      * minutes, and that is worth seeing on the map.
      */
     private static String personGlyph(JSONObject props) {
-        if ("inreach".equalsIgnoreCase(str(props, "data_source")))
+        final String src = str(props, "data_source");
+        if ("inreach".equalsIgnoreCase(src))
             return "inreach";
+        // A WFTAK user gets EGP's TAK glyph, not the question mark of "personnel-other":
+        // the resource type is usually empty for them, and a TAK logo says what the
+        // position is coming from (operator, 2026-09-18, on a WFTAK user drawn as "?").
+        if (src != null && src.toLowerCase(Locale.US).contains("tak"))
+            return "wftak";
         final String t = str(props, "resource_type");
         if (t == null)
             return "personnel-crew";
@@ -313,8 +371,9 @@ final class DartStyles {
      * The glyph on its dark disc, composed once and cached. Null when the glyph was not
      * unpacked, so a caller falls back rather than drawing nothing.
      */
-    private static synchronized File marker(String glyph, File iconDir) {
-        final File out = new File(iconDir, "dartm" + MARK_V + "_" + glyph.replace('-', '_') + ".png");
+    private static synchronized File marker(String glyph, int ageBucket, File iconDir) {
+        final File out = new File(iconDir, "dartm" + MARK_V + "_" + glyph.replace('-', '_')
+                + (ageBucket < 0 ? "" : "_a" + ageBucket) + ".png");
         if (out.isFile())
             return out;
         final File src = new File(iconDir, "dart_egp-dart-" + glyph + ".png");
@@ -330,12 +389,17 @@ final class DartStyles {
             final Canvas c = new Canvas(bmp);
             final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
             p.setStyle(Paint.Style.FILL);
-            p.setColor(DISC);
+            // EGP's WFTAK badge is a 31 px dark green shield; on the near-black disc it
+            // is a smudge, so a TAK user sits on a light disc, which also sets them apart.
+            p.setColor("wftak".equals(glyph) ? DISC_LIGHT : DISC);
             c.drawCircle(CANVAS / 2f, CANVAS / 2f, CANVAS / 2f - 3f, p);
             p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(4f);
-            p.setColor(RING);
-            c.drawCircle(CANVAS / 2f, CANVAS / 2f, CANVAS / 2f - 3f, p);
+            // The ring is the report age when one is known: thicker so the color reads at
+            // marker size, the plain light ring when there is no time to judge.
+            final int ring = ageColor(ageBucket);
+            p.setStrokeWidth(ring == 0 ? 4f : 7f);
+            p.setColor(ring == 0 ? RING : ring);
+            c.drawCircle(CANVAS / 2f, CANVAS / 2f, CANVAS / 2f - (ring == 0 ? 3f : 4.5f), p);
             // Fit inside the disc, aspect kept: EGP's vehicles are wide (130x88) and its
             // personnel glyphs are square, and a squashed fire engine reads as a smudge.
             final float fit = CANVAS * 0.74f;
