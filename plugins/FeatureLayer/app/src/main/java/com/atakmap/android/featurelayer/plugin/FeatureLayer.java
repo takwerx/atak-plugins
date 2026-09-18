@@ -864,7 +864,8 @@ public class FeatureLayer implements IPlugin {
                 final String t = ((LoadedLayer.Hit) o[1]).type;
                 counts.put(t, counts.containsKey(t) ? counts.get(t) + 1 : 1);
             }
-            status.setText(withLegend(counts.size() + " types, " + all.size() + " features \u00b7 tap a type, or type a name", scope));
+            status.setText(withLegend(counts.size() + " types, " + all.size() + " features" + scopeNote(scope)
+                    + " \u00b7 tap a type, or type a name", scope));
             shownHits = null;   // the type list carries counts, not distances
             container.removeAllViews();
             for (final java.util.Map.Entry<String, Integer> e : counts.entrySet()) {
@@ -926,6 +927,7 @@ public class FeatureLayer implements IPlugin {
             st.append(" \u00b7 no GPS fix, measured from the map center");
         else if (from == null)
             st.append(" \u00b7 nowhere to measure from, sorted by name");
+        st.append(scopeNote(scope));
         status.setText(withLegend(st.toString(), scope));
         container.removeAllViews();
         shownHits = new java.util.ArrayList<>();
@@ -1750,6 +1752,26 @@ public class FeatureLayer implements IPlugin {
         b.setSpan(new android.text.style.ForegroundColorSpan(color), at, at + 1,
                 android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         b.append(what);
+    }
+
+    /**
+     * How wide the search is, on the line the results sit under: there is no search of
+     * everything, a scoped layer searches its own area, and people have to be told
+     * (operator, 2026-09-18: "people need to know there is no overall search, it's by
+     * extent set on the map").
+     */
+    private String scopeNote(LoadedLayer only) {
+        if (only != null) {
+            if (!only.hasScopeControl())
+                return "";
+            final String label = only.scopeLabel();
+            return " \u00b7 " + Character.toLowerCase(label.charAt(0)) + label.substring(1);
+        }
+        if (manager != null)
+            for (LoadedLayer l : manager.snapshot())
+                if (l.hasScopeControl())
+                    return " \u00b7 scoped layers search only their own area";
+        return "";
     }
 
     /** A status line with the legend under it when the list is one DART layer's. */
