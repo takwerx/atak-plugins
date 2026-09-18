@@ -1053,6 +1053,14 @@ public class FeatureLayer implements IPlugin {
                 pickDart();
             }
         });
+        // FireGuard rides the same NIFC sign-in and the same row: one tap adds it.
+        paneView.findViewById(R.id.btn_fireguard).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (manager != null)
+                    manager.add(Sources.fireGuard());
+            }
+        });
         if (org == null) {
             orgButton.setText("Pick a source");
             signin.setVisibility(View.GONE);

@@ -1363,6 +1363,11 @@ public class LoadedLayer {
                             title = (cls != null ? cls : (disp != null ? disp : layerName))
                                     + (cls != null && disp != null && !codeOnly && !cls.equals(disp) ? " " + disp : "")
                                     + " (" + layerName + ")";
+                            if (FireGuardStyles.handles(spec)) {
+                                // "Possible Prescribed Fire · 12 ac", not the serial number.
+                                name = FireGuardStyles.title(props, name);
+                                title = name + " (" + layerName + ")";
+                            }
                             style = generic.styleFor(props);
                             if (DartStyles.handles(spec) && isPointLayer) {
                                 // EGP's symbology, not the services' own: personnel declare a
@@ -1465,13 +1470,25 @@ public class LoadedLayer {
                                 if (h != 0)
                                     hue = h;
                             }
+                            final boolean fireguard = !nwcg && FireGuardStyles.handles(spec);
+                            if (fireguard) {
+                                final int h = FireGuardStyles.fillHue(props);
+                                if (h != 0)
+                                    hue = h;
+                            }
                             attrs.setAttribute("_fill", String.valueOf(hue));
                             // The renderer bakes in the fill it was built with, which is the
                             // source layer's. A layer that splits its types by a field has a
                             // fill per type, and without this it came back at the layer's
                             // default on every refresh.
                             final int want = spec.fillFor(target);
-                            if (want != fill && hue != 0) {
+                            if (fireguard && hue != 0) {
+                                // EGP's age ramp is per feature, so the service's one fill is
+                                // never right: every detection is refilled in its own color.
+                                style = refilled(style, hue & 0x00FFFFFF, want);
+                                if (alt != null)
+                                    alt = refilled(alt, hue & 0x00FFFFFF, want);
+                            } else if (want != fill && hue != 0) {
                                 style = refilled(style, hue & 0x00FFFFFF, want);
                                 if (alt != null)
                                     alt = refilled(alt, hue & 0x00FFFFFF, want);

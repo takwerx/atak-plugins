@@ -326,6 +326,14 @@
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="DART" />
+        <Button
+            android:id="@+id/btn_fireguard"
+            android:layout_marginLeft="8dp"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="FireGuard" />
     </LinearLayout>
 
     <LinearLayout

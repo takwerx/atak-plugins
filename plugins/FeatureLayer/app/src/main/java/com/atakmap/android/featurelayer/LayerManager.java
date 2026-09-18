@@ -94,6 +94,10 @@ public class LayerManager {
      * (operator, 2026-09-18: "even if you did a fire first then chose dart, dart is on
      * top"). The sort is stable, so nothing else changes place.
      */
+    private static int rank(LoadedLayer l) {
+        return DartStyles.handles(l.spec) ? 0 : FireGuardStyles.handles(l.spec) ? 1 : 2;
+    }
+
     public List<LoadedLayer> snapshot() {
         final List<LoadedLayer> copy;
         synchronized (layers) {
@@ -102,8 +106,9 @@ public class LayerManager {
         java.util.Collections.sort(copy, new java.util.Comparator<LoadedLayer>() {
             @Override
             public int compare(LoadedLayer a, LoadedLayer b) {
-                final boolean da = DartStyles.handles(a.spec), db = DartStyles.handles(b.spec);
-                return da == db ? 0 : (da ? -1 : 1);
+                // DART, then FireGuard, then whatever incidents were added, in their order
+                // (operator, 2026-09-18: "dart, fireguard, any incidents you have marked").
+                return Integer.compare(rank(a), rank(b));
             }
         });
         return copy;

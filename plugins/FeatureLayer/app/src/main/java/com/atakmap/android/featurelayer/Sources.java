@@ -171,6 +171,38 @@ public final class Sources {
                 "resource_type", "location_timestamp");
     }
 
+    static final String FIREGUARD = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/FireGuard_Project_Data/FeatureServer";
+
+    /**
+     * National FireGuard detections: the polygons the FireGuard analysts draw around a
+     * satellite heat detection, with type, acreage, urgency and jurisdiction. About 33 a
+     * day nationally, 750 in EGP's fourteen-day window, so no scope and no cap. Colored by
+     * age the way EGP colors them (FireGuardStyles); typed by IncidentType.
+     */
+    public static LayerSpec fireGuard() {
+        final LayerSpec s = new LayerSpec();
+        s.id = "nifc-fireguard";
+        s.title = "FireGuard";
+        s.subtitle = "NIFC";
+        s.layerTitle = "Detection";
+        s.portal = NIFC_PORTAL;
+        s.orgName = "NIFC";
+        s.base = FIREGUARD;
+        s.layerIds = new int[] { 0 };
+        s.where = "delete_feature <> 'Yes'"; // EGP's own filter; a deleted detection stays in the table
+        s.geojson = false;
+        s.profile = LayerSpec.Profile.GENERIC;
+        s.labelField = "SerialNumber";
+        s.setField = "IncidentType";
+        s.timeField = "CreationDate";
+        s.sinceHours = 24;
+        s.live = true;
+        s.refreshMinutes = 5;
+        s.iconSet = "fireguard";
+        s.fillAlpha = 0x99; // the age ramp has to read; a quarter-alpha pale yellow does not
+        return s;
+    }
+
     /** USFS and DOI fire vehicles, every row inside 24 hours and most inside the hour. */
     public static LayerSpec dartVehicles() {
         return dart("dart-vehicles", "Vehicles", "Vehicle", DART_VEHICLES, "ResourceName", "ResourceType",
@@ -191,7 +223,8 @@ public final class Sources {
         if (s == null || s.id == null)
             return;
         final LayerSpec now = "dart-personnel".equals(s.id) ? dartPersonnel()
-                : "dart-vehicles".equals(s.id) ? dartVehicles() : null;
+                : "dart-vehicles".equals(s.id) ? dartVehicles()
+                : "nifc-fireguard".equals(s.id) ? fireGuard() : null;
         if (now == null)
             return;
         s.base = now.base;
