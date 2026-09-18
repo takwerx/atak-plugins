@@ -51,6 +51,8 @@ public class LayerManager {
     private final Map<String, String> sarcopIcons = new HashMap<>();
     private String lineGlyph, polygonGlyph;
     private final List<LoadedLayer> layers = new ArrayList<>();
+    /** Saved entries that failed to open at start, carried through save() untouched until they open. */
+    private final List<JSONObject> unrestored = new ArrayList<>();
     private final Map<String, ArcGisAuth> auths = new HashMap<>();
     private FeatureDetailsReceiver details;
     private MarkerHereReceiver markerHere;
@@ -653,6 +655,17 @@ public class LayerManager {
                     }
                 } catch (Exception e) {
                     Log.w(TAG, "could not restore " + spec.id, e);
+                    // Keep it: the next save() writes it back and the next start tries
+                    // again. Dropping it turned one bad build into a deleted layer list
+                    // (every incident layer, 2026-09-18).
+                    synchronized (unrestored) {
+                        unrestored.add(o);
+                    }
+                    try {
+                        android.widget.Toast.makeText(mapView.getContext(), "Could not open " + spec.title
+                                + " (kept for next start): " + e, android.widget.Toast.LENGTH_LONG).show();
+                    } catch (Exception ignored) {
+                    }
                 }
             }
         } catch (Exception e) {
@@ -670,6 +683,10 @@ public class LayerManager {
                 o.put("visible", l.isVisible());
                 o.put("lastRefresh", l.lastRefresh);
                 arr.put(o);
+            }
+            synchronized (unrestored) {
+                for (JSONObject o : unrestored)
+                    arr.put(o);
             }
             try (OutputStream out = new FileOutputStream(stateFile)) {
                 out.write(arr.toString(1).getBytes("UTF-8"));
