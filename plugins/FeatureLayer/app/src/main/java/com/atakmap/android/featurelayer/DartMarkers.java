@@ -137,6 +137,19 @@ final class DartMarkers {
                         m.setMetaString("title", r.callsign);
                     }
                     m.setMetaLong("featureid", r.featureId);
+                    // A reused marker keeps its Icon unless told otherwise. When the
+                    // composite changes -- a new MARK_V, or a vehicle changing kind -- the
+                    // uri changes, and a marker left holding the old file drew the previous
+                    // build's image for as long as it lived (2026-09-17).
+                    final String had = m.getMetaString("dart_icon", "");
+                    final String want = r.iconUri == null ? "" : r.iconUri;
+                    if (!had.equals(want)) {
+                        final Icon icon = icon(r.iconUri);
+                        if (icon != null) {
+                            m.setIcon(icon);
+                            m.setMetaString("dart_icon", want);
+                        }
+                    }
                 }
                 m.setVisible(visible);
             }
@@ -168,6 +181,7 @@ final class DartMarkers {
         if (icon != null) {
             m.setIcon(icon);
             m.setIconVisibility(Marker.ICON_VISIBLE);
+            m.setMetaString("dart_icon", r.iconUri == null ? "" : r.iconUri);
         }
         // The tap target: the feature behind this marker is written with a gate that never
         // draws, so this is what a finger finds. The metadata is the same set

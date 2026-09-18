@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 41;
+    private static final int STYLE_VERSION = 44;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -246,14 +246,17 @@ public class LoadedLayer {
         // store only ever holds what is shown: drop what should not be before the map sees it.
         dedupeSets();
         pruneHidden();
-        mapView.getMapOverlayManager().addFilesOverlay(overlay);
-        // A DART layer is drawn by its markers (see DartMarkers) and its feature layer
-        // never goes on the render stack. Gating the sets to 0 was supposed to do this and
-        // did not: the features still drew, disc and trimmed name label, on top of the
-        // markers -- with the marker icon hidden, the feature's disc still bit a circle
-        // out of the callsign (2026-09-17). The store stays for details, search and counts.
-        if (dartLabels == null)
+        // A DART layer is drawn by its markers (see DartMarkers): neither its feature layer
+        // nor its Overlay Manager entry is registered, because either one renders the
+        // store's own discs under the markers. Gating the sets to 0 was supposed to do
+        // this and did not: the features still drew, disc and trimmed name label, on top
+        // of the markers -- with the marker icon hidden, the feature's disc still bit a
+        // circle out of the callsign (2026-09-17). The store stays for details, search
+        // and counts.
+        if (dartLabels == null) {
+            mapView.getMapOverlayManager().addFilesOverlay(overlay);
             mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+        }
         count = countFeatures();
         status = count > 0 ? "cached" : "empty";
     }
@@ -303,7 +306,7 @@ public class LoadedLayer {
                 dartLabels.dispose();
             if (layer != null && !drawnByMarkers)
                 mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
-            if (overlay != null)
+            if (overlay != null && !drawnByMarkers)
                 mapView.getMapOverlayManager().removeOverlay(overlay);
             if (store != null)
                 store.dispose();

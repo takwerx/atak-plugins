@@ -45,8 +45,14 @@ final class DartStyles {
      * that beats "it matches ATAK".
      */
     private static final float PX = 32f;
-    /** Bumped when the composite itself changes, so cached ones are not reused. */
-    private static final int MARK_V = 5;
+    /**
+     * Bumped when the composite itself changes, so cached ones are not reused. Never reuse
+     * a number: 5 was used once for a 4x-wide test canvas, reverted, then used again for
+     * the padded one, and the phone still had the wide test file for one glyph -- that
+     * vehicle drew at a third the size of its neighbors while everything about its code
+     * path was identical (2026-09-17).
+     */
+    private static final int MARK_V = 6;
     /**
      * A square canvas, and the disc is centered on the position.
      *
@@ -117,7 +123,9 @@ final class DartStyles {
         // sits. It spent a few hours shoved above and then below the point to keep a
         // feature label off it; the callsign is a marker label now (see DartMarkers), and
         // ATAK lays that out clear of the icon by itself.
-        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX, 0, 0, 0f, true);
+        // The composite is PX wide and PX*(1+PAD) tall; asking for a square box squashed the
+        // padded image to a third-size disc wherever the feature itself got drawn.
+        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX * (1f + PAD), 0, 0, 0f, true);
     }
 
     /**
