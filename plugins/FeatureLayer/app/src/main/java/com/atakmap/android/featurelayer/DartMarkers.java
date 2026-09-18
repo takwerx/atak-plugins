@@ -143,7 +143,7 @@ final class DartMarkers {
             @Override
             public void run() {
                 for (Row r : rows)
-                    icon(r.iconUri, show ? r.callsign : "");
+                    icon(r.iconUri, show || DartStyles.sos(r.callsign) ? r.callsign : "");
                 mapView.post(new Runnable() {
                     @Override
                     public void run() {
@@ -193,7 +193,7 @@ final class DartMarkers {
                 // A marker that exists but never got an icon is rebuilt from scratch rather
                 // than patched: a Marker that started iconless kept drawing the reference
                 // dot after setIcon on the XCover (2026-09-18).
-                if (m != null && m.getMetaString("dart_icon", "").isEmpty() && icon(r.iconUri, show ? r.callsign : "") != null) {
+                if (m != null && m.getMetaString("dart_icon", "").isEmpty() && icon(r.iconUri, show || DartStyles.sos(r.callsign) ? r.callsign : "") != null) {
                     live.remove(r.uid);
                     m.removeFromGroup();
                     m = null;
@@ -217,7 +217,7 @@ final class DartMarkers {
                     final String had = m.getMetaString("dart_icon", "");
                     final String want = iconKey(r, show);
                     if (!had.equals(want)) {
-                        final Icon icon = icon(r.iconUri, show ? r.callsign : "");
+                        final Icon icon = icon(r.iconUri, show || DartStyles.sos(r.callsign) ? r.callsign : "");
                         if (icon != null) {
                             m.setIcon(icon);
                             m.setMetaString("dart_icon", want);
@@ -250,7 +250,7 @@ final class DartMarkers {
         // The callsign is pixels in the icon (DartStyles.labelled); the engine's own label
         // is off so it cannot draw a second, trimmed copy.
         m.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);
-        final Icon icon = icon(r.iconUri, show ? r.callsign : "");
+        final Icon icon = icon(r.iconUri, show || DartStyles.sos(r.callsign) ? r.callsign : "");
         if (icon != null) {
             m.setIcon(icon);
             m.setIconVisibility(Marker.ICON_VISIBLE);
@@ -337,7 +337,8 @@ final class DartMarkers {
     }
 
     private static String iconKey(Row r, boolean show) {
-        return (r.iconUri == null ? "" : r.iconUri) + "|" + (!show || r.callsign == null ? "" : r.callsign);
+        return (r.iconUri == null ? "" : r.iconUri) + "|"
+                + (r.callsign == null || !(show || DartStyles.sos(r.callsign)) ? "" : r.callsign);
     }
 
     private MapGroup group() {

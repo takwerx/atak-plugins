@@ -1,4 +1,5 @@
 {
+ "dart-pin": "egp-nifc-dart-pin-2026.png",
  "doi-buggy": "egp-dart-doi-buggy.png",
  "doi-dozer": "egp-dart-doi-dozer.png",
  "doi-engine": "egp-dart-doi-engine.png",
@@ -10,18 +11,10 @@
  "other-engine": "egp-dart-other-engine.png",
  "other-other": "egp-dart-other-other.png",
  "other-vehicle": "egp-dart-other-vehicle.png",
- "personnel-aviation": "egp-dart-personnel-aviation.png",
- "personnel-bulldozer": "egp-dart-personnel-bulldozer.png",
- "personnel-crew": "egp-dart-personnel-crew.png",
- "personnel-engine-crew": "egp-dart-personnel-engine-crew.png",
- "personnel-ihc": "egp-dart-personnel-ihc.png",
- "personnel-medical": "egp-dart-personnel-medical.png",
- "personnel-other": "egp-dart-personnel-other.png",
- "personnel-overhead": "egp-dart-personnel-overhead.png",
  "usfs-buggy": "egp-dart-usfs-buggy.png",
  "usfs-dozer": "egp-dart-usfs-dozer.png",
  "usfs-engine": "egp-dart-usfs-engine.png",
- "usfs-other": "egp-dart-usfs-other.png",
+ "usfs-other": "egp-wftak-usfs.png",
  "usfs-vehicle": "egp-dart-usfs-vehicle.png",
  "wftak": "egp-dart-wftak.png"
 }

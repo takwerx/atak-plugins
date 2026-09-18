@@ -25,8 +25,10 @@ import java.util.Locale;
  * which is an olive speck about thirteen pixels across and invisible over dry ground.
  * EGP's WildFireSA Advanced does not draw either one: it applies its own icon style, and
  * that style is a public ArcGIS Online item (26d310d186ee4677b896c38eece3f261, "EGP
- * WildFireSA Icons"), so the 25 {@code egp-dart-*} glyphs are bundled under
- * {@code assets/dart} and used here. A user who has seen the EGP viewer recognizes them.
+ * WildFireSA Icons"), so the glyphs its map uses are bundled under {@code assets/dart}.
+ * Which glyph a row gets is EGP's rule too, read from the "EGP - WildFireSA Advanced"
+ * web map's renderers (see {@link #vehicleGlyph} and {@link #personGlyph}). A user who
+ * has seen the EGP viewer sees the same thing here.
  *
  * <p>The glyphs are pale by design -- a light blue hard hat, a mint green fire engine --
  * because EGP draws them over a muted basemap. Over imagery they disappear, so each one
@@ -52,7 +54,7 @@ public final class DartStyles {
      * vehicle drew at a third the size of its neighbors while everything about its code
      * path was identical (2026-09-17).
      */
-    private static final int MARK_V = 10;
+    private static final int MARK_V = 11;
     /**
      * A square canvas, and the disc is centered on the position.
      *
@@ -156,6 +158,17 @@ public final class DartStyles {
     private static final int GAP = 4, PAD_X = 8, PAD_Y = 4, RADIUS = 6;
     /** The backing ATAK draws behind its own marker labels: argb(153, 0, 0, 0). */
     private static final int LABEL_BG = 0x99000000;
+    /** The pill behind an inReach S.O.S., which EGP flags in its own label. */
+    private static final int SOS_BG = 0xE6C62828;
+
+    /** EGP's rule: a callsign ending "-Alert" is an inReach S.O.S.; the label carries the flag. */
+    public static boolean sosCallsign(String name) {
+        return name != null && name.endsWith("-Alert");
+    }
+
+    public static boolean sos(String label) {
+        return label != null && label.startsWith("S.O.S. ");
+    }
 
     /**
      * The disc with its callsign drawn above it as pixels, at device resolution, so a
@@ -220,7 +233,7 @@ public final class DartStyles {
             final Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
             final Canvas c = new Canvas(bmp);
             final Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
-            bg.setColor(LABEL_BG);
+            bg.setColor(sos(callsign) ? SOS_BG : LABEL_BG);
             final float pl = (w - pillW) / 2f;
             c.drawRoundRect(new RectF(pl, 1, pl + pillW, 1 + pillH), RADIUS, RADIUS, bg);
             c.drawText(callsign, pl + PAD_X, 1 + PAD_Y - fm.ascent, tp);
@@ -292,34 +305,19 @@ public final class DartStyles {
      * it is a satellite beacon, so its position can be hours old while a phone's is
      * minutes, and that is worth seeing on the map.
      */
+    /**
+     * EGP's own rule for a person, from the "Personnel" renderers of the same web map:
+     * by data source only. An inReach gets the device glyph, a WFTAK user the TAK badge,
+     * everyone else (Field Maps, "nifc_lkl") the DART pin. EGP's style also carries role
+     * glyphs (crew, hotshot, overhead...) but the map does not use them, so neither do we.
+     */
     private static String personGlyph(JSONObject props) {
         final String src = str(props, "data_source");
         if ("inreach".equalsIgnoreCase(src))
             return "inreach";
-        // A WFTAK user gets EGP's TAK glyph, not the question mark of "personnel-other":
-        // the resource type is usually empty for them, and a TAK logo says what the
-        // position is coming from (operator, 2026-09-18, on a WFTAK user drawn as "?").
         if (src != null && src.toLowerCase(Locale.US).contains("tak"))
             return "wftak";
-        final String t = str(props, "resource_type");
-        if (t == null)
-            return "personnel-crew";
-        final String u = t.toUpperCase(Locale.US);
-        if (u.startsWith("IHC") || u.contains("HOTSHOT") || u.contains("HOT SHOT"))
-            return "personnel-ihc";
-        if (u.startsWith("ENG"))
-            return "personnel-engine-crew";
-        if (u.startsWith("OPS") || u.startsWith("WFM") || u.contains("OVERHEAD") || u.contains("PIO"))
-            return "personnel-overhead";
-        if (u.contains("MEDIC") || u.startsWith("EMT") || u.startsWith("EMR"))
-            return "personnel-medical";
-        if (u.startsWith("HEQ") || u.contains("DOZER") || u.contains("TRACTOR"))
-            return "personnel-bulldozer";
-        if (u.startsWith("SMKJ") || u.contains("HELI") || u.contains("AIR") || u.contains("AVIATION"))
-            return "personnel-aviation";
-        if (u.startsWith("CRW") || u.contains("CREW"))
-            return "personnel-crew";
-        return "personnel-other";
+        return "dart-pin";
     }
 
     /**
@@ -328,36 +326,44 @@ public final class DartStyles {
      * neither USFS nor DOI is "other", which is also what a null agency gets rather than
      * being dropped.
      */
+    /**
+     * EGP's own rule for a vehicle, from the "Apparatus (Large Scale)" renderer of the
+     * "EGP - WildFireSA Advanced" web map (item 6d9c43056ddc4b8e96e4daddfd185024, read
+     * 2026-09-18): the type words are matched in this order, Vehicle first, and a type
+     * none of them match is "Other". Agency: USFS; BLM, BIA, NPS and FWS as DOI; anything
+     * else generic. A USFS "Other" is the Forest Service shield, a DOI "Other" the DOI
+     * seal, a generic one EGP's own "other-other" symbol. Not our judgment: EGP's.
+     */
     private static String vehicleGlyph(JSONObject props) {
-        final String a = str(props, "Agency");
-        final String agency = a == null ? "other"
-                : a.toUpperCase(Locale.US).startsWith("USFS") ? "usfs"
-                        : (a.toUpperCase(Locale.US).startsWith("BLM") || a.toUpperCase(Locale.US).startsWith("DOI")
-                                || a.toUpperCase(Locale.US).startsWith("NPS") || a.toUpperCase(Locale.US).startsWith("FWS")
-                                || a.toUpperCase(Locale.US).startsWith("BIA")) ? "doi" : "other";
         final String t = str(props, "ResourceType");
-        final String u = t == null ? "" : t.toUpperCase(Locale.US);
+        final String u = t == null ? "" : t.toLowerCase(Locale.US);
         final String kind;
-        // EGP has no tender glyph and groups tenders with engines. The feed says just
-        // "Tender" -- not "Water Tender", not "WT" -- and CA-ANF-WT225 wore the USFS
-        // shield for a day because of it (2026-09-17).
-        if (u.startsWith("ENGINE") || u.contains("TENDER") || u.startsWith("WT"))
-            kind = "engine";
-        else if (u.contains("CREW CARRIER") || u.contains("BUGGY") || u.contains("CREW"))
-            kind = "buggy";
-        else if (u.contains("DOZER") || u.contains("TRACTOR") || u.contains("PLOW") || u.contains("EXCAVATOR"))
-            kind = "dozer";
-        else if (u.contains("TRUCK") || u.contains("SUV") || u.contains("COMMAND") || u.contains("PICKUP")
-                || u.contains("SEDAN") || u.contains("VAN") || u.contains("SUPT"))
+        if (has(u, "boat", "sedan", "helitack", "trailer", "tanker", "helitak", "pickup", "tender", "suv", "truck",
+                "command"))
             kind = "vehicle";
+        else if (has(u, "crew carrier", "hot shot supt"))
+            kind = "buggy";
+        else if (has(u, "dozer", "tractor"))
+            kind = "dozer";
+        else if (has(u, "engine"))
+            kind = "engine";
         else {
             kind = "other";
-            // The agency logo is a fallback, not a symbol. Say which type fell through
-            // so the next gap is found in a log rather than on a screen.
             if (t != null && UNKNOWN_KINDS.add(u))
-                Log.w(TAG, "DART vehicle type has no glyph, using the agency logo: \"" + t + "\"");
+                Log.w(TAG, "DART vehicle type outside EGP's rule, drawn as Other: \"" + t + "\"");
         }
+        final String a = str(props, "Agency");
+        final String al = a == null ? "" : a.toLowerCase(Locale.US);
+        final String agency = al.contains("usfs") ? "usfs"
+                : has(al, "blm", "bia", "nps", "fws") ? "doi" : "other";
         return agency + "-" + kind;
+    }
+
+    private static boolean has(String text, String... words) {
+        for (String w : words)
+            if (text.contains(w))
+                return true;
+        return false;
     }
 
     private static String str(JSONObject props, String field) {
@@ -371,12 +377,21 @@ public final class DartStyles {
      * The glyph on its dark disc, composed once and cached. Null when the glyph was not
      * unpacked, so a caller falls back rather than drawing nothing.
      */
+    /** The bundled file behind a glyph name; two of EGP's are not from its "dart" family. */
+    private static String assetFor(String glyph) {
+        if ("dart-pin".equals(glyph))
+            return "egp-nifc-dart-pin-2026";
+        if ("usfs-other".equals(glyph))
+            return "egp-wftak-usfs";
+        return "egp-dart-" + glyph;
+    }
+
     private static synchronized File marker(String glyph, int ageBucket, File iconDir) {
         final File out = new File(iconDir, "dartm" + MARK_V + "_" + glyph.replace('-', '_')
                 + (ageBucket < 0 ? "" : "_a" + ageBucket) + ".png");
         if (out.isFile())
             return out;
-        final File src = new File(iconDir, "dart_egp-dart-" + glyph + ".png");
+        final File src = new File(iconDir, "dart_" + assetFor(glyph) + ".png");
         if (!src.isFile()) {
             Log.w(TAG, "DART glyph missing: " + src.getName());
             return null;

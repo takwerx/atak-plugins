@@ -624,7 +624,8 @@ public class LoadedLayer {
                     final com.atakmap.map.layer.feature.geometry.Point pt =
                             (com.atakmap.map.layer.feature.geometry.Point) pf.geometry;
                     labels.add(new DartMarkers.Row(spec.id + "." + pf.setName + "." + pf.name,
-                            spec.labels ? pf.name : "", iconUriOf(pf.style), fid,
+                            DartStyles.sosCallsign(pf.name) ? "S.O.S. " + pf.name : spec.labels ? pf.name : "",
+                            iconUriOf(pf.style), fid,
                             pt.getY(), pt.getX()));
                 }
             }

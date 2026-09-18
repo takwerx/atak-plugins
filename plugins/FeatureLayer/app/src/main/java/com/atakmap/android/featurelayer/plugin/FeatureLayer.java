@@ -936,7 +936,9 @@ public class FeatureLayer implements IPlugin {
             final LoadedLayer l = (LoadedLayer) o[0];
             final LoadedLayer.Hit h = (LoadedLayer.Hit) o[1];
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.result_row, null);
-            ((TextView) row.findViewById(R.id.result_title)).setText(h.title);
+            // An inReach S.O.S. (EGP's rule: the callsign ends "-Alert") says so in the list too.
+            ((TextView) row.findViewById(R.id.result_title)).setText(
+                    com.atakmap.android.featurelayer.DartStyles.sosCallsign(h.title) ? "S.O.S. " + h.title : h.title);
             final StringBuilder sub = new StringBuilder();
             if (h.type != null && !h.type.equalsIgnoreCase(h.title))
                 sub.append(h.type);
