@@ -43,7 +43,7 @@ final class LabelledIcons {
     }
 
     /**
-     * @param symbol  the symbol's PNG on disk.
+     * @param symbol  the symbol's PNG on disk, or null for a text-only pill (a Label Point).
      * @param symW    the width the symbol is drawn at on screen, in device px.
      * @param symH    the height, in device px.
      * @param text    the label; null or empty means no composite (returns null).
@@ -54,10 +54,17 @@ final class LabelledIcons {
      */
     static File compose(File symbol, int symW, int symH, String text, Typeface face, float textPx,
             File iconDir, int[] out) {
-        if (symbol == null || !symbol.isFile() || text == null || text.isEmpty() || symW <= 0 || symH <= 0)
+        if (text == null || text.isEmpty())
             return null;
-        final String key = symbol.getName().replace(".png", "") + "_" + Integer.toHexString(text.hashCode())
-                + "_" + symW + "x" + symH + "_f" + Math.round(textPx * 10) + "_v" + V;
+        // No symbol: a text-only pill, centered on the point. That is a Label Point, the
+        // one kind that had kept an engine label -- and "Boy Scout Camp" drew as "ut Camp".
+        final boolean textOnly = symbol == null;
+        if (!textOnly && (!symbol.isFile() || symW <= 0 || symH <= 0))
+            return null;
+        if (textOnly)
+            symW = symH = 0;
+        final String key = (textOnly ? "text" : symbol.getName().replace(".png", "")) + "_"
+                + Integer.toHexString(text.hashCode()) + "_" + symW + "x" + symH + "_f" + Math.round(textPx * 10) + "_v" + V;
         final File outFile = new File(iconDir, "lbl_" + key + ".png");
         final Paint tp = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         tp.setTypeface(face);
@@ -67,10 +74,10 @@ final class LabelledIcons {
         final Paint.FontMetricsInt fm = tp.getFontMetricsInt();
         final int textH = fm.descent - fm.ascent;
         final int pillW = textW + 2 * PAD_X, pillH = textH + 2 * PAD_Y;
-        final int above = pillH + GAP;
+        final int above = textOnly ? 0 : pillH + GAP;
         final int w = Math.max(pillW, symW) + 2;
         // Symmetric: as much below the symbol as the label takes above it.
-        final int h = above + symH + above;
+        final int h = textOnly ? pillH + 2 : above + symH + above;
         if (out != null && out.length >= 2) {
             out[0] = w;
             out[1] = h;
@@ -78,8 +85,8 @@ final class LabelledIcons {
         if (outFile.isFile())
             return outFile;
         try {
-            final Bitmap sym = BitmapFactory.decodeFile(symbol.getAbsolutePath());
-            if (sym == null)
+            final Bitmap sym = textOnly ? null : BitmapFactory.decodeFile(symbol.getAbsolutePath());
+            if (!textOnly && sym == null)
                 return null;
             final Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
             final Canvas c = new Canvas(bmp);
@@ -88,10 +95,12 @@ final class LabelledIcons {
             final float pl = (w - pillW) / 2f;
             c.drawRoundRect(new RectF(pl, 1, pl + pillW, 1 + pillH), RADIUS, RADIUS, bg);
             c.drawText(text, pl + PAD_X, 1 + PAD_Y - fm.ascent, tp);
-            final float sx = (w - symW) / 2f, sy = above;
-            c.drawBitmap(sym, new Rect(0, 0, sym.getWidth(), sym.getHeight()),
-                    new RectF(sx, sy, sx + symW, sy + symH),
-                    new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+            if (sym != null) {
+                final float sx = (w - symW) / 2f, sy = above;
+                c.drawBitmap(sym, new Rect(0, 0, sym.getWidth(), sym.getHeight()),
+                        new RectF(sx, sy, sx + symW, sy + symH),
+                        new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG));
+            }
             final File tmp = new File(outFile.getPath() + ".tmp");
             final FileOutputStream o = new FileOutputStream(tmp);
             try {
@@ -99,7 +108,8 @@ final class LabelledIcons {
             } finally {
                 o.close();
                 bmp.recycle();
-                sym.recycle();
+                if (sym != null)
+                    sym.recycle();
             }
             //noinspection ResultOfMethodCallIgnored
             tmp.renameTo(outFile);

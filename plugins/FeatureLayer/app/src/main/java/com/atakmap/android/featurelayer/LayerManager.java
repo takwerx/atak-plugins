@@ -122,6 +122,7 @@ public class LayerManager {
 
     public void start() {
         started = true;
+        attachFollow();
         iconDir.mkdirs();
         layersDir.mkdirs();
         try {
@@ -145,6 +146,7 @@ public class LayerManager {
 
     public void stop() {
         started = false;
+        detachFollow();
         main.removeCallbacks(timer);
         try {
             AtakBroadcast.getInstance().unregisterReceiver(details);
@@ -277,6 +279,88 @@ public class LayerManager {
                 }
             }
         });
+    }
+
+    /** Where a scoped layer looks: kind "me", "center" or "view", and the radius; then fetch. */
+    public void setScope(final LoadedLayer l, String kind, double radiusM) {
+        l.spec.scopeKind = kind;
+        if (radiusM > 0)
+            l.spec.scopeRadiusM = radiusM;
+        save();
+        changed();
+        refresh(l);
+    }
+
+    /**
+     * Follow the map and the operator. Runs on the GL render thread -- ATAK dispatches it
+     * from GLMapView.dispatchCameraChanged over JNI, and touching a View or a map item
+     * here is a native SIGSEGV with no Java stack -- so it only posts, and it coalesces:
+     * during a pinch it fires every frame.
+     */
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener moveWatch =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView v, boolean animate) {
+                    main.removeCallbacks(moveTick);
+                    main.postDelayed(moveTick, MOVE_SETTLE_MS);
+                }
+            };
+    private final com.atakmap.android.maps.PointMapItem.OnPointChangedListener selfWatch =
+            new com.atakmap.android.maps.PointMapItem.OnPointChangedListener() {
+                @Override
+                public void onPointChanged(com.atakmap.android.maps.PointMapItem item) {
+                    main.removeCallbacks(moveTick);
+                    main.postDelayed(moveTick, MOVE_SETTLE_MS);
+                }
+            };
+    private com.atakmap.android.maps.Marker selfWatched;
+    /** About a second after the last movement, so a pan asks once, not per frame. */
+    private static final long MOVE_SETTLE_MS = 1000;
+    /** No layer is re-fetched for movement more often than this. */
+    private static final long MOVE_MIN_GAP_MS = 20_000;
+    private final java.util.Map<String, Long> lastMoveFetch = new java.util.HashMap<>();
+    private final Runnable moveTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!started)
+                return;
+            final long now = System.currentTimeMillis();
+            for (LoadedLayer l : snapshot()) {
+                if (!l.movedOutOfScope())
+                    continue;
+                final Long last = lastMoveFetch.get(l.spec.id);
+                if (last != null && now - last < MOVE_MIN_GAP_MS)
+                    continue;
+                lastMoveFetch.put(l.spec.id, now);
+                refresh(l);
+            }
+        }
+    };
+
+    private void attachFollow() {
+        try {
+            mapView.addOnMapMovedListener(moveWatch);
+            final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
+            if (self != null) {
+                selfWatched = self;
+                self.addOnPointChangedListener(selfWatch);
+            }
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "could not follow the map", e);
+        }
+    }
+
+    private void detachFollow() {
+        try {
+            mapView.removeOnMapMovedListener(moveWatch);
+            if (selfWatched != null)
+                selfWatched.removeOnPointChangedListener(selfWatch);
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "could not stop following the map", e);
+        } finally {
+            selfWatched = null;
+            main.removeCallbacks(moveTick);
+        }
     }
 
     /** Point labels for one layer; a store rewrite from memory, no network. */

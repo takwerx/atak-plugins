@@ -18,6 +18,7 @@ import com.atakmap.android.featurelayer.ArcGisAuth;
 import com.atakmap.android.featurelayer.LayerManager;
 import com.atakmap.android.featurelayer.LayerSpec;
 import com.atakmap.android.featurelayer.LoadedLayer;
+import com.atakmap.android.featurelayer.Units;
 import com.atakmap.android.featurelayer.Sources;
 import com.atakmap.coremap.log.Log;
 
@@ -1158,8 +1159,121 @@ public class FeatureLayer implements IPlugin {
                     manager.remove(l);
                 }
             });
+            final View scopeBlock = row.findViewById(R.id.row_scope);
+            if (l.hasScopeControl()) {
+                scopeBlock.setVisibility(View.VISIBLE);
+                bindScope(row, l);
+            } else {
+                scopeBlock.setVisibility(View.GONE);
+            }
             container.addView(row);
         }
+    }
+
+    /** The radius a layer gets when the operator asks for a point without naming one. */
+    private static final int DEFAULT_SCOPE_BIG = 25;
+    /** Radius choices, in the operator's own big unit. 0 is "what is in view". */
+    private static final int[] SCOPE_PRESETS = { 0, 2, 5, 10, 25, 50 };
+
+    private static String scopePresetLabel(int r) {
+        return r == 0 ? "What is in view" : r + " " + Units.bigLabel();
+    }
+
+    /**
+     * Cam Depot's radius control, on a layer that has a scope: the label says the state,
+     * the slider is the radius (0 = what is in view), the From button names the point it
+     * measures from and rotates it, Use this extent takes the radius from the map, and
+     * Presets is the list. Every change fetches.
+     */
+    private void bindScope(final View row, final LoadedLayer l) {
+        final TextView label = row.findViewById(R.id.row_scope_label);
+        final android.widget.SeekBar seek = row.findViewById(R.id.row_scope_seek);
+        final Button from = row.findViewById(R.id.row_scope_from);
+        final boolean center = "center".equals(l.spec.scopeKind);
+        final boolean inView = "view".equals(l.spec.scopeKind);
+        final String fromName = center ? "Map Center" : "My Location";
+        final int big = inView ? 0
+                : (int) Math.max(0, Math.min(seek.getMax(), Math.round(l.spec.scopeRadiusM / Units.bigToMeters(1))));
+        label.setText(l.scopeLabel());
+        seek.setProgress(big);
+        from.setText("Measuring from: " + fromName);
+        seek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar sb, int p, boolean fromUser) {
+                if (fromUser)
+                    label.setText(p == 0 ? "What is in view"
+                            : "Within " + p + " " + Units.bigLabel() + " of " + fromName);
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar sb) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar sb) {
+                applyScope(l, sb.getProgress(), center ? "center" : "me");
+            }
+        });
+        from.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Rotates between the two points. From "what is in view" it also needs a
+                // radius, or the button would change nothing anyone could see.
+                final int p = seek.getProgress() == 0 ? DEFAULT_SCOPE_BIG : seek.getProgress();
+                applyScope(l, p, center ? "me" : "center");
+            }
+        });
+        row.findViewById(R.id.row_scope_extent).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // "What I am looking at", as a radius: center to corner, so the whole
+                // visible rectangle is inside the circle.
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+                if (b == null || c == null) {
+                    toast("The map has no extent yet");
+                    return;
+                }
+                final double m = c.distanceTo(new com.atakmap.coremap.maps.coords.GeoPoint(b.getNorth(), b.getEast()));
+                final double bigD = m / Units.bigToMeters(1);
+                if (bigD > seek.getMax())
+                    toast(String.format(java.util.Locale.US, "That view is wider than %d %s, radius set to the maximum",
+                            seek.getMax(), Units.bigLabel()));
+                applyScope(l, (int) Math.max(1, Math.min(seek.getMax(), Math.round(bigD))), "center");
+            }
+        });
+        row.findViewById(R.id.row_scope_preset).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final String[] items = new String[SCOPE_PRESETS.length];
+                int checked = -1;
+                for (int i = 0; i < SCOPE_PRESETS.length; i++) {
+                    items[i] = scopePresetLabel(SCOPE_PRESETS[i]);
+                    if (SCOPE_PRESETS[i] == (inView ? 0 : big))
+                        checked = i;
+                }
+                // MapView context, never the plugin context: a dialog on the plugin
+                // context is a BadTokenException and ATAK dies.
+                new android.app.AlertDialog.Builder(mapView.getContext())
+                        .setTitle("Show " + l.spec.title.toLowerCase(java.util.Locale.US) + " within")
+                        .setSingleChoiceItems(items, checked, new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface d, int w) {
+                                d.dismiss();
+                                applyScope(l, SCOPE_PRESETS[w], center ? "center" : "me");
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+    }
+
+    private void applyScope(LoadedLayer l, int big, String kind) {
+        if (big <= 0)
+            manager.setScope(l, "view", 0);
+        else
+            manager.setScope(l, kind, Units.bigToMeters(big));
     }
 
     /**
@@ -1384,6 +1498,8 @@ public class FeatureLayer implements IPlugin {
             sb.append(" · STALE: ").append(l.status);
         else if (!l.refreshing && l.status.startsWith("partial"))
             sb.append(" · ").append(l.status);
+        if (l.capped)
+            sb.append(" \u00b7 ").append(l.spec.maxFeatures).append(" shown, more exist: zoom in or shrink the radius");
         return sb.toString();
     }
 

@@ -46,7 +46,7 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store.
      */
-    private static final int STYLE_VERSION = 48;
+    private static final int STYLE_VERSION = 49;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -87,6 +87,16 @@ public class LoadedLayer {
     /** Features fetched so far during a refresh, for the pane's loading line. */
     public volatile int progress;
     public volatile boolean stale;
+    /** The last fetch returned the layer's cap, so there is more than is drawn. */
+    public volatile boolean capped;
+    /**
+     * A word about how the scope was resolved this time, for the pane: "no GPS fix --
+     * measured from Map Center", or null when there is nothing to say.
+     */
+    public volatile String scopeNote;
+    /** Where the last fetch looked, so a move can be judged against it. */
+    private volatile double fetchedLat = Double.NaN, fetchedLon = Double.NaN, fetchedRadiusM;
+    private volatile double[] fetchedBox; // south, west, north, east, with the margin
     private volatile boolean closed;
     /** The last "anything new?" answer, and the where clause shape it was for. */
     private String lastStamp = "", lastStampWhere = "";
@@ -828,26 +838,71 @@ public class LoadedLayer {
      * <p>Throws with words the operator can act on when the scope cannot be resolved:
      * there is no own position yet, or the drawn shape the layer was scoped to is gone.
      */
-    /** Where this layer is looking, for the log and the panel. */
-    String scopeLabel() {
+    /** Where this layer is looking, in the operator's words, for the pane and the log. */
+    public String scopeLabel() {
         if (spec.scopeKind == null)
-            return "everything";
-        if ("view".equals(spec.scopeKind)) {
-            final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
-            return b == null ? "what is in view"
-                    : String.format(java.util.Locale.US, "what is in view (%.3f..%.3f, %.3f..%.3f)",
-                            b.getSouth(), b.getNorth(), b.getWest(), b.getEast());
-        }
+            return "Everything";
+        if ("view".equals(spec.scopeKind))
+            return "What is in view";
         if ("box".equals(spec.scopeKind))
-            return "an area";
+            return "An area";
         if ("shape".equals(spec.scopeKind))
-            return "a drawn shape";
+            return "A drawn shape";
+        final String from = "center".equals(spec.scopeKind) ? "Map Center" : "My Location";
+        final String note = scopeNote;
+        return "Within " + Units.formatBig(spec.scopeRadiusM) + " of " + from + (note == null ? "" : " (" + note + ")");
+    }
+
+    /** Whether this layer's scope is one the pane offers a control for. */
+    public boolean hasScopeControl() {
+        return "me".equals(spec.scopeKind) || "center".equals(spec.scopeKind) || "view".equals(spec.scopeKind);
+    }
+
+    /** A usable own position, or null: the self marker before a fix reads 0,0 and calls itself valid. */
+    private com.atakmap.coremap.maps.coords.GeoPoint ownPosition() {
         final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
         final com.atakmap.coremap.maps.coords.GeoPoint p = self == null ? null : self.getPoint();
-        if (p == null)
-            return "around you (no position)";
-        return String.format(java.util.Locale.US, "within %.0f km of %.4f, %.4f",
-                spec.scopeRadiusM / 1000d, p.getLatitude(), p.getLongitude());
+        if (p == null || !p.isValid() || (Math.abs(p.getLatitude()) < 0.01 && Math.abs(p.getLongitude()) < 0.01))
+            return null;
+        return p;
+    }
+
+    /**
+     * Whether the map or the operator has moved far enough since the last fetch that
+     * what is drawn no longer answers the scope. Judged on the main thread by
+     * {@link LayerManager} after a debounced map move.
+     */
+    boolean movedOutOfScope() {
+        if (!hasScopeControl() || refreshing || busy)
+            return false;
+        try {
+            if ("view".equals(spec.scopeKind)) {
+                final double[] fb = fetchedBox;
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                if (fb == null || b == null)
+                    return false;
+                // Still inside the margin the last fetch added: nothing new to ask for.
+                return b.getSouth() < fb[0] || b.getWest() < fb[1] || b.getNorth() > fb[2] || b.getEast() > fb[3];
+            }
+            if (Double.isNaN(fetchedLat))
+                return false;
+            final com.atakmap.coremap.maps.coords.GeoPoint now = "center".equals(spec.scopeKind)
+                    ? mapView.getPoint().get() : ownPosition();
+            if (now == null)
+                return false;
+            // Half the radius: far enough that the edge of the circle has moved a lot,
+            // not so far that a slow drive re-fetches every minute anyway.
+            return distanceM(now.getLatitude(), now.getLongitude(), fetchedLat, fetchedLon) > fetchedRadiusM * 0.5;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    private static double distanceM(double lat1, double lon1, double lat2, double lon2) {
+        final double r = 6371000d, dLat = Math.toRadians(lat2 - lat1), dLon = Math.toRadians(lon2 - lon1);
+        final double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     private Esri.Scope scope() {
@@ -863,8 +918,22 @@ public class LoadedLayer {
             // A margin, so a small pan still has features under it before the next fetch.
             final double padLat = Math.max(0.01, (b.getNorth() - b.getSouth()) * 0.2);
             final double padLon = Math.max(0.01, (b.getEast() - b.getWest()) * 0.2);
-            return Esri.Scope.box(b.getSouth() - padLat, b.getWest() - padLon,
-                    b.getNorth() + padLat, b.getEast() + padLon);
+            fetchedBox = new double[] { b.getSouth() - padLat, b.getWest() - padLon,
+                    b.getNorth() + padLat, b.getEast() + padLon };
+            scopeNote = null;
+            return Esri.Scope.box(fetchedBox[0], fetchedBox[1], fetchedBox[2], fetchedBox[3]);
+        }
+        if ("center".equals(spec.scopeKind)) {
+            // Where the map is NOW, not where it was when the control was set: a control
+            // named for the map center that ignored the map moving is Cam Depot's old bug.
+            final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+            if (c == null)
+                throw new IllegalStateException("the map has no center yet");
+            fetchedLat = c.getLatitude();
+            fetchedLon = c.getLongitude();
+            fetchedRadiusM = spec.scopeRadiusM;
+            scopeNote = null;
+            return Esri.Scope.circle(c.getLatitude(), c.getLongitude(), spec.scopeRadiusM);
         }
         if ("box".equals(spec.scopeKind)) {
             if (spec.scopeBox == null)
@@ -876,14 +945,23 @@ public class LoadedLayer {
                 throw new IllegalStateException("the shape " + spec.title + " was scoped to is gone; pick another");
             return Esri.Scope.polygon(spec.scopeRings);
         }
-        final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
-        final com.atakmap.coremap.maps.coords.GeoPoint p = self == null ? null : self.getPoint();
-        // GeoPoint.isValid() is true at 0,0, which is not a position -- it is what the self
-        // marker reads before a fix. Scoping to it put a 25 mile circle in the Gulf of
-        // Guinea, so every fetch came back empty while the map still showed the last
-        // place's features (2026-09-17).
-        if (p == null || !p.isValid() || (Math.abs(p.getLatitude()) < 0.01 && Math.abs(p.getLongitude()) < 0.01))
-            throw new IllegalStateException("no own position yet; wait for GPS or set your location in ATAK");
+        // "me". GeoPoint.isValid() is true at 0,0, which is not a position -- it is what
+        // the self marker reads before a fix. Scoping to it put a 25 mile circle in the
+        // Gulf of Guinea, so every fetch came back empty while the map still showed the
+        // last place's features (2026-09-17). With no fix the map center stands in, and
+        // the pane says so, rather than refusing to fetch anything.
+        com.atakmap.coremap.maps.coords.GeoPoint p = ownPosition();
+        if (p == null) {
+            p = mapView.getPoint().get();
+            if (p == null)
+                throw new IllegalStateException("no own position yet; wait for GPS or set your location in ATAK");
+            scopeNote = "no GPS fix, measured from Map Center";
+        } else {
+            scopeNote = null;
+        }
+        fetchedLat = p.getLatitude();
+        fetchedLon = p.getLongitude();
+        fetchedRadiusM = spec.scopeRadiusM;
         return Esri.Scope.circle(p.getLatitude(), p.getLongitude(), spec.scopeRadiusM);
     }
 
@@ -955,7 +1033,8 @@ public class LoadedLayer {
             lastRefresh = System.currentTimeMillis();
             stale = false;
             status = problems.isEmpty() ? "ok" : "partial: " + problems.get(0);
-            if (spec.maxFeatures > 0 && pending.size() >= spec.maxFeatures * spec.layerIds.length)
+            capped = spec.maxFeatures > 0 && pending.size() >= spec.maxFeatures * spec.layerIds.length;
+            if (capped)
                 status = "capped at " + spec.maxFeatures + " per layer";
         } catch (Exception e) {
             Log.w(TAG, spec.id + " refresh failed", e);
@@ -1262,15 +1341,14 @@ public class LoadedLayer {
                             style = NwcgStyles.withoutLabel(style);
                             if (alt != null)
                                 alt = NwcgStyles.withoutLabel(alt);
-                        } else if (isPointLayer && spec.labels && name != null && !name.isEmpty()
-                                && !(style instanceof com.atakmap.map.layer.feature.style.LabelPointStyle)) {
+                        } else if (isPointLayer && spec.labels && name != null && !name.isEmpty()) {
                             // A point's name is pixels in its icon (LabelledIcons), not a label.
                             // ATAK's label engine drew NWCG point names in white with no backing
                             // and trimmed them -- "Value at Risk" as "Va", "Hazard" as "ard" over
                             // red terrain on the Timber fire (2026-09-17) -- and trimmed the
                             // pill on every other layer's points the same way. A transparent
                             // empty label then keeps the engine from drawing the name itself.
-                            // (A Label Point layer is text only and keeps its own style.)
+                            // A Label Point is text only: its pill is composed with no symbol.
                             final Style ls = labelledPoint(style, name);
                             if (ls != null) {
                                 style = ls;
@@ -1363,6 +1441,27 @@ public class LoadedLayer {
      */
     private Style labelledPoint(Style s, String text) {
         final com.atakmap.map.layer.feature.style.IconPointStyle ip;
+        if (s instanceof com.atakmap.map.layer.feature.style.LabelPointStyle) {
+            // A Label Point: text and nothing else. "Boy Scout Camp" drew as "ut Camp"
+            // through the engine (2026-09-17); as pixels it is whole.
+            try {
+                final float scale = gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling();
+                final com.atakmap.android.maps.MapTextFormat tf = MapView.getDefaultTextFormat();
+                float textPx = tf.getDensityAdjustedFontSize();
+                if (textPx <= 0f)
+                    textPx = tf.getFontSize() * scale;
+                final int[] dim = new int[2];
+                final File f = LabelledIcons.compose(null, 0, 0, text, tf.getTypeface(), textPx, iconDir, dim);
+                if (f == null)
+                    return null;
+                final Style icon = new com.atakmap.map.layer.feature.style.IconPointStyle(0xFFFFFFFF,
+                        "file://" + f.getAbsolutePath(), dim[0] / scale, dim[1] / scale, 0, 0, 0f, true);
+                return NwcgStyles.withoutLabel(icon);
+            } catch (Exception e) {
+                Log.w(TAG, "labelled text \"" + text + "\"", e);
+                return null;
+            }
+        }
         if (s instanceof com.atakmap.map.layer.feature.style.IconPointStyle)
             ip = (com.atakmap.map.layer.feature.style.IconPointStyle) s;
         else if (s instanceof com.atakmap.map.layer.feature.style.CompositeStyle)
