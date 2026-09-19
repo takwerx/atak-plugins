@@ -58,6 +58,8 @@ public class LoadedLayer {
     private static final double GSD_MARKS_COARSE_MIN = 400d, GSD_MARKS_SPLIT = 25d;
 
     public final LayerSpec spec;
+    /** A pan asked for a new area and the fetch is waiting out the minimum gap; the list says "scanning". */
+    public volatile boolean pendingMove;
     private final MapView mapView;
     private final Context pluginContext;
     private final File storeFile;

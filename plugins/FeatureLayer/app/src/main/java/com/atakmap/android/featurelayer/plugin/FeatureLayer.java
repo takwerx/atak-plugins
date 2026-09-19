@@ -1786,10 +1786,10 @@ public class FeatureLayer implements IPlugin {
     /** Whether the layers behind the list are fetching right now: a pan just asked for a new area. */
     private boolean scanning(LoadedLayer only) {
         if (only != null)
-            return only.refreshing || only.busy;
+            return only.refreshing || only.busy || only.pendingMove;
         if (manager != null)
             for (LoadedLayer l : manager.snapshot())
-                if (l.refreshing || l.busy)
+                if (l.refreshing || l.busy || l.pendingMove)
                     return true;
         return false;
     }
