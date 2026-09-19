@@ -443,7 +443,9 @@ public final class Esri {
         final Iterator<String> keys = props.keys();
         while (keys.hasNext()) {
             final String k = keys.next();
-            if (props.isNull(k))
+            // Keys starting with "_" are the plugin's own (_title, _time, _bare...): a
+            // server must not be able to plant one (security review, 2026-09-18).
+            if (k.startsWith("_") || props.isNull(k))
                 continue;
             final Object v = props.opt(k);
             if (v == null)

@@ -88,7 +88,11 @@ public class LayerManager {
     /** A line in tools/featurelayer/start-log.txt: the start sequence, which no log on this phone shows. */
     void startLog(String line) {
         try {
-            final java.io.FileWriter w = new java.io.FileWriter(new File(root, "start-log.txt"), true);
+            final File f = new File(root, "start-log.txt");
+            if (f.length() > 200_000)
+                //noinspection ResultOfMethodCallIgnored
+                f.delete();
+            final java.io.FileWriter w = new java.io.FileWriter(f, true);
             try {
                 w.write(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date())
                         + " " + Thread.currentThread().getName() + " " + line + "\n");
@@ -251,7 +255,11 @@ public class LayerManager {
                             "Could not add " + spec.title + ": " + e, android.widget.Toast.LENGTH_LONG).show();
                     final java.io.StringWriter sw = new java.io.StringWriter();
                     e.printStackTrace(new java.io.PrintWriter(sw));
-                    final java.io.FileWriter w = new java.io.FileWriter(new File(layersDir.getParentFile(), "add-failed.txt"), true);
+                    final File af = new File(layersDir.getParentFile(), "add-failed.txt");
+                    if (af.length() > 200_000)
+                        //noinspection ResultOfMethodCallIgnored
+                        af.delete();
+                    final java.io.FileWriter w = new java.io.FileWriter(af, true);
                     try {
                         w.write(new java.util.Date() + " " + spec.id + "\n" + sw + "\n");
                     } finally {
@@ -645,7 +653,7 @@ public class LayerManager {
             @Override
             public List<LoadedLayer.Hit> call() throws Exception {
                 String token = null;
-                if (l.spec.portal != null) {
+                if (l.spec.portal != null && trusted(l.spec)) {
                     token = auth(l.spec.portal).getValidToken();
                     if (token == null)
                         throw new IllegalStateException("sign in to " + (l.spec.orgName != null ? l.spec.orgName : "the portal"));
