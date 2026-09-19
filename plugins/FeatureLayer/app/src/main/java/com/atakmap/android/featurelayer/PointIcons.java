@@ -24,31 +24,73 @@ final class PointIcons {
     private final File dir;
     private final Map<String, String> uris = new HashMap<>();
 
+    /**
+     * Whether this plugin load has already refreshed the composites. They are redrawn
+     * once per load on a background thread, never once per layer on the caller's.
+     *
+     * <p>The constructor used to redraw all of them inline, and it runs from
+     * {@code LoadedLayer}'s constructor, which runs from {@code LayerManager.add} on the
+     * main thread. With 127 composites on disk that blocked past Android's 10 s input
+     * timeout and raised an ANR: two of them on 2026-09-17, one from adding a layer and
+     * one from restoring at start, both reading to the operator as "it crashed the app".
+     * A timestamp check does not help, because the plugin rewrites its own symbols every
+     * time it unpacks them at start, so every composite always looks stale.
+     */
+    private static boolean refreshStarted;
+
     PointIcons(File dir) {
         this.dir = dir;
-        // The cached store points at these by name, and ATAK remembers a failed icon load
-        // until it restarts, so a composite is never deleted: it is redrawn in place from
-        // the (possibly corrected) symbol it was made from.
-        final File[] old = dir.listFiles();
-        if (old != null)
-            for (File f : old) {
-                final String n = f.getName();
-                if (!n.startsWith("status_") || !n.endsWith(".png"))
-                    continue;
-                try {
-                    // status_<argb>_<disc|ring>_<icon file>
-                    final String[] parts = n.split("_", 4);
-                    if (parts.length < 4)
+        refreshComposites(dir);
+    }
+
+    /**
+     * Redraws every composite from the symbol it was made from, once per plugin load, off
+     * the caller's thread. The cached store points at these by name and ATAK remembers a
+     * failed icon load until it restarts, so a composite is never deleted -- it is
+     * redrawn in place from the (possibly corrected) symbol.
+     *
+     * <p>The pass is advisory: {@link #withStatus} composes anything missing on demand,
+     * and each file is written whole and renamed into place, so a point drawn while this
+     * is running gets the previous composite rather than a torn one.
+     */
+    private static void refreshComposites(final File dir) {
+        synchronized (PointIcons.class) {
+            if (refreshStarted)
+                return;
+            refreshStarted = true;
+        }
+        final Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final File[] old = dir.listFiles();
+                if (old == null)
+                    return;
+                int redrawn = 0;
+                final long t0 = System.currentTimeMillis();
+                for (File f : old) {
+                    final String n = f.getName();
+                    if (!n.startsWith("status_") || !n.endsWith(".png"))
                         continue;
-                    final int color = (int) Long.parseLong(parts[1], 16);
-                    final boolean hollow = "ring".equals(parts[2]);
-                    final File icon = new File(dir, parts[3]);
-                    if (icon.isFile())
-                        compose(icon, color, hollow, f);
-                } catch (Exception e) {
-                    Log.w(TAG, "status icon " + n + " not redrawn", e);
+                    try {
+                        // status_<argb>_<disc|ring>_<icon file>
+                        final String[] parts = n.split("_", 4);
+                        if (parts.length < 4)
+                            continue;
+                        final int color = (int) Long.parseLong(parts[1], 16);
+                        final boolean hollow = "ring".equals(parts[2]);
+                        final File icon = new File(dir, parts[3]);
+                        if (icon.isFile() && compose(icon, color, hollow, f))
+                            redrawn++;
+                    } catch (Exception e) {
+                        Log.w(TAG, "status icon " + n + " not redrawn", e);
+                    }
                 }
+                Log.d(TAG, "status icons: " + redrawn + " redrawn in "
+                        + (System.currentTimeMillis() - t0) + " ms, off the main thread");
             }
+        }, "featurelayer-status-icons");
+        t.setPriority(Thread.MIN_PRIORITY);
+        t.start();
     }
 
     /** The icon on its status disc, or the icon itself when nothing can be composited. */

@@ -181,7 +181,15 @@ public class EsriRenderer {
                         out.write(bytes);
                     }
                 }
-                return new IconPointStyle(0xFFFFFFFF, "file://" + png.getAbsolutePath(), 2.0f, 0, 0, 0f, true);
+                // The marker's own declared size, points to pixels, instead of a blanket 2x
+                // scale: DART Personnel declares a 64 px hard hat and it drew at double that,
+                // swamping the map (2026-09-17). Clamped so a service asking for 4 points is
+                // still tappable and one asking for 60 does not cover the fire. Width and
+                // height are kept separate because EGP's vehicle glyphs are wide, not square.
+                final double wPt = s.optDouble("width", 0), hPt = s.optDouble("height", 0);
+                final float w = clampPx(wPt > 0 ? (float) (wPt * 4 / 3) : 28f);
+                final float h = clampPx(hPt > 0 ? (float) (hPt * 4 / 3) : w);
+                return new IconPointStyle(0xFFFFFFFF, "file://" + png.getAbsolutePath(), w, h, 0, 0, 0f, true);
             }
             case "esriSLS": {
                 final int color = argb(s.optJSONArray("color"), 0xFFFFFFFF);
@@ -210,6 +218,11 @@ public class EsriRenderer {
             default:
                 return null;
         }
+    }
+
+    /** A marker edge in pixels: big enough to tap with a glove, small enough to see past. */
+    private static float clampPx(float px) {
+        return Math.max(16f, Math.min(36f, px));
     }
 
     private static short pattern(String style) {
