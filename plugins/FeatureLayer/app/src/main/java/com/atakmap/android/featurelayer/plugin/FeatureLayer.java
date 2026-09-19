@@ -441,7 +441,11 @@ public class FeatureLayer implements IPlugin {
                         final LoadedLayer showing = featuresFor;
                         final View search = paneView == null ? null : paneView.findViewById(R.id.search_panel);
                         final boolean finding = search != null && search.getVisibility() == View.VISIBLE;
-                        if (showing != null && !showing.refreshing && !showing.busy) {
+                        final View details = paneView == null ? null : paneView.findViewById(R.id.details_panel);
+                        final boolean reading = details != null && details.getVisibility() == View.VISIBLE;
+                        // Details up: leave them alone. The in-place Features redraw put its
+                        // panel back over the details on every refresh tick (S22, 2026-09-19).
+                        if (showing != null && !showing.refreshing && !showing.busy && !reading) {
                             if (finding)
                                 refreshResultsInPlace();
                             else
