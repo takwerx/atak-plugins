@@ -664,16 +664,19 @@ public class FeatureLayer implements IPlugin {
         return m > 0 ? m / res : 200;
     }
 
+    // A level is printed and picked through one nominal bar length, not the live scale
+    // bar: the same 40 m/px read "5 mi" on the XCover and "9.38 mi" on the S22
+    // (2026-09-19), because the bar's pixel length differs per phone and zoom.
     private String labelLevel(LoadedLayer l) {
         if (l.spec.labelGsd == Double.MAX_VALUE)
             return "Always";
-        return com.atakmap.android.featurelayer.ScaleBar.describe(l.spec.labelGsd * scaleBarPixels()) + " or closer";
+        return com.atakmap.android.featurelayer.ScaleBar.describe(l.spec.labelGsd * com.atakmap.android.featurelayer.ScaleBar.FALLBACK_BAR_PIXELS) + " or closer";
     }
 
     private String gateLabel(LoadedLayer l) {
         if (l.spec.gateGsd == Double.MAX_VALUE)
             return "Always";
-        return com.atakmap.android.featurelayer.ScaleBar.describe(l.spec.gateGsd * scaleBarPixels()) + " or closer";
+        return com.atakmap.android.featurelayer.ScaleBar.describe(l.spec.gateGsd * com.atakmap.android.featurelayer.ScaleBar.FALLBACK_BAR_PIXELS) + " or closer";
     }
 
     /** Opens the search pane with the text inside one layer: a fire, an incident, a source. */
@@ -753,6 +756,7 @@ public class FeatureLayer implements IPlugin {
             public void onClick(View v) {
                 searchPanel.setVisibility(View.GONE);
                 paneView.findViewById(R.id.details_panel).setVisibility(View.GONE);
+                paneView.findViewById(R.id.features_header).setVisibility(View.VISIBLE);
                 header.setVisibility(View.GONE);
                 if (scope != null) {
                     pickSets(scope); // back to the layer's Features, where this came from
@@ -1048,6 +1052,7 @@ public class FeatureLayer implements IPlugin {
             @Override
             public void onClick(View v) {
                 panel.setVisibility(View.GONE);
+                paneView.findViewById(R.id.features_header).setVisibility(View.VISIBLE);
                 searchPanel.setVisibility(View.VISIBLE);
             }
         });
@@ -1058,6 +1063,7 @@ public class FeatureLayer implements IPlugin {
             }
         });
         searchPanel.setVisibility(View.GONE);
+        paneView.findViewById(R.id.features_header).setVisibility(View.GONE); // one Back, the details' own
         panel.setVisibility(View.VISIBLE);
         scrollPaneToTop();
     }
@@ -1589,7 +1595,7 @@ public class FeatureLayer implements IPlugin {
                                 @Override
                                 public void onClick(DialogInterface d, int which) {
                                     final double gsd = which == GATE_BIG.length ? Double.MAX_VALUE
-                                            : com.atakmap.android.featurelayer.Units.bigToMeters(GATE_BIG[which]) / scaleBarPixels();
+                                            : com.atakmap.android.featurelayer.Units.bigToMeters(GATE_BIG[which]) / com.atakmap.android.featurelayer.ScaleBar.FALLBACK_BAR_PIXELS;
                                     manager.setGate(l, gsd);
                                     preset.setText(gateLabel(l));
                                 }
@@ -1645,7 +1651,7 @@ public class FeatureLayer implements IPlugin {
                                 @Override
                                 public void onClick(DialogInterface d, int which) {
                                     final double gsd = which == GATE_BIG.length ? Double.MAX_VALUE
-                                            : com.atakmap.android.featurelayer.Units.bigToMeters(GATE_BIG[which]) / scaleBarPixels();
+                                            : com.atakmap.android.featurelayer.Units.bigToMeters(GATE_BIG[which]) / com.atakmap.android.featurelayer.ScaleBar.FALLBACK_BAR_PIXELS;
                                     manager.setLabelLevel(l, gsd);
                                     level.setText(labelLevel(l));
                                 }

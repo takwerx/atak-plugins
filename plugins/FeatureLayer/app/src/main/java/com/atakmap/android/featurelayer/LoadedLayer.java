@@ -58,6 +58,8 @@ public class LoadedLayer {
     private static final double GSD_MARKS_COARSE_MIN = 400d, GSD_MARKS_SPLIT = 25d;
 
     public final LayerSpec spec;
+    /** The source layer's date fields as of the last fetch, so a feed search formats dates the same way. */
+    private volatile Set<String> lastDateFields = new java.util.HashSet<>();
     /** A pan asked for a new area and the fetch is waiting out the minimum gap; the list says "scanning". */
     public volatile boolean pendingMove;
     private final MapView mapView;
@@ -900,7 +902,7 @@ public class LoadedLayer {
                 final String type = spec.setField == null ? null : Esri.firstNonEmpty(props.optString(spec.setField, null));
                 final long when = spec.timeField != null && props.opt(spec.timeField) instanceof Number
                         ? ((Number) props.opt(spec.timeField)).longValue() : 0L;
-                final AttributeSet attrs = Esri.toAttributes(props, new java.util.HashSet<String>());
+                final AttributeSet attrs = Esri.toAttributes(props, lastDateFields);
                 final String title = name != null ? name : (type != null ? type : spec.title);
                 attrs.setAttribute("_title", title);
                 attrs.setAttribute("_type", type != null ? type : (spec.layerTitle != null ? spec.layerTitle : spec.title));
@@ -1372,6 +1374,7 @@ public class LoadedLayer {
         final String setName = info.name;
         final String repairName = (nwcg && isPointLayer) ? info.name + " (repair)" : null;
         final Set<String> dates = info.dateFields;
+        lastDateFields = dates == null ? new java.util.HashSet<String>() : dates;
         final String displayField = info.displayField != null && info.fields.contains(info.displayField)
                 ? info.displayField : null;
         // The service's own layer name is a table name to the operator ("DART_AVLs"), so a
@@ -1551,7 +1554,7 @@ public class LoadedLayer {
                         // "Pickup", "IHC"), so the picker lists kinds and a row says what it
                         // is; the layer's name was standing in (operator, 2026-09-18: "when i
                         // click on vehicle how come i dont get a sub type?").
-                        final String dartType = DartStyles.handles(spec) && spec.setField != null
+                        final String dartType = (DartStyles.handles(spec) || FireGuardStyles.handles(spec)) && spec.setField != null
                                 ? props.optString(spec.setField, "").trim() : "";
                         attrs.setAttribute("_type", !dartType.isEmpty() && !"null".equalsIgnoreCase(dartType) ? dartType
                                 : nwcg ? (cat != null ? cat : layerName)

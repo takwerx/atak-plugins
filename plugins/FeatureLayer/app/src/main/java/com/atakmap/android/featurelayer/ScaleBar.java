@@ -28,7 +28,7 @@ public final class ScaleBar {
     private static final String TAG = "CamDepotScaleBar";
 
     /** Roughly the bar's own width; only used by the fallback. */
-    static final double FALLBACK_BAR_PIXELS = 200;
+    public static final double FALLBACK_BAR_PIXELS = 200;
 
     private static ScaleWidget cached;
     private static boolean lookupFailed;
