@@ -237,6 +237,166 @@ takes any ArcGIS Online organization you sign in to.
 ]
 
 #tak-slide[
+= DART
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("30.png", width: 100%)
+
+  DART is NIFC's live position feed: the vehicles of the federal wildland fire
+  fleet (USFS and the DOI agencies, by AVL) and people sharing a last known
+  location from Field Maps, a Garmin inReach or WFTAK. Once you are signed in to
+  NIFC, *DART* and *FireGuard* sit under the search box.
+][
+  #image("31.png", width: 100%)
+
+  *DART* asks which half you want. Personnel and vehicles are two layers, each
+  turned off or removed on its own. Both are 24-hour views that refresh every
+  minute, and both sit at the top of the layer list whatever else is loaded.
+][
+  #image("7-2.png", width: 100%)
+
+  A DART row carries the usual controls plus a scope: what the layer fetches.
+  The default is *What is in view*; the next page says how that works.
+]
+]
+
+#tak-slide[
+= DART: on the map
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("33.png", width: 100%)
+
+  Every rig is drawn the way NIFC's own EGP viewer draws it, with its whole
+  callsign above the icon. The ring says how recently it reported: green inside
+  10 minutes, yellow inside 70, red older than that. A parked engine reports every
+  half hour or hour, so yellow is normal for one that is not moving.
+][
+  #image("35.png", width: 100%)
+
+  The icon says what it is, engine, crew carrier, dozer, light vehicle, and the
+  color says whose: green for the Forest Service, lime yellow-green for the
+  U.S. Wildland Fire Service and BLM, grey for a rig with no agency in the feed.
+][
+  #image("36.png", width: 100%)
+
+  People come three ways. A yellow DART pin is a Field Maps user, the handset on
+  a light disc is a Garmin inReach, the badge on a light disc is a WFTAK user. An
+  inReach that has sent an S.O.S. gets a red S.O.S. label at every zoom.
+]
+]
+
+#tak-slide[
+= DART: what it fetches
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("37.png", width: 100%)
+
+  *What is in view* fetches what the map shows and follows the map: pan or zoom,
+  and a second or two later the rigs there appear. *My Location* and *Map Center*
+  fetch a radius instead, set on the slider or with a preset, and follow you or
+  the map center.
+][
+  #image("43.png", width: 100%)
+
+  A view wider than about 300 miles is not fetched; the status line says to zoom
+  in and the layer keeps what it has. A layer never draws more than 300 rigs at
+  once; when there are more, the row says so and asks you to zoom in.
+][
+  #image("34.png", width: 100%)
+
+  Zoomed out, the callsigns come off and the discs stay, so a wide view stays
+  readable. Where that happens is the *Label zoom*, on the next page.
+]
+]
+
+#tak-slide[
+= Label zoom
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("32-2.png", width: 100%)
+
+  Every layer has a *Label zoom* under its *Labels* switch: names show from that
+  scale-bar reading and closer, symbols alone further out. Out of the box it is
+  about five miles for DART and FireGuard and about a mile for fires; change it
+  per layer. The *Reported* line under it is the ring legend.
+][
+  #image("47.png", width: 100%)
+
+  Tap the reading to pick a preset, or *Always* to label at every zoom. *Use this
+  zoom* takes the zoom the map is at right now, the same way the zoom gate does.
+][
+  #image("32-1.png", width: 100%)
+
+  The rest of a layer's Features panel is as before: *Find in this layer*, the
+  time window, the zoom gate, then the kinds of thing the layer holds, each with
+  its own switch.
+]
+]
+
+#tak-slide[
+= Find in DART
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("38.png", width: 100%)
+
+  *Find* with nothing typed lists every kind of rig the layer has ever seen, with
+  how many are in view beside each. Pick one and the list follows the map: pan,
+  and it fills with that kind wherever you look. When there are none it says so.
+][
+  #image("40.png", width: 100%)
+
+  Type a callsign or part of one and *Find* asks the feed itself, the whole
+  country, not just the view: "31 matches on the feed, anywhere". Rows are sorted
+  by distance from you or the map center. *Go* pans to one.
+][
+  #image("41.png", width: 100%)
+
+  Tap a row for its details: every attribute the feed carries, with *Go there* at
+  the top and *Back* to the list. The same details come from the radial menu on
+  the map.
+]
+]
+
+#tak-slide[
+= FireGuard
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("45.png", width: 100%)
+
+  *FireGuard* adds NIFC's FireGuard detections: the areas the analysts draw around
+  a satellite heat detection, named by type and acreage, marked URGENT when they
+  flag it so. The fill is the detection's age the way EGP colors it: maroon in the
+  first half hour, red to 75 minutes, orange to two hours, yellow through the
+  first day, grey after four.
+][
+  #image("44.png", width: 100%)
+
+  The layer refreshes every five minutes and sits under DART in the list. The
+  time window is 24 hours by default; widen it up to EGP's 14 days from the
+  Features panel.
+][
+  #image("46-2.png", width: 100%)
+
+  Tap a detection, or a row in *Find*, for its details: type, acres, county,
+  jurisdiction, dispatch center, the weather at detection, and when it was
+  created and last edited.
+]
+]
+
+#tak-slide[
+= Tap a rig
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("49.png", width: 100%)
+][
+  Rigs parked together stack on the map. Tap the stack and ATAK lists one row
+  per rig, with its callsign and position, so you pick the one you meant. The
+  radial menu on a rig offers the same *Details*, *Bloodhound* and *range and
+  bearing* as any feature.
+]
+]
+
+#tak-slide[
 = SARCOP
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
