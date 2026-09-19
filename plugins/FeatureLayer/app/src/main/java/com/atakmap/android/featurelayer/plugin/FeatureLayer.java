@@ -864,8 +864,9 @@ public class FeatureLayer implements IPlugin {
                 final String t = ((LoadedLayer.Hit) o[1]).type;
                 counts.put(t, counts.containsKey(t) ? counts.get(t) + 1 : 1);
             }
-            status.setText(withLegend(counts.size() + " types, " + all.size() + " features" + scopeNote(scope)
-                    + " \u00b7 tap a type, or type a name", scope));
+            status.setText(withLegend(all.isEmpty() ? emptyOrScanning(null, scope) + scopeNote(scope)
+                    : counts.size() + " types, " + all.size() + " features" + scopeNote(scope)
+                            + (scanning(scope) ? " \u00b7 updating\u2026" : "") + " \u00b7 tap a type, or type a name", scope));
             shownHits = null;   // the type list carries counts, not distances
             container.removeAllViews();
             for (final java.util.Map.Entry<String, Integer> e : counts.entrySet()) {
@@ -920,7 +921,11 @@ public class FeatureLayer implements IPlugin {
             }
         });
         final StringBuilder st = new StringBuilder();
-        st.append(hits.size()).append(hits.size() == 1 ? " feature" : " features");
+        if (hits.isEmpty())
+            st.append(emptyOrScanning(text, scope));
+        else
+            st.append(hits.size()).append(hits.size() == 1 ? " feature" : " features")
+                    .append(scanning(scope) ? " \u00b7 updating\u2026" : "");
         if (hits.size() > RESULT_CAP)
             st.append(", showing ").append(SORT_LABELS[mode].toLowerCase(java.util.Locale.US)).append(" ").append(RESULT_CAP);
         if (noFix && from != null)
@@ -1776,6 +1781,29 @@ public class FeatureLayer implements IPlugin {
                 if (l.hasScopeControl())
                     return " \u00b7 scoped layers search only their own area";
         return "";
+    }
+
+    /** Whether the layers behind the list are fetching right now: a pan just asked for a new area. */
+    private boolean scanning(LoadedLayer only) {
+        if (only != null)
+            return only.refreshing || only.busy;
+        if (manager != null)
+            for (LoadedLayer l : manager.snapshot())
+                if (l.refreshing || l.busy)
+                    return true;
+        return false;
+    }
+
+    /**
+     * What an empty or in-progress list says, so a pan to a new area reads as "looking"
+     * and then "nothing here", never as a list that quietly stayed empty (operator,
+     * 2026-09-18: "loading features or scanning area or something so you know").
+     */
+    private String emptyOrScanning(String text, LoadedLayer only) {
+        if (scanning(only))
+            return "Scanning this area\u2026";
+        return text == null || text.isEmpty() ? "No features in this view"
+                : "Nothing matches \"" + text + "\" in this view";
     }
 
     /** A status line with the legend under it when the list is one DART layer's. */
