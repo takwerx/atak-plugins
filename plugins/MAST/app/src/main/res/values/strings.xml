@@ -3,5 +3,12 @@
     <!-- App -->
     <string name="app_name">MAST</string>
     <!-- description -->
-    <string name="app_desc">MAST</string>
+    <string name="app_desc">Mission Adaptable Survey Tool: pick the mission, get only its tools</string>
+
+    <!-- M0 throwaway pane -->
+    <string name="m0_title">M0 mechanics</string>
+    <string name="m0_maps">Maps here</string>
+    <string name="m0_shape">Draw shape</string>
+    <string name="m0_marker">Drop marker</string>
+    <string name="m0_overlays">List overlays</string>
 </resources>

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-
+<!-- M0 throwaway pane: one button per unproven mechanic. Replaced at M1. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -11,12 +10,48 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical" >
+        android:orientation="vertical"
+        android:padding="6dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/app_name" />
+            android:text="@string/m0_title"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:alpha="0.6" />
+
+        <Button
+            android:id="@+id/m0_maps"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/m0_maps" />
+
+        <Button
+            android:id="@+id/m0_shape"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/m0_shape" />
+
+        <Button
+            android:id="@+id/m0_marker"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/m0_marker" />
+
+        <Button
+            android:id="@+id/m0_overlays"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/m0_overlays" />
 
     </LinearLayout>
 </ScrollView>

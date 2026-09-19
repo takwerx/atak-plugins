@@ -20,7 +20,7 @@ buildscript {
         def p = (PLUGIN_VERSION.tokenize('.') + ['0', '0']).collect { it as int }
         return p[0] * 10000 + p[1] * 100 + p[2]
     }()
-    ext.ATAK_VERSION = '5.6.0'
+    ext.ATAK_VERSION = '5.8.0'
 
     def takdevVersion = '3.+'
 
