@@ -864,8 +864,17 @@ public class FeatureLayer implements IPlugin {
                 final String t = ((LoadedLayer.Hit) o[1]).type;
                 counts.put(t, counts.containsKey(t) ? counts.get(t) + 1 : 1);
             }
-            status.setText(withLegend(all.isEmpty() ? emptyOrScanning(null, scope) + scopeNote(scope)
-                    : counts.size() + " types, " + all.size() + " features" + scopeNote(scope)
+            // The picker is the catalog of what the layer carries, not what happens to be
+            // in view: a DART layer's types are its sets, every kind ever seen, so
+            // "Command" can be picked with none in view and the list fills as the map
+            // pans (operator, 2026-09-18: "your current view should not limit that").
+            // The count beside each is what is in view now.
+            if (scope != null && com.atakmap.android.featurelayer.DartStyles.handles(scope.spec))
+                for (LoadedLayer.SetInfo si : scope.types())
+                    if (!counts.containsKey(si.name))
+                        counts.put(si.name, 0);
+            status.setText(withLegend(counts.isEmpty() ? emptyOrScanning(null, scope) + scopeNote(scope)
+                    : counts.size() + " types, " + all.size() + " in view" + scopeNote(scope)
                             + (scanning(scope) ? " \u00b7 updating\u2026" : "") + " \u00b7 tap a type, or type a name", scope));
             shownHits = null;   // the type list carries counts, not distances
             container.removeAllViews();
@@ -875,7 +884,7 @@ public class FeatureLayer implements IPlugin {
                 ((TextView) row.findViewById(R.id.result_title)).setText(e.getKey());
                 ((TextView) row.findViewById(R.id.result_sub)).setText("");
                 ((TextView) row.findViewById(R.id.result_goto)).setText("tap to list");
-                ((TextView) row.findViewById(R.id.result_dist)).setText(String.valueOf(e.getValue()));
+                ((TextView) row.findViewById(R.id.result_dist)).setText(e.getValue() + " in view");
                 row.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -1802,8 +1811,9 @@ public class FeatureLayer implements IPlugin {
     private String emptyOrScanning(String text, LoadedLayer only) {
         if (scanning(only))
             return "Scanning this area\u2026";
-        return text == null || text.isEmpty() ? "No features in this view"
-                : "Nothing matches \"" + text + "\" in this view";
+        if (text != null && !text.isEmpty())
+            return "Nothing matches \"" + text + "\" in this view";
+        return filterType != null ? "No " + filterType + " in this view" : "No features in this view";
     }
 
     /** A status line with the legend under it when the list is one DART layer's. */
