@@ -254,15 +254,16 @@ public class LayerManager {
                     // The reason goes to the file, not the screen (Fortify: no exception text in UI).
                     android.widget.Toast.makeText(mapView.getContext(),
                             "Could not add " + spec.title + "; see add-failed.txt", android.widget.Toast.LENGTH_LONG).show();
-                    final java.io.StringWriter sw = new java.io.StringWriter();
-                    e.printStackTrace(new java.io.PrintWriter(sw));
+                    // The file says which layer failed and when, and the kind of failure;
+                    // the stack is in ATAK's own log (Log.e above). Fortify flagged a stack
+                    // trace written to a file as a system information leak (0.8 scan).
                     final File af = new File(layersDir.getParentFile(), "add-failed.txt");
                     if (af.length() > 200_000)
                         //noinspection ResultOfMethodCallIgnored
                         af.delete();
                     final java.io.FileWriter w = new java.io.FileWriter(af, true);
                     try {
-                        w.write(new java.util.Date() + " " + spec.id + "\n" + sw + "\n");
+                        w.write(new java.util.Date() + " " + spec.id + " " + e.getClass().getSimpleName() + "\n");
                     } finally {
                         w.close();
                     }

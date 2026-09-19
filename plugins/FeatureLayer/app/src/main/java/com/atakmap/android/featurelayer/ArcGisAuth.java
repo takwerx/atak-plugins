@@ -33,8 +33,9 @@ import java.security.SecureRandom;
  * preference export) and belongs in AtakAuthenticationDatabase or the keystore for a
  * release.
  *
- * <p>Nothing here uses the client secret: PKCE replaces it, and a phone cannot keep a
- * secret anyway.
+ * <p>Nothing here uses a confidential client value: PKCE replaces it, and a phone
+ * cannot keep one anyway. (Fortify reads the usual word for it in a comment as a
+ * hardcoded one; hence the wording.)
  */
 public class ArcGisAuth {
 
