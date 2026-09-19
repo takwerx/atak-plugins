@@ -251,8 +251,9 @@ public class LayerManager {
                 // nothing happened" (FireGuard, 2026-09-18). The trace goes to a file too,
                 // because this phone's logcat never carries ATAK's log.
                 try {
+                    // The reason goes to the file, not the screen (Fortify: no exception text in UI).
                     android.widget.Toast.makeText(mapView.getContext(),
-                            "Could not add " + spec.title + ": " + e, android.widget.Toast.LENGTH_LONG).show();
+                            "Could not add " + spec.title + "; see add-failed.txt", android.widget.Toast.LENGTH_LONG).show();
                     final java.io.StringWriter sw = new java.io.StringWriter();
                     e.printStackTrace(new java.io.PrintWriter(sw));
                     final File af = new File(layersDir.getParentFile(), "add-failed.txt");
@@ -737,7 +738,7 @@ public class LayerManager {
                     }
                     try {
                         android.widget.Toast.makeText(mapView.getContext(), "Could not open " + spec.title
-                                + " (kept for next start): " + e, android.widget.Toast.LENGTH_LONG).show();
+                                + "; kept for next start", android.widget.Toast.LENGTH_LONG).show();
                     } catch (Exception ignored) {
                     }
                 }
