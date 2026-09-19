@@ -45,6 +45,20 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 _________________________________________________________________
 STATUS
 
+0.9, DART and FireGuard: NIFC's live positions are two layers, vehicles and
+personnel, drawn the way NIFC's own EGP viewer draws them, with whole callsigns
+and a ring that says how recently each reported (green under 10 minutes, yellow
+under 70, red older). Vehicles are colored by fleet, people by how they share
+(Field Maps pin, inReach handset, WFTAK badge), and an inReach S.O.S. is labeled
+as one. A layer fetches what is in view and follows the map, with a ceiling and a
+cap that say when to zoom in. Every layer has a label zoom: names from a chosen
+scale and closer, symbols alone further out. Find lists a DART layer's kinds with
+counts in view, a typed callsign asks the feed nationally, and a row opens its
+details with Go there. FireGuard adds NIFC's detections, filled by age the way
+EGP colors them. Point and area names are drawn whole, never trimmed. 0.7 and
+0.8 were the same work; each went to tak.gov once and was superseded on a scan
+finding before publication.
+
 0.6, distances that follow the map: a feature list was measured once, when it
 was drawn, so panning the map left every row reading its distance from wherever
 the map used to be - which is worse than no distance, because it still looks
