@@ -639,6 +639,22 @@ public class LayerManager {
         });
     }
 
+    /** The feed's own answer to a typed name, for a scoped layer, on the worker; the callback runs on main. */
+    public void searchFeed(final LoadedLayer l, final String text, final SearchCallback<List<LoadedLayer.Hit>> cb) {
+        search(new java.util.concurrent.Callable<List<LoadedLayer.Hit>>() {
+            @Override
+            public List<LoadedLayer.Hit> call() throws Exception {
+                String token = null;
+                if (l.spec.portal != null) {
+                    token = auth(l.spec.portal).getValidToken();
+                    if (token == null)
+                        throw new IllegalStateException("sign in to " + (l.spec.orgName != null ? l.spec.orgName : "the portal"));
+                }
+                return l.searchFeed(text, token, 60);
+            }
+        }, cb);
+    }
+
     /** Matches across every loaded layer, with the layer that owns each. */
     public List<Object[]> findFeatures(String text) {
         final List<Object[]> out = new ArrayList<>();

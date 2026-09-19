@@ -897,9 +897,18 @@ public class FeatureLayer implements IPlugin {
             return;
         }
         final List<Object[]> hits = new java.util.ArrayList<>();
-        for (Object[] o : all)
-            if (filterType == null || filterType.equalsIgnoreCase(((LoadedLayer.Hit) o[1]).type))
-                hits.add(o);
+        // A typed name in a scoped layer: the feed's own answer, anywhere, once it is in;
+        // the cached view's matches until then.
+        final List<LoadedLayer.Hit> fromFeed = text.isEmpty() ? null : feedHitsFor(text, scope);
+        if (fromFeed != null) {
+            for (LoadedLayer.Hit h : fromFeed)
+                if (filterType == null || filterType.equalsIgnoreCase(h.type))
+                    hits.add(new Object[] { scope, h });
+        } else {
+            for (Object[] o : all)
+                if (filterType == null || filterType.equalsIgnoreCase(((LoadedLayer.Hit) o[1]).type))
+                    hits.add(o);
+        }
         // From the device, or from the map's center; without a fix, the map center stands in.
         final com.atakmap.coremap.maps.coords.GeoPoint me = fromMapCenter ? null : selfPoint();
         final boolean noFix = !fromMapCenter && me == null;
@@ -930,7 +939,14 @@ public class FeatureLayer implements IPlugin {
             }
         });
         final StringBuilder st = new StringBuilder();
-        if (hits.isEmpty())
+        if (fromFeed != null) {
+            st.append(hits.isEmpty() ? "Nothing on the feed matches \"" + text + "\""
+                    : hits.size() + (hits.size() == 1 ? " match" : " matches") + " on the feed, anywhere");
+            if (feedError != null)
+                st.append(" \u00b7 ").append(feedError);
+        } else if (!text.isEmpty() && scope != null && scope.hasScopeControl() && feedAsking) {
+            st.append(hits.isEmpty() ? "" : hits.size() + " in view \u00b7 ").append("asking the feed for \"").append(text).append("\"\u2026");
+        } else if (hits.isEmpty())
             st.append(emptyOrScanning(text, scope));
         else
             st.append(hits.size()).append(hits.size() == 1 ? " feature" : " features")
@@ -941,7 +957,8 @@ public class FeatureLayer implements IPlugin {
             st.append(" \u00b7 no GPS fix, measured from the map center");
         else if (from == null)
             st.append(" \u00b7 nowhere to measure from, sorted by name");
-        st.append(scopeNote(scope));
+        if (fromFeed == null)
+            st.append(scopeNote(scope));
         status.setText(withLegend(st.toString(), scope));
         container.removeAllViews();
         shownHits = new java.util.ArrayList<>();
@@ -1790,6 +1807,46 @@ public class FeatureLayer implements IPlugin {
                 if (l.hasScopeControl())
                     return " \u00b7 scoped layers search only their own area";
         return "";
+    }
+
+    // ---- a typed name asks the feed, not only the cached view ----------------------
+    private String feedText;                       // the text the feed was last asked for
+    private List<LoadedLayer.Hit> feedHits;        // its answer, or null while it is being asked
+    private long feedAt;                           // when it answered, so a stale answer is asked again
+    private String feedError;
+    private boolean feedAsking;
+
+    /**
+     * The feed's answer for the typed text in a scoped layer, asking for it if it has not
+     * been asked (or the answer is older than two minutes). Null while the answer is on
+     * its way, so the cached matches show meanwhile.
+     */
+    private List<LoadedLayer.Hit> feedHitsFor(final String text, final LoadedLayer only) {
+        if (only == null || !only.hasScopeControl() || text == null || text.isEmpty())
+            return null;
+        final boolean fresh = text.equals(feedText) && feedHits != null && System.currentTimeMillis() - feedAt < 120_000;
+        if (fresh)
+            return feedHits;
+        if (feedAsking && text.equals(feedText))
+            return null;
+        feedText = text;
+        feedHits = null;
+        feedError = null;
+        feedAsking = true;
+        manager.searchFeed(only, text, new LayerManager.SearchCallback<List<LoadedLayer.Hit>>() {
+            @Override
+            public void onResult(List<LoadedLayer.Hit> result, String error) {
+                feedAsking = false;
+                if (!text.equals(feedText))
+                    return; // the box moved on
+                feedHits = result == null ? new java.util.ArrayList<LoadedLayer.Hit>() : result;
+                feedError = error;
+                feedAt = System.currentTimeMillis();
+                if (paneView != null && paneView.findViewById(R.id.search_panel).getVisibility() == View.VISIBLE)
+                    refreshResultsInPlace();
+            }
+        });
+        return null;
     }
 
     /** Whether the layers behind the list are fetching right now: a pan just asked for a new area. */

@@ -869,6 +869,50 @@ public class LoadedLayer {
         return out;
     }
 
+    /**
+     * Asks the feed itself for rows whose name or type contains {@code text}, with no
+     * scope: a typed callsign should find a rig anywhere, not only in the cached view
+     * ("az-pnf" from California found nothing, 2026-09-18). Worker thread; at most
+     * {@code max} rows, inside the layer's time window.
+     */
+    public List<Hit> searchFeed(String text, String token, int max) throws Exception {
+        final List<Hit> out = new ArrayList<>();
+        final String needle = text.trim().toUpperCase(Locale.US).replace("'", "''");
+        if (needle.isEmpty() || spec.layerIds == null || spec.layerIds.length == 0)
+            return out;
+        final StringBuilder like = new StringBuilder();
+        for (String f : new String[] { spec.labelField, spec.setField })
+            if (f != null && !f.isEmpty())
+                like.append(like.length() > 0 ? " OR " : "").append("UPPER(").append(f).append(") LIKE '%").append(needle).append("%'");
+        if (like.length() == 0)
+            return out;
+        final String where = "(" + spec.whereNow() + ") AND (" + like + ")";
+        final int layerId = spec.layerIds[0];
+        Esri.query(spec.base, layerId, where, null, token, spec.geojson, 100, max, new Esri.FeatureSink() {
+            @Override
+            public void feature(JSONObject props, Geometry g) {
+                if (g == null)
+                    return;
+                final com.atakmap.map.layer.feature.geometry.Envelope e = g.getEnvelope();
+                if (e == null || Double.isNaN(e.minX))
+                    return;
+                final String name = spec.labelField == null ? null : Esri.firstNonEmpty(props.optString(spec.labelField, null));
+                final String type = spec.setField == null ? null : Esri.firstNonEmpty(props.optString(spec.setField, null));
+                final long when = spec.timeField != null && props.opt(spec.timeField) instanceof Number
+                        ? ((Number) props.opt(spec.timeField)).longValue() : 0L;
+                final AttributeSet attrs = Esri.toAttributes(props, new java.util.HashSet<String>());
+                final String title = name != null ? name : (type != null ? type : spec.title);
+                attrs.setAttribute("_title", title);
+                attrs.setAttribute("_type", type != null ? type : (spec.layerTitle != null ? spec.layerTitle : spec.title));
+                if (when > 0)
+                    attrs.setAttribute("_time", when);
+                out.add(new Hit(title, spec.title, spec.id, type != null ? type : spec.title, when,
+                        (e.minY + e.maxY) / 2, (e.minX + e.maxX) / 2, Math.max(e.maxX - e.minX, e.maxY - e.minY), attrs));
+            }
+        });
+        return out;
+    }
+
     /** Zooms onto a hit: the feature's own extent, or a few hundred meters around a point. */
     public void zoomTo(Hit h) {
         try {
