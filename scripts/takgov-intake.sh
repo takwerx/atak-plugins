@@ -25,7 +25,8 @@
 # What it checks, and why each one is here:
 #   signer          a build signed by anything but the TAK Product Center is not
 #                   the artifact we asked for
-#   versionCode     MAJOR*10000+MINOR*100+PATCH, or no MDM can push it as an
+#   versionCode     (MAJOR*10000+MINOR*100+PATCH)*10000 + ATAK major*1000+minor*10
+#                   +patch, one code per target, or no MDM can push it as an
 #                   update -- the same rule submission-zip.sh enforces going out
 #   version match   the APK inside says the version its name claims
 #   package         the same package id as the last signed release, or it installs
@@ -124,11 +125,12 @@ for Z in "${ZIPS[@]}"; do
     BADGING="$("$AAPT" dump badging "$APK" 2>/dev/null | head -1)"
     GOT_CODE="$(echo "$BADGING" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p")"
     GOT_NAME="$(echo "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")"
-    WANT_CODE="$(printf '%s' "$VERSION" | awk -F. '{printf "%d", $1*10000 + $2*100 + $3}')"
+    WANT_CODE="$(printf '%s %s' "$VERSION" "$TARGET" | awk '{ split($1, p, "."); split($2, a, ".");
+        printf "%d", (p[1]*10000 + p[2]*100 + p[3]) * 10000 + a[1]*1000 + a[2]*10 + a[3] }')"
     if [ "$GOT_CODE" = "$WANT_CODE" ] && [ "$GOT_CODE" -gt 1 ] 2>/dev/null; then
-        ok "versionCode $GOT_CODE, derived from $VERSION as an MDM needs"
+        ok "versionCode $GOT_CODE, derived from $VERSION on ATAK $TARGET as an MDM needs"
     else
-        bad "versionCode $GOT_CODE, expected $WANT_CODE from version $VERSION -- no MDM can push this as an update"
+        bad "versionCode $GOT_CODE, expected $WANT_CODE from version $VERSION on ATAK $TARGET -- no MDM can push this as an update"
     fi
     case "$GOT_NAME" in
         "$VERSION"*) ok "versionName '$GOT_NAME' agrees with the file name" ;;

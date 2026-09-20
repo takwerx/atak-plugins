@@ -366,7 +366,8 @@ produces a plugin that builds fine and then refuses to load:
   not to change these, and the third-party publication pipeline expects the resulting
   `ATAK-Plugin-<name>-<ver>-<gitsha>-<atakver>.apk` naming. The one deliberate
   departure is `versionCode`: it is `PLUGIN_VERSION_CODE`, derived from
-  `PLUGIN_VERSION`, never the SDK's `getVersionCode()` — see the release checklist.
+  `PLUGIN_VERSION` and `ATAK_VERSION`, never the SDK's `getVersionCode()` — see
+  the release checklist.
 
 ## Release builds differ from debug builds — test the release APK
 
@@ -587,7 +588,8 @@ It reads the plugin, version and ATAK target off the APK name inside, files the
 APK and AAB under `dist/signed/` and the scans under
 `dist/scans/<Plugin>/<version>/<target>/`, and then gates on what decides whether
 a build is fit to publish: the signer is the TAK Product Center, the versionCode
-is `MAJOR*10000+MINOR*100+PATCH`, the versionName agrees with the file name, the
+is the one `PLUGIN_VERSION` and the ATAK target derive (release checklist), the
+versionName agrees with the file name, the
 package id and signing certificate match the last signed release, and Fortify
 rendered zero results. It exits non-zero on a real finding.
 
@@ -714,8 +716,9 @@ Work through this before building submission zips. None of it is theoretical.
 **Think like the MDM and the package manager, not only the plugin loader.** The
 fleet gets these plugins pushed by Watchtower MDM. A release that sideloads fine
 but cannot be pushed as an update is a broken release: same package name, same
-signer, a `versionCode` higher than the last release, and one APK per ATAK
-target the fleet runs. When a new fleet-side failure turns up, add a mechanical
+signer, one APK per ATAK target the fleet runs, and a `versionCode` that is
+higher than the last release on that target and different from every other
+target of the release. When a new fleet-side failure turns up, add a mechanical
 check for it the same day.
 
 **Two icons, not one.** `android:icon` is what Android shows on **light**
@@ -756,17 +759,38 @@ Cam Depot 1.3 exists only to carry the fix. Sideloading and the Market never
 showed it, because the system installer replaces a same-version-code package.
 
 So every plugin's `app/build.gradle` sets `versionCode = PLUGIN_VERSION_CODE`,
-computed from `PLUGIN_VERSION` as `MAJOR*10000 + MINOR*100 + PATCH` (1.3 →
-10300), the same on every machine. `new-plugin.sh` writes it, and
+computed from `PLUGIN_VERSION`, at first as `MAJOR*10000 + MINOR*100 + PATCH`
+(1.3 → 10300), the same on every machine. `new-plugin.sh` writes it, and
 `submission-zip.sh` reads the clean-extract APK with `aapt` and fails the zip
 when the code is not that number.
+
+**One code per release was not enough: the ATAK target is folded in too.** A
+release is one APK per ATAK version, all the same package, and on 2026-09-20 an
+MDM handed the 5.7 and 5.8 builds of Feature Layer 0.9 reported an incompatible
+build (takwerx/feature-layer#1): both said code 900 and the hashes differed, so
+it could neither upgrade one with the other nor treat them as one file.
+Watchtower had accepted Cam Depot 1.3 because only one target was loaded. Since
+2026-09-20 the code is `(MAJOR*10000 + MINOR*100 + PATCH) * 10000 + ATAK_MAJOR*1000
++ ATAK_MINOR*10 + ATAK_PATCH`, from `PLUGIN_VERSION` and `ATAK_VERSION` (1.3 on
+5.8.0 → 103005080), so the three builds of a release carry three codes, ordered
+5.6 < 5.7 < 5.8, and every release is above the last on every target. Every
+new-scheme code is above every old one, so the switch is a plain upgrade on
+every phone. The ceilings are plugin major 20, ATAK major 9, ATAK patch 9; the
+build throws past them. `check-version-code.sh --signed` reads each target's
+last signed APK and requires the new code above it, and refuses two targets of
+one release with one code. What it costs: the 5.8 build orders above the 5.7
+build, so moving a phone *down* an ATAK version needs the plugin uninstalled
+first; moving up takes the matching plugin as a normal update. And a unique
+code lets an MDM hold every target of a release, it does not pick the right
+one: the 5.8 build installs on any phone and only ATAK refuses to load it, so
+the MDM assigns each build to a device group by ATAK version.
 
 `scripts/check-version-code.sh <Plugin>` holds the rest of the rule, and it
 is the rule: the version is above every release in `~/atak-dist/signed/` (a
 resubmission is a new version; `--target` lets one target that was never
 signed be re-zipped), and with `--signed` this version's APKs are all present,
-one per target the README links, carry that code, and keep the package name
-and signing certificate of the last release. `submission-zip.sh` runs it per
+one per target the README links, carry that target's code, and keep the package
+name and signing certificate of the last release. `submission-zip.sh` runs it per
 target before zipping, `/ship` runs it with `--signed --live`, and
 `release-links-guard.sh` blocks the subtree push and `gh release create` on a
 FAIL. Watchtower accepted Cam Depot 1.3 as the update to 1.2 on 2026-09-06,
