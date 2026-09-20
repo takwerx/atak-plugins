@@ -34,6 +34,8 @@ public final class Mission {
     /** One tile of the Tactical grid. Which fields are set depends on the kind. */
     public static final class Tile {
         public final int index;
+        /** Stable id, in the CoT detail and the board rows; defaults to a slug of the label. */
+        public final String id;
         public final String label;
         public final String icon;
         public final Kind kind;
@@ -42,6 +44,8 @@ public final class Mission {
         public final Map<String, Boolean> prefs;
         public final String ask;
         public final String askTitle;
+        /** Overlay Manager list UIDs to navigate into, top level first. */
+        public final List<String> paths;
         // Shape
         public final String title;
         public final int color;
@@ -60,6 +64,7 @@ public final class Mission {
         Tile(int index, JSONObject o, String file) throws Exception {
             this.index = index;
             label = need(o, "label", file);
+            id = o.optString("id", label.toLowerCase().replaceAll("[^a-z0-9]+", "_"));
             icon = need(o, "icon", file);
             String k = need(o, "kind", file);
             Kind kk;
@@ -73,6 +78,12 @@ public final class Mission {
             action = o.optString("action", null);
             ask = o.optString("ask", null);
             askTitle = o.optString("askTitle", label);
+            List<String> pl = new ArrayList<String>();
+            JSONArray pa = o.optJSONArray("paths");
+            if (pa != null)
+                for (int i = 0; i < pa.length(); i++)
+                    pl.add(pa.getString(i));
+            paths = Collections.unmodifiableList(pl);
             Map<String, Boolean> p = new HashMap<String, Boolean>();
             JSONObject po = o.optJSONObject("prefs");
             if (po != null) {

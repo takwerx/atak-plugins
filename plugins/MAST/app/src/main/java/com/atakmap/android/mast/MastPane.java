@@ -52,8 +52,8 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     private static final String SHAPE_DONE = "com.atakmap.android.mast.SHAPE_DONE";
     private static final String EXTRA_TILE = "mast_tile";
     private static final String PREF_MODE = "mast_mode_command";
-    private static final String PREF_FLOOR = "mast_floor";
-    private static final String[] FLOORS = { "B2", "B1", "F1", "F2", "F3", "F4", "F5", "F6" };
+    static final String PREF_FLOOR = "mast_floor";
+    static final String[] FLOORS = { "B2", "B1", "F1", "F2", "F3", "F4", "F5", "F6" };
 
     private final Context plugin;
     private final Context host;
@@ -66,6 +66,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     private final Button floorBtn;
     private final TextView section;
     private final LinearLayout tiles;
+    private final MarkerDrop drop;
     private Mission mission;
     private double currentWidth = HALF_WIDTH;
     private double currentHeight = FULL_HEIGHT;
@@ -83,6 +84,8 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         this.host = mapView.getContext();
         this.feeds = feeds;
         this.prefs = PreferenceManager.getDefaultSharedPreferences(host);
+        this.drop = new MarkerDrop(mapView, pluginContext, feeds, FLOORS,
+                pluginContext.getString(R.string.floor_all), PREF_FLOOR);
 
         root = PluginLayoutInflater.inflate(plugin, R.layout.mast_pane, null);
         missionBtn = root.findViewById(R.id.mast_mission);
@@ -231,7 +234,8 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
                 startShape(t);
                 break;
             case MARKER:
-                toast(plugin.getString(R.string.next_build, t.label));
+                closeDropDown();
+                drop.begin(t, mission != null && mission.floors);
                 break;
             case PLUGIN:
                 openPlugin(t);
@@ -276,9 +280,36 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         Intent i = new Intent(t.action);
         if (asked != null && t.ask != null)
             i.putExtra(t.ask, asked);
+        if (!t.paths.isEmpty())
+            i.putStringArrayListExtra("list_item_paths", new java.util.ArrayList<String>(t.paths));
         Log.d(TAG, "tile " + t.label + " -> " + t.action + (asked == null ? "" : " " + t.ask + "=" + asked));
         closeDropDown();
         AtakBroadcast.getInstance().sendBroadcast(i);
+        if (!t.paths.isEmpty() && !t.prefs.isEmpty())
+            getMapView().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    reapplyPrefs(t);
+                }
+            }, 700);
+    }
+
+    /**
+     * Overlay Manager turns Show All back on whenever it navigates into a list
+     * ({@code openMenu} ticks the box for any non-empty path, and the box writes
+     * {@code fov_filter=false}), so a tile that wants both a folder and the in-view
+     * filter sets the preference again once the navigation has landed and sends the
+     * toolbar-unset broadcast, which is the one intent that makes Overlay Manager
+     * re-read the preference into the box ({@code setViewToMode}, 4.6 source).
+     */
+    private void reapplyPrefs(Mission.Tile t) {
+        SharedPreferences.Editor e = prefs.edit();
+        for (Map.Entry<String, Boolean> p : t.prefs.entrySet())
+            e.putBoolean(p.getKey(), p.getValue());
+        e.apply();
+        AtakBroadcast.getInstance().sendBroadcast(
+                new Intent("com.atakmap.android.maps.toolbar.UNSET_TOOLBAR"));
+        Log.d(TAG, "tile " + t.label + ": prefs re-applied after navigation");
     }
 
     /** ATAK's own polygon tool; the shape gets the tile's name and colors when it is done. */
@@ -418,6 +449,7 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     @Override
     protected void disposeImpl() {
+        drop.dispose();
         try {
             AtakBroadcast.getInstance().unregisterReceiver(shapeDone);
         } catch (Exception e) {
