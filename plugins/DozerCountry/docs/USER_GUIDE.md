@@ -1,6 +1,6 @@
 # Dozer Country for ATAK — User Guide
 
-**Version 0.7 · takwerx**
+**Version 0.8 · takwerx**
 
 **Download Dozer Country 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
