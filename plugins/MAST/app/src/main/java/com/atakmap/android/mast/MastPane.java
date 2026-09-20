@@ -44,7 +44,7 @@ import java.util.Map;
  * <p>Every dialog and toast here is built on the MapView's context; the plugin context
  * cannot own a window and takes ATAK down with it.
  */
-public class MastPane extends DropDownReceiver implements DropDown.OnStateListener {
+public class MastPane extends DropDownReceiver implements DropDown.OnStateListener, MapsList.Host {
 
     private static final String TAG = "MAST.Pane";
     private static final String SHAPE_TOOL = "com.atakmap.android.drawing.SHAPE_TOOL";
@@ -66,6 +66,9 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     private final Button floorBtn;
     private final TextView section;
     private final LinearLayout tiles;
+    private final View grid;
+    private final View mapsView;
+    private final MapsList maps;
     private final MarkerDrop drop;
     private Mission mission;
     private double currentWidth = HALF_WIDTH;
@@ -94,6 +97,9 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         floorBtn = root.findViewById(R.id.mast_floor);
         section = root.findViewById(R.id.mast_section);
         tiles = root.findViewById(R.id.mast_tiles);
+        grid = root.findViewById(R.id.mast_grid);
+        mapsView = root.findViewById(R.id.mast_maps);
+        maps = new MapsList(mapView, pluginContext, root, this);
 
         missionBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -232,6 +238,11 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
                 break;
             case SHAPE:
                 startShape(t);
+                break;
+            case MAPS:
+                grid.setVisibility(View.GONE);
+                mapsView.setVisibility(View.VISIBLE);
+                maps.open(t.view, t.search);
                 break;
             case MARKER:
                 closeDropDown();
@@ -418,8 +429,24 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         return !isPortrait() ? currentWidth > HALF_WIDTH + 0.01 : currentHeight > HALF_HEIGHT + 0.01;
     }
 
+    /** The maps list's Back: the tile grid again. */
+    @Override
+    public void onBack() {
+        maps.close();
+        mapsView.setVisibility(View.GONE);
+        grid.setVisibility(View.VISIBLE);
+    }
+
+    private boolean showingMaps() {
+        return mapsView.getVisibility() == View.VISIBLE;
+    }
+
     @Override
     protected boolean onBackButtonPressed() {
+        if (showingMaps()) {
+            onBack();
+            return true;
+        }
         if (isWide()) {
             goNarrow();
             return true;
@@ -445,6 +472,8 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
 
     @Override
     public void onDropDownClose() {
+        if (showingMaps())
+            onBack();
     }
 
     @Override

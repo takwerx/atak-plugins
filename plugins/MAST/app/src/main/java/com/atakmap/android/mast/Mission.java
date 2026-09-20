@@ -29,7 +29,7 @@ public final class Mission {
 
     public static final int SCHEMA_VERSION = 1;
 
-    public enum Kind { ATAK, SHAPE, MARKER, PLUGIN }
+    public enum Kind { ATAK, SHAPE, MARKER, PLUGIN, MAPS }
 
     /** One tile of the Tactical grid. Which fields are set depends on the kind. */
     public static final class Tile {
@@ -46,6 +46,9 @@ public final class Mission {
         public final String askTitle;
         /** Overlay Manager list UIDs to navigate into, top level first. */
         public final List<String> paths;
+        // Maps: MAST's own image-overlay list
+        public final boolean view;
+        public final boolean search;
         // Shape
         public final String title;
         public final int color;
@@ -84,6 +87,8 @@ public final class Mission {
                 for (int i = 0; i < pa.length(); i++)
                     pl.add(pa.getString(i));
             paths = Collections.unmodifiableList(pl);
+            view = o.optBoolean("view", true);
+            search = o.optBoolean("search", false);
             Map<String, Boolean> p = new HashMap<String, Boolean>();
             JSONObject po = o.optJSONObject("prefs");
             if (po != null) {

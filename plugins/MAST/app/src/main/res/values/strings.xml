@@ -20,6 +20,19 @@
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
 
+    <!-- Maps list -->
+    <string name="back_to_tools">Back to tools</string>
+    <string name="maps_section">Maps</string>
+    <string name="maps_in_view">In view</string>
+    <string name="maps_all">All maps</string>
+    <string name="maps_go">Go</string>
+    <string name="maps_shown">Shown</string>
+    <string name="maps_hidden">Hidden</string>
+    <string name="maps_search_hint">Building name</string>
+    <string name="maps_none_in_view">No maps in view. Tap All maps, or move the map.</string>
+    <string name="maps_none">No image overlays on this phone</string>
+    <string name="maps_no_overlay">ATAK has no Image Overlay list</string>
+
     <!-- Marker drop popup -->
     <string name="pick_feed_first">Pick a feed first</string>
     <string name="count_label">How many</string>
