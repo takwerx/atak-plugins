@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.9** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.10** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.9/ATAK-Plugin-FeatureLayer-0.9--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.9/ATAK-Plugin-FeatureLayer-0.9--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.9/ATAK-Plugin-FeatureLayer-0.9--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -44,6 +44,13 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 
 _________________________________________________________________
 STATUS
+
+0.10, one versionCode per APK: the same plugin as 0.9, rebuilt so that each
+ATAK target's APK carries its own versionCode, the plugin version and the ATAK
+version folded into one integer. An MDM handed the 5.7 and 5.8 builds of 0.9
+saw two different files claiming one revision and reported an incompatible
+build (issue #1); with 0.10 it holds all three, and a phone moving up an ATAK
+version takes the matching build as a normal update. Nothing else changed.
 
 0.9, DART and FireGuard: NIFC's live positions are two layers, vehicles and
 personnel, drawn the way NIFC's own EGP viewer draws them, with whole callsigns
