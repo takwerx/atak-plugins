@@ -410,24 +410,30 @@ public class PlssPackManager {
     /**
      * The SHA-256 of a file on disk, as lower-case hex. An empty file is
      * refused rather than hashed: there is no pack in it to verify, and a
-     * manifest row without a sha256 would otherwise accept it. The first read
-     * happens before the loop so the digest is never finalized without having
-     * been fed; tak.gov's Fortify scan of 0.6 flagged the old download-time
-     * digest for exactly that path.
+     * manifest row without a sha256 would otherwise accept it.
+     *
+     * The last chunk goes in through digest(byte[]), which is update and
+     * finalize in one call, so the call that finalizes the hash carries data
+     * on every path. tak.gov's Fortify scan (a control-flow rule that treats
+     * a loop body as optional) flagged a bare digest() after an update loop
+     * on 0.6, and again on 0.7 with the loop as do/while.
      */
     private static String sha256Of(File f) throws Exception {
         final MessageDigest md = MessageDigest.getInstance("SHA-256");
         final byte[] buf = new byte[BUFFER];
+        byte[] last;
         try (InputStream in = new java.io.FileInputStream(f)) {
             int n = in.read(buf);
             if (n <= 0)
                 throw new IllegalStateException("empty download: " + f);
-            do {
-                md.update(buf, 0, n);
-            } while ((n = in.read(buf)) > 0);
+            last = java.util.Arrays.copyOf(buf, n);
+            while ((n = in.read(buf)) > 0) {
+                md.update(last);
+                last = java.util.Arrays.copyOf(buf, n);
+            }
         }
         final StringBuilder hex = new StringBuilder();
-        for (byte b : md.digest())
+        for (byte b : md.digest(last))
             hex.append(String.format("%02x", b));
         return hex.toString();
     }
