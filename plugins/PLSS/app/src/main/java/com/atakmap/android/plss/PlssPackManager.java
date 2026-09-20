@@ -329,10 +329,11 @@ public class PlssPackManager {
      * Streams to {@code dest}, resuming if it already holds part of the file,
      * and returns the SHA-256 of the whole thing.
      *
-     * The digest has to cover bytes written by earlier attempts too, so an
-     * existing prefix is read back through the digest before the transfer picks
-     * up. That costs one sequential read of what is already on disk, which is
-     * nothing next to re-downloading it.
+     * The digest is taken from the finished file on disk, not from the bytes
+     * as they pass, so it covers what earlier attempts wrote as well as this
+     * one, and it is the hash of what will actually be installed. That costs
+     * one sequential read of the file, which is nothing next to downloading
+     * it.
      */
     private String stream(String url, File dest, Pack pack,
             final DownloadCallback cb) throws Exception {
@@ -370,11 +371,7 @@ public class PlssPackManager {
             final long total = pack.bytes > 0 ? pack.bytes
                     : have + Math.max(conn.getContentLength(), 0);
 
-            final MessageDigest md = MessageDigest.getInstance("SHA-256");
             final byte[] buf = new byte[BUFFER];
-
-            if (append)
-                digestExisting(dest, md, buf);
 
             long soFar = append ? have : 0;
             int lastPercent = -1;
@@ -384,7 +381,6 @@ public class PlssPackManager {
                 int n;
                 while ((n = in.read(buf)) > 0) {
                     out.write(buf, 0, n);
-                    md.update(buf, 0, n);
                     soFar += n;
 
                     final int percent = total > 0
@@ -405,23 +401,35 @@ public class PlssPackManager {
                 }
             }
 
-            final StringBuilder hex = new StringBuilder();
-            for (byte b : md.digest())
-                hex.append(String.format("%02x", b));
-            return hex.toString();
+            return sha256Of(dest);
         } finally {
             conn.disconnect();
         }
     }
 
-    /** Feeds bytes already on disk through the digest before resuming. */
-    private static void digestExisting(File f, MessageDigest md, byte[] buf)
-            throws Exception {
+    /**
+     * The SHA-256 of a file on disk, as lower-case hex. An empty file is
+     * refused rather than hashed: there is no pack in it to verify, and a
+     * manifest row without a sha256 would otherwise accept it. The first read
+     * happens before the loop so the digest is never finalized without having
+     * been fed; tak.gov's Fortify scan of 0.6 flagged the old download-time
+     * digest for exactly that path.
+     */
+    private static String sha256Of(File f) throws Exception {
+        final MessageDigest md = MessageDigest.getInstance("SHA-256");
+        final byte[] buf = new byte[BUFFER];
         try (InputStream in = new java.io.FileInputStream(f)) {
-            int n;
-            while ((n = in.read(buf)) > 0)
+            int n = in.read(buf);
+            if (n <= 0)
+                throw new IllegalStateException("empty download: " + f);
+            do {
                 md.update(buf, 0, n);
+            } while ((n = in.read(buf)) > 0);
         }
+        final StringBuilder hex = new StringBuilder();
+        for (byte b : md.digest())
+            hex.append(String.format("%02x", b));
+        return hex.toString();
     }
 
     private static String describe(Exception e) {
