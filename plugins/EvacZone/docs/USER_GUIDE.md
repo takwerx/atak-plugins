@@ -1,6 +1,6 @@
 # Evac Zone for ATAK — User Guide
 
-**Version 0.4 · takwerx**
+**Version 0.5 · takwerx**
 
 **Download Evac Zone 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
