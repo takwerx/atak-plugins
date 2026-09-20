@@ -4,7 +4,12 @@ import android.content.Context;
 import android.widget.Toast;
 
 import com.atak.plugins.impl.PluginContextProvider;
+import com.atakmap.android.cot.detail.CotDetailManager;
+import com.atakmap.android.maps.MapEvent;
+import com.atakmap.android.maps.MapEventDispatcher;
+import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.mast.MastDetailHandler;
 import com.atakmap.android.mast.MastPane;
 import com.atakmap.android.mast.Mission;
 import com.atakmap.android.mast.feed.FeedPublisher;
@@ -32,6 +37,18 @@ public class MAST implements IPlugin {
     private MapView mapView;
     private MastPane pane;
     private FeedPublisher feeds;
+    private MastDetailHandler detailHandler;
+
+    /** Every save of an item MAST put in a feed is re-sent to it: a drag, a rename, a count. */
+    private final MapEventDispatcher.MapEventDispatchListener persisted =
+            new MapEventDispatcher.MapEventDispatchListener() {
+                @Override
+                public void onMapEvent(MapEvent event) {
+                    MapItem item = event.getItem();
+                    if (feeds != null && item != null && feeds.isLive(item))
+                        feeds.onPersisted(item);
+                }
+            };
 
     public MAST(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -71,7 +88,10 @@ public class MAST implements IPlugin {
             Log.w(TAG, "no MapView; MAST not started");
             return;
         }
+        detailHandler = new MastDetailHandler();
+        CotDetailManager.getInstance().registerHandler(detailHandler);
         feeds = new FeedPublisher(mapView, pluginContext);
+        mapView.getMapEventDispatcher().addMapEventListener(MapEvent.ITEM_PERSIST, persisted);
         pane = new MastPane(mapView, pluginContext, feeds);
         try {
             pane.setMission(Mission.load(pluginContext, "missions/active_shooter.json"));
@@ -93,9 +113,15 @@ public class MAST implements IPlugin {
             pane.dispose();
             pane = null;
         }
+        if (mapView != null)
+            mapView.getMapEventDispatcher().removeMapEventListener(MapEvent.ITEM_PERSIST, persisted);
         if (feeds != null) {
             feeds.dispose();
             feeds = null;
+        }
+        if (detailHandler != null) {
+            CotDetailManager.getInstance().unregisterHandler(detailHandler);
+            detailHandler = null;
         }
     }
 }

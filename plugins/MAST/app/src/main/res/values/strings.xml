@@ -20,6 +20,16 @@
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
 
+    <!-- Marker drop popup -->
+    <string name="pick_feed_first">Pick a feed first</string>
+    <string name="count_label">How many</string>
+    <string name="place_on_map">On the map</string>
+    <string name="place_my_location">My location</string>
+    <string name="place_no_gps">No GPS</string>
+    <string name="tap_to_place">Tap the map to place %s</string>
+    <string name="text_needed">%s is needed</string>
+    <string name="place_failed">%s was not placed</string>
+
     <!-- Not built yet: every tile says so rather than doing nothing -->
     <string name="next_build">%s: next build</string>
     <string name="plugin_missing">Install %s from the TAKwerx Market</string>
