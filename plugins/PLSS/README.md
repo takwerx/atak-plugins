@@ -1,10 +1,10 @@
 ATAK Plugin — PLSS Grid
 
-**Download PLSS Grid 0.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download PLSS Grid 0.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/plss-grid/releases/download/v0.6/ATAK-Plugin-PLSS-0.6--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/plss-grid/releases/download/v0.6/ATAK-Plugin-PLSS-0.6--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/plss-grid/releases/download/v0.6/ATAK-Plugin-PLSS-0.6--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/plss-grid/releases/download/v0.7/ATAK-Plugin-PLSS-0.7--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/plss-grid/releases/download/v0.7/ATAK-Plugin-PLSS-0.7--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/plss-grid/releases/download/v0.7/ATAK-Plugin-PLSS-0.7--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/plss-grid/releases
 
@@ -46,10 +46,12 @@ source submission zip).
 _________________________________________________________________
 STATUS
 
-Version 0.6: one versionCode per APK. The same plugin as 0.5, rebuilt so that
-each ATAK target's APK carries its own versionCode, the plugin version and the
-ATAK version folded into one integer, which lets an MDM hold all three builds
-and push each one as an update. Nothing else changed.
+Version 0.7: the pack checksum is taken from the finished file on disk, and an
+empty download is refused instead of hashed (tak.gov's Fortify scan of 0.6
+flagged the download-time digest). 0.7 also carries the change 0.6 was built
+for: each ATAK target's APK has its own versionCode, so an MDM can hold all
+three builds and push each one as an update. 0.6 went to tak.gov once and was
+superseded on the scan finding before publication.
 
 Version 0.5. Verified on ATAK-CIV 5.7.0.5.
 

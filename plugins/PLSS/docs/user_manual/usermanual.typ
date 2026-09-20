@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "PLSS Grid",
-   plugin-version: "0.6",
+   plugin-version: "0.7",
    platform: "ATAK",
    platform-version: "5.7.0",
 )
