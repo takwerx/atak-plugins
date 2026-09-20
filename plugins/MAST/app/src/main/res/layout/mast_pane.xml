@@ -1,19 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    The MAST pane: a header of value buttons (mission, mode, feed, floor), then the
-    mission's tool tiles, FOBS-style, three per row, built in code from the mission
-    file. Every button is TakwerxButton (CLAUDE.md, "Plugin UI standard").
+    The MAST pane: a header of value buttons (mission, mode, feed, floor) that stays
+    put, over a scroller holding the mission's tool tiles (FOBS-style, three per row,
+    built in code from the mission file) or MAST's own maps list. Every button is
+    TakwerxButton (CLAUDE.md, "Plugin UI standard"). The header is outside the
+    scroller on purpose: "menu on top ... needs to be frozen, tools scroll"
+    (operator, 2026-09-19).
 -->
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fadeScrollbars="false">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="8dp">
+    android:orientation="vertical"
+    android:padding="8dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -71,6 +69,18 @@
                 android:maxLines="2"
                 android:ellipsize="end" />
         </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="4dp"
+        android:fadeScrollbars="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
         <LinearLayout
             android:id="@+id/mast_grid"
@@ -167,5 +177,9 @@
                 android:orientation="vertical" />
         </LinearLayout>
 
-    </LinearLayout>
-</ScrollView>
+    
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
