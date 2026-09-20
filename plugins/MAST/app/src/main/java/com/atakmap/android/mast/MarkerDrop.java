@@ -57,6 +57,7 @@ public class MarkerDrop {
     private final String prefFloor;
 
     private boolean placing;
+    private Runnable onDone;
     private MapEventDispatcher.MapEventDispatchListener tapListener;
     private final View.OnKeyListener backListener = new View.OnKeyListener() {
         @Override
@@ -64,6 +65,7 @@ public class MarkerDrop {
             if (keyCode != KeyEvent.KEYCODE_BACK)
                 return false;
             endPlacing();
+            done();
             return true;
         }
     };
@@ -92,11 +94,22 @@ public class MarkerDrop {
         endPlacing();
     }
 
+    /** Runs when a drop is placed or given up, so the pane can come back to the tools. */
+    public void setOnDone(Runnable r) {
+        onDone = r;
+    }
+
+    private void done() {
+        if (onDone != null)
+            onDone.run();
+    }
+
     // ---- the popup -----------------------------------------------------------------
 
     public void begin(final Mission.Tile tile, final boolean missionHasFloors) {
         if (feeds.current() == null) {
             toast(plugin.getString(R.string.pick_feed_first));
+            done();
             return;
         }
         final Spec spec = new Spec();
@@ -171,7 +184,20 @@ public class MarkerDrop {
                 .setTitle(tile.label)
                 .setView(box)
                 .setNegativeButton(plugin.getString(R.string.cancel), null)
+                .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                    @Override
+                    public void onCancel(DialogInterface d) {
+                        done();
+                    }
+                })
                 .create();
+        dlg.setButton(DialogInterface.BUTTON_NEGATIVE, plugin.getString(R.string.cancel),
+                new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        done();
+                    }
+                });
         onMap.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -364,6 +390,7 @@ public class MarkerDrop {
                 .placePoint();
         if (m == null) {
             toast(plugin.getString(R.string.place_failed, t.label));
+            done();
             return;
         }
         m.setMovable(true);
@@ -389,6 +416,7 @@ public class MarkerDrop {
         feeds.onPersisted(m);
         Log.d(TAG, "placed " + m.getUID() + " '" + m.getTitle() + "' type=" + t.type
                 + " feed=" + (feed == null ? "none" : feed.name));
+        done();
     }
 
     /** How many MAST markers of this kind are on the map already, so the next is numbered. */

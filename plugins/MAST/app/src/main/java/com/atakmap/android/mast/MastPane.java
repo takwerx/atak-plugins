@@ -89,6 +89,14 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         this.prefs = PreferenceManager.getDefaultSharedPreferences(host);
         this.drop = new MarkerDrop(mapView, pluginContext, feeds, FLOORS,
                 pluginContext.getString(R.string.floor_all), PREF_FLOOR);
+        // A finished or cancelled drop brings the tools back (operator, 2026-09-19:
+        // "when I cancel a tool it needs to bring me back to tools").
+        this.drop.setOnDone(new Runnable() {
+            @Override
+            public void run() {
+                reopen();
+            }
+        });
 
         root = PluginLayoutInflater.inflate(plugin, R.layout.mast_pane, null);
         missionBtn = root.findViewById(R.id.mast_mission);
@@ -334,6 +342,9 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
     }
 
     private void onShapeDone(String uid, int tileIndex) {
+        // The callback fires whether the shape was finished or the tool was cancelled
+        // (no uid); either way the tools come back.
+        reopen();
         if (uid == null || mission == null || tileIndex < 0 || tileIndex >= mission.tiles.size())
             return;
         Mission.Tile t = mission.tiles.get(tileIndex);
@@ -389,6 +400,16 @@ public class MastPane extends DropDownReceiver implements DropDown.OnStateListen
         refreshHeader();
         // ignoreBackButton: Back steps a full-width pane back to half before it closes.
         showDropDown(root, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, true, this);
+    }
+
+    /** Back to the tools after a tool on the map ends, on the UI thread. */
+    private void reopen() {
+        getMapView().post(new Runnable() {
+            @Override
+            public void run() {
+                show();
+            }
+        });
     }
 
     public void toggle() {
