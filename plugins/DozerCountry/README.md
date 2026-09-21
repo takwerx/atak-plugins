@@ -1,10 +1,10 @@
 ATAK Plugin — Dozer Country
 
-**Download Dozer Country 0.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Dozer Country 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/dozer-country/releases/download/v0.7/ATAK-Plugin-DozerCountry-0.7--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/dozer-country/releases/download/v0.7/ATAK-Plugin-DozerCountry-0.7--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/dozer-country/releases/download/v0.7/ATAK-Plugin-DozerCountry-0.7--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/dozer-country/releases/download/v0.8/ATAK-Plugin-DozerCountry-0.8--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/dozer-country/releases/download/v0.8/ATAK-Plugin-DozerCountry-0.8--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/dozer-country/releases/download/v0.8/ATAK-Plugin-DozerCountry-0.8--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/dozer-country/releases
 
@@ -61,6 +61,11 @@ clearance.
 
 _________________________________________________________________
 STATUS
+
+Version 0.8: one versionCode per APK. The same plugin as 0.7, rebuilt so that
+each ATAK target's APK carries its own versionCode, the plugin version and the
+ATAK version folded into one integer, which lets an MDM hold all three builds
+and push each one as an update. Nothing else changed.
 
 Version 0.7. First public release was 0.5, 2026-09-15. Built and tested against ATAK-CIV 5.6, 5.7
 and 5.8.
