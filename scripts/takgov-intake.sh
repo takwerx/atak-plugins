@@ -34,7 +34,10 @@
 #   certificate     the same signing certificate as the last signed release, for
 #                   the same reason
 #   Fortify         "Rendering N results": any N above zero is a real finding in
-#                   our own source and stops the gate
+#                   our own source and stops the gate, unless the operator has
+#                   accepted that exact finding (plugin, category and file) in
+#                   ../atak-plugins-notes/fortify-accepted.txt, each line naming
+#                   the record of the decision; those print as ACCEPTED
 #   Dependency-Check  every CVE is listed with the artifact it attached to. These
 #                   are frequently false positives -- the scanner opens an Android
 #                   asset renamed to .jar and fuzzy-matches it against a library
@@ -71,6 +74,49 @@ NOTE=0
 ok()   { echo "  PASS  $*"; }
 bad()  { echo "  FAIL  $*"; FAIL=1; }
 note() { echo "  ..    $*"; NOTE=1; }
+
+# One line per Fortify finding, read from the scan's own results (audit.fvdl
+# inside scan_results.fpr), each marked ACCEPTED when the operator's list has
+# a matching plugin, category and file. Prints nothing when the results cannot
+# be read, and the caller then fails on the count alone.
+fortify_findings() {
+    local fpr="$1" plugin="$2" list="$3" tmp
+    [ -f "$fpr" ] && command -v python3 >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1 || return 0
+    tmp="$(mktemp)"
+    unzip -p "$fpr" audit.fvdl > "$tmp" 2>/dev/null
+    python3 - "$plugin" "$list" "$tmp" <<'PY'
+import sys, re
+plugin, listing, xml = sys.argv[1], sys.argv[2], sys.argv[3]
+accepted = []
+try:
+    for raw in open(listing, encoding="utf-8"):
+        raw = raw.strip()
+        if not raw or raw.startswith("#"):
+            continue
+        parts = [f.strip() for f in raw.split("|")]
+        if len(parts) >= 4 and parts[0] == plugin:
+            accepted.append((parts[1].lower(), parts[2], parts[3]))
+except OSError:
+    pass
+x = open(xml, encoding="utf-8", errors="replace").read()
+for v in re.findall(r"<Vulnerability>.*?</Vulnerability>", x, re.S):
+    t = re.search(r"<Type>(.*?)</Type>", v)
+    st = re.search(r"<Subtype>(.*?)</Subtype>", v)
+    cat = (t.group(1) if t else "?") + ((": " + st.group(1)) if st and st.group(1) else "")
+    locs = re.findall(r'<SourceLocation[^>]*path="([^"]+)"[^>]*line="(\d+)"', v)
+    path, line = (locs[-1] if locs else ("?", "?"))
+    hit = None
+    for acat, afile, rec in accepted:
+        if acat == cat.lower() and any(p.endswith(afile) or afile.endswith(p) for p, _ in locs):
+            hit = rec
+            break
+    if hit:
+        print("ACCEPTED %s at %s:%s -- %s" % (cat, path, line, hit))
+    else:
+        print("%s at %s:%s (not accepted)" % (cat, path, line))
+PY
+    rm -f "$tmp"
+}
 
 # The signing certificate of the newest signed release of this plugin other than
 # the one in hand, so a change of key is caught the moment it happens.
@@ -162,7 +208,22 @@ for Z in "${ZIPS[@]}"; do
         elif [ "$N" -eq 0 ]; then
             ok "Fortify: 0 findings"
         else
-            bad "Fortify: $N finding(s) in our own source -- open $DEST/fortify_scan_results.pdf"
+            # A finding the operator has accepted, by plugin, category and file,
+            # is printed and does not fail the gate; anything else still does.
+            ACCEPTED_LIST="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)/atak-plugins-notes/fortify-accepted.txt"
+            VERDICT="$(fortify_findings "$DEST/scan_results.fpr" "$PLUGIN" "$ACCEPTED_LIST")"
+            if [ -z "$VERDICT" ]; then
+                bad "Fortify: $N finding(s) in our own source -- open $DEST/fortify_scan_results.pdf"
+            else
+                unaccepted=0
+                while IFS= read -r line; do
+                    case "$line" in
+                        ACCEPTED*) note "Fortify: $line" ;;
+                        *) bad "Fortify: $line -- open $DEST/fortify_scan_results.pdf"; unaccepted=1 ;;
+                    esac
+                done <<< "$VERDICT"
+                [ "$unaccepted" -eq 0 ] && note "Fortify: $N finding(s), every one accepted by the operator (fortify-accepted.txt); read the record before publishing"
+            fi
         fi
     else
         note "no Fortify report in this zip"
