@@ -42,12 +42,12 @@ import java.util.List;
  * connection with a {@code <marti><dest mission="..."/></marti>} detail, and the UID
  * is added to the mission's contents with the same REST call ATAK's Data Sync uses
  * ({@code PUT /Marti/api/missions/{name}/contents}), over ATAK's HTTP client, which
- * carries the server's certificates and login. Split, join and lasso carry the feed
+ * carries the server's certificates and sign-in. Split, join and lasso carry the feed
  * membership onto their result and take the consumed pieces out of the feed; a bare
  * delete from the map does not touch the feed.
  *
  * <p>Data Sync itself is not in the SDK; this is what Fire Area Survey did, read from
- * its APK, minus the forked UI. Password-protected feeds are listed but refused for now.
+ * its APK, minus the forked UI. Protected feeds are listed but refused for now.
  */
 public class FeedPublisher {
 

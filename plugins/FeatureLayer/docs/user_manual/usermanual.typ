@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Feature Layer",
-   plugin-version: "0.9",
+   plugin-version: "0.10",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
