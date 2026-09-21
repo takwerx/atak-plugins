@@ -593,6 +593,19 @@ versionName agrees with the file name, the
 package id and signing certificate match the last signed release, and Fortify
 rendered zero results. It exits non-zero on a real finding.
 
+**A Fortify finding the operator has accepted is recorded, not worked around.**
+Some findings cannot be cleared because they describe the design: the Market
+fetches what its catalog names, and Fortify's SSRF rule follows that data to
+the connection whatever the code checks on the way. The operator's decision
+to accept one goes in `../atak-plugins-notes/fortify-accepted.txt` as
+`Plugin|Category|File|record`, with the record (`docs/FORTIFY-ACCEPTED-...md`)
+saying what the finding is, why it cannot be cleared, what holds instead and
+what would reopen it. The intake matches a finding on all three fields, reads
+them from the scan's own results (`audit.fvdl` inside `scan_results.fpr`),
+prints it as ACCEPTED and passes; any other finding still fails. The first
+was the Market's SSRF on 2026-09-20, after the two path findings beside it
+were fixed. Never add a line without that decision and that record.
+
 **Dependency-Check needs a human's eye and the script gives it one.** The scanner
 opens every archive in the build, including Android assets the packager has
 renamed with a `.jar` suffix, and fuzzy-matches them against the CVE database. On
