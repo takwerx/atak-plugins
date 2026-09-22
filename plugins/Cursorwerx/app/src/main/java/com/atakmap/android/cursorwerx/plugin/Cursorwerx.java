@@ -4,6 +4,8 @@ package com.atakmap.android.cursorwerx.plugin;
 import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
+import com.atakmap.android.cursorwerx.BackControl;
+import com.atakmap.android.maps.MapView;
 import com.atak.plugins.impl.PluginLayoutInflater;
 
 import gov.tak.api.plugin.IPlugin;
@@ -22,6 +24,7 @@ public class Cursorwerx implements IPlugin {
     IHostUIService uiService;
     ToolbarItem toolbarItem;
     Pane templatePane;
+    BackControl backControl;
 
     public Cursorwerx(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -57,6 +60,14 @@ public class Cursorwerx implements IPlugin {
 
     @Override
     public void onStart() {
+        // A Back control that works. ATAK's own faux nav bar cannot press Back on
+        // Android 14; see BackControl for why and for the measurement.
+        final MapView mapView = MapView.getMapView();
+        if (mapView != null) {
+            backControl = new BackControl(mapView);
+            backControl.attach();
+        }
+
         // the plugin is starting, add the button to the toolbar
         if (uiService == null)
             return;
@@ -66,6 +77,12 @@ public class Cursorwerx implements IPlugin {
 
     @Override
     public void onStop() {
+        // Symmetric with onStart: a reload must leave no view and no listener behind.
+        if (backControl != null) {
+            backControl.detach();
+            backControl = null;
+        }
+
         // the plugin is stopping, remove the button from the toolbar
         if (uiService == null)
             return;
