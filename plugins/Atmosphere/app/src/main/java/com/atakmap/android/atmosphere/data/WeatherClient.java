@@ -78,7 +78,7 @@ public final class WeatherClient {
 
         final SnapshotStore.Entry cached = store.read(cacheKey);
         if (cached != null && !force && cached.ageMillis(now) < FRESH_MS) {
-            final Snapshot snapshot = parse(def, cached, listener);
+            final Snapshot snapshot = parse(def, cached, lat, lon, listener);
             if (snapshot != null)
                 listener.onSnapshot(snapshot, true);
             return;
@@ -86,7 +86,7 @@ public final class WeatherClient {
 
         final String refusal = egress.refuse(def);
         if (refusal != null) {
-            listener.onError(refusal, cached == null ? null : parse(def, cached, null));
+            listener.onError(refusal, cached == null ? null : parse(def, cached, lat, lon, null));
             return;
         }
 
@@ -110,8 +110,12 @@ public final class WeatherClient {
         final SnapshotStore.Entry resolved = store.read(resolveKey);
         final long now = System.currentTimeMillis();
 
+        // A resolved URL cached before the source named a place is re-resolved once,
+        // so the place appears without waiting a week for the entry to age out.
+        final boolean placeKnown = def.placePaths.isEmpty()
+                || store.read(placeKey(def, lat, lon)) != null;
         if (resolved != null && resolved.ageMillis(now) < RESOLVE_FRESH_MS
-                && !resolved.body.isEmpty()) {
+                && !resolved.body.isEmpty() && placeKnown) {
             request(def, resolved.body, lat, lon, cacheKey, cached, listener);
             return;
         }
@@ -121,27 +125,34 @@ public final class WeatherClient {
                     @Override
                     public void onSuccess(String body) {
                         String dataUrl = null;
+                        String place = null;
                         try {
-                            dataUrl = JsonPath.getString(new JSONObject(body),
-                                    def.resolvePath);
+                            final JSONObject resolved = new JSONObject(body);
+                            dataUrl = JsonPath.getString(resolved, def.resolvePath);
+                            place = ResponseMapper.place(resolved, def.placePaths);
                         } catch (JSONException e) {
                             Log.w(TAG, def.id + ": resolve response was not JSON", e);
                         }
                         if (dataUrl == null || !dataUrl.startsWith("https://")) {
                             listener.onError(def.displayName
                                     + ": provider did not return a usable forecast URL",
-                                    cached == null ? null : parse(def, cached, null));
+                                    cached == null ? null : parse(def, cached, lat, lon, null));
                             return;
                         }
                         store.write(resolveKey, dataUrl, System.currentTimeMillis(),
                                 Double.NaN, Double.NaN);
+                        // Written even when empty: "asked, and it named none" is an
+                        // answer, and stops the re-resolve above from repeating.
+                        if (!def.placePaths.isEmpty())
+                            store.write(placeKey(def, lat, lon), place == null ? "" : place,
+                                    System.currentTimeMillis(), Double.NaN, Double.NaN);
                         request(def, dataUrl, lat, lon, cacheKey, cached, listener);
                     }
 
                     @Override
                     public void onFailure(String error) {
                         listener.onError(def.displayName + ": " + error,
-                                cached == null ? null : parse(def, cached, null));
+                                cached == null ? null : parse(def, cached, lat, lon, null));
                     }
                 });
     }
@@ -163,9 +174,10 @@ public final class WeatherClient {
                     Log.w(TAG, def.id + ": response did not match the source definition", e);
                     listener.onError(def.displayName
                             + ": response did not match its source definition",
-                            cached == null ? null : parse(def, cached, null));
+                            cached == null ? null : parse(def, cached, lat, lon, null));
                     return;
                 }
+                snapshot = snapshot.withPlace(placeFor(def, lat, lon));
                 store.write(cacheKey, body, fetchedAt, latitude, longitude);
                 listener.onSnapshot(snapshot, false);
             }
@@ -173,7 +185,7 @@ public final class WeatherClient {
             @Override
             public void onFailure(String error) {
                 listener.onError(def.displayName + ": " + error,
-                        cached == null ? null : parse(def, cached, null));
+                        cached == null ? null : parse(def, cached, lat, lon, null));
             }
         });
     }
@@ -210,11 +222,27 @@ public final class WeatherClient {
         return sb.toString();
     }
 
+    /**
+     * The place the resolve step named for this point, cached beside the resolved URL
+     * under its own key so a fresh forecast and a cached one carry the same name.
+     */
+    private static String placeKey(WxSourceDef def, String lat, String lon) {
+        return SnapshotStore.key(def.id + "-place", lat, lon);
+    }
+
+    private String placeFor(WxSourceDef def, String lat, String lon) {
+        if (def.placePaths.isEmpty())
+            return null;
+        final SnapshotStore.Entry e = store.read(placeKey(def, lat, lon));
+        return e == null || e.body.isEmpty() ? null : e.body;
+    }
+
     /** Re-read a cached body; null (and a reported error) when it no longer parses. */
-    private Snapshot parse(WxSourceDef def, SnapshotStore.Entry entry, Listener listener) {
+    private Snapshot parse(WxSourceDef def, SnapshotStore.Entry entry, String lat, String lon,
+            Listener listener) {
         try {
             return ResponseMapper.map(def, entry.body, entry.latitude, entry.longitude,
-                    entry.fetchedAt);
+                    entry.fetchedAt).withPlace(placeFor(def, lat, lon));
         } catch (JSONException e) {
             Log.w(TAG, def.id + ": cached response no longer parses", e);
             if (listener != null)

@@ -108,6 +108,24 @@ public final class WxSourceParser {
             warnings.add(file + ": resolvePath is set but resolveUrl is not; ignored");
         }
 
+        // Where the resolve response names the place; each entry a dotted path.
+        final List<String> placePaths = new ArrayList<>();
+        final JSONArray placeArray = root.optJSONArray("placePaths");
+        if (placeArray != null) {
+            for (int i = 0; i < placeArray.length(); i++) {
+                final String pp = placeArray.optString(i, null);
+                if (pp == null || pp.trim().isEmpty())
+                    errors.add(file + ": placePaths[" + i + "] must be a non-empty path");
+                else
+                    placePaths.add(pp.trim());
+            }
+            if (resolveUrl == null)
+                warnings.add(file + ": placePaths is set but resolveUrl is not; the place "
+                        + "is read from the resolve response, so it is ignored");
+        } else if (root.has("placePaths")) {
+            errors.add(file + ": placePaths must be an array of paths");
+        }
+
         WxSourceDef.Layout layout = WxSourceDef.Layout.COLUMNS;
         final String layoutName = str(root, "layout");
         if (layoutName != null) {
@@ -171,7 +189,7 @@ public final class WxSourceParser {
 
         final WxSourceDef def = new WxSourceDef(
                 schemaVersion, id, displayName, str(root, "description"),
-                attribution, str(root, "termsUrl"), resolveUrl, resolvePath,
+                attribution, str(root, "termsUrl"), resolveUrl, resolvePath, placePaths,
                 requestUrl, headers, requiresApiKey, layout, recordsPath,
                 str(root, "timePath"), str(root, "currentTimePath"),
                 params, origin, file);

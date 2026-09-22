@@ -350,7 +350,8 @@ public final class AtmospherePane {
                 snapshot = result;
                 final long age = result.ageMillis(System.currentTimeMillis());
                 statusText.setTextColor(Color.parseColor("#dfb228"));
-                statusText.setText(result.sourceName + " — "
+                statusText.setText((result.place == null ? "" : result.place + " — ")
+                        + result.sourceName + " — "
                         + Snapshot.describeAge(age) + (fromCache ? " (cached)" : ""));
                 render();
             }

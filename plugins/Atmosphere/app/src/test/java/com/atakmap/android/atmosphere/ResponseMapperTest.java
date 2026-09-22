@@ -13,9 +13,12 @@ import com.atakmap.android.atmosphere.source.WxSourceDef;
 import com.atakmap.android.atmosphere.source.WxSourceParser;
 import com.atakmap.android.atmosphere.units.UnitSystem;
 
+import org.json.JSONObject;
 import org.junit.Test;
 
 import java.io.File;
+import java.util.Collections;
+import java.util.Arrays;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
@@ -130,5 +133,33 @@ public class ResponseMapperTest {
                 return r;
         }
         return null;
+    }
+
+    // ---- the place a resolve response names --------------------------------------
+
+    private static final java.util.List<String> NWS_PLACE = Arrays.asList(
+            "properties.relativeLocation.properties.city",
+            "properties.relativeLocation.properties.state");
+
+    @Test
+    public void placeJoinsCityAndState() throws Exception {
+        final JSONObject points = new JSONObject("{\"properties\":{\"relativeLocation\":"
+                + "{\"properties\":{\"city\":\"Corona\",\"state\":\"CA\"}}}}");
+        assertEquals("Corona, CA", ResponseMapper.place(points, NWS_PLACE));
+    }
+
+    @Test
+    public void placeSkipsWhatIsMissing() throws Exception {
+        final JSONObject cityOnly = new JSONObject("{\"properties\":{\"relativeLocation\":"
+                + "{\"properties\":{\"city\":\"Corona\"}}}}");
+        assertEquals("Corona", ResponseMapper.place(cityOnly, NWS_PLACE));
+        assertEquals(null, ResponseMapper.place(new JSONObject("{}"), NWS_PLACE));
+        assertEquals(null, ResponseMapper.place(cityOnly, Collections.<String>emptyList()));
+    }
+
+    @Test
+    public void bundledNwsNamesThePlacePaths() throws Exception {
+        final WxSourceDef nws = def("nws.json");
+        assertEquals(NWS_PLACE, nws.placePaths);
     }
 }

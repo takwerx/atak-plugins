@@ -22,10 +22,24 @@ public final class Snapshot {
     public final long fetchedAt;
     public final List<Reading> current;
     public final List<SeriesEntry> series;
+    /**
+     * The place the provider says the point is near, "Corona, CA", from the resolve
+     * response's {@code placePaths}; null when the source has no resolve step or the
+     * response did not name one. The status line leads with it, so the operator sees
+     * a town and not just a source name.
+     */
+    public final String place;
 
     public Snapshot(String sourceId, String sourceName, String attribution,
             double latitude, double longitude, long fetchedAt,
             List<Reading> current, List<SeriesEntry> series) {
+        this(sourceId, sourceName, attribution, latitude, longitude, fetchedAt, current,
+                series, null);
+    }
+
+    public Snapshot(String sourceId, String sourceName, String attribution,
+            double latitude, double longitude, long fetchedAt,
+            List<Reading> current, List<SeriesEntry> series, String place) {
         this.sourceId = sourceId;
         this.sourceName = sourceName;
         this.attribution = attribution;
@@ -34,6 +48,15 @@ public final class Snapshot {
         this.fetchedAt = fetchedAt;
         this.current = Collections.unmodifiableList(current);
         this.series = Collections.unmodifiableList(series);
+        this.place = place;
+    }
+
+    /** The same snapshot naming a place; the lists are shared, not copied. */
+    public Snapshot withPlace(String place) {
+        if (place == null ? this.place == null : place.equals(this.place))
+            return this;
+        return new Snapshot(sourceId, sourceName, attribution, latitude, longitude,
+                fetchedAt, current, series, place);
     }
 
     public long ageMillis(long now) {

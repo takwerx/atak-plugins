@@ -110,6 +110,26 @@ public final class ResponseMapper {
         return reading(p, JsonPath.get(scope, path), unitFor(p, scope, root));
     }
 
+    /**
+     * The place a resolve response names: the values at {@code paths}, in order, joined
+     * with ", "; a path that does not resolve is skipped, and no value at all is null.
+     * NWS's points response gives "Corona" and "CA".
+     */
+    public static String place(Object root, List<String> paths) {
+        if (root == null || paths == null || paths.isEmpty())
+            return null;
+        final StringBuilder sb = new StringBuilder();
+        for (String p : paths) {
+            final String v = JsonPath.getString(root, p);
+            if (v == null || v.trim().isEmpty() || "null".equals(v))
+                continue;
+            if (sb.length() > 0)
+                sb.append(", ");
+            sb.append(v.trim());
+        }
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
     private static Reading reading(WxParam p, Object raw, String unit) {
         final double parsed = coerce(raw, p);
         final double canonical = Double.isNaN(parsed)

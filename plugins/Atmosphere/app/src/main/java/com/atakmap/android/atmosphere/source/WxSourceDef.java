@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
 /**
  * A weather source, described entirely by data.
@@ -47,6 +48,12 @@ public final class WxSourceDef {
     public final String resolveUrl;
     /** Path in the resolve response holding the data URL. */
     public final String resolvePath;
+    /**
+     * Paths in the resolve response that name the place, joined with ", " for the
+     * status line: NWS carries the nearest city and state beside the gridpoint URL.
+     * Empty when the source names none.
+     */
+    public final List<String> placePaths;
 
     /** Data request URL template. Placeholders: {lat} {lon} {group:NAME} {apiKey}. */
     public final String requestUrl;
@@ -71,6 +78,7 @@ public final class WxSourceDef {
 
     WxSourceDef(int schemaVersion, String id, String displayName, String description,
             String attribution, String termsUrl, String resolveUrl, String resolvePath,
+            List<String> placePaths,
             String requestUrl, Map<String, String> headers, boolean requiresApiKey,
             Layout layout, String recordsPath, String timePath, String currentTimePath,
             List<WxParam> params, Origin origin, String originFile) {
@@ -82,6 +90,7 @@ public final class WxSourceDef {
         this.termsUrl = termsUrl;
         this.resolveUrl = resolveUrl;
         this.resolvePath = resolvePath;
+        this.placePaths = Collections.unmodifiableList(new ArrayList<>(placePaths));
         this.requestUrl = requestUrl;
         this.headers = Collections.unmodifiableMap(new LinkedHashMap<>(headers));
         this.requiresApiKey = requiresApiKey;

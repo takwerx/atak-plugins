@@ -43,6 +43,7 @@ under **Position sent**.
 | `requestUrl` | yes¹ | The data request. HTTPS only. |
 | `resolveUrl` | no | A first request that returns the data URL. See *Two-step providers*. |
 | `resolvePath` | with `resolveUrl` | Where the data URL is in the resolve response. |
+| `placePaths` | no | With `resolveUrl`: paths in the resolve response that name the place, joined with ", " on the status line. |
 | `headers` | no | Extra request headers. `User-Agent` here is ignored — the plugin sets it. |
 | `layout` | no | `columns` (default) or `records`. |
 | `recordsPath` | with `records` | Path to the array of period objects. |
@@ -116,6 +117,20 @@ Some providers make you ask where to ask. NWS turns a point into a gridpoint for
 ```
 
 The resolved URL is cached for a week; the forecast itself for fifteen minutes.
+
+The resolve response often names the place as well. Point at those fields and the
+status line leads with them, so the operator reads "Corona, CA" and not only a
+source name:
+
+```json
+"placePaths": [
+  "properties.relativeLocation.properties.city",
+  "properties.relativeLocation.properties.state"
+]
+```
+
+The place is cached beside the resolved URL. A source with no resolve step has no
+place to show.
 
 ## A complete example
 

@@ -7,6 +7,10 @@
   "termsUrl": "https://www.weather.gov/documentation/services-web-api",
   "resolveUrl": "https://api.weather.gov/points/{lat},{lon}",
   "resolvePath": "properties.forecastHourly",
+  "placePaths": [
+    "properties.relativeLocation.properties.city",
+    "properties.relativeLocation.properties.state"
+  ],
   "headers": {
     "Accept": "application/geo+json"
   },
