@@ -5,6 +5,7 @@ import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atakmap.android.cursorwerx.BackControl;
+import com.atakmap.android.cursorwerx.PointerRouter;
 import com.atakmap.android.maps.MapView;
 import com.atak.plugins.impl.PluginLayoutInflater;
 
@@ -25,6 +26,7 @@ public class Cursorwerx implements IPlugin {
     ToolbarItem toolbarItem;
     Pane templatePane;
     BackControl backControl;
+    PointerRouter pointerRouter;
 
     public Cursorwerx(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -66,6 +68,11 @@ public class Cursorwerx implements IPlugin {
         if (mapView != null) {
             backControl = new BackControl(mapView);
             backControl.attach();
+
+            // Stop the map zooming when the wheel is used over ATAK's own UI.
+            pointerRouter = new PointerRouter(mapView);
+            pointerRouter.setVerbose(true); // bring-up: log where each tick landed
+            pointerRouter.attach();
         }
 
         // the plugin is starting, add the button to the toolbar
@@ -78,6 +85,10 @@ public class Cursorwerx implements IPlugin {
     @Override
     public void onStop() {
         // Symmetric with onStart: a reload must leave no view and no listener behind.
+        if (pointerRouter != null) {
+            pointerRouter.detach();
+            pointerRouter = null;
+        }
         if (backControl != null) {
             backControl.detach();
             backControl = null;
