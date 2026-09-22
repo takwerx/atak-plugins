@@ -1,10 +1,10 @@
 ATAK Plugin — Cam Depot
 
-**Download Cam Depot 1.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cam Depot 1.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.3/ATAK-Plugin-CamDepot-1.3--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.3/ATAK-Plugin-CamDepot-1.3--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.3/ATAK-Plugin-CamDepot-1.3--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.4/ATAK-Plugin-CamDepot-1.4--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.4/ATAK-Plugin-CamDepot-1.4--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.4/ATAK-Plugin-CamDepot-1.4--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cam-depot/releases
 
@@ -58,6 +58,11 @@ source submission zip).
 
 _________________________________________________________________
 STATUS
+
+Version 1.4: one versionCode per APK. The same plugin as 1.3, rebuilt so that
+each ATAK target's APK carries its own versionCode, the plugin version and the
+ATAK version folded into one integer, which lets an MDM hold all three builds
+and push each one as an update. Nothing else changed.
 
 Release candidate. Version 1.3.
 
@@ -164,3 +169,33 @@ DEVELOPER NOTES
   video entries are registered in one batch when the queue drains: each
   registration broadcasts a hierarchy refresh, and doing that per batch rebuilds
   ATAK's Overlay Manager enough times to stop the application responding.
+
+LICENSE
+
+Copyright (C) 2026 Andreas Johansson (TAKWERX).
+
+Cam Depot is free software, licensed under the
+**[GNU Affero General Public License v3.0 or later](LICENSE)**
+(AGPL-3.0-or-later), with an
+**[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
+this plugin may be built against the TAK SDK, loaded into ATAK and distributed
+without the AGPL reaching into ATAK itself.
+
+You may run it, study it, modify it, and share it -- for any purpose, commercial
+or not, with no fee and no per-seat license. What the AGPL adds over a permissive
+license is a guarantee that it **stays** free: modify Cam Depot and pass it on,
+and the people you pass it to are owed the complete corresponding source of your
+version under the same license. Nobody can take this, close it, and sell it back
+to the emergency-services community.
+
+**If you only install and use Cam Depot, this obligation never touches you.**
+Running it, in any agency, on any number of devices, triggers nothing.
+
+**Scope.** The AGPL covers Cam Depot's own code. It does not change the license
+of the TAK Software, which stays under the TAK Software License Agreement, and it
+does not cover the parts of this repository scaffolded from the TAK-SDK plugin
+template -- those are listed under Provenance in
+[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md). No SDK binary is distributed here.
+
+Contributions are welcome -- see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+contribution terms and the [Contributor License Agreement](CLA.md).

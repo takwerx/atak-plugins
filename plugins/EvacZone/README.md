@@ -1,10 +1,10 @@
 ATAK Plugin — Evac Zone
 
-**Download Evac Zone 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Evac Zone 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/evac-zone/releases/download/v0.4/ATAK-Plugin-EvacZone-0.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/evac-zone/releases/download/v0.4/ATAK-Plugin-EvacZone-0.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/evac-zone/releases/download/v0.4/ATAK-Plugin-EvacZone-0.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/evac-zone/releases/download/v0.5/ATAK-Plugin-EvacZone-0.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/evac-zone/releases/download/v0.5/ATAK-Plugin-EvacZone-0.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/evac-zone/releases/download/v0.5/ATAK-Plugin-EvacZone-0.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/evac-zone/releases
 
@@ -53,6 +53,11 @@ A step-by-step user guide lives at docs/USER_GUIDE.md in the repository
 
 _________________________________________________________________
 STATUS
+
+Version 0.5: one versionCode per APK. The same plugin as 0.4, rebuilt so that
+each ATAK target's APK carries its own versionCode, the plugin version and the
+ATAK version folded into one integer, which lets an MDM hold all three builds
+and push each one as an update. Nothing else changed.
 
 Version 0.4. Verified on ATAK-CIV 5.8.0.3 (Samsung Galaxy XCover Pro), release
 build with proguard. Compiles against the 5.6, 5.7 and 5.8 SDKs.
@@ -152,3 +157,33 @@ DEVELOPER NOTES
   terms forbid automated use; live status for Genasys counties comes through
   the state aggregations (Cal OES, CAL FIRE, Oregon OEM), which carry every
   Genasys county.
+
+LICENSE
+
+Copyright (C) 2026 Andreas Johansson (TAKWERX).
+
+Evac Zone is free software, licensed under the
+**[GNU Affero General Public License v3.0 or later](LICENSE)**
+(AGPL-3.0-or-later), with an
+**[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
+this plugin may be built against the TAK SDK, loaded into ATAK and distributed
+without the AGPL reaching into ATAK itself.
+
+You may run it, study it, modify it, and share it -- for any purpose, commercial
+or not, with no fee and no per-seat license. What the AGPL adds over a permissive
+license is a guarantee that it **stays** free: modify Evac Zone and pass it on,
+and the people you pass it to are owed the complete corresponding source of your
+version under the same license. Nobody can take this, close it, and sell it back
+to the emergency-services community.
+
+**If you only install and use Evac Zone, this obligation never touches you.**
+Running it, in any agency, on any number of devices, triggers nothing.
+
+**Scope.** The AGPL covers Evac Zone's own code. It does not change the license
+of the TAK Software, which stays under the TAK Software License Agreement, and it
+does not cover the parts of this repository scaffolded from the TAK-SDK plugin
+template -- those are listed under Provenance in
+[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md). No SDK binary is distributed here.
+
+Contributions are welcome -- see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+contribution terms and the [Contributor License Agreement](CLA.md).

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Dozer Country has no settings. The standard it paints by lives in
+    assets/dozer_data.json where it can be audited, and every other choice (the
+    area, the overlay, the opacity) is made on the panel, next to the thing it
+    affects.
+
+    This screen exists so the manual has somewhere to be reached from. ATAK
+    surfaces a plugin's documentation through its Tool Preferences entry, and
+    without one the PDF ships inside the APK with no way for anyone to open it,
+    which has already happened once in this repo.
+-->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <com.atakmap.android.gui.PanPreference
+        android:key="manual"
+        android:title="@string/manual_title"
+        android:summary="@string/manual_summary" />
+
+</PreferenceScreen>

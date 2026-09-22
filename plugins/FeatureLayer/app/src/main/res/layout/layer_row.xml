@@ -76,4 +76,59 @@
             android:layout_marginLeft="4dp"
             android:text="Remove" />
     </LinearLayout>
+    <!-- Where a live layer looks. Cam Depot's control, word for word, shown only on
+         layers that have a scope (DART): the label says the state, the slider sets a
+         radius (0 = what is in view), the From button names the point it measures
+         from, and the two below set the radius from the map or from a list. -->
+    <LinearLayout
+        android:id="@+id/row_scope"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Distance from a point"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:paddingTop="6dp"
+            android:alpha="0.6" />
+        <TextView
+            android:id="@+id/row_scope_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="#FFFFFF" />
+        <SeekBar
+            android:id="@+id/row_scope_seek"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="50" />
+        <Button
+            android:id="@+id/row_scope_from"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/row_scope_extent"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Use this extent" />
+            <Button
+                android:id="@+id/row_scope_preset"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="4dp"
+                android:text="Presets" />
+        </LinearLayout>
+    </LinearLayout>
 </LinearLayout>

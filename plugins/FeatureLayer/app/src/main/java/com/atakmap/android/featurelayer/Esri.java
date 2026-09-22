@@ -38,6 +38,45 @@ public final class Esri {
     }
 
     /**
+     * A spatial filter for a query: the Esri JSON geometry, the type name the REST API
+     * wants for it, and for a radius the distance parameters. Built, never sniffed from
+     * the JSON, so a caller cannot hand over rings and have them read as an envelope.
+     */
+    public static class Scope {
+        private final String geometry, type, extra;
+
+        private Scope(String geometry, String type, String extra) {
+            this.geometry = geometry;
+            this.type = type;
+            this.extra = extra;
+        }
+
+        /** Everything within {@code metres} of a point: a true circle, not its bounding box. */
+        public static Scope circle(double lat, double lon, double metres) {
+            return new Scope("{\"x\":" + lon + ",\"y\":" + lat + ",\"spatialReference\":{\"wkid\":4326}}",
+                    "esriGeometryPoint", "&distance=" + (long) metres + "&units=esriSRUnit_Meter");
+        }
+
+        /** A lat/lon box: a map extent, or a loaded layer's own bounds. */
+        public static Scope box(double south, double west, double north, double east) {
+            return new Scope("{\"xmin\":" + west + ",\"ymin\":" + south + ",\"xmax\":" + east
+                    + ",\"ymax\":" + north + ",\"spatialReference\":{\"wkid\":4326}}",
+                    "esriGeometryEnvelope", "");
+        }
+
+        /** A shape the operator drew in ATAK; {@code rings} is the Esri JSON rings array. */
+        public static Scope polygon(String rings) {
+            return new Scope("{\"rings\":" + rings + ",\"spatialReference\":{\"wkid\":4326}}",
+                    "esriGeometryPolygon", "");
+        }
+
+        String params() throws Exception {
+            return "&geometry=" + enc(geometry) + "&geometryType=" + type
+                    + "&inSR=4326&spatialRel=esriSpatialRelIntersects" + extra;
+        }
+    }
+
+    /**
      * Feature services the organization owns whose title matches. The query carries the
      * org's own ID: without it ArcGIS Online answers from every public item on the
      * platform (0.3 listed DC fire hydrants for a California city), and an Enterprise
@@ -78,12 +117,23 @@ public final class Esri {
      * this every minute costs nothing; the full fetch runs only when it changes.
      */
     public static String stamp(String base, int layerId, String where, String token, String timeField) throws Exception {
+        return stamp(base, layerId, where, null, token, timeField);
+    }
+
+    /**
+     * The same fingerprint for a scoped layer. It has to carry the same filter as the
+     * fetch: a stamp of the whole national feed changes every minute whatever is in
+     * view, so it would either refresh constantly or describe rows nobody is drawing.
+     */
+    public static String stamp(String base, int layerId, String where, Scope scope, String token, String timeField)
+            throws Exception {
         final String stats = "[{\"statisticType\":\"count\",\"onStatisticField\":\"" + timeField
                 + "\",\"outStatisticFieldName\":\"n\"},{\"statisticType\":\"max\",\"onStatisticField\":\"" + timeField
                 + "\",\"outStatisticFieldName\":\"mx\"}]";
-        final String url = base + "/" + layerId + "/query?where=" + enc(where) + "&outStatistics=" + enc(stats)
-                + "&returnGeometry=false&f=json";
-        final JSONObject d = new JSONObject(get(url, token));
+        final String params = "where=" + enc(where) + "&outStatistics=" + enc(stats)
+                + "&returnGeometry=false&f=json" + (scope == null ? "" : scope.params());
+        final String url = base + "/" + layerId + "/query";
+        final JSONObject d = new JSONObject(scope == null ? get(url + "?" + params, token) : post(url, params, token));
         if (d.has("error"))
             throw new IllegalStateException(d.getJSONObject("error").optString("message"));
         final JSONArray feats = d.optJSONArray("features");
@@ -173,14 +223,37 @@ public final class Esri {
      */
     public static int query(String base, int layerId, String where, String token, boolean geojson,
             int pageSize, int maxFeatures, FeatureSink sink) throws Exception {
+        return query(base, layerId, where, null, token, geojson, pageSize, maxFeatures, sink);
+    }
+
+    /**
+     * The same query with a spatial filter, and every scoped page goes by POST.
+     * services*.arcgis.com answers a GET whose URL runs over about 2,000 characters with
+     * HTTP 404, not 414: measured 747 characters fine, 2,275 refused, every length above
+     * it refused, the identical query by POST fine. A 40-vertex shape traced by hand is
+     * already 2,500 characters once URL-encoded, and one real fire perimeter was 237
+     * rings and 52,270 vertices -- 2.0 MB. So this is not a limit to approach with care,
+     * it is one to stay off entirely, and a 404 would read as a wrong URL or a deleted
+     * layer rather than as a long request.
+     */
+    public static int query(String base, int layerId, String where, Scope scope, String token, boolean geojson,
+            int pageSize, int maxFeatures, FeatureSink sink) throws Exception {
         int count = 0, offset = 0;
+        // The cap is a cap: a 1,000-row page for a 300-feature layer delivered 1,000
+        // (a national view of DART on 2026-09-18). Ask for no more than the cap, and
+        // stop handing rows to the sink at it.
+        if (maxFeatures > 0)
+            pageSize = Math.min(pageSize, maxFeatures);
         while (true) {
             if (maxFeatures > 0 && count >= maxFeatures)
                 break;
-            final String url = base + "/" + layerId + "/query?where=" + enc(where)
+            final String params = "where=" + enc(where)
                     + "&outFields=*&outSR=4326&f=" + (geojson ? "geojson" : "json")
-                    + "&resultRecordCount=" + pageSize + "&resultOffset=" + offset;
-            final JSONObject page = new JSONObject(get(url, token));
+                    + "&resultRecordCount=" + pageSize + "&resultOffset=" + offset
+                    + (scope == null ? "" : scope.params());
+            final String url = base + "/" + layerId + "/query";
+            final JSONObject page = new JSONObject(
+                    scope == null ? get(url + "?" + params, token) : post(url, params, token));
             if (page.has("error")) {
                 final JSONObject err = page.getJSONObject("error");
                 throw new IllegalStateException(err.optString("message") + " " + err.optJSONArray("details"));
@@ -199,6 +272,8 @@ public final class Esri {
                     continue;
                 sink.feature(props, g);
                 count++;
+                if (maxFeatures > 0 && count >= maxFeatures)
+                    break;
             }
             final boolean more = page.optBoolean("exceededTransferLimit", false)
                     || (page.optJSONObject("properties") != null
@@ -326,14 +401,51 @@ public final class Esri {
         return a / 2d;
     }
 
+    /** The format {@link #toAttributes} writes date fields in. */
+    private static final String STORED_DATE = "yyyy-MM-dd HH:mm";
+
+    /**
+     * "4 min ago" for a stored date string, or null when the value is not one. Worked out
+     * when it is shown, never when it is stored: a last known location is only as good as
+     * its age, and an age written into the cache would keep saying "2 min ago" for hours.
+     */
+    public static String ago(String stored) {
+        if (stored == null || stored.length() != STORED_DATE.length())
+            return null;
+        final long then;
+        try {
+            final SimpleDateFormat f = new SimpleDateFormat(STORED_DATE, Locale.US);
+            final Date d = f.parse(stored);
+            if (d == null)
+                return null;
+            then = d.getTime();
+        } catch (Exception e) {
+            return null;
+        }
+        final long secs = (System.currentTimeMillis() - then) / 1000L;
+        if (secs < -90)
+            return "in the future";
+        if (secs < 90)
+            return "just now";
+        final long mins = (secs + 30) / 60;
+        if (mins < 90)
+            return mins + " min ago";
+        final long hours = (mins + 30) / 60;
+        if (hours < 36)
+            return hours + (hours == 1 ? " hour ago" : " hours ago");
+        return ((hours + 12) / 24) + " days ago";
+    }
+
     /** Every non-null property as a string; dates formatted from epoch ms. */
     public static AttributeSet toAttributes(JSONObject props, Set<String> dateFields) {
         final AttributeSet a = new AttributeSet();
-        final SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US);
+        final SimpleDateFormat fmt = new SimpleDateFormat(STORED_DATE, Locale.US);
         final Iterator<String> keys = props.keys();
         while (keys.hasNext()) {
             final String k = keys.next();
-            if (props.isNull(k))
+            // Keys starting with "_" are the plugin's own (_title, _time, _bare...): a
+            // server must not be able to plant one (security review, 2026-09-18).
+            if (k.startsWith("_") || props.isNull(k))
                 continue;
             final Object v = props.opt(k);
             if (v == null)
@@ -416,6 +528,45 @@ public final class Esri {
                 final int q = url.indexOf('?');
                 throw new IllegalStateException("HTTP " + code + " for " + (q > 0 ? url.substring(0, q) : url));
             }
+            final StringBuilder sb = new StringBuilder();
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
+                final char[] buf = new char[16384];
+                int n;
+                while ((n = r.read(buf)) > 0)
+                    sb.append(buf, 0, n);
+            }
+            return sb.toString();
+        } finally {
+            c.disconnect();
+        }
+    }
+
+    /**
+     * POST of a form-encoded body, same rules as {@link #get}: https only, and the token
+     * in the Esri authorization header rather than the body, so it never lands in a
+     * server access log.
+     */
+    public static String post(String url, String body, String token) throws Exception {
+        if (!url.startsWith("https://"))
+            throw new IllegalStateException("not https: " + hostOf(url));
+        final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(20000);
+        c.setReadTimeout(60000);
+        c.setRequestMethod("POST");
+        c.setDoOutput(true);
+        c.setRequestProperty("User-Agent", "FeatureLayer/0.1 (ATAK plugin)");
+        c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        if (token != null)
+            c.setRequestProperty("X-Esri-Authorization", "Bearer " + token);
+        try {
+            final byte[] out = body.getBytes("UTF-8");
+            c.setFixedLengthStreamingMode(out.length);
+            try (java.io.OutputStream os = c.getOutputStream()) {
+                os.write(out);
+            }
+            final int code = c.getResponseCode();
+            if (code != 200)
+                throw new IllegalStateException("HTTP " + code + " for POST " + url);
             final StringBuilder sb = new StringBuilder();
             try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
                 final char[] buf = new char[16384];

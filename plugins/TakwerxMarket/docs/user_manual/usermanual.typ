@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "TAKwerx Market",
-   plugin-version: "1.5",
+   plugin-version: "1.7",
    platform: "ATAK",
    platform-version: "5.8.0",
 )

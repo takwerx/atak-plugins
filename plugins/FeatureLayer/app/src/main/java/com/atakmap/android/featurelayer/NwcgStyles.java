@@ -343,7 +343,99 @@ public final class NwcgStyles {
      * text, stays silent. One feature, one label, at the center (Evac Zone's rule).
      */
     public static Style withNameLabel(Style s) {
-        final Style pill = new LabelPointStyle("", WHITE, 0xA0000000, LabelPointStyle.ScrollMode.OFF, 0f, 0, 100, 0f, false);
+        return withNameLabel(s, false);
+    }
+
+    /**
+     * {@code LabelPointStyle}'s alignment arguments are three-way enums collapsed <b>by
+     * sign</b>, not pixel offsets, and nothing in the SDK says so -- the constructor maps
+     * {@code alignY < 0} to ABOVE, {@code 0} to V_CENTER and {@code > 0} to BELOW and then
+     * discards the number. So the area form's long-standing {@code 100} was only ever
+     * BELOW, and the {@code -160} invented for points was only ever ABOVE, identical to
+     * {@code -1}. Read from the decompiled {@code LabelPointStyle}; the SDK's javadoc jar
+     * does not cover the map engine at all.
+     *
+     * <p>The names below say what each one was <b>measured</b> to do under
+     * {@code FeatureLayer3}, which renders natively and not through {@code GLBatchPoint}:
+     *
+     * <ul>
+     * <li>{@code alignY > 0} (BELOW) puts the label's <b>top edge on the point</b>, not
+     * below the icon. A centered icon therefore covers the label's upper half and clips the
+     * callsign's first characters: "CA-ANF-E325" read as "E325" on 2026-09-17, which is
+     * what "cut off and behind icon" was.
+     * <li>{@code Y_ABOVE} is not its mirror. It pins the label's <b>top</b> edge about 40 px
+     * above the point and lets the label grow downwards from there, so it also overlaps an
+     * icon centered on the point -- by about 24 px, measured. Neither direction clears a
+     * centered icon; the icon has to move.
+     * <li>{@code X_CENTERED} (0) centers the label on the point, which is what ATAK does
+     * with every other marker label. {@code 1} puts its left edge on the point instead and
+     * {@code -1} its right edge, both of which hang the callsign off to one side.
+     * </ul>
+     *
+     * <p><b>Always pass the text.</b> With an empty label the renderer substitutes the
+     * feature's name and draws it trimmed of its leading characters -- every DART callsign
+     * lost its state prefix, "CA-ANF-E325" reading as "ANF-E325". Handing it the string
+     * explicitly draws it whole. There is no width cap: a 19-character label rendered at
+     * 305 px with nothing cut.
+     *
+     * <p>Still unexplained, and worth knowing before chasing it: a minority of labels lose
+     * the prefix even with explicit text, and it is positional -- "CA-ANF-E321" and
+     * "CA-ANF-E327" sat side by side on 2026-09-17, same length and same code path, and
+     * only E327 was trimmed. Both names were read out of the layer's sqlite to be sure the
+     * feed was not simply inconsistent. Ruled out already: every {@code alignX}/
+     * {@code alignY} pair, both other {@code ScrollMode}s, clearing
+     * {@code HINT_WEIGHTED_FLOAT}, clearing {@code labelHints} outright, and a 4x wider
+     * transparent icon box. Do not shorten callsigns to work around it -- that was proposed
+     * and rejected (commit d3a5548), because the state and unit are the point of a
+     * callsign.
+     *
+     * <p>Three earlier readings here were wrong, all from measuring a dark pill against a
+     * dark marker disc, which reads as one shape: that the alignment arguments did nothing,
+     * that {@code alignX = 0} truncated the text by itself, and that the style's text was
+     * ignored. Set the backing to opaque red, measure the box against the icon's ring, then
+     * put the color back -- and read the feature's real name out of
+     * {@code layers/<layer>.sqlite} before calling anything truncated.
+     *
+     * <p>The pairing that follows is in {@link DartStyles}: the icon is drawn below the
+     * point so its top edge is on it, and the label sits above, centered, clearing the
+     * icon by about 3 px. That is the arrangement ATAK uses for its own markers, which is
+     * what the operator asked for. Measured on ATAK 5.8.0.3, with 26 vehicles in view.
+     */
+    private static final int LABEL_X_CENTERED = 0, LABEL_Y_ABOVE = -1;
+
+    /**
+     * @param underIcon true for a point that also draws an icon: centered above it, and on
+     *        a darker backing, being read against a marker rather than open ground. Every
+     *        point layer gets the same label; only DART's icon is moved out from under it
+     *        (see {@link DartStyles}), so on a layer whose icon is still centered on its
+     *        point the label overlaps the icon's top by about 24 px, as it always has.
+     *        <p>The area form is left exactly as it shipped: its label point carries no
+     *        icon, so none of this applies to it, and it has looked right for as long as it
+     *        has existed. Its {@code 100} is BELOW, same as 1.
+     */
+    public static Style withNameLabel(Style s, boolean underIcon) {
+        return withNameLabel(s, underIcon, null);
+    }
+
+    /**
+     * @param text the callsign to draw, for a point that has one. Passing it matters: with
+     *        an empty label the renderer substitutes the feature's name and draws it
+     *        <b>trimmed</b>, which is where "CA-ANF-E325" became "ANF-E325". An explicit
+     *        string is drawn whole -- a 19-character test label rendered at 305 px with
+     *        nothing cut, so there is no width cap.
+     */
+    public static Style withNameLabel(Style s, boolean underIcon, String text) {
+        // The empty text is not an oversight: the renderer draws the feature's own name and
+        // ignores a label style's text, so passing the callsign in here changes nothing --
+        // measured with a ">>" prefix that never appeared and a pill whose width never
+        // moved. What the style does control is the backing, the text color and the
+        // alignment. The 0f is a fix for every point layer, not just DART: the 14f it
+        // replaces drew the text larger than the pill sized itself for, and that was the
+        // other half of the clipping.
+        final Style pill = underIcon
+                ? new LabelPointStyle(text == null ? "" : text, WHITE, 0xC0000000,
+                        LabelPointStyle.ScrollMode.OFF, 0f, LABEL_X_CENTERED, LABEL_Y_ABOVE, 0f, false)
+                : new LabelPointStyle("", WHITE, 0xA0000000, LabelPointStyle.ScrollMode.OFF, 0f, 0, 100, 0f, false);
         if (s instanceof CompositeStyle) {
             final CompositeStyle cs = (CompositeStyle) s;
             final Style[] all = new Style[cs.getNumStyles() + 1];
