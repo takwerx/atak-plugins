@@ -173,11 +173,13 @@ public class WindGridTest {
         assertEquals(700, NomadsWind.Level.MB_700.millibars());
         assertEquals(0, NomadsWind.Level.AGL_10.millibars());
 
-        assertEquals("10 m above ground", NomadsWind.Level.AGL_10.label(true));
-        assertEquals("33 ft above ground", NomadsWind.Level.AGL_10.label(false));
-        // A pressure level always names the millibars, since its height moves.
-        assertEquals("about 10,000 ft (700 mb)", NomadsWind.Level.MB_700.label(false));
-        assertEquals("about 3,000 m (700 mb)", NomadsWind.Level.MB_700.label(true));
+        assertEquals("10 m above ground", NomadsWind.Level.AGL_10.label(true, false));
+        assertEquals("33 ft above ground", NomadsWind.Level.AGL_10.label(false, false));
+        // A crew gets the height alone; the millibars are for aviation units, where a
+        // pilot is briefed on the pressure surface itself.
+        assertEquals("about 10,000 ft", NomadsWind.Level.MB_700.label(false, false));
+        assertEquals("about 10,000 ft (700 mb)", NomadsWind.Level.MB_700.label(false, true));
+        assertEquals("about 3,000 m", NomadsWind.Level.MB_700.label(true, false));
     }
 
     @Test

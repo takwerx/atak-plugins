@@ -11,7 +11,7 @@
     <string name="self_position">My position</string>
     <string name="units_metric">Metric</string>
     <string name="no_position">No position yet</string>
-    <string name="status_idle">Pick a source and refresh</string>
+    <string name="status_idle">Tap Refresh for the forecast</string>
     <string name="heading_now">Now</string>
     <string name="heading_hours">Next hours</string>
     <string name="heading_days">Next days</string>
@@ -25,11 +25,11 @@
     <string name="wind_on">Wind ON</string>
     <string name="wind_off">Wind OFF</string>
     <string name="wind_allow_title">Allow wind</string>
-    <string name="wind_allow_text">Wind draws the HRRR model\u2019s surface wind from nomads.ncep.noaa.gov (the US National Weather Service) as moving particles. Each request carries the map view\u2019s extent, nothing else.</string>
+    <string name="wind_allow_text">Wind comes from the US National Weather Service, drawn as moving air over the map.\n\nTurning it on lets Atmosphere ask them for wind over the part of the map you are looking at. Nothing else about you is sent.\n\nServer: nomads.ncep.noaa.gov</string>
     <string name="radar_allow_title">Allow radar</string>
-    <string name="radar_allow_text">Radar draws NWS reflectivity images from opengeo.ncep.noaa.gov (the US National Weather Service). Each request carries the map view\u2019s extent, nothing else.</string>
-    <string name="variables">Variables</string>
-    <string name="sources">Sources</string>
+    <string name="radar_allow_text">Radar comes from the US National Weather Service, the same picture their own radar site draws.\n\nTurning it on lets Atmosphere ask them for radar over the part of the map you are looking at. Nothing else about you is sent.\n\nServer: opengeo.ncep.noaa.gov</string>
+    <string name="variables">What to show</string>
+    <string name="sources">Weather services</string>
     <string name="privacy">Position sent</string>
     <string name="pick_point">Pick a point</string>
     <string name="pick_prompt">Tap the map to pick the point</string>
@@ -51,13 +51,13 @@
     <string name="remove">Remove</string>
 
     <!-- Dialogs -->
-    <string name="sources_title">Sources</string>
-    <string name="source_title">Source</string>
-    <string name="label_source">Source</string>
+    <string name="sources_title">Weather services</string>
+    <string name="source_title">Weather service</string>
+    <string name="label_source">Weather service</string>
     <string name="label_where">Where</string>
-    <string name="variables_title">Variables</string>
-    <string name="privacy_title">Position sent to providers</string>
-    <string name="no_sources">No source definitions loaded</string>
-    <string name="source_problems">Source file problems</string>
+    <string name="variables_title">What to show</string>
+    <string name="privacy_title">Position sent</string>
+    <string name="no_sources">No weather service available</string>
+    <string name="source_problems">Weather service problems</string>
     <string name="close">Close</string>
 </resources>

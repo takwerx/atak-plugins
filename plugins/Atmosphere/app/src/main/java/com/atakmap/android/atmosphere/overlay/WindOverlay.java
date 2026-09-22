@@ -271,8 +271,8 @@ public final class WindOverlay {
      * toggle above already says Wind, and the model's name is not something a crew
      * can act on (operator, 2026-09-22: "what does ... HRRR mean, like wtf is HRRR?").
      */
-    public String levelLabel(boolean metric) {
-        return level.label(metric) + ", " + model.detail(metric);
+    public String levelLabel(boolean metric, boolean showPressure) {
+        return level.label(metric, showPressure) + ", " + model.detail(metric);
     }
 
     /**

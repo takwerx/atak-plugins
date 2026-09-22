@@ -83,17 +83,21 @@ public final class NomadsWind {
         }
 
         /**
-         * "10 m above ground" or "about 10,000 ft (700 mb)". Altitude is feet unless
-         * the operator is in metric; aviation and imperial both fly in feet.
+         * "10 m above ground" or "about 10,000 ft". Altitude is feet unless the operator
+         * is in metric; aviation and imperial both fly in feet.
+         *
+         * @param showPressure append the millibars. Only in aviation units, where the
+         *                     pressure surface is what a pilot is briefed on; to anyone
+         *                     else it is a word to decode for nothing.
          */
-        public String label(boolean metric) {
+        public String label(boolean metric, boolean showPressure) {
             if (surface)
                 return metric ? approxMetres + " m above ground"
                         : Math.round(approxMetres / 0.3048) + " ft above ground";
             final String height = metric
                     ? String.format(Locale.US, "%,d m", approxMetres)
                     : String.format(Locale.US, "%,d ft", Math.round(approxMetres / 0.3048 / 500) * 500);
-            return "about " + height + " (" + millibars() + " mb)";
+            return "about " + height + (showPressure ? " (" + millibars() + " mb)" : "");
         }
     }
 

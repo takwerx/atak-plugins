@@ -723,7 +723,8 @@ public final class AtmospherePane {
         windLevelBar.setMax(Math.max(0, wind.levelCount() - 1));
         if (windLevelBar.getProgress() != wind.levelIndex())
             windLevelBar.setProgress(wind.levelIndex());
-        windLevelLabel.setText(wind.levelLabel(units == UnitSystem.METRIC));
+        windLevelLabel.setText(wind.levelLabel(units == UnitSystem.METRIC,
+                units == UnitSystem.AVIATION));
     }
 
     /**
@@ -734,7 +735,23 @@ public final class AtmospherePane {
     private String levelLabelFor(int index) {
         final com.atakmap.android.atmosphere.wind.NomadsWind.Level[] all =
                 com.atakmap.android.atmosphere.wind.NomadsWind.Level.values();
-        return all[Math.max(0, Math.min(index, all.length - 1))].label(units == UnitSystem.METRIC);
+        return all[Math.max(0, Math.min(index, all.length - 1))].label(
+                units == UnitSystem.METRIC, units == UnitSystem.AVIATION);
+    }
+
+    /**
+     * A distance a crew can picture, for the position-rounding choices. Decimal places
+     * are a way of storing a number, not a thing anybody can stand in.
+     */
+    private String roughly(int metres) {
+        if (units == UnitSystem.METRIC)
+            return metres >= 1000 ? Math.round(metres / 1000.0) + " km" : metres + " m";
+        final double feet = metres / 0.3048;
+        if (feet >= 5280)
+            return Math.round(feet / 5280) + " mi";
+        if (feet >= 900)
+            return (Math.round(feet / 528) / 10.0) + " mi";
+        return Math.round(feet / 3) + " yd";
     }
 
     /** The legend's numbers follow the operator's unit, like every other speed. */
@@ -1083,12 +1100,12 @@ public final class AtmospherePane {
             return;
         }
 
-        positionText.setText(modeLabel() + " \u2014 sending " + egress.latitude(p) + ", "
-                + egress.longitude(p)
-                + "  (rounded to ~" + EgressPolicy.approximateMetres(
-                        egress.positionDecimals()) + " m)");
+        // The point being read, and nothing about how it is rounded on the way
+        // out; that belongs in Position sent, not on a line read every time.
+        positionText.setText(modeLabel() + " \u2014 " + egress.latitude(p) + ", "
+                + egress.longitude(p));
         statusText.setTextColor(Color.parseColor("#dfb228"));
-        statusText.setText("Fetching from " + selected.displayName + "…");
+        statusText.setText("Getting the forecast\u2026");
 
         client.fetch(selected, p, force, new WeatherClient.Listener() {
             @Override
@@ -1096,9 +1113,10 @@ public final class AtmospherePane {
                 snapshot = result;
                 final long age = result.ageMillis(System.currentTimeMillis());
                 statusText.setTextColor(Color.parseColor("#dfb228"));
-                statusText.setText((result.place == null ? "" : result.place + " — ")
-                        + result.sourceName + " — "
-                        + Snapshot.describeAge(age) + (fromCache ? " (cached)" : ""));
+                // The place and how old it is. Which service answered, and whether
+                // the bytes came off disk, are not things a crew can act on.
+                statusText.setText((result.place == null ? "" : result.place + " \u2014 ")
+                        + Snapshot.describeAge(age));
                 render();
             }
 
@@ -1108,7 +1126,7 @@ public final class AtmospherePane {
                 if (stale != null) {
                     snapshot = stale;
                     final long age = stale.ageMillis(System.currentTimeMillis());
-                    statusText.setText(message + " — showing cached, "
+                    statusText.setText(message + " — showing the last one, "
                             + Snapshot.describeAge(age));
                     render();
                 } else {
@@ -1156,8 +1174,9 @@ public final class AtmospherePane {
             fromSeries = true;
         }
 
-        currentHeading.setText(fromSeries ? "Now (first forecast step)"
-                : pluginContext.getString(R.string.heading_now));
+        // A service with no "current" block gives its first forecast hour instead. That
+        // is a fact about the feed, not about the weather, so the heading stays "Now".
+        currentHeading.setText(pluginContext.getString(R.string.heading_now));
 
         renderNow(now);
         renderSunMoon();
@@ -1717,7 +1736,7 @@ public final class AtmospherePane {
             if (def.origin == WxSourceDef.Origin.EXTERNAL)
                 sb.append("\nfrom ").append(def.originFile);
             if (def.requiresApiKey)
-                sb.append("\nneeds an API key — not supported in this build");
+                sb.append("\nnot available in this build");
             labels[i] = sb.toString();
             enabled[i] = egress.isEnabled(def);
         }
@@ -1913,8 +1932,8 @@ public final class AtmospherePane {
         final int[] choices = {0, 1, 2, 3, 4};
         final String[] labels = new String[choices.length];
         for (int i = 0; i < choices.length; i++) {
-            labels[i] = choices[i] + " decimals — about "
-                    + EgressPolicy.approximateMetres(choices[i]) + " m";
+            labels[i] = "Rounded to about " + roughly(
+                    EgressPolicy.approximateMetres(choices[i]));
         }
 
         int current = 0;
@@ -1927,9 +1946,9 @@ public final class AtmospherePane {
 
         new AlertDialog.Builder(ctx)
                 .setTitle(pluginContext.getString(R.string.privacy_title))
-                .setMessage("A forecast query has to say roughly where you are. This is "
-                        + "how precisely your position is sent to the provider — nothing "
-                        + "else about you goes with it.")
+                .setMessage("Asking for a forecast means saying roughly where you "
+                        + "are. This sets how exact that is. Nothing else about you "
+                        + "is sent.")
                 .setSingleChoiceItems(labels, current,
                         new DialogInterface.OnClickListener() {
                             @Override
