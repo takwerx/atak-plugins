@@ -725,10 +725,37 @@ public class LayerManager {
                     startLog("restore: attaching " + spec.id);
                     l.attach();
                     startLog("restore: attached " + spec.id);
-                    l.setVisible(o.optBoolean("visible", true));
+                    final boolean vis = o.optBoolean("visible", true);
+                    l.markVisible(vis);
                     synchronized (layers) {
                         layers.add(l);
                     }
+                    // Showing a restored layer reads its whole cached store into memory
+                    // and rewrites every feature with this build's styles, under the
+                    // layer lock: seconds on a large DART layer. Until 0.10 that ran
+                    // here, on ATAK's main thread inside onStart, and on the XCover it
+                    // was 24.6 s of main-thread time and two "ATAK isn't responding"
+                    // dialogs before any pane had opened (2026-09-21). It goes to the
+                    // worker, the way the pane's own on/off toggle already does; the
+                    // refreshes start() queues next run on the same single thread, so
+                    // each layer is shown before it is fetched. The layer is on the map
+                    // meanwhile with its cached contents as they are.
+                    l.busy = vis;
+                    worker.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                startLog("restore: showing " + spec.id);
+                                l.setVisible(vis);
+                                startLog("restore: shown " + spec.id);
+                            } catch (Exception e) {
+                                Log.w(TAG, "could not show restored " + spec.id, e);
+                            } finally {
+                                l.busy = false;
+                                changed();
+                            }
+                        }
+                    });
                 } catch (Exception e) {
                     Log.w(TAG, "could not restore " + spec.id, e);
                     // Keep it: the next save() writes it back and the next start tries
