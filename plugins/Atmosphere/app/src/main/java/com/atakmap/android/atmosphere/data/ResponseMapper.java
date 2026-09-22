@@ -25,8 +25,12 @@ import java.util.List;
  */
 public final class ResponseMapper {
 
-    /** Series steps kept. Two days of hourly data is more than a plan needs. */
-    public static final int MAX_SERIES = 48;
+    /**
+     * Seven days of hours. NWS serves 156 hourly periods (six and a half days) and
+     * Open-Meteo up to 16 days; the August cap of 48 kept the old vertical list
+     * short and cut the days strip to three columns.
+     */
+    public static final int MAX_SERIES = 168;
 
     private ResponseMapper() {
     }
