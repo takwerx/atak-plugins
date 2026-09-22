@@ -98,6 +98,24 @@ public final class WindGrid {
         return new WindGrid(west, south, east, north, nx, ny, u, v, valid);
     }
 
+    /**
+     * A message already on a lon/lat lattice becomes a grid with no resampling: the
+     * values are copied south-up, which is the only ordering the sampler knows.
+     */
+    public static WindGrid fromLatLon(Grib2.Message uMsg, Grib2.Message vMsg) {
+        final LatLonGrid g = uMsg.latLon;
+        final int nx = g.ni, ny = g.nj;
+        final float[] u = new float[nx * ny], v = new float[nx * ny];
+        for (int y = 0; y < ny; y++) {
+            for (int x = 0; x < nx; x++) {
+                u[y * nx + x] = uMsg.at(x, y);
+                v[y * nx + x] = vMsg.at(x, y);
+            }
+        }
+        final long valid = uMsg.referenceTime + uMsg.forecastHours * 3_600_000L;
+        return new WindGrid(g.west, g.south, g.east, g.north, nx, ny, u, v, valid);
+    }
+
     private static float bilinearLcc(Grib2.Message m, double fi, double fj) {
         if (fi < 0 || fj < 0 || fi > m.nx - 1 || fj > m.ny - 1)
             return Float.NaN;

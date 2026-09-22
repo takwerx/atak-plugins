@@ -2,11 +2,13 @@ package com.atakmap.android.atmosphere;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.atakmap.android.atmosphere.wind.Grib2;
 import com.atakmap.android.atmosphere.wind.Lcc;
 import com.atakmap.android.atmosphere.wind.NomadsWind;
+import com.atakmap.android.atmosphere.wind.NomadsWind.Model;
 import com.atakmap.android.atmosphere.wind.WindGrid;
 
 import org.junit.Test;
@@ -98,13 +100,117 @@ public class WindGridTest {
     @Test
     public void filterUrlNamesRunHourAndBox() {
         final long run = java.time.Instant.parse("2026-09-22T03:00:00Z").toEpochMilli();
-        final String url = NomadsWind.url(run, 7, -119.5, 32.5, -115.5, 35.5);
+        final String url = NomadsWind.url(Model.HRRR, run, 7, -119.5, 32.5, -115.5, 35.5);
+        assertTrue(url, url.contains("filter_hrrr_2d.pl"));
         assertTrue(url, url.contains("dir=%2Fhrrr.20260922%2Fconus"));
         assertTrue(url, url.contains("file=hrrr.t03z.wrfsfcf07.grib2"));
         assertTrue(url, url.contains("toplat=35.500&leftlon=-119.500&rightlon=-115.500&bottomlat=32.500"));
-        assertEquals(18, NomadsWind.hoursFor(run));
-        assertEquals(48, NomadsWind.hoursFor(java.time.Instant.parse("2026-09-22T06:00:00Z").toEpochMilli()));
+    }
+
+    // ---- the model ladder ---------------------------------------------------------
+
+    @Test
+    public void eachModelBuildsItsOwnRequest() {
+        final long run = java.time.Instant.parse("2026-09-22T03:00:00Z").toEpochMilli();
+        final String rap = NomadsWind.url(Model.RAP, run, 7, -125, 24, -66, 50);
+        assertTrue(rap, rap.contains("filter_rap.pl"));
+        assertTrue(rap, rap.contains("dir=%2Frap.20260922"));
+        assertTrue(rap, rap.contains("file=rap.t03z.awp130pgrbf07.grib2"));
+
+        // GFS keeps its files under the run hour and counts forecast hours in three digits.
+        final long gfsRun = java.time.Instant.parse("2026-09-22T00:00:00Z").toEpochMilli();
+        final String gfs = NomadsWind.url(Model.GFS, gfsRun, 3, -160, 15, -60, 60);
+        assertTrue(gfs, gfs.contains("filter_gfs_0p25.pl"));
+        assertTrue(gfs, gfs.contains("dir=%2Fgfs.20260922%2F00%2Fatmos"));
+        assertTrue(gfs, gfs.contains("file=gfs.t00z.pgrb2.0p25.f003"));
+    }
+
+    @Test
+    public void runsAreTheNewestCertainlyPublished() {
+        final long now = java.time.Instant.parse("2026-09-22T05:40:00Z").toEpochMilli();
+        // HRRR and RAP run hourly and are two hours behind.
         assertEquals(java.time.Instant.parse("2026-09-22T03:00:00Z").toEpochMilli(),
-                NomadsWind.latestRun(java.time.Instant.parse("2026-09-22T05:40:00Z").toEpochMilli()));
+                Model.HRRR.latestRun(now));
+        assertEquals(java.time.Instant.parse("2026-09-22T03:00:00Z").toEpochMilli(),
+                Model.RAP.latestRun(now));
+        // GFS runs every six hours; six back from 05:40 is 23:40, which floors to 18Z.
+        assertEquals(java.time.Instant.parse("2026-09-21T18:00:00Z").toEpochMilli(),
+                Model.GFS.latestRun(now));
+        assertEquals(java.time.Instant.parse("2026-09-22T02:00:00Z").toEpochMilli(),
+                Model.HRRR.previousRun(java.time.Instant.parse("2026-09-22T03:00:00Z").toEpochMilli()));
+        assertEquals(java.time.Instant.parse("2026-09-21T12:00:00Z").toEpochMilli(),
+                Model.GFS.previousRun(java.time.Instant.parse("2026-09-21T18:00:00Z").toEpochMilli()));
+    }
+
+    @Test
+    public void theViewPicksTheModel() {
+        // A fire line: HRRR's 3 km cells.
+        assertEquals(Model.HRRR, NomadsWind.forView(-118.5, 33, -116.5, 35));
+        // Half the west: too wide for HRRR, still CONUS, so RAP.
+        assertEquals(Model.RAP, NomadsWind.forView(-125, 30, -95, 45));
+        // The continent: wider than RAP is asked for.
+        assertEquals(Model.GFS, NomadsWind.forView(-160, 20, -60, 60));
+        // Alaska and Hawaii are small views the CONUS models do not reach.
+        assertEquals(Model.GFS, NomadsWind.forView(-155, 60, -145, 66));
+        assertEquals(Model.GFS, NomadsWind.forView(-159, 19, -154, 23));
+    }
+
+    @Test
+    public void everyModelsRunLandsOnItsOwnCadence() {
+        // The overlay recomputes the run when the zoom changes the model; a run must
+        // always be a time that model publishes, or the filter has no such file.
+        final long now = java.time.Instant.parse("2026-09-22T14:20:00Z").toEpochMilli();
+        for (Model m : Model.values()) {
+            final long run = m.latestRun(now);
+            final java.util.Calendar c = java.util.Calendar.getInstance(
+                    java.util.TimeZone.getTimeZone("UTC"));
+            c.setTimeInMillis(run);
+            assertEquals("run is on the hour", 0, c.get(java.util.Calendar.MINUTE));
+            assertTrue(m + " run " + c.get(java.util.Calendar.HOUR_OF_DAY) + "Z is not published",
+                    m == Model.GFS ? c.get(java.util.Calendar.HOUR_OF_DAY) % 6 == 0 : true);
+            assertTrue("run is in the past", run < now);
+        }
+    }
+
+    @Test
+    public void rapReadsAsLambertAndCoversConus() throws Exception {
+        final byte[] body = Files.readAllBytes(
+                new File("src/test/resources/rap_wind_conus.grib2").toPath());
+        final List<Grib2.Message> msgs = Grib2.read(body);
+        assertEquals(2, msgs.size());
+        assertEquals(427, msgs.get(0).nx);
+        assertEquals(240, msgs.get(0).ny);
+        assertNotNull("RAP is on a Lambert grid", msgs.get(0).grid);
+
+        final WindGrid grid = NomadsWind.read(body, 160);
+        for (double[] p : new double[][] { { 33.835, -117.573 }, { 44.0, -103.0 }, { 30.0, -90.0 } }) {
+            final float speed = grid.speed(p[0], p[1]);
+            assertFalse("no wind at " + p[0] + "," + p[1], Float.isNaN(speed));
+            assertTrue("wind " + speed + " m/s at " + p[0] + "," + p[1], speed >= 0 && speed < 60);
+        }
+    }
+
+    @Test
+    public void gfsReadsAsALatLonGridAtItsOwnResolution() throws Exception {
+        final byte[] body = Files.readAllBytes(
+                new File("src/test/resources/gfs_wind_conus.grib2").toPath());
+        final List<Grib2.Message> msgs = Grib2.read(body);
+        assertEquals(2, msgs.size());
+        assertNotNull("GFS is on a lat/lon grid", msgs.get(0).latLon);
+        assertEquals(237, msgs.get(0).latLon.ni);
+        assertEquals(105, msgs.get(0).latLon.nj);
+
+        // Taken as it stands: no resampling, and the 0..360 longitudes come back as the
+        // map's own -180..180.
+        final WindGrid grid = NomadsWind.read(body, 160);
+        assertEquals(237, grid.nx);
+        assertEquals(105, grid.ny);
+        assertEquals(-125.0, grid.west, 1e-6);
+        assertEquals(-66.0, grid.east, 1e-6);
+        assertEquals(24.0, grid.south, 1e-6);
+        assertEquals(50.0, grid.north, 1e-6);
+        final float speed = grid.speed(33.835, -117.573);
+        assertFalse(Float.isNaN(speed));
+        assertTrue("wind " + speed + " m/s", speed >= 0 && speed < 60);
     }
 }

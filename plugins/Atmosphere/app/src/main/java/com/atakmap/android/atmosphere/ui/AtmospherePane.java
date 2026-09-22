@@ -429,7 +429,7 @@ public final class AtmospherePane {
             return "Wind: no forecast yet";
         final SimpleDateFormat fmt = new SimpleDateFormat("EEE h a", Locale.US);
         return "Wind +" + hour + " h, " + fmt.format(new Date(validTime)).toLowerCase(Locale.US)
-                + " (HRRR)";
+                + " (" + wind.modelName() + ")";
     }
 
     // ---- layers ------------------------------------------------------------------

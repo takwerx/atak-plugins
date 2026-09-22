@@ -8,10 +8,12 @@ import java.util.TimeZone;
 
 /**
  * The smallest GRIB2 reader that serves the wind grid: messages in simple packing
- * (data representation template 5.0) on a Lambert conformal grid (grid template 3.30),
- * which is what the NOMADS grib filter returns for HRRR 10 m wind. Anything else is
- * refused by name, never guessed. Checked 2026-09-21 against a 44 KB filter response
- * for a 4 by 3 degree box: two messages, UGRD and VGRD, 144 by 135 cells.
+ * (data representation template 5.0) on a Lambert conformal grid (template 3.30,
+ * HRRR and RAP) or a plain longitude/latitude lattice (template 3.0, GFS), which is
+ * what the NOMADS grib filter returns for 10 m wind. Anything else is refused by
+ * name, never guessed. Checked against real filter responses: HRRR 4x3 degrees,
+ * 44 KB, 144 by 135 Lambert cells; RAP CONUS, 231 KB, 427 by 240 Lambert cells;
+ * GFS CONUS, 75 KB, 237 by 105 quarter-degree cells.
  *
  * <p>Offsets follow the WMO FM 92 GRIB edition 2 tables; signed fields use GRIB's
  * sign-and-magnitude form (the top bit is the sign), not two's complement.
@@ -25,7 +27,10 @@ public final class Grib2 {
         public final long referenceTime;
         /** Hours after the run this field is valid for. */
         public final int forecastHours;
+        /** The Lambert grid, when the message is on one; null for a lat/lon grid. */
         public final Lcc grid;
+        /** The lat/lon lattice, when the message is on one; null for a Lambert grid. */
+        public final LatLonGrid latLon;
         public final int nx, ny;
         /** Row-major, row 0 the first row in the file; {@link #jNorthUp} says which way rows run. */
         public final float[] values;
@@ -33,13 +38,14 @@ public final class Grib2 {
         public final boolean jNorthUp;
 
         Message(int discipline, int category, int number, long referenceTime, int forecastHours,
-                Lcc grid, int nx, int ny, float[] values, boolean jNorthUp) {
+                Lcc grid, LatLonGrid latLon, int nx, int ny, float[] values, boolean jNorthUp) {
             this.discipline = discipline;
             this.category = category;
             this.number = number;
             this.referenceTime = referenceTime;
             this.forecastHours = forecastHours;
             this.grid = grid;
+            this.latLon = latLon;
             this.nx = nx;
             this.ny = ny;
             this.values = values;
@@ -85,6 +91,7 @@ public final class Grib2 {
         long referenceTime = 0;
         int category = -1, number = -1, forecastHours = 0;
         Lcc grid = null;
+        LatLonGrid latLon = null;
         int nx = 0, ny = 0;
         boolean jNorthUp = true;
         float ref = 0;
@@ -112,9 +119,28 @@ public final class Grib2 {
                 }
                 case 3: {
                     final int template = u16(b, p + 12);
-                    if (template != 30)
-                        throw new IOException("grid template 3." + template + ", only 3.30 (Lambert) is read");
+                    if (template != 30 && template != 0)
+                        throw new IOException("grid template 3." + template
+                                + ", only 3.0 (lat/lon) and 3.30 (Lambert) are read");
                     npts = (int) u32(b, p + 6);
+                    if (template == 0) {
+                        // Octets are 1-based in the WMO tables; octet N is at p + N - 1.
+                        if (u32(b, p + 38) != 0)
+                            throw new IOException("a basic angle other than degrees is not read");
+                        nx = (int) u32(b, p + 30);
+                        ny = (int) u32(b, p + 34);
+                        final double a1 = s32(b, p + 46) / 1e6, o1 = normLon(s32(b, p + 50) / 1e6);
+                        final double a2 = s32(b, p + 55) / 1e6, o2 = normLon(s32(b, p + 59) / 1e6);
+                        final int scan0 = u8(b, p + 71);
+                        if ((scan0 & 0x80) != 0 || (scan0 & 0x20) != 0)
+                            throw new IOException("scanning mode " + scan0
+                                    + " (reversed i or j-first) is not read");
+                        if (o2 <= o1)
+                            throw new IOException("a grid crossing the antimeridian is not read");
+                        jNorthUp = (scan0 & 0x40) != 0;
+                        latLon = new LatLonGrid(nx, ny, o1, Math.min(a1, a2), o2, Math.max(a1, a2));
+                        break;
+                    }
                     final int shape = u8(b, p + 14);
                     double radius = 6371229d;
                     if (shape == 1) {
@@ -188,11 +214,11 @@ public final class Grib2 {
             }
             p += len;
         }
-        if (grid == null || values == null || nx * ny != values.length)
-            throw new IOException("incomplete GRIB message (grid " + (grid != null)
+        if ((grid == null && latLon == null) || values == null || nx * ny != values.length)
+            throw new IOException("incomplete GRIB message (grid " + (grid != null || latLon != null)
                     + ", values " + (values == null ? "none" : values.length) + ", nx*ny " + (nx * ny) + ")");
         return new Message(discipline, category, number, referenceTime, forecastHours, grid,
-                nx, ny, values, jNorthUp);
+                latLon, nx, ny, values, jNorthUp);
     }
 
     /** Simple packing: value = (R + X * 2^E) / 10^D, X read as {@code bits}-bit unsigned. */
@@ -228,6 +254,13 @@ public final class Grib2 {
             out[i] = (float) ((ref + x * binFactor) * decFactor);
         }
         return out;
+    }
+
+    /** Longitudes come 0..360 from some models; the map wants -180..180. */
+    private static double normLon(double lon) {
+        while (lon > 180) lon -= 360;
+        while (lon < -180) lon += 360;
+        return lon;
     }
 
     private static int u8(byte[] b, int i) {

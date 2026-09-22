@@ -27,10 +27,15 @@ import java.util.Map;
  * Lives for the plugin's life; the pane drives and reads it.
  *
  * <p>Region and cache rules are the radar's: the view padded by half its span,
- * clamped to HRRR's cover; grids cached per (run, hour, region); a map move outside
- * the region or a zoom past a third of it fetches again. The run is the newest one
- * likely complete; a response that is not GRIB (the filter answers HTML for a file
- * it does not have yet) steps back one run, up to four times.
+ * clamped to the model's cover; grids cached per (model, run, hour, region); a map
+ * move outside the region or a zoom past a third of it fetches again. The run is the
+ * newest one certainly published; a response that is not GRIB (the filter answers
+ * HTML for a file it does not have yet) steps back one run, up to four times.
+ *
+ * <p>Which model answers depends on how much ground is on screen: HRRR at 3 km close
+ * in, RAP at 13 km for a region, GFS at a quarter degree for a continent and for
+ * everywhere the other two do not reach ({@link NomadsWind#forView}). The scrubber
+ * label names it, because the cells change size with the zoom.
  */
 public final class WindOverlay {
 
@@ -39,14 +44,17 @@ public final class WindOverlay {
     public static final String HOST = NomadsWind.HOST;
 
     private static final String PREF_ON = "weather.layer.wind.on";
-    private static final int GRID_NX = 96;
+    /**
+     * Columns a projected grid is resampled onto. 160 is about 5 km across an HRRR box
+     * and about 27 km across a RAP region, either side of those models' own cells; a
+     * lat/lon model (GFS) is taken at its own resolution and never resampled.
+     */
+    private static final int GRID_NX = 160;
     private static final int PARTICLES = 2400;
     private static final long TICK_MS = 33L;
     private static final long MOVE_SETTLE_MS = 600L;
     private static final long SCRUB_SETTLE_MS = 180L;
     private static final int CACHE_GRIDS = 24;
-    /** The widest box asked of the filter: HRRR is 3 km, and a wider box is megabytes. */
-    private static final double MAX_BOX_LON = 8.0, MAX_BOX_LAT = 6.0;
     private static final int RUN_STEPS_BACK = 4;
 
     public interface Listener {
@@ -66,6 +74,8 @@ public final class WindOverlay {
     };
 
     private boolean started, on;
+    /** Which model is answering; set from the view every time the region is chosen. */
+    private NomadsWind.Model model = NomadsWind.Model.HRRR;
     private long run;
     private int hours;
     private int hour;
@@ -184,8 +194,8 @@ public final class WindOverlay {
         if (p != null)
             p.edit().putBoolean(PREF_ON, value).apply();
         if (value) {
-            run = NomadsWind.latestRun(System.currentTimeMillis());
-            hours = NomadsWind.hoursFor(run);
+            run = model.latestRun(System.currentTimeMillis());
+            hours = NomadsWind.HOURS;
             hour = Math.max(0, Math.min(hour, hours));
             if (listener != null)
                 listener.onFrames(labels(), hour);
@@ -234,9 +244,14 @@ public final class WindOverlay {
 
     // ---- region and grids ----------------------------------------------------------
 
-    private static String key(long run, int hour, GeoBounds r) {
-        return String.format(Locale.US, "%d|%d|%.3f,%.3f,%.3f,%.3f", run, hour,
+    private String key(long run, int hour, GeoBounds r) {
+        return String.format(Locale.US, "%s|%d|%d|%.3f,%.3f,%.3f,%.3f", model.name(), run, hour,
                 r.getWest(), r.getSouth(), r.getEast(), r.getNorth());
+    }
+
+    /** The model answering right now, for the scrubber label. */
+    public String modelName() {
+        return model.label;
     }
 
     private static boolean contains(GeoBounds outer, GeoBounds inner) {
@@ -250,24 +265,44 @@ public final class WindOverlay {
         final GeoBounds bounds = mapView.getBounds();
         if (bounds == null)
             return;
+        // On the globe the bounds come back NaN, or span the world, or cross the
+        // antimeridian; any of those means "everything", which is a job for GFS.
         final boolean wholeWorld = Double.isNaN(bounds.getNorth()) || Double.isNaN(bounds.getSouth())
                 || Double.isNaN(bounds.getEast()) || Double.isNaN(bounds.getWest())
                 || bounds.getEast() <= bounds.getWest()
-                || bounds.getEast() - bounds.getWest() >= NomadsWind.EAST - NomadsWind.WEST;
-        final GeoBounds clamped = wholeWorld
-                ? new GeoBounds(NomadsWind.NORTH, NomadsWind.WEST, NomadsWind.SOUTH, NomadsWind.EAST)
-                : new GeoBounds(
-                        Math.min(NomadsWind.NORTH, bounds.getNorth()), Math.max(NomadsWind.WEST, bounds.getWest()),
-                        Math.max(NomadsWind.SOUTH, bounds.getSouth()), Math.min(NomadsWind.EAST, bounds.getEast()));
+                || bounds.getEast() - bounds.getWest() >= 355;
+        if (wholeWorld) {
+            // The view draws each trail between the four projected corners of the map,
+            // which is a quadrilateral on a flat map and not one on the globe, so the
+            // particles would land nowhere. Say so rather than fetch half a megabyte of
+            // wind and draw nothing (XCover, 2026-09-22).
+            if (view != null)
+                view.setGrid(null);
+            status("Wind: zoom in to draw");
+            region = null;
+            return;
+        }
+        final double vw = bounds.getWest();
+        final double ve = bounds.getEast();
+        final double vs = bounds.getSouth();
+        final double vn = bounds.getNorth();
+
+        final NomadsWind.Model chosen = NomadsWind.forView(vw, vs, ve, vn);
+        final GeoBounds clamped = new GeoBounds(
+                Math.min(chosen.north, vn), Math.max(chosen.west, vw),
+                Math.max(chosen.south, vs), Math.min(chosen.east, ve));
         if (clamped.getEast() <= clamped.getWest() || clamped.getNorth() <= clamped.getSouth()) {
             if (view != null)
                 view.setGrid(null);
-            status("Wind: outside HRRR coverage");
+            status("Wind: outside " + chosen.label + " coverage");
             return;
         }
-        boolean refetch = region == null || !contains(region, clamped);
-        if (refetch && region != null && clamped.getEast() - clamped.getWest() > MAX_BOX_LON) {
-            // Wider than the box: refetch only when the center left the box.
+
+        boolean refetch = chosen != model || region == null || !contains(region, clamped);
+        if (refetch && region != null && chosen == model
+                && clamped.getEast() - clamped.getWest() > chosen.maxSpanLon) {
+            // Wider than the box this model is asked for: refetch only when the view's
+            // center leaves it, so a pan across a continent is not a request a second.
             final double cx = (clamped.getEast() + clamped.getWest()) / 2;
             final double cy = (clamped.getNorth() + clamped.getSouth()) / 2;
             refetch = cx < region.getWest() || cx > region.getEast()
@@ -279,24 +314,35 @@ public final class WindOverlay {
             refetch = viewSpan < regionSpan / 3.5 || viewSpan > regionSpan * 1.6;
         }
         if (refetch) {
-            double w = clamped.getWest(), e = clamped.getEast(), s = clamped.getSouth(), n = clamped.getNorth();
-            // A continental view gets a box around its center, not the whole grid: the
-            // whole HRRR grid is 7 MB of wind per hour, and particles read at that
-            // scale anyway only near where the eye is.
-            if (e - w > MAX_BOX_LON) {
+            if (chosen != model) {
+                // Each model runs on its own clock: HRRR and RAP hourly, GFS every six.
+                // Carrying an hourly run over to GFS asks for a file that never exists,
+                // and stepping back from it walks a chain of misses.
+                model = chosen;
+                run = chosen.latestRun(System.currentTimeMillis());
+            }
+            double w = clamped.getWest(), e = clamped.getEast();
+            double s = clamped.getSouth(), n = clamped.getNorth();
+            // A view wider than the model is worth asking for gets a box around its
+            // center: the whole HRRR grid is 7 MB of wind per hour, and particles read
+            // at that scale only near where the eye is anyway.
+            if (e - w > chosen.maxSpanLon) {
                 final double c = (e + w) / 2;
-                w = c - MAX_BOX_LON / 2;
-                e = c + MAX_BOX_LON / 2;
+                w = c - chosen.maxSpanLon / 2;
+                e = c + chosen.maxSpanLon / 2;
             }
-            if (n - s > MAX_BOX_LAT) {
+            if (n - s > chosen.maxSpanLat) {
                 final double c = (n + s) / 2;
-                s = c - MAX_BOX_LAT / 2;
-                n = c + MAX_BOX_LAT / 2;
+                s = c - chosen.maxSpanLat / 2;
+                n = c + chosen.maxSpanLat / 2;
             }
-            final double padX = Math.min((e - w) * 0.5, MAX_BOX_LON / 4);
-            final double padY = Math.min((n - s) * 0.5, MAX_BOX_LAT / 4);
-            region = new GeoBounds(Math.min(NomadsWind.NORTH, n + padY), Math.max(NomadsWind.WEST, w - padX),
-                    Math.max(NomadsWind.SOUTH, s - padY), Math.min(NomadsWind.EAST, e + padX));
+            // Pad by half the view, but never past the cap: padding it on top of the
+            // cap is how a globe view asked GFS for 180 degrees of quarter-degree
+            // cells, 700 KB a frame, when the cap says 120.
+            final double padX = Math.min((e - w) * 0.5, Math.max(0, (chosen.maxSpanLon - (e - w)) / 2));
+            final double padY = Math.min((n - s) * 0.5, Math.max(0, (chosen.maxSpanLat - (n - s)) / 2));
+            region = new GeoBounds(Math.min(chosen.north, n + padY), Math.max(chosen.west, w - padX),
+                    Math.max(chosen.south, s - padY), Math.min(chosen.east, e + padX));
             cache.clear();
         }
         showHour();
@@ -321,9 +367,10 @@ public final class WindOverlay {
     /** Ask the filter; a non-GRIB answer means the run is not out yet, so step back. */
     private void fetch(final long tryRun, final int stepsBack, final int h, final GeoBounds r,
             final String k, final int mine) {
-        status("Wind: fetching HRRR +" + h + " h…");
+        final NomadsWind.Model asked = model;
+        status("Wind: fetching " + asked.label + " +" + h + " h…");
         // The filter's box is the region grown by a cell, so the grid covers it fully.
-        Http.getBytes(NomadsWind.url(tryRun, h, r.getWest() - 0.05, r.getSouth() - 0.05,
+        Http.getBytes(NomadsWind.url(asked, tryRun, h, r.getWest() - 0.05, r.getSouth() - 0.05,
                 r.getEast() + 0.05, r.getNorth() + 0.05), egress.userAgent(), new Http.BytesCallback() {
             @Override
             public void onSuccess(byte[] body) {
@@ -333,11 +380,11 @@ public final class WindOverlay {
                 }
                 if (!NomadsWind.looksLikeGrib(body)) {
                     if (stepsBack < RUN_STEPS_BACK) {
-                        fetch(tryRun - 3_600_000L, stepsBack + 1, h, r, k, mine);
+                        fetch(asked.previousRun(tryRun), stepsBack + 1, h, r, k, mine);
                         return;
                     }
                     if (k.equals(pendingKey)) pendingKey = null;
-                    status("Wind: no HRRR run available yet");
+                    status("Wind: no " + asked.label + " run available yet");
                     return;
                 }
                 if (k.equals(pendingKey)) pendingKey = null;
@@ -352,13 +399,14 @@ public final class WindOverlay {
                 if (tryRun != run) {
                     // A newer run was not out: keep the one that answered.
                     run = tryRun;
-                    hours = NomadsWind.hoursFor(run);
                     if (listener != null)
                         listener.onFrames(labels(), hour);
                 }
                 cache.put(key(run, h, r), grid);
-                Log.d(TAG, String.format(Locale.US, "grid +%d h run %d drawn %dx%d over %.2f,%.2f..%.2f,%.2f",
-                        h, run, grid.nx, grid.ny, grid.west, grid.south, grid.east, grid.north));
+                Log.d(TAG, String.format(Locale.US,
+                        "%s grid +%d h run %d drawn %dx%d over %.2f,%.2f..%.2f,%.2f",
+                        asked.label, h, run, grid.nx, grid.ny, grid.west, grid.south,
+                        grid.east, grid.north));
                 if (h == hour)
                     show(grid, r);
             }
