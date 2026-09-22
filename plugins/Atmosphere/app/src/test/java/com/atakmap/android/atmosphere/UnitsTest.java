@@ -64,9 +64,9 @@ public class UnitsTest {
 
     @Test
     public void formattingCarriesTheUnit() {
-        assertEquals("20.0 °C", Units.format(Quantity.TEMPERATURE, 20.0, UnitSystem.METRIC));
-        assertEquals("68.0 °F", Units.format(Quantity.TEMPERATURE, 20.0, UnitSystem.IMPERIAL));
-        assertEquals("19.4 kt", Units.format(Quantity.SPEED, 10.0, UnitSystem.AVIATION));
+        assertEquals("20 °C", Units.format(Quantity.TEMPERATURE, 20.0, UnitSystem.METRIC));
+        assertEquals("68 °F", Units.format(Quantity.TEMPERATURE, 20.0, UnitSystem.IMPERIAL));
+        assertEquals("19 kt", Units.format(Quantity.SPEED, 10.0, UnitSystem.AVIATION));
         assertEquals("270°", Units.format(Quantity.ANGLE, 270.0, UnitSystem.METRIC));
         assertEquals("65%", Units.format(Quantity.PERCENT, 65.0, UnitSystem.IMPERIAL));
     }

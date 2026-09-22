@@ -61,12 +61,12 @@ public class ResponseMapperTest {
         final Reading temp = current(s, "temperature_2m");
         assertNotNull(temp);
         assertEquals(21.5, temp.value, EPS);
-        assertEquals("21.5 °C", temp.format(UnitSystem.METRIC));
-        assertEquals("70.7 °F", temp.format(UnitSystem.IMPERIAL));
+        assertEquals("22 °C", temp.format(UnitSystem.METRIC));
+        assertEquals("71 °F", temp.format(UnitSystem.IMPERIAL));
 
         // m/s in, canonical m/s stored, km/h shown.
-        assertEquals("18.0 km/h", current(s, "wind_speed_10m").format(UnitSystem.METRIC));
-        assertEquals("9.7 kt", current(s, "wind_speed_10m").format(UnitSystem.AVIATION));
+        assertEquals("18 km/h", current(s, "wind_speed_10m").format(UnitSystem.METRIC));
+        assertEquals("10 kt", current(s, "wind_speed_10m").format(UnitSystem.AVIATION));
         assertEquals("315° NW", current(s, "wind_direction_10m").format(UnitSystem.METRIC));
 
         assertEquals(2, s.series.size());
@@ -98,7 +98,7 @@ public class ResponseMapperTest {
 
         final SeriesEntry first = s.series.get(0);
         assertEquals(20.0, first.reading("temperature").value, 0.01);   // 68F
-        assertEquals("68.0 °F", first.reading("temperature").format(UnitSystem.IMPERIAL));
+        assertEquals("68 °F", first.reading("temperature").format(UnitSystem.IMPERIAL));
         assertEquals(4.4704, first.reading("windSpeed").value, EPS);    // "10 mph"
         assertEquals(315.0, first.reading("windDirection").value, EPS); // "NW"
         assertEquals(42.0, first.reading("relativeHumidity").value, EPS);

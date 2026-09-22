@@ -178,10 +178,13 @@ public final class Units {
                 return system == UnitSystem.METRIC ? 1 : 2;
             case PRESSURE:
                 return system == UnitSystem.AVIATION ? 2 : 0;
-            case TEMPERATURE:
-            case SPEED:
             case LENGTH:
                 return 1;
+            // Whole degrees and whole speeds: a crew reads "72 °F" and "10 mph" off a
+            // mount; the tenth is noise the forecast does not have anyway.
+            case TEMPERATURE:
+            case SPEED:
+                return 0;
             default:
                 return 0;
         }

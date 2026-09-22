@@ -371,12 +371,83 @@ public final class AtmospherePane {
         currentHeading.setText(fromSeries ? "Now (first forecast step)"
                 : pluginContext.getString(R.string.heading_now));
 
-        for (Reading r : now)
-            currentContainer.addView(readingRow(r.label, r.format(units)));
+        renderNow(now);
 
         renderHours(wanted);
         renderDays(wanted);
         attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
+    }
+
+    private static final int TILE_COLUMNS = 3;
+    /** Roboto Medium: the readout face. Not monospace, which spaced the digits like a terminal. */
+    private static final Typeface VALUE_FACE = Typeface.create("sans-serif-medium", Typeface.NORMAL);
+
+    /**
+     * The "now" block as tiles: the number big with its label directly under it, three
+     * across. A label-left, value-right row put the two at opposite edges, and at 95 %
+     * width they were half a screen apart.
+     */
+    private void renderNow(List<Reading> now) {
+        LinearLayout row = null;
+        int inRow = TILE_COLUMNS;
+        for (Reading r : now) {
+            if (inRow == TILE_COLUMNS) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                currentContainer.addView(row);
+                inRow = 0;
+            }
+            row.addView(tile(tileLabel(r), r.format(units)));
+            inRow++;
+        }
+        // Pad a short last row so its tiles keep the width of the others.
+        while (row != null && inRow < TILE_COLUMNS) {
+            final View filler = new View(pluginContext);
+            filler.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
+            row.addView(filler);
+            inRow++;
+        }
+    }
+
+    /** Wind direction is where the wind comes from; the label says so. */
+    private static String tileLabel(Reading r) {
+        switch (kind(r)) {
+            case TEMP: return "Temperature";
+            case DEW: return "Dew point";
+            case FEELS: return "Feels like";
+            case RH: return "Humidity";
+            case WIND: return "Wind";
+            case GUST: return "Gusts";
+            case DIR: return "Wind from";
+            case POP: return "Precip chance";
+            case PRECIP: return "Precip";
+            default: return r.label;
+        }
+    }
+
+    private View tile(String label, String value) {
+        final LinearLayout t = new LinearLayout(pluginContext);
+        t.setOrientation(LinearLayout.VERTICAL);
+        t.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        t.setPadding(dp(4), dp(6), dp(4), dp(6));
+        t.setGravity(Gravity.CENTER_HORIZONTAL);
+        final TextView v = new TextView(pluginContext);
+        v.setText(value);
+        v.setTextSize(26);
+        v.setTypeface(VALUE_FACE);
+        v.setTextColor(Color.WHITE);
+        v.setGravity(Gravity.CENTER);
+        v.setSingleLine(true);
+        final TextView l = new TextView(pluginContext);
+        l.setText(label);
+        l.setTextSize(11);
+        l.setAlpha(0.6f);
+        l.setGravity(Gravity.CENTER);
+        l.setSingleLine(true);
+        t.addView(v);
+        t.addView(l);
+        return t;
     }
 
     /** Hours are shown as columns; more than this is the days strip's job. */
@@ -602,14 +673,14 @@ public final class AtmospherePane {
         for (String v : values) {
             final TextView t = new TextView(pluginContext);
             t.setText(v);
-            t.setTextSize(14);
+            t.setTextSize(15);
             t.setSingleLine(true);
             t.setHeight(dp(ROW_DP));
             t.setGravity((legend ? Gravity.START : Gravity.CENTER_HORIZONTAL) | Gravity.CENTER_VERTICAL);
             if (legend)
                 t.setAlpha(0.7f);
             else
-                t.setTypeface(Typeface.MONOSPACE);
+                t.setTypeface(VALUE_FACE);
             col.addView(t);
         }
         return col;
@@ -617,29 +688,6 @@ public final class AtmospherePane {
 
     private int dp(int v) {
         return Math.round(v * pluginContext.getResources().getDisplayMetrics().density);
-    }
-
-    private View readingRow(String label, String value) {
-        final LinearLayout row = new LinearLayout(pluginContext);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-
-        final TextView left = new TextView(pluginContext);
-        left.setText(label);
-        left.setTextSize(14);
-        left.setLayoutParams(new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-        final TextView right = new TextView(pluginContext);
-        right.setText(value);
-        right.setTextSize(14);
-        right.setTypeface(Typeface.MONOSPACE);
-        right.setGravity(Gravity.END);
-        right.setLayoutParams(new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1.2f));
-
-        row.addView(left);
-        row.addView(right);
-        return row;
     }
 
     // ---- dialogs -----------------------------------------------------------------
