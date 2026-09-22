@@ -93,8 +93,12 @@ public final class SnapshotStore {
             final JSONObject o = new JSONObject();
             o.put("body", body);
             o.put("fetchedAt", fetchedAt);
-            o.put("latitude", latitude);
-            o.put("longitude", longitude);
+            // Android's org.json refuses NaN in put(); the resolve entries carry no
+            // position, and read() already defaults a missing field to NaN.
+            if (!Double.isNaN(latitude))
+                o.put("latitude", latitude);
+            if (!Double.isNaN(longitude))
+                o.put("longitude", longitude);
             out = new FileOutputStream(f);
             out.write(o.toString().getBytes("UTF-8"));
         } catch (IOException | JSONException e) {
