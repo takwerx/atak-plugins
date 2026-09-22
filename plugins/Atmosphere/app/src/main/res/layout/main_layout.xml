@@ -154,6 +154,49 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
 
+        <!-- The hours as a table, every value per hour with the legend pinned on the
+             left, behind a toggle: the graph is the default read, the table is there
+             when a number for an hour is wanted. Closed by default. The scrollbar
+             stays visible so it is plain that more hours are off screen, and sits in
+             the padding under the last row rather than over it. -->
+        <Button
+            android:id="@+id/hours_table_button"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/show_hours_table" />
+
+        <LinearLayout
+            android:id="@+id/hours_table"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/hours_legend"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <HorizontalScrollView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fadeScrollbars="false"
+                android:scrollbarSize="3dp"
+                android:scrollbarStyle="outsideOverlay"
+                android:paddingBottom="6dp">
+
+                <LinearLayout
+                    android:id="@+id/hours_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+        </LinearLayout>
+
         <TextView
             android:id="@+id/days_heading"
             android:layout_width="match_parent"

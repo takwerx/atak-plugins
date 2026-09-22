@@ -57,6 +57,7 @@ public final class AtmospherePane {
     private static final String PREF_UNITS = "weather.units";
     private static final String PREF_USE_SELF = "weather.position.useSelf";
     private static final String PREF_TREND = "weather.trend.kind";
+    private static final String PREF_HOURS_TABLE = "weather.hours.table";
 
     private final View root;
     private final Context pluginContext;
@@ -79,6 +80,11 @@ public final class AtmospherePane {
     private final LinearLayout trendChips;
     private final TrendStripView trend;
     private Kind trendKind = Kind.TEMP;
+    private final Button hoursTableButton;
+    private final View hoursTable;
+    private final LinearLayout hoursLegend;
+    private final LinearLayout hoursContainer;
+    private boolean hoursTableOpen;
     private final TextView daysHeading;
     private final View daysStrip;
     private final LinearLayout daysLegend;
@@ -117,6 +123,10 @@ public final class AtmospherePane {
         trendChips = root.findViewById(R.id.trend_chips);
         trend = new TrendStripView(pluginContext);
         trendHost.addView(trend);
+        hoursTableButton = root.findViewById(R.id.hours_table_button);
+        hoursTable = root.findViewById(R.id.hours_table);
+        hoursLegend = root.findViewById(R.id.hours_legend);
+        hoursContainer = root.findViewById(R.id.hours_container);
         daysHeading = root.findViewById(R.id.days_heading);
         daysStrip = root.findViewById(R.id.days_strip);
         daysLegend = root.findViewById(R.id.days_legend);
@@ -128,6 +138,19 @@ public final class AtmospherePane {
                 : prefs.getString(PREF_UNITS, null), UnitSystem.METRIC);
         useSelf = prefs != null && prefs.getBoolean(PREF_USE_SELF, false);
         trendKind = Kind.fromName(prefs == null ? null : prefs.getString(PREF_TREND, null));
+        hoursTableOpen = prefs != null && prefs.getBoolean(PREF_HOURS_TABLE, false);
+        updateHoursTableButton();
+        hoursTableButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                hoursTableOpen = !hoursTableOpen;
+                final SharedPreferences p = MapCompat.prefs();
+                if (p != null)
+                    p.edit().putBoolean(PREF_HOURS_TABLE, hoursTableOpen).apply();
+                updateHoursTableButton();
+                render();
+            }
+        });
 
         wireSourceButton(prefs);
         wireButtons();
@@ -350,9 +373,16 @@ public final class AtmospherePane {
         });
     }
 
+    private void updateHoursTableButton() {
+        hoursTableButton.setText(hoursTableOpen ? R.string.hide_hours_table
+                : R.string.show_hours_table);
+    }
+
     private void render() {
         currentContainer.removeAllViews();
         trendChips.removeAllViews();
+        hoursLegend.removeAllViews();
+        hoursContainer.removeAllViews();
         daysLegend.removeAllViews();
         daysContainer.removeAllViews();
 
@@ -386,6 +416,7 @@ public final class AtmospherePane {
         renderSunMoon();
 
         renderTrend(wanted);
+        renderHours(wanted);
         renderDays(wanted);
         attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
     }
@@ -543,6 +574,46 @@ public final class AtmospherePane {
         }
         trend.setColumns(trendColumns(chosen, order));
         trendScroll.scrollTo(0, 0);
+    }
+
+    /**
+     * The hours as a table: every shown value per hour, the legend pinned on the left,
+     * behind a toggle. The trend strip is the default read and the table is there when
+     * a number for a given hour is wanted; the operator asked to keep both. Closed by
+     * default, the choice kept in prefs, and only built while open, since 48 columns
+     * of TextViews are not free.
+     */
+    private void renderHours(Set<String> wanted) {
+        final List<Reading> order = keyOrder(wanted);
+        final boolean any = !order.isEmpty() && !snapshot.series.isEmpty();
+        hoursTableButton.setVisibility(any ? View.VISIBLE : View.GONE);
+        hoursTable.setVisibility(any && hoursTableOpen ? View.VISIBLE : View.GONE);
+        if (!any || !hoursTableOpen)
+            return;
+        final List<String> labels = new ArrayList<>();
+        for (Reading r : order)
+            labels.add(shortLabel(r));
+        hoursLegend.addView(column("", labels, true));
+        final SimpleDateFormat day = new SimpleDateFormat("EEE", Locale.US);
+        final SimpleDateFormat hour = new SimpleDateFormat("ha", Locale.US);
+        int shown = 0;
+        for (SeriesEntry entry : snapshot.series) {
+            if (shown++ >= HOURS_SHOWN)
+                break;
+            final List<String> values = new ArrayList<>();
+            for (Reading k : order) {
+                final Reading r = entry.reading(k.key);
+                values.add(r == null ? "\u2014" : r.format(units));
+            }
+            final String header;
+            if (entry.timeMillis > 0) {
+                final Date d = new Date(entry.timeMillis);
+                header = day.format(d) + "\n" + hour.format(d).toLowerCase(Locale.US);
+            } else {
+                header = String.valueOf(entry.timeRaw);
+            }
+            hoursContainer.addView(column(header, values, false));
+        }
     }
 
     /** The chip text carries the unit, so the columns can print bare numbers. */
