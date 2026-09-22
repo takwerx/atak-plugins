@@ -11,6 +11,7 @@ import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.SnapshotStore;
 import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
+import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
 import com.atakmap.android.atmosphere.ui.AtmosphereDropDown;
 import com.atakmap.android.atmosphere.ui.AtmospherePane;
@@ -43,6 +44,10 @@ public class Atmosphere implements IPlugin {
     ToolbarItem toolbarItem;
     private AtmosphereDropDown dropDown;
     private AtmospherePane atmospherePane;
+    /** One egress policy for the pane and the overlays: the single choke point. */
+    private EgressPolicy egress;
+    /** Outlives the pane: the radar stays up while the pane is closed. */
+    private RadarOverlay radar;
 
     public Atmosphere(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -77,12 +82,32 @@ public class Atmosphere implements IPlugin {
         if (uiService == null)
             return;
         uiService.addToolbarItem(toolbarItem);
+        startOverlays();
+    }
+
+    /** The overlays need the map; it exists by onStart, and showPane retries if not. */
+    private void startOverlays() {
+        if (radar != null)
+            return;
+        final MapView mapView = MapView.getMapView();
+        if (mapView == null)
+            return;
+        if (egress == null)
+            egress = new EgressPolicy(pluginVersion());
+        radar = new RadarOverlay(mapView, egress);
+        radar.start();
+        if (atmospherePane != null)
+            atmospherePane.setRadar(radar);
     }
 
     @Override
     public void onStop() {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+        if (radar != null) {
+            radar.stop();
+            radar = null;
+        }
         if (dropDown != null) {
             dropDown.dispose();
             dropDown = null;
@@ -99,7 +124,8 @@ public class Atmosphere implements IPlugin {
             }
             final View view = PluginLayoutInflater.inflate(pluginContext,
                     R.layout.main_layout, null);
-            final EgressPolicy egress = new EgressPolicy(pluginVersion());
+            if (egress == null)
+                egress = new EgressPolicy(pluginVersion());
             final SourceRegistry registry = new SourceRegistry(pluginContext,
                     externalSourceDir());
             final WeatherClient client = new WeatherClient(egress,
@@ -107,6 +133,9 @@ public class Atmosphere implements IPlugin {
             atmospherePane = new AtmospherePane(view, pluginContext, registry, egress, client);
             dropDown = new AtmosphereDropDown(mapView, view, atmospherePane);
             atmospherePane.setHost(dropDown);
+            startOverlays();
+            if (radar != null)
+                atmospherePane.setRadar(radar);
         }
         dropDown.show();
     }

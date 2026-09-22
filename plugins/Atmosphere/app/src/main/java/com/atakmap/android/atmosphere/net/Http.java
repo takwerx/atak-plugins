@@ -5,6 +5,9 @@ import android.os.Looper;
 
 import com.atakmap.coremap.log.Log;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,6 +60,48 @@ public final class Http {
     private Http() {
     }
 
+    public interface BitmapCallback {
+        void onSuccess(Bitmap bitmap);
+        void onFailure(String error);
+    }
+
+    /** An image GET, decoded on the worker so main only draws it. */
+    public static void getBitmap(final String url, final String userAgent,
+            final BitmapCallback callback) {
+        EXECUTOR.execute(new Runnable() {
+            @Override
+            public void run() {
+                Bitmap bitmap = null;
+                String error = null;
+                try {
+                    final byte[] bytes = requestBytes(url, userAgent, null);
+                    bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    if (bitmap == null)
+                        error = "the provider did not return an image";
+                } catch (IOException e) {
+                    Log.w(TAG, "GET failed: " + safeUrl(url), e);
+                    error = describe(e);
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "GET failed hard: " + safeUrl(url), e);
+                    error = "request failed";
+                }
+                final Bitmap b = bitmap;
+                final String err = error;
+                MAIN.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (callback == null)
+                            return;
+                        if (err == null)
+                            callback.onSuccess(b);
+                        else
+                            callback.onFailure(err);
+                    }
+                });
+            }
+        });
+    }
+
     public static void get(final String url, final String userAgent,
             final Map<String, String> headers, final Callback callback) {
 
@@ -77,8 +122,13 @@ public final class Http {
         });
     }
 
-    private static String request(String url, String userAgent, Map<String, String> headers)
-            throws IOException {
+    private static String request(String url, String userAgent,
+            Map<String, String> headers) throws IOException {
+        return new String(requestBytes(url, userAgent, headers), "UTF-8");
+    }
+
+    private static byte[] requestBytes(String url, String userAgent,
+            Map<String, String> headers) throws IOException {
 
         final URL parsed = new URL(url);
         if (!"https".equalsIgnoreCase(parsed.getProtocol()))
@@ -101,7 +151,7 @@ public final class Http {
 
             final int status = conn.getResponseCode();
             if (status == HttpURLConnection.HTTP_NO_CONTENT)
-                return "";
+                return new byte[0];
             if (status == HttpURLConnection.HTTP_NOT_FOUND)
                 throw new IOException("no data for this point (HTTP 404)");
             if (status != HttpURLConnection.HTTP_OK)
@@ -122,7 +172,7 @@ public final class Http {
         }
     }
 
-    private static String read(InputStream in) throws IOException {
+    private static byte[] read(InputStream in) throws IOException {
         final ByteArrayOutputStream out = new ByteArrayOutputStream(16 * 1024);
         final byte[] buf = new byte[8192];
         int n;
@@ -134,7 +184,7 @@ public final class Http {
                         + (MAX_BYTES / (1024 * 1024)) + " MB");
             out.write(buf, 0, n);
         }
-        return out.toString("UTF-8");
+        return out.toByteArray();
     }
 
     private static void deliver(final Callback callback, final String body,

@@ -18,6 +18,12 @@
     <string name="show_hours_table">Show hourly table</string>
     <string name="hide_hours_table">Hide hourly table</string>
     <string name="heading_sun_moon">Sun and moon</string>
+    <string name="heading_layers">Layers</string>
+    <string name="radar_on">Radar ON</string>
+    <string name="radar_off">Radar OFF</string>
+    <string name="allow">Allow</string>
+    <string name="radar_allow_title">Allow radar</string>
+    <string name="radar_allow_text">Radar draws NWS reflectivity images from opengeo.ncep.noaa.gov (the US National Weather Service). Each request carries the map view\u2019s extent, nothing else.</string>
     <string name="variables">Variables</string>
     <string name="sources">Sources</string>
     <string name="privacy">Position sent</string>

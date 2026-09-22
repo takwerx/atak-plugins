@@ -26,6 +26,7 @@ import java.util.Locale;
 public final class EgressPolicy {
 
     private static final String PREF_ENABLED_PREFIX = "weather.source.enabled.";
+    private static final String PREF_LAYER_PREFIX = "weather.layer.enabled.";
     private static final String PREF_PRECISION = "weather.position.decimals";
 
     /** ~110 m at the equator. Plenty for a forecast, coarse enough not to be a fix. */
@@ -58,6 +59,23 @@ public final class EgressPolicy {
         if (prefs == null || def == null)
             return;
         prefs.edit().putBoolean(PREF_ENABLED_PREFIX + def.id, enabled).apply();
+    }
+
+    /**
+     * Map layers are gated like sources: off until the operator allows the host, once,
+     * by name. A layer request carries no position beyond the map view's extent.
+     */
+    public boolean isLayerEnabled(String layerId) {
+        final SharedPreferences prefs = MapCompat.prefs();
+        return prefs != null && layerId != null
+                && prefs.getBoolean(PREF_LAYER_PREFIX + layerId, false);
+    }
+
+    public void setLayerEnabled(String layerId, boolean enabled) {
+        final SharedPreferences prefs = MapCompat.prefs();
+        if (prefs == null || layerId == null)
+            return;
+        prefs.edit().putBoolean(PREF_LAYER_PREFIX + layerId, enabled).apply();
     }
 
     /** Decimal places kept on coordinates sent to a provider. 0 disables rounding. */

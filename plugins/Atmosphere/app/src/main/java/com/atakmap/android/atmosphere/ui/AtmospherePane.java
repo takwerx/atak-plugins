@@ -13,6 +13,7 @@ import android.view.View;
 import android.widget.HorizontalScrollView;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.SeekBar;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -27,6 +28,7 @@ import com.atakmap.android.atmosphere.model.Reading;
 import com.atakmap.android.atmosphere.model.SeriesEntry;
 import com.atakmap.android.atmosphere.model.Snapshot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
+import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
 import com.atakmap.android.atmosphere.source.WxParam;
@@ -107,6 +109,12 @@ public final class AtmospherePane {
     private final LinearLayout daysLegend;
     private final LinearLayout daysContainer;
     private final TextView attributionText;
+    private final Button radarToggle;
+    private final View scrubber;
+    private final TextView scrubberLabel;
+    private final SeekBar scrubberBar;
+    private RadarOverlay radar;
+    private List<String> radarFrames = new ArrayList<>();
 
     private final List<WxSourceDef> sources;
 
@@ -174,6 +182,11 @@ public final class AtmospherePane {
         daysLegend = root.findViewById(R.id.days_legend);
         daysContainer = root.findViewById(R.id.days_container);
         attributionText = root.findViewById(R.id.attribution_text);
+        radarToggle = root.findViewById(R.id.radar_toggle);
+        scrubber = root.findViewById(R.id.scrubber);
+        scrubberLabel = root.findViewById(R.id.scrubber_label);
+        scrubberBar = root.findViewById(R.id.scrubber_bar);
+        wireLayers();
 
         final SharedPreferences prefs = MapCompat.prefs();
         units = UnitSystem.fromName(prefs == null ? null
@@ -211,11 +224,130 @@ public final class AtmospherePane {
     /** Called every time the pane is shown, so a stale pane never lingers. */
     public void onShown() {
         refresh(false);
+        // The frame list ages while the pane is closed; a stale one is re-read.
+        if (radar != null && radar.isOn())
+            radar.refreshFrames(false);
     }
 
     /** The drop-down hosting this pane; the wide toggle needs it. */
     public void setHost(AtmosphereDropDown host) {
         this.host = host;
+    }
+
+    /** The radar overlay, owned by the plugin; the pane drives and reads it. */
+    public void setRadar(RadarOverlay overlay) {
+        radar = overlay;
+        if (radar == null)
+            return;
+        radar.setListener(new RadarOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> times, int shown) {
+                radarFrames = times;
+                scrubberBar.setMax(Math.max(0, times.size() - 1));
+                if (shown >= 0)
+                    scrubberBar.setProgress(shown);
+                updateRadarControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, String time) {
+                if (index >= 0 && scrubberBar.getProgress() != index)
+                    scrubberBar.setProgress(index);
+                scrubberLabel.setText(frameLabel(index, time));
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!status.isEmpty())
+                    scrubberLabel.setText(status);
+                else if (radar != null) {
+                    final int i = radar.frameIndex();
+                    scrubberLabel.setText(frameLabel(i,
+                            i < 0 || i >= radarFrames.size() ? null : radarFrames.get(i)));
+                }
+            }
+        });
+        updateRadarControls();
+    }
+
+    // ---- layers ------------------------------------------------------------------
+
+    private void wireLayers() {
+        radarToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (radar == null)
+                    return;
+                if (radar.isOn()) {
+                    radar.setOn(false);
+                    updateRadarControls();
+                } else if (egress.isLayerEnabled(RadarOverlay.LAYER_ID)) {
+                    radar.setOn(true);
+                    updateRadarControls();
+                } else {
+                    askToAllowRadar();
+                }
+            }
+        });
+        scrubberBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
+                if (fromUser && radar != null)
+                    radar.setFrameIndex(value);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+            }
+        });
+    }
+
+    /** The egress gate: the host, by name, once. */
+    private void askToAllowRadar() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.radar_allow_title))
+                .setMessage(pluginContext.getString(R.string.radar_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(RadarOverlay.LAYER_ID, true);
+                                if (radar != null)
+                                    radar.setOn(true);
+                                updateRadarControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void updateRadarControls() {
+        final boolean on = radar != null && radar.isOn();
+        radarToggle.setText(on ? R.string.radar_on : R.string.radar_off);
+        radarToggle.setTextColor(pluginContext.getResources().getColor(
+                on ? R.color.state_on : R.color.state_off));
+        scrubber.setVisibility(on ? View.VISIBLE : View.GONE);
+    }
+
+    /** "Radar 4:40 pm, latest, 3 min ago", in the phone's zone. */
+    private String frameLabel(int index, String time) {
+        if (time == null || index < 0)
+            return "Radar: no frame yet";
+        final long t = com.atakmap.android.atmosphere.data.IsoTime.parse(time);
+        if (t <= 0)
+            return "Radar: " + time;
+        final SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.US);
+        final String when = clock.format(new Date(t)).toLowerCase(Locale.US);
+        final boolean latest = index == radarFrames.size() - 1;
+        final long ageMin = Math.max(0, (System.currentTimeMillis() - t) / 60000L);
+        return "Radar " + when + (latest ? ", latest" : "") + ", " + ageMin + " min ago";
     }
 
     /** The pane left the screen: an armed pick must not keep the map's tap listeners. */
