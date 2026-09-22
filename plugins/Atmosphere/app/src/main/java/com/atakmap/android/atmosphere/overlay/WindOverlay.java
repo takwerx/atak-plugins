@@ -40,7 +40,7 @@ public final class WindOverlay {
 
     private static final String PREF_ON = "weather.layer.wind.on";
     private static final int GRID_NX = 96;
-    private static final int PARTICLES = 1600;
+    private static final int PARTICLES = 2400;
     private static final long TICK_MS = 33L;
     private static final long MOVE_SETTLE_MS = 600L;
     private static final long SCRUB_SETTLE_MS = 180L;

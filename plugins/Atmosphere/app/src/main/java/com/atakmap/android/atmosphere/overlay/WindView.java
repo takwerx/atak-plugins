@@ -35,10 +35,10 @@ import java.util.Random;
  */
 final class WindView extends View {
 
-    private static final int TRAIL = 14;
+    private static final int TRAIL = 36;
     /** Screen pixels a 6 m/s wind moves a particle per frame. */
     private static final float PX_PER_FRAME_AT_6MS = 1.7f;
-    private static final int MAX_AGE = 120;
+    private static final int MAX_AGE = 200;
 
     private final MapView mapView;
     private final int particles;
@@ -72,11 +72,12 @@ final class WindView extends View {
             for (int k = 0; k < TRAIL; k++) {
                 final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
                 p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(1.5f);
+                p.setStrokeWidth(2.0f);
                 p.setStrokeCap(Paint.Cap.ROUND);
                 p.setColor(colors[b]);
                 // newest segment brightest; the tail fades to nothing
-                p.setAlpha(Math.round(230f * (k + 1) / TRAIL));
+                // a slow rise so the tail thins out over its length, not in a step
+                p.setAlpha(Math.round(235f * (float) Math.pow((k + 1f) / TRAIL, 1.6)));
                 paints[b][k] = p;
             }
         }
@@ -200,7 +201,7 @@ final class WindView extends View {
     /** Once a second: what the view is doing, for the log. */
     private void report(float w, float h) {
         final long now = System.currentTimeMillis();
-        if (now - lastReport < 1000)
+        if (now - lastReport < 5000)
             return;
         lastReport = now;
         com.atakmap.coremap.log.Log.d("AtmosphereWind", String.format(java.util.Locale.US,
