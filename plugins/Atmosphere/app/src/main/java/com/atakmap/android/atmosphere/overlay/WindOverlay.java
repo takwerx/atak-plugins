@@ -320,7 +320,7 @@ public final class WindOverlay {
             // wind and draw nothing (XCover, 2026-09-22).
             if (view != null)
                 view.setGrid(null);
-            status("Wind: zoom in to draw");
+            status("Zoom in to see the wind");
             region = null;
             return;
         }
@@ -336,7 +336,7 @@ public final class WindOverlay {
         if (clamped.getEast() <= clamped.getWest() || clamped.getNorth() <= clamped.getSouth()) {
             if (view != null)
                 view.setGrid(null);
-            status("Wind: outside " + chosen.label + " coverage");
+            status("No wind data for this area");
             return;
         }
 
@@ -411,7 +411,7 @@ public final class WindOverlay {
             final String k, final int mine) {
         final NomadsWind.Model asked = model;
         final NomadsWind.Level askedLevel = level;
-        status("Wind: fetching " + asked.label + " +" + h + " h…");
+        status("Getting the wind…");
         // The filter's box is the region grown by a cell, so the grid covers it fully.
         Http.getBytes(NomadsWind.url(asked, askedLevel, tryRun, h, r.getWest() - 0.05, r.getSouth() - 0.05,
                 r.getEast() + 0.05, r.getNorth() + 0.05), egress.userAgent(), new Http.BytesCallback() {
@@ -427,7 +427,7 @@ public final class WindOverlay {
                         return;
                     }
                     if (k.equals(pendingKey)) pendingKey = null;
-                    status("Wind: no " + asked.label + " run available yet");
+                    status("No forecast published yet");
                     return;
                 }
                 if (k.equals(pendingKey)) pendingKey = null;
@@ -436,7 +436,7 @@ public final class WindOverlay {
                     grid = NomadsWind.read(body, GRID_NX);
                 } catch (IOException e) {
                     Log.w(TAG, "wind grid unreadable", e);
-                    status("Wind: " + e.getMessage());
+                    status(e.getMessage());
                     return;
                 }
                 if (tryRun != run) {
@@ -459,7 +459,7 @@ public final class WindOverlay {
                 if (k.equals(pendingKey)) pendingKey = null;
                 if (mine != generation)
                     return;
-                status("Wind: " + error);
+                status(error);
             }
         });
     }

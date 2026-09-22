@@ -228,7 +228,7 @@ public final class RadarOverlay {
             return;
         capsInFlight = true;
         final int mine = ++generation;
-        status("Radar: reading the frame list\u2026");
+        status("Getting radar\u2026");
         Http.get(BASE + "?service=WMS&version=1.3.0&request=GetCapabilities",
                 egress.userAgent(), null, new Http.Callback() {
                     @Override
@@ -238,7 +238,7 @@ public final class RadarOverlay {
                             return;
                         final List<String> times = parseTimes(body);
                         if (times.isEmpty()) {
-                            status("Radar: the server listed no frames");
+                            status("No radar frames available");
                             return;
                         }
                         capsFetchedAt = System.currentTimeMillis();
@@ -259,7 +259,7 @@ public final class RadarOverlay {
                         capsInFlight = false;
                         if (mine != generation)
                             return;
-                        status("Radar: " + error);
+                        status(error);
                     }
                 });
     }
@@ -333,7 +333,7 @@ public final class RadarOverlay {
         if (clampedView.getEast() <= clampedView.getWest()
                 || clampedView.getNorth() <= clampedView.getSouth()) {
             layer.clear();
-            status("Radar: outside CONUS coverage");
+            status("No radar for this area");
             return;
         }
         boolean refetch = region == null || !contains(region, clampedView);
@@ -372,7 +372,7 @@ public final class RadarOverlay {
             return;
         pendingKey = key;
         final int mine = ++generation;
-        status("Radar: fetching " + time.substring(11, 16) + "Z\u2026");
+        status("Getting radar\u2026");
         Http.getBitmap(imageUrl(r, time), egress.userAgent(), new Http.BitmapCallback() {
             @Override
             public void onSuccess(Bitmap bitmap) {
@@ -397,7 +397,7 @@ public final class RadarOverlay {
                     pendingKey = null;
                 if (mine != generation)
                     return;
-                status("Radar: " + error);
+                status(error);
             }
         });
     }
