@@ -12,7 +12,9 @@ import com.atakmap.android.atmosphere.data.SnapshotStore;
 import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
+import com.atakmap.android.atmosphere.ui.AtmosphereDropDown;
 import com.atakmap.android.atmosphere.ui.AtmospherePane;
+import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 
 import java.io.File;
@@ -20,14 +22,12 @@ import java.io.File;
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
 import gov.tak.api.ui.IHostUIService;
-import gov.tak.api.ui.Pane;
-import gov.tak.api.ui.PaneBuilder;
 import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
 /**
- * Plugin lifecycle only: the toolbar item and the pane.
+ * Plugin lifecycle only: the toolbar item and the drop-down that hosts the pane.
  *
  * <p>The weather work lives in {@link AtmospherePane} and below it. Building the registry
  * and the cache is deferred until the pane is first opened, because both need ATAK's own
@@ -41,8 +41,7 @@ public class Atmosphere implements IPlugin {
     Context pluginContext;
     IHostUIService uiService;
     ToolbarItem toolbarItem;
-    Pane pane;
-
+    private AtmosphereDropDown dropDown;
     private AtmospherePane atmospherePane;
 
     public Atmosphere(IServiceController serviceController) {
@@ -82,35 +81,33 @@ public class Atmosphere implements IPlugin {
 
     @Override
     public void onStop() {
-        if (uiService == null)
-            return;
-        uiService.removeToolbarItem(toolbarItem);
+        if (uiService != null)
+            uiService.removeToolbarItem(toolbarItem);
+        if (dropDown != null) {
+            dropDown.dispose();
+            dropDown = null;
+            atmospherePane = null;
+        }
     }
 
     private void showPane() {
-        if (pane == null) {
+        if (dropDown == null) {
+            final MapView mapView = MapView.getMapView();
+            if (mapView == null) {
+                Log.w(TAG, "no MapView yet; cannot open the pane");
+                return;
+            }
             final View view = PluginLayoutInflater.inflate(pluginContext,
                     R.layout.main_layout, null);
-
             final EgressPolicy egress = new EgressPolicy(pluginVersion());
             final SourceRegistry registry = new SourceRegistry(pluginContext,
                     externalSourceDir());
             final WeatherClient client = new WeatherClient(egress,
                     new SnapshotStore(cacheDir()));
-
             atmospherePane = new AtmospherePane(view, pluginContext, registry, egress, client);
-
-            pane = new PaneBuilder(view)
-                    .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
-                    .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
-                    .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
-                    .build();
+            dropDown = new AtmosphereDropDown(mapView, view, atmospherePane);
         }
-
-        if (!uiService.isPaneVisible(pane)) {
-            uiService.showPane(pane, null);
-            atmospherePane.onShown();
-        }
+        dropDown.show();
     }
 
     /** Where the operator drops their own source definitions. */
