@@ -29,6 +29,7 @@ import com.atakmap.android.atmosphere.model.SeriesEntry;
 import com.atakmap.android.atmosphere.model.Snapshot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
+import com.atakmap.android.atmosphere.overlay.WindOverlay;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
 import com.atakmap.android.atmosphere.source.WxParam;
@@ -115,6 +116,9 @@ public final class AtmospherePane {
     private final SeekBar scrubberBar;
     private RadarOverlay radar;
     private List<String> radarFrames = new ArrayList<>();
+    private final Button windToggle;
+    private WindOverlay wind;
+    private int windHours;
 
     private final List<WxSourceDef> sources;
 
@@ -183,6 +187,7 @@ public final class AtmospherePane {
         daysContainer = root.findViewById(R.id.days_container);
         attributionText = root.findViewById(R.id.attribution_text);
         radarToggle = root.findViewById(R.id.radar_toggle);
+        windToggle = root.findViewById(R.id.wind_toggle);
         scrubber = root.findViewById(R.id.scrubber);
         scrubberLabel = root.findViewById(R.id.scrubber_label);
         scrubberBar = root.findViewById(R.id.scrubber_bar);
@@ -227,6 +232,7 @@ public final class AtmospherePane {
         // The frame list ages while the pane is closed; a stale one is re-read.
         if (radar != null && radar.isOn())
             radar.refreshFrames(false);
+        updateLayerControls();
     }
 
     /** The drop-down hosting this pane; the wide toggle needs it. */
@@ -243,14 +249,18 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> times, int shown) {
                 radarFrames = times;
-                scrubberBar.setMax(Math.max(0, times.size() - 1));
-                if (shown >= 0)
-                    scrubberBar.setProgress(shown);
-                updateRadarControls();
+                if (radar.isOn()) {
+                    scrubberBar.setMax(Math.max(0, times.size() - 1));
+                    if (shown >= 0)
+                        scrubberBar.setProgress(shown);
+                }
+                updateLayerControls();
             }
 
             @Override
             public void onFrameShown(int index, String time) {
+                if (!radar.isOn())
+                    return;
                 if (index >= 0 && scrubberBar.getProgress() != index)
                     scrubberBar.setProgress(index);
                 scrubberLabel.setText(frameLabel(index, time));
@@ -258,6 +268,8 @@ public final class AtmospherePane {
 
             @Override
             public void onStatus(String status) {
+                if (!radar.isOn())
+                    return;
                 if (!status.isEmpty())
                     scrubberLabel.setText(status);
                 else if (radar != null) {
@@ -267,12 +279,73 @@ public final class AtmospherePane {
                 }
             }
         });
-        updateRadarControls();
+        updateLayerControls();
+    }
+
+    /** The wind overlay, owned by the plugin; shares the scrubber with the radar. */
+    public void setWind(WindOverlay overlay) {
+        wind = overlay;
+        if (wind == null)
+            return;
+        wind.setListener(new WindOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+                windHours = Math.max(0, labels.size() - 1);
+                if (wind.isOn()) {
+                    scrubberBar.setMax(windHours);
+                    scrubberBar.setProgress(shown);
+                }
+                updateLayerControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                if (!wind.isOn())
+                    return;
+                if (scrubberBar.getProgress() != index)
+                    scrubberBar.setProgress(index);
+                scrubberLabel.setText(windLabel(index, validTime));
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!wind.isOn())
+                    return;
+                if (!status.isEmpty())
+                    scrubberLabel.setText(status);
+                else
+                    scrubberLabel.setText(windLabel(wind.hourIndex(), wind.validTime(wind.hourIndex())));
+            }
+        });
+        updateLayerControls();
+    }
+
+    private String windLabel(int hour, long validTime) {
+        if (validTime <= 0)
+            return "Wind: no forecast yet";
+        final SimpleDateFormat fmt = new SimpleDateFormat("EEE h a", Locale.US);
+        return "Wind +" + hour + " h, " + fmt.format(new Date(validTime)).toLowerCase(Locale.US)
+                + " (HRRR)";
     }
 
     // ---- layers ------------------------------------------------------------------
 
     private void wireLayers() {
+        windToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (wind == null)
+                    return;
+                if (wind.isOn()) {
+                    wind.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(WindOverlay.LAYER_ID)) {
+                    turnWindOn();
+                } else {
+                    askToAllowWind();
+                }
+            }
+        });
         radarToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -280,10 +353,9 @@ public final class AtmospherePane {
                     return;
                 if (radar.isOn()) {
                     radar.setOn(false);
-                    updateRadarControls();
+                    updateLayerControls();
                 } else if (egress.isLayerEnabled(RadarOverlay.LAYER_ID)) {
-                    radar.setOn(true);
-                    updateRadarControls();
+                    turnRadarOn();
                 } else {
                     askToAllowRadar();
                 }
@@ -292,7 +364,11 @@ public final class AtmospherePane {
         scrubberBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
-                if (fromUser && radar != null)
+                if (!fromUser)
+                    return;
+                if (wind != null && wind.isOn())
+                    wind.setHourIndex(value);
+                else if (radar != null && radar.isOn())
                     radar.setFrameIndex(value);
             }
 
@@ -319,21 +395,65 @@ public final class AtmospherePane {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 egress.setLayerEnabled(RadarOverlay.LAYER_ID, true);
-                                if (radar != null)
-                                    radar.setOn(true);
-                                updateRadarControls();
+                                turnRadarOn();
                             }
                         })
                 .setNegativeButton(pluginContext.getString(R.string.close), null)
                 .show();
     }
 
-    private void updateRadarControls() {
-        final boolean on = radar != null && radar.isOn();
-        radarToggle.setText(on ? R.string.radar_on : R.string.radar_off);
+    /** One time-enabled layer at a time (WxReport's rule): the scrubber is one strip. */
+    private void turnRadarOn() {
+        if (wind != null && wind.isOn())
+            wind.setOn(false);
+        if (radar != null) {
+            radar.setOn(true);
+            scrubberBar.setMax(Math.max(0, radarFrames.size() - 1));
+            scrubberBar.setProgress(Math.max(0, radar.frameIndex()));
+        }
+        updateLayerControls();
+    }
+
+    private void turnWindOn() {
+        if (radar != null && radar.isOn())
+            radar.setOn(false);
+        if (wind != null) {
+            wind.setOn(true);
+            scrubberBar.setMax(windHours);
+            scrubberBar.setProgress(wind.hourIndex());
+        }
+        updateLayerControls();
+    }
+
+    private void askToAllowWind() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.wind_allow_title))
+                .setMessage(pluginContext.getString(R.string.wind_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(WindOverlay.LAYER_ID, true);
+                                turnWindOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void updateLayerControls() {
+        final boolean radarOn = radar != null && radar.isOn();
+        final boolean windOn = wind != null && wind.isOn();
+        radarToggle.setText(radarOn ? R.string.radar_on : R.string.radar_off);
         radarToggle.setTextColor(pluginContext.getResources().getColor(
-                on ? R.color.state_on : R.color.state_off));
-        scrubber.setVisibility(on ? View.VISIBLE : View.GONE);
+                radarOn ? R.color.state_on : R.color.state_off));
+        windToggle.setText(windOn ? R.string.wind_on : R.string.wind_off);
+        windToggle.setTextColor(pluginContext.getResources().getColor(
+                windOn ? R.color.state_on : R.color.state_off));
+        scrubber.setVisibility(radarOn || windOn ? View.VISIBLE : View.GONE);
     }
 
     /** "Radar 4:40 pm, latest, 3 min ago", in the phone's zone. */

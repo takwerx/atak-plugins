@@ -22,6 +22,10 @@
     <string name="radar_on">Radar ON</string>
     <string name="radar_off">Radar OFF</string>
     <string name="allow">Allow</string>
+    <string name="wind_on">Wind ON</string>
+    <string name="wind_off">Wind OFF</string>
+    <string name="wind_allow_title">Allow wind</string>
+    <string name="wind_allow_text">Wind draws the HRRR model\u2019s surface wind from nomads.ncep.noaa.gov (the US National Weather Service) as moving particles. Each request carries the map view\u2019s extent, nothing else.</string>
     <string name="radar_allow_title">Allow radar</string>
     <string name="radar_allow_text">Radar draws NWS reflectivity images from opengeo.ncep.noaa.gov (the US National Weather Service). Each request carries the map view\u2019s extent, nothing else.</string>
     <string name="variables">Variables</string>

@@ -12,6 +12,7 @@ import com.atakmap.android.atmosphere.data.SnapshotStore;
 import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
+import com.atakmap.android.atmosphere.overlay.WindOverlay;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
 import com.atakmap.android.atmosphere.ui.AtmosphereDropDown;
 import com.atakmap.android.atmosphere.ui.AtmospherePane;
@@ -48,6 +49,7 @@ public class Atmosphere implements IPlugin {
     private EgressPolicy egress;
     /** Outlives the pane: the radar stays up while the pane is closed. */
     private RadarOverlay radar;
+    private WindOverlay wind;
 
     public Atmosphere(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -96,14 +98,22 @@ public class Atmosphere implements IPlugin {
             egress = new EgressPolicy(pluginVersion());
         radar = new RadarOverlay(mapView, egress);
         radar.start();
-        if (atmospherePane != null)
+        wind = new WindOverlay(mapView, egress);
+        wind.start();
+        if (atmospherePane != null) {
             atmospherePane.setRadar(radar);
+            atmospherePane.setWind(wind);
+        }
     }
 
     @Override
     public void onStop() {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+        if (wind != null) {
+            wind.stop();
+            wind = null;
+        }
         if (radar != null) {
             radar.stop();
             radar = null;
@@ -136,6 +146,8 @@ public class Atmosphere implements IPlugin {
             startOverlays();
             if (radar != null)
                 atmospherePane.setRadar(radar);
+            if (wind != null)
+                atmospherePane.setWind(wind);
         }
         dropDown.show();
     }

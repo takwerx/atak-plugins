@@ -49,6 +49,19 @@ public final class GLRasterLayer extends GLAbstractLayer
         }
     };
 
+    private static int registrations;
+
+    /** Register the renderer for the first layer, once; unregister after the last. */
+    public static synchronized void register() {
+        if (registrations++ == 0)
+            com.atakmap.map.layer.opengl.GLLayerFactory.register(SPI);
+    }
+
+    public static synchronized void unregister() {
+        if (registrations > 0 && --registrations == 0)
+            com.atakmap.map.layer.opengl.GLLayerFactory.unregister(SPI);
+    }
+
     private final RasterLayer subject;
     private Data frame;
 

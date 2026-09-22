@@ -10,7 +10,6 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoBounds;
 import com.atakmap.map.AtakMapView;
-import com.atakmap.map.layer.opengl.GLLayerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -139,7 +138,7 @@ public final class RadarOverlay {
         if (started)
             return;
         started = true;
-        GLLayerFactory.register(GLRasterLayer.SPI);
+        GLRasterLayer.register();
         mapView.addLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
         layer.setVisible(false);
         mapView.addOnMapMovedListener(moved);
@@ -159,7 +158,7 @@ public final class RadarOverlay {
         generation++;
         layer.clear();
         mapView.removeLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
-        GLLayerFactory.unregister(GLRasterLayer.SPI);
+        GLRasterLayer.unregister();
         cache.clear();
     }
 

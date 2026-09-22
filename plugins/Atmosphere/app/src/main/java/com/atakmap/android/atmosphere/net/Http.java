@@ -60,6 +60,45 @@ public final class Http {
     private Http() {
     }
 
+    public interface BytesCallback {
+        void onSuccess(byte[] body);
+        void onFailure(String error);
+    }
+
+    /** A binary GET, delivered on main. */
+    public static void getBytes(final String url, final String userAgent,
+            final BytesCallback callback) {
+        EXECUTOR.execute(new Runnable() {
+            @Override
+            public void run() {
+                byte[] body = null;
+                String error = null;
+                try {
+                    body = requestBytes(url, userAgent, null);
+                } catch (IOException e) {
+                    Log.w(TAG, "GET failed: " + safeUrl(url), e);
+                    error = describe(e);
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "GET failed hard: " + safeUrl(url), e);
+                    error = "request failed";
+                }
+                final byte[] b = body;
+                final String err = error;
+                MAIN.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (callback == null)
+                            return;
+                        if (err == null)
+                            callback.onSuccess(b);
+                        else
+                            callback.onFailure(err);
+                    }
+                });
+            }
+        });
+    }
+
     public interface BitmapCallback {
         void onSuccess(Bitmap bitmap);
         void onFailure(String error);

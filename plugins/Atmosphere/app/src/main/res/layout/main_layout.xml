@@ -253,6 +253,14 @@
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
                 android:text="@string/radar_off" />
+
+            <Button
+                android:id="@+id/wind_toggle"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/wind_off" />
         </LinearLayout>
 
         <LinearLayout
