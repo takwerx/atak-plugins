@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">Atmosphere</string>
+    <!-- description -->
+    <string name="app_desc">Fire and hazmat weather for a point on the map, kept when the network drops</string>
+
+    <!-- Pane -->
+    <string name="refresh">Refresh</string>
+    <string name="map_center">Map center</string>
+    <string name="self_position">My position</string>
+    <string name="units_metric">Metric</string>
+    <string name="no_position">No position yet</string>
+    <string name="status_idle">Pick a source and refresh</string>
+    <string name="heading_now">Now</string>
+    <string name="heading_hours">Next hours</string>
+    <string name="variables">Variables</string>
+    <string name="sources">Sources</string>
+    <string name="privacy">Position sent</string>
+
+    <!-- Dialogs -->
+    <string name="sources_title">Sources</string>
+    <string name="variables_title">Variables</string>
+    <string name="privacy_title">Position sent to providers</string>
+    <string name="no_sources">No source definitions loaded</string>
+    <string name="source_problems">Source file problems</string>
+    <string name="close">Close</string>
+</resources>
