@@ -106,6 +106,7 @@ public class Atmosphere implements IPlugin {
                     new SnapshotStore(cacheDir()));
             atmospherePane = new AtmospherePane(view, pluginContext, registry, egress, client);
             dropDown = new AtmosphereDropDown(mapView, view, atmospherePane);
+            atmospherePane.setHost(dropDown);
         }
         dropDown.show();
     }

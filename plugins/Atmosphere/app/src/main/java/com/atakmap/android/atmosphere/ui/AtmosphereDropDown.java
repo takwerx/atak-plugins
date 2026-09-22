@@ -118,7 +118,9 @@ public class AtmosphereDropDown extends DropDownReceiver implements OnStateListe
     @Override
     public void onDropDownClose() {
         // Nothing runs while the pane is closed; the client's own work finishes on its
-        // executor and the snapshot store is on disk.
+        // executor and the snapshot store is on disk. An armed pick is the exception:
+        // it holds the map's tap listeners and must let go.
+        pane.onClosed();
     }
 
     @Override
@@ -128,6 +130,6 @@ public class AtmosphereDropDown extends DropDownReceiver implements OnStateListe
 
     @Override
     protected void disposeImpl() {
-        // nothing held beyond the views
+        pane.onClosed();
     }
 }

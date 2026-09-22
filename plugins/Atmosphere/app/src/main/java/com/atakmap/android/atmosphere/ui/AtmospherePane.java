@@ -5,12 +5,14 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.PointF;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.HorizontalScrollView;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -32,7 +34,11 @@ import com.atakmap.android.atmosphere.source.WxSourceDef;
 import com.atakmap.android.atmosphere.units.Quantity;
 import com.atakmap.android.atmosphere.units.UnitSystem;
 import com.atakmap.android.atmosphere.units.Units;
+import com.atakmap.android.maps.MapEvent;
+import com.atakmap.android.maps.MapEventDispatcher;
+import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.maps.coords.GeoPoint;
+import com.atakmap.coremap.maps.coords.GeoPointMetaData;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -58,7 +64,10 @@ public final class AtmospherePane {
 
     private static final String PREF_SOURCE = "weather.source.selected";
     private static final String PREF_UNITS = "weather.units";
-    private static final String PREF_USE_SELF = "weather.position.useSelf";
+    /** Which point the readout is for: a {@link PointMode} name. */
+    private static final String PREF_MODE = "weather.position.mode";
+    /** The picked point as "lat,lon", kept so a picked point survives a reopen. */
+    private static final String PREF_PICKED = "weather.position.picked";
     /** The name of the favorite being read, when one is; absent for map center or self. */
     private static final String PREF_FAVORITE = "weather.position.favorite";
     private static final String PREF_TREND = "weather.trend.kind";
@@ -70,12 +79,14 @@ public final class AtmospherePane {
     private final EgressPolicy egress;
     private final WeatherClient client;
 
-    private final Button sourceButton;
-    private final Button refreshButton;
-    private final Button centerButton;
-    private final Button selfButton;
+    private final ImageButton modeSelf;
+    private final ImageButton modeCenter;
+    private final ImageButton modePick;
+    private final ImageButton favoritesButton;
     private final Button unitsButton;
-    private final Button favoritesButton;
+    private final ImageButton wideButton;
+    private final ImageButton refreshButton;
+    private final ImageButton settingsButton;
     private final TextView positionText;
     private final TextView statusText;
     private final TextView currentHeading;
@@ -101,10 +112,29 @@ public final class AtmospherePane {
 
     private WxSourceDef selected;
     private UnitSystem units;
-    private boolean useSelf;
-    /** The saved place being read, or null when the point is the map center or self. */
+    /** Where the readout is for. */
+    public enum PointMode {
+        SELF, CENTER, PICKED, FAVORITE;
+
+        static PointMode fromName(String n) {
+            if (n != null)
+                for (PointMode m : values())
+                    if (m.name().equals(n)) return m;
+            return CENTER;
+        }
+    }
+
+    private PointMode mode = PointMode.CENTER;
+    /** The point picked on the map, when the mode is PICKED. */
+    private GeoPoint pickedPoint;
+    /** The saved place being read, when the mode is FAVORITE. */
     private Favorites.Place favorite;
     private final Favorites favorites;
+    /** True between the Pick tap and the map tap; the map listeners are pushed. */
+    private boolean pickArmed;
+    private MapEventDispatcher.MapEventDispatchListener pickListener;
+    /** The drop-down hosting this pane, for the wide toggle; set after construction. */
+    private AtmosphereDropDown host;
     private Snapshot snapshot;
 
     public AtmospherePane(View root, Context pluginContext, SourceRegistry registry,
@@ -117,12 +147,14 @@ public final class AtmospherePane {
         this.client = client;
         this.sources = registry.sources();
 
-        sourceButton = root.findViewById(R.id.source_button);
-        refreshButton = root.findViewById(R.id.refresh_button);
-        centerButton = root.findViewById(R.id.center_button);
-        selfButton = root.findViewById(R.id.self_button);
-        unitsButton = root.findViewById(R.id.units_button);
+        modeSelf = root.findViewById(R.id.mode_self);
+        modeCenter = root.findViewById(R.id.mode_center);
+        modePick = root.findViewById(R.id.mode_pick);
         favoritesButton = root.findViewById(R.id.favorites_button);
+        unitsButton = root.findViewById(R.id.units_button);
+        wideButton = root.findViewById(R.id.wide_button);
+        refreshButton = root.findViewById(R.id.refresh_button);
+        settingsButton = root.findViewById(R.id.settings_button);
         positionText = root.findViewById(R.id.position_text);
         statusText = root.findViewById(R.id.status_text);
         currentHeading = root.findViewById(R.id.current_heading);
@@ -146,9 +178,14 @@ public final class AtmospherePane {
         final SharedPreferences prefs = MapCompat.prefs();
         units = UnitSystem.fromName(prefs == null ? null
                 : prefs.getString(PREF_UNITS, null), UnitSystem.METRIC);
-        useSelf = prefs != null && prefs.getBoolean(PREF_USE_SELF, false);
         favorites = new Favorites(MapCompat.atakContext());
         favorite = favorites.byName(prefs == null ? null : prefs.getString(PREF_FAVORITE, null));
+        pickedPoint = parsePoint(prefs == null ? null : prefs.getString(PREF_PICKED, null));
+        mode = PointMode.fromName(prefs == null ? null : prefs.getString(PREF_MODE, null));
+        // A mode whose point is gone (favorite removed, nothing picked) falls back.
+        if ((mode == PointMode.FAVORITE && favorite == null)
+                || (mode == PointMode.PICKED && pickedPoint == null))
+            mode = PointMode.CENTER;
         trendKind = Kind.fromName(prefs == null ? null : prefs.getString(PREF_TREND, null));
         hoursTableOpen = prefs != null && prefs.getBoolean(PREF_HOURS_TABLE, false);
         updateHoursTableButton();
@@ -164,10 +201,10 @@ public final class AtmospherePane {
             }
         });
 
-        wireSourceButton(prefs);
+        loadSelectedSource(prefs);
         wireButtons();
         updateUnitsButton();
-        updatePositionMode();
+        updateModeIcons();
         showSourceProblemsIfAny();
     }
 
@@ -176,13 +213,18 @@ public final class AtmospherePane {
         refresh(false);
     }
 
-    /**
-     * The source picker is a button that opens a single-choice dialog on ATAK's own
-     * context. Never a Spinner: its dropdown is a Dialog built from the context that
-     * inflated the view, and on the plugin context that is a BadTokenException that
-     * kills ATAK (plugin UI standard, CLAUDE.md).
-     */
-    private void wireSourceButton(SharedPreferences prefs) {
+    /** The drop-down hosting this pane; the wide toggle needs it. */
+    public void setHost(AtmosphereDropDown host) {
+        this.host = host;
+    }
+
+    /** The pane left the screen: an armed pick must not keep the map's tap listeners. */
+    public void onClosed() {
+        disarmPick();
+        updateModeIcons();
+    }
+
+    private void loadSelectedSource(SharedPreferences prefs) {
         final String storedId = prefs == null ? null : prefs.getString(PREF_SOURCE, null);
         int index = 0;
         for (int i = 0; i < sources.size(); i++) {
@@ -193,40 +235,70 @@ public final class AtmospherePane {
         }
         if (!sources.isEmpty())
             selected = sources.get(index);
-        updateSourceButton();
+    }
 
-        sourceButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (sources.isEmpty())
-                    return;
-                final Context ctx = MapCompat.atakContext();
-                if (ctx == null)
-                    return;
-                final String[] names = sourceNames();
-                final int checked = selected == null ? -1 : sources.indexOf(selected);
-                new AlertDialog.Builder(ctx)
-                        .setTitle(pluginContext.getString(R.string.source_title))
-                        .setSingleChoiceItems(names, checked,
-                                new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface d, int which) {
-                                        d.dismiss();
-                                        if (which < 0 || which >= sources.size())
-                                            return;
-                                        selected = sources.get(which);
-                                        final SharedPreferences p = MapCompat.prefs();
-                                        if (p != null)
-                                            p.edit().putString(PREF_SOURCE, selected.id).apply();
-                                        updateSourceButton();
-                                        snapshot = null;
-                                        refresh(false);
-                                    }
-                                })
-                        .setNegativeButton(pluginContext.getString(R.string.close), null)
-                        .show();
-            }
-        });
+    /**
+     * The source picker: a single-choice dialog on ATAK's own context. Never a
+     * Spinner: its dropdown is a Dialog built from the context that inflated the
+     * view, and on the plugin context that is a BadTokenException that kills ATAK
+     * (plugin UI standard, CLAUDE.md).
+     */
+    private void showSourceDialog() {
+        if (sources.isEmpty())
+            return;
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final String[] names = sourceNames();
+        final int checked = selected == null ? -1 : sources.indexOf(selected);
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.source_title))
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        d.dismiss();
+                        if (which < 0 || which >= sources.size())
+                            return;
+                        selected = sources.get(which);
+                        final SharedPreferences p = MapCompat.prefs();
+                        if (p != null)
+                            p.edit().putString(PREF_SOURCE, selected.id).apply();
+                        snapshot = null;
+                        refresh(false);
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /** The gear: everything that is not the readout itself. */
+    private void showSettingsDialog() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final String[] items = {
+                pluginContext.getString(R.string.source_title) + ": "
+                        + (selected == null ? pluginContext.getString(R.string.no_sources)
+                                : sourceName(selected)),
+                pluginContext.getString(R.string.sources_title),
+                pluginContext.getString(R.string.variables_title),
+                pluginContext.getString(R.string.privacy_title),
+        };
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.settings_title))
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        switch (which) {
+                            case 0: showSourceDialog(); break;
+                            case 1: showSourcesDialog(); break;
+                            case 2: showVariablesDialog(); break;
+                            default: showPrivacyDialog(); break;
+                        }
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
     }
 
     private String[] sourceNames() {
@@ -242,16 +314,6 @@ public final class AtmospherePane {
                 ? def.displayName + " *" : def.displayName;
     }
 
-    private void updateSourceButton() {
-        if (selected == null) {
-            sourceButton.setText(R.string.no_sources);
-            sourceButton.setEnabled(false);
-        } else {
-            sourceButton.setText(sourceName(selected));
-            sourceButton.setEnabled(true);
-        }
-    }
-
     private void wireButtons() {
         refreshButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -260,17 +322,24 @@ public final class AtmospherePane {
             }
         });
 
-        centerButton.setOnClickListener(new View.OnClickListener() {
+        modeSelf.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                setUseSelf(false);
+                setMode(PointMode.SELF);
             }
         });
 
-        selfButton.setOnClickListener(new View.OnClickListener() {
+        modeCenter.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                setUseSelf(true);
+                setMode(PointMode.CENTER);
+            }
+        });
+
+        modePick.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                armPick();
             }
         });
 
@@ -295,73 +364,156 @@ public final class AtmospherePane {
             }
         });
 
-        root.findViewById(R.id.variables_button).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        showVariablesDialog();
-                    }
-                });
+        wideButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (host != null)
+                    host.toggleWide();
+            }
+        });
 
-        root.findViewById(R.id.sources_button).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        showSourcesDialog();
-                    }
-                });
-
-        root.findViewById(R.id.privacy_button).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        showPrivacyDialog();
-                    }
-                });
+        settingsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showSettingsDialog();
+            }
+        });
     }
 
-    private void setUseSelf(boolean value) {
-        useSelf = value;
-        favorite = null;
+    // ---- the point ---------------------------------------------------------------
+
+    private void setMode(PointMode m) {
+        disarmPick();
+        mode = m;
+        if (m != PointMode.FAVORITE)
+            favorite = null;
         final SharedPreferences p = MapCompat.prefs();
-        if (p != null)
-            p.edit().putBoolean(PREF_USE_SELF, value).remove(PREF_FAVORITE).apply();
-        updatePositionMode();
+        if (p != null) {
+            final SharedPreferences.Editor e = p.edit().putString(PREF_MODE, m.name());
+            if (favorite == null)
+                e.remove(PREF_FAVORITE);
+            else
+                e.putString(PREF_FAVORITE, favorite.name);
+            if (pickedPoint == null)
+                e.remove(PREF_PICKED);
+            else
+                e.putString(PREF_PICKED, pickedPoint.getLatitude() + "," + pickedPoint.getLongitude());
+            e.apply();
+        }
+        updateModeIcons();
         snapshot = null;
         refresh(false);
-    }
-
-    private void updatePositionMode() {
-        // The button for the point in use is the flat, disabled one. With a favorite
-        // in use both of the others are live, and the star's text goes green.
-        centerButton.setEnabled(useSelf || favorite != null);
-        selfButton.setEnabled(!useSelf || favorite != null);
-        favoritesButton.setTextColor(favorite != null
-                ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
     }
 
     private void setFavorite(Favorites.Place place) {
         favorite = place;
-        final SharedPreferences p = MapCompat.prefs();
-        if (p != null) {
-            if (place == null)
-                p.edit().remove(PREF_FAVORITE).apply();
-            else
-                p.edit().putString(PREF_FAVORITE, place.name).apply();
-        }
-        updatePositionMode();
-        snapshot = null;
-        refresh(false);
+        setMode(place == null ? PointMode.CENTER : PointMode.FAVORITE);
     }
 
+    /** The icon for the point in use is green; an armed pick is green until the tap. */
+    private void updateModeIcons() {
+        final int on = pluginContext.getResources().getColor(R.color.state_on);
+        modeSelf.setColorFilter(mode == PointMode.SELF ? on : Color.WHITE);
+        modeCenter.setColorFilter(mode == PointMode.CENTER ? on : Color.WHITE);
+        modePick.setColorFilter(pickArmed || mode == PointMode.PICKED ? on : Color.WHITE);
+        favoritesButton.setColorFilter(mode == PointMode.FAVORITE ? on : Color.WHITE);
+    }
+
+    /** The row is too narrow for "Imperial"; the temperature unit says which system. */
     private void updateUnitsButton() {
-        unitsButton.setText(units.label());
+        unitsButton.setText(units == UnitSystem.IMPERIAL ? "\u00b0F" : "\u00b0C");
+        unitsButton.setContentDescription(units.label());
     }
 
     private GeoPoint point() {
-        if (favorite != null)
-            return new GeoPoint(favorite.latitude, favorite.longitude);
-        return useSelf ? MapCompat.selfPoint() : MapCompat.mapCenter();
+        switch (mode) {
+            case SELF: return MapCompat.selfPoint();
+            case PICKED: return pickedPoint;
+            case FAVORITE: return favorite == null ? null
+                    : new GeoPoint(favorite.latitude, favorite.longitude);
+            default: return MapCompat.mapCenter();
+        }
+    }
+
+    /** What the position line calls the point. */
+    private String modeLabel() {
+        switch (mode) {
+            case SELF: return pluginContext.getString(R.string.self_position);
+            case PICKED: return pluginContext.getString(R.string.picked_point);
+            case FAVORITE: return "\u2605 " + (favorite == null ? "" : favorite.name);
+            default: return pluginContext.getString(R.string.map_center);
+        }
+    }
+
+    private static GeoPoint parsePoint(String s) {
+        if (s == null)
+            return null;
+        final String[] parts = s.split(",");
+        if (parts.length != 2)
+            return null;
+        try {
+            final GeoPoint p = new GeoPoint(Double.parseDouble(parts[0].trim()),
+                    Double.parseDouble(parts[1].trim()));
+            return p.isValid() ? p : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Pick a point: the next map tap is the point (WxReport's Map Lock). The map's
+     * click listeners are pushed and ours put in front, and popped again on the tap,
+     * on a second Pick tap, or when the pane closes, so an armed pick never outlives
+     * the pane and never eats a tap meant for ATAK.
+     */
+    private void armPick() {
+        if (pickArmed) {
+            disarmPick();
+            updateModeIcons();
+            statusText.setText("");
+            return;
+        }
+        final MapView mv = MapView.getMapView();
+        if (mv == null)
+            return;
+        pickArmed = true;
+        updateModeIcons();
+        statusText.setTextColor(pluginContext.getResources().getColor(R.color.state_on));
+        statusText.setText(pluginContext.getString(R.string.pick_prompt));
+        final MapEventDispatcher d = mv.getMapEventDispatcher();
+        d.pushListeners();
+        d.clearListeners(MapEvent.MAP_CLICK);
+        d.clearListeners(MapEvent.ITEM_CLICK);
+        pickListener = new MapEventDispatcher.MapEventDispatchListener() {
+            @Override
+            public void onMapEvent(MapEvent event) {
+                final PointF pf = event.getPointF();
+                GeoPoint p = null;
+                if (pf != null) {
+                    final GeoPointMetaData gp = mv.inverseWithElevation(pf.x, pf.y);
+                    p = gp == null ? null : gp.get();
+                }
+                disarmPick();
+                if (p == null || !p.isValid()) {
+                    updateModeIcons();
+                    return;
+                }
+                pickedPoint = p;
+                setMode(PointMode.PICKED);
+            }
+        };
+        d.addMapEventListener(MapEvent.MAP_CLICK, pickListener);
+        d.addMapEventListener(MapEvent.ITEM_CLICK, pickListener);
+    }
+
+    private void disarmPick() {
+        if (!pickArmed)
+            return;
+        pickArmed = false;
+        pickListener = null;
+        final MapView mv = MapView.getMapView();
+        if (mv != null)
+            mv.getMapEventDispatcher().popListeners();
     }
 
     private void refresh(boolean force) {
@@ -373,16 +525,17 @@ public final class AtmospherePane {
         final GeoPoint p = point();
         if (p == null) {
             positionText.setText(R.string.no_position);
-            statusText.setText(useSelf
+            statusText.setText(mode == PointMode.SELF
                     ? "No self position yet (no GPS fix). Tap Refresh once ATAK has one."
-                    : "No map center yet");
+                    : mode == PointMode.PICKED ? "No point picked yet" : "No map center yet");
             return;
         }
 
-        positionText.setText((favorite == null ? "" : "\u2605 " + favorite.name + " \u2014 ")
-                + "Sending " + egress.latitude(p) + ", " + egress.longitude(p)
+        positionText.setText(modeLabel() + " \u2014 sending " + egress.latitude(p) + ", "
+                + egress.longitude(p)
                 + "  (rounded to ~" + EgressPolicy.approximateMetres(
                         egress.positionDecimals()) + " m)");
+        statusText.setTextColor(Color.parseColor("#dfb228"));
         statusText.setText("Fetching from " + selected.displayName + "…");
 
         client.fetch(selected, p, force, new WeatherClient.Listener() {
@@ -1193,7 +1346,7 @@ public final class AtmospherePane {
                         }
                         // The place being read is gone: back to the map center.
                         if (activeGone)
-                            setUseSelf(false);
+                            setMode(PointMode.CENTER);
                     }
                 })
                 .setNegativeButton(pluginContext.getString(R.string.close), null)

@@ -12,86 +12,70 @@
         android:orientation="vertical"
         android:paddingBottom="8dp">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/label_source"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:paddingTop="2dp"
-            android:alpha="0.6" />
-
-        <!-- Source picker: a button opening a single-choice dialog on ATAK's context.
-             Never a Spinner; its dropdown on the plugin context kills ATAK. -->
+        <!-- The icon row: point modes, favorites, units, wide, refresh, settings.
+             44 dp targets on ATAK's own button background, white masks tinted green
+             for the mode in use (the Traffic toggle convention). Replaces the Source
+             and Where button rows, so the readout starts one row down. -->
         <LinearLayout
+            android:id="@+id/icon_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:paddingTop="4dp">
 
-            <Button
-                android:id="@+id/source_button"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/no_sources" />
+            <ImageButton
+                android:id="@+id/mode_self"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/self_position"
+                android:src="@drawable/ic_point_self" />
 
-            <Button
-                android:id="@+id/refresh_button"
-                style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/refresh" />
-        </LinearLayout>
+            <ImageButton
+                android:id="@+id/mode_center"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/map_center"
+                android:src="@drawable/ic_point_center" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/label_where"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:paddingTop="6dp"
-            android:alpha="0.6" />
+            <ImageButton
+                android:id="@+id/mode_pick"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/pick_point"
+                android:src="@drawable/ic_point_pick" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <Button
-                android:id="@+id/center_button"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/map_center" />
-
-            <Button
-                android:id="@+id/self_button"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/self_position" />
-
-            <!-- Favorites: the star opens the saved-places picker; green text while one
-                 is the point being read (the Traffic toggle convention). -->
-            <Button
+            <ImageButton
                 android:id="@+id/favorites_button"
-                style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="44dp"
-                android:text="@string/favorites_glyph" />
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/favorites_title"
+                android:src="@drawable/ic_favorites" />
 
             <Button
                 android:id="@+id/units_button"
                 style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="44dp"
+                android:layout_marginLeft="2dp"
+                android:layout_marginRight="2dp"
+                android:paddingLeft="4dp"
+                android:paddingRight="4dp"
                 android:text="@string/units_metric" />
+
+            <ImageButton
+                android:id="@+id/wide_button"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/wide"
+                android:src="@drawable/ic_wide" />
+
+            <ImageButton
+                android:id="@+id/refresh_button"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/refresh"
+                android:src="@drawable/ic_refresh" />
+
+            <ImageButton
+                android:id="@+id/settings_button"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/settings"
+                android:src="@drawable/ic_settings" />
         </LinearLayout>
 
         <TextView
@@ -242,37 +226,6 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal" />
             </HorizontalScrollView>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="@dimen/auto_margin">
-
-            <Button
-                android:id="@+id/variables_button"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/variables" />
-
-            <Button
-                android:id="@+id/sources_button"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/sources" />
-
-            <Button
-                android:id="@+id/privacy_button"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/privacy" />
         </LinearLayout>
 
         <TextView
