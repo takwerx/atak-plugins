@@ -76,6 +76,16 @@
                 android:layout_height="wrap_content"
                 android:text="@string/self_position" />
 
+            <!-- Favorites: the star opens the saved-places picker; green text while one
+                 is the point being read (the Traffic toggle convention). -->
+            <Button
+                android:id="@+id/favorites_button"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="44dp"
+                android:text="@string/favorites_glyph" />
+
             <Button
                 android:id="@+id/units_button"
                 style="@style/TakwerxButton"

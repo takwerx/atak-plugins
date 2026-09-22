@@ -11,11 +11,14 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.HorizontalScrollView;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.atakmap.android.atmosphere.astro.Astro;
 import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.data.Favorites;
 import com.atakmap.android.atmosphere.data.ParamSelection;
 import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.model.Reading;
@@ -56,6 +59,8 @@ public final class AtmospherePane {
     private static final String PREF_SOURCE = "weather.source.selected";
     private static final String PREF_UNITS = "weather.units";
     private static final String PREF_USE_SELF = "weather.position.useSelf";
+    /** The name of the favorite being read, when one is; absent for map center or self. */
+    private static final String PREF_FAVORITE = "weather.position.favorite";
     private static final String PREF_TREND = "weather.trend.kind";
     private static final String PREF_HOURS_TABLE = "weather.hours.table";
 
@@ -70,6 +75,7 @@ public final class AtmospherePane {
     private final Button centerButton;
     private final Button selfButton;
     private final Button unitsButton;
+    private final Button favoritesButton;
     private final TextView positionText;
     private final TextView statusText;
     private final TextView currentHeading;
@@ -96,6 +102,9 @@ public final class AtmospherePane {
     private WxSourceDef selected;
     private UnitSystem units;
     private boolean useSelf;
+    /** The saved place being read, or null when the point is the map center or self. */
+    private Favorites.Place favorite;
+    private final Favorites favorites;
     private Snapshot snapshot;
 
     public AtmospherePane(View root, Context pluginContext, SourceRegistry registry,
@@ -113,6 +122,7 @@ public final class AtmospherePane {
         centerButton = root.findViewById(R.id.center_button);
         selfButton = root.findViewById(R.id.self_button);
         unitsButton = root.findViewById(R.id.units_button);
+        favoritesButton = root.findViewById(R.id.favorites_button);
         positionText = root.findViewById(R.id.position_text);
         statusText = root.findViewById(R.id.status_text);
         currentHeading = root.findViewById(R.id.current_heading);
@@ -137,6 +147,8 @@ public final class AtmospherePane {
         units = UnitSystem.fromName(prefs == null ? null
                 : prefs.getString(PREF_UNITS, null), UnitSystem.METRIC);
         useSelf = prefs != null && prefs.getBoolean(PREF_USE_SELF, false);
+        favorites = new Favorites(MapCompat.atakContext());
+        favorite = favorites.byName(prefs == null ? null : prefs.getString(PREF_FAVORITE, null));
         trendKind = Kind.fromName(prefs == null ? null : prefs.getString(PREF_TREND, null));
         hoursTableOpen = prefs != null && prefs.getBoolean(PREF_HOURS_TABLE, false);
         updateHoursTableButton();
@@ -262,6 +274,13 @@ public final class AtmospherePane {
             }
         });
 
+        favoritesButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showFavoritesDialog();
+            }
+        });
+
         unitsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -303,17 +322,36 @@ public final class AtmospherePane {
 
     private void setUseSelf(boolean value) {
         useSelf = value;
+        favorite = null;
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
-            p.edit().putBoolean(PREF_USE_SELF, value).apply();
+            p.edit().putBoolean(PREF_USE_SELF, value).remove(PREF_FAVORITE).apply();
         updatePositionMode();
         snapshot = null;
         refresh(false);
     }
 
     private void updatePositionMode() {
-        centerButton.setEnabled(useSelf);
-        selfButton.setEnabled(!useSelf);
+        // The button for the point in use is the flat, disabled one. With a favorite
+        // in use both of the others are live, and the star's text goes green.
+        centerButton.setEnabled(useSelf || favorite != null);
+        selfButton.setEnabled(!useSelf || favorite != null);
+        favoritesButton.setTextColor(favorite != null
+                ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+    }
+
+    private void setFavorite(Favorites.Place place) {
+        favorite = place;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null) {
+            if (place == null)
+                p.edit().remove(PREF_FAVORITE).apply();
+            else
+                p.edit().putString(PREF_FAVORITE, place.name).apply();
+        }
+        updatePositionMode();
+        snapshot = null;
+        refresh(false);
     }
 
     private void updateUnitsButton() {
@@ -321,6 +359,8 @@ public final class AtmospherePane {
     }
 
     private GeoPoint point() {
+        if (favorite != null)
+            return new GeoPoint(favorite.latitude, favorite.longitude);
         return useSelf ? MapCompat.selfPoint() : MapCompat.mapCenter();
     }
 
@@ -339,7 +379,8 @@ public final class AtmospherePane {
             return;
         }
 
-        positionText.setText("Sending " + egress.latitude(p) + ", " + egress.longitude(p)
+        positionText.setText((favorite == null ? "" : "\u2605 " + favorite.name + " \u2014 ")
+                + "Sending " + egress.latitude(p) + ", " + egress.longitude(p)
                 + "  (rounded to ~" + EgressPolicy.approximateMetres(
                         egress.positionDecimals()) + " m)");
         statusText.setText("Fetching from " + selected.displayName + "…");
@@ -977,7 +1018,7 @@ public final class AtmospherePane {
         }
 
         new AlertDialog.Builder(ctx)
-                .setTitle(R.string.sources_title)
+                .setTitle(pluginContext.getString(R.string.sources_title))
                 .setMultiChoiceItems(labels, enabled,
                         new DialogInterface.OnMultiChoiceClickListener() {
                             @Override
@@ -986,7 +1027,7 @@ public final class AtmospherePane {
                                 egress.setEnabled(sources.get(which), isChecked);
                             }
                         })
-                .setPositiveButton(R.string.close, new DialogInterface.OnClickListener() {
+                .setPositiveButton(pluginContext.getString(R.string.close), new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         refresh(false);
@@ -1010,7 +1051,7 @@ public final class AtmospherePane {
         }
 
         new AlertDialog.Builder(ctx)
-                .setTitle(R.string.variables_title)
+                .setTitle(pluginContext.getString(R.string.variables_title))
                 .setMultiChoiceItems(labels, checked,
                         new DialogInterface.OnMultiChoiceClickListener() {
                             @Override
@@ -1022,7 +1063,7 @@ public final class AtmospherePane {
                                     keys.remove(params.get(which).key);
                             }
                         })
-                .setPositiveButton(R.string.close, new DialogInterface.OnClickListener() {
+                .setPositiveButton(pluginContext.getString(R.string.close), new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         ParamSelection.setSelected(selected, keys);
@@ -1031,6 +1072,131 @@ public final class AtmospherePane {
                         refresh(true);
                     }
                 })
+                .show();
+    }
+
+    // ---- favorites -----------------------------------------------------------------
+
+    private void showFavoritesDialog() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final List<Favorites.Place> all = new ArrayList<>(favorites.all());
+        final AlertDialog.Builder b = new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.favorites_title));
+        if (all.isEmpty()) {
+            b.setMessage(pluginContext.getString(R.string.favorites_none));
+        } else {
+            final String[] names = new String[all.size()];
+            int checked = -1;
+            for (int i = 0; i < all.size(); i++) {
+                names[i] = all.get(i).name;
+                if (favorite != null && favorite.name.equals(names[i]))
+                    checked = i;
+            }
+            b.setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    dialog.dismiss();
+                    setFavorite(all.get(which));
+                }
+            });
+            b.setNeutralButton(pluginContext.getString(R.string.favorites_remove), new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    showRemoveFavoritesDialog();
+                }
+            });
+        }
+        b.setPositiveButton(pluginContext.getString(R.string.favorites_add), new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                showAddFavoriteDialog();
+            }
+        });
+        b.setNegativeButton(pluginContext.getString(R.string.close), null);
+        b.show();
+    }
+
+    /**
+     * Save the point being read now under a name, suggested from the provider's
+     * nearest city when the last snapshot is for this point, else the coordinates.
+     * Saving does not switch to it: an operator starring their own position wants
+     * to keep following it, not freeze it.
+     */
+    private void showAddFavoriteDialog() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final GeoPoint p = point();
+        if (p == null) {
+            Toast.makeText(ctx, pluginContext.getString(R.string.no_position), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String suggested = egress.latitude(p) + ", " + egress.longitude(p);
+        if (snapshot != null && snapshot.place != null
+                && Math.abs(snapshot.latitude - p.getLatitude()) < 0.01
+                && Math.abs(snapshot.longitude - p.getLongitude()) < 0.01)
+            suggested = snapshot.place;
+
+        final EditText input = new EditText(ctx);
+        input.setSingleLine(true);
+        input.setText(suggested);
+        input.setSelectAllOnFocus(true);
+        final double lat = p.getLatitude(), lon = p.getLongitude();
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.favorite_name_title))
+                .setView(input)
+                .setPositiveButton(pluginContext.getString(R.string.save), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        final Favorites.Place saved = favorites.add(
+                                input.getText().toString(), lat, lon);
+                        if (saved != null)
+                            Toast.makeText(ctx, "Saved \u2605 " + saved.name,
+                                    Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void showRemoveFavoritesDialog() {
+        final Context ctx = MapCompat.atakContext();
+        final List<Favorites.Place> all = new ArrayList<>(favorites.all());
+        if (ctx == null || all.isEmpty())
+            return;
+        final String[] names = new String[all.size()];
+        for (int i = 0; i < all.size(); i++)
+            names[i] = all.get(i).name;
+        final boolean[] checked = new boolean[all.size()];
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.favorites_remove_title))
+                .setMultiChoiceItems(names, checked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which,
+                                    boolean isChecked) {
+                                checked[which] = isChecked;
+                            }
+                        })
+                .setPositiveButton(pluginContext.getString(R.string.remove), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        boolean activeGone = false;
+                        for (int i = 0; i < names.length; i++) {
+                            if (!checked[i])
+                                continue;
+                            favorites.remove(names[i]);
+                            if (favorite != null && favorite.name.equals(names[i]))
+                                activeGone = true;
+                        }
+                        // The place being read is gone: back to the map center.
+                        if (activeGone)
+                            setUseSelf(false);
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
                 .show();
     }
 
@@ -1055,7 +1221,7 @@ public final class AtmospherePane {
         }
 
         new AlertDialog.Builder(ctx)
-                .setTitle(R.string.privacy_title)
+                .setTitle(pluginContext.getString(R.string.privacy_title))
                 .setMessage("A forecast query has to say roughly where you are. This is "
                         + "how precisely your position is sent to the provider — nothing "
                         + "else about you goes with it.")
@@ -1066,7 +1232,7 @@ public final class AtmospherePane {
                                 egress.setPositionDecimals(choices[which]);
                             }
                         })
-                .setPositiveButton(R.string.close, new DialogInterface.OnClickListener() {
+                .setPositiveButton(pluginContext.getString(R.string.close), new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         refresh(false);
@@ -1093,9 +1259,9 @@ public final class AtmospherePane {
             sb.append("• ").append(p).append("\n");
 
         new AlertDialog.Builder(ctx)
-                .setTitle(R.string.source_problems)
+                .setTitle(pluginContext.getString(R.string.source_problems))
                 .setMessage(sb.toString().trim())
-                .setPositiveButton(R.string.close, null)
+                .setPositiveButton(pluginContext.getString(R.string.close), null)
                 .show();
     }
 

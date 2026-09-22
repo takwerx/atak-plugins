@@ -21,6 +21,15 @@
     <string name="variables">Variables</string>
     <string name="sources">Sources</string>
     <string name="privacy">Position sent</string>
+    <string name="favorites_glyph">\u2605</string>
+    <string name="favorites_title">Favorites</string>
+    <string name="favorites_none">No favorites yet. Add the place you are reading now, then pick it here any time.</string>
+    <string name="favorites_add">Add this place</string>
+    <string name="favorites_remove">Remove\u2026</string>
+    <string name="favorites_remove_title">Remove favorites</string>
+    <string name="favorite_name_title">Name this place</string>
+    <string name="save">Save</string>
+    <string name="remove">Remove</string>
 
     <!-- Dialogs -->
     <string name="sources_title">Sources</string>
