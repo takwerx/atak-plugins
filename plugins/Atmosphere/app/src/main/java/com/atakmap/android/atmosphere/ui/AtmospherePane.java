@@ -311,8 +311,8 @@ public final class AtmospherePane {
         if (p == null) {
             positionText.setText(R.string.no_position);
             statusText.setText(useSelf
-                    ? "No self position yet — no GPS fix"
-                    : "No map centre yet");
+                    ? "No self position yet (no GPS fix). Tap Refresh once ATAK has one."
+                    : "No map center yet");
             return;
         }
 

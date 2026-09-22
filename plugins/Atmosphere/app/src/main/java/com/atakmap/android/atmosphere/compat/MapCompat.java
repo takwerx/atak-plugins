@@ -41,6 +41,12 @@ public final class MapCompat {
         final GeoPoint p = self.getPoint();
         if (p == null || !p.isValid())
             return null;
+        // ATAK parks the self marker at 0,0 until it has a location, and
+        // GeoPoint.isValid() is true there. Opened right after a restart, the pane
+        // sent 0.000, 0.000 to NWS and showed the 404 that came back (XCover,
+        // 2026-09-21). No fix is no position.
+        if (p.getLatitude() == 0 && p.getLongitude() == 0)
+            return null;
         return p;
     }
 

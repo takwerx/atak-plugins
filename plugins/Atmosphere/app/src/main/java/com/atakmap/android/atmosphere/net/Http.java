@@ -102,6 +102,8 @@ public final class Http {
             final int status = conn.getResponseCode();
             if (status == HttpURLConnection.HTTP_NO_CONTENT)
                 return "";
+            if (status == HttpURLConnection.HTTP_NOT_FOUND)
+                throw new IOException("no data for this point (HTTP 404)");
             if (status != HttpURLConnection.HTTP_OK)
                 throw new IOException("provider returned HTTP " + status);
 
