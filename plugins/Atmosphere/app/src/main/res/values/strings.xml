@@ -15,6 +15,7 @@
     <string name="heading_now">Now</string>
     <string name="heading_hours">Next hours</string>
     <string name="heading_days">Next days</string>
+    <string name="heading_sun_moon">Sun and moon</string>
     <string name="variables">Variables</string>
     <string name="sources">Sources</string>
     <string name="privacy">Position sent</string>

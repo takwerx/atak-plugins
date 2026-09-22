@@ -14,6 +14,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Response JSON plus a {@link WxSourceDef} becomes a {@link Snapshot}.
@@ -110,10 +111,30 @@ public final class ResponseMapper {
     }
 
     private static Reading reading(WxParam p, Object raw, String unit) {
-        final double parsed = JsonPath.number(raw, p.parse);
+        final double parsed = coerce(raw, p);
         final double canonical = Double.isNaN(parsed)
                 ? Double.NaN : Units.toCanonical(p.quantity, unit, parsed);
         return new Reading(p.key, p.label, p.quantity, canonical);
+    }
+
+    /**
+     * The raw JSON value as a number under the parameter's parse mode. {@code lookup}
+     * tries the table's substrings in order against the value's text, case-insensitive,
+     * and takes the first match; no match is NaN, shown as a dash, never a guess.
+     */
+    public static double coerce(Object raw, WxParam p) {
+        if (!"lookup".equals(p.parse) || p.lookupKeys == null)
+            return JsonPath.number(raw, p.parse);
+        if (raw == null || raw == JSONObject.NULL)
+            return Double.NaN;
+        if (raw instanceof Number)
+            return ((Number) raw).doubleValue();
+        final String s = String.valueOf(raw).toLowerCase(Locale.US);
+        for (int i = 0; i < p.lookupKeys.length; i++) {
+            if (s.contains(p.lookupKeys[i].toLowerCase(Locale.US)))
+                return p.lookupValues[i];
+        }
+        return Double.NaN;
     }
 
     /**

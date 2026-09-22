@@ -54,6 +54,60 @@
       "defaultOn": true
     },
     {
+      "key": "skyCover",
+      "label": "Sky cover",
+      "quantity": "percent",
+      "seriesPath": "icon",
+      "parse": "lookup",
+      "lookup": [
+        [
+          "skc",
+          0
+        ],
+        [
+          "few",
+          15
+        ],
+        [
+          "sct",
+          37
+        ],
+        [
+          "bkn",
+          69
+        ],
+        [
+          "ovc",
+          94
+        ],
+        [
+          "blizzard",
+          100
+        ],
+        [
+          "snow",
+          88
+        ],
+        [
+          "sleet",
+          88
+        ],
+        [
+          "fzra",
+          88
+        ],
+        [
+          "tsra",
+          69
+        ],
+        [
+          "rain",
+          69
+        ]
+      ],
+      "defaultOn": true
+    },
+    {
       "key": "dewpoint",
       "label": "Dew point",
       "quantity": "temperature",

@@ -7,11 +7,14 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.HorizontalScrollView;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.atakmap.android.atmosphere.astro.Astro;
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.ParamSelection;
 import com.atakmap.android.atmosphere.data.WeatherClient;
@@ -37,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 
 /**
  * The plugin pane: pick a source, pick a place, read the weather.
@@ -52,6 +56,7 @@ public final class AtmospherePane {
     private static final String PREF_SOURCE = "weather.source.selected";
     private static final String PREF_UNITS = "weather.units";
     private static final String PREF_USE_SELF = "weather.position.useSelf";
+    private static final String PREF_TREND = "weather.trend.kind";
 
     private final View root;
     private final Context pluginContext;
@@ -69,8 +74,11 @@ public final class AtmospherePane {
     private final TextView currentHeading;
     private final LinearLayout currentContainer;
     private final TextView seriesHeading;
-    private final LinearLayout seriesLegend;
-    private final LinearLayout seriesContainer;
+    private final HorizontalScrollView trendScroll;
+    private final LinearLayout trendHost;
+    private final LinearLayout trendChips;
+    private final TrendStripView trend;
+    private Kind trendKind = Kind.TEMP;
     private final TextView daysHeading;
     private final View daysStrip;
     private final LinearLayout daysLegend;
@@ -104,8 +112,11 @@ public final class AtmospherePane {
         currentHeading = root.findViewById(R.id.current_heading);
         currentContainer = root.findViewById(R.id.current_container);
         seriesHeading = root.findViewById(R.id.series_heading);
-        seriesLegend = root.findViewById(R.id.series_legend);
-        seriesContainer = root.findViewById(R.id.series_container);
+        trendScroll = root.findViewById(R.id.trend_scroll);
+        trendHost = root.findViewById(R.id.trend_host);
+        trendChips = root.findViewById(R.id.trend_chips);
+        trend = new TrendStripView(pluginContext);
+        trendHost.addView(trend);
         daysHeading = root.findViewById(R.id.days_heading);
         daysStrip = root.findViewById(R.id.days_strip);
         daysLegend = root.findViewById(R.id.days_legend);
@@ -116,6 +127,7 @@ public final class AtmospherePane {
         units = UnitSystem.fromName(prefs == null ? null
                 : prefs.getString(PREF_UNITS, null), UnitSystem.METRIC);
         useSelf = prefs != null && prefs.getBoolean(PREF_USE_SELF, false);
+        trendKind = Kind.fromName(prefs == null ? null : prefs.getString(PREF_TREND, null));
 
         wireSourceButton(prefs);
         wireButtons();
@@ -332,7 +344,7 @@ public final class AtmospherePane {
                 } else {
                     statusText.setText(message);
                     currentContainer.removeAllViews();
-                    seriesContainer.removeAllViews();
+                    trendChips.removeAllViews();
                 }
             }
         });
@@ -340,8 +352,7 @@ public final class AtmospherePane {
 
     private void render() {
         currentContainer.removeAllViews();
-        seriesLegend.removeAllViews();
-        seriesContainer.removeAllViews();
+        trendChips.removeAllViews();
         daysLegend.removeAllViews();
         daysContainer.removeAllViews();
 
@@ -372,8 +383,9 @@ public final class AtmospherePane {
                 : pluginContext.getString(R.string.heading_now));
 
         renderNow(now);
+        renderSunMoon();
 
-        renderHours(wanted);
+        renderTrend(wanted);
         renderDays(wanted);
         attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
     }
@@ -397,7 +409,10 @@ public final class AtmospherePane {
                 currentContainer.addView(row);
                 inRow = 0;
             }
-            row.addView(tile(tileLabel(r), r.format(units)));
+            if (kind(r) == Kind.SKY)
+                row.addView(skyTile(r));
+            else
+                row.addView(tile(tileLabel(r), r.format(units)));
             inRow++;
         }
         // Pad a short last row so its tiles keep the width of the others.
@@ -421,8 +436,31 @@ public final class AtmospherePane {
             case DIR: return "Wind from";
             case POP: return "Precip chance";
             case PRECIP: return "Precip";
+            case SKY: return "Sky cover";
             default: return r.label;
         }
+    }
+
+    /** Sky cover as the station-plot okta circle, the percentage in the label under it. */
+    private View skyTile(Reading r) {
+        final LinearLayout t = new LinearLayout(pluginContext);
+        t.setOrientation(LinearLayout.VERTICAL);
+        t.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        t.setPadding(dp(4), dp(6), dp(4), dp(6));
+        t.setGravity(Gravity.CENTER_HORIZONTAL);
+        final SkyCoverView glyph = new SkyCoverView(pluginContext);
+        glyph.setLayoutParams(new LinearLayout.LayoutParams(dp(34), dp(34)));
+        glyph.setPercent(r.valid() ? r.value : Double.NaN);
+        final TextView l = new TextView(pluginContext);
+        l.setText(r.valid() ? "Sky cover " + r.format(units) : "Sky cover");
+        l.setTextSize(11);
+        l.setAlpha(0.6f);
+        l.setGravity(Gravity.CENTER);
+        l.setSingleLine(true);
+        t.addView(glyph);
+        t.addView(l);
+        return t;
     }
 
     private View tile(String label, String value) {
@@ -457,42 +495,186 @@ public final class AtmospherePane {
     private static final int ROW_DP = 24;
 
     /**
-     * One column per forecast hour, scrolled sideways, with the legend pinned on the
-     * left (Jean's daily strip and WxReport's hourly row, as the operator asked).
-     * Numbers, not a chart: an engine boss reads a number on a vehicle mount.
+     * One value across the coming hours, the way the operator reads it in a consumer
+     * weather app: a column per hour, the number on a line whose height follows it, a
+     * sun or moon with cloud for the sky, sunrise and sunset as their own columns. The
+     * chip row under it picks the value; direction rides on the wind as an arrow and
+     * sky cover is in every column, so neither is a chip.
      */
-    private void renderHours(Set<String> wanted) {
+    private void renderTrend(Set<String> wanted) {
         final List<Reading> order = keyOrder(wanted);
-        final boolean any = !order.isEmpty();
+        final List<Reading> chips = new ArrayList<>();
+        for (Reading r : order) {
+            final Kind k = kind(r);
+            if (k != Kind.DIR && k != Kind.SKY && k != Kind.OTHER)
+                chips.add(r);
+        }
+        final boolean any = !chips.isEmpty() && !snapshot.series.isEmpty();
         seriesHeading.setVisibility(any ? View.VISIBLE : View.GONE);
-        seriesLegend.setVisibility(any ? View.VISIBLE : View.GONE);
+        trendScroll.setVisibility(any ? View.VISIBLE : View.GONE);
+        trendChips.setVisibility(any ? View.VISIBLE : View.GONE);
         if (!any)
             return;
-        final List<String> labels = new ArrayList<>();
-        for (Reading r : order)
-            labels.add(shortLabel(r));
-        seriesLegend.addView(column("", labels, true));
+        // The chosen kind must be one this source has, or fall back to the first.
+        Reading chosen = null;
+        for (Reading r : chips)
+            if (kind(r) == trendKind) chosen = r;
+        if (chosen == null) {
+            chosen = chips.get(0);
+            trendKind = kind(chosen);
+        }
+        for (final Reading r : chips) {
+            final Button chip = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, trendChips, false);
+            chip.setText(chipLabel(r));
+            chip.setTextColor(kind(r) == trendKind
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            chip.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    trendKind = kind(r);
+                    final SharedPreferences p = MapCompat.prefs();
+                    if (p != null)
+                        p.edit().putString(PREF_TREND, trendKind.name()).apply();
+                    render();
+                }
+            });
+            trendChips.addView(chip);
+        }
+        trend.setColumns(trendColumns(chosen, order));
+        trendScroll.scrollTo(0, 0);
+    }
 
-        final SimpleDateFormat day = new SimpleDateFormat("EEE", Locale.US);
-        final SimpleDateFormat hour = new SimpleDateFormat("HH:mm", Locale.US);
+    /** The chip text carries the unit, so the columns can print bare numbers. */
+    private String chipLabel(Reading r) {
+        switch (kind(r)) {
+            case TEMP: return "Temperature";
+            case DEW: return "Dew point";
+            case FEELS: return "Feels like";
+            case RH: return "Humidity";
+            case WIND: return "Wind " + Units.displayUnit(Quantity.SPEED, units);
+            case GUST: return "Gusts " + Units.displayUnit(Quantity.SPEED, units);
+            case POP: return "Precip chance";
+            case PRECIP: return "Precip " + Units.displayUnit(Quantity.PRECIPITATION, units);
+            default: return r.label;
+        }
+    }
+
+    /** A column's number: compact, the unit implied by the chip. */
+    private String columnText(Reading r) {
+        if (r == null || !r.valid())
+            return "\u2014";
+        switch (r.quantity) {
+            case TEMPERATURE:
+                return Math.round(Units.toDisplay(r.quantity, r.value, units)) + "\u00b0";
+            case PERCENT:
+                return Math.round(r.value) + "%";
+            case SPEED:
+                return String.valueOf(Math.round(Units.toDisplay(r.quantity, r.value, units)));
+            default:
+                return Units.format(r.quantity, r.value, units)
+                        .replace(" " + Units.displayUnit(r.quantity, units), "");
+        }
+    }
+
+    private List<TrendStripView.Column> trendColumns(Reading chosen, List<Reading> order) {
+        final List<TrendStripView.Column> cols = new ArrayList<>();
+        String dirKey = null, skyKey = null;
+        for (Reading r : order) {
+            if (kind(r) == Kind.DIR) dirKey = r.key;
+            if (kind(r) == Kind.SKY) skyKey = r.key;
+        }
+        final long now = System.currentTimeMillis();
+        final SimpleDateFormat hourFmt = new SimpleDateFormat("ha", Locale.US);
+        final SimpleDateFormat dayFmt = new SimpleDateFormat("EEE", Locale.US);
+        final SimpleDateFormat dayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        final SimpleDateFormat clock = new SimpleDateFormat("h:mm", Locale.US);
+        final Map<String, long[]> sunByDay = new LinkedHashMap<>();
+        String lastDay = null;
         int shown = 0;
-        for (SeriesEntry entry : snapshot.series) {
+        long prevTime = 0;
+        boolean nowMarked = false;
+        for (SeriesEntry e : snapshot.series) {
             if (shown++ >= HOURS_SHOWN)
                 break;
-            final List<String> values = new ArrayList<>();
-            for (Reading k : order) {
-                final Reading r = entry.reading(k.key);
-                values.add(r == null ? "\u2014" : r.format(units));
+            if (e.timeMillis <= 0)
+                continue;
+            final Date d = new Date(e.timeMillis);
+            final String dk = dayKey.format(d);
+            long[] sun = sunByDay.get(dk);
+            if (sun == null && !sunByDay.containsKey(dk)) {
+                sun = Astro.sunRiseSet(e.timeMillis, TimeZone.getDefault(),
+                        snapshot.latitude, snapshot.longitude);
+                sunByDay.put(dk, sun);
             }
-            final String header;
-            if (entry.timeMillis > 0) {
-                final Date d = new Date(entry.timeMillis);
-                header = day.format(d) + "\n" + hour.format(d);
+            // a sunrise or sunset between the previous hour and this one gets its own column
+            if (sun != null && prevTime > 0) {
+                for (int i = 0; i < 2; i++) {
+                    if (sun[i] > prevTime && sun[i] <= e.timeMillis) {
+                        final TrendStripView.Column sc = new TrendStripView.Column();
+                        sc.sunEvent = true;
+                        sc.sunrise = i == 0;
+                        sc.header = clock.format(new Date(sun[i]));
+                        sc.sunLabel = i == 0 ? "Sunrise" : "Sunset";
+                        cols.add(sc);
+                    }
+                }
+            }
+            final TrendStripView.Column c = new TrendStripView.Column();
+            final boolean isNow = !nowMarked && e.timeMillis <= now + 3_600_000L
+                    && e.timeMillis > now - 3_600_000L;
+            if (isNow) {
+                c.header = "Now";
+                c.now = true;
+                nowMarked = true;
+            } else if (lastDay != null && !dk.equals(lastDay)) {
+                c.header = dayFmt.format(d) + "\n" + hourFmt.format(d).toLowerCase(Locale.US);
             } else {
-                header = String.valueOf(entry.timeRaw);
+                c.header = hourFmt.format(d).toLowerCase(Locale.US);
             }
-            seriesContainer.addView(column(header, values, false));
+            lastDay = dk;
+            final Reading v = e.reading(chosen.key);
+            c.value = v == null || !v.valid() ? Double.NaN
+                    : Units.toDisplay(v.quantity, v.value, units);
+            c.text = columnText(v);
+            if ((kind(chosen) == Kind.WIND || kind(chosen) == Kind.GUST) && dirKey != null) {
+                final Reading dir = e.reading(dirKey);
+                if (dir != null && dir.valid())
+                    c.arrowDeg = (dir.value + 180) % 360;   // from -> toward
+            }
+            if (skyKey != null) {
+                final Reading sky = e.reading(skyKey);
+                c.oktas = sky == null || !sky.valid() ? -1 : SkyCoverView.oktas(sky.value);
+            }
+            c.night = sun == null ? false : (e.timeMillis < sun[0] || e.timeMillis >= sun[1]);
+            cols.add(c);
+            prevTime = e.timeMillis;
         }
+        return cols;
+    }
+
+    /** Sunrise, sunset and the moon for the point, computed on the device. */
+    private void renderSunMoon() {
+        if (snapshot == null)
+            return;
+        final long now = System.currentTimeMillis();
+        final long[] sun = Astro.sunRiseSet(now, TimeZone.getDefault(), snapshot.latitude,
+                snapshot.longitude);
+        final SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.US);
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        if (sun != null) {
+            row.addView(tile("Sunrise", clock.format(new Date(sun[0])).toLowerCase(Locale.US)));
+            row.addView(tile("Sunset", clock.format(new Date(sun[1])).toLowerCase(Locale.US)));
+        } else {
+            row.addView(tile("Sun", "no rise or set today"));
+            final View filler = new View(pluginContext);
+            filler.setLayoutParams(new LinearLayout.LayoutParams(0, 1, 1f));
+            row.addView(filler);
+        }
+        final int lit = (int) Math.round(Astro.moonIllumination(now) * 100);
+        row.addView(tile(Astro.moonPhaseName(now), lit + "% lit"));
+        currentContainer.addView(row);
     }
 
     /** The wanted readings in the order the source lists them, taken from the first hour that has them. */
@@ -564,7 +746,16 @@ public final class AtmospherePane {
     }
 
     /** What a reading is, from its quantity and its name, so days can be aggregated. */
-    private enum Kind { TEMP, DEW, FEELS, RH, WIND, GUST, DIR, POP, PRECIP, OTHER }
+    private enum Kind {
+        TEMP, DEW, FEELS, RH, WIND, GUST, DIR, POP, PRECIP, SKY, OTHER;
+
+        static Kind fromName(String n) {
+            if (n == null) return TEMP;
+            for (Kind k : values())
+                if (k.name().equals(n)) return k;
+            return TEMP;
+        }
+    }
 
     private static Kind kind(Reading r) {
         final String k = (r.key + " " + r.label).toLowerCase(Locale.US);
@@ -576,6 +767,7 @@ public final class AtmospherePane {
             case PERCENT:
                 if (k.contains("humid")) return Kind.RH;
                 if (k.contains("precip")) return Kind.POP;
+                if (k.contains("cloud") || k.contains("sky")) return Kind.SKY;
                 return Kind.OTHER;
             case SPEED:
                 return k.contains("gust") ? Kind.GUST : Kind.WIND;
@@ -600,6 +792,7 @@ public final class AtmospherePane {
             case DIR: return "Dir";
             case POP: return "Precip %";
             case PRECIP: return "Precip";
+            case SKY: return "Sky";
             default: return r.label.length() > 9 ? r.label.substring(0, 9) : r.label;
         }
     }

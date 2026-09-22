@@ -32,10 +32,24 @@ public final class WxParam {
     public final String seriesPath;
     /** How to coerce the raw value: {@code number}, {@code leadingNumber}, {@code compass}. */
     public final String parse;
+    /**
+     * For {@code parse: "lookup"}: substrings tried in order against the raw value, and
+     * the number each stands for. NWS puts sky cover in an icon URL ({@code .../few?...});
+     * Open-Meteo puts weather in a WMO code. Null for the other parse modes.
+     */
+    public final String[] lookupKeys;
+    public final double[] lookupValues;
 
     WxParam(String key, String label, Quantity quantity, String unit, String unitPath,
             boolean defaultOn, String[] requestGroups, String currentPath,
             String seriesPath, String parse) {
+        this(key, label, quantity, unit, unitPath, defaultOn, requestGroups, currentPath,
+                seriesPath, parse, null, null);
+    }
+
+    WxParam(String key, String label, Quantity quantity, String unit, String unitPath,
+            boolean defaultOn, String[] requestGroups, String currentPath,
+            String seriesPath, String parse, String[] lookupKeys, double[] lookupValues) {
         this.key = key;
         this.label = label;
         this.quantity = quantity;
@@ -46,6 +60,8 @@ public final class WxParam {
         this.currentPath = currentPath;
         this.seriesPath = seriesPath;
         this.parse = parse;
+        this.lookupKeys = lookupKeys;
+        this.lookupValues = lookupValues;
     }
 
     public boolean inGroup(String group) {

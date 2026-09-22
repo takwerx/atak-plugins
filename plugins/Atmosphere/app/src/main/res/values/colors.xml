@@ -4,5 +4,7 @@
     <color name="white">#ffffff</color>
     <color name="darker_gray">#121212</color>
     <color name="heading_yellow">#dfb228</color>
+    <!-- Toggle and selected-chip text, the same green Traffic uses: a pure #00ff00 glares on dark. -->
+    <color name="state_on">#3ddc61</color>
 
 </resources>

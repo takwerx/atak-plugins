@@ -75,7 +75,8 @@ verbatim and come back as a 400 that looks like a network fault.
 | `requestGroups` | no | Which `{group:…}` lists this key belongs in, e.g. `["current","hourly"]`. |
 | `currentPath` | one of these two | Absolute path to the current value. |
 | `seriesPath` | one of these two | Path in the series — absolute for `columns`, relative to each record for `records`. |
-| `parse` | no | `number` (default), `leadingNumber` (`"10 mph"`, and the low end of `"10 to 15 mph"`), `compass` (`"NW"` → 315). |
+| `parse` | no | `number` (default), `leadingNumber` (`"10 mph"`, and the low end of `"10 to 15 mph"`), `compass` (`"NW"` → 315), `lookup` (a text value matched against the `lookup` table). |
+| `lookup` | with `parse: "lookup"` | An array of `["substring", number]` pairs, tried in order, case-insensitive; the first substring found in the value gives the number, no match gives no value. NWS's hourly periods carry sky cover only as an icon code, so `"seriesPath": "icon"` with `[["skc", 0], ["few", 15], ["sct", 37], ["bkn", 69], ["ovc", 94]]` reads it. |
 | `defaultOn` | no | Selected the first time this source is used. |
 
 Values are converted to canonical units on arrival — Celsius, m/s, metres, mm, hPa,

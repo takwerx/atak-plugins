@@ -218,10 +218,38 @@ public final class WxSourceParser {
 
         final String parse = str(p, "parse");
         if (parse != null && !parse.equals("number") && !parse.equals("leadingNumber")
-                && !parse.equals("compass")) {
+                && !parse.equals("compass") && !parse.equals("lookup")) {
             errors.add(where + " (" + key + ") parse \"" + parse
-                    + "\" is not number, leadingNumber or compass");
+                    + "\" is not number, leadingNumber, compass or lookup");
             return null;
+        }
+
+        String[] lookupKeys = null;
+        double[] lookupValues = null;
+        if ("lookup".equals(parse)) {
+            final JSONArray table = p.optJSONArray("lookup");
+            if (table == null || table.length() == 0) {
+                errors.add(where + " (" + key + ") parse \"lookup\" needs a non-empty "
+                        + "\"lookup\" array of [\"substring\", number] pairs");
+                return null;
+            }
+            lookupKeys = new String[table.length()];
+            lookupValues = new double[table.length()];
+            for (int i = 0; i < table.length(); i++) {
+                final JSONArray pair = table.optJSONArray(i);
+                final String needle = pair == null ? null : pair.optString(0, null);
+                final double value = pair == null ? Double.NaN : pair.optDouble(1, Double.NaN);
+                if (needle == null || needle.trim().isEmpty() || Double.isNaN(value)) {
+                    errors.add(where + " (" + key + ") lookup[" + i
+                            + "] must be [\"substring\", number]");
+                    return null;
+                }
+                lookupKeys[i] = needle.trim();
+                lookupValues[i] = value;
+            }
+        } else if (p.has("lookup")) {
+            warnings.add(where + " (" + key + ") has a lookup table but parse is not "
+                    + "\"lookup\"; the table is ignored");
         }
 
         if (layout == WxSourceDef.Layout.RECORDS && seriesPath != null
@@ -232,7 +260,8 @@ public final class WxSourceParser {
 
         return new WxParam(key, label, Quantity.fromName(quantityName), str(p, "unit"),
                 str(p, "unitPath"), p.optBoolean("defaultOn", false),
-                groups.toArray(new String[0]), currentPath, seriesPath, parse);
+                groups.toArray(new String[0]), currentPath, seriesPath, parse,
+                lookupKeys, lookupValues);
     }
 
     /**

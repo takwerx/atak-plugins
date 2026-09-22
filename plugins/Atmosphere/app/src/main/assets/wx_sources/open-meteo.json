@@ -15,7 +15,10 @@
       "label": "Temperature",
       "quantity": "temperature",
       "unit": "celsius",
-      "requestGroups": ["current", "hourly"],
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
       "currentPath": "current.temperature_2m",
       "seriesPath": "hourly.temperature_2m",
       "defaultOn": true
@@ -24,7 +27,10 @@
       "key": "relative_humidity_2m",
       "label": "Relative humidity",
       "quantity": "percent",
-      "requestGroups": ["current", "hourly"],
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
       "currentPath": "current.relative_humidity_2m",
       "seriesPath": "hourly.relative_humidity_2m",
       "defaultOn": true
@@ -34,7 +40,10 @@
       "label": "Wind",
       "quantity": "speed",
       "unit": "m/s",
-      "requestGroups": ["current", "hourly"],
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
       "currentPath": "current.wind_speed_10m",
       "seriesPath": "hourly.wind_speed_10m",
       "defaultOn": true
@@ -44,7 +53,10 @@
       "label": "Gusts",
       "quantity": "speed",
       "unit": "m/s",
-      "requestGroups": ["current", "hourly"],
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
       "currentPath": "current.wind_gusts_10m",
       "seriesPath": "hourly.wind_gusts_10m",
       "defaultOn": true
@@ -53,7 +65,10 @@
       "key": "wind_direction_10m",
       "label": "Wind direction",
       "quantity": "angle",
-      "requestGroups": ["current", "hourly"],
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
       "currentPath": "current.wind_direction_10m",
       "seriesPath": "hourly.wind_direction_10m",
       "defaultOn": true
@@ -63,7 +78,10 @@
       "label": "Precipitation",
       "quantity": "precipitation",
       "unit": "mm",
-      "requestGroups": ["current", "hourly"],
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
       "currentPath": "current.precipitation",
       "seriesPath": "hourly.precipitation",
       "defaultOn": true
@@ -72,7 +90,9 @@
       "key": "precipitation_probability",
       "label": "Chance of precipitation",
       "quantity": "percent",
-      "requestGroups": ["hourly"],
+      "requestGroups": [
+        "hourly"
+      ],
       "seriesPath": "hourly.precipitation_probability",
       "defaultOn": true
     },
@@ -81,7 +101,10 @@
       "label": "Dew point",
       "quantity": "temperature",
       "unit": "celsius",
-      "requestGroups": ["current", "hourly"],
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
       "currentPath": "current.dew_point_2m",
       "seriesPath": "hourly.dew_point_2m",
       "defaultOn": false
@@ -91,7 +114,10 @@
       "label": "Feels like",
       "quantity": "temperature",
       "unit": "celsius",
-      "requestGroups": ["current", "hourly"],
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
       "currentPath": "current.apparent_temperature",
       "seriesPath": "hourly.apparent_temperature",
       "defaultOn": false
@@ -101,7 +127,10 @@
       "label": "Surface pressure",
       "quantity": "pressure",
       "unit": "hPa",
-      "requestGroups": ["current", "hourly"],
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
       "currentPath": "current.surface_pressure",
       "seriesPath": "hourly.surface_pressure",
       "defaultOn": false
@@ -110,17 +139,22 @@
       "key": "cloud_cover",
       "label": "Cloud cover",
       "quantity": "percent",
-      "requestGroups": ["current", "hourly"],
+      "requestGroups": [
+        "current",
+        "hourly"
+      ],
       "currentPath": "current.cloud_cover",
       "seriesPath": "hourly.cloud_cover",
-      "defaultOn": false
+      "defaultOn": true
     },
     {
       "key": "visibility",
       "label": "Visibility",
       "quantity": "length",
       "unit": "m",
-      "requestGroups": ["hourly"],
+      "requestGroups": [
+        "hourly"
+      ],
       "seriesPath": "hourly.visibility",
       "defaultOn": false
     }

@@ -126,34 +126,33 @@
             android:paddingTop="8dp"
             android:alpha="0.6" />
 
-        <!-- One column per forecast hour, scrolled sideways; the legend column stays put.
-             The scrollbar is kept visible so it is plain that more hours are off screen. -->
-        <LinearLayout
-            android:id="@+id/series_strip"
+        <!-- The trend strip: one value across the coming hours as numbers on a line,
+             the value chosen by the chip row under it. Both scroll sideways. -->
+        <HorizontalScrollView
+            android:id="@+id/trend_scroll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:scrollbars="none">
 
             <LinearLayout
-                android:id="@+id/series_legend"
+                android:id="@+id/trend_host"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="vertical" />
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
 
-            <HorizontalScrollView
-                android:layout_width="0dp"
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:layout_marginTop="4dp">
+
+            <LinearLayout
+                android:id="@+id/trend_chips"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:fadeScrollbars="false"
-                android:scrollbarSize="3dp">
-
-                <LinearLayout
-                    android:id="@+id/series_container"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal" />
-            </HorizontalScrollView>
-        </LinearLayout>
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
 
         <TextView
             android:id="@+id/days_heading"
