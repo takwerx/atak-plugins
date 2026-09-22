@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.10** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.11** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.11/ATAK-Plugin-FeatureLayer-0.11--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.11/ATAK-Plugin-FeatureLayer-0.11--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.11/ATAK-Plugin-FeatureLayer-0.11--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -44,6 +44,13 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 
 _________________________________________________________________
 STATUS
+
+0.11, saved layers restore without holding up ATAK: at start, the cached
+store of each saved layer is re-styled on the plugin's own thread instead of
+ATAK's main thread. A phone with a large saved layer (a long-lived NIFS live
+layer, a DART fleet) hung for twenty seconds at every ATAK start on 0.9 and
+0.10, with "ATAK isn't responding" dialogs before any pane opened. Nothing
+else changed.
 
 0.10, one versionCode per APK: the same plugin as 0.9, rebuilt so that each
 ATAK target's APK carries its own versionCode, the plugin version and the ATAK
