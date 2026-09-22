@@ -5,6 +5,7 @@ import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atakmap.android.cursorwerx.BackControl;
+import com.atakmap.android.cursorwerx.PanControl;
 import com.atakmap.android.cursorwerx.PointerRouter;
 import com.atakmap.android.maps.MapView;
 import com.atak.plugins.impl.PluginLayoutInflater;
@@ -27,6 +28,7 @@ public class Cursorwerx implements IPlugin {
     Pane templatePane;
     BackControl backControl;
     PointerRouter pointerRouter;
+    PanControl panControl;
 
     public Cursorwerx(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -73,6 +75,11 @@ public class Cursorwerx implements IPlugin {
             pointerRouter = new PointerRouter(mapView);
             pointerRouter.setVerbose(true); // bring-up: log where each tick landed
             pointerRouter.attach();
+
+            // Middle-button drag pans the map.
+            panControl = new PanControl(mapView);
+            panControl.setVerbose(true);
+            panControl.attach();
         }
 
         // the plugin is starting, add the button to the toolbar
@@ -85,6 +92,10 @@ public class Cursorwerx implements IPlugin {
     @Override
     public void onStop() {
         // Symmetric with onStart: a reload must leave no view and no listener behind.
+        if (panControl != null) {
+            panControl.detach();
+            panControl = null;
+        }
         if (pointerRouter != null) {
             pointerRouter.detach();
             pointerRouter = null;
