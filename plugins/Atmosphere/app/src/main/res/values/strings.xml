@@ -14,6 +14,7 @@
     <string name="status_idle">Pick a source and refresh</string>
     <string name="heading_now">Now</string>
     <string name="heading_hours">Next hours</string>
+    <string name="heading_days">Next days</string>
     <string name="variables">Variables</string>
     <string name="sources">Sources</string>
     <string name="privacy">Position sent</string>

@@ -23,15 +23,19 @@ import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
 import com.atakmap.android.atmosphere.source.WxParam;
 import com.atakmap.android.atmosphere.source.WxSourceDef;
+import com.atakmap.android.atmosphere.units.Quantity;
 import com.atakmap.android.atmosphere.units.UnitSystem;
+import com.atakmap.android.atmosphere.units.Units;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -65,7 +69,12 @@ public final class AtmospherePane {
     private final TextView currentHeading;
     private final LinearLayout currentContainer;
     private final TextView seriesHeading;
+    private final LinearLayout seriesLegend;
     private final LinearLayout seriesContainer;
+    private final TextView daysHeading;
+    private final View daysStrip;
+    private final LinearLayout daysLegend;
+    private final LinearLayout daysContainer;
     private final TextView attributionText;
 
     private final List<WxSourceDef> sources;
@@ -95,7 +104,12 @@ public final class AtmospherePane {
         currentHeading = root.findViewById(R.id.current_heading);
         currentContainer = root.findViewById(R.id.current_container);
         seriesHeading = root.findViewById(R.id.series_heading);
+        seriesLegend = root.findViewById(R.id.series_legend);
         seriesContainer = root.findViewById(R.id.series_container);
+        daysHeading = root.findViewById(R.id.days_heading);
+        daysStrip = root.findViewById(R.id.days_strip);
+        daysLegend = root.findViewById(R.id.days_legend);
+        daysContainer = root.findViewById(R.id.days_container);
         attributionText = root.findViewById(R.id.attribution_text);
 
         final SharedPreferences prefs = MapCompat.prefs();
@@ -326,7 +340,10 @@ public final class AtmospherePane {
 
     private void render() {
         currentContainer.removeAllViews();
+        seriesLegend.removeAllViews();
         seriesContainer.removeAllViews();
+        daysLegend.removeAllViews();
+        daysContainer.removeAllViews();
 
         if (snapshot == null)
             return;
@@ -357,26 +374,249 @@ public final class AtmospherePane {
         for (Reading r : now)
             currentContainer.addView(readingRow(r.label, r.format(units)));
 
-        seriesHeading.setVisibility(snapshot.series.isEmpty() ? View.GONE : View.VISIBLE);
-        final SimpleDateFormat fmt = new SimpleDateFormat("EEE HH:mm", Locale.US);
+        renderHours(wanted);
+        renderDays(wanted);
+        attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
+    }
+
+    /** Hours are shown as columns; more than this is the days strip's job. */
+    private static final int HOURS_SHOWN = 48;
+    private static final int COLUMN_DP = 92;
+    private static final int HEADER_DP = 36;
+    private static final int ROW_DP = 24;
+
+    /**
+     * One column per forecast hour, scrolled sideways, with the legend pinned on the
+     * left (Jean's daily strip and WxReport's hourly row, as the operator asked).
+     * Numbers, not a chart: an engine boss reads a number on a vehicle mount.
+     */
+    private void renderHours(Set<String> wanted) {
+        final List<Reading> order = keyOrder(wanted);
+        final boolean any = !order.isEmpty();
+        seriesHeading.setVisibility(any ? View.VISIBLE : View.GONE);
+        seriesLegend.setVisibility(any ? View.VISIBLE : View.GONE);
+        if (!any)
+            return;
+        final List<String> labels = new ArrayList<>();
+        for (Reading r : order)
+            labels.add(shortLabel(r));
+        seriesLegend.addView(column("", labels, true));
+
+        final SimpleDateFormat day = new SimpleDateFormat("EEE", Locale.US);
+        final SimpleDateFormat hour = new SimpleDateFormat("HH:mm", Locale.US);
+        int shown = 0;
         for (SeriesEntry entry : snapshot.series) {
-            final StringBuilder values = new StringBuilder();
-            for (Reading r : entry.readings) {
-                if (!wanted.contains(r.key) || !r.valid())
-                    continue;
-                if (values.length() > 0)
-                    values.append("   ");
-                values.append(r.format(units));
+            if (shown++ >= HOURS_SHOWN)
+                break;
+            final List<String> values = new ArrayList<>();
+            for (Reading k : order) {
+                final Reading r = entry.reading(k.key);
+                values.add(r == null ? "\u2014" : r.format(units));
             }
-            if (values.length() == 0)
+            final String header;
+            if (entry.timeMillis > 0) {
+                final Date d = new Date(entry.timeMillis);
+                header = day.format(d) + "\n" + hour.format(d);
+            } else {
+                header = String.valueOf(entry.timeRaw);
+            }
+            seriesContainer.addView(column(header, values, false));
+        }
+    }
+
+    /** The wanted readings in the order the source lists them, taken from the first hour that has them. */
+    private List<Reading> keyOrder(Set<String> wanted) {
+        final List<Reading> order = new ArrayList<>();
+        final Set<String> seen = new HashSet<>();
+        for (SeriesEntry entry : snapshot.series) {
+            for (Reading r : entry.readings) {
+                if (wanted.contains(r.key) && seen.add(r.key))
+                    order.add(r);
+            }
+            if (!order.isEmpty())
+                break;
+        }
+        return order;
+    }
+
+    /**
+     * The hours folded into days: the numbers a shift is planned on. High and low
+     * temperature, the lowest RH, the strongest wind and gust, the highest chance of
+     * precipitation and the total. Only shown when the forecast covers more than one day.
+     */
+    private void renderDays(Set<String> wanted) {
+        final Map<String, DayAgg> days = new LinkedHashMap<>();
+        final SimpleDateFormat dayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        final SimpleDateFormat dayHead = new SimpleDateFormat("EEE\nM/d", Locale.US);
+        for (SeriesEntry e : snapshot.series) {
+            if (e.timeMillis <= 0)
                 continue;
-            final String when = entry.timeMillis > 0
-                    ? fmt.format(new Date(entry.timeMillis))
-                    : String.valueOf(entry.timeRaw);
-            seriesContainer.addView(readingRow(when, values.toString()));
+            final Date d = new Date(e.timeMillis);
+            final String k = dayKey.format(d);
+            DayAgg agg = days.get(k);
+            if (agg == null) {
+                agg = new DayAgg(dayHead.format(d));
+                days.put(k, agg);
+            }
+            for (Reading r : e.readings) {
+                if (r.valid() && wanted.contains(r.key))
+                    agg.take(r);
+            }
+        }
+        final boolean any = days.size() >= 2;
+        daysHeading.setVisibility(any ? View.VISIBLE : View.GONE);
+        daysStrip.setVisibility(any ? View.VISIBLE : View.GONE);
+        if (!any)
+            return;
+
+        // Rows exist only when some day has the value, so a source without gusts has no gust row.
+        final String[] rowLabels = {"Hi", "Lo", "Min RH", "Max wind", "Max gust", "Precip %", "Precip"};
+        final boolean[] rowUsed = new boolean[rowLabels.length];
+        for (DayAgg a : days.values()) {
+            for (int i = 0; i < rowLabels.length; i++)
+                rowUsed[i] |= !Double.isNaN(a.row(i));
+        }
+        final List<String> labels = new ArrayList<>();
+        for (int i = 0; i < rowLabels.length; i++)
+            if (rowUsed[i]) labels.add(rowLabels[i]);
+        daysLegend.addView(column("", labels, true));
+        for (DayAgg a : days.values()) {
+            final List<String> values = new ArrayList<>();
+            for (int i = 0; i < rowLabels.length; i++) {
+                if (!rowUsed[i])
+                    continue;
+                final double v = a.row(i);
+                values.add(Double.isNaN(v) ? "\u2014" : Units.format(a.quantity(i), v, units));
+            }
+            daysContainer.addView(column(a.header, values, false));
+        }
+    }
+
+    /** What a reading is, from its quantity and its name, so days can be aggregated. */
+    private enum Kind { TEMP, DEW, FEELS, RH, WIND, GUST, DIR, POP, PRECIP, OTHER }
+
+    private static Kind kind(Reading r) {
+        final String k = (r.key + " " + r.label).toLowerCase(Locale.US);
+        switch (r.quantity) {
+            case TEMPERATURE:
+                if (k.contains("dew")) return Kind.DEW;
+                if (k.contains("feel") || k.contains("apparent")) return Kind.FEELS;
+                return Kind.TEMP;
+            case PERCENT:
+                if (k.contains("humid")) return Kind.RH;
+                if (k.contains("precip")) return Kind.POP;
+                return Kind.OTHER;
+            case SPEED:
+                return k.contains("gust") ? Kind.GUST : Kind.WIND;
+            case ANGLE:
+                return Kind.DIR;
+            case PRECIPITATION:
+                return Kind.PRECIP;
+            default:
+                return Kind.OTHER;
+        }
+    }
+
+    /** Legend text that fits a column. */
+    private static String shortLabel(Reading r) {
+        switch (kind(r)) {
+            case TEMP: return "Temp";
+            case DEW: return "Dew pt";
+            case FEELS: return "Feels";
+            case RH: return "RH";
+            case WIND: return "Wind";
+            case GUST: return "Gust";
+            case DIR: return "Dir";
+            case POP: return "Precip %";
+            case PRECIP: return "Precip";
+            default: return r.label.length() > 9 ? r.label.substring(0, 9) : r.label;
+        }
+    }
+
+    /** One day's extremes, NaN until a reading arrives. */
+    private static final class DayAgg {
+        final String header;
+        double tHi = Double.NaN, tLo = Double.NaN, rhLo = Double.NaN, windHi = Double.NaN,
+                gustHi = Double.NaN, popHi = Double.NaN, precipSum = Double.NaN;
+
+        DayAgg(String header) {
+            this.header = header;
         }
 
-        attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
+        void take(Reading r) {
+            switch (kind(r)) {
+                case TEMP:
+                    tHi = Double.isNaN(tHi) ? r.value : Math.max(tHi, r.value);
+                    tLo = Double.isNaN(tLo) ? r.value : Math.min(tLo, r.value);
+                    break;
+                case RH: rhLo = Double.isNaN(rhLo) ? r.value : Math.min(rhLo, r.value); break;
+                case WIND: windHi = Double.isNaN(windHi) ? r.value : Math.max(windHi, r.value); break;
+                case GUST: gustHi = Double.isNaN(gustHi) ? r.value : Math.max(gustHi, r.value); break;
+                case POP: popHi = Double.isNaN(popHi) ? r.value : Math.max(popHi, r.value); break;
+                case PRECIP: precipSum = Double.isNaN(precipSum) ? r.value : precipSum + r.value; break;
+                default: break;
+            }
+        }
+
+        double row(int i) {
+            switch (i) {
+                case 0: return tHi;
+                case 1: return tLo;
+                case 2: return rhLo;
+                case 3: return windHi;
+                case 4: return gustHi;
+                case 5: return popHi;
+                default: return precipSum;
+            }
+        }
+
+        Quantity quantity(int i) {
+            switch (i) {
+                case 0: case 1: return Quantity.TEMPERATURE;
+                case 2: case 5: return Quantity.PERCENT;
+                case 3: case 4: return Quantity.SPEED;
+                default: return Quantity.PRECIPITATION;
+            }
+        }
+    }
+
+    /**
+     * A column of the strip: a two-line header and one line per row, every line a fixed
+     * height so the legend column and the value columns line up.
+     */
+    private View column(String header, List<String> values, boolean legend) {
+        final LinearLayout col = new LinearLayout(pluginContext);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setLayoutParams(new LinearLayout.LayoutParams(
+                legend ? LinearLayout.LayoutParams.WRAP_CONTENT : dp(COLUMN_DP),
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        col.setPadding(dp(4), 0, dp(4), 0);
+        final TextView h = new TextView(pluginContext);
+        h.setText(header);
+        h.setTextSize(12);
+        h.setMaxLines(2);
+        h.setHeight(dp(HEADER_DP));
+        h.setGravity((legend ? Gravity.START : Gravity.CENTER_HORIZONTAL) | Gravity.BOTTOM);
+        h.setAlpha(0.8f);
+        col.addView(h);
+        for (String v : values) {
+            final TextView t = new TextView(pluginContext);
+            t.setText(v);
+            t.setTextSize(14);
+            t.setSingleLine(true);
+            t.setHeight(dp(ROW_DP));
+            t.setGravity((legend ? Gravity.START : Gravity.CENTER_HORIZONTAL) | Gravity.CENTER_VERTICAL);
+            if (legend)
+                t.setAlpha(0.7f);
+            else
+                t.setTypeface(Typeface.MONOSPACE);
+            col.addView(t);
+        }
+        return col;
+    }
+
+    private int dp(int v) {
+        return Math.round(v * pluginContext.getResources().getDisplayMetrics().density);
     }
 
     private View readingRow(String label, String value) {
