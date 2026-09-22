@@ -128,6 +128,7 @@ public final class AtmospherePane {
     private final Button windToggle;
     private final View windScaleHost;
     private final WindScaleView windScale;
+    private final LinearLayout windUnitRow;
     private WindOverlay wind;
     private int windHours;
 
@@ -214,6 +215,10 @@ public final class AtmospherePane {
         windScaleHost = find(R.id.wind_scale_host);
         windScale = new WindScaleView(pluginContext);
         ((LinearLayout) windScaleHost).addView(windScale);
+        windUnitRow = new LinearLayout(pluginContext);
+        windUnitRow.setOrientation(LinearLayout.HORIZONTAL);
+        ((LinearLayout) windScaleHost).addView(windUnitRow);
+        buildWindUnitRow();
         scrubber = find(R.id.scrubber);
         scrubberLabel = find(R.id.scrubber_label);
         scrubberBar = find(R.id.scrubber_bar);
@@ -565,9 +570,63 @@ public final class AtmospherePane {
                 windOn ? R.color.state_on : R.color.state_off));
         // The legend explains what is on the map, so it appears with the layer.
         windScaleHost.setVisibility(windOn ? View.VISIBLE : View.GONE);
-        if (windOn)
+        if (windOn) {
             updateWindScale();
+            // The row is built in the constructor, before the stored unit has been
+            // read, so the first paint of it happens here.
+            updateWindUnitRow();
+        }
         scrubber.setVisibility(radarOn || windOn ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * Wind speed by the unit a crew names it in, picked where they are looking at it
+     * (operator, 2026-09-22: "on wind can we have kt and mph as option on the scale
+     * on the layers"). Each button sets the whole unit system rather than a private
+     * wind unit, so there is one answer to "what units am I in" and the icon row's
+     * button never disagrees: knots is the aviation system, miles per hour imperial,
+     * kilometres per hour metric. The third is there because the system has three; a
+     * row where the live setting matched no button would be worse than a spare.
+     */
+    private void buildWindUnitRow() {
+        final UnitSystem[] order = { UnitSystem.IMPERIAL, UnitSystem.AVIATION, UnitSystem.METRIC };
+        for (final UnitSystem system : order) {
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, windUnitRow, false);
+            b.setText(Units.displayUnit(Quantity.SPEED, system));
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    applyUnits(system);
+                }
+            });
+            b.setTag(system);
+            windUnitRow.addView(b);
+        }
+        updateWindUnitRow();
+    }
+
+    private void updateWindUnitRow() {
+        for (int i = 0; i < windUnitRow.getChildCount(); i++) {
+            final View child = windUnitRow.getChildAt(i);
+            if (!(child instanceof Button))
+                continue;
+            ((Button) child).setTextColor(child.getTag() == units
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+        }
+    }
+
+    /** Every route to a unit change goes through here, so nothing gets left behind. */
+    private void applyUnits(UnitSystem system) {
+        units = system;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putString(PREF_UNITS, units.name()).apply();
+        updateUnitsButton();
+        updateWindScale();
+        updateWindUnitRow();
+        // A unit change is a display change: re-render, never re-fetch.
+        render();
     }
 
     /** The legend's numbers follow the operator's unit, like every other speed. */
@@ -728,14 +787,7 @@ public final class AtmospherePane {
             @Override
             public void onClick(View v) {
                 final UnitSystem[] all = UnitSystem.values();
-                units = all[(units.ordinal() + 1) % all.length];
-                final SharedPreferences p = MapCompat.prefs();
-                if (p != null)
-                    p.edit().putString(PREF_UNITS, units.name()).apply();
-                updateUnitsButton();
-                updateWindScale();
-                // A unit change is a display change: re-render, never re-fetch.
-                render();
+                applyUnits(all[(units.ordinal() + 1) % all.length]);
             }
         });
 
