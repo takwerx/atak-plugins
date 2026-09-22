@@ -51,8 +51,9 @@ final class WindView extends View {
     private final Random random = new Random();
     private final Paint[][] paints = new Paint[6][TRAIL];
     private WindGrid grid;
-    private final GeoPoint corner = new GeoPoint(0, 0);
     private final double[] cornerX = new double[4], cornerY = new double[4];
+    private long lastReport;
+    private int drawnSegments;
 
     WindView(Context context, MapView mapView, int particles) {
         super(context);
@@ -169,6 +170,7 @@ final class WindView extends View {
         project(vs, ve, 2);
         project(vs, vw, 3);
         final float w = getWidth(), h = getHeight();
+        drawnSegments = 0;
         for (int i = 0; i < particles; i++) {
             final int n = len[i];
             if (n < 2)
@@ -182,19 +184,39 @@ final class WindView extends View {
                 final double fx = (tLon[slot] - vw) / (ve - vw);
                 final double fy = (vn - tLat[slot]) / (vn - vs);
                 final double sx = bilin(cornerX, fx, fy), sy = bilin(cornerY, fx, fy);
-                if (!Double.isNaN(px) && sx >= -20 && sx <= w + 20 && sy >= -20 && sy <= h + 20)
+                if (!Double.isNaN(px) && sx >= -20 && sx <= w + 20 && sy >= -20 && sy <= h + 20) {
                     canvas.drawLine((float) px, (float) py, (float) sx, (float) sy,
                             paints[band][TRAIL - n + k]);
+                    drawnSegments++;
+                }
                 px = sx;
                 py = sy;
                 idx = (idx + 1) % TRAIL;
             }
         }
+        report(w, h);
     }
 
+    /** Once a second: what the view is doing, for the log. */
+    private void report(float w, float h) {
+        final long now = System.currentTimeMillis();
+        if (now - lastReport < 1000)
+            return;
+        lastReport = now;
+        com.atakmap.coremap.log.Log.d("AtmosphereWind", String.format(java.util.Locale.US,
+                "view %dx%d vis %d parent %s corners NW %.0f,%.0f SE %.0f,%.0f segments %d",
+                (int) w, (int) h, getVisibility(), getParent() == null ? "none"
+                        : getParent().getClass().getSimpleName(),
+                cornerX[0], cornerY[0], cornerX[2], cornerY[2], drawnSegments));
+    }
+
+    /**
+     * A fresh point each time: a GeoPoint from the two-argument constructor is
+     * read-only and set() leaves it at 0,0, which put all four corners on one pixel
+     * and every particle with them (XCover, 2026-09-21). Four allocations a frame.
+     */
     private void project(double la, double lo, int k) {
-        corner.set(la, lo);
-        final PointF p = mapView.forward(corner);
+        final PointF p = mapView.forward(new GeoPoint(la, lo));
         cornerX[k] = p.x;
         cornerY[k] = p.y;
     }

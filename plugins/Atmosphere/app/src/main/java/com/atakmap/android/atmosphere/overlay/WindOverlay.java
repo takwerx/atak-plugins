@@ -138,15 +138,15 @@ public final class WindOverlay {
         if (started)
             return;
         started = true;
-        // A transparent view right above the map in its parent, under everything
-        // that comes later (the drop-down pane, the toolbar), sized like the map.
+        // A transparent view inside the map view, after its GL surface, so it is
+        // laid out to the map's full bounds and drawn over the surface's hole. The
+        // map's parent is a horizontal LinearLayout: a sibling there was laid out as
+        // the next item in the row, at zero width off the right edge (XCover,
+        // 2026-09-21, seen in the view hierarchy dump).
         view = new WindView(mapView.getContext(), mapView, PARTICLES);
         view.setVisibility(android.view.View.GONE);
-        final ViewGroup parent = (ViewGroup) mapView.getParent();
-        if (parent != null)
-            parent.addView(view, parent.indexOfChild(mapView) + 1,
-                    new ViewGroup.LayoutParams(mapView.getLayoutParams().width,
-                            mapView.getLayoutParams().height));
+        mapView.addView(view, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         mapView.addOnMapMovedListener(moved);
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
