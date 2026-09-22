@@ -29,7 +29,12 @@ public final class WxSourceParser {
     public static final int SCHEMA_VERSION = 1;
 
     private static final Pattern ID = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
-    private static final Pattern PLACEHOLDER = Pattern.compile("\\{([^}]*)}");
+    // Both braces escaped on purpose. OpenJDK's regex takes a bare closing brace as a
+    // literal, so the unit tests passed; Android's ICU engine refuses it with
+    // "Syntax error in regexp pattern", the static initializer threw, and ATAK died
+    // the first time the pane opened on a phone (XCover, 2026-09-21).
+    // RegexPortabilityTest scans the source so this cannot come back quietly.
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\{([^}]*)\\}");
 
     private WxSourceParser() {
     }
