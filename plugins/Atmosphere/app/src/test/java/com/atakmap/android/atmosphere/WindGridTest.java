@@ -144,6 +144,19 @@ public class WindGridTest {
     }
 
     @Test
+    public void aModelSaysItsCellSizeNotItsName() {
+        // What a model is, to a crew, is how much ground one cell covers. The name is
+        // for the log; the label is for somebody deciding whether the wind on screen
+        // can know about their canyon.
+        assertEquals("2 mi detail", Model.HRRR.detail(false));
+        assertEquals("3 km detail", Model.HRRR.detail(true));
+        assertEquals("8 mi detail", Model.RAP.detail(false));
+        assertEquals("16 mi detail", Model.GFS.detail(false));
+        for (Model m : Model.values())
+            assertFalse(m + " leaks its name", m.detail(false).contains(m.label));
+    }
+
+    @Test
     public void theHeightLadderRisesAndLabelsItself() {
         final NomadsWind.Level[] all = NomadsWind.Level.values();
         assertEquals(NomadsWind.Level.AGL_10, all[0]);

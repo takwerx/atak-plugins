@@ -483,18 +483,42 @@ public final class AtmospherePane {
                 if (!status.isEmpty())
                     scrubberLabel.setText(status);
                 else
-                    scrubberLabel.setText(windLabel(wind.hourIndex(), wind.validTime(wind.hourIndex())));
+                    scrubberLabel.setText(
+                            windLabel(wind.hourIndex(), wind.validTime(wind.hourIndex())));
             }
         });
         updateLayerControls();
     }
 
+    /**
+     * When the wind on screen is for, led by how far that is from now, which is what
+     * somebody scrubbing the bar is actually asking. "+0 h" is a modeller's way of
+     * counting and the model's name is not something a crew can act on.
+     */
     private String windLabel(int hour, long validTime) {
         if (validTime <= 0)
-            return "Wind: no forecast yet";
-        final SimpleDateFormat fmt = new SimpleDateFormat("EEE h a", Locale.US);
-        return "Wind +" + hour + " h, " + fmt.format(new Date(validTime)).toLowerCase(Locale.US)
-                + " (" + wind.modelName() + ")";
+            return "No forecast yet";
+        return capitalize(relativeTime(validTime)) + ", " + clock(validTime);
+    }
+
+    /** "now", "in 6 h", "2 h ago" \u2014 a forecast hour in the operator's terms. */
+    private static String relativeTime(long when) {
+        final long minutes = Math.round((when - System.currentTimeMillis()) / 60000.0);
+        if (Math.abs(minutes) <= 30)
+            return "now";
+        final long size = Math.abs(minutes);
+        final String gap = size < 60 ? size + " min" : Math.round(size / 60.0) + " h";
+        return minutes > 0 ? "in " + gap : gap + " ago";
+    }
+
+    /** "Tue 6 pm": the day and hour, with a lower-case meridiem. */
+    private static String clock(long when) {
+        return new SimpleDateFormat("EEE h a", Locale.US).format(new Date(when))
+                .replace("AM", "am").replace("PM", "pm");
+    }
+
+    private static String capitalize(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     // ---- layers ------------------------------------------------------------------
@@ -702,12 +726,15 @@ public final class AtmospherePane {
         windLevelLabel.setText(wind.levelLabel(units == UnitSystem.METRIC));
     }
 
-    /** What a height would read while the finger is still on the slider. */
+    /**
+     * The height under the finger. How fine the wind is there is left off until the
+     * finger lifts, because the model that answers can change with the height and a
+     * number that flickers while dragging is worse than one that arrives a beat late.
+     */
     private String levelLabelFor(int index) {
-        return "Wind at " + com.atakmap.android.atmosphere.wind.NomadsWind.Level.values()[
-                Math.max(0, Math.min(index,
-                        com.atakmap.android.atmosphere.wind.NomadsWind.Level.values().length - 1))]
-                .label(units == UnitSystem.METRIC);
+        final com.atakmap.android.atmosphere.wind.NomadsWind.Level[] all =
+                com.atakmap.android.atmosphere.wind.NomadsWind.Level.values();
+        return all[Math.max(0, Math.min(index, all.length - 1))].label(units == UnitSystem.METRIC);
     }
 
     /** The legend's numbers follow the operator's unit, like every other speed. */
@@ -718,18 +745,17 @@ public final class AtmospherePane {
         windScale.setScale(breaks, Units.displayUnit(Quantity.SPEED, units));
     }
 
-    /** "Radar 4:40 pm, latest, 3 min ago", in the phone's zone. */
+    /** "Latest, 4:40 pm" or "18 min ago, 4:22 pm", in the phone's zone. */
     private String frameLabel(int index, String time) {
         if (time == null || index < 0)
-            return "Radar: no frame yet";
+            return "No frame yet";
         final long t = com.atakmap.android.atmosphere.data.IsoTime.parse(time);
         if (t <= 0)
-            return "Radar: " + time;
-        final SimpleDateFormat clock = new SimpleDateFormat("h:mm a", Locale.US);
-        final String when = clock.format(new Date(t)).toLowerCase(Locale.US);
+            return time;
+        final String when = new SimpleDateFormat("h:mm a", Locale.US).format(new Date(t))
+                .replace("AM", "am").replace("PM", "pm");
         final boolean latest = index == radarFrames.size() - 1;
-        final long ageMin = Math.max(0, (System.currentTimeMillis() - t) / 60000L);
-        return "Radar " + when + (latest ? ", latest" : "") + ", " + ageMin + " min ago";
+        return (latest ? "Latest" : capitalize(relativeTime(t))) + ", " + when;
     }
 
     /** The pane left the screen: an armed pick must not keep the map's tap listeners. */

@@ -99,17 +99,19 @@ public final class NomadsWind {
 
     public enum Model {
         /** 3 km, CONUS. Close in, where terrain shapes the wind. */
-        HRRR("HRRR", "filter_hrrr_2d.pl", 1, 2, 8.0, 6.0,
+        HRRR("HRRR", 3, "filter_hrrr_2d.pl", 1, 2, 8.0, 6.0,
                 CONUS_W, CONUS_S, CONUS_E, CONUS_N),
         /** 13 km, the same CONUS ground, cheap enough to cover a region at once. */
-        RAP("RAP", "filter_rap.pl", 1, 2, 40.0, 30.0,
+        RAP("RAP", 13, "filter_rap.pl", 1, 2, 40.0, 30.0,
                 CONUS_W, CONUS_S, CONUS_E, CONUS_N),
         /** A quarter degree, global: Alaska, Hawaii, the borders, and any wide view. */
-        GFS("GFS", "filter_gfs_0p25.pl", 6, 6, 120.0, 60.0,
+        GFS("GFS", 25, "filter_gfs_0p25.pl", 6, 6, 120.0, 60.0,
                 -180, -85, 180, 85);
 
-        /** Shown to the operator beside the forecast hour. */
+        /** The model's own name. Engineering only: never put it on a control. */
         public final String label;
+        /** How wide one cell is. This is what a model's name means to a crew. */
+        public final int cellKm;
         private final String script;
         /** Hours between runs. */
         private final int runStep;
@@ -119,9 +121,10 @@ public final class NomadsWind {
         public final double maxSpanLon, maxSpanLat;
         public final double west, south, east, north;
 
-        Model(String label, String script, int runStep, int lag, double maxSpanLon,
+        Model(String label, int cellKm, String script, int runStep, int lag, double maxSpanLon,
                 double maxSpanLat, double west, double south, double east, double north) {
             this.label = label;
+            this.cellKm = cellKm;
             this.script = script;
             this.runStep = runStep;
             this.lag = lag;
@@ -131,6 +134,16 @@ public final class NomadsWind {
             this.south = south;
             this.east = east;
             this.north = north;
+        }
+
+        /**
+         * What the model is, in words a crew can act on: how much ground one cell
+         * covers. "HRRR" tells a firefighter nothing; "2 mi detail" tells them whether
+         * the wind on screen can know about their canyon.
+         */
+        public String detail(boolean metric) {
+            return metric ? cellKm + " km detail"
+                    : Math.round(cellKm / 1.609344) + " mi detail";
         }
 
         public boolean covers(double lat, double lon) {

@@ -266,9 +266,13 @@ public final class WindOverlay {
         return level.ordinal();
     }
 
-    /** "10 m above ground" or "about 10,000 ft (700 mb)", plus the model answering. */
+    /**
+     * The height being drawn and how fine the wind is there, in plain words: the
+     * toggle above already says Wind, and the model's name is not something a crew
+     * can act on (operator, 2026-09-22: "what does ... HRRR mean, like wtf is HRRR?").
+     */
     public String levelLabel(boolean metric) {
-        return "Wind at " + level.label(metric) + " \u2014 " + model.label;
+        return level.label(metric) + ", " + model.detail(metric);
     }
 
     /**
@@ -291,10 +295,6 @@ public final class WindOverlay {
         ensureRegion();
     }
 
-    /** The model answering right now, for the scrubber label. */
-    public String modelName() {
-        return model.label;
-    }
 
     private static boolean contains(GeoBounds outer, GeoBounds inner) {
         return inner.getWest() >= outer.getWest() && inner.getEast() <= outer.getEast()
