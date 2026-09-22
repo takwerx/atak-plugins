@@ -1,6 +1,8 @@
 package com.atakmap.android.atmosphere.plugin;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Environment;
 import android.view.View;
@@ -16,6 +18,8 @@ import com.atakmap.android.atmosphere.overlay.WindOverlay;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
 import com.atakmap.android.atmosphere.ui.AtmosphereDropDown;
 import com.atakmap.android.atmosphere.ui.AtmospherePane;
+import com.atakmap.android.ipc.AtakBroadcast;
+import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 
@@ -38,6 +42,21 @@ import gov.tak.platform.marshal.MarshalManager;
 public class Atmosphere implements IPlugin {
 
     private static final String TAG = "Atmosphere";
+
+    /**
+     * Opens the pane from outside: another plugin (MAST's tool tiles), a hotkey, or
+     * a test over adb. A system broadcast, because ATAK's own registerReceiver is
+     * process-local and unreachable from anything but ATAK itself. It opens a
+     * pane and nothing else.
+     */
+    public static final String ACTION_SHOW = "com.atakmap.android.atmosphere.SHOW";
+
+    private final BroadcastReceiver showReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            showPane();
+        }
+    };
 
     IServiceController serviceController;
     Context pluginContext;
@@ -85,6 +104,8 @@ public class Atmosphere implements IPlugin {
             return;
         uiService.addToolbarItem(toolbarItem);
         startOverlays();
+        AtakBroadcast.getInstance().registerSystemReceiver(showReceiver,
+                new DocumentedIntentFilter(ACTION_SHOW, "Open the Atmosphere pane"));
     }
 
     /** The overlays need the map; it exists by onStart, and showPane retries if not. */
@@ -110,6 +131,11 @@ public class Atmosphere implements IPlugin {
     public void onStop() {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+        try {
+            AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "show receiver was not registered", e);
+        }
         if (wind != null) {
             wind.stop();
             wind = null;

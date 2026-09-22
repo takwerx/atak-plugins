@@ -9,6 +9,7 @@ import android.graphics.PointF;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.ViewGroup;
 import android.view.View;
 import android.widget.HorizontalScrollView;
 import android.widget.Button;
@@ -18,6 +19,9 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.viewpager.widget.PagerAdapter;
+import androidx.viewpager.widget.ViewPager;
 
 import com.atakmap.android.atmosphere.astro.Astro;
 import com.atakmap.android.atmosphere.compat.MapCompat;
@@ -88,6 +92,10 @@ public final class AtmospherePane {
     private final ImageButton favoritesButton;
     private final Button unitsButton;
     private final ImageButton wideButton;
+    private final ImageButton pageButton;
+    private final ViewPager pager;
+    private final LinearLayout pageDots;
+    private final View[] pages;
     private final ImageButton refreshButton;
     private final ImageButton settingsButton;
     private final TextView positionText;
@@ -159,38 +167,50 @@ public final class AtmospherePane {
         this.client = client;
         this.sources = registry.sources();
 
-        modeSelf = root.findViewById(R.id.mode_self);
-        modeCenter = root.findViewById(R.id.mode_center);
-        modePick = root.findViewById(R.id.mode_pick);
-        favoritesButton = root.findViewById(R.id.favorites_button);
-        unitsButton = root.findViewById(R.id.units_button);
-        wideButton = root.findViewById(R.id.wide_button);
-        refreshButton = root.findViewById(R.id.refresh_button);
-        settingsButton = root.findViewById(R.id.settings_button);
-        positionText = root.findViewById(R.id.position_text);
-        statusText = root.findViewById(R.id.status_text);
-        currentHeading = root.findViewById(R.id.current_heading);
-        currentContainer = root.findViewById(R.id.current_container);
-        seriesHeading = root.findViewById(R.id.series_heading);
-        trendScroll = root.findViewById(R.id.trend_scroll);
-        trendHost = root.findViewById(R.id.trend_host);
-        trendChips = root.findViewById(R.id.trend_chips);
+        // The pages are their own layouts, inflated here and handed to the pager;
+        // every id below is looked up across the root and the pages.
+        final LayoutInflater inflater = LayoutInflater.from(pluginContext);
+        pages = new View[] {
+                inflater.inflate(R.layout.page_forecast, null),
+                inflater.inflate(R.layout.page_layers, null)
+        };
+        pager = root.findViewById(R.id.pager);
+        pageDots = root.findViewById(R.id.page_dots);
+        pageButton = root.findViewById(R.id.page_button);
+        wirePager();
+
+        modeSelf = find(R.id.mode_self);
+        modeCenter = find(R.id.mode_center);
+        modePick = find(R.id.mode_pick);
+        favoritesButton = find(R.id.favorites_button);
+        unitsButton = find(R.id.units_button);
+        wideButton = find(R.id.wide_button);
+        refreshButton = find(R.id.refresh_button);
+        settingsButton = find(R.id.settings_button);
+        positionText = find(R.id.position_text);
+        statusText = find(R.id.status_text);
+        currentHeading = find(R.id.current_heading);
+        currentContainer = find(R.id.current_container);
+        seriesHeading = find(R.id.series_heading);
+        trendScroll = find(R.id.trend_scroll);
+        trendHost = find(R.id.trend_host);
+        trendChips = find(R.id.trend_chips);
         trend = new TrendStripView(pluginContext);
         trendHost.addView(trend);
-        hoursTableButton = root.findViewById(R.id.hours_table_button);
-        hoursTable = root.findViewById(R.id.hours_table);
-        hoursLegend = root.findViewById(R.id.hours_legend);
-        hoursContainer = root.findViewById(R.id.hours_container);
-        daysHeading = root.findViewById(R.id.days_heading);
-        daysStrip = root.findViewById(R.id.days_strip);
-        daysLegend = root.findViewById(R.id.days_legend);
-        daysContainer = root.findViewById(R.id.days_container);
-        attributionText = root.findViewById(R.id.attribution_text);
-        radarToggle = root.findViewById(R.id.radar_toggle);
-        windToggle = root.findViewById(R.id.wind_toggle);
-        scrubber = root.findViewById(R.id.scrubber);
-        scrubberLabel = root.findViewById(R.id.scrubber_label);
-        scrubberBar = root.findViewById(R.id.scrubber_bar);
+        hoursTableButton = find(R.id.hours_table_button);
+        hoursTable = find(R.id.hours_table);
+        hoursLegend = find(R.id.hours_legend);
+        hoursContainer = find(R.id.hours_container);
+        daysHeading = find(R.id.days_heading);
+        daysStrip = find(R.id.days_strip);
+        daysLegend = find(R.id.days_legend);
+        daysContainer = find(R.id.days_container);
+        attributionText = find(R.id.attribution_text);
+        radarToggle = find(R.id.radar_toggle);
+        windToggle = find(R.id.wind_toggle);
+        scrubber = find(R.id.scrubber);
+        scrubberLabel = find(R.id.scrubber_label);
+        scrubberBar = find(R.id.scrubber_bar);
         wireLayers();
 
         final SharedPreferences prefs = MapCompat.prefs();
@@ -233,6 +253,90 @@ public final class AtmospherePane {
         if (radar != null && radar.isOn())
             radar.refreshFrames(false);
         updateLayerControls();
+    }
+
+    /** A view by id, in the root or on any page. */
+    private <T extends View> T find(int id) {
+        T v = root.findViewById(id);
+        if (v != null)
+            return v;
+        for (View page : pages) {
+            v = page.findViewById(id);
+            if (v != null)
+                return v;
+        }
+        throw new IllegalStateException("no view with id " + id);
+    }
+
+    /**
+     * Pages in ATAK's own ViewPager (the SDK helloworld TabViewDropDown pattern):
+     * the forecast first, the layers a swipe or the arrow away. Plain views, not
+     * fragments: a fragment needs the host activity's FragmentManager and the
+     * plugin class loader, which is a release-proguard risk for nothing.
+     */
+    private void wirePager() {
+        pager.setAdapter(new PagerAdapter() {
+            @Override
+            public int getCount() {
+                return pages.length;
+            }
+
+            @Override
+            public boolean isViewFromObject(View view, Object object) {
+                return view == object;
+            }
+
+            @Override
+            public Object instantiateItem(ViewGroup container, int position) {
+                container.addView(pages[position]);
+                return pages[position];
+            }
+
+            @Override
+            public void destroyItem(ViewGroup container, int position, Object object) {
+                container.removeView((View) object);
+            }
+        });
+        pager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+            @Override
+            public void onPageSelected(int position) {
+                updatePageDots(position);
+            }
+        });
+        for (int i = 0; i < pages.length; i++) {
+            final View dot = new View(pluginContext);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(9), dp(9));
+            lp.setMargins(dp(4), 0, dp(4), 0);
+            dot.setLayoutParams(lp);
+            final android.graphics.drawable.GradientDrawable bg =
+                    new android.graphics.drawable.GradientDrawable();
+            bg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            bg.setColor(Color.WHITE);
+            dot.setBackground(bg);
+            final int page = i;
+            dot.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    pager.setCurrentItem(page, true);
+                }
+            });
+            pageDots.addView(dot);
+        }
+        updatePageDots(0);
+        pageButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pager.setCurrentItem((pager.getCurrentItem() + 1) % pages.length, true);
+            }
+        });
+    }
+
+    private void updatePageDots(int current) {
+        for (int i = 0; i < pageDots.getChildCount(); i++)
+            pageDots.getChildAt(i).setAlpha(i == current ? 1f : 0.35f);
+        // The arrow points at the page it will go to: right until the last page,
+        // then mirrored, since from there it goes back to the first.
+        pageButton.setScaleX(current == pages.length - 1 ? -1f : 1f);
     }
 
     /** The drop-down hosting this pane; the wide toggle needs it. */

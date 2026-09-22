@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Page 2: the overlays on the map, their shared scrubber and, as they land,
+     each layer's own controls. -->
+<!-- focusableInTouchMode + beforeDescendants: the scroller takes focus itself,
+     so a rebuilt button (the chip row, the layer toggles) cannot pull the page down
+     to itself on the next layout. Without it the forecast opened scrolled past the
+     place, status and now-values (XCover, 2026-09-22). -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fadeScrollbars="false"
+    android:focusableInTouchMode="true"
+    android:descendantFocusability="beforeDescendants">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="8dp">
+
+        <!-- ====== LAYERS: overlays on the map, one toggle each, ON green / OFF red
+             on a plain TakwerxButton the way Traffic does it. Time-enabled layers
+             share the scrubber under the grid. ====== -->
+        <TextView
+            android:id="@+id/layers_heading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/heading_layers"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:paddingTop="8dp"
+            android:alpha="0.6" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/radar_toggle"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/radar_off" />
+
+            <Button
+                android:id="@+id/wind_toggle"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/wind_off" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/scrubber"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/scrubber_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:text="" />
+
+            <SeekBar
+                android:id="@+id/scrubber_bar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="0"
+                android:progress="0" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/attribution_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:layout_marginTop="@dimen/auto_margin"
+            android:text="" />
+
+        <TextView
+            android:id="@+id/attribution_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:layout_marginTop="@dimen/auto_margin"
+            android:text="" />
+    </LinearLayout>
+</ScrollView>
