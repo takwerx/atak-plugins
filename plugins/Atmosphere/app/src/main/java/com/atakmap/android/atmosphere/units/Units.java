@@ -8,7 +8,7 @@ import java.util.Locale;
  * <p>Two rules make this predictable:
  * <ol>
  *   <li>Every value is converted to a <b>canonical</b> unit the moment it is parsed —
- *       Celsius, metres per second, metres, millimetres, hectopascals, degrees. Nothing
+ *       Celsius, meters per second, meters, millimeters, hectopascals, degrees. Nothing
  *       downstream has to know what the API sent.</li>
  *   <li>The unit system is applied at <b>display</b> time only. Switching it re-renders;
  *       it never refetches and never round-trips a value through a lossy conversion.</li>

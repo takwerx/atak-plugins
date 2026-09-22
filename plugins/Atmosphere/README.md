@@ -6,7 +6,7 @@ and which keeps answering after the network drops.
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
 
-Forecast conditions for a point on the map — the map centre or the operator's own
+Forecast conditions for a point on the map — the map center or the operator's own
 position — from a provider the operator chooses, shown in the units the operator
 chooses, with the age of the reading on the face of it.
 

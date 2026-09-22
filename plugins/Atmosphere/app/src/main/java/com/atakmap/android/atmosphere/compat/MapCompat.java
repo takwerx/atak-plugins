@@ -22,7 +22,7 @@ public final class MapCompat {
     private MapCompat() {
     }
 
-    /** Needs: the map's current centre. No stable-API equivalent as of ATAK 5.7. */
+    /** Needs: the map's current center. No stable-API equivalent as of ATAK 5.7. */
     public static GeoPoint mapCenter() {
         final MapView mv = MapView.getMapView();
         if (mv == null)

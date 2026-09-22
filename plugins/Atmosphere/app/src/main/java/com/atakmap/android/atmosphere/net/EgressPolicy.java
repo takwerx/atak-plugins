@@ -76,7 +76,7 @@ public final class EgressPolicy {
         prefs.edit().putInt(PREF_PRECISION, Math.max(0, Math.min(decimals, 6))).apply();
     }
 
-    /** How coarse the current setting is, in metres, for the settings UI. */
+    /** How coarse the current setting is, in meters, for the settings UI. */
     public static int approximateMetres(int decimals) {
         switch (decimals) {
             case 0:

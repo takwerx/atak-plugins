@@ -79,7 +79,7 @@ verbatim and come back as a 400 that looks like a network fault.
 | `lookup` | with `parse: "lookup"` | An array of `["substring", number]` pairs, tried in order, case-insensitive; the first substring found in the value gives the number, no match gives no value. NWS's hourly periods carry sky cover only as an icon code, so `"seriesPath": "icon"` with `[["skc", 0], ["few", 15], ["sct", 37], ["bkn", 69], ["ovc", 94]]` reads it. |
 | `defaultOn` | no | Selected the first time this source is used. |
 
-Values are converted to canonical units on arrival — Celsius, m/s, metres, mm, hPa,
+Values are converted to canonical units on arrival — Celsius, m/s, meters, mm, hPa,
 degrees — and converted again only for display. Switching metric/imperial/aviation never
 refetches and never loses precision. A JSON `null` reads as *no value*, not as zero.
 
