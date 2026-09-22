@@ -20,6 +20,9 @@
 
     <!-- Dialogs -->
     <string name="sources_title">Sources</string>
+    <string name="source_title">Source</string>
+    <string name="label_source">Source</string>
+    <string name="label_where">Where</string>
     <string name="variables_title">Variables</string>
     <string name="privacy_title">Position sent to providers</string>
     <string name="no_sources">No source definitions loaded</string>

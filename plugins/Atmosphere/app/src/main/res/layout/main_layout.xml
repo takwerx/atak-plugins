@@ -12,37 +12,57 @@
         android:orientation="vertical"
         android:paddingBottom="8dp">
 
-        <!-- Source and refresh -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/label_source"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:paddingTop="2dp"
+            android:alpha="0.6" />
+
+        <!-- Source picker: a button opening a single-choice dialog on ATAK's context.
+             Never a Spinner; its dropdown on the plugin context kills ATAK. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <Spinner
-                android:id="@+id/source_spinner"
+            <Button
+                android:id="@+id/source_button"
+                style="@style/TakwerxButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1" />
+                android:layout_weight="1"
+                android:text="@string/no_sources" />
 
             <Button
                 android:id="@+id/refresh_button"
+                style="@style/TakwerxButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="0dp"
                 android:text="@string/refresh" />
         </LinearLayout>
 
-        <!-- Where the forecast is for -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/label_where"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:paddingTop="6dp"
+            android:alpha="0.6" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="@dimen/auto_margin">
+            android:gravity="center_vertical">
 
             <Button
                 android:id="@+id/center_button"
+                style="@style/TakwerxButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
@@ -50,6 +70,7 @@
 
             <Button
                 android:id="@+id/self_button"
+                style="@style/TakwerxButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
@@ -57,9 +78,9 @@
 
             <Button
                 android:id="@+id/units_button"
+                style="@style/TakwerxButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:minWidth="0dp"
                 android:text="@string/units_metric" />
         </LinearLayout>
 
@@ -79,15 +100,15 @@
             android:textColor="@color/heading_yellow"
             android:text="@string/status_idle" />
 
-        <!-- Current conditions, filled at runtime from the source definition -->
         <TextView
             android:id="@+id/current_heading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="@dimen/fontSize"
-            android:textColor="@color/heading_yellow"
-            android:layout_marginTop="@dimen/auto_margin"
-            android:text="@string/heading_now" />
+            android:text="@string/heading_now"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:paddingTop="8dp"
+            android:alpha="0.6" />
 
         <LinearLayout
             android:id="@+id/current_container"
@@ -99,10 +120,11 @@
             android:id="@+id/series_heading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="@dimen/fontSize"
-            android:textColor="@color/heading_yellow"
-            android:layout_marginTop="@dimen/auto_margin"
-            android:text="@string/heading_hours" />
+            android:text="@string/heading_hours"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:paddingTop="8dp"
+            android:alpha="0.6" />
 
         <LinearLayout
             android:id="@+id/series_container"
@@ -110,7 +132,6 @@
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
-        <!-- Configuration -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -119,6 +140,7 @@
 
             <Button
                 android:id="@+id/variables_button"
+                style="@style/TakwerxButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
@@ -126,6 +148,7 @@
 
             <Button
                 android:id="@+id/sources_button"
+                style="@style/TakwerxButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
@@ -133,6 +156,7 @@
 
             <Button
                 android:id="@+id/privacy_button"
+                style="@style/TakwerxButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"

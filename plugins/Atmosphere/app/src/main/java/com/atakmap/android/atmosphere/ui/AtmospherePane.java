@@ -8,11 +8,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
@@ -58,7 +55,7 @@ public final class AtmospherePane {
     private final EgressPolicy egress;
     private final WeatherClient client;
 
-    private final Spinner sourceSpinner;
+    private final Button sourceButton;
     private final Button refreshButton;
     private final Button centerButton;
     private final Button selfButton;
@@ -88,7 +85,7 @@ public final class AtmospherePane {
         this.client = client;
         this.sources = registry.sources();
 
-        sourceSpinner = root.findViewById(R.id.source_spinner);
+        sourceButton = root.findViewById(R.id.source_button);
         refreshButton = root.findViewById(R.id.refresh_button);
         centerButton = root.findViewById(R.id.center_button);
         selfButton = root.findViewById(R.id.self_button);
@@ -106,7 +103,7 @@ public final class AtmospherePane {
                 : prefs.getString(PREF_UNITS, null), UnitSystem.METRIC);
         useSelf = prefs != null && prefs.getBoolean(PREF_USE_SELF, false);
 
-        wireSourceSpinner(prefs);
+        wireSourceButton(prefs);
         wireButtons();
         updateUnitsButton();
         updatePositionMode();
@@ -118,20 +115,13 @@ public final class AtmospherePane {
         refresh(false);
     }
 
-    private void wireSourceSpinner(SharedPreferences prefs) {
-        final List<String> names = new ArrayList<>(sources.size());
-        for (WxSourceDef def : sources) {
-            names.add(def.origin == WxSourceDef.Origin.EXTERNAL
-                    ? def.displayName + " *" : def.displayName);
-        }
-        if (names.isEmpty())
-            names.add(pluginContext.getString(R.string.no_sources));
-
-        final ArrayAdapter<String> adapter = new ArrayAdapter<>(pluginContext,
-                android.R.layout.simple_spinner_item, names);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        sourceSpinner.setAdapter(adapter);
-
+    /**
+     * The source picker is a button that opens a single-choice dialog on ATAK's own
+     * context. Never a Spinner: its dropdown is a Dialog built from the context that
+     * inflated the view, and on the plugin context that is a BadTokenException that
+     * kills ATAK (plugin UI standard, CLAUDE.md).
+     */
+    private void wireSourceButton(SharedPreferences prefs) {
         final String storedId = prefs == null ? null : prefs.getString(PREF_SOURCE, null);
         int index = 0;
         for (int i = 0; i < sources.size(); i++) {
@@ -140,30 +130,65 @@ public final class AtmospherePane {
                 break;
             }
         }
-        if (!sources.isEmpty()) {
+        if (!sources.isEmpty())
             selected = sources.get(index);
-            sourceSpinner.setSelection(index);
-        }
+        updateSourceButton();
 
-        sourceSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        sourceButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position,
-                    long id) {
-                if (position < 0 || position >= sources.size())
+            public void onClick(View v) {
+                if (sources.isEmpty())
                     return;
-                selected = sources.get(position);
-                final SharedPreferences p = MapCompat.prefs();
-                if (p != null)
-                    p.edit().putString(PREF_SOURCE, selected.id).apply();
-                snapshot = null;
-                refresh(false);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                // Spinner always has a selection once populated.
+                final Context ctx = MapCompat.atakContext();
+                if (ctx == null)
+                    return;
+                final String[] names = sourceNames();
+                final int checked = selected == null ? -1 : sources.indexOf(selected);
+                new AlertDialog.Builder(ctx)
+                        .setTitle(pluginContext.getString(R.string.source_title))
+                        .setSingleChoiceItems(names, checked,
+                                new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface d, int which) {
+                                        d.dismiss();
+                                        if (which < 0 || which >= sources.size())
+                                            return;
+                                        selected = sources.get(which);
+                                        final SharedPreferences p = MapCompat.prefs();
+                                        if (p != null)
+                                            p.edit().putString(PREF_SOURCE, selected.id).apply();
+                                        updateSourceButton();
+                                        snapshot = null;
+                                        refresh(false);
+                                    }
+                                })
+                        .setNegativeButton(pluginContext.getString(R.string.close), null)
+                        .show();
             }
         });
+    }
+
+    private String[] sourceNames() {
+        final String[] names = new String[sources.size()];
+        for (int i = 0; i < sources.size(); i++)
+            names[i] = sourceName(sources.get(i));
+        return names;
+    }
+
+    /** External (operator-dropped) definitions are marked, as the Sources dialog marks them. */
+    private static String sourceName(WxSourceDef def) {
+        return def.origin == WxSourceDef.Origin.EXTERNAL
+                ? def.displayName + " *" : def.displayName;
+    }
+
+    private void updateSourceButton() {
+        if (selected == null) {
+            sourceButton.setText(R.string.no_sources);
+            sourceButton.setEnabled(false);
+        } else {
+            sourceButton.setText(sourceName(selected));
+            sourceButton.setEnabled(true);
+        }
     }
 
     private void wireButtons() {
