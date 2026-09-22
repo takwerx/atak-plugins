@@ -33,6 +33,7 @@ import com.atakmap.android.atmosphere.model.SeriesEntry;
 import com.atakmap.android.atmosphere.model.Snapshot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
+import com.atakmap.android.atmosphere.overlay.WindScaleView;
 import com.atakmap.android.atmosphere.overlay.WindOverlay;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
@@ -125,6 +126,8 @@ public final class AtmospherePane {
     private RadarOverlay radar;
     private List<String> radarFrames = new ArrayList<>();
     private final Button windToggle;
+    private final View windScaleHost;
+    private final WindScaleView windScale;
     private WindOverlay wind;
     private int windHours;
 
@@ -208,6 +211,9 @@ public final class AtmospherePane {
         attributionText = find(R.id.attribution_text);
         radarToggle = find(R.id.radar_toggle);
         windToggle = find(R.id.wind_toggle);
+        windScaleHost = find(R.id.wind_scale_host);
+        windScale = new WindScaleView(pluginContext);
+        ((LinearLayout) windScaleHost).addView(windScale);
         scrubber = find(R.id.scrubber);
         scrubberLabel = find(R.id.scrubber_label);
         scrubberBar = find(R.id.scrubber_bar);
@@ -557,7 +563,19 @@ public final class AtmospherePane {
         windToggle.setText(windOn ? R.string.wind_on : R.string.wind_off);
         windToggle.setTextColor(pluginContext.getResources().getColor(
                 windOn ? R.color.state_on : R.color.state_off));
+        // The legend explains what is on the map, so it appears with the layer.
+        windScaleHost.setVisibility(windOn ? View.VISIBLE : View.GONE);
+        if (windOn)
+            updateWindScale();
         scrubber.setVisibility(radarOn || windOn ? View.VISIBLE : View.GONE);
+    }
+
+    /** The legend's numbers follow the operator's unit, like every other speed. */
+    private void updateWindScale() {
+        final float[] breaks = new float[WindScaleView.bandCount() - 1];
+        for (int i = 0; i < breaks.length; i++)
+            breaks[i] = (float) Units.toDisplay(Quantity.SPEED, WindScaleView.bandEdgeMs(i), units);
+        windScale.setScale(breaks, Units.displayUnit(Quantity.SPEED, units));
     }
 
     /** "Radar 4:40 pm, latest, 3 min ago", in the phone's zone. */
@@ -715,6 +733,7 @@ public final class AtmospherePane {
                 if (p != null)
                     p.edit().putString(PREF_UNITS, units.name()).apply();
                 updateUnitsButton();
+                updateWindScale();
                 // A unit change is a display change: re-render, never re-fetch.
                 render();
             }
@@ -775,9 +794,27 @@ public final class AtmospherePane {
         favoritesButton.setColorFilter(mode == PointMode.FAVORITE ? on : Color.WHITE);
     }
 
-    /** The row is too narrow for "Imperial"; the temperature unit says which system. */
+    /**
+     * The row is too narrow for "Imperial", so the button wears the unit that tells
+     * the three systems apart: Celsius for metric, Fahrenheit for imperial, knots
+     * for aviation, which is imperial in every way but wind, distance and pressure.
+     * It read "\u00b0C" in aviation until 2026-09-22, which is the one thing it must
+     * never do: say Celsius while the readout is in Fahrenheit.
+     */
     private void updateUnitsButton() {
-        unitsButton.setText(units == UnitSystem.IMPERIAL ? "\u00b0F" : "\u00b0C");
+        final String face;
+        switch (units) {
+            case METRIC:
+                face = "\u00b0C";
+                break;
+            case AVIATION:
+                face = "kt";
+                break;
+            default:
+                face = "\u00b0F";
+                break;
+        }
+        unitsButton.setText(face);
         unitsButton.setContentDescription(units.label());
     }
 

@@ -31,26 +31,42 @@
             android:paddingTop="8dp"
             android:alpha="0.6" />
 
+        <!-- One layer per row, full width, so the list grows downward as layers
+             land rather than squeezing more buttons across. Each layer's own
+             controls sit under its toggle: wind's speed legend here, radar's
+             transparency and dBZ scale when they come. -->
         <LinearLayout
+            android:id="@+id/layer_list"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
             <Button
                 android:id="@+id/radar_toggle"
                 style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/radar_off" />
 
             <Button
                 android:id="@+id/wind_toggle"
                 style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
                 android:text="@string/wind_off" />
+
+            <!-- The speed legend, added in code so the custom view is built with the
+                 plugin's own class loader. -->
+            <LinearLayout
+                android:id="@+id/wind_scale_host"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingLeft="4dp"
+                android:paddingRight="4dp"
+                android:paddingTop="4dp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <LinearLayout

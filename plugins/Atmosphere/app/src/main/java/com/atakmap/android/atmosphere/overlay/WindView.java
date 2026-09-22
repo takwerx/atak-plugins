@@ -35,6 +35,16 @@ import java.util.Random;
  */
 final class WindView extends View {
 
+    /**
+     * Speed bands, shared with {@link WindScaleView} so the legend can never drift
+     * from what is drawn. {@link #BAND_MAX_MS} holds the upper edge of every band
+     * but the last, which runs to whatever the wind is doing.
+     */
+    static final int[] BAND_COLORS = {
+            0xFFB8DCFF, 0xFF58B4FF, 0xFF58E890, 0xFFFFE850, 0xFFFF9A30, 0xFFFF4040
+    };
+    static final float[] BAND_MAX_MS = { 2, 5, 8, 12, 18 };
+
     private static final int TRAIL = 36;
     /** Screen pixels a 6 m/s wind moves a particle per frame. */
     private static final float PX_PER_FRAME_AT_6MS = 1.7f;
@@ -67,7 +77,7 @@ final class WindView extends View {
         len = new int[particles];
         age = new int[particles];
         speed = new float[particles];
-        final int[] colors = { 0xFFB8DCFF, 0xFF58B4FF, 0xFF58E890, 0xFFFFE850, 0xFFFF9A30, 0xFFFF4040 };
+        final int[] colors = BAND_COLORS;
         for (int b = 0; b < colors.length; b++) {
             for (int k = 0; k < TRAIL; k++) {
                 final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -230,11 +240,10 @@ final class WindView extends View {
     }
 
     static int band(float ms) {
-        if (ms < 2) return 0;
-        if (ms < 5) return 1;
-        if (ms < 8) return 2;
-        if (ms < 12) return 3;
-        if (ms < 18) return 4;
-        return 5;
+        for (int i = 0; i < BAND_MAX_MS.length; i++) {
+            if (ms < BAND_MAX_MS[i])
+                return i;
+        }
+        return BAND_MAX_MS.length;
     }
 }

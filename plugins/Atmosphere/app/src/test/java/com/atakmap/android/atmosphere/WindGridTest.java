@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 import com.atakmap.android.atmosphere.wind.Grib2;
 import com.atakmap.android.atmosphere.wind.Lcc;
 import com.atakmap.android.atmosphere.wind.NomadsWind;
+import com.atakmap.android.atmosphere.overlay.WindScaleView;
 import com.atakmap.android.atmosphere.wind.NomadsWind.Model;
 import com.atakmap.android.atmosphere.wind.WindGrid;
 
@@ -153,6 +154,21 @@ public class WindGridTest {
         // Alaska and Hawaii are small views the CONUS models do not reach.
         assertEquals(Model.GFS, NomadsWind.forView(-155, 60, -145, 66));
         assertEquals(Model.GFS, NomadsWind.forView(-159, 19, -154, 23));
+    }
+
+    @Test
+    public void theLegendUsesTheSameBandsAsTheParticles() {
+        // The bar and the trails read the same table, so a color on the map always
+        // means what the legend says. Six bands, five boundaries, rising.
+        assertEquals(6, WindScaleView.bandCount());
+        float last = -1;
+        for (int i = 0; i < WindScaleView.bandCount() - 1; i++) {
+            final float edge = WindScaleView.bandEdgeMs(i);
+            assertTrue("band edges must rise: " + edge + " after " + last, edge > last);
+            last = edge;
+        }
+        // 18 m/s is the last boundary, so a gale lands in the top band.
+        assertEquals(18f, WindScaleView.bandEdgeMs(WindScaleView.bandCount() - 2), 1e-6);
     }
 
     @Test
