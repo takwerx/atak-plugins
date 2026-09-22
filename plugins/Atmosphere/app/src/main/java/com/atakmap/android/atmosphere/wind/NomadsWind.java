@@ -40,6 +40,63 @@ public final class NomadsWind {
     /** Where the HRRR and RAP CONUS grids reach, measured off their own headers. */
     private static final double CONUS_W = -132.7, CONUS_E = -60.2, CONUS_S = 21.2, CONUS_N = 52.1;
 
+    /**
+     * The heights wind can be asked for, lowest first: the slider walks this ladder.
+     *
+     * <p>Two of them are heights above the ground, which is what a crew on the line
+     * and a turbine care about, and the rest are pressure surfaces, which is how the
+     * models and every aviation product carry wind aloft. The height printed beside a
+     * pressure level is the standard atmosphere's and is approximate by nature: the
+     * real height of a surface moves with the air mass, so the label says "about" and
+     * always names the millibars as well.
+     *
+     * <p>{@link #surface} marks the two that live in HRRR's surface file. HRRR has no
+     * pressure-level filter at all on NOMADS, so choosing one takes the answer to RAP
+     * inside CONUS or GFS outside, however far in the map is zoomed.
+     */
+    public enum Level {
+        AGL_10("lev_10_m_above_ground", 10, true),
+        AGL_80("lev_80_m_above_ground", 80, true),
+        MB_925("lev_925_mb", 750, false),
+        MB_850("lev_850_mb", 1500, false),
+        MB_700("lev_700_mb", 3000, false),
+        MB_500("lev_500_mb", 5500, false),
+        MB_300("lev_300_mb", 9200, false),
+        MB_250("lev_250_mb", 10400, false);
+
+        /** The grib filter's own name for it. */
+        public final String param;
+        /** Height above ground, or the standard atmosphere's height of the surface. */
+        public final int approxMetres;
+        /** True when it comes from a model's surface file, so HRRR can serve it. */
+        public final boolean surface;
+
+        Level(String param, int approxMetres, boolean surface) {
+            this.param = param;
+            this.approxMetres = approxMetres;
+            this.surface = surface;
+        }
+
+        /** The millibars, or 0 for a height above ground. */
+        public int millibars() {
+            return surface ? 0 : Integer.parseInt(name().substring(3));
+        }
+
+        /**
+         * "10 m above ground" or "about 10,000 ft (700 mb)". Altitude is feet unless
+         * the operator is in metric; aviation and imperial both fly in feet.
+         */
+        public String label(boolean metric) {
+            if (surface)
+                return metric ? approxMetres + " m above ground"
+                        : Math.round(approxMetres / 0.3048) + " ft above ground";
+            final String height = metric
+                    ? String.format(Locale.US, "%,d m", approxMetres)
+                    : String.format(Locale.US, "%,d ft", Math.round(approxMetres / 0.3048 / 500) * 500);
+            return "about " + height + " (" + millibars() + " mb)";
+        }
+    }
+
     public enum Model {
         /** 3 km, CONUS. Close in, where terrain shapes the wind. */
         HRRR("HRRR", "filter_hrrr_2d.pl", 1, 2, 8.0, 6.0,
@@ -131,9 +188,21 @@ public final class NomadsWind {
      * decide which cells to ask for.
      */
     public static Model forView(double west, double south, double east, double north) {
+        return forView(west, south, east, north, Level.AGL_10);
+    }
+
+    /**
+     * The model for a view at a height: the finest whose box covers the view, whose
+     * center it holds, and which carries that height. HRRR has no pressure-level
+     * filter on NOMADS, so any level above the surface starts at RAP.
+     */
+    public static Model forView(double west, double south, double east, double north,
+            Level level) {
         final double spanLon = east - west, spanLat = north - south;
         final double cLat = (north + south) / 2, cLon = (east + west) / 2;
         for (Model m : new Model[] { Model.HRRR, Model.RAP }) {
+            if (m == Model.HRRR && !level.surface)
+                continue;
             if (spanLon <= m.maxSpanLon && spanLat <= m.maxSpanLat && m.covers(cLat, cLon))
                 return m;
         }
@@ -143,6 +212,12 @@ public final class NomadsWind {
     /** The filter request for 10 m U and V over a box at a forecast hour of a run. */
     public static String url(Model model, long runUtc, int forecastHour, double west,
             double south, double east, double north) {
+        return url(model, Level.AGL_10, runUtc, forecastHour, west, south, east, north);
+    }
+
+    /** The filter request for U and V at a height over a box at a forecast hour. */
+    public static String url(Model model, Level level, long runUtc, int forecastHour,
+            double west, double south, double east, double north) {
         final Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         c.setTimeInMillis(runUtc);
         final String day = String.format(Locale.US, "%04d%02d%02d", c.get(Calendar.YEAR),
@@ -151,7 +226,7 @@ public final class NomadsWind {
         return FILTER + model.script
                 + "?dir=" + model.dir(day, hh)
                 + "&file=" + model.file(hh, forecastHour)
-                + "&var_UGRD=on&var_VGRD=on&lev_10_m_above_ground=on&subregion="
+                + "&var_UGRD=on&var_VGRD=on&" + level.param + "=on&subregion="
                 + String.format(Locale.US, "&toplat=%.3f&leftlon=%.3f&rightlon=%.3f&bottomlat=%.3f",
                         north, west, east, south);
     }

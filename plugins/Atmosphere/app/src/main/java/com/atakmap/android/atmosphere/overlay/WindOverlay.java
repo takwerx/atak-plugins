@@ -44,6 +44,7 @@ public final class WindOverlay {
     public static final String HOST = NomadsWind.HOST;
 
     private static final String PREF_ON = "weather.layer.wind.on";
+    private static final String PREF_LEVEL = "weather.layer.wind.level";
     /**
      * Columns a projected grid is resampled onto. 160 is about 5 km across an HRRR box
      * and about 27 km across a RAP region, either side of those models' own cells; a
@@ -76,6 +77,8 @@ public final class WindOverlay {
     private boolean started, on;
     /** Which model is answering; set from the view every time the region is chosen. */
     private NomadsWind.Model model = NomadsWind.Model.HRRR;
+    /** The height being drawn; the slider walks {@link NomadsWind.Level}. */
+    private NomadsWind.Level level = NomadsWind.Level.AGL_10;
     private long run;
     private int hours;
     private int hour;
@@ -159,6 +162,11 @@ public final class WindOverlay {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         mapView.addOnMapMovedListener(moved);
         final SharedPreferences p = MapCompat.prefs();
+        if (p != null) {
+            final int saved = p.getInt(PREF_LEVEL, 0);
+            if (saved >= 0 && saved < NomadsWind.Level.values().length)
+                level = NomadsWind.Level.values()[saved];
+        }
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
             setOn(true);
     }
@@ -245,8 +253,42 @@ public final class WindOverlay {
     // ---- region and grids ----------------------------------------------------------
 
     private String key(long run, int hour, GeoBounds r) {
-        return String.format(Locale.US, "%s|%d|%d|%.3f,%.3f,%.3f,%.3f", model.name(), run, hour,
-                r.getWest(), r.getSouth(), r.getEast(), r.getNorth());
+        return String.format(Locale.US, "%s|%s|%d|%d|%.3f,%.3f,%.3f,%.3f", model.name(),
+                level.name(), run, hour, r.getWest(), r.getSouth(), r.getEast(), r.getNorth());
+    }
+
+    /** How many heights the slider walks. */
+    public int levelCount() {
+        return NomadsWind.Level.values().length;
+    }
+
+    public int levelIndex() {
+        return level.ordinal();
+    }
+
+    /** "10 m above ground" or "about 10,000 ft (700 mb)", plus the model answering. */
+    public String levelLabel(boolean metric) {
+        return "Wind at " + level.label(metric) + " \u2014 " + model.label;
+    }
+
+    /**
+     * Change the height. A pressure level cannot come from HRRR, so this may also
+     * change the model; the region is recomputed either way.
+     */
+    public void setLevelIndex(int i) {
+        final NomadsWind.Level[] all = NomadsWind.Level.values();
+        i = Math.max(0, Math.min(i, all.length - 1));
+        if (all[i] == level)
+            return;
+        level = all[i];
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putInt(PREF_LEVEL, i).apply();
+        cache.clear();
+        region = null;
+        generation++;
+        pendingKey = null;
+        ensureRegion();
     }
 
     /** The model answering right now, for the scrubber label. */
@@ -287,7 +329,7 @@ public final class WindOverlay {
         final double vs = bounds.getSouth();
         final double vn = bounds.getNorth();
 
-        final NomadsWind.Model chosen = NomadsWind.forView(vw, vs, ve, vn);
+        final NomadsWind.Model chosen = NomadsWind.forView(vw, vs, ve, vn, level);
         final GeoBounds clamped = new GeoBounds(
                 Math.min(chosen.north, vn), Math.max(chosen.west, vw),
                 Math.max(chosen.south, vs), Math.min(chosen.east, ve));
@@ -368,9 +410,10 @@ public final class WindOverlay {
     private void fetch(final long tryRun, final int stepsBack, final int h, final GeoBounds r,
             final String k, final int mine) {
         final NomadsWind.Model asked = model;
+        final NomadsWind.Level askedLevel = level;
         status("Wind: fetching " + asked.label + " +" + h + " h…");
         // The filter's box is the region grown by a cell, so the grid covers it fully.
-        Http.getBytes(NomadsWind.url(asked, tryRun, h, r.getWest() - 0.05, r.getSouth() - 0.05,
+        Http.getBytes(NomadsWind.url(asked, askedLevel, tryRun, h, r.getWest() - 0.05, r.getSouth() - 0.05,
                 r.getEast() + 0.05, r.getNorth() + 0.05), egress.userAgent(), new Http.BytesCallback() {
             @Override
             public void onSuccess(byte[] body) {
@@ -404,9 +447,9 @@ public final class WindOverlay {
                 }
                 cache.put(key(run, h, r), grid);
                 Log.d(TAG, String.format(Locale.US,
-                        "%s grid +%d h run %d drawn %dx%d over %.2f,%.2f..%.2f,%.2f",
-                        asked.label, h, run, grid.nx, grid.ny, grid.west, grid.south,
-                        grid.east, grid.north));
+                        "%s %s grid +%d h run %d drawn %dx%d over %.2f,%.2f..%.2f,%.2f",
+                        asked.label, askedLevel.name(), h, run, grid.nx, grid.ny, grid.west,
+                        grid.south, grid.east, grid.north));
                 if (h == hour)
                     show(grid, r);
             }

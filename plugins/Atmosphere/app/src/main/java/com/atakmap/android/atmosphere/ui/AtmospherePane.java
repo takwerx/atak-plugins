@@ -9,6 +9,7 @@ import android.graphics.PointF;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.ViewGroup;
 import android.view.View;
 import android.widget.HorizontalScrollView;
@@ -129,6 +130,9 @@ public final class AtmospherePane {
     private final View windScaleHost;
     private final WindScaleView windScale;
     private final LinearLayout windUnitRow;
+    private final View windLevelBlock;
+    private final TextView windLevelLabel;
+    private final SeekBar windLevelBar;
     private WindOverlay wind;
     private int windHours;
 
@@ -219,6 +223,30 @@ public final class AtmospherePane {
         windUnitRow.setOrientation(LinearLayout.HORIZONTAL);
         ((LinearLayout) windScaleHost).addView(windUnitRow);
         buildWindUnitRow();
+        windLevelBlock = find(R.id.wind_level_block);
+        windLevelLabel = find(R.id.wind_level_label);
+        windLevelBar = find(R.id.wind_level_bar);
+        keepDragsFromThePager(windLevelBar);
+        windLevelBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
+                if (!fromUser || wind == null)
+                    return;
+                // The label follows the finger; the fetch waits for it to stop.
+                windLevelLabel.setText(levelLabelFor(value));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+                if (wind != null)
+                    wind.setLevelIndex(bar.getProgress());
+                updateWindLevel();
+            }
+        });
         scrubber = find(R.id.scrubber);
         scrubberLabel = find(R.id.scrubber_label);
         scrubberBar = find(R.id.scrubber_bar);
@@ -264,6 +292,30 @@ public final class AtmospherePane {
         if (radar != null && radar.isOn())
             radar.refreshFrames(false);
         updateLayerControls();
+    }
+
+    /**
+     * Let a slider keep a sideways drag that the pager would otherwise take.
+     *
+     * <p>A ViewPager claims any horizontal drag from its children once it passes the
+     * touch slop, and a SeekBar inside a scrolling container waits for that slop
+     * before claiming it, so the pager always wins and the thumb never moves. A tap
+     * still worked, which is what made it look like a miss rather than a bug (XCover,
+     * 2026-09-22). The bar asks its parents to keep their hands off for the length of
+     * one touch.
+     */
+    private static void keepDragsFromThePager(SeekBar bar) {
+        bar.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                final int action = event.getActionMasked();
+                if (action == MotionEvent.ACTION_DOWN)
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                return false;
+            }
+        });
     }
 
     /** A view by id, in the root or on any page. */
@@ -420,6 +472,8 @@ public final class AtmospherePane {
                 if (scrubberBar.getProgress() != index)
                     scrubberBar.setProgress(index);
                 scrubberLabel.setText(windLabel(index, validTime));
+                // The model can change with the height, so the level line follows.
+                updateWindLevel();
             }
 
             @Override
@@ -476,6 +530,7 @@ public final class AtmospherePane {
                 }
             }
         });
+        keepDragsFromThePager(scrubberBar);
         scrubberBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
@@ -570,11 +625,13 @@ public final class AtmospherePane {
                 windOn ? R.color.state_on : R.color.state_off));
         // The legend explains what is on the map, so it appears with the layer.
         windScaleHost.setVisibility(windOn ? View.VISIBLE : View.GONE);
+        windLevelBlock.setVisibility(windOn ? View.VISIBLE : View.GONE);
         if (windOn) {
             updateWindScale();
             // The row is built in the constructor, before the stored unit has been
             // read, so the first paint of it happens here.
             updateWindUnitRow();
+            updateWindLevel();
         }
         scrubber.setVisibility(radarOn || windOn ? View.VISIBLE : View.GONE);
     }
@@ -625,8 +682,32 @@ public final class AtmospherePane {
         updateUnitsButton();
         updateWindScale();
         updateWindUnitRow();
+        updateWindLevel();
         // A unit change is a display change: re-render, never re-fetch.
         render();
+    }
+
+    /**
+     * The height the wind is drawn at (operator, 2026-09-22: "do we have a slider for
+     * wind height?"). Ten metres up to the jet, walked as a ladder rather than a free
+     * scale because that is what the models carry: two heights above the ground and
+     * the standard pressure surfaces above them.
+     */
+    private void updateWindLevel() {
+        if (wind == null)
+            return;
+        windLevelBar.setMax(Math.max(0, wind.levelCount() - 1));
+        if (windLevelBar.getProgress() != wind.levelIndex())
+            windLevelBar.setProgress(wind.levelIndex());
+        windLevelLabel.setText(wind.levelLabel(units == UnitSystem.METRIC));
+    }
+
+    /** What a height would read while the finger is still on the slider. */
+    private String levelLabelFor(int index) {
+        return "Wind at " + com.atakmap.android.atmosphere.wind.NomadsWind.Level.values()[
+                Math.max(0, Math.min(index,
+                        com.atakmap.android.atmosphere.wind.NomadsWind.Level.values().length - 1))]
+                .label(units == UnitSystem.METRIC);
     }
 
     /** The legend's numbers follow the operator's unit, like every other speed. */

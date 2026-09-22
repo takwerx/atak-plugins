@@ -144,6 +144,54 @@ public class WindGridTest {
     }
 
     @Test
+    public void theHeightLadderRisesAndLabelsItself() {
+        final NomadsWind.Level[] all = NomadsWind.Level.values();
+        assertEquals(NomadsWind.Level.AGL_10, all[0]);
+        int last = -1;
+        for (NomadsWind.Level l : all) {
+            assertTrue("heights must rise: " + l, l.approxMetres > last);
+            last = l.approxMetres;
+        }
+        // The two lowest are heights above ground and live in HRRR's surface file;
+        // everything above is a pressure surface that HRRR cannot serve.
+        assertTrue(NomadsWind.Level.AGL_10.surface);
+        assertTrue(NomadsWind.Level.AGL_80.surface);
+        assertFalse(NomadsWind.Level.MB_700.surface);
+        assertEquals(700, NomadsWind.Level.MB_700.millibars());
+        assertEquals(0, NomadsWind.Level.AGL_10.millibars());
+
+        assertEquals("10 m above ground", NomadsWind.Level.AGL_10.label(true));
+        assertEquals("33 ft above ground", NomadsWind.Level.AGL_10.label(false));
+        // A pressure level always names the millibars, since its height moves.
+        assertEquals("about 10,000 ft (700 mb)", NomadsWind.Level.MB_700.label(false));
+        assertEquals("about 3,000 m (700 mb)", NomadsWind.Level.MB_700.label(true));
+    }
+
+    @Test
+    public void aHeightAboveTheSurfaceTakesTheAnswerOffHrrr() {
+        // HRRR has no pressure-level filter on NOMADS, so a close-in view that would
+        // otherwise be HRRR has to come from RAP once the slider leaves the ground.
+        assertEquals(Model.HRRR,
+                NomadsWind.forView(-118.5, 33, -116.5, 35, NomadsWind.Level.AGL_10));
+        assertEquals(Model.HRRR,
+                NomadsWind.forView(-118.5, 33, -116.5, 35, NomadsWind.Level.AGL_80));
+        assertEquals(Model.RAP,
+                NomadsWind.forView(-118.5, 33, -116.5, 35, NomadsWind.Level.MB_700));
+        // Outside CONUS it is GFS at every height.
+        assertEquals(Model.GFS,
+                NomadsWind.forView(-159, 19, -154, 23, NomadsWind.Level.MB_700));
+    }
+
+    @Test
+    public void theRequestCarriesTheLevel() {
+        final long run = java.time.Instant.parse("2026-09-22T18:00:00Z").toEpochMilli();
+        final String url = NomadsWind.url(Model.RAP, NomadsWind.Level.MB_700, run, 1,
+                -119, 33, -117, 35);
+        assertTrue(url, url.contains("lev_700_mb=on"));
+        assertFalse(url, url.contains("lev_10_m_above_ground"));
+    }
+
+    @Test
     public void theViewPicksTheModel() {
         // A fire line: HRRR's 3 km cells.
         assertEquals(Model.HRRR, NomadsWind.forView(-118.5, 33, -116.5, 35));
