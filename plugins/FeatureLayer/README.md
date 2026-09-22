@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.10** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -45,16 +45,39 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 _________________________________________________________________
 STATUS
 
-0.5, correct multi-part areas: an Esri service sends every ring of a feature in
-one list and only the winding order separates them, so a fire perimeter of
-several separate burn islands drew as one island full of holes - no fill, and
-the shape fell apart on zoom-in. A CA Air Intel flight is also labeled by its
-mission now, and a feature type's fill setting survives a refresh (0.1 could not
-sign in, its OAuth client ID was empty; 0.2 lost cached features on the first
-toggle after a restart; 0.3 searched all of ArcGIS Online instead of your own
-organization for Find layer; 0.4 was the first release for feedback, with the
-illustrated guide). Tested on ATAK-CIV 5.8 with live NIFS incidents, the SARCOP
-training sandbox and CA Air Intel. SARCOP Live is not wired yet.
+0.10, one versionCode per APK: the same plugin as 0.9, rebuilt so that each
+ATAK target's APK carries its own versionCode, the plugin version and the ATAK
+version folded into one integer. An MDM handed the 5.7 and 5.8 builds of 0.9
+saw two different files claiming one revision and reported an incompatible
+build (issue #1); with 0.10 it holds all three, and a phone moving up an ATAK
+version takes the matching build as a normal update. Nothing else changed.
+
+0.9, DART and FireGuard: NIFC's live positions are two layers, vehicles and
+personnel, drawn the way NIFC's own EGP viewer draws them, with whole callsigns
+and a ring that says how recently each reported (green under 10 minutes, yellow
+under 70, red older). Vehicles are colored by fleet, people by how they share
+(Field Maps pin, inReach handset, WFTAK badge), and an inReach S.O.S. is labeled
+as one. A layer fetches what is in view and follows the map, with a ceiling and a
+cap that say when to zoom in. Every layer has a label zoom: names from a chosen
+scale and closer, symbols alone further out. Find lists a DART layer's kinds with
+counts in view, a typed callsign asks the feed nationally, and a row opens its
+details with Go there. FireGuard adds NIFC's detections, filled by age the way
+EGP colors them. Point and area names are drawn whole, never trimmed. 0.7 and
+0.8 were the same work; each went to tak.gov once and was superseded on a scan
+finding before publication.
+
+0.6, distances that follow the map: a feature list was measured once, when it
+was drawn, so panning the map left every row reading its distance from wherever
+the map used to be - which is worse than no distance, because it still looks
+right. The list now follows the map center and the self marker as they move,
+re-sorting when the sort is Nearest and updating the numbers in place otherwise
+(0.1 could not sign in, its OAuth client ID was empty; 0.2 lost cached features
+on the first toggle after a restart; 0.3 searched all of ArcGIS Online instead
+of your own organization for Find layer; 0.4 was the first release for feedback,
+with the illustrated guide; 0.5 drew multi-part areas correctly, named a CA Air
+Intel flight by its mission, and kept a type's fill setting across a refresh).
+Tested on ATAK-CIV 5.8 with live NIFS incidents, the SARCOP training sandbox and
+CA Air Intel. SARCOP Live is not wired yet.
 
 _________________________________________________________________
 POINT OF CONTACTS
@@ -112,3 +135,33 @@ geometry inside the line's own feature. Symbol images and colors come from the
 NWCG PMS 936 symbology pages and NAPSG's published US&R symbol library. Area
 names sit at the centroid by pairing the polygon with its center point in one
 feature under an empty label style.
+
+LICENSE
+
+Copyright (C) 2026 Andreas Johansson (TAKWERX).
+
+Feature Layer is free software, licensed under the
+**[GNU Affero General Public License v3.0 or later](LICENSE)**
+(AGPL-3.0-or-later), with an
+**[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
+this plugin may be built against the TAK SDK, loaded into ATAK and distributed
+without the AGPL reaching into ATAK itself.
+
+You may run it, study it, modify it, and share it -- for any purpose, commercial
+or not, with no fee and no per-seat license. What the AGPL adds over a permissive
+license is a guarantee that it **stays** free: modify Feature Layer and pass it on,
+and the people you pass it to are owed the complete corresponding source of your
+version under the same license. Nobody can take this, close it, and sell it back
+to the emergency-services community.
+
+**If you only install and use Feature Layer, this obligation never touches you.**
+Running it, in any agency, on any number of devices, triggers nothing.
+
+**Scope.** The AGPL covers Feature Layer's own code. It does not change the license
+of the TAK Software, which stays under the TAK Software License Agreement, and it
+does not cover the parts of this repository scaffolded from the TAK-SDK plugin
+template -- those are listed under Provenance in
+[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md). No SDK binary is distributed here.
+
+Contributions are welcome -- see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+contribution terms and the [Contributor License Agreement](CLA.md).

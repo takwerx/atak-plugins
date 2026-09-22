@@ -1,10 +1,10 @@
 ATAK Plugin — Map Depot
 
-**Download Map Depot 1.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.9** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.6/ATAK-Plugin-MapDepot-1.6--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.6/ATAK-Plugin-MapDepot-1.6--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.6/ATAK-Plugin-MapDepot-1.6--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.9/ATAK-Plugin-MapDepot-1.9--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.9/ATAK-Plugin-MapDepot-1.9--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.9/ATAK-Plugin-MapDepot-1.9--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -67,6 +67,13 @@ archives are read live, since what they hold changes through the day.
 
 _________________________________________________________________
 STATUS
+
+Version 1.9: a downloaded region that inflates to nothing is refused instead
+of hashed, and the hash is finalized with data in hand (tak.gov's Fortify
+scan flagged the digest on 1.7 and 1.8). 1.9 also carries the change 1.7 was
+built for: each ATAK target's APK has its own versionCode, so an MDM can hold
+all three builds and push each one as an update. 1.7 and 1.8 each went to
+tak.gov once and were superseded on the scan finding before publication.
 
 Version 1.6. Verified on ATAK-CIV 5.8.0.3 (SDK build) and, as the tak.gov-signed
 builds, on official ATAK-CIV 5.6.0.18 and 5.8.0.4 -- on the latter the gate,
@@ -174,3 +181,33 @@ Region, source and package identifiers arrive over the network and become both
 URL components and filenames, so each is validated against a closed pattern
 before use, and every written path is checked to be inside its intended
 directory.
+
+LICENSE
+
+Copyright (C) 2026 Andreas Johansson (TAKWERX).
+
+Map Depot is free software, licensed under the
+**[GNU Affero General Public License v3.0 or later](LICENSE)**
+(AGPL-3.0-or-later), with an
+**[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
+this plugin may be built against the TAK SDK, loaded into ATAK and distributed
+without the AGPL reaching into ATAK itself.
+
+You may run it, study it, modify it, and share it -- for any purpose, commercial
+or not, with no fee and no per-seat license. What the AGPL adds over a permissive
+license is a guarantee that it **stays** free: modify Map Depot and pass it on,
+and the people you pass it to are owed the complete corresponding source of your
+version under the same license. Nobody can take this, close it, and sell it back
+to the emergency-services community.
+
+**If you only install and use Map Depot, this obligation never touches you.**
+Running it, in any agency, on any number of devices, triggers nothing.
+
+**Scope.** The AGPL covers Map Depot's own code. It does not change the license
+of the TAK Software, which stays under the TAK Software License Agreement, and it
+does not cover the parts of this repository scaffolded from the TAK-SDK plugin
+template -- those are listed under Provenance in
+[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md). No SDK binary is distributed here.
+
+Contributions are welcome -- see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+contribution terms and the [Contributor License Agreement](CLA.md).

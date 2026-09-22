@@ -114,6 +114,29 @@ finished until all of this matches:
 4. The SDK template headings, unchanged and in template order: PURPOSE AND
    CAPABILITIES, STATUS, POINT OF CONTACTS, PORTS REQUIRED, EQUIPMENT REQUIRED,
    EQUIPMENT SUPPORTED, COMPILATION, DEVELOPER NOTES
+5. A `LICENSE` section, last, after DEVELOPER NOTES
+
+**Every plugin carries its license.** `LICENSE` (AGPL-3.0-or-later, verbatim, so
+GitHub detects it), `LICENSE-EXCEPTION.md`, `CONTRIBUTING.md` and `CLA.md`, plus
+that README section. `scripts/add-license.sh <Plugin>` writes them and
+`new-plugin.sh` runs it, so a new plugin has them from the first commit; it is
+idempotent and never overwrites a file a plugin has grown its own version of
+(Comms documents its catalog row-file format in CONTRIBUTING.md). A repository
+with no license is not permissive by default, it is all rights reserved: two
+people offered work on takwerx/comms in September 2026 and neither could open a
+pull request, and the same question sat unanswered on takwerx/map-depot for a
+week.
+
+The exception matters and is not boilerplate. A plugin's classes load into
+ATAK's process and call its API directly, so the AGPL needs an additional
+permission under §7 for the TAK Software; and `new-plugin.sh` copies the SDK's
+`plugintemplate` wholesale, so `LICENSE-EXCEPTION.md` lists the files that came
+from the TAK Product Center rather than stamping AGPL on them — the SDK license
+grants the right to derive new works, not to sublicense the SDK. That list is
+generated from what is actually on disk, because the class names do not follow
+the plugin name (`PlssPreferenceFragment`, `FobsPreferenceFragment`, and
+TakwerxMarket has none); a provenance statement naming files that do not exist
+is worse than none.
 
 Check it mechanically before shipping — this compares a plugin against the
 reference and should print only the plugin's own name:
@@ -343,7 +366,8 @@ produces a plugin that builds fine and then refuses to load:
   not to change these, and the third-party publication pipeline expects the resulting
   `ATAK-Plugin-<name>-<ver>-<gitsha>-<atakver>.apk` naming. The one deliberate
   departure is `versionCode`: it is `PLUGIN_VERSION_CODE`, derived from
-  `PLUGIN_VERSION`, never the SDK's `getVersionCode()` — see the release checklist.
+  `PLUGIN_VERSION` and `ATAK_VERSION`, never the SDK's `getVersionCode()` — see
+  the release checklist.
 
 ## Release builds differ from debug builds — test the release APK
 
@@ -564,9 +588,23 @@ It reads the plugin, version and ATAK target off the APK name inside, files the
 APK and AAB under `dist/signed/` and the scans under
 `dist/scans/<Plugin>/<version>/<target>/`, and then gates on what decides whether
 a build is fit to publish: the signer is the TAK Product Center, the versionCode
-is `MAJOR*10000+MINOR*100+PATCH`, the versionName agrees with the file name, the
+is the one `PLUGIN_VERSION` and the ATAK target derive (release checklist), the
+versionName agrees with the file name, the
 package id and signing certificate match the last signed release, and Fortify
 rendered zero results. It exits non-zero on a real finding.
+
+**A Fortify finding the operator has accepted is recorded, not worked around.**
+Some findings cannot be cleared because they describe the design: the Market
+fetches what its catalog names, and Fortify's SSRF rule follows that data to
+the connection whatever the code checks on the way. The operator's decision
+to accept one goes in `../atak-plugins-notes/fortify-accepted.txt` as
+`Plugin|Category|File|record`, with the record (`docs/FORTIFY-ACCEPTED-...md`)
+saying what the finding is, why it cannot be cleared, what holds instead and
+what would reopen it. The intake matches a finding on all three fields, reads
+them from the scan's own results (`audit.fvdl` inside `scan_results.fpr`),
+prints it as ACCEPTED and passes; any other finding still fails. The first
+was the Market's SSRF on 2026-09-20, after the two path findings beside it
+were fixed. Never add a line without that decision and that record.
 
 **Dependency-Check needs a human's eye and the script gives it one.** The scanner
 opens every archive in the build, including Android assets the packager has
@@ -691,8 +729,9 @@ Work through this before building submission zips. None of it is theoretical.
 **Think like the MDM and the package manager, not only the plugin loader.** The
 fleet gets these plugins pushed by Watchtower MDM. A release that sideloads fine
 but cannot be pushed as an update is a broken release: same package name, same
-signer, a `versionCode` higher than the last release, and one APK per ATAK
-target the fleet runs. When a new fleet-side failure turns up, add a mechanical
+signer, one APK per ATAK target the fleet runs, and a `versionCode` that is
+higher than the last release on that target and different from every other
+target of the release. When a new fleet-side failure turns up, add a mechanical
 check for it the same day.
 
 **Two icons, not one.** `android:icon` is what Android shows on **light**
@@ -733,17 +772,38 @@ Cam Depot 1.3 exists only to carry the fix. Sideloading and the Market never
 showed it, because the system installer replaces a same-version-code package.
 
 So every plugin's `app/build.gradle` sets `versionCode = PLUGIN_VERSION_CODE`,
-computed from `PLUGIN_VERSION` as `MAJOR*10000 + MINOR*100 + PATCH` (1.3 →
-10300), the same on every machine. `new-plugin.sh` writes it, and
+computed from `PLUGIN_VERSION`, at first as `MAJOR*10000 + MINOR*100 + PATCH`
+(1.3 → 10300), the same on every machine. `new-plugin.sh` writes it, and
 `submission-zip.sh` reads the clean-extract APK with `aapt` and fails the zip
 when the code is not that number.
+
+**One code per release was not enough: the ATAK target is folded in too.** A
+release is one APK per ATAK version, all the same package, and on 2026-09-20 an
+MDM handed the 5.7 and 5.8 builds of Feature Layer 0.9 reported an incompatible
+build (takwerx/feature-layer#1): both said code 900 and the hashes differed, so
+it could neither upgrade one with the other nor treat them as one file.
+Watchtower had accepted Cam Depot 1.3 because only one target was loaded. Since
+2026-09-20 the code is `(MAJOR*10000 + MINOR*100 + PATCH) * 10000 + ATAK_MAJOR*1000
++ ATAK_MINOR*10 + ATAK_PATCH`, from `PLUGIN_VERSION` and `ATAK_VERSION` (1.3 on
+5.8.0 → 103005080), so the three builds of a release carry three codes, ordered
+5.6 < 5.7 < 5.8, and every release is above the last on every target. Every
+new-scheme code is above every old one, so the switch is a plain upgrade on
+every phone. The ceilings are plugin major 20, ATAK major 9, ATAK patch 9; the
+build throws past them. `check-version-code.sh --signed` reads each target's
+last signed APK and requires the new code above it, and refuses two targets of
+one release with one code. What it costs: the 5.8 build orders above the 5.7
+build, so moving a phone *down* an ATAK version needs the plugin uninstalled
+first; moving up takes the matching plugin as a normal update. And a unique
+code lets an MDM hold every target of a release, it does not pick the right
+one: the 5.8 build installs on any phone and only ATAK refuses to load it, so
+the MDM assigns each build to a device group by ATAK version.
 
 `scripts/check-version-code.sh <Plugin>` holds the rest of the rule, and it
 is the rule: the version is above every release in `~/atak-dist/signed/` (a
 resubmission is a new version; `--target` lets one target that was never
 signed be re-zipped), and with `--signed` this version's APKs are all present,
-one per target the README links, carry that code, and keep the package name
-and signing certificate of the last release. `submission-zip.sh` runs it per
+one per target the README links, carry that target's code, and keep the package
+name and signing certificate of the last release. `submission-zip.sh` runs it per
 target before zipping, `/ship` runs it with `--signed --live`, and
 `release-links-guard.sh` blocks the subtree push and `gh release create` on a
 FAIL. Watchtower accepted Cam Depot 1.3 as the update to 1.2 on 2026-09-06,
@@ -867,3 +927,14 @@ catalog.
   `/ship`. General approval given before the prompt does not count. Shared
   files (scripts, hooks, this file) go to `main` with `/ship tooling` the same
   day they change: merge and push, nothing published anywhere.
+- **A file that cannot change the APK is published with `/ship <Plugin> docs`,
+  not with a version.** A README, a guide, a screenshot, a LICENSE. Until
+  2026-09-14 the only route to a plugin's public repo was the subtree push
+  inside a release, and a release refuses a version already signed -- so the
+  LICENSE two contributors were waiting on (takwerx/comms#1 and #2) could only
+  be published by inventing a version: a new tak.gov submission, three fresh
+  signed APKs and a Market refresh, to ship a text file. `docs` merges to main
+  and subtree-pushes, and stops: no tag, no release, no catalog, no version
+  bump. `scripts/check-docs-only.sh <Plugin>` is the gate and refuses any change
+  under `app/`, `gradle/` or the build files, so a docs ship can never quietly
+  publish a different plugin than the one already signed.

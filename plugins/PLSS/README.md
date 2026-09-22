@@ -1,10 +1,10 @@
 ATAK Plugin — PLSS Grid
 
-**Download PLSS Grid 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download PLSS Grid 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/plss-grid/releases/download/v0.5/ATAK-Plugin-PLSS-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/plss-grid/releases/download/v0.5/ATAK-Plugin-PLSS-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/plss-grid/releases/download/v0.5/ATAK-Plugin-PLSS-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/plss-grid/releases/download/v0.8/ATAK-Plugin-PLSS-0.8--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/plss-grid/releases/download/v0.8/ATAK-Plugin-PLSS-0.8--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/plss-grid/releases/download/v0.8/ATAK-Plugin-PLSS-0.8--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/plss-grid/releases
 
@@ -45,6 +45,14 @@ source submission zip).
 
 _________________________________________________________________
 STATUS
+
+Version 0.8: the pack checksum is taken from the finished file on disk, an
+empty download is refused instead of hashed, and the hash is finalized with
+data in hand (tak.gov's Fortify scan flagged the digest on 0.6 and 0.7). 0.8
+also carries the change 0.6 was built for: each ATAK target's APK has its own
+versionCode, so an MDM can hold all three builds and push each one as an
+update. 0.6 and 0.7 each went to tak.gov once and were superseded on the scan
+finding before publication.
 
 Version 0.5. Verified on ATAK-CIV 5.7.0.5.
 
@@ -162,3 +170,33 @@ DEVELOPER NOTES
   BLM spells some principal meridians more than one way in its own data. The
   packer canonicalizes them, otherwise the meridian picker offers several
   near-identical entries and a lookup against the wrong one silently fails.
+
+LICENSE
+
+Copyright (C) 2026 Andreas Johansson (TAKWERX).
+
+PLSS Grid is free software, licensed under the
+**[GNU Affero General Public License v3.0 or later](LICENSE)**
+(AGPL-3.0-or-later), with an
+**[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
+this plugin may be built against the TAK SDK, loaded into ATAK and distributed
+without the AGPL reaching into ATAK itself.
+
+You may run it, study it, modify it, and share it -- for any purpose, commercial
+or not, with no fee and no per-seat license. What the AGPL adds over a permissive
+license is a guarantee that it **stays** free: modify PLSS Grid and pass it on,
+and the people you pass it to are owed the complete corresponding source of your
+version under the same license. Nobody can take this, close it, and sell it back
+to the emergency-services community.
+
+**If you only install and use PLSS Grid, this obligation never touches you.**
+Running it, in any agency, on any number of devices, triggers nothing.
+
+**Scope.** The AGPL covers PLSS Grid's own code. It does not change the license
+of the TAK Software, which stays under the TAK Software License Agreement, and it
+does not cover the parts of this repository scaffolded from the TAK-SDK plugin
+template -- those are listed under Provenance in
+[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md). No SDK binary is distributed here.
+
+Contributions are welcome -- see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+contribution terms and the [Contributor License Agreement](CLA.md).
