@@ -33,8 +33,8 @@ public final class Http {
 
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS = 15_000;
-    /** A forecast response is tens of KB. Anything past this is not one. */
-    private static final int MAX_BYTES = 4 * 1024 * 1024;
+    /** A forecast response is tens of KB, a wind box under a megabyte. Past this is not one. */
+    private static final int MAX_BYTES = 8 * 1024 * 1024;
     /** Bounded pool: a burst of requests must not spawn a thread per request. */
     private static final int MAX_CONCURRENT = 3;
 

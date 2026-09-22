@@ -1,7 +1,7 @@
 package com.atakmap.android.atmosphere.overlay;
 
 import android.content.SharedPreferences;
-import android.graphics.Bitmap;
+import android.view.ViewGroup;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
@@ -23,7 +23,7 @@ import java.util.Map;
 /**
  * Animated surface wind on the map: HRRR 10 m wind from the NOMADS grib filter for
  * the map view, one forecast hour at a time picked on the scrubber, drawn as moving
- * particles by {@link WindAnimator} on the same RasterLayer path the radar uses.
+ * particles by {@link WindView}, a transparent view over the map drawn at screen resolution.
  * Lives for the plugin's life; the pane drives and reads it.
  *
  * <p>Region and cache rules are the radar's: the view padded by half its span,
@@ -40,12 +40,13 @@ public final class WindOverlay {
 
     private static final String PREF_ON = "weather.layer.wind.on";
     private static final int GRID_NX = 96;
-    private static final int FRAME_W = 512;
-    private static final int PARTICLES = 1400;
-    private static final long TICK_MS = 50L;
+    private static final int PARTICLES = 1600;
+    private static final long TICK_MS = 33L;
     private static final long MOVE_SETTLE_MS = 600L;
     private static final long SCRUB_SETTLE_MS = 180L;
     private static final int CACHE_GRIDS = 24;
+    /** The widest box asked of the filter: HRRR is 3 km, and a wider box is megabytes. */
+    private static final double MAX_BOX_LON = 8.0, MAX_BOX_LAT = 6.0;
     private static final int RUN_STEPS_BACK = 4;
 
     public interface Listener {
@@ -56,7 +57,7 @@ public final class WindOverlay {
 
     private final MapView mapView;
     private final EgressPolicy egress;
-    private final RasterLayer layer = new RasterLayer("Atmosphere wind");
+    private WindView view;
     private final Map<String, WindGrid> cache = new LinkedHashMap<String, WindGrid>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, WindGrid> eldest) {
@@ -69,7 +70,6 @@ public final class WindOverlay {
     private int hours;
     private int hour;
     private GeoBounds region;
-    private WindAnimator animator;
     private WindGrid shown;
     private int generation;
     private String pendingKey;
@@ -78,11 +78,10 @@ public final class WindOverlay {
     private final Runnable ticker = new Runnable() {
         @Override
         public void run() {
-            if (!on || animator == null)
+            if (!on || view == null)
                 return;
-            final Bitmap frame = animator.tick();
-            if (frame != null && region != null)
-                layer.setImage(frame, region);
+            view.step();
+            view.invalidate();
             mapView.postDelayed(this, TICK_MS);
         }
     };
@@ -92,6 +91,14 @@ public final class WindOverlay {
         public void run() {
             if (on)
                 ensureRegion();
+        }
+    };
+
+    private final Runnable redraw = new Runnable() {
+        @Override
+        public void run() {
+            if (on && view != null)
+                view.invalidate();
         }
     };
 
@@ -105,7 +112,10 @@ public final class WindOverlay {
 
     private final AtakMapView.OnMapMovedListener moved = new AtakMapView.OnMapMovedListener() {
         @Override
-        public void onMapMoved(AtakMapView view, boolean animate) {
+        public void onMapMoved(AtakMapView v, boolean animate) {
+            // GL thread: the particles are on the ground, so a move only needs a
+            // redraw now and a region check once it settles.
+            mapView.post(redraw);
             mapView.removeCallbacks(moveSettled);
             mapView.postDelayed(moveSettled, MOVE_SETTLE_MS);
         }
@@ -128,9 +138,15 @@ public final class WindOverlay {
         if (started)
             return;
         started = true;
-        GLRasterLayer.register();
-        mapView.addLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
-        layer.setVisible(false);
+        // A transparent view right above the map in its parent, under everything
+        // that comes later (the drop-down pane, the toolbar), sized like the map.
+        view = new WindView(mapView.getContext(), mapView, PARTICLES);
+        view.setVisibility(android.view.View.GONE);
+        final ViewGroup parent = (ViewGroup) mapView.getParent();
+        if (parent != null)
+            parent.addView(view, parent.indexOfChild(mapView) + 1,
+                    new ViewGroup.LayoutParams(mapView.getLayoutParams().width,
+                            mapView.getLayoutParams().height));
         mapView.addOnMapMovedListener(moved);
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
@@ -147,11 +163,13 @@ public final class WindOverlay {
         mapView.removeCallbacks(scrubSettled);
         mapView.removeCallbacks(ticker);
         generation++;
-        layer.clear();
-        mapView.removeLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
-        GLRasterLayer.unregister();
+        if (view != null) {
+            final ViewGroup parent = (ViewGroup) view.getParent();
+            if (parent != null)
+                parent.removeView(view);
+            view = null;
+        }
         cache.clear();
-        animator = null;
     }
 
     public boolean isOn() {
@@ -171,13 +189,16 @@ public final class WindOverlay {
             hour = Math.max(0, Math.min(hour, hours));
             if (listener != null)
                 listener.onFrames(labels(), hour);
-            layer.setVisible(true);
+            if (view != null)
+                view.setVisibility(android.view.View.VISIBLE);
             ensureRegion();
         } else {
             generation++;
             mapView.removeCallbacks(ticker);
-            layer.setVisible(false);
-            layer.clear();
+            if (view != null) {
+                view.setVisibility(android.view.View.GONE);
+                view.setGrid(null);
+            }
             shown = null;
             status("");
         }
@@ -226,32 +247,54 @@ public final class WindOverlay {
     private void ensureRegion() {
         if (!on)
             return;
-        final GeoBounds view = mapView.getBounds();
-        if (view == null)
+        final GeoBounds bounds = mapView.getBounds();
+        if (bounds == null)
             return;
-        final boolean wholeWorld = Double.isNaN(view.getNorth()) || Double.isNaN(view.getSouth())
-                || Double.isNaN(view.getEast()) || Double.isNaN(view.getWest())
-                || view.getEast() <= view.getWest()
-                || view.getEast() - view.getWest() >= NomadsWind.EAST - NomadsWind.WEST;
+        final boolean wholeWorld = Double.isNaN(bounds.getNorth()) || Double.isNaN(bounds.getSouth())
+                || Double.isNaN(bounds.getEast()) || Double.isNaN(bounds.getWest())
+                || bounds.getEast() <= bounds.getWest()
+                || bounds.getEast() - bounds.getWest() >= NomadsWind.EAST - NomadsWind.WEST;
         final GeoBounds clamped = wholeWorld
                 ? new GeoBounds(NomadsWind.NORTH, NomadsWind.WEST, NomadsWind.SOUTH, NomadsWind.EAST)
                 : new GeoBounds(
-                        Math.min(NomadsWind.NORTH, view.getNorth()), Math.max(NomadsWind.WEST, view.getWest()),
-                        Math.max(NomadsWind.SOUTH, view.getSouth()), Math.min(NomadsWind.EAST, view.getEast()));
+                        Math.min(NomadsWind.NORTH, bounds.getNorth()), Math.max(NomadsWind.WEST, bounds.getWest()),
+                        Math.max(NomadsWind.SOUTH, bounds.getSouth()), Math.min(NomadsWind.EAST, bounds.getEast()));
         if (clamped.getEast() <= clamped.getWest() || clamped.getNorth() <= clamped.getSouth()) {
-            layer.clear();
+            if (view != null)
+                view.setGrid(null);
             status("Wind: outside HRRR coverage");
             return;
         }
         boolean refetch = region == null || !contains(region, clamped);
+        if (refetch && region != null && clamped.getEast() - clamped.getWest() > MAX_BOX_LON) {
+            // Wider than the box: refetch only when the center left the box.
+            final double cx = (clamped.getEast() + clamped.getWest()) / 2;
+            final double cy = (clamped.getNorth() + clamped.getSouth()) / 2;
+            refetch = cx < region.getWest() || cx > region.getEast()
+                    || cy < region.getSouth() || cy > region.getNorth();
+        }
         if (!refetch) {
             final double viewSpan = clamped.getEast() - clamped.getWest();
             final double regionSpan = region.getEast() - region.getWest();
-            refetch = viewSpan < regionSpan / 3.5 || viewSpan > regionSpan;
+            refetch = viewSpan < regionSpan / 3.5 || viewSpan > regionSpan * 1.6;
         }
         if (refetch) {
             double w = clamped.getWest(), e = clamped.getEast(), s = clamped.getSouth(), n = clamped.getNorth();
-            final double padX = (e - w) * 0.5, padY = (n - s) * 0.5;
+            // A continental view gets a box around its center, not the whole grid: the
+            // whole HRRR grid is 7 MB of wind per hour, and particles read at that
+            // scale anyway only near where the eye is.
+            if (e - w > MAX_BOX_LON) {
+                final double c = (e + w) / 2;
+                w = c - MAX_BOX_LON / 2;
+                e = c + MAX_BOX_LON / 2;
+            }
+            if (n - s > MAX_BOX_LAT) {
+                final double c = (n + s) / 2;
+                s = c - MAX_BOX_LAT / 2;
+                n = c + MAX_BOX_LAT / 2;
+            }
+            final double padX = Math.min((e - w) * 0.5, MAX_BOX_LON / 4);
+            final double padY = Math.min((n - s) * 0.5, MAX_BOX_LAT / 4);
             region = new GeoBounds(Math.min(NomadsWind.NORTH, n + padY), Math.max(NomadsWind.WEST, w - padX),
                     Math.max(NomadsWind.SOUTH, s - padY), Math.min(NomadsWind.EAST, e + padX));
             cache.clear();
@@ -332,15 +375,10 @@ public final class WindOverlay {
 
     private void show(WindGrid grid, GeoBounds r) {
         shown = grid;
-        // The animator's bitmap covers the grid's own extent, which is the region
-        // grown by the filter's cut; drape it over exactly that.
+        // The grid's own extent is the region grown by the filter's cut.
         region = new GeoBounds(grid.north, grid.west, grid.south, grid.east);
-        final int h = Math.max(64, (int) Math.round(FRAME_W * (grid.north - grid.south) / (grid.east - grid.west)));
-        if (animator == null)
-            animator = new WindAnimator(FRAME_W, h, PARTICLES);
-        else if (animator.current().getHeight() != h)
-            animator = new WindAnimator(FRAME_W, h, PARTICLES);
-        animator.setGrid(grid);
+        if (view != null)
+            view.setGrid(grid);
         mapView.removeCallbacks(ticker);
         mapView.post(ticker);
         if (listener != null)
