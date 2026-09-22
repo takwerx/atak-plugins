@@ -1,22 +1,114 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:fadeScrollbars="false"
-    android:layout_marginLeft="3dp"
-    android:layout_marginRight="3dp">
+    android:layout_height="match_parent"
+    android:paddingLeft="8dp"
+    android:paddingRight="8dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical" >
+        android:orientation="vertical"
+        android:paddingBottom="12dp">
 
+        <!-- ====== LAUNCH POINT ====== -->
         <TextView
-            android:layout_width="wrap_content"
+            style="@style/TakwerxSectionHeading"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/app_name" />
+            android:text="@string/section_launch" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/tap_map"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/tap_map" />
+
+            <Button
+                android:id="@+id/use_position"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:layout_weight="1"
+                android:text="@string/use_position" />
+        </LinearLayout>
+
+        <!-- The ground under the marker. Bigger than the rest: it is the number the
+             pilot came for, and "0 AGL" beside it says it is the ground, not the
+             phone's GPS altitude. -->
+        <TextView
+            android:id="@+id/ground"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <!-- ====== CEILING ====== -->
+        <TextView
+            style="@style/TakwerxSectionHeading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/section_ceiling" />
+
+        <!-- "5,500 ft MSL is 1,350 ft above your launch point": the number that goes
+             into the controller's altitude limit. -->
+        <TextView
+            android:id="@+id/ceiling"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            android:textSize="15sp" />
+
+        <!-- ====== ISLANDS ====== -->
+        <TextView
+            style="@style/TakwerxSectionHeading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/section_islands" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/toggle_islands"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/islands_off" />
+
+            <Button
+                android:id="@+id/clear"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:layout_weight="1"
+                android:text="@string/clear" />
+        </LinearLayout>
+
+        <!-- What the plugin is doing, what it painted, and what it is not showing.
+             Never silent. -->
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:text="@string/status_idle" />
 
     </LinearLayout>
 </ScrollView>
