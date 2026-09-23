@@ -51,8 +51,14 @@ public final class WindOverlay {
      * lat/lon model (GFS) is taken at its own resolution and never resampled.
      */
     private static final int GRID_NX = 160;
-    private static final int PARTICLES = 2400;
-    private static final long TICK_MS = 33L;
+    private static final int PARTICLES = 1200;
+    /**
+     * 20 frames a second, not 30. The field is fill-bound on the phones this runs on
+     * and asking for 30 got 8: the renderer fell behind, the ticks queued up and the
+     * pane stopped answering. Asking for a rate the device can hold is what actually
+     * looks smooth.
+     */
+    private static final long TICK_MS = 50L;
     private static final long MOVE_SETTLE_MS = 600L;
     private static final long SCRUB_SETTLE_MS = 180L;
     private static final int CACHE_GRIDS = 24;
@@ -97,13 +103,32 @@ public final class WindOverlay {
     private String pendingKey;
     private Listener listener;
 
+    private long tickStepNanos, tickGapNanos, tickLast, tickReport;
+    private int tickCount;
     private final Runnable ticker = new Runnable() {
         @Override
         public void run() {
             if (!on || view == null)
                 return;
+            final long t0 = System.nanoTime();
+            if (tickLast != 0)
+                tickGapNanos += t0 - tickLast;
+            tickLast = t0;
             view.step();
+            tickStepNanos += System.nanoTime() - t0;
+            tickCount++;
             view.invalidate();
+            final long now = System.currentTimeMillis();
+            if (now - tickReport > 5000) {
+                tickReport = now;
+                Log.d(TAG, String.format(Locale.US,
+                        "tick step avg %.1f ms, gap avg %.1f ms, %d ticks",
+                        tickStepNanos / 1e6 / Math.max(1, tickCount),
+                        tickGapNanos / 1e6 / Math.max(1, tickCount), tickCount));
+                tickStepNanos = 0;
+                tickGapNanos = 0;
+                tickCount = 0;
+            }
             mapView.postDelayed(this, TICK_MS);
         }
     };

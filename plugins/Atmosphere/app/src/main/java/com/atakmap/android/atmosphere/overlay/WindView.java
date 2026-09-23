@@ -46,6 +46,15 @@ final class WindView extends View {
     static final float[] BAND_MAX_MS = { 2, 5, 8, 12, 18 };
 
     private static final int TRAIL = 36;
+    /**
+     * Draw every third stored position instead of all of them. A particle moves about
+     * 1.7 px a frame, so segment-per-frame meant 35 stubs shorter than their own round
+     * caps per particle: 55,000 tiny capped dots a frame, which the renderer took
+     * ~400 ms to rasterize while our own draw recorded in 17 ms. The trail is the same
+     * length on screen and the same shape; it is built of a dozen longer pieces
+     * instead of three dozen stubs.
+     */
+    private static final int DRAW_STEP = 3;
     /** Screen pixels a 6 m/s wind moves a particle per frame. */
     private static final float PX_PER_FRAME_AT_6MS = 1.7f;
     private static final int MAX_AGE = 200;
@@ -59,11 +68,26 @@ final class WindView extends View {
     private final float[] speed;
     private final float[] uv = new float[2];
     private final Random random = new Random();
-    private final Paint[][] paints = new Paint[6][TRAIL];
+    /**
+     * How many brightness steps the trail fades through. It was one per trail point,
+     * which meant a Paint per point and so a canvas call per segment: 69,000 of them
+     * a frame at 30 fps, all on the thread the pane's taps queue behind, and the pane
+     * stopped answering (XCover, 2026-09-22: "side bar not really reactive"). Eight
+     * steps over a 36-point trail of 2 px lines is the same picture, and it lets the
+     * segments be batched into one call per color and step.
+     */
+    private static final int FADES = 8;
+    private final Paint[][] paints = new Paint[6][FADES];
+    /** Segment endpoints per (color, fade) bucket, grown once and reused every frame. */
+    private final float[][] batch = new float[6 * FADES][];
+    private final int[] batchCount = new int[6 * FADES];
     private WindGrid grid;
     private final double[] cornerX = new double[4], cornerY = new double[4];
     private long lastReport;
     private int drawnSegments;
+    private long drawNanos;
+    private int drawCount;
+    private boolean hardware;
 
     WindView(Context context, MapView mapView, int particles) {
         super(context);
@@ -79,15 +103,19 @@ final class WindView extends View {
         speed = new float[particles];
         final int[] colors = BAND_COLORS;
         for (int b = 0; b < colors.length; b++) {
-            for (int k = 0; k < TRAIL; k++) {
+            for (int k = 0; k < FADES; k++) {
                 final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
                 p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(2.0f);
-                p.setStrokeCap(Paint.Cap.ROUND);
+                p.setStrokeWidth(1.6f);
+                // Butt, not round: a round cap puts a filled semicircle on both ends of
+                // every segment, and the field is thousands of them blended over each
+                // other. The joins are a few pixels apart along a smooth curve, so the
+                // trail still reads as a line.
+                p.setStrokeCap(Paint.Cap.BUTT);
                 p.setColor(colors[b]);
                 // newest segment brightest; the tail fades to nothing
                 // a slow rise so the tail thins out over its length, not in a step
-                p.setAlpha(Math.round(235f * (float) Math.pow((k + 1f) / TRAIL, 1.6)));
+                p.setAlpha(Math.round(235f * (float) Math.pow((k + 1f) / FADES, 1.6)));
                 paints[b][k] = p;
             }
         }
@@ -168,6 +196,7 @@ final class WindView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        final long t0 = System.nanoTime();
         final WindGrid g = grid;
         if (g == null)
             return;
@@ -182,6 +211,7 @@ final class WindView extends View {
         project(vs, vw, 3);
         final float w = getWidth(), h = getHeight();
         drawnSegments = 0;
+        java.util.Arrays.fill(batchCount, 0);
         for (int i = 0; i < particles; i++) {
             final int n = len[i];
             if (n < 2)
@@ -191,21 +221,51 @@ final class WindView extends View {
             int idx = (head[i] - n + TRAIL) % TRAIL;
             double px = Double.NaN, py = Double.NaN;
             for (int k = 0; k < n; k++) {
-                final int slot = i * TRAIL + idx;
-                final double fx = (tLon[slot] - vw) / (ve - vw);
-                final double fy = (vn - tLat[slot]) / (vn - vs);
-                final double sx = bilin(cornerX, fx, fy), sy = bilin(cornerY, fx, fy);
-                if (!Double.isNaN(px) && sx >= -20 && sx <= w + 20 && sy >= -20 && sy <= h + 20) {
-                    canvas.drawLine((float) px, (float) py, (float) sx, (float) sy,
-                            paints[band][TRAIL - n + k]);
-                    drawnSegments++;
+                // Sampled from the newest point back, so the head of the trail always
+                // sits exactly where the particle is.
+                if ((n - 1 - k) % DRAW_STEP == 0) {
+                    final int slot = i * TRAIL + idx;
+                    final double fx = (tLon[slot] - vw) / (ve - vw);
+                    final double fy = (vn - tLat[slot]) / (vn - vs);
+                    final double sx = bilin(cornerX, fx, fy), sy = bilin(cornerY, fx, fy);
+                    if (!Double.isNaN(px)
+                            && sx >= -20 && sx <= w + 20 && sy >= -20 && sy <= h + 20) {
+                        final int fade = ((TRAIL - n + k) * FADES) / TRAIL;
+                        add(band * FADES + fade, (float) px, (float) py, (float) sx, (float) sy);
+                        drawnSegments++;
+                    }
+                    px = sx;
+                    py = sy;
                 }
-                px = sx;
-                py = sy;
                 idx = (idx + 1) % TRAIL;
             }
         }
+        // One canvas call per color and fade step rather than one per segment.
+        for (int b = 0; b < batch.length; b++)
+            if (batchCount[b] > 0)
+                canvas.drawLines(batch[b], 0, batchCount[b], paints[b / FADES][b % FADES]);
+        drawNanos += System.nanoTime() - t0;
+        drawCount++;
+        hardware = canvas.isHardwareAccelerated();
         report(w, h);
+    }
+
+    /** Append one segment to its bucket, growing the bucket the first time it is short. */
+    private void add(int bucket, float x1, float y1, float x2, float y2) {
+        float[] a = batch[bucket];
+        final int at = batchCount[bucket];
+        if (a == null)
+            a = batch[bucket] = new float[1024];
+        else if (at + 4 > a.length) {
+            final float[] bigger = new float[a.length * 2];
+            System.arraycopy(a, 0, bigger, 0, at);
+            a = batch[bucket] = bigger;
+        }
+        a[at] = x1;
+        a[at + 1] = y1;
+        a[at + 2] = x2;
+        a[at + 3] = y2;
+        batchCount[bucket] = at + 4;
     }
 
     /** Once a second: what the view is doing, for the log. */
@@ -215,10 +275,12 @@ final class WindView extends View {
             return;
         lastReport = now;
         com.atakmap.coremap.log.Log.d("AtmosphereWind", String.format(java.util.Locale.US,
-                "view %dx%d vis %d parent %s corners NW %.0f,%.0f SE %.0f,%.0f segments %d",
-                (int) w, (int) h, getVisibility(), getParent() == null ? "none"
+                "view %dx%d hw %b layer %d parent %s segments %d onDraw avg %.1f ms over %d",
+                (int) w, (int) h, hardware, getLayerType(), getParent() == null ? "none"
                         : getParent().getClass().getSimpleName(),
-                cornerX[0], cornerY[0], cornerX[2], cornerY[2], drawnSegments));
+                drawnSegments, drawCount == 0 ? 0 : drawNanos / 1e6 / drawCount, drawCount));
+        drawNanos = 0;
+        drawCount = 0;
     }
 
     /**
