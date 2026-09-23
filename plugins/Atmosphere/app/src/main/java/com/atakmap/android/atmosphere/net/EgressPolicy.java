@@ -95,7 +95,7 @@ public final class EgressPolicy {
     }
 
     /** How coarse the current setting is, in meters, for the settings UI. */
-    public static int approximateMetres(int decimals) {
+    public static int approximateMeters(int decimals) {
         switch (decimals) {
             case 0:
                 return 111000;

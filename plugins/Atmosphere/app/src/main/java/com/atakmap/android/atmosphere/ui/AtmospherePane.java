@@ -653,7 +653,7 @@ public final class AtmospherePane {
      * on the layers"). Each button sets the whole unit system rather than a private
      * wind unit, so there is one answer to "what units am I in" and the icon row's
      * button never disagrees: knots is the aviation system, miles per hour imperial,
-     * kilometres per hour metric. The third is there because the system has three; a
+     * kilometers per hour metric. The third is there because the system has three; a
      * row where the live setting matched no button would be worse than a spare.
      */
     private void buildWindUnitRow() {
@@ -798,10 +798,10 @@ public final class AtmospherePane {
      * A distance a crew can picture, for the position-rounding choices. Decimal places
      * are a way of storing a number, not a thing anybody can stand in.
      */
-    private String roughly(int metres) {
+    private String roughly(int meters) {
         if (units == UnitSystem.METRIC)
-            return metres >= 1000 ? Math.round(metres / 1000.0) + " km" : metres + " m";
-        final double feet = metres / 0.3048;
+            return meters >= 1000 ? Math.round(meters / 1000.0) + " km" : meters + " m";
+        final double feet = meters / 0.3048;
         if (feet >= 5280)
             return Math.round(feet / 5280) + " mi";
         if (feet >= 900)
@@ -1988,7 +1988,7 @@ public final class AtmospherePane {
         final String[] labels = new String[choices.length];
         for (int i = 0; i < choices.length; i++) {
             labels[i] = "Rounded to about " + roughly(
-                    EgressPolicy.approximateMetres(choices[i]));
+                    EgressPolicy.approximateMeters(choices[i]));
         }
 
         int current = 0;

@@ -67,13 +67,13 @@ public final class NomadsWind {
         /** The grib filter's own name for it. */
         public final String param;
         /** Height above ground, or the standard atmosphere's height of the surface. */
-        public final int approxMetres;
+        public final int approxMeters;
         /** True when it comes from a model's surface file, so HRRR can serve it. */
         public final boolean surface;
 
-        Level(String param, int approxMetres, boolean surface) {
+        Level(String param, int approxMeters, boolean surface) {
             this.param = param;
-            this.approxMetres = approxMetres;
+            this.approxMeters = approxMeters;
             this.surface = surface;
         }
 
@@ -91,12 +91,12 @@ public final class NomadsWind {
             if (this == AGL_10)
                 return "Ground";
             if (surface)
-                return metric ? approxMetres + " m"
-                        : Math.round(approxMetres / 0.3048 / 10) * 10 + " ft";
+                return metric ? approxMeters + " m"
+                        : Math.round(approxMeters / 0.3048 / 10) * 10 + " ft";
             return metric
-                    ? String.format(Locale.US, "%,d m", approxMetres)
+                    ? String.format(Locale.US, "%,d m", approxMeters)
                     : String.format(Locale.US, "%,d ft",
-                            Math.round(approxMetres / 0.3048 / 500) * 500);
+                            Math.round(approxMeters / 0.3048 / 500) * 500);
         }
 
         /**
@@ -109,11 +109,11 @@ public final class NomadsWind {
          */
         public String label(boolean metric, boolean showPressure) {
             if (surface)
-                return metric ? approxMetres + " m above ground"
-                        : Math.round(approxMetres / 0.3048) + " ft above ground";
+                return metric ? approxMeters + " m above ground"
+                        : Math.round(approxMeters / 0.3048) + " ft above ground";
             final String height = metric
-                    ? String.format(Locale.US, "%,d m", approxMetres)
-                    : String.format(Locale.US, "%,d ft", Math.round(approxMetres / 0.3048 / 500) * 500);
+                    ? String.format(Locale.US, "%,d m", approxMeters)
+                    : String.format(Locale.US, "%,d ft", Math.round(approxMeters / 0.3048 / 500) * 500);
             return "about " + height + (showPressure ? " (" + millibars() + " mb)" : "");
         }
     }

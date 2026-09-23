@@ -44,7 +44,7 @@ public final class Lcc {
         return lon;
     }
 
-    /** Lon/lat in degrees to projected metres {x, y}. */
+    /** Lon/lat in degrees to projected meters {x, y}. */
     public double[] forward(double lat, double lon) {
         final double phi = Math.toRadians(lat);
         double dl = Math.toRadians(normLon(lon)) - lambda0;
@@ -55,7 +55,7 @@ public final class Lcc {
         return new double[] { rho * Math.sin(theta), rho0 - rho * Math.cos(theta) };
     }
 
-    /** Projected metres to {lat, lon} in degrees. */
+    /** Projected meters to {lat, lon} in degrees. */
     public double[] inverse(double x, double y) {
         final double dy0 = rho0 - y;
         final double rho = Math.signum(n) * Math.sqrt(x * x + dy0 * dy0);

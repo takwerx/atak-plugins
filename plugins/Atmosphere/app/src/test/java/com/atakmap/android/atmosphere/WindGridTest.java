@@ -50,7 +50,7 @@ public class WindGridTest {
     }
 
     @Test
-    public void gridCoversTheRequestedBoxAtThreeKilometres() throws Exception {
+    public void gridCoversTheRequestedBoxAtThreeKilometers() throws Exception {
         // Requested: lon -119.5..-115.5, lat 32.5..35.5. The filter cuts an index box on
         // the tilted Lambert grid that covers it, so the box's corners all fall inside
         // the grid within a cell of its edge (its own corners overshoot: the SW one
@@ -162,8 +162,8 @@ public class WindGridTest {
         assertEquals(NomadsWind.Level.AGL_10, all[0]);
         int last = -1;
         for (NomadsWind.Level l : all) {
-            assertTrue("heights must rise: " + l, l.approxMetres > last);
-            last = l.approxMetres;
+            assertTrue("heights must rise: " + l, l.approxMeters > last);
+            last = l.approxMeters;
         }
         // The two lowest are heights above ground and live in HRRR's surface file;
         // everything above is a pressure surface that HRRR cannot serve.

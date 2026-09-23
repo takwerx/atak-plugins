@@ -136,7 +136,7 @@ final class WindView extends View {
         final WindGrid g = grid;
         if (g == null)
             return;
-        // Metres per screen pixel decides how far a frame carries a particle, so the
+        // Meters per screen pixel decides how far a frame carries a particle, so the
         // motion reads the same at every zoom and faster wind still moves faster.
         final double mPerPx = Math.max(0.1, mapView.getMapResolution());
         final double secondsPerFrame = PX_PER_FRAME_AT_6MS * mPerPx / 6.0;
