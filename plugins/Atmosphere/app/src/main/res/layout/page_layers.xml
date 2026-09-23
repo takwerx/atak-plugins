@@ -56,6 +56,41 @@
                 android:layout_marginTop="6dp"
                 android:text="@string/wind_off" />
 
+            <!-- When: shared by every time-enabled layer, so it sits with the
+                 toggles rather than under one layer's controls. Live first, then
+                 the day, then the hour, all as buttons: a slider on a pager page
+                 fights the pager sideways and steals the page's scroll, and the
+                 operator could not work it (XCover, 2026-09-22: "the slider very
+                 hard to work ... so like live, then pick day and hour"). -->
+            <LinearLayout
+                android:id="@+id/scrubber"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/scrubber_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/scrubber_days"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <LinearLayout
+                    android:id="@+id/scrubber_hours"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
             <!-- The speed legend, added in code so the custom view is built with the
                  plugin's own class loader. -->
             <LinearLayout
@@ -91,30 +126,6 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
             </LinearLayout>
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/scrubber"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/scrubber_label"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textColor="@color/white"
-                android:textSize="13sp"
-                android:text="" />
-
-            <SeekBar
-                android:id="@+id/scrubber_bar"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:max="0"
-                android:progress="0" />
         </LinearLayout>
 
         <TextView

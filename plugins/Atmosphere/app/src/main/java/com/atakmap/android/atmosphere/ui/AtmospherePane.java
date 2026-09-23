@@ -9,13 +9,11 @@ import android.graphics.PointF;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.ViewGroup;
 import android.view.View;
 import android.widget.HorizontalScrollView;
 import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.SeekBar;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -52,6 +50,7 @@ import com.atakmap.coremap.maps.coords.GeoPointMetaData;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -124,7 +123,15 @@ public final class AtmospherePane {
     private final Button radarToggle;
     private final View scrubber;
     private final TextView scrubberLabel;
-    private final SeekBar scrubberBar;
+    private final LinearLayout scrubberDays;
+    private final LinearLayout scrubberHours;
+    /** The times the picker offers, and which of them is on the map. */
+    private final List<Long> whenTimes = new ArrayList<>();
+    private int whenIndex = -1;
+    /** The index that means "right now": hour 0 for wind, the last frame for radar. */
+    private int whenLive = -1;
+    /** Start of the day whose hours are laid out, so a repaint need not rebuild. */
+    private long whenDay = Long.MIN_VALUE;
     private RadarOverlay radar;
     private List<String> radarFrames = new ArrayList<>();
     private final Button windToggle;
@@ -230,7 +237,8 @@ public final class AtmospherePane {
         buildWindLevelRows();
         scrubber = find(R.id.scrubber);
         scrubberLabel = find(R.id.scrubber_label);
-        scrubberBar = find(R.id.scrubber_bar);
+        scrubberDays = find(R.id.scrubber_days);
+        scrubberHours = find(R.id.scrubber_hours);
         wireLayers();
 
         final SharedPreferences prefs = MapCompat.prefs();
@@ -273,30 +281,6 @@ public final class AtmospherePane {
         if (radar != null && radar.isOn())
             radar.refreshFrames(false);
         updateLayerControls();
-    }
-
-    /**
-     * Let a slider keep a sideways drag that the pager would otherwise take.
-     *
-     * <p>A ViewPager claims any horizontal drag from its children once it passes the
-     * touch slop, and a SeekBar inside a scrolling container waits for that slop
-     * before claiming it, so the pager always wins and the thumb never moves. A tap
-     * still worked, which is what made it look like a miss rather than a bug (XCover,
-     * 2026-09-22). The bar asks its parents to keep their hands off for the length of
-     * one touch.
-     */
-    private static void keepDragsFromThePager(SeekBar bar) {
-        bar.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                final int action = event.getActionMasked();
-                if (action == MotionEvent.ACTION_DOWN)
-                    v.getParent().requestDisallowInterceptTouchEvent(true);
-                else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
-                    v.getParent().requestDisallowInterceptTouchEvent(false);
-                return false;
-            }
-        });
     }
 
     /** A view by id, in the root or on any page. */
@@ -397,11 +381,8 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> times, int shown) {
                 radarFrames = times;
-                if (radar.isOn()) {
-                    scrubberBar.setMax(Math.max(0, times.size() - 1));
-                    if (shown >= 0)
-                        scrubberBar.setProgress(shown);
-                }
+                if (radar.isOn())
+                    setWhenTimes(radarTimes(), shown, Math.max(0, times.size() - 1));
                 updateLayerControls();
             }
 
@@ -409,8 +390,7 @@ public final class AtmospherePane {
             public void onFrameShown(int index, String time) {
                 if (!radar.isOn())
                     return;
-                if (index >= 0 && scrubberBar.getProgress() != index)
-                    scrubberBar.setProgress(index);
+                showWhen(index);
                 scrubberLabel.setText(frameLabel(index, time));
             }
 
@@ -439,10 +419,8 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> labels, int shown) {
                 windHours = Math.max(0, labels.size() - 1);
-                if (wind.isOn()) {
-                    scrubberBar.setMax(windHours);
-                    scrubberBar.setProgress(shown);
-                }
+                if (wind.isOn())
+                    setWhenTimes(windTimes(), shown, 0);
                 updateLayerControls();
             }
 
@@ -450,8 +428,7 @@ public final class AtmospherePane {
             public void onFrameShown(int index, long validTime) {
                 if (!wind.isOn())
                     return;
-                if (scrubberBar.getProgress() != index)
-                    scrubberBar.setProgress(index);
+                showWhen(index);
                 scrubberLabel.setText(windLabel(index, validTime));
                 // The model can change with the height, so the level line follows.
                 updateWindLevel();
@@ -541,26 +518,230 @@ public final class AtmospherePane {
                 }
             }
         });
-        keepDragsFromThePager(scrubberBar);
-        scrubberBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
-                if (!fromUser)
-                    return;
-                if (wind != null && wind.isOn())
-                    wind.setHourIndex(value);
-                else if (radar != null && radar.isOn())
-                    radar.setFrameIndex(value);
-            }
+    }
 
-            @Override
-            public void onStartTrackingTouch(SeekBar bar) {
-            }
+    // ---- when: live, then a day, then an hour ----------------------------------------
 
+    /** The wind's forecast hours as wall-clock times, index for index. */
+    private List<Long> windTimes() {
+        final List<Long> out = new ArrayList<>();
+        if (wind != null)
+            for (int i = 0; i <= windHours; i++)
+                out.add(wind.validTime(i));
+        return out;
+    }
+
+    /** The radar's frame stamps as wall-clock times, index for index. */
+    private List<Long> radarTimes() {
+        final List<Long> out = new ArrayList<>();
+        for (String t : radarFrames)
+            out.add(com.atakmap.android.atmosphere.data.IsoTime.parse(t));
+        return out;
+    }
+
+    /**
+     * Hand the picker a fresh set of times.
+     *
+     * @param live the index that means now: hour 0 for a forecast that runs forward,
+     *             the last frame for a radar loop that runs up to the present.
+     */
+    private void setWhenTimes(List<Long> times, int shown, int live) {
+        whenTimes.clear();
+        whenTimes.addAll(times);
+        whenLive = live;
+        whenIndex = shown >= 0 && shown < whenTimes.size() ? shown : live;
+        whenDay = Long.MIN_VALUE;
+        buildWhenPicker();
+    }
+
+    /** The map moved to another time; follow it without rebuilding unless the day changed. */
+    private void showWhen(int index) {
+        if (index < 0 || index >= whenTimes.size())
+            return;
+        whenIndex = index;
+        if (startOfDay(whenTimes.get(index)) != whenDay)
+            buildWhenPicker();
+        else
+            paintWhenPicker();
+    }
+
+    /**
+     * Live, the days, and the hours of the day being shown, as buttons.
+     *
+     * <p>This was a SeekBar and a SeekBar was wrong here twice over: on a pager page
+     * it will not drag sideways, and once it is made to, a finger meaning to scroll
+     * the page drags the value instead. Buttons also say what the choices are without
+     * being touched, which is the whole of "pick a day and an hour".
+     */
+    private void buildWhenPicker() {
+        scrubberDays.removeAllViews();
+        scrubberHours.removeAllViews();
+        if (whenTimes.isEmpty())
+            return;
+        if (whenIndex < 0 || whenIndex >= whenTimes.size())
+            whenIndex = Math.max(0, Math.min(whenLive, whenTimes.size() - 1));
+        whenDay = startOfDay(whenTimes.get(whenIndex));
+
+        // Live, then one button per day the times cover. A single day is not worth
+        // a button of its own: the hours below it are already that day.
+        scrubberDays.addView(whenButton("Live", null, new View.OnClickListener() {
             @Override
-            public void onStopTrackingTouch(SeekBar bar) {
+            public void onClick(View v) {
+                pickWhen(whenLive);
             }
-        });
+        }, whenIndex == whenLive));
+        final List<Long> days = new ArrayList<>();
+        for (Long t : whenTimes) {
+            final long d = startOfDay(t);
+            if (!days.contains(d))
+                days.add(d);
+        }
+        if (days.size() > 1)
+            for (final Long day : days)
+                scrubberDays.addView(whenButton(dayLabel(day), day, new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        // A day is picked by going to its first hour, so green always
+                        // means "this is what is on the map" and never "this is open".
+                        for (int i = 0; i < whenTimes.size(); i++)
+                            if (startOfDay(whenTimes.get(i)) == day) {
+                                pickWhen(i);
+                                return;
+                            }
+                    }
+                }, day == whenDay));
+
+        LinearLayout row = null;
+        int inRow = 0;
+        for (int i = 0; i < whenTimes.size(); i++) {
+            if (startOfDay(whenTimes.get(i)) != whenDay)
+                continue;
+            if (inRow % 4 == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                scrubberHours.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            final int index = i;
+            final Button b = whenButton(hourLabel(whenTimes.get(i)), index,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            pickWhen(index);
+                        }
+                    }, i == whenIndex);
+            row.addView(b);
+            inRow++;
+        }
+        // Pad the last row so four across stay four across.
+        if (row != null)
+            for (int i = inRow % 4; i > 0 && i < 4; i++) {
+                final View filler = new View(pluginContext);
+                final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        0, 1, 1f);
+                lp.rightMargin = dp(4);
+                row.addView(filler, lp);
+            }
+    }
+
+    /** Repaint which button is green without rebuilding the rows. */
+    private void paintWhenPicker() {
+        paintGreen(scrubberDays);
+        for (int i = 0; i < scrubberHours.getChildCount(); i++) {
+            final View row = scrubberHours.getChildAt(i);
+            if (row instanceof LinearLayout)
+                paintGreen((LinearLayout) row);
+        }
+    }
+
+    private void paintGreen(LinearLayout host) {
+        final long day = whenIndex >= 0 && whenIndex < whenTimes.size()
+                ? startOfDay(whenTimes.get(whenIndex)) : Long.MIN_VALUE;
+        for (int i = 0; i < host.getChildCount(); i++) {
+            final View v = host.getChildAt(i);
+            if (!(v instanceof Button))
+                continue;
+            final Object tag = v.getTag(R.id.scrubber);
+            final boolean on;
+            if (tag instanceof Integer)
+                on = (Integer) tag == whenIndex;
+            else if (tag instanceof Long)
+                on = ((Long) tag).longValue() == day;
+            else
+                on = whenIndex == whenLive;
+            ((Button) v).setTextColor(on
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+        }
+    }
+
+    /** One cell of the picker: a quarter-width TakwerxButton, green when it is on. */
+    private Button whenButton(String text, Object tag, View.OnClickListener onClick,
+            boolean on) {
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, scrubberHours, false);
+        b.setText(text);
+        // Keyed so a repaint can tell an hour (Integer) from a day (Long) from Live.
+        b.setTag(R.id.scrubber, tag);
+        b.setTextSize(13);
+        b.setOnClickListener(onClick);
+        b.setTextColor(on
+                ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        lp.topMargin = dp(4);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    /** Send a pick to whichever layer owns the strip. */
+    private void pickWhen(int index) {
+        if (index < 0 || index >= whenTimes.size())
+            return;
+        // The line answers the tap, not the fetch. A grid takes a moment to arrive and
+        // the label is only written when it does, so the heading sat on the old time
+        // while the buttons had already moved, which reads as a control that did not
+        // take (XCover, 2026-09-22).
+        if (wind != null && wind.isOn()) {
+            wind.setHourIndex(index);
+            scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
+        } else if (radar != null && radar.isOn()) {
+            radar.setFrameIndex(index);
+            scrubberLabel.setText(frameLabel(index,
+                    index < radarFrames.size() ? radarFrames.get(index) : null));
+        }
+        showWhen(index);
+    }
+
+    /** "Today", "Tomorrow", else the weekday. */
+    private static String dayLabel(long day) {
+        final long from = Math.round(
+                (day - startOfDay(System.currentTimeMillis())) / 86_400_000.0);
+        if (from == 0)
+            return "Today";
+        if (from == 1)
+            return "Tomorrow";
+        return new SimpleDateFormat("EEE", Locale.US).format(new Date(day));
+    }
+
+    /** "6 pm" on the hour, "5:12 pm" off it, because radar frames are not hourly. */
+    private static String hourLabel(long when) {
+        final Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(when);
+        final String pattern = c.get(Calendar.MINUTE) == 0 ? "h a" : "h:mm a";
+        return new SimpleDateFormat(pattern, Locale.US).format(new Date(when))
+                .replace("AM", "am").replace("PM", "pm");
+    }
+
+    private static long startOfDay(long when) {
+        final Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(when);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTimeInMillis();
     }
 
     /** The egress gate: the host, by name, once. */
@@ -589,8 +770,8 @@ public final class AtmospherePane {
             wind.setOn(false);
         if (radar != null) {
             radar.setOn(true);
-            scrubberBar.setMax(Math.max(0, radarFrames.size() - 1));
-            scrubberBar.setProgress(Math.max(0, radar.frameIndex()));
+            setWhenTimes(radarTimes(), radar.frameIndex(),
+                    Math.max(0, radarFrames.size() - 1));
         }
         updateLayerControls();
     }
@@ -600,8 +781,7 @@ public final class AtmospherePane {
             radar.setOn(false);
         if (wind != null) {
             wind.setOn(true);
-            scrubberBar.setMax(windHours);
-            scrubberBar.setProgress(wind.hourIndex());
+            setWhenTimes(windTimes(), wind.hourIndex(), 0);
         }
         updateLayerControls();
     }
