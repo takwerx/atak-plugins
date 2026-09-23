@@ -236,7 +236,6 @@ public final class WindOverlay {
         if (p != null)
             p.edit().putBoolean(PREF_ON, value).apply();
         if (value) {
-            hours = NomadsWind.HOURS;
             setRun(model.latestRun(System.currentTimeMillis()));
             if (listener != null)
                 listener.onFrames(labels(), hourIndex());
@@ -262,6 +261,10 @@ public final class WindOverlay {
      */
     private void setRun(long value) {
         run = value;
+        // How far this run reaches depends on the model and on which run it is, so
+        // it is read here rather than fixed once: HRRR's 12Z run carries 48 hours
+        // and its 13Z run 18.
+        hours = model.forecastHours(run);
         final long ahead = System.currentTimeMillis() - run;
         firstHour = (int) Math.max(0, Math.min(hours, ahead / 3_600_000L));
         hour = Math.max(firstHour, Math.min(hour, hours));

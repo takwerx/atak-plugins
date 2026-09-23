@@ -35,6 +35,10 @@ public final class NomadsWind {
      * the zoom changed models or the clock crossed a run. Eighteen hourly steps is the
      * shift a crew plans, and every model has them.
      */
+    /**
+     * The shortest forecast any model offers, and the floor the picker can rely on.
+     * How far a given run actually reaches is {@link Model#forecastHours(long)}.
+     */
     public static final int HOURS = 18;
 
     /** Where the HRRR and RAP CONUS grids reach, measured off their own headers. */
@@ -171,6 +175,30 @@ public final class NomadsWind {
             c.set(Calendar.SECOND, 0);
             c.set(Calendar.MILLISECOND, 0);
             return c.getTimeInMillis();
+        }
+
+        /**
+         * How far forward this run is published, measured on NOMADS rather than
+         * assumed (2026-09-23). A flat 18 for everything was leaving most of it on
+         * the floor: the operator opened the pane at 7 am and there was no Tomorrow,
+         * because 18 hours off the 12Z run ends at 11 pm the same evening.
+         *
+         * <ul>
+         *   <li>HRRR publishes 48 h on the 00/06/12/18Z runs and 18 h on the rest
+         *       (hrrr.t12z.wrfsfcf48 is there, hrrr.t13z stops at f17).</li>
+         *   <li>RAP publishes 21 h.</li>
+         *   <li>GFS publishes 384 h, but hourly only to f120 and 3-hourly after.
+         *       The picker counts in whole hours, so it stops where the hourly
+         *       files do rather than carry a second step size for days nobody
+         *       plans a shift on.</li>
+         * </ul>
+         */
+        public int forecastHours(long runUtc) {
+            if (this == HRRR)
+                return (runUtc / 3_600_000L) % 6 == 0 ? 48 : HOURS;
+            if (this == RAP)
+                return 21;
+            return 120;
         }
 
         /** The previous run, for when a filter answers that it has no such file yet. */

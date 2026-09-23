@@ -144,6 +144,27 @@ public class WindGridTest {
     }
 
     @Test
+    public void aRunReachesAsFarAsNomadsPublishesIt() {
+        // Measured against NOMADS on 2026-09-23, not assumed: hrrr.t12z.wrfsfcf48 is
+        // on disk and hrrr.t13z stops at f17, rap.t12z stops at f21, and GFS runs to
+        // f384 but only hourly to f120.
+        final long z12 = java.time.Instant.parse("2026-09-23T12:00:00Z").toEpochMilli();
+        final long z13 = java.time.Instant.parse("2026-09-23T13:00:00Z").toEpochMilli();
+        final long z18 = java.time.Instant.parse("2026-09-23T18:00:00Z").toEpochMilli();
+        assertEquals(48, Model.HRRR.forecastHours(z12));
+        assertEquals(48, Model.HRRR.forecastHours(z18));
+        assertEquals(NomadsWind.HOURS, Model.HRRR.forecastHours(z13));
+        assertEquals(21, Model.RAP.forecastHours(z12));
+        assertEquals(120, Model.GFS.forecastHours(z12));
+        // Whatever the run, a model reaches at least the short-run floor, and the
+        // picker is built off that number.
+        for (Model m : Model.values())
+            for (int h = 0; h < 24; h++)
+                assertTrue(m + " at " + h + "z", m.forecastHours(z12 + h * 3_600_000L)
+                        >= NomadsWind.HOURS);
+    }
+
+    @Test
     public void aHeightSaysAHeightAndNothingElse() {
         // The buttons carry these, so they are the whole of what a crew reads. The
         // cell size used to sit beside them and is gone: how much ground one forecast
