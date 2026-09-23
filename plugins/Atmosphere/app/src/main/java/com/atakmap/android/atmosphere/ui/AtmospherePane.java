@@ -36,6 +36,7 @@ import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.WindScaleView;
 import com.atakmap.android.atmosphere.overlay.WindOverlay;
+import com.atakmap.android.atmosphere.wind.NomadsWind;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
 import com.atakmap.android.atmosphere.source.WxParam;
@@ -132,7 +133,7 @@ public final class AtmospherePane {
     private final LinearLayout windUnitRow;
     private final View windLevelBlock;
     private final TextView windLevelLabel;
-    private final SeekBar windLevelBar;
+    private final LinearLayout windLevelRows;
     private WindOverlay wind;
     private int windHours;
 
@@ -225,28 +226,8 @@ public final class AtmospherePane {
         buildWindUnitRow();
         windLevelBlock = find(R.id.wind_level_block);
         windLevelLabel = find(R.id.wind_level_label);
-        windLevelBar = find(R.id.wind_level_bar);
-        keepDragsFromThePager(windLevelBar);
-        windLevelBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
-                if (!fromUser || wind == null)
-                    return;
-                // The label follows the finger; the fetch waits for it to stop.
-                windLevelLabel.setText(levelLabelFor(value));
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar bar) {
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar bar) {
-                if (wind != null)
-                    wind.setLevelIndex(bar.getProgress());
-                updateWindLevel();
-            }
-        });
+        windLevelRows = find(R.id.wind_level_rows);
+        buildWindLevelRows();
         scrubber = find(R.id.scrubber);
         scrubberLabel = find(R.id.scrubber_label);
         scrubberBar = find(R.id.scrubber_bar);
@@ -498,7 +479,13 @@ public final class AtmospherePane {
     private String windLabel(int hour, long validTime) {
         if (validTime <= 0)
             return "No forecast yet";
-        return capitalize(relativeTime(validTime)) + ", " + clock(validTime);
+        // Counted in steps off the bar rather than off the clock. Step 0 is the hour
+        // that contains now, so at 5:46 it is the 5 pm forecast: measuring that
+        // against the clock reads "44 min ago", which is stale weather to anyone
+        // looking at it, and it is the wind blowing right now.
+        final String when = hour <= 0 ? "Now"
+                : "In " + hour + " h";
+        return when + ", " + clock(validTime);
     }
 
     /** "now", "in 6 h", "2 h ago" \u2014 a forecast hour in the operator's terms. */
@@ -706,37 +693,105 @@ public final class AtmospherePane {
         updateUnitsButton();
         updateWindScale();
         updateWindUnitRow();
+        relabelWindLevelRows();
         updateWindLevel();
         // A unit change is a display change: re-render, never re-fetch.
         render();
     }
 
     /**
-     * The height the wind is drawn at (operator, 2026-09-22: "do we have a slider for
-     * wind height?"). Ten metres up to the jet, walked as a ladder rather than a free
-     * scale because that is what the models carry: two heights above the ground and
-     * the standard pressure surfaces above them.
+     * Paint the height that is being drawn, and say how fine the wind is there.
+     * Ten meters up to the jet, a ladder rather than a scale because that is what
+     * the models carry: two heights above the ground and the standard pressure
+     * surfaces above them.
      */
     private void updateWindLevel() {
         if (wind == null)
             return;
-        windLevelBar.setMax(Math.max(0, wind.levelCount() - 1));
-        if (windLevelBar.getProgress() != wind.levelIndex())
-            windLevelBar.setProgress(wind.levelIndex());
+        final int picked = wind.levelIndex();
+        for (int i = 0; i < windLevelRows.getChildCount(); i++) {
+            final View row = windLevelRows.getChildAt(i);
+            if (!(row instanceof LinearLayout))
+                continue;
+            final LinearLayout cells = (LinearLayout) row;
+            for (int j = 0; j < cells.getChildCount(); j++) {
+                final View cell = cells.getChildAt(j);
+                if (!(cell instanceof Button) || !(cell.getTag() instanceof Integer))
+                    continue;
+                ((Button) cell).setTextColor((Integer) cell.getTag() == picked
+                        ? pluginContext.getResources().getColor(R.color.state_on)
+                        : Color.WHITE);
+            }
+        }
         windLevelLabel.setText(wind.levelLabel(units == UnitSystem.METRIC,
                 units == UnitSystem.AVIATION));
     }
 
     /**
-     * The height under the finger. How fine the wind is there is left off until the
-     * finger lifts, because the model that answers can change with the height and a
-     * number that flickers while dragging is worse than one that arrives a beat late.
+     * One button per height the models carry (operator, 2026-09-22: "lets just do
+     * some presets on the wind height"). It began as a slider and the slider was the
+     * wrong control here: it lives on a page of a ViewPager inside a scroller, so a
+     * finger meaning to scroll the page moved the wind to the jet stream instead, and
+     * eight discrete levels were never a scale to begin with. Buttons say what the
+     * choices are without being touched, which a slider cannot.
+     *
+     * <p>Four to a row, weighted so the two rows line up, and the labels are the
+     * heights themselves rather than the pressure surfaces they come from.
      */
-    private String levelLabelFor(int index) {
-        final com.atakmap.android.atmosphere.wind.NomadsWind.Level[] all =
-                com.atakmap.android.atmosphere.wind.NomadsWind.Level.values();
-        return all[Math.max(0, Math.min(index, all.length - 1))].label(
-                units == UnitSystem.METRIC, units == UnitSystem.AVIATION);
+    private void buildWindLevelRows() {
+        final NomadsWind.Level[] all = NomadsWind.Level.values();
+        final int perRow = 4;
+        LinearLayout row = null;
+        for (int i = 0; i < all.length; i++) {
+            if (i % perRow == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                windLevelRows.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            final int index = i;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(all[i].shortLabel(units == UnitSystem.METRIC));
+            b.setTextSize(13);
+            b.setTag(index);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (wind == null)
+                        return;
+                    wind.setLevelIndex(index);
+                    updateWindLevel();
+                }
+            });
+            // Even columns: each cell takes a quarter of the row whatever its text.
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
+    /** The preset labels carry a unit, so a unit change relabels them. */
+    private void relabelWindLevelRows() {
+        final NomadsWind.Level[] all = NomadsWind.Level.values();
+        for (int i = 0; i < windLevelRows.getChildCount(); i++) {
+            final View r = windLevelRows.getChildAt(i);
+            if (!(r instanceof LinearLayout))
+                continue;
+            final LinearLayout cells = (LinearLayout) r;
+            for (int j = 0; j < cells.getChildCount(); j++) {
+                final View cell = cells.getChildAt(j);
+                if (!(cell instanceof Button) || !(cell.getTag() instanceof Integer))
+                    continue;
+                final int index = (Integer) cell.getTag();
+                if (index >= 0 && index < all.length)
+                    ((Button) cell).setText(all[index].shortLabel(units == UnitSystem.METRIC));
+            }
+        }
     }
 
     /**

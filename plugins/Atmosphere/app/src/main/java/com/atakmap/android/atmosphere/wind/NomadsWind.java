@@ -83,6 +83,23 @@ public final class NomadsWind {
         }
 
         /**
+         * The same height on a preset button, short enough to read in a row of them.
+         * The ground is called the ground rather than given a number, because that is
+         * the one every crew already stands on.
+         */
+        public String shortLabel(boolean metric) {
+            if (this == AGL_10)
+                return "Ground";
+            if (surface)
+                return metric ? approxMetres + " m"
+                        : Math.round(approxMetres / 0.3048 / 10) * 10 + " ft";
+            return metric
+                    ? String.format(Locale.US, "%,d m", approxMetres)
+                    : String.format(Locale.US, "%,d ft",
+                            Math.round(approxMetres / 0.3048 / 500) * 500);
+        }
+
+        /**
          * "10 m above ground" or "about 10,000 ft". Altitude is feet unless the operator
          * is in metric; aviation and imperial both fly in feet.
          *

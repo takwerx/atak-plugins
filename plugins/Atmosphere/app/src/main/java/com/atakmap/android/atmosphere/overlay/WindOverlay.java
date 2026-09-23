@@ -80,8 +80,17 @@ public final class WindOverlay {
     /** The height being drawn; the slider walks {@link NomadsWind.Level}. */
     private NomadsWind.Level level = NomadsWind.Level.AGL_10;
     private long run;
-    private int hours;
+    private int hours = NomadsWind.HOURS;
+    /** The model forecast hour being drawn, counted from the run. */
     private int hour;
+    /**
+     * The first forecast hour worth offering: the one covering now. A run is published
+     * an hour or more after its own start, so hour 0 is always in the past and the
+     * scrubber used to open on weather that had already happened (operator, 2026-09-22:
+     * "i dont care about 3 hours ago i need now, then forward on"). Everything the
+     * scrubber says is counted from here; only the fetch uses the model's own hour.
+     */
+    private int firstHour;
     private GeoBounds region;
     private WindGrid shown;
     private int generation;
@@ -142,8 +151,8 @@ public final class WindOverlay {
     public void setListener(Listener l) {
         listener = l;
         if (l != null) {
-            l.onFrames(labels(), hour);
-            l.onFrameShown(hour, shown == null ? 0 : shown.validTime);
+            l.onFrames(labels(), hourIndex());
+            l.onFrameShown(hourIndex(), shown == null ? 0 : shown.validTime);
         }
     }
 
@@ -202,11 +211,10 @@ public final class WindOverlay {
         if (p != null)
             p.edit().putBoolean(PREF_ON, value).apply();
         if (value) {
-            run = model.latestRun(System.currentTimeMillis());
             hours = NomadsWind.HOURS;
-            hour = Math.max(0, Math.min(hour, hours));
+            setRun(model.latestRun(System.currentTimeMillis()));
             if (listener != null)
-                listener.onFrames(labels(), hour);
+                listener.onFrames(labels(), hourIndex());
             if (view != null)
                 view.setVisibility(android.view.View.VISIBLE);
             ensureRegion();
@@ -222,24 +230,37 @@ public final class WindOverlay {
         }
     }
 
-    /** Forecast hour labels for the scrubber, one per hour of the run. */
+    /**
+     * Adopt a run and work out where now falls in it. Called wherever the run moves:
+     * turning the layer on, switching models, and stepping back to the run that
+     * actually answered.
+     */
+    private void setRun(long value) {
+        run = value;
+        final long ahead = System.currentTimeMillis() - run;
+        firstHour = (int) Math.max(0, Math.min(hours, ahead / 3_600_000L));
+        hour = Math.max(firstHour, Math.min(hour, hours));
+    }
+
+    /** One label per hour the scrubber offers, from now forward. */
     public List<String> labels() {
         final List<String> out = new ArrayList<>();
-        for (int h = 0; h <= hours; h++)
-            out.add("+" + h + " h");
+        for (int h = firstHour; h <= hours; h++)
+            out.add("+" + (h - firstHour) + " h");
         return out;
     }
 
+    /** Where the scrubber sits: 0 is now, counting forward. */
     public int hourIndex() {
-        return hour;
+        return hour - firstHour;
     }
 
-    public long validTime(int h) {
-        return run + h * 3_600_000L;
+    public long validTime(int index) {
+        return run + (firstHour + index) * 3_600_000L;
     }
 
-    public void setHourIndex(int h) {
-        h = Math.max(0, Math.min(h, hours));
+    public void setHourIndex(int index) {
+        final int h = Math.max(firstHour, Math.min(firstHour + index, hours));
         if (h == hour)
             return;
         hour = h;
@@ -361,7 +382,7 @@ public final class WindOverlay {
                 // Carrying an hourly run over to GFS asks for a file that never exists,
                 // and stepping back from it walks a chain of misses.
                 model = chosen;
-                run = chosen.latestRun(System.currentTimeMillis());
+                setRun(chosen.latestRun(System.currentTimeMillis()));
             }
             double w = clamped.getWest(), e = clamped.getEast();
             double s = clamped.getSouth(), n = clamped.getNorth();
@@ -440,10 +461,11 @@ public final class WindOverlay {
                     return;
                 }
                 if (tryRun != run) {
-                    // A newer run was not out: keep the one that answered.
-                    run = tryRun;
+                    // A newer run was not out: keep the one that answered. Now sits
+                    // further into an older run, so the scrubber's zero moves with it.
+                    setRun(tryRun);
                     if (listener != null)
-                        listener.onFrames(labels(), hour);
+                        listener.onFrames(labels(), hourIndex());
                 }
                 cache.put(key(run, h, r), grid);
                 Log.d(TAG, String.format(Locale.US,
@@ -473,7 +495,7 @@ public final class WindOverlay {
         mapView.removeCallbacks(ticker);
         mapView.post(ticker);
         if (listener != null)
-            listener.onFrameShown(hour, grid.validTime);
+            listener.onFrameShown(hourIndex(), grid.validTime);
         status("");
     }
 

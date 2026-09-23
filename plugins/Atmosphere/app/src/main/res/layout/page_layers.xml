@@ -68,7 +68,7 @@
                 android:paddingTop="4dp"
                 android:visibility="gone" />
 
-            <!-- Wind height: the slider walks a ladder of levels, lowest first. -->
+            <!-- Wind height: one preset button per level the models carry, lowest first. -->
             <LinearLayout
                 android:id="@+id/wind_level_block"
                 android:layout_width="match_parent"
@@ -85,12 +85,11 @@
                     android:textSize="13sp"
                     android:text="" />
 
-                <SeekBar
-                    android:id="@+id/wind_level_bar"
+                <LinearLayout
+                    android:id="@+id/wind_level_rows"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="0"
-                    android:progress="0" />
+                    android:orientation="vertical" />
             </LinearLayout>
         </LinearLayout>
 
@@ -117,14 +116,6 @@
                 android:max="0"
                 android:progress="0" />
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/attribution_text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="11sp"
-            android:layout_marginTop="@dimen/auto_margin"
-            android:text="" />
 
         <TextView
             android:id="@+id/attribution_text"
