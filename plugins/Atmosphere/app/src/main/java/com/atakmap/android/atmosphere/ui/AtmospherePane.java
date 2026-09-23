@@ -9,8 +9,9 @@ import android.graphics.PointF;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.ViewGroup;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.HorizontalScrollView;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -81,6 +82,8 @@ public final class AtmospherePane {
     private static final String PREF_FAVORITE = "weather.position.favorite";
     private static final String PREF_TREND = "weather.trend.kind";
     private static final String PREF_HOURS_TABLE = "weather.hours.table";
+    private static final String PREF_RADAR_OPEN = "weather.radar.open";
+    private static final String PREF_WIND_OPEN = "weather.wind.open";
 
     private final View root;
     private final Context pluginContext;
@@ -124,6 +127,13 @@ public final class AtmospherePane {
     private final Button radarToggle;
     private final View scrubber;
     private final TextView scrubberLabel;
+    private final LinearLayout radarSettings;
+    private final LinearLayout windSettings;
+    private final ImageButton radarExpand;
+    private final ImageButton windExpand;
+    /** Whether each layer is showing its own settings. Folded away, a layer is a row. */
+    private boolean radarOpen;
+    private boolean windOpen = true;
     private final LinearLayout scrubberDays;
     private final LinearLayout scrubberHours;
     /** The times the picker offers, and which of them is on the map. */
@@ -247,6 +257,10 @@ public final class AtmospherePane {
         buildWindLevelRows();
         scrubber = find(R.id.scrubber);
         scrubberLabel = find(R.id.scrubber_label);
+        radarSettings = find(R.id.radar_settings);
+        windSettings = find(R.id.wind_settings);
+        radarExpand = find(R.id.radar_expand);
+        windExpand = find(R.id.wind_expand);
         scrubberDays = find(R.id.scrubber_days);
         scrubberHours = find(R.id.scrubber_hours);
         wireLayers();
@@ -264,6 +278,26 @@ public final class AtmospherePane {
             mode = PointMode.CENTER;
         trendKind = Kind.fromName(prefs == null ? null : prefs.getString(PREF_TREND, null));
         hoursTableOpen = prefs != null && prefs.getBoolean(PREF_HOURS_TABLE, false);
+        // Open the first time a layer is used, so its controls are found; after that
+        // the operator's own choice stands.
+        radarOpen = prefs == null || prefs.getBoolean(PREF_RADAR_OPEN, true);
+        windOpen = prefs == null || prefs.getBoolean(PREF_WIND_OPEN, true);
+        radarExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                radarOpen = !radarOpen;
+                rememberFold(PREF_RADAR_OPEN, radarOpen);
+                updateLayerControls();
+            }
+        });
+        windExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                windOpen = !windOpen;
+                rememberFold(PREF_WIND_OPEN, windOpen);
+                updateLayerControls();
+            }
+        });
         updateHoursTableButton();
         hoursTableButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -835,6 +869,13 @@ public final class AtmospherePane {
         windToggle.setText(windOn ? R.string.wind_on : R.string.wind_off);
         windToggle.setTextColor(pluginContext.getResources().getColor(
                 windOn ? R.color.state_on : R.color.state_off));
+        // A layer with nothing on the map has no settings worth a chevron.
+        radarExpand.setVisibility(radarOn ? View.VISIBLE : View.GONE);
+        windExpand.setVisibility(windOn ? View.VISIBLE : View.GONE);
+        radarExpand.setRotation(radarOpen ? 180f : 0f);
+        windExpand.setRotation(windOpen ? 180f : 0f);
+        radarSettings.setVisibility(radarOn && radarOpen ? View.VISIBLE : View.GONE);
+        windSettings.setVisibility(windOn && windOpen ? View.VISIBLE : View.GONE);
         // The legend explains what is on the map, so it appears with the layer.
         windScaleHost.setVisibility(windOn ? View.VISIBLE : View.GONE);
         windLevelBlock.setVisibility(windOn ? View.VISIBLE : View.GONE);
@@ -845,8 +886,33 @@ public final class AtmospherePane {
             updateWindUnitRow();
             updateWindLevel();
         }
+        if (windOn)
+            hostScrubberIn(windSettings);
+        else if (radarOn)
+            hostScrubberIn(radarSettings);
         scrubber.setVisibility(radarOn || windOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
+    }
+
+    /**
+     * Put the time strip under the layer that owns it. One strip, not one per layer:
+     * only one time-enabled layer can be on at a time (WxReport's rule), so moving
+     * the one view beats keeping two in step. It goes first in the block, above that
+     * layer's own controls.
+     */
+    private void hostScrubberIn(LinearLayout container) {
+        final ViewParent parent = scrubber.getParent();
+        if (parent == container)
+            return;
+        if (parent instanceof ViewGroup)
+            ((ViewGroup) parent).removeView(scrubber);
+        container.addView(scrubber, 0);
+    }
+
+    private void rememberFold(String key, boolean open) {
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putBoolean(key, open).apply();
     }
 
     /**
