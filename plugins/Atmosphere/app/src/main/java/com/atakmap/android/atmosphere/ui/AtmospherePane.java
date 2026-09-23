@@ -645,21 +645,26 @@ public final class AtmospherePane {
             if (!days.contains(d))
                 days.add(d);
         }
-        if (days.size() > 1)
-            for (final Long day : days)
-                scrubberDays.addView(whenButton(dayLabel(day), day, new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        // A day is picked by going to its first hour, so green always
-                        // means "this is what is on the map" and never "this is open".
-                        liveMode = false;
-                        for (int i = 0; i < whenTimes.size(); i++)
-                            if (startOfDay(whenTimes.get(i)) == day) {
-                                pickWhen(i);
-                                return;
-                            }
-                    }
-                }, !liveMode && day == whenDay));
+        // Every day the forecast reaches gets a button, even when that is one. It used
+        // to take two before any appeared, on the grounds that a lone "Today" says
+        // nothing -- but Live hides the hours, so a forecast that fits inside one day
+        // left Live as the only control on the page with no way to reach an hour at
+        // all (operator, 2026-09-23: "all i see is live"). Last night's window
+        // straddled midnight and showed two, which is why this held until morning.
+        for (final Long day : days)
+            scrubberDays.addView(whenButton(dayLabel(day), day, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    // A day is picked by going to its first hour, so green always
+                    // means "this is what is on the map" and never "this is open".
+                    liveMode = false;
+                    for (int i = 0; i < whenTimes.size(); i++)
+                        if (startOfDay(whenTimes.get(i)) == day) {
+                            pickWhen(i);
+                            return;
+                        }
+                }
+            }, !liveMode && day == whenDay));
 
         // Live is not a day, so it has no hours to choose from.
         scrubberHours.setVisibility(liveMode ? View.GONE : View.VISIBLE);
