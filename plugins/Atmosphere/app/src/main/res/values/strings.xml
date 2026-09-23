@@ -19,6 +19,7 @@
     <string name="hide_hours_table">Hide hourly table</string>
     <string name="heading_sun_moon">Sun and moon</string>
     <string name="heading_layers">Layers</string>
+    <string name="heading_height">Height</string>
     <string name="radar_on">Radar ON</string>
     <string name="radar_off">Radar OFF</string>
     <string name="allow">Allow</string>

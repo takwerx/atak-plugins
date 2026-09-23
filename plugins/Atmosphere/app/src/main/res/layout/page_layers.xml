@@ -111,14 +111,18 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
+                <!-- A heading, not a readout: the lit button below says the height,
+                     and the sentence that used to sit here also carried the model's
+                     grid spacing, which is not a thing a crew can act on. -->
                 <TextView
                     android:id="@+id/wind_level_label"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="@color/white"
-                    android:textSize="13sp"
-                    android:text="" />
+                    android:layout_marginTop="8dp"
+                    android:text="@string/heading_height"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
 
                 <LinearLayout
                     android:id="@+id/wind_level_rows"

@@ -157,15 +157,6 @@ public final class NomadsWind {
             this.north = north;
         }
 
-        /**
-         * What the model is, in words a crew can act on: how much ground one cell
-         * covers. "HRRR" tells a firefighter nothing; "2 mi detail" tells them whether
-         * the wind on screen can know about their canyon.
-         */
-        public String detail(boolean metric) {
-            return metric ? cellKm + " km detail"
-                    : Math.round(cellKm / 1.609344) + " mi detail";
-        }
 
         public boolean covers(double lat, double lon) {
             return lat >= south && lat <= north && lon >= west && lon <= east;

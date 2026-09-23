@@ -922,8 +922,6 @@ public final class AtmospherePane {
                         : Color.WHITE);
             }
         }
-        windLevelLabel.setText(wind.levelLabel(units == UnitSystem.METRIC,
-                units == UnitSystem.AVIATION));
     }
 
     /**
@@ -953,6 +951,10 @@ public final class AtmospherePane {
             final Button b = (Button) LayoutInflater.from(pluginContext)
                     .inflate(R.layout.trend_chip, row, false);
             b.setText(all[i].shortLabel(units == UnitSystem.METRIC));
+            // The button is a height on a small target; spoken, it is the whole name,
+            // with the pressure surface for anyone in aviation units.
+            b.setContentDescription(all[i].label(units == UnitSystem.METRIC,
+                    units == UnitSystem.AVIATION));
             b.setTextSize(13);
             b.setTag(index);
             b.setOnClickListener(new View.OnClickListener() {
@@ -987,8 +989,11 @@ public final class AtmospherePane {
                 if (!(cell instanceof Button) || !(cell.getTag() instanceof Integer))
                     continue;
                 final int index = (Integer) cell.getTag();
-                if (index >= 0 && index < all.length)
+                if (index >= 0 && index < all.length) {
                     ((Button) cell).setText(all[index].shortLabel(units == UnitSystem.METRIC));
+                    cell.setContentDescription(all[index].label(units == UnitSystem.METRIC,
+                            units == UnitSystem.AVIATION));
+                }
             }
         }
     }

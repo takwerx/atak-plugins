@@ -313,15 +313,6 @@ public final class WindOverlay {
     }
 
     /**
-     * The height being drawn and how fine the wind is there, in plain words: the
-     * toggle above already says Wind, and the model's name is not something a crew
-     * can act on (operator, 2026-09-22: "what does ... HRRR mean, like wtf is HRRR?").
-     */
-    public String levelLabel(boolean metric, boolean showPressure) {
-        return level.label(metric, showPressure) + ", " + model.detail(metric);
-    }
-
-    /**
      * Change the height. A pressure level cannot come from HRRR, so this may also
      * change the model; the region is recomputed either way.
      */

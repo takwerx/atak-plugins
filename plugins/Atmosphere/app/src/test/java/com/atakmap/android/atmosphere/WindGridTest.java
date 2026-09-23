@@ -144,16 +144,25 @@ public class WindGridTest {
     }
 
     @Test
-    public void aModelSaysItsCellSizeNotItsName() {
-        // What a model is, to a crew, is how much ground one cell covers. The name is
-        // for the log; the label is for somebody deciding whether the wind on screen
-        // can know about their canyon.
-        assertEquals("2 mi detail", Model.HRRR.detail(false));
-        assertEquals("3 km detail", Model.HRRR.detail(true));
-        assertEquals("8 mi detail", Model.RAP.detail(false));
-        assertEquals("16 mi detail", Model.GFS.detail(false));
-        for (Model m : Model.values())
-            assertFalse(m + " leaks its name", m.detail(false).contains(m.label));
+    public void aHeightSaysAHeightAndNothingElse() {
+        // The buttons carry these, so they are the whole of what a crew reads. The
+        // cell size used to sit beside them and is gone: how much ground one forecast
+        // cell covers is not something anybody can act on either (operator,
+        // 2026-09-22: "what does 33ft above ground 2 mi detail mean?").
+        assertEquals("Ground", NomadsWind.Level.AGL_10.shortLabel(false));
+        assertEquals("Ground", NomadsWind.Level.AGL_10.shortLabel(true));
+        assertEquals("260 ft", NomadsWind.Level.AGL_80.shortLabel(false));
+        assertEquals("80 m", NomadsWind.Level.AGL_80.shortLabel(true));
+        assertEquals("5,000 ft", NomadsWind.Level.MB_850.shortLabel(false));
+        assertEquals("10,000 ft", NomadsWind.Level.MB_700.shortLabel(false));
+        assertEquals("3,000 m", NomadsWind.Level.MB_700.shortLabel(true));
+        // "wtf is HRRR?" -- the model's name is for the log and nowhere else.
+        for (NomadsWind.Level l : NomadsWind.Level.values())
+            for (boolean metric : new boolean[] { false, true })
+                for (String shown : new String[] { l.shortLabel(metric),
+                        l.label(metric, false), l.label(metric, true) })
+                    for (Model m : Model.values())
+                        assertFalse(shown + " leaks " + m.label, shown.contains(m.label));
     }
 
     @Test
