@@ -168,5 +168,13 @@
             </HorizontalScrollView>
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/attribution_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:layout_marginTop="@dimen/auto_margin"
+            android:text="" />
+
     </LinearLayout>
 </ScrollView>

@@ -20,6 +20,8 @@
     <string name="heading_sun_moon">Sun and moon</string>
     <string name="heading_layers">Layers</string>
     <string name="heading_height">Height</string>
+    <string name="credit_wind">Wind forecast from NOAA (%1$s)</string>
+    <string name="credit_radar">Radar from the US National Weather Service (%1$s)</string>
     <string name="radar_on">Radar ON</string>
     <string name="radar_off">Radar OFF</string>
     <string name="allow">Allow</string>

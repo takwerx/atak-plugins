@@ -132,8 +132,12 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Credits what this page draws, which is not what the forecast page draws:
+             the wind comes from NOAA's model files and the radar from an NWS map
+             service, neither of them the forecast API. The forecast's own credit
+             sits on the forecast page, where it used to be written into this view. -->
         <TextView
-            android:id="@+id/attribution_text"
+            android:id="@+id/layers_attribution"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="11sp"

@@ -120,6 +120,7 @@ public final class AtmospherePane {
     private final LinearLayout daysLegend;
     private final LinearLayout daysContainer;
     private final TextView attributionText;
+    private final TextView layersAttribution;
     private final Button radarToggle;
     private final View scrubber;
     private final TextView scrubberLabel;
@@ -230,6 +231,7 @@ public final class AtmospherePane {
         daysLegend = find(R.id.days_legend);
         daysContainer = find(R.id.days_container);
         attributionText = find(R.id.attribution_text);
+        layersAttribution = find(R.id.layers_attribution);
         radarToggle = find(R.id.radar_toggle);
         windToggle = find(R.id.wind_toggle);
         windScaleHost = find(R.id.wind_scale_host);
@@ -844,6 +846,27 @@ public final class AtmospherePane {
             updateWindLevel();
         }
         scrubber.setVisibility(radarOn || windOn ? View.VISIBLE : View.GONE);
+        creditTheLayers(radarOn, windOn);
+    }
+
+    /**
+     * Credit what this page actually draws. It used to show the forecast source's
+     * line, because the one attribution view in the pane sat on this page while the
+     * forecast wrote into it -- so a page of NOAA model wind and an NWS radar service
+     * was crediting the forecast API, which serves neither (operator, 2026-09-22:
+     * "yeah i guess make it accurate"). The host comes from the constant the fetch
+     * uses, so the credit cannot drift from where the data came from.
+     */
+    private void creditTheLayers(boolean radarOn, boolean windOn) {
+        final StringBuilder out = new StringBuilder();
+        if (windOn)
+            out.append(pluginContext.getString(R.string.credit_wind, NomadsWind.HOST));
+        if (radarOn) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_radar, RadarOverlay.HOST));
+        }
+        layersAttribution.setText(out.toString());
     }
 
     /**
