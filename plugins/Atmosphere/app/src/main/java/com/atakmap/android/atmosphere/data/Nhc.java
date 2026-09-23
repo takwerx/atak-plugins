@@ -49,6 +49,46 @@ public final class Nhc {
     private static final int FIRST_BLOCK = 4;
     private static final int BLOCK_STRIDE = 26;
 
+    /**
+     * What the service publishes for one storm, as things an operator can turn on.
+     * The offset is from the storm's own block; verified by name against the live
+     * service on 2026-09-23. Called Product rather than Feature so it cannot be
+     * confused with ATAK's own {@code map.layer.feature.Feature}.
+     */
+    public enum Product {
+        /** The five-day cone of uncertainty: one polygon. */
+        CONE(4, "Cone", true),
+        /** The forecast track: one line through the forecast positions. */
+        TRACK(3, "Track", true),
+        /** Forecast positions, each with its day and time, wind, gust and pressure. */
+        POINTS(2, "Forecast positions", true),
+        /** Coastal watches and warnings for this storm. */
+        WATCHES(5, "Watches and warnings", false),
+        /**
+         * Contours of when tropical-storm-force winds most likely arrive, each
+         * carrying its own "Wed 2 pm". This is the "when does it get here" map.
+         */
+        ARRIVAL(16, "Wind arrival times", false);
+
+        public final int offset;
+        /** What the toggle says. No two-letter codes, no layer numbers. */
+        public final String label;
+        /** On the first time a storm is drawn; after that the operator's choice. */
+        public final boolean onByDefault;
+
+        Product(int offset, String label, boolean onByDefault) {
+            this.offset = offset;
+            this.label = label;
+            this.onByDefault = onByDefault;
+        }
+
+        /** This product's layer id for a slot, or -1. */
+        public int layer(String bin) {
+            final int base = baseLayer(bin);
+            return base < 0 ? -1 : base + offset;
+        }
+    }
+
     /** Offsets inside a storm's block. Verified by name against the live service. */
     private static final int OFF_POINTS = 2;
     private static final int OFF_TRACK = 3;

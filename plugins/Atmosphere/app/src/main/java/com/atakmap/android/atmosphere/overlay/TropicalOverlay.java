@@ -1,6 +1,7 @@
 
 package com.atakmap.android.atmosphere.overlay;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
@@ -11,6 +12,9 @@ import com.atakmap.android.drawing.mapItems.DrawingShape;
 import com.atakmap.android.maps.DefaultMapGroup;
 import com.atakmap.android.maps.MapGroup;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.maps.Marker;
+import com.atakmap.android.atmosphere.plugin.R;
+import com.atakmap.coremap.maps.assets.Icon;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 import com.atakmap.map.layer.feature.Feature;
@@ -61,6 +65,10 @@ public final class TropicalOverlay {
     private static final int CONE_FILL = 0x33FFFFFF;
     private static final double CONE_WEIGHT = 2.0;
     private static final double TRACK_WEIGHT = 3.0;
+    /** A watch or warning is a coastline, and red is the only color for it. */
+    private static final int WATCH_STROKE = 0xFFFF2020;
+    /** Arrival contours are a timetable, not a hazard: readable, not alarming. */
+    private static final int ARRIVAL_STROKE = 0xFF90E0FF;
 
     public interface Listener {
         /** What is running. Empty when nothing is. */
@@ -71,6 +79,7 @@ public final class TropicalOverlay {
     }
 
     private final MapView mapView;
+    private final Context pluginContext;
     private final EgressPolicy egress;
 
     private MapGroup group;
@@ -80,6 +89,7 @@ public final class TropicalOverlay {
     private long lastRefresh;
     /** Bumped whenever the layer is cleared, so a late response cannot redraw. */
     private int generation;
+    private final StormIcons icons;
     private final List<Nhc.Storm> active = new ArrayList<>();
     /**
      * What each storm covers on the map, by slot: minLat, minLon, maxLat, maxLon.
@@ -88,9 +98,55 @@ public final class TropicalOverlay {
      */
     private final Map<String, double[]> extents = new HashMap<>();
 
-    public TropicalOverlay(MapView mapView, EgressPolicy egress) {
+    public TropicalOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
         this.mapView = mapView;
+        this.pluginContext = pluginContext;
         this.egress = egress;
+        // ATAK's own storage, not the plugin's: the plugin package's cache dir belongs
+        // to a different uid than the process this runs in, so mkdirs there fails and
+        // every composite lands on ENOENT (XCover, 2026-09-23). Feature Layer keeps its
+        // label composites under tools/ for the same reason.
+        this.icons = new StormIcons(pluginContext,
+                com.atakmap.coremap.filesystem.FileSystemUtils.getItem(
+                        "tools/atmosphere/storm-icons"));
+    }
+
+    /**
+     * Whether a storm is showing one of its products. Keyed by the storm's own id
+     * rather than its slot: a slot is reused by whatever storm is running, so
+     * "EP2" means a different hurricane next week, and a toggle would carry over
+     * to a storm nobody chose it for.
+     */
+    public boolean isEnabled(Nhc.Storm storm, Nhc.Product product) {
+        final SharedPreferences p = MapCompat.prefs();
+        if (p == null || storm == null)
+            return product.onByDefault;
+        return p.getBoolean(key(storm, product), product.onByDefault);
+    }
+
+    public void setEnabled(Nhc.Storm storm, Nhc.Product product, boolean enabled) {
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null && storm != null)
+            p.edit().putBoolean(key(storm, product), enabled).apply();
+        redrawAll();
+    }
+
+    private static String key(Nhc.Storm storm, Nhc.Product product) {
+        return "weather.tropical." + storm.id + "." + product.name();
+    }
+
+    /**
+     * Wipe and redraw every storm. A toggle refetches rather than hiding what is
+     * already there: an advisory is a handful of small files, and a layer that keeps
+     * shapes it is not showing is a layer that drifts from what the operator sees.
+     */
+    private void redrawAll() {
+        if (!on || !started)
+            return;
+        final List<Nhc.Storm> storms = new ArrayList<>(active);
+        clear();
+        for (Nhc.Storm s : storms)
+            draw(s, generation);
     }
 
     public void setListener(Listener l) {
@@ -216,27 +272,227 @@ public final class TropicalOverlay {
 
     private void draw(final Nhc.Storm storm, final int mine) {
         final String name = label(storm);
-        // The cone first: it is the biggest thing and the one people look for.
-        fetchShape(storm, Nhc.coneLayer(storm.bin), mine, name + " cone", CONE_STROKE,
-                CONE_FILL, CONE_WEIGHT, true);
-        fetchShape(storm, Nhc.trackLayer(storm.bin), mine, name + " track",
-                trackColor(storm), 0, TRACK_WEIGHT, false);
+        for (Nhc.Product product : Nhc.Product.values()) {
+            if (!isEnabled(storm, product))
+                continue;
+            final int layer = product.layer(storm.bin);
+            switch (product) {
+                case CONE:
+                    fetchShape(storm, layer, mine, name + " cone", CONE_STROKE,
+                            CONE_FILL, CONE_WEIGHT, true);
+                    break;
+                case TRACK:
+                    // Drawn from the forecast positions rather than the service's own
+                    // track line, so each leg can carry the category it ends at --
+                    // which is how every track map anybody has read is drawn. The
+                    // points layer answers both; POINTS asks for it too and the second
+                    // ask is a few KB.
+                    fetchPoints(storm, Nhc.Product.POINTS.layer(storm.bin), mine,
+                            true, isEnabled(storm, Nhc.Product.POINTS));
+                    break;
+                case POINTS:
+                    if (!isEnabled(storm, Nhc.Product.TRACK))
+                        fetchPoints(storm, layer, mine, false, true);
+                    break;
+                case WATCHES:
+                    fetchShape(storm, layer, mine, name + " watches", WATCH_STROKE,
+                            0, TRACK_WEIGHT, false);
+                    break;
+                case ARRIVAL:
+                    fetchShape(storm, layer, mine, name + " wind arrival",
+                            ARRIVAL_STROKE, 0, CONE_WEIGHT, false);
+                    break;
+            }
+        }
     }
 
-    /** Category color, the way every outlet draws it: hotter is stronger. */
-    private static int trackColor(Nhc.Storm s) {
-        switch (s.category()) {
-            case 5:
-            case 4:
-                return 0xFFFF3030;
-            case 3:
-                return 0xFFFF8000;
-            case 2:
-            case 1:
-                return 0xFFFFD000;
-            default:
-                return 0xFF50C0FF;
+    /**
+     * The forecast positions, each as a marker carrying its day and time.
+     *
+     * <p>This is the part a crew reads off the map: where it is now, and when it is
+     * forecast to be somewhere else. The symbol is NHC's own letter -- D depression,
+     * S storm, H hurricane, M major -- punched through a disc tinted by category, and
+     * the label is always drawn, because these are looked at from hundreds of meters
+     * per pixel and ATAK otherwise holds a marker's name back until 10 m/px.
+     */
+    private void fetchPoints(final Nhc.Storm storm, final int layer, final int mine,
+            final boolean drawTrack, final boolean drawMarkers) {
+        if (layer < 0)
+            return;
+        Http.get(Nhc.queryUrl(layer), egress.userAgent(), null, new Http.Callback() {
+            @Override
+            public void onSuccess(String body) {
+                if (mine != generation || !on || group == null)
+                    return;
+                try {
+                    final JSONArray feats = new JSONObject(body).optJSONArray("features");
+                    if (feats == null)
+                        return;
+                    final List<GeoPoint> path = new ArrayList<>();
+                    final List<Integer> colors = new ArrayList<>();
+                    for (int i = 0; i < feats.length(); i++) {
+                        final JSONObject f = feats.optJSONObject(i);
+                        if (f == null)
+                            continue;
+                        final JSONObject g = f.optJSONObject("geometry");
+                        final JSONObject pr = f.optJSONObject("properties");
+                        if (g == null || pr == null
+                                || !"Point".equals(g.optString("type", "")))
+                            continue;
+                        final JSONArray c = g.optJSONArray("coordinates");
+                        if (c == null || c.length() < 2)
+                            continue;
+                        final GeoPoint p = new GeoPoint(c.optDouble(1), c.optDouble(0));
+                        path.add(p);
+                        colors.add(categoryColor(pr.optInt("ssnum", 0),
+                                pr.optInt("maxwind", -1)));
+                        if (drawMarkers)
+                            addPoint(storm, p, pr);
+                    }
+                    if (drawTrack)
+                        drawLegs(storm, path, colors);
+                } catch (Exception e) {
+                    Log.w(TAG, "forecast points unreadable", e);
+                }
+            }
+
+            @Override
+            public void onFailure(String error) {
+                if (mine == generation && on)
+                    Log.w(TAG, "points layer " + layer + " failed: " + error);
+            }
+        });
+    }
+
+    /**
+     * The track as one short shape per leg, each in the color of the category it
+     * arrives at. The service does publish a single track line, but a line has one
+     * stroke, and a track whose color never changes throws away the thing the map is
+     * for: seeing where it becomes a major hurricane.
+     */
+    private void drawLegs(Nhc.Storm storm, List<GeoPoint> path, List<Integer> colors) {
+        if (group == null || path.size() < 2)
+            return;
+        for (int i = 0; i + 1 < path.size(); i++) {
+            final DrawingShape leg = new DrawingShape(mapView, group,
+                    UUID.randomUUID().toString());
+            leg.setPoints(new GeoPoint[] { path.get(i), path.get(i + 1) });
+            leg.setClosed(false);
+            leg.setStrokeColor(colors.get(i + 1));
+            leg.setStrokeWeight(TRACK_WEIGHT);
+            leg.setTitle(label(storm) + " track");
+            leg.setAltitudeMode(Feature.AltitudeMode.ClampToGround);
+            leg.setMetaBoolean("removable", false);
+            leg.setMetaString("menu", "");
+            group.addItem(leg);
+            grow(storm.bin, new GeoPoint[] { path.get(i), path.get(i + 1) });
         }
+    }
+
+    private void addPoint(Nhc.Storm storm, GeoPoint p, JSONObject pr) {
+        // tau is the forecast hour, so tau 0 is where the storm is right now.
+        final int tau = pr.optInt("tau", -1);
+        final String when = pr.optString("datelbl", "");
+        final Marker m = new Marker(p, UUID.randomUUID().toString());
+        // A plain point. Two types were wrong before this one, both because ATAK
+        // decides a marker's symbol from its CoT type (XCover, 2026-09-23):
+        // "a-h-X-i-g" is an ATOM with a HOSTILE affiliation, so every forecast
+        // position drew as a red 2525 diamond; "b-m-p-s-p-loc" is the sensor point
+        // Cam Depot uses precisely because ATAK ships an icon for it, and that icon
+        // won over ours. "u-d-p" carries neither.
+        m.setType("u-d-p");
+        // Ours alone, and it never becomes traffic on the network.
+        m.setMetaBoolean("nevercot", true);
+        m.setMetaBoolean("addToObjList", false);
+        final String label = tau == 0 ? storm.display()
+                : (when.isEmpty() ? storm.name : when);
+        m.setTitle(label);
+        m.setMetaString("callsign", label);
+        // The label is drawn into the icon, so ATAK must not draw one of its own: its
+        // engine trims marker labels freely and a plugin cannot give them a priority.
+        m.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);
+        m.setMetaString("remarks", remarks(storm, pr));
+        m.setMetaBoolean("removable", false);
+        m.setMetaBoolean("editable", false);
+        // Tinted by THIS position's forecast category, not the storm's current one,
+        // so a track that strengthens or weakens shows it.
+        final Icon icon = icons.labelled(label,
+                categoryColor(pr.optInt("ssnum", 0), pr.optInt("maxwind", -1)),
+                tau == 0 ? 40 : 26);
+        group.addItem(m);
+        // After the add, not before: joining a group is where ATAK settles a marker's
+        // symbol from its type, and an icon set first is the one that loses.
+        if (icon != null)
+            m.setIcon(icon);
+        grow(storm.bin, new GeoPoint[] { p });
+    }
+
+    /** Everything the advisory says about this position, for the marker's detail. */
+    private static String remarks(Nhc.Storm storm, JSONObject pr) {
+        final StringBuilder b = new StringBuilder();
+        line(b, "", pr.optString("tcdvlp", ""));
+        line(b, "Valid ", pr.optString("fldatelbl", ""));
+        final int wind = pr.optInt("maxwind", -1);
+        if (wind > 0)
+            line(b, "Wind ", Math.round(wind * 1.15078) + " mph sustained");
+        final int gust = pr.optInt("gust", -1);
+        if (gust > 0)
+            line(b, "Gusts ", Math.round(gust * 1.15078) + " mph");
+        final int mslp = pr.optInt("mslp", -1);
+        if (mslp > 0)
+            line(b, "Pressure ", mslp + " mb");
+        final int dir = pr.optInt("tcdir", -1);
+        final int spd = pr.optInt("tcspd", -1);
+        if (dir >= 0 && spd >= 0)
+            line(b, "Moving ", dir + " deg at " + Math.round(spd * 1.15078) + " mph");
+        line(b, "Advisory ", pr.optString("advisnum", ""));
+        line(b, "", storm.display());
+        return b.toString();
+    }
+
+    private static void line(StringBuilder b, String prefix, String value) {
+        if (value == null || value.isEmpty() || value.equals("null"))
+            return;
+        if (b.length() > 0)
+            b.append('\n');
+        b.append(prefix).append(value);
+    }
+
+    /**
+     * The Saffir-Simpson track-map palette: the colors NHC's own track maps use, and
+     * with them every outlet and every briefing anybody has seen. Worth taking as
+     * given rather than inventing, because the whole value of it is that a crew
+     * already knows what orange means (operator, 2026-09-23: "if there is any
+     * standard symbology for hurricane strength that we can apply to the segments").
+     *
+     * <p>Depression and storm are below category one and the scale does not number
+     * them, so they are told apart by wind rather than by {@code ssnum}.
+     */
+    private static final int[] SAFFIR_SIMPSON = {
+            0xFF5EBAFF,   // tropical depression, under 39 mph
+            0xFF00FAF4,   // tropical storm, 39-73
+            0xFFFFFFCC,   // category 1, 74-95
+            0xFFFFE775,   // category 2, 96-110
+            0xFFFFC140,   // category 3, 111-129
+            0xFFFF8F20,   // category 4, 130-156
+            0xFFFF6060,   // category 5, 157 and up
+    };
+
+    /** Where a position sits on the scale: 0 depression, 1 storm, 2-6 categories 1-5. */
+    private static int rung(int category, int windKt) {
+        if (category >= 1)
+            return Math.min(6, category + 1);
+        if (windKt >= 34)
+            return 1;
+        return 0;
+    }
+
+    private static int categoryColor(int category, int windKt) {
+        return SAFFIR_SIMPSON[rung(category, windKt)];
+    }
+
+    private static int trackColor(Nhc.Storm s) {
+        return categoryColor(s.category(), s.intensityKt);
     }
 
     private void fetchShape(final Nhc.Storm storm, final int layer, final int mine,

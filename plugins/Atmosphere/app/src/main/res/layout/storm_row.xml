@@ -40,4 +40,15 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
         android:text="@string/go_to" />
+
+    <!-- Each storm folds open to its own maps, the way a layer folds open to its
+         settings: same chevron, same meaning. -->
+    <ImageButton
+        android:id="@+id/storm_expand"
+        style="@style/TakwerxIconButton"
+        android:layout_width="44dp"
+        android:layout_weight="0"
+        android:layout_gravity="center_vertical"
+        android:contentDescription="@string/show_storm_maps"
+        android:src="@drawable/ic_expand" />
 </LinearLayout>

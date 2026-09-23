@@ -123,7 +123,7 @@ public class Atmosphere implements IPlugin {
         radar.start();
         wind = new WindOverlay(mapView, egress);
         wind.start();
-        tropical = new TropicalOverlay(mapView, egress);
+        tropical = new TropicalOverlay(mapView, pluginContext, egress);
         tropical.start();
         if (atmospherePane != null) {
             atmospherePane.setRadar(radar);

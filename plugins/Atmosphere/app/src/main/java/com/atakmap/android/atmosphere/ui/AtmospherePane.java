@@ -137,6 +137,8 @@ public final class AtmospherePane {
     private final LinearLayout tropicalRows;
     private TropicalOverlay tropical;
     private boolean tropicalOpen = true;
+    /** Which storms are showing their own list of maps. By storm id, not by slot. */
+    private final Set<String> stormOpen = new HashSet<>();
     private final LinearLayout radarSettings;
     private final LinearLayout windSettings;
     private final ImageButton radarExpand;
@@ -901,7 +903,59 @@ public final class AtmospherePane {
                 }
             });
             tropicalRows.addView(row);
+
+            // Each storm's own maps, folded under it. Same chevron as a layer's
+            // settings, because it means the same thing (operator, 2026-09-23:
+            // "sub menus for the different maps it has for each one ... to turn on
+            // and off like we have in the feature layer plugin").
+            final LinearLayout products = new LinearLayout(pluginContext);
+            products.setOrientation(LinearLayout.VERTICAL);
+            products.setVisibility(stormOpen.contains(storm.id)
+                    ? View.VISIBLE : View.GONE);
+            for (final Nhc.Product product : Nhc.Product.values())
+                products.addView(productButton(storm, product));
+            tropicalRows.addView(products);
+
+            final ImageButton chevron = (ImageButton) row.findViewById(R.id.storm_expand);
+            chevron.setRotation(stormOpen.contains(storm.id) ? 180f : 0f);
+            chevron.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (stormOpen.contains(storm.id))
+                        stormOpen.remove(storm.id);
+                    else
+                        stormOpen.add(storm.id);
+                    final boolean open = stormOpen.contains(storm.id);
+                    products.setVisibility(open ? View.VISIBLE : View.GONE);
+                    chevron.setRotation(open ? 180f : 0f);
+                }
+            });
         }
+    }
+
+    /** One of a storm's maps: ON green, OFF plain, the way every toggle here reads. */
+    private Button productButton(final Nhc.Storm storm, final Nhc.Product product) {
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.storm_product, tropicalRows, false);
+        paintProduct(b, storm, product);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (tropical == null)
+                    return;
+                final boolean next = !tropical.isEnabled(storm, product);
+                tropical.setEnabled(storm, product, next);
+                paintProduct((Button) v, storm, product);
+            }
+        });
+        return b;
+    }
+
+    private void paintProduct(Button b, Nhc.Storm storm, Nhc.Product product) {
+        final boolean on = tropical != null && tropical.isEnabled(storm, product);
+        b.setText(product.label + (on ? "  ON" : "  OFF"));
+        b.setTextColor(pluginContext.getResources().getColor(
+                on ? R.color.state_on : R.color.state_off));
     }
 
     /** "150 mph, cat 4, 922 mb" -- the numbers a crew would hear on the news. */

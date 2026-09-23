@@ -22,6 +22,7 @@
     <string name="heading_height">Height</string>
     <string name="tropical_none">No storms right now</string>
     <string name="go_to">Go to</string>
+    <string name="show_storm_maps">Show or hide this storm\'s maps</string>
     <string name="credit_tropical">Hurricanes from the National Hurricane Center (%1$s)</string>
     <string name="tropical_on">Hurricanes ON</string>
     <string name="tropical_off">Hurricanes OFF</string>
