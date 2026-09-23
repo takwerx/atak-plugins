@@ -20,6 +20,12 @@
     <string name="heading_sun_moon">Sun and moon</string>
     <string name="heading_layers">Layers</string>
     <string name="heading_height">Height</string>
+    <string name="tropical_none">No storms right now</string>
+    <string name="credit_tropical">Hurricanes from the National Hurricane Center (%1$s)</string>
+    <string name="tropical_on">Hurricanes ON</string>
+    <string name="tropical_off">Hurricanes OFF</string>
+    <string name="tropical_allow_title">Show hurricanes?</string>
+    <string name="tropical_allow_text">Atmosphere will ask the National Hurricane Center which storms are running, and draw their forecast cones and tracks on the map. Your position is not sent. Server: mapservices.weather.noaa.gov</string>
     <string name="show_settings">Show or hide this layer\'s settings</string>
     <string name="credit_wind">Wind forecast from NOAA (%1$s)</string>
     <string name="credit_radar">Radar from the US National Weather Service (%1$s)</string>

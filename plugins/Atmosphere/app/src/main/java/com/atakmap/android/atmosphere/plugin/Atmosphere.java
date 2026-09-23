@@ -14,6 +14,7 @@ import com.atakmap.android.atmosphere.data.SnapshotStore;
 import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
+import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
 import com.atakmap.android.atmosphere.overlay.WindOverlay;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
 import com.atakmap.android.atmosphere.ui.AtmosphereDropDown;
@@ -68,6 +69,7 @@ public class Atmosphere implements IPlugin {
     private EgressPolicy egress;
     /** Outlives the pane: the radar stays up while the pane is closed. */
     private RadarOverlay radar;
+    private TropicalOverlay tropical;
     private WindOverlay wind;
 
     public Atmosphere(IServiceController serviceController) {
@@ -121,9 +123,12 @@ public class Atmosphere implements IPlugin {
         radar.start();
         wind = new WindOverlay(mapView, egress);
         wind.start();
+        tropical = new TropicalOverlay(mapView, egress);
+        tropical.start();
         if (atmospherePane != null) {
             atmospherePane.setRadar(radar);
             atmospherePane.setWind(wind);
+            atmospherePane.setTropical(tropical);
         }
     }
 
@@ -135,6 +140,10 @@ public class Atmosphere implements IPlugin {
             AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
         } catch (RuntimeException e) {
             Log.w(TAG, "show receiver was not registered", e);
+        }
+        if (tropical != null) {
+            tropical.stop();
+            tropical = null;
         }
         if (wind != null) {
             wind.stop();
@@ -174,6 +183,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setRadar(radar);
             if (wind != null)
                 atmospherePane.setWind(wind);
+            if (tropical != null)
+                atmospherePane.setTropical(tropical);
         }
         dropDown.show();
     }

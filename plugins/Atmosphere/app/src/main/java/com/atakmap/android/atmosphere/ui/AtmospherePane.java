@@ -33,6 +33,7 @@ import com.atakmap.android.atmosphere.model.SeriesEntry;
 import com.atakmap.android.atmosphere.model.Snapshot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
+import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
 import com.atakmap.android.atmosphere.overlay.WindScaleView;
 import com.atakmap.android.atmosphere.overlay.WindOverlay;
 import com.atakmap.android.atmosphere.wind.NomadsWind;
@@ -83,6 +84,7 @@ public final class AtmospherePane {
     private static final String PREF_TREND = "weather.trend.kind";
     private static final String PREF_HOURS_TABLE = "weather.hours.table";
     private static final String PREF_RADAR_OPEN = "weather.radar.open";
+    private static final String PREF_TROPICAL_OPEN = "weather.tropical.open";
     private static final String PREF_WIND_OPEN = "weather.wind.open";
 
     private final View root;
@@ -127,6 +129,12 @@ public final class AtmospherePane {
     private final Button radarToggle;
     private final View scrubber;
     private final TextView scrubberLabel;
+    private final LinearLayout tropicalSettings;
+    private final ImageButton tropicalExpand;
+    private final Button tropicalToggle;
+    private final TextView tropicalList;
+    private TropicalOverlay tropical;
+    private boolean tropicalOpen = true;
     private final LinearLayout radarSettings;
     private final LinearLayout windSettings;
     private final ImageButton radarExpand;
@@ -257,6 +265,10 @@ public final class AtmospherePane {
         buildWindLevelRows();
         scrubber = find(R.id.scrubber);
         scrubberLabel = find(R.id.scrubber_label);
+        tropicalSettings = find(R.id.tropical_settings);
+        tropicalExpand = find(R.id.tropical_expand);
+        tropicalToggle = find(R.id.tropical_toggle);
+        tropicalList = find(R.id.tropical_list);
         radarSettings = find(R.id.radar_settings);
         windSettings = find(R.id.wind_settings);
         radarExpand = find(R.id.radar_expand);
@@ -281,6 +293,15 @@ public final class AtmospherePane {
         // Open the first time a layer is used, so its controls are found; after that
         // the operator's own choice stands.
         radarOpen = prefs == null || prefs.getBoolean(PREF_RADAR_OPEN, true);
+        tropicalOpen = prefs == null || prefs.getBoolean(PREF_TROPICAL_OPEN, true);
+        tropicalExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                tropicalOpen = !tropicalOpen;
+                rememberFold(PREF_TROPICAL_OPEN, tropicalOpen);
+                updateLayerControls();
+            }
+        });
         windOpen = prefs == null || prefs.getBoolean(PREF_WIND_OPEN, true);
         radarExpand.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -324,6 +345,10 @@ public final class AtmospherePane {
         // The frame list ages while the pane is closed; a stale one is re-read.
         if (radar != null && radar.isOn())
             radar.refreshFrames(false);
+        // An advisory is six-hourly, so this is cheap and only runs when somebody
+        // has actually opened the pane to look.
+        if (tropical != null && tropical.isOn())
+            tropical.refresh(false);
         updateLayerControls();
     }
 
@@ -532,6 +557,21 @@ public final class AtmospherePane {
     // ---- layers ------------------------------------------------------------------
 
     private void wireLayers() {
+        tropicalToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (tropical == null)
+                    return;
+                if (tropical.isOn()) {
+                    tropical.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(TropicalOverlay.LAYER_ID)) {
+                    turnTropicalOn();
+                } else {
+                    askToAllowTropical();
+                }
+            }
+        });
         windToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -804,6 +844,66 @@ public final class AtmospherePane {
         return c.getTimeInMillis();
     }
 
+    /**
+     * Hurricanes: NHC's live storms, their forecast cone and their track. Unlike radar
+     * and wind this is not a time-enabled layer -- an advisory is a single picture
+     * issued every six hours, so it does not share the strip.
+     */
+    public void setTropical(TropicalOverlay overlay) {
+        tropical = overlay;
+        if (tropical == null)
+            return;
+        tropical.setListener(new TropicalOverlay.Listener() {
+            @Override
+            public void onStorms(List<String> storms) {
+                if (storms.isEmpty()) {
+                    tropicalList.setText(R.string.tropical_none);
+                } else {
+                    final StringBuilder b = new StringBuilder();
+                    for (String s : storms) {
+                        if (b.length() > 0)
+                            b.append('\n');
+                        b.append(s);
+                    }
+                    tropicalList.setText(b.toString());
+                }
+                updateLayerControls();
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!status.isEmpty())
+                    tropicalList.setText(status);
+            }
+        });
+        updateLayerControls();
+    }
+
+    private void turnTropicalOn() {
+        if (tropical != null)
+            tropical.setOn(true);
+        updateLayerControls();
+    }
+
+    private void askToAllowTropical() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.tropical_allow_title))
+                .setMessage(pluginContext.getString(R.string.tropical_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(TropicalOverlay.LAYER_ID, true);
+                                turnTropicalOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     /** The egress gate: the host, by name, once. */
     private void askToAllowRadar() {
         final Context ctx = MapCompat.atakContext();
@@ -875,6 +975,13 @@ public final class AtmospherePane {
         windToggle.setTextColor(pluginContext.getResources().getColor(
                 windOn ? R.color.state_on : R.color.state_off));
         // A layer with nothing on the map has no settings worth a chevron.
+        final boolean tropicalOn = tropical != null && tropical.isOn();
+        tropicalToggle.setText(tropicalOn ? R.string.tropical_on : R.string.tropical_off);
+        tropicalToggle.setTextColor(pluginContext.getResources().getColor(
+                tropicalOn ? R.color.state_on : R.color.state_off));
+        tropicalExpand.setVisibility(tropicalOn ? View.VISIBLE : View.GONE);
+        tropicalExpand.setRotation(tropicalOpen ? 180f : 0f);
+        tropicalSettings.setVisibility(tropicalOn && tropicalOpen ? View.VISIBLE : View.GONE);
         radarExpand.setVisibility(radarOn ? View.VISIBLE : View.GONE);
         windExpand.setVisibility(windOn ? View.VISIBLE : View.GONE);
         radarExpand.setRotation(radarOpen ? 180f : 0f);
@@ -936,6 +1043,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_radar, RadarOverlay.HOST));
+        }
+        if (tropical != null && tropical.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_tropical, TropicalOverlay.HOST));
         }
         layersAttribution.setText(out.toString());
     }

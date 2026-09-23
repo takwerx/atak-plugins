@@ -1,0 +1,49 @@
+{
+  "activeStorms": [
+    {
+      "id": "ep162026",
+      "binNumber": "EP1",
+      "name": "Odalys",
+      "classification": "HU",
+      "intensity": "65",
+      "pressure": "989",
+      "latitude": "15.9N",
+      "longitude": "128.4W",
+      "latitudeNumeric": 15.9,
+      "longitudeNumeric": -128.4,
+      "movementDir": 65,
+      "movementSpeed": 9,
+      "lastUpdate": "2026-09-23T09:00:00.000Z"
+    },
+    {
+      "id": "ep172026",
+      "binNumber": "EP2",
+      "name": "Polo",
+      "classification": "HU",
+      "intensity": "130",
+      "pressure": "922",
+      "latitude": "15.3N",
+      "longitude": "101.4W",
+      "latitudeNumeric": 15.3,
+      "longitudeNumeric": -101.4,
+      "movementDir": 350,
+      "movementSpeed": 2,
+      "lastUpdate": "2026-09-23T12:00:00.000Z"
+    },
+    {
+      "id": "ep152026",
+      "binNumber": "CP2",
+      "name": "Fifteen-E",
+      "classification": "TD",
+      "intensity": "30",
+      "pressure": "1006",
+      "latitude": "14.0N",
+      "longitude": "153.7W",
+      "latitudeNumeric": 14,
+      "longitudeNumeric": -153.7,
+      "movementDir": 290,
+      "movementSpeed": 12,
+      "lastUpdate": "2026-09-23T09:00:00.000Z"
+    }
+  ]
+}
