@@ -130,6 +130,14 @@ public final class AtmospherePane {
     private int whenIndex = -1;
     /** The index that means "right now": hour 0 for wind, the last frame for radar. */
     private int whenLive = -1;
+    /**
+     * True while the strip is following now rather than a time somebody picked. Live,
+     * Today and Tomorrow are one choice of three, so exactly one of them is ever lit
+     * (operator, 2026-09-22: "how can i have live and today both checked with 6pm,
+     * this makes no sense, its live or today or tomorrow"). The hours belong to a day,
+     * so they are only up when a day is the choice.
+     */
+    private boolean liveMode = true;
     /** Start of the day whose hours are laid out, so a repaint need not rebuild. */
     private long whenDay = Long.MIN_VALUE;
     private RadarOverlay radar;
@@ -550,6 +558,9 @@ public final class AtmospherePane {
         whenTimes.addAll(times);
         whenLive = live;
         whenIndex = shown >= 0 && shown < whenTimes.size() ? shown : live;
+        // A rebuilt list is following now again whenever it lands on now: the run
+        // rolled forward, or the layer was just switched on.
+        liveMode = whenIndex == whenLive;
         whenDay = Long.MIN_VALUE;
         buildWhenPicker();
     }
@@ -559,7 +570,8 @@ public final class AtmospherePane {
         if (index < 0 || index >= whenTimes.size())
             return;
         whenIndex = index;
-        if (startOfDay(whenTimes.get(index)) != whenDay)
+        if (liveMode == (scrubberHours.getVisibility() == View.VISIBLE)
+                || startOfDay(whenTimes.get(index)) != whenDay)
             buildWhenPicker();
         else
             paintWhenPicker();
@@ -587,9 +599,10 @@ public final class AtmospherePane {
         scrubberDays.addView(whenButton("Live", null, new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                liveMode = true;
                 pickWhen(whenLive);
             }
-        }, whenIndex == whenLive));
+        }, liveMode));
         final List<Long> days = new ArrayList<>();
         for (Long t : whenTimes) {
             final long d = startOfDay(t);
@@ -603,14 +616,19 @@ public final class AtmospherePane {
                     public void onClick(View v) {
                         // A day is picked by going to its first hour, so green always
                         // means "this is what is on the map" and never "this is open".
+                        liveMode = false;
                         for (int i = 0; i < whenTimes.size(); i++)
                             if (startOfDay(whenTimes.get(i)) == day) {
                                 pickWhen(i);
                                 return;
                             }
                     }
-                }, day == whenDay));
+                }, !liveMode && day == whenDay));
 
+        // Live is not a day, so it has no hours to choose from.
+        scrubberHours.setVisibility(liveMode ? View.GONE : View.VISIBLE);
+        if (liveMode)
+            return;
         LinearLayout row = null;
         int inRow = 0;
         for (int i = 0; i < whenTimes.size(); i++) {
@@ -628,6 +646,7 @@ public final class AtmospherePane {
                     new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
+                            liveMode = false;
                             pickWhen(index);
                         }
                     }, i == whenIndex);
@@ -665,11 +684,11 @@ public final class AtmospherePane {
             final Object tag = v.getTag(R.id.scrubber);
             final boolean on;
             if (tag instanceof Integer)
-                on = (Integer) tag == whenIndex;
+                on = !liveMode && (Integer) tag == whenIndex;
             else if (tag instanceof Long)
-                on = ((Long) tag).longValue() == day;
+                on = !liveMode && ((Long) tag).longValue() == day;
             else
-                on = whenIndex == whenLive;
+                on = liveMode;
             ((Button) v).setTextColor(on
                     ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
         }
