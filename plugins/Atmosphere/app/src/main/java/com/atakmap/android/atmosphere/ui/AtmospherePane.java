@@ -26,6 +26,7 @@ import androidx.viewpager.widget.ViewPager;
 import com.atakmap.android.atmosphere.astro.Astro;
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.Favorites;
+import com.atakmap.android.atmosphere.data.Nhc;
 import com.atakmap.android.atmosphere.data.ParamSelection;
 import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.model.Reading;
@@ -132,7 +133,8 @@ public final class AtmospherePane {
     private final LinearLayout tropicalSettings;
     private final ImageButton tropicalExpand;
     private final Button tropicalToggle;
-    private final TextView tropicalList;
+    private final TextView tropicalStatus;
+    private final LinearLayout tropicalRows;
     private TropicalOverlay tropical;
     private boolean tropicalOpen = true;
     private final LinearLayout radarSettings;
@@ -268,7 +270,8 @@ public final class AtmospherePane {
         tropicalSettings = find(R.id.tropical_settings);
         tropicalExpand = find(R.id.tropical_expand);
         tropicalToggle = find(R.id.tropical_toggle);
-        tropicalList = find(R.id.tropical_list);
+        tropicalStatus = find(R.id.tropical_status);
+        tropicalRows = find(R.id.tropical_rows);
         radarSettings = find(R.id.radar_settings);
         windSettings = find(R.id.wind_settings);
         radarExpand = find(R.id.radar_expand);
@@ -855,28 +858,68 @@ public final class AtmospherePane {
             return;
         tropical.setListener(new TropicalOverlay.Listener() {
             @Override
-            public void onStorms(List<String> storms) {
-                if (storms.isEmpty()) {
-                    tropicalList.setText(R.string.tropical_none);
-                } else {
-                    final StringBuilder b = new StringBuilder();
-                    for (String s : storms) {
-                        if (b.length() > 0)
-                            b.append('\n');
-                        b.append(s);
-                    }
-                    tropicalList.setText(b.toString());
-                }
+            public void onStorms(List<Nhc.Storm> storms) {
+                buildStormRows(storms);
                 updateLayerControls();
             }
 
             @Override
             public void onStatus(String status) {
-                if (!status.isEmpty())
-                    tropicalList.setText(status);
+                if (!status.isEmpty()) {
+                    tropicalStatus.setText(status);
+                    tropicalStatus.setVisibility(View.VISIBLE);
+                }
             }
         });
         updateLayerControls();
+    }
+
+    /**
+     * One row per storm: what it is, how hard, and Go to. The shape is Comms'
+     * site_row and Cam Depot's camera_row, so a crew moving between takwerx plugins
+     * finds the same control (operator, 2026-09-23).
+     */
+    private void buildStormRows(List<Nhc.Storm> storms) {
+        tropicalRows.removeAllViews();
+        if (storms.isEmpty()) {
+            tropicalStatus.setText(R.string.tropical_none);
+            tropicalStatus.setVisibility(View.VISIBLE);
+            return;
+        }
+        // The list is the answer, so the status line gets out of its way.
+        tropicalStatus.setVisibility(View.GONE);
+        for (final Nhc.Storm storm : storms) {
+            final View row = LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.storm_row, tropicalRows, false);
+            ((TextView) row.findViewById(R.id.name)).setText(storm.display());
+            ((TextView) row.findViewById(R.id.detail)).setText(strength(storm));
+            row.findViewById(R.id.goto_btn).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (tropical != null)
+                        tropical.goTo(storm);
+                }
+            });
+            tropicalRows.addView(row);
+        }
+    }
+
+    /** "150 mph, cat 4, 922 mb" -- the numbers a crew would hear on the news. */
+    private String strength(Nhc.Storm storm) {
+        final StringBuilder b = new StringBuilder();
+        if (storm.intensityKt > 0) {
+            // Knots are how the advisory is written and how nobody outside aviation
+            // reads it. This line is not a unit the pane's own switch reaches.
+            b.append(Math.round(storm.intensityKt * 1.15078)).append(" mph");
+            if (storm.category() > 0)
+                b.append(", cat ").append(storm.category());
+        }
+        if (storm.pressureMb > 0) {
+            if (b.length() > 0)
+                b.append(", ");
+            b.append(storm.pressureMb).append(" mb");
+        }
+        return b.toString();
     }
 
     private void turnTropicalOn() {

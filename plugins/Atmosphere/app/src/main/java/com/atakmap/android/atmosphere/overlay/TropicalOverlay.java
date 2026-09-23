@@ -19,7 +19,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -61,8 +63,8 @@ public final class TropicalOverlay {
     private static final double TRACK_WEIGHT = 3.0;
 
     public interface Listener {
-        /** What is running, in words, for the pane. Empty when nothing is. */
-        void onStorms(List<String> storms);
+        /** What is running. Empty when nothing is. */
+        void onStorms(List<Nhc.Storm> storms);
 
         /** A line for the pane while something is happening, or "". */
         void onStatus(String status);
@@ -78,7 +80,13 @@ public final class TropicalOverlay {
     private long lastRefresh;
     /** Bumped whenever the layer is cleared, so a late response cannot redraw. */
     private int generation;
-    private final List<String> names = new ArrayList<>();
+    private final List<Nhc.Storm> active = new ArrayList<>();
+    /**
+     * What each storm covers on the map, by slot: minLat, minLon, maxLat, maxLon.
+     * Grown as its shapes arrive, so "go to" frames the cone rather than dropping the
+     * operator on a point inside it.
+     */
+    private final Map<String, double[]> extents = new HashMap<>();
 
     public TropicalOverlay(MapView mapView, EgressPolicy egress) {
         this.mapView = mapView;
@@ -88,7 +96,7 @@ public final class TropicalOverlay {
     public void setListener(Listener l) {
         listener = l;
         if (l != null) {
-            l.onStorms(new ArrayList<>(names));
+            l.onStorms(new ArrayList<>(active));
             l.onStatus("");
         }
     }
@@ -131,17 +139,17 @@ public final class TropicalOverlay {
             refresh(true);
         } else {
             clear();
-            names.clear();
+            active.clear();
             if (listener != null) {
-                listener.onStorms(new ArrayList<String>());
+                listener.onStorms(new ArrayList<Nhc.Storm>());
                 listener.onStatus("");
             }
         }
     }
 
-    /** The storms being drawn, in words. */
-    public List<String> storms() {
-        return new ArrayList<>(names);
+    /** The storms being drawn. */
+    public List<Nhc.Storm> storms() {
+        return new ArrayList<>(active);
     }
 
     /**
@@ -165,22 +173,21 @@ public final class TropicalOverlay {
                     return;
                 final List<Nhc.Storm> storms = Nhc.parseActive(body);
                 clear();
-                names.clear();
+                active.clear();
                 if (storms.isEmpty()) {
                     // Saying so is the point: an empty map and a broken layer look
                     // identical, and most of the year this is the true answer.
                     status("No storms right now");
                     if (listener != null)
-                        listener.onStorms(new ArrayList<String>());
+                        listener.onStorms(new ArrayList<Nhc.Storm>());
                     return;
                 }
-                for (Nhc.Storm s : storms) {
-                    names.add(label(s));
+                active.addAll(storms);
+                for (Nhc.Storm s : storms)
                     draw(s, generation);
-                }
                 status("");
                 if (listener != null)
-                    listener.onStorms(new ArrayList<>(names));
+                    listener.onStorms(new ArrayList<>(active));
             }
 
             @Override
@@ -193,8 +200,8 @@ public final class TropicalOverlay {
         });
     }
 
-    /** "Hurricane Polo, 150 mph" -- what it is, and how hard, in one line. */
-    private String label(Nhc.Storm s) {
+    /** "Hurricane Polo, 150 mph" -- what it is, and how hard, for a map item's title. */
+    public static String label(Nhc.Storm s) {
         final StringBuilder b = new StringBuilder(s.display());
         if (s.intensityKt > 0) {
             // Knots are how the advisory is written and how nobody outside aviation
@@ -210,9 +217,9 @@ public final class TropicalOverlay {
     private void draw(final Nhc.Storm storm, final int mine) {
         final String name = label(storm);
         // The cone first: it is the biggest thing and the one people look for.
-        fetchShape(Nhc.coneLayer(storm.bin), mine, name + " cone", CONE_STROKE,
+        fetchShape(storm, Nhc.coneLayer(storm.bin), mine, name + " cone", CONE_STROKE,
                 CONE_FILL, CONE_WEIGHT, true);
-        fetchShape(Nhc.trackLayer(storm.bin), mine, name + " track",
+        fetchShape(storm, Nhc.trackLayer(storm.bin), mine, name + " track",
                 trackColor(storm), 0, TRACK_WEIGHT, false);
     }
 
@@ -232,8 +239,9 @@ public final class TropicalOverlay {
         }
     }
 
-    private void fetchShape(final int layer, final int mine, final String title,
-            final int stroke, final int fill, final double weight, final boolean closed) {
+    private void fetchShape(final Nhc.Storm storm, final int layer, final int mine,
+            final String title, final int stroke, final int fill, final double weight,
+            final boolean closed) {
         if (layer < 0)
             return;
         Http.get(Nhc.queryUrl(layer), egress.userAgent(), null, new Http.Callback() {
@@ -265,6 +273,7 @@ public final class TropicalOverlay {
                     shape.setMetaBoolean("removable", false);
                     shape.setMetaString("menu", "");
                     group.addItem(shape);
+                    grow(storm.bin, ring);
                     Log.d(TAG, String.format(Locale.US,
                             "drew %s: %d points, %.2f,%.2f..%.2f,%.2f", shape.getTitle(),
                             ring.length, bound(ring, true, true), bound(ring, false, true),
@@ -357,9 +366,75 @@ public final class TropicalOverlay {
         return v;
     }
 
+    /** Widen what a storm is known to cover, as each of its shapes lands. */
+    private void grow(String bin, GeoPoint[] ring) {
+        double[] e = extents.get(bin);
+        if (e == null) {
+            e = new double[] { Double.MAX_VALUE, Double.MAX_VALUE,
+                    -Double.MAX_VALUE, -Double.MAX_VALUE };
+            extents.put(bin, e);
+        }
+        for (GeoPoint p : ring) {
+            e[0] = Math.min(e[0], p.getLatitude());
+            e[1] = Math.min(e[1], p.getLongitude());
+            e[2] = Math.max(e[2], p.getLatitude());
+            e[3] = Math.max(e[3], p.getLongitude());
+        }
+    }
+
+    /**
+     * Put a storm on screen, cone and all.
+     *
+     * <p>Deliberately unlike the "go to" in Cam Depot and Comms, which will not zoom
+     * the operator back out to reach a site. A five-day cone is a thousand miles
+     * across, so arriving at the storm's own position at a street-level zoom shows a
+     * patch of empty ocean inside the cone. This frames what was drawn.
+     */
+    public void goTo(Nhc.Storm storm) {
+        if (storm == null)
+            return;
+        final double[] e = extents.get(storm.bin);
+        final GeoPoint here = Double.isNaN(storm.latitude) || Double.isNaN(storm.longitude)
+                ? null : new GeoPoint(storm.latitude, storm.longitude);
+        if (e == null || e[0] > e[2]) {
+            // Shapes have not landed yet: the storm's own position is still an answer.
+            if (here != null)
+                pan(here, Double.NaN);
+            return;
+        }
+        final GeoPoint center = new GeoPoint((e[0] + e[2]) / 2, (e[1] + e[3]) / 2);
+        pan(center, fitResolution(e));
+    }
+
+    /** Meters per pixel that fits a box in the map view, with room around it. */
+    private double fitResolution(double[] e) {
+        final int w = Math.max(1, mapView.getWidth());
+        final int h = Math.max(1, mapView.getHeight());
+        final double midLat = Math.toRadians((e[0] + e[2]) / 2);
+        final double tall = (e[2] - e[0]) * 111_320.0;
+        final double wide = (e[3] - e[1]) * 111_320.0 * Math.max(0.1, Math.cos(midLat));
+        // A sixth again, so the cone is not drawn against the edges of the screen.
+        return Math.max(tall / h, wide / w) * 1.15;
+    }
+
+    private void pan(GeoPoint p, double resolution) {
+        try {
+            if (Double.isNaN(resolution)) {
+                mapView.getMapController().panTo(p, true);
+                return;
+            }
+            mapView.getMapController().panZoomTo(p,
+                    mapView.mapResolutionAsMapScale(resolution), true);
+        } catch (LinkageError | RuntimeException ex) {
+            Log.w(TAG, "panZoomTo failed; falling back to a plain pan", ex);
+            mapView.getMapController().panTo(p, true);
+        }
+    }
+
     /** Drop everything drawn and make any response in flight land nowhere. */
     private void clear() {
         generation++;
+        extents.clear();
         if (group != null)
             group.clearItems();
     }
