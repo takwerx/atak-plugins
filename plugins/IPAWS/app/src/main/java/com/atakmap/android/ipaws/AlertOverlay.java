@@ -76,6 +76,48 @@ public class AlertOverlay {
         this.title = title;
     }
 
+    /**
+     * One feature's attributes by id, without its geometry or style; null when absent.
+     *
+     * <p>This exists because {@code feature.getAttributes()} is <b>always null</b> in
+     * {@code featureToMapItem} on a tap: ATAK's hit-test query asks the store for
+     * features with {@code ignoredFeatureProperties = PROPERTY_FEATURE_ATTRIBUTES},
+     * so the feature handed to the callback has none. Reading them there returned
+     * nothing, the alert id never reached the map item, and the radial's Details
+     * button logged "carries no alert id" and did nothing.
+     *
+     * <p>Feature Layer re-fetches for exactly this reason. Knowing the trap is not the
+     * same as avoiding it -- it was written into this plugin's own comments and then
+     * walked into anyway.
+     */
+    private AttributeSet attributesOf(long fid) {
+        final FeatureDataStore2 s = store;
+        if (s == null)
+            return null;
+        com.atakmap.map.layer.feature.FeatureCursor c = null;
+        try {
+            final FeatureDataStore2.FeatureQueryParameters p =
+                    new FeatureDataStore2.FeatureQueryParameters();
+            p.ids = java.util.Collections.singleton(fid);
+            p.ignoredFeatureProperties = FeatureDataStore2.PROPERTY_FEATURE_GEOMETRY
+                    | FeatureDataStore2.PROPERTY_FEATURE_STYLE;
+            p.limit = 1;
+            c = s.queryFeatures(p);
+            if (c.moveToNext())
+                return c.get().getAttributes();
+        } catch (Exception e) {
+            Log.w(TAG, "attributes of feature " + fid + " failed", e);
+        } finally {
+            if (c != null)
+                try {
+                    c.close();
+                } catch (Exception ignored) {
+                    // Nothing useful to do with a cursor that will not close.
+                }
+        }
+        return null;
+    }
+
     public void attach() throws Exception {
         synchronized (lock) {
             store = new FeatureSetDatabase2(storeFile);
@@ -98,7 +140,10 @@ public class AlertOverlay {
                             item.setMetaString("menu", PluginMenuParser.getMenu(
                                     pluginContext, "menu/alert_shape.xml"));
                             String title = feature.getName();
-                            final AttributeSet a = feature.getAttributes();
+                            // Null on a tap: the hit-test query drops attributes.
+                            AttributeSet a = feature.getAttributes();
+                            if (a == null)
+                                a = attributesOf(feature.getId());
                             if (a != null) {
                                 try {
                                     final String t = a.getStringAttribute("headline");
