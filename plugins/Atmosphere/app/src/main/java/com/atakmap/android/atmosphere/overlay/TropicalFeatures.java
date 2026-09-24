@@ -149,8 +149,6 @@ final class TropicalFeatures {
                         @Override
                         protected MapItem featureToMapItem(Feature feature) {
                             final MapItem item = super.featureToMapItem(feature);
-                            Log.d(TAG, "hit-test reached feature " + feature.getId()
-                                    + " " + feature.getName());
                             // A READ-ONLY radial, not no radial. Blanking the menu
                             // removed the radial and with it the only route to the
                             // details pane, so a tap said nothing at all (operator,
@@ -211,9 +209,6 @@ final class TropicalFeatures {
                 Log.d(TAG, "vector stack: " + stack.size() + " layers, ours present="
                         + stack.contains(layer) + ", layer='" + layer.getName()
                         + "' visible=" + layer.isVisible());
-                for (com.atakmap.map.layer.Layer l : stack)
-                    Log.d(TAG, "  stack layer: " + l.getClass().getSimpleName()
-                            + " '" + l.getName() + "'");
             } catch (Exception e) {
                 Log.w(TAG, "could not read the vector stack", e);
             }
@@ -384,13 +379,21 @@ final class TropicalFeatures {
      */
     void addIcon(String setName, String name, GeoPoint p, String iconUri,
             int width, int height, AttributeSet attrs) {
-        // The feature is given NO name. ATAK draws a feature's name as a label of its
-        // own, and the label is already inside this icon, so a named feature drew
-        // every storm twice: the composite's label plus ATAK's, a few pixels apart
-        // (XCover, 2026-09-23). The name it would have had is in the attributes, which
-        // is where the details pane reads from anyway.
-        insert(setName, "", new Point(p.getLongitude(), p.getLatitude()),
-                new IconPointStyle(0xFFFFFFFF, iconUri, width, height, 0, 0, 0f, true),
+        // Named, but with an EMPTY label style beside the icon.
+        //
+        // A named feature draws its name as a label, and the label is already inside
+        // this icon, so naming it drew every storm twice a few pixels apart. Leaving
+        // the name off fixed that and cost something else: ATAK's Select Item chooser
+        // reads the feature's NAME, so every forecast position listed as "[Unnamed]"
+        // while the cone and track listed properly (XCover, 2026-09-23). An empty
+        // LabelPointStyle is what Feature Layer calls withoutLabel(): the engine
+        // draws that instead of the default name, which is to say nothing.
+        insert(setName, name, new Point(p.getLongitude(), p.getLatitude()),
+                new CompositeStyle(new Style[] {
+                        new IconPointStyle(0xFFFFFFFF, iconUri, width, height, 0, 0,
+                                0f, true),
+                        new LabelPointStyle("", 0x00FFFFFF, 0x00000000,
+                                LabelPointStyle.ScrollMode.DEFAULT) }),
                 attrs);
     }
 
