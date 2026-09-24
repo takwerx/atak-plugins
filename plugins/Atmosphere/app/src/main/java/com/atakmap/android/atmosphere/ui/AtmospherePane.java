@@ -34,9 +34,11 @@ import com.atakmap.android.atmosphere.model.SeriesEntry;
 import com.atakmap.android.atmosphere.model.Snapshot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
+import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
 import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
 import com.atakmap.android.atmosphere.overlay.WindScaleView;
 import com.atakmap.android.atmosphere.overlay.WindOverlay;
+import com.atakmap.android.atmosphere.smoke.NomadsSmoke;
 import com.atakmap.android.atmosphere.wind.NomadsWind;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
@@ -87,6 +89,7 @@ public final class AtmospherePane {
     private static final String PREF_RADAR_OPEN = "weather.radar.open";
     private static final String PREF_TROPICAL_OPEN = "weather.tropical.open";
     private static final String PREF_WIND_OPEN = "weather.wind.open";
+    private static final String PREF_SMOKE_OPEN = "weather.smoke.open";
 
     private final View root;
     private final Context pluginContext;
@@ -176,6 +179,15 @@ public final class AtmospherePane {
     private final LinearLayout windLevelRows;
     private WindOverlay wind;
     private int windHours;
+    private final Button smokeToggle;
+    private final ImageButton smokeExpand;
+    private final LinearLayout smokeSettings;
+    private final WindScaleView smokeScale;
+    private final TextView smokeReading;
+    private final LinearLayout smokeHeightRow;
+    private boolean smokeOpen = true;
+    private SmokeOverlay smoke;
+    private int smokeHours;
 
     private final List<WxSourceDef> sources;
 
@@ -283,6 +295,14 @@ public final class AtmospherePane {
         windSettings = find(R.id.wind_settings);
         radarExpand = find(R.id.radar_expand);
         windExpand = find(R.id.wind_expand);
+        smokeToggle = find(R.id.smoke_toggle);
+        smokeExpand = find(R.id.smoke_expand);
+        smokeSettings = find(R.id.smoke_settings);
+        smokeScale = new WindScaleView(pluginContext);
+        ((LinearLayout) find(R.id.smoke_scale_host)).addView(smokeScale);
+        smokeReading = find(R.id.smoke_reading);
+        smokeHeightRow = find(R.id.smoke_height_row);
+        buildSmokeHeightRow();
         scrubberDays = find(R.id.scrubber_days);
         scrubberHours = find(R.id.scrubber_hours);
         wireLayers();
@@ -326,6 +346,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 windOpen = !windOpen;
                 rememberFold(PREF_WIND_OPEN, windOpen);
+                updateLayerControls();
+            }
+        });
+        smokeOpen = prefs == null || prefs.getBoolean(PREF_SMOKE_OPEN, true);
+        smokeExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                smokeOpen = !smokeOpen;
+                rememberFold(PREF_SMOKE_OPEN, smokeOpen);
                 updateLayerControls();
             }
         });
@@ -528,6 +557,48 @@ public final class AtmospherePane {
     }
 
     /**
+     * The smoke overlay, owned by the plugin. A forecast from the same runs as the
+     * wind, so it shares the strip and the wind's way of naming an hour.
+     */
+    public void setSmoke(SmokeOverlay overlay) {
+        smoke = overlay;
+        if (smoke == null)
+            return;
+        smoke.setListener(new SmokeOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+                smokeHours = Math.max(0, labels.size() - 1);
+                if (smoke.isOn())
+                    setWhenTimes(smokeTimes(), shown, 0);
+                updateLayerControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                if (!smoke.isOn())
+                    return;
+                showWhen(index);
+                scrubberLabel.setText(windLabel(index, validTime));
+                // A new hour is a new picture, so the number at the point moves too.
+                updateSmokeReading();
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!smoke.isOn())
+                    return;
+                if (!status.isEmpty())
+                    scrubberLabel.setText(status);
+                else
+                    scrubberLabel.setText(
+                            windLabel(smoke.hourIndex(), smoke.validTime(smoke.hourIndex())));
+                updateSmokeReading();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /**
      * When the wind on screen is for, led by how far that is from now, which is what
      * somebody scrubbing the bar is actually asking. "+0 h" is a modeller's way of
      * counting and the model's name is not something a crew can act on.
@@ -597,6 +668,21 @@ public final class AtmospherePane {
                 }
             }
         });
+        smokeToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (smoke == null)
+                    return;
+                if (smoke.isOn()) {
+                    smoke.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SmokeOverlay.LAYER_ID)) {
+                    turnSmokeOn();
+                } else {
+                    askToAllowSmoke();
+                }
+            }
+        });
         radarToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -622,6 +708,15 @@ public final class AtmospherePane {
         if (wind != null)
             for (int i = 0; i <= windHours; i++)
                 out.add(wind.validTime(i));
+        return out;
+    }
+
+    /** The smoke's forecast hours as wall-clock times, index for index. */
+    private List<Long> smokeTimes() {
+        final List<Long> out = new ArrayList<>();
+        if (smoke != null)
+            for (int i = 0; i <= smokeHours; i++)
+                out.add(smoke.validTime(i));
         return out;
     }
 
@@ -815,6 +910,9 @@ public final class AtmospherePane {
         // take (XCover, 2026-09-22).
         if (wind != null && wind.isOn()) {
             wind.setHourIndex(index);
+            scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
+        } else if (smoke != null && smoke.isOn()) {
+            smoke.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
         } else if (radar != null && radar.isOn()) {
             radar.setFrameIndex(index);
@@ -1054,6 +1152,8 @@ public final class AtmospherePane {
     private void turnRadarOn() {
         if (wind != null && wind.isOn())
             wind.setOn(false);
+        if (smoke != null && smoke.isOn())
+            smoke.setOn(false);
         if (radar != null) {
             radar.setOn(true);
             setWhenTimes(radarTimes(), radar.frameIndex(),
@@ -1065,11 +1165,45 @@ public final class AtmospherePane {
     private void turnWindOn() {
         if (radar != null && radar.isOn())
             radar.setOn(false);
+        if (smoke != null && smoke.isOn())
+            smoke.setOn(false);
         if (wind != null) {
             wind.setOn(true);
             setWhenTimes(windTimes(), wind.hourIndex(), 0);
         }
         updateLayerControls();
+    }
+
+    /** One time-enabled layer at a time, because they share the one strip. */
+    private void turnSmokeOn() {
+        if (radar != null && radar.isOn())
+            radar.setOn(false);
+        if (wind != null && wind.isOn())
+            wind.setOn(false);
+        if (smoke != null) {
+            smoke.setOn(true);
+            setWhenTimes(smokeTimes(), smoke.hourIndex(), 0);
+        }
+        updateLayerControls();
+    }
+
+    private void askToAllowSmoke() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.smoke_allow_title))
+                .setMessage(pluginContext.getString(R.string.smoke_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SmokeOverlay.LAYER_ID, true);
+                                turnSmokeOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
     }
 
     private void askToAllowWind() {
@@ -1100,6 +1234,18 @@ public final class AtmospherePane {
         windToggle.setText(windOn ? R.string.wind_on : R.string.wind_off);
         windToggle.setTextColor(pluginContext.getResources().getColor(
                 windOn ? R.color.state_on : R.color.state_off));
+        final boolean smokeOn = smoke != null && smoke.isOn();
+        smokeToggle.setText(smokeOn ? R.string.smoke_on : R.string.smoke_off);
+        smokeToggle.setTextColor(pluginContext.getResources().getColor(
+                smokeOn ? R.color.state_on : R.color.state_off));
+        smokeExpand.setVisibility(smokeOn ? View.VISIBLE : View.GONE);
+        smokeExpand.setRotation(smokeOpen ? 180f : 0f);
+        smokeSettings.setVisibility(smokeOn && smokeOpen ? View.VISIBLE : View.GONE);
+        if (smokeOn) {
+            updateSmokeScale();
+            updateSmokeHeightRow();
+            updateSmokeReading();
+        }
         // A layer with nothing on the map has no settings worth a chevron.
         final boolean tropicalOn = tropical != null && tropical.isOn();
         tropicalToggle.setText(tropicalOn ? R.string.tropical_on : R.string.tropical_off);
@@ -1127,9 +1273,11 @@ public final class AtmospherePane {
         }
         if (windOn)
             hostScrubberIn(windSettings);
+        else if (smokeOn)
+            hostScrubberIn(smokeSettings);
         else if (radarOn)
             hostScrubberIn(radarSettings);
-        scrubber.setVisibility(radarOn || windOn ? View.VISIBLE : View.GONE);
+        scrubber.setVisibility(radarOn || windOn || smokeOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
     }
 
@@ -1166,6 +1314,11 @@ public final class AtmospherePane {
         final StringBuilder out = new StringBuilder();
         if (windOn)
             out.append(pluginContext.getString(R.string.credit_wind, NomadsWind.HOST));
+        if (smoke != null && smoke.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_smoke, SmokeOverlay.HOST));
+        }
         if (radarOn) {
             if (out.length() > 0)
                 out.append('\n');
@@ -1358,6 +1511,97 @@ public final class AtmospherePane {
                 }
             }
         }
+    }
+
+    /**
+     * The two heights the model carries smoke at, as two presets side by side: the
+     * ground, which is what a crew breathes, and the whole sky, which is what they see
+     * and what the sun and the aircraft come through.
+     */
+    private void buildSmokeHeightRow() {
+        for (final NomadsSmoke.Height h : NomadsSmoke.Height.values()) {
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, smokeHeightRow, false);
+            b.setText(h == NomadsSmoke.Height.GROUND ? R.string.smoke_ground : R.string.smoke_sky);
+            b.setTextSize(13);
+            b.setTag(h);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (smoke == null)
+                        return;
+                    smoke.setHeight(h);
+                    updateSmokeHeightRow();
+                    updateSmokeScale();
+                    updateSmokeReading();
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = dp(4);
+            b.setLayoutParams(lp);
+            smokeHeightRow.addView(b);
+        }
+    }
+
+    private void updateSmokeHeightRow() {
+        final NomadsSmoke.Height picked = smoke == null ? null : smoke.height();
+        for (int i = 0; i < smokeHeightRow.getChildCount(); i++) {
+            final View cell = smokeHeightRow.getChildAt(i);
+            if (cell instanceof Button)
+                ((Button) cell).setTextColor(cell.getTag() == picked
+                        ? pluginContext.getResources().getColor(R.color.state_on)
+                        : Color.WHITE);
+        }
+    }
+
+    /**
+     * The legend for the height on the map: the air quality bands with their numbers
+     * near the ground, light to dense for the sky, which has no scale a crew reads
+     * in numbers.
+     */
+    private void updateSmokeScale() {
+        final NomadsSmoke.Height h = smoke == null ? NomadsSmoke.Height.GROUND : smoke.height();
+        smokeScale.setBands(h.legendColors(), h.legendBreaks(), h.unit);
+        if (h == NomadsSmoke.Height.GROUND)
+            smokeScale.setEnds(null, null);
+        else
+            smokeScale.setEnds(pluginContext.getString(R.string.smoke_light),
+                    pluginContext.getString(R.string.smoke_dense));
+    }
+
+    /**
+     * The smoke at the pane's own point, read out of the picture already on the map.
+     * Near the ground it is a number and what the number means for breathing; for
+     * the sky it is words only.
+     */
+    private void updateSmokeReading() {
+        if (smoke == null || !smoke.isOn()) {
+            smokeReading.setText(R.string.empty);
+            return;
+        }
+        final GeoPoint p = point();
+        final NomadsSmoke.Height h = smoke.height();
+        final float v = p == null ? Float.NaN
+                : smoke.readingAt(p.getLatitude(), p.getLongitude());
+        String line;
+        if (p == null)
+            line = "";
+        else if (Float.isNaN(v))
+            // Silence would read as clean air. Say which it is.
+            line = pluginContext.getString(R.string.wind_here_unknown);
+        else if (h == NomadsSmoke.Height.GROUND && h.band(v) >= 0)
+            line = pluginContext.getString(R.string.smoke_here_amount,
+                    v >= 10 ? String.valueOf(Math.round(v))
+                            : String.format(Locale.US, "%.1f", v),
+                    h.unit, h.words(v));
+        else
+            line = pluginContext.getString(R.string.smoke_here, h.words(v));
+        if (smoke.isCropped())
+            line = line.isEmpty() ? pluginContext.getString(R.string.smoke_cropped)
+                    : line + "\n" + pluginContext.getString(R.string.smoke_cropped);
+        smokeReading.setText(line);
     }
 
     /**

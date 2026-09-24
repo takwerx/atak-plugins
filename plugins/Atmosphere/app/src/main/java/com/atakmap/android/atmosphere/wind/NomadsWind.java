@@ -271,6 +271,20 @@ public final class NomadsWind {
     /** The filter request for U and V at a height over a box at a forecast hour. */
     public static String url(Model model, Level level, long runUtc, int forecastHour,
             double west, double south, double east, double north) {
+        return filterUrl(model, "var_UGRD=on&var_VGRD=on&" + level.param + "=on", runUtc,
+                forecastHour, west, south, east, north);
+    }
+
+    /**
+     * A filter request for any fields a model's file carries, over a box at a forecast
+     * hour of a run. The smoke rides the same files, runs and hours as the wind, so it
+     * asks through here rather than keeping a second copy of where NOMADS files things.
+     *
+     * @param fields the filter's own variable and level switches, joined by {@code &},
+     *               e.g. {@code var_MASSDEN=on&lev_8_m_above_ground=on}
+     */
+    public static String filterUrl(Model model, String fields, long runUtc, int forecastHour,
+            double west, double south, double east, double north) {
         final Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         c.setTimeInMillis(runUtc);
         final String day = String.format(Locale.US, "%04d%02d%02d", c.get(Calendar.YEAR),
@@ -279,7 +293,7 @@ public final class NomadsWind {
         return FILTER + model.script
                 + "?dir=" + model.dir(day, hh)
                 + "&file=" + model.file(hh, forecastHour)
-                + "&var_UGRD=on&var_VGRD=on&" + level.param + "=on&subregion="
+                + "&" + fields + "&subregion="
                 + String.format(Locale.US, "&toplat=%.3f&leftlon=%.3f&rightlon=%.3f&bottomlat=%.3f",
                         north, west, east, south);
     }
