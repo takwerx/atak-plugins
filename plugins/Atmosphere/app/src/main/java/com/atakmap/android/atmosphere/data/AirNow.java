@@ -88,46 +88,17 @@ public final class AirNow {
         public final Category category;
         /** The GeoJSON geometry as it came, for the map. */
         public final JSONObject geometry;
-        /** polygons[p][r] = lon, lat, lon, lat...; ring 0 of each polygon is the outside. */
-        final double[][][] polygons;
-        final double minLon, minLat, maxLon, maxLat;
+        final GeoRings.Area area;
 
-        Contour(Category category, JSONObject geometry, double[][][] polygons) {
+        Contour(Category category, JSONObject geometry, GeoRings.Area area) {
             this.category = category;
             this.geometry = geometry;
-            this.polygons = polygons;
-            double w = 180, s = 90, e = -180, n = -90;
-            for (double[][] poly : polygons) {
-                if (poly.length == 0)
-                    continue;
-                final double[] outer = poly[0];
-                for (int i = 0; i + 1 < outer.length; i += 2) {
-                    w = Math.min(w, outer[i]);
-                    e = Math.max(e, outer[i]);
-                    s = Math.min(s, outer[i + 1]);
-                    n = Math.max(n, outer[i + 1]);
-                }
-            }
-            minLon = w;
-            minLat = s;
-            maxLon = e;
-            maxLat = n;
+            this.area = area;
         }
 
         /** Inside an outer ring and outside all of that polygon's holes. */
         public boolean contains(double lat, double lon) {
-            if (lon < minLon || lon > maxLon || lat < minLat || lat > maxLat)
-                return false;
-            for (double[][] poly : polygons) {
-                if (poly.length == 0 || !inRing(poly[0], lon, lat))
-                    continue;
-                boolean inHole = false;
-                for (int r = 1; r < poly.length && !inHole; r++)
-                    inHole = inRing(poly[r], lon, lat);
-                if (!inHole)
-                    return true;
-            }
-            return false;
+            return area.contains(lat, lon);
         }
     }
 
@@ -213,11 +184,16 @@ public final class AirNow {
             final Category cat = Category.of(props.optInt("gridcode", 0));
             if (cat == null)
                 continue;
-            final double[][][] polys = polygons(geom);
-            if (polys == null)
+            // Polygons only: a contour band is an area, and anything else from this
+            // service is not a band.
+            final String type = geom.optString("type", "");
+            if (!"Polygon".equals(type) && !"MultiPolygon".equals(type))
+                continue;
+            final GeoRings.Area area = GeoRings.of(geom);
+            if (area == null)
                 continue;
             stamp = Math.max(stamp, props.optLong("Unixtime", 0));
-            out.add(new Contour(cat, geom, polys));
+            out.add(new Contour(cat, geom, area));
         }
         final JSONObject meta = root.optJSONObject("properties");
         final boolean truncated = root.optBoolean("exceededTransferLimit", false)
@@ -252,54 +228,5 @@ public final class AirNow {
                 utc.get(Calendar.MINUTE), utc.get(Calendar.SECOND));
         final long t = eastern.getTimeInMillis();
         return t > nowMillis + 30 * 60_000L ? raw : t;
-    }
-
-    /** Polygon or MultiPolygon as rings of flat lon/lat pairs, or null. */
-    private static double[][][] polygons(JSONObject g) {
-        final String type = g.optString("type", "");
-        final JSONArray c = g.optJSONArray("coordinates");
-        if (c == null)
-            return null;
-        try {
-            if ("Polygon".equals(type))
-                return new double[][][] { rings(c) };
-            if ("MultiPolygon".equals(type)) {
-                final double[][][] out = new double[c.length()][][];
-                for (int i = 0; i < c.length(); i++)
-                    out[i] = rings(c.getJSONArray(i));
-                return out;
-            }
-        } catch (Exception e) {
-            return null;
-        }
-        return null;
-    }
-
-    private static double[][] rings(JSONArray rings) throws Exception {
-        final double[][] out = new double[rings.length()][];
-        for (int r = 0; r < rings.length(); r++) {
-            final JSONArray ring = rings.getJSONArray(r);
-            final double[] flat = new double[ring.length() * 2];
-            for (int i = 0; i < ring.length(); i++) {
-                final JSONArray p = ring.getJSONArray(i);
-                flat[2 * i] = p.getDouble(0);
-                flat[2 * i + 1] = p.getDouble(1);
-            }
-            out[r] = flat;
-        }
-        return out;
-    }
-
-    /** Even-odd crossing test on a flat lon/lat ring. */
-    private static boolean inRing(double[] ring, double lon, double lat) {
-        boolean in = false;
-        final int n = ring.length / 2;
-        for (int i = 0, j = n - 1; i < n; j = i++) {
-            final double xi = ring[2 * i], yi = ring[2 * i + 1];
-            final double xj = ring[2 * j], yj = ring[2 * j + 1];
-            if ((yi > lat) != (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)
-                in = !in;
-        }
-        return in;
     }
 }

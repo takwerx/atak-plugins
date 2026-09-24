@@ -62,6 +62,16 @@
     <string name="credit_air">Air quality from the U.S. EPA\'s AirNow (%1$s)</string>
     <string name="air_allow_title">Allow air quality</string>
     <string name="air_allow_text">Air quality comes from the U.S. Environmental Protection Agency\'s AirNow: the latest hour of ozone and fine particles, measured at monitors and drawn in the six Air Quality Index colors.\n\nTurning it on lets Atmosphere ask EPA for the map of the whole country. Your position is not sent.\n\nServer: services.arcgis.com</string>
+    <string name="warn_on">Warnings ON</string>
+    <string name="warn_off">Warnings OFF</string>
+    <string name="heading_show">Show</string>
+    <string name="warn_fire">Fire weather</string>
+    <string name="warn_land">Land</string>
+    <string name="warn_marine">Marine</string>
+    <string name="warn_here_none">Here: no warnings in effect</string>
+    <string name="credit_warnings">Warnings from the US National Weather Service (%1$s)</string>
+    <string name="warn_allow_title">Allow warnings</string>
+    <string name="warn_allow_text">Warnings come from the US National Weather Service: Red Flag Warnings, Fire Weather Watches and every other warning and watch in effect, drawn in the Weather Service\'s own colors.\n\nTurning it on lets Atmosphere download the country\'s active warnings and the shapes of the areas they cover. Your position is not sent.\n\nServer: api.weather.gov</string>
     <string name="heading_spot">Spot forecasts</string>
     <string name="heading_spot_forecast">Forecast</string>
     <string name="page_spot">Spot forecasts</string>

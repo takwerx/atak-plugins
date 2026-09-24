@@ -336,6 +336,77 @@
                     android:text="" />
             </LinearLayout>
 
+            <!-- Warnings: NWS warnings and watches, Red Flag first among them. Not
+                 time-enabled; on beside anything. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/warn_toggle"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/warn_off" />
+
+                <ImageButton
+                    android:id="@+id/warn_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/warn_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- What is in effect at the pane's own point: the answer to "am I in
+                     a Red Flag Warning", which the map only shows. -->
+                <TextView
+                    android:id="@+id/warn_here"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:text="" />
+
+                <TextView
+                    android:id="@+id/warn_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/heading_show"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <!-- Fire weather, land, marine: three switches, green when shown. -->
+                <LinearLayout
+                    android:id="@+id/warn_groups"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:orientation="horizontal" />
+            </LinearLayout>
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

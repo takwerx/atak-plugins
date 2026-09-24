@@ -102,6 +102,10 @@ public final class AirQualityOverlay {
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
             setOn(true);
+        // The store outlives a session: a killed ATAK leaves last session's contours
+        // in it, and with the layer off they would still draw.
+        if (!on)
+            features.clear();
     }
 
     public void stop() {

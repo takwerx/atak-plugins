@@ -35,6 +35,8 @@ import com.atakmap.android.atmosphere.model.Snapshot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.data.AirNow;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
+import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
+import com.atakmap.android.atmosphere.data.NwsAlerts;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
 import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
@@ -93,6 +95,7 @@ public final class AtmospherePane {
     private static final String PREF_WIND_OPEN = "weather.wind.open";
     private static final String PREF_SMOKE_OPEN = "weather.smoke.open";
     private static final String PREF_AIR_OPEN = "weather.air.open";
+    private static final String PREF_WARN_OPEN = "weather.warn.open";
 
     private final View root;
     private final Context pluginContext;
@@ -201,6 +204,14 @@ public final class AtmospherePane {
     private final TextView airReading;
     private boolean airOpen = true;
     private AirQualityOverlay air;
+    private final Button warnToggle;
+    private final ImageButton warnExpand;
+    private final LinearLayout warnSettings;
+    private final TextView warnHere;
+    private final TextView warnStatus;
+    private final LinearLayout warnGroups;
+    private boolean warnOpen = true;
+    private WarningsOverlay warnings;
 
     private final List<WxSourceDef> sources;
 
@@ -336,6 +347,13 @@ public final class AtmospherePane {
         airScale = find(R.id.air_scale);
         airReading = find(R.id.air_reading);
         buildAirScale();
+        warnToggle = find(R.id.warn_toggle);
+        warnExpand = find(R.id.warn_expand);
+        warnSettings = find(R.id.warn_settings);
+        warnHere = find(R.id.warn_here);
+        warnStatus = find(R.id.warn_status);
+        warnGroups = find(R.id.warn_groups);
+        buildWarnGroups();
         scrubberDays = find(R.id.scrubber_days);
         scrubberHours = find(R.id.scrubber_hours);
         wireLayers();
@@ -384,6 +402,15 @@ public final class AtmospherePane {
         });
         smokeOpen = prefs == null || prefs.getBoolean(PREF_SMOKE_OPEN, true);
         airOpen = prefs == null || prefs.getBoolean(PREF_AIR_OPEN, true);
+        warnOpen = prefs == null || prefs.getBoolean(PREF_WARN_OPEN, true);
+        warnExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                warnOpen = !warnOpen;
+                rememberFold(PREF_WARN_OPEN, warnOpen);
+                updateLayerControls();
+            }
+        });
         airExpand.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -432,6 +459,8 @@ public final class AtmospherePane {
             tropical.refresh(false);
         if (air != null && air.isOn())
             air.refresh(false);
+        if (warnings != null && warnings.isOn())
+            warnings.refresh(false);
         if (pages[pager.getCurrentItem()] == spotPage.view())
             spotPage.onShown();
         updateLayerControls();
@@ -646,6 +675,26 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** Warnings, owned by the plugin. Not time-enabled; its lines follow the pane's point. */
+    public void setWarnings(WarningsOverlay overlay) {
+        warnings = overlay;
+        if (warnings == null)
+            return;
+        warnings.setListener(new WarningsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                warnStatus.setText(status);
+                warnStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+
+            @Override
+            public void onAlerts() {
+                updateWarnHere();
+            }
+        });
+        updateLayerControls();
+    }
+
     /**
      * Air quality, owned by the plugin. The latest hour only, so no strip: its line
      * says which hour is on the map, and its reading follows the pane's point.
@@ -736,6 +785,22 @@ public final class AtmospherePane {
                     turnWindOn();
                 } else {
                     askToAllowWind();
+                }
+            }
+        });
+        warnToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (warnings == null)
+                    return;
+                if (warnings.isOn()) {
+                    warnings.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(WarningsOverlay.LAYER_ID)) {
+                    warnings.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowWarnings();
                 }
             }
         });
@@ -1153,6 +1218,83 @@ public final class AtmospherePane {
         }
     }
 
+    /**
+     * Fire weather, land, marine: one switch each, green when shown. Categories first,
+     * the IPAWS lesson -- "if i dont care about marine i dont want marine".
+     */
+    private void buildWarnGroups() {
+        final NwsAlerts.Group[] order = { NwsAlerts.Group.FIRE, NwsAlerts.Group.LAND,
+                NwsAlerts.Group.MARINE };
+        final int[] labels = { R.string.warn_fire, R.string.warn_land, R.string.warn_marine };
+        for (int i = 0; i < order.length; i++) {
+            final NwsAlerts.Group g = order[i];
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, warnGroups, false);
+            b.setText(labels[i]);
+            b.setTextSize(13);
+            b.setTag(g);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (warnings == null)
+                        return;
+                    warnings.setShowing(g, !warnings.isShowing(g));
+                    updateWarnGroups();
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = dp(4);
+            b.setLayoutParams(lp);
+            warnGroups.addView(b);
+        }
+    }
+
+    private void updateWarnGroups() {
+        for (int i = 0; i < warnGroups.getChildCount(); i++) {
+            final View v = warnGroups.getChildAt(i);
+            if (v instanceof Button && v.getTag() instanceof NwsAlerts.Group)
+                ((Button) v).setTextColor(warnings != null
+                        && warnings.isShowing((NwsAlerts.Group) v.getTag())
+                        ? pluginContext.getResources().getColor(R.color.state_on)
+                        : Color.WHITE);
+        }
+    }
+
+    /**
+     * What is in effect at the pane's point, most urgent first: "Here: Red Flag Warning
+     * until Thu 8 pm". One line per warning, three at most; the map has the rest.
+     */
+    private void updateWarnHere() {
+        if (warnings == null || !warnings.isOn()) {
+            warnHere.setText(R.string.empty);
+            return;
+        }
+        final GeoPoint p = point();
+        if (p == null) {
+            warnHere.setText(R.string.empty);
+            return;
+        }
+        final List<NwsAlerts.Alert> here = warnings.inEffectAt(p.getLatitude(), p.getLongitude());
+        if (here.isEmpty()) {
+            warnHere.setText(R.string.warn_here_none);
+            return;
+        }
+        final StringBuilder b = new StringBuilder("Here: ");
+        for (int i = 0; i < here.size() && i < 3; i++) {
+            if (i > 0)
+                b.append('\n').append("      ");
+            final NwsAlerts.Alert a = here.get(i);
+            b.append(a.event);
+            if (a.until() > 0)
+                b.append(" until ").append(WarningsOverlay.clock(a.until()));
+        }
+        if (here.size() > 3)
+            b.append("\n      and ").append(here.size() - 3).append(" more");
+        warnHere.setText(b.toString());
+    }
+
     /** The category at the pane's point, from the contours already on the map. */
     private void updateAirReading() {
         if (air == null || !air.isOn()) {
@@ -1316,6 +1458,27 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    private void askToAllowWarnings() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.warn_allow_title))
+                .setMessage(pluginContext.getString(R.string.warn_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(WarningsOverlay.LAYER_ID, true);
+                                if (warnings != null)
+                                    warnings.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowAir() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -1405,6 +1568,17 @@ public final class AtmospherePane {
         airSettings.setVisibility(airOn && airOpen ? View.VISIBLE : View.GONE);
         if (airOn)
             updateAirReading();
+        final boolean warnOn = warnings != null && warnings.isOn();
+        warnToggle.setText(warnOn ? R.string.warn_on : R.string.warn_off);
+        warnToggle.setTextColor(pluginContext.getResources().getColor(
+                warnOn ? R.color.state_on : R.color.state_off));
+        warnExpand.setVisibility(warnOn ? View.VISIBLE : View.GONE);
+        warnExpand.setRotation(warnOpen ? 180f : 0f);
+        warnSettings.setVisibility(warnOn && warnOpen ? View.VISIBLE : View.GONE);
+        if (warnOn) {
+            updateWarnGroups();
+            updateWarnHere();
+        }
         // A layer with nothing on the map has no settings worth a chevron.
         final boolean tropicalOn = tropical != null && tropical.isOn();
         tropicalToggle.setText(tropicalOn ? R.string.tropical_on : R.string.tropical_off);
@@ -1487,6 +1661,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_air, AirQualityOverlay.HOST));
+        }
+        if (warnings != null && warnings.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_warnings, WarningsOverlay.HOST));
         }
         if (tropical != null && tropical.isOn()) {
             if (out.length() > 0)

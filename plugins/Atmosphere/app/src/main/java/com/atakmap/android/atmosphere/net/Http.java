@@ -65,6 +65,65 @@ public final class Http {
         void onFailure(String error);
     }
 
+    /**
+     * A failure that carries the server's answer. A 404 from api.weather.gov for a
+     * zone is a durable "no such zone" worth remembering; a timeout is a zone we could
+     * not reach today and must not be remembered, and only the status tells them apart.
+     */
+    public static final class StatusException extends IOException {
+        public final int status;
+
+        StatusException(int status, String message) {
+            super(message);
+            this.status = status;
+        }
+    }
+
+    public interface StatusCallback {
+        void onSuccess(byte[] body);
+
+        /** @param status the HTTP status, or 0 when there was no answer at all */
+        void onFailure(int status, String error);
+    }
+
+    /** A binary GET that says which status failed it, delivered on main. */
+    public static void getBytes(final String url, final String userAgent,
+            final StatusCallback callback) {
+        EXECUTOR.execute(new Runnable() {
+            @Override
+            public void run() {
+                byte[] body = null;
+                String error = null;
+                int status = 0;
+                try {
+                    body = requestBytes(url, userAgent, null);
+                } catch (StatusException e) {
+                    status = e.status;
+                    error = e.getMessage();
+                } catch (IOException e) {
+                    error = describe(e);
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "GET failed hard: " + safeUrl(url), e);
+                    error = "request failed";
+                }
+                final byte[] b = body;
+                final String err = error;
+                final int st = status;
+                MAIN.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (callback == null)
+                            return;
+                        if (err == null)
+                            callback.onSuccess(b);
+                        else
+                            callback.onFailure(st, err);
+                    }
+                });
+            }
+        });
+    }
+
     /** A binary GET, delivered on main. */
     public static void getBytes(final String url, final String userAgent,
             final BytesCallback callback) {
@@ -192,9 +251,9 @@ public final class Http {
             if (status == HttpURLConnection.HTTP_NO_CONTENT)
                 return new byte[0];
             if (status == HttpURLConnection.HTTP_NOT_FOUND)
-                throw new IOException("no data for this point (HTTP 404)");
+                throw new StatusException(status, "no data for this point (HTTP 404)");
             if (status != HttpURLConnection.HTTP_OK)
-                throw new IOException("provider returned HTTP " + status);
+                throw new StatusException(status, "provider returned HTTP " + status);
 
             in = conn.getInputStream();
             // Identity is asked for above, so a server only compresses when a caller

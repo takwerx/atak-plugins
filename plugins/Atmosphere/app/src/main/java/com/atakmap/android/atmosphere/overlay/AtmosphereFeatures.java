@@ -99,7 +99,32 @@ final class AtmosphereFeatures {
     private FeatureSetDatabase2 store;
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
-    private final Map<String, Long> sets = new HashMap<>();
+    private final Map<String, Long> sets = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Held by a rewrite on the worker and by detach, so a store is never closed mid-write. */
+    private final Object lock = new Object();
+
+    /** One thing to draw in a {@link #rewrite}: a shape, its set, its style, its fields. */
+    static final class Drawn {
+        final String setName, name;
+        final com.atakmap.map.layer.feature.geometry.Geometry geometry;
+        final Style style;
+        final AttributeSet attrs;
+
+        Drawn(String setName, String name, com.atakmap.map.layer.feature.geometry.Geometry geometry,
+                Style style, AttributeSet attrs) {
+            this.setName = setName;
+            this.name = name;
+            this.geometry = geometry;
+            this.style = style;
+            this.attrs = attrs;
+        }
+    }
+
+    /** An area's style: a faint fill under a full-color edge. */
+    static Style area(int stroke, float weight, int fill) {
+        return new CompositeStyle(new Style[] {
+                new BasicFillStyle(fill), new BasicStrokeStyle(stroke, weight) });
+    }
 
     AtmosphereFeatures(MapView mapView, Context pluginContext, String logTag, String layerName,
             String storeName, String type, boolean sweepOldStormDrawings) {
@@ -306,6 +331,12 @@ final class AtmosphereFeatures {
     }
 
     void detach() {
+        synchronized (lock) {
+            detachLocked();
+        }
+    }
+
+    private void detachLocked() {
         try {
             if (overlay != null)
                 mapView.getMapOverlayManager().removeOverlay(overlay);
@@ -320,6 +351,55 @@ final class AtmosphereFeatures {
         layer = null;
         store = null;
         sets.clear();
+    }
+
+    /**
+     * Replace everything with this set. <b>Worker thread only</b>: it writes a database,
+     * and a country's warnings with their zone shapes is not work for main.
+     *
+     * <p>IPAWS's {@code AlertOverlay.rewrite}, carried forward: one modify lock for the
+     * whole write, so ATAK re-queries the store once rather than once per insert, and
+     * the new sets go in BEFORE the old come out, so the map never blanks between two
+     * polls. An empty list is honored -- when everything expires the map goes quiet --
+     * so a failed poll must not call this at all.
+     */
+    void rewrite(java.util.List<Drawn> drawn) {
+        synchronized (lock) {
+            if (store == null)
+                return;
+            boolean bulk = false;
+            try {
+                store.acquireModifyLock(true);
+                bulk = true;
+                final java.util.List<Long> old = new java.util.ArrayList<>(sets.values());
+                final Map<String, Long> fresh = new HashMap<>();
+                for (Drawn d : drawn) {
+                    Long fsid = fresh.get(d.setName);
+                    if (fsid == null) {
+                        fsid = store.insertFeatureSet(
+                                new FeatureSet(PROVIDER, type, d.setName, MIN_GSD, MAX_GSD));
+                        store.setFeatureSetVisible(fsid, true);
+                        fresh.put(d.setName, fsid);
+                    }
+                    store.insertFeature(new Feature(fsid, d.name, d.geometry, d.style,
+                            d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                }
+                for (Long id : old) {
+                    try {
+                        store.deleteFeatureSet(id);
+                    } catch (Exception e) {
+                        Log.w(tag, "old set " + id, e);
+                    }
+                }
+                sets.clear();
+                sets.putAll(fresh);
+            } catch (Exception e) {
+                Log.w(tag, layerName + " rewrite failed", e);
+            } finally {
+                if (bulk)
+                    store.releaseModifyLock();
+            }
+        }
     }
 
     /** Empty the store without taking the layer off the map. */
