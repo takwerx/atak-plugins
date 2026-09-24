@@ -23,6 +23,7 @@ import com.atakmap.map.layer.feature.style.BasicFillStyle;
 import com.atakmap.map.layer.feature.style.BasicStrokeStyle;
 import com.atakmap.map.layer.feature.style.CompositeStyle;
 import com.atakmap.map.layer.feature.style.IconPointStyle;
+import com.atakmap.map.layer.feature.style.LabelPointStyle;
 import com.atakmap.map.layer.feature.style.Style;
 import com.atakmap.android.features.FeatureDataStoreDeepMapItemQuery;
 
@@ -64,7 +65,19 @@ final class TropicalFeatures {
      * at, so the permissive value is the large one; 0 there means it never draws at
      * all, which is the opposite of what it reads like.
      */
-    private static final double MIN_GSD = Double.MAX_VALUE;
+    /**
+     * Coarse enough for any view of a storm, but a REAL number.
+     *
+     * <p>It was Double.MAX_VALUE, which draws at every zoom and looks right. ATAK
+     * converts a feature set's resolution into a level of detail internally, though,
+     * and MAX_VALUE has no sane level of detail to become: the features drew and the
+     * hit test never reached the layer at all, at any zoom, dead on a line (XCover,
+     * 2026-09-23). Feature Layer gates its sets at real resolutions -- 120 m/px for
+     * points, 400 for lines -- and its features are tappable. 100 km/px is coarser
+     * than the whole globe on this screen, so nothing is gated out, and it is a
+     * number the conversion can carry.
+     */
+    private static final double MIN_GSD = 100_000d;
     private static final double MAX_GSD = 0d;
 
     private final MapView mapView;
@@ -99,6 +112,10 @@ final class TropicalFeatures {
             // whose stores always carry the last session's features. Whether the
             // renderer's hit-test control survives being created over nothing is the
             // open question (XCover, 2026-09-23).
+            // BEFORE the overlay is built, and that ordering is the whole point --
+            // see sweepOldDrawings.
+            sweepOldDrawings();
+
             store = new FeatureSetDatabase2(storeFile);
             final FeatureDataStore2.FeatureQueryParameters visibleOnly =
                     new FeatureDataStore2.FeatureQueryParameters();
@@ -185,7 +202,6 @@ final class TropicalFeatures {
             } catch (Exception e) {
                 Log.w(TAG, "could not read the vector stack", e);
             }
-            sweepOldDrawings();
         } catch (Exception e) {
             Log.w(TAG, "storm store would not open", e);
             store = null;
@@ -206,8 +222,23 @@ final class TropicalFeatures {
      * <p>Matched on the titles that build wrote, because it left nothing else to
      * recognize it by. Runs once at start and costs nothing when there is nothing to
      * find; it can go once no phone has a build older than 2026-09-23 on it.
+     *
+     * <p><b>It must run BEFORE the overlay is created, and that is not a detail.</b>
+     * {@link FeatureDataStoreMapOverlay}'s constructor makes its own
+     * {@code DefaultMapGroup} named after the overlay, and {@code addOverlay} binds
+     * the hit-test query to that group. This sweep removes a root group called
+     * "Hurricanes" -- which, once the overlay exists, IS the overlay's own group --
+     * and {@code RootMapGroup.removeGroupImpl} deletes the query along with it. The
+     * result was an overlay that reported added=true and findable=true, a layer that
+     * drew perfectly, and a query ATAK never asked anything, at any zoom, dead on a
+     * line. The log said "removed a leftover Hurricanes group" on every single start
+     * and was read as the cleanup working rather than as the bug reporting itself
+     * (XCover, 2026-09-23).
      */
     private void sweepOldDrawings() {
+        if (overlay != null)
+            // Never while our own overlay is registered: see below.
+            return;
         try {
             final com.atakmap.android.maps.MapGroup root = mapView.getRootGroup();
             final com.atakmap.android.maps.MapGroup mine = root.findMapGroup("Hurricanes");
@@ -308,7 +339,27 @@ final class TropicalFeatures {
 
     void addLine(String setName, String name, GeoPoint[] pts, int stroke, float weight,
             AttributeSet attrs) {
-        insert(setName, name, ring(pts), new BasicStrokeStyle(stroke, weight), attrs);
+        addLine(setName, name, pts, stroke, weight, attrs, false);
+    }
+
+    /**
+     * A line, optionally with its name drawn along it.
+     *
+     * <p>ATAK does not label a line feature from its name the way it labels a point:
+     * the arrival contours were correctly named "Sat 8 pm" and the map showed nothing
+     * (operator, 2026-09-23: "no arrival times"). A LabelPointStyle in the composite
+     * is what puts text on a line, and the hour is the only reason that line is drawn.
+     */
+    void addLine(String setName, String name, GeoPoint[] pts, int stroke, float weight,
+            AttributeSet attrs, boolean labelled) {
+        final Style stroked = new BasicStrokeStyle(stroke, weight);
+        Style style = stroked;
+        if (labelled && name != null && !name.isEmpty()) {
+            final LabelPointStyle label = new LabelPointStyle(name, 0xFFFFFFFF,
+                    0x99000000, LabelPointStyle.ScrollMode.DEFAULT);
+            style = new CompositeStyle(new Style[] { stroked, label });
+        }
+        insert(setName, name, ring(pts), style, attrs);
     }
 
     /**

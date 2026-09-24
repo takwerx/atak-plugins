@@ -523,17 +523,25 @@ public final class TropicalOverlay {
                     final GeoPoint[] ring = s.ring;
                     if (ring.length < 2)
                         continue;
-                    // An arrival contour names its own hour, so let it be the label.
+                    // An arrival contour IS its hour, so that is the whole of its
+                    // name. ATAK draws a feature's name as a label on the line, and
+                    // the hour is the only reason the line is on the map: "Sat 8 pm"
+                    // reads, "Hurricane Polo, 161 mph (cat 5) wind arrival, Sat 8 pm"
+                    // does not (operator, 2026-09-23: "i have the wind arrival on, it
+                    // has no times"). The storm it belongs to is in the attributes and
+                    // in the feature set's own name.
                     final String own = s.props == null ? ""
                             : s.props.optString("arrival_time", "");
-                    final String name = !own.isEmpty() ? title + ", " + own
+                    final String name = !own.isEmpty() ? own
                             : rings.size() > 1 ? title + " " + (++n) : title;
                     if (closed)
                         features.addPolygon(set, name, ring, stroke, (float) weight,
                                 fill, attrs(storm, s.props));
                     else
+                        // An arrival contour carries its hour as its name, so it is
+                        // the one line worth labeling on the map.
                         features.addLine(set, name, ring, stroke, (float) weight,
-                                attrs(storm, s.props));
+                                attrs(storm, s.props), !own.isEmpty());
                     grow(storm.bin, ring);
                     Log.d(TAG, String.format(Locale.US,
                             "drew %s: %d points, %.2f,%.2f..%.2f,%.2f", name,
