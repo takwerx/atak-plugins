@@ -22,6 +22,8 @@
     <string name="heading_height">Height</string>
     <string name="tropical_none">No storms right now</string>
     <string name="go_to">Go to</string>
+    <string name="back">Back</string>
+    <string name="heading_details">Details</string>
     <string name="wind_here">Here: %1$s from %2$d\u00b0 %3$s</string>
     <string name="wind_here_unknown">Here: outside the area being drawn</string>
     <string name="empty"></string>

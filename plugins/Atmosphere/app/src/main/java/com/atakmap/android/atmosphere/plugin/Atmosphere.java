@@ -15,6 +15,7 @@ import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
+import com.atakmap.android.atmosphere.ui.StormDetailsReceiver;
 import com.atakmap.android.atmosphere.overlay.WindOverlay;
 import com.atakmap.android.atmosphere.source.SourceRegistry;
 import com.atakmap.android.atmosphere.ui.AtmosphereDropDown;
@@ -70,6 +71,7 @@ public class Atmosphere implements IPlugin {
     /** Outlives the pane: the radar stays up while the pane is closed. */
     private RadarOverlay radar;
     private TropicalOverlay tropical;
+    private StormDetailsReceiver stormDetails;
     private WindOverlay wind;
 
     public Atmosphere(IServiceController serviceController) {
@@ -125,6 +127,13 @@ public class Atmosphere implements IPlugin {
         wind.start();
         tropical = new TropicalOverlay(mapView, pluginContext, egress);
         tropical.start();
+        if (stormDetails == null) {
+            stormDetails = new StormDetailsReceiver(mapView, pluginContext);
+            final DocumentedIntentFilter f = new DocumentedIntentFilter();
+            f.addAction(StormDetailsReceiver.ACTION,
+                    "show what the advisory says about a tapped storm feature");
+            AtakBroadcast.getInstance().registerReceiver(stormDetails, f);
+        }
         if (atmospherePane != null) {
             atmospherePane.setRadar(radar);
             atmospherePane.setWind(wind);
@@ -140,6 +149,15 @@ public class Atmosphere implements IPlugin {
             AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
         } catch (RuntimeException e) {
             Log.w(TAG, "show receiver was not registered", e);
+        }
+        if (stormDetails != null) {
+            try {
+                AtakBroadcast.getInstance().unregisterReceiver(stormDetails);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "storm details receiver was not registered", e);
+            }
+            stormDetails.dispose();
+            stormDetails = null;
         }
         if (tropical != null) {
             tropical.stop();

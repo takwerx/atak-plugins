@@ -171,7 +171,22 @@ final class TropicalFeatures {
                             item.setMetaLong("featureid", feature.getId());
                             final AttributeSet a = attributesOf(feature.getId());
                             if (a != null)
-                                item.setMetaString("remarks", readable(a));
+                                item.setMetaString("remarks",
+                                        com.atakmap.android.atmosphere.ui
+                                                .StormDetailsReceiver.render(a));
+                            // What the details pane shows as its heading and subtitle.
+                            String title = feature.getName();
+                            if ((title == null || title.isEmpty()) && a != null)
+                                try {
+                                    title = a.getStringAttribute("Position");
+                                } catch (Exception ignored) {
+                                    // the set name is a good enough heading
+                                }
+                            if (title == null || title.isEmpty())
+                                title = setOf(feature.getId());
+                            item.setMetaString("title", title);
+                            item.setMetaString("callsign", title);
+                            item.setMetaString("storm_set", setOf(feature.getId()));
                             return item;
                         }
                     };
@@ -394,6 +409,38 @@ final class TropicalFeatures {
         }
     }
 
+    /** Which feature set a feature belongs to, by name, for the details subtitle. */
+    private String setOf(long fid) {
+        if (store == null)
+            return "";
+        com.atakmap.map.layer.feature.FeatureCursor c = null;
+        try {
+            final FeatureDataStore2.FeatureQueryParameters p =
+                    new FeatureDataStore2.FeatureQueryParameters();
+            p.ids = java.util.Collections.singleton(fid);
+            p.ignoredFeatureProperties = FeatureDataStore2.PROPERTY_FEATURE_GEOMETRY
+                    | FeatureDataStore2.PROPERTY_FEATURE_STYLE
+                    | FeatureDataStore2.PROPERTY_FEATURE_ATTRIBUTES;
+            p.limit = 1;
+            c = store.queryFeatures(p);
+            if (c.moveToNext()) {
+                final long fsid = c.get().getFeatureSetId();
+                for (java.util.Map.Entry<String, Long> e : sets.entrySet())
+                    if (e.getValue() == fsid)
+                        return e.getKey();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "set of " + fid, e);
+        } finally {
+            if (c != null)
+                try {
+                    c.close();
+                } catch (Exception ignored) {
+                }
+        }
+        return "";
+    }
+
     /** One feature's attributes by id: the hit-test query drops them, so fetch them. */
     private AttributeSet attributesOf(long fid) {
         if (store == null)
@@ -421,20 +468,5 @@ final class TropicalFeatures {
         return null;
     }
 
-    /** The advisory's own fields, one per line, for the details pane. */
-    private static String readable(AttributeSet a) {
-        final StringBuilder b = new StringBuilder();
-        for (String k : a.getAttributeNames()) {
-            // getAttributeType answers with a Class, not a tag.
-            if (a.getAttributeType(k) != String.class)
-                continue;
-            final String v = a.getStringAttribute(k);
-            if (v == null || v.isEmpty() || v.equals("null"))
-                continue;
-            if (b.length() > 0)
-                b.append('\n');
-            b.append(k).append(": ").append(v);
-        }
-        return b.toString();
-    }
+
 }
