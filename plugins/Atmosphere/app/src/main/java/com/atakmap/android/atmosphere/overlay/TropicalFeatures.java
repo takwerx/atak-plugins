@@ -159,13 +159,17 @@ final class TropicalFeatures {
 
             overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
                     "Hurricanes", "file://asset/nothing", query, null, null);
-            // addFilesOverlay, which is what Feature Layer uses for exactly this class.
-            // addOverlay registers the overlay but its query is never consulted on a
-            // map tap: the probe in featureToMapItem below never fired once, so a tap
-            // on a cone said nothing at all (XCover, 2026-09-23). Hit-testing is the
-            // whole point of these being features, so match the configuration that is
-            // known to work rather than the one that reads better.
-            mapView.getMapOverlayManager().addFilesOverlay(overlay);
+            // addOverlay, not addFilesOverlay. With addFilesOverlay this overlay did
+            // not appear anywhere in Overlay Manager on the XCover, while its polygons
+            // drew on the map perfectly well -- the same thing IPAWS found on the same
+            // phone. The add reports whether it took, so ask rather than assume: the
+            // symptom of getting it wrong is an absence from a list, which looks like
+            // nothing at all.
+            final boolean added = mapView.getMapOverlayManager().addOverlay(overlay);
+            final String id = overlay.getIdentifier();
+            Log.d(TAG, "overlay registration: added=" + added + " identifier='" + id
+                    + "' findable="
+                    + (mapView.getMapOverlayManager().getOverlay(id) != null));
             mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             sweepOldDrawings();
         } catch (Exception e) {
@@ -230,7 +234,7 @@ final class TropicalFeatures {
     void detach() {
         try {
             if (overlay != null)
-                mapView.getMapOverlayManager().removeFilesOverlay(overlay);
+                mapView.getMapOverlayManager().removeOverlay(overlay);
             if (layer != null)
                 mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             if (store != null)
