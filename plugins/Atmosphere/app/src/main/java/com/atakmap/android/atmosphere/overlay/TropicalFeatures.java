@@ -91,12 +91,14 @@ final class TropicalFeatures {
             if (dir != null && !dir.isDirectory())
                 //noinspection ResultOfMethodCallIgnored
                 dir.mkdirs();
-            // An advisory is replaced whole every six hours, so a store carried over
-            // from a previous run is only a chance to draw a storm that has since
-            // dissipated. Start empty.
-            //noinspection ResultOfMethodCallIgnored
-            storeFile.delete();
-
+            // The store is NOT emptied here. It was, on the reasoning that an advisory
+            // is replaced whole every six hours so yesterday's storms are only a
+            // chance to draw one that has dissipated -- and the refresh clears it
+            // anyway, moments later. But that made the layer open over an EMPTY store,
+            // which is the one structural difference from IPAWS and Feature Layer,
+            // whose stores always carry the last session's features. Whether the
+            // renderer's hit-test control survives being created over nothing is the
+            // open question (XCover, 2026-09-23).
             store = new FeatureSetDatabase2(storeFile);
             final FeatureDataStore2.FeatureQueryParameters visibleOnly =
                     new FeatureDataStore2.FeatureQueryParameters();
@@ -171,6 +173,18 @@ final class TropicalFeatures {
                     + "' findable="
                     + (mapView.getMapOverlayManager().getOverlay(id) != null));
             mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+            try {
+                final java.util.List<com.atakmap.map.layer.Layer> stack =
+                        mapView.getLayers(MapView.RenderStack.VECTOR_OVERLAYS);
+                Log.d(TAG, "vector stack: " + stack.size() + " layers, ours present="
+                        + stack.contains(layer) + ", layer='" + layer.getName()
+                        + "' visible=" + layer.isVisible());
+                for (com.atakmap.map.layer.Layer l : stack)
+                    Log.d(TAG, "  stack layer: " + l.getClass().getSimpleName()
+                            + " '" + l.getName() + "'");
+            } catch (Exception e) {
+                Log.w(TAG, "could not read the vector stack", e);
+            }
             sweepOldDrawings();
         } catch (Exception e) {
             Log.w(TAG, "storm store would not open", e);
