@@ -316,6 +316,22 @@ public final class WindOverlay {
     }
 
     /**
+     * The wind at a point, as {@code {u, v}} in meters per second, or null when the
+     * grid on screen does not cover it.
+     *
+     * <p>A lookup, not a fetch: the grid the particles are already flying on is in
+     * memory and knows how to interpolate itself. Nothing here asks the network, so
+     * this is safe to call on every pane render.
+     */
+    public float[] readingAt(double lat, double lon) {
+        final WindGrid g = shown;
+        if (g == null || !g.contains(lat, lon))
+            return null;
+        final float[] uv = g.sample(lat, lon, new float[2]);
+        return uv == null || Float.isNaN(uv[0]) ? null : uv;
+    }
+
+    /**
      * Change the height. A pressure level cannot come from HRRR, so this may also
      * change the model; the region is recomputed either way.
      */

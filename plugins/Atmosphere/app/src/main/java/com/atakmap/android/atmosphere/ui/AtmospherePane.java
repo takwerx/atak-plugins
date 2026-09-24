@@ -171,6 +171,7 @@ public final class AtmospherePane {
     private final LinearLayout windUnitRow;
     private final View windLevelBlock;
     private final TextView windLevelLabel;
+    private final TextView windReading;
     private final LinearLayout windLevelRows;
     private WindOverlay wind;
     private int windHours;
@@ -265,6 +266,7 @@ public final class AtmospherePane {
         buildWindUnitRow();
         windLevelBlock = find(R.id.wind_level_block);
         windLevelLabel = find(R.id.wind_level_label);
+        windReading = find(R.id.wind_reading);
         windLevelRows = find(R.id.wind_level_rows);
         buildWindLevelRows();
         scrubber = find(R.id.scrubber);
@@ -1089,6 +1091,7 @@ public final class AtmospherePane {
         windScaleHost.setVisibility(windOn ? View.VISIBLE : View.GONE);
         windLevelBlock.setVisibility(windOn ? View.VISIBLE : View.GONE);
         if (windOn) {
+            updateWindReading();
             updateWindScale();
             // The row is built in the constructor, before the stored unit has been
             // read, so the first paint of it happens here.
@@ -1199,6 +1202,35 @@ public final class AtmospherePane {
         updateWindLevel();
         // A unit change is a display change: re-render, never re-fetch.
         render();
+    }
+
+    /**
+     * What the wind is doing at the pane's own point, in the operator's own units.
+     *
+     * <p>Read straight out of the grid the particles are flying on, so it costs a
+     * bilinear interpolation and never a request. It is the point mode's point, which
+     * means "Pick a point" is already the tap-the-map-and-read-it control; nothing new
+     * to learn and nothing new to get in the way of panning.
+     */
+    private void updateWindReading() {
+        final GeoPoint p = point();
+        final float[] uv = wind == null || p == null ? null
+                : wind.readingAt(p.getLatitude(), p.getLongitude());
+        if (uv == null) {
+            // Silence would read as calm. Say which it is.
+            windReading.setText(wind != null && wind.isOn() && p != null
+                    ? R.string.wind_here_unknown : R.string.empty);
+            return;
+        }
+        final double speed = Math.hypot(uv[0], uv[1]);
+        // Meteorological convention: the wind is named for where it comes FROM, which
+        // is the opposite of the vector it blows along.
+        double from = Math.toDegrees(Math.atan2(-uv[0], -uv[1]));
+        if (from < 0)
+            from += 360;
+        windReading.setText(pluginContext.getString(R.string.wind_here,
+                Units.format(Quantity.SPEED, speed, units),
+                Math.round(from), Units.degreesToCompass(from)));
     }
 
     /**

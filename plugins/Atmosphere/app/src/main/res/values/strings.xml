@@ -22,6 +22,9 @@
     <string name="heading_height">Height</string>
     <string name="tropical_none">No storms right now</string>
     <string name="go_to">Go to</string>
+    <string name="wind_here">Here: %1$s from %2$d\u00b0 %3$s</string>
+    <string name="wind_here_unknown">Here: outside the area being drawn</string>
+    <string name="empty"></string>
     <string name="show_storm_maps">Show or hide this storm\'s maps</string>
     <string name="credit_tropical">Hurricanes from the National Hurricane Center (%1$s)</string>
     <string name="tropical_on">Hurricanes ON</string>

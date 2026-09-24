@@ -213,6 +213,21 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
+                <!-- The wind where the pane is pointed. It answers "what is it doing
+                     here", which the moving field alone cannot: the particles show a
+                     shape, not a number (operator, 2026-09-23: "is there no extra
+                     details if i click on the wind?"). The point is the pane's own
+                     (self, map center, a picked point or a favorite), so Pick a point
+                     is the click-to-read this asks for, and it already exists. -->
+                <TextView
+                    android:id="@+id/wind_reading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:text="" />
+
                 <!-- A heading, not a readout: the lit button below says the height,
                      and the sentence that used to sit here also carried the model's
                      grid spacing, which is not a thing a crew can act on. -->

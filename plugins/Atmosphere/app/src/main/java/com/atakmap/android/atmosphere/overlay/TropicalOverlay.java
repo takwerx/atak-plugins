@@ -8,16 +8,12 @@ import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.Nhc;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
-import com.atakmap.android.drawing.mapItems.DrawingShape;
-import com.atakmap.android.maps.DefaultMapGroup;
-import com.atakmap.android.maps.MapGroup;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.android.maps.Marker;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.coremap.maps.assets.Icon;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPoint;
-import com.atakmap.map.layer.feature.Feature;
+import com.atakmap.map.layer.feature.AttributeSet;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -82,7 +78,7 @@ public final class TropicalOverlay {
     private final Context pluginContext;
     private final EgressPolicy egress;
 
-    private MapGroup group;
+    private final TropicalFeatures features;
     private Listener listener;
     private boolean started;
     private boolean on;
@@ -106,6 +102,7 @@ public final class TropicalOverlay {
         // to a different uid than the process this runs in, so mkdirs there fails and
         // every composite lands on ENOENT (XCover, 2026-09-23). Feature Layer keeps its
         // label composites under tools/ for the same reason.
+        this.features = new TropicalFeatures(mapView, pluginContext);
         this.icons = new StormIcons(pluginContext,
                 com.atakmap.coremap.filesystem.FileSystemUtils.getItem(
                         "tools/atmosphere/storm-icons"));
@@ -159,10 +156,7 @@ public final class TropicalOverlay {
 
     public void start() {
         started = true;
-        group = new DefaultMapGroup(GROUP);
-        group.setMetaString("overlay", GROUP);
-        group.setMetaBoolean("permaGroup", true);
-        mapView.getRootGroup().addGroup(group);
+        features.attach();
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
             setOn(true);
@@ -172,12 +166,7 @@ public final class TropicalOverlay {
         started = false;
         on = false;
         clear();
-        if (group != null) {
-            // Off the group's own thread work and out of the tree: a plugin that
-            // leaves items behind leaves them on the map with nothing to remove them.
-            mapView.getRootGroup().removeGroup(group);
-            group = null;
-        }
+        features.detach();
     }
 
     public boolean isOn() {
@@ -278,8 +267,8 @@ public final class TropicalOverlay {
             final int layer = product.layer(storm.bin);
             switch (product) {
                 case CONE:
-                    fetchShape(storm, layer, mine, name + " cone", CONE_STROKE,
-                            CONE_FILL, CONE_WEIGHT, true);
+                    fetchShape(storm, layer, mine, name + " cone", name + " - Cone",
+                            CONE_STROKE, CONE_FILL, CONE_WEIGHT, true);
                     break;
                 case TRACK:
                     // Drawn from the forecast positions rather than the service's own
@@ -295,12 +284,14 @@ public final class TropicalOverlay {
                         fetchPoints(storm, layer, mine, false, true);
                     break;
                 case WATCHES:
-                    fetchShape(storm, layer, mine, name + " watches", WATCH_STROKE,
-                            0, TRACK_WEIGHT, false);
+                    fetchShape(storm, layer, mine, name + " watches",
+                            name + " - Watches and warnings", WATCH_STROKE, 0,
+                            TRACK_WEIGHT, false);
                     break;
                 case ARRIVAL:
                     fetchShape(storm, layer, mine, name + " wind arrival",
-                            ARRIVAL_STROKE, 0, CONE_WEIGHT, false);
+                            name + " - Wind arrival times", ARRIVAL_STROKE, 0,
+                            CONE_WEIGHT, false);
                     break;
             }
         }
@@ -322,7 +313,7 @@ public final class TropicalOverlay {
         Http.get(Nhc.queryUrl(layer), egress.userAgent(), null, new Http.Callback() {
             @Override
             public void onSuccess(String body) {
-                if (mine != generation || !on || group == null)
+                if (mine != generation || !on)
                     return;
                 try {
                     final JSONArray feats = new JSONObject(body).optJSONArray("features");
@@ -371,21 +362,14 @@ public final class TropicalOverlay {
      * for: seeing where it becomes a major hurricane.
      */
     private void drawLegs(Nhc.Storm storm, List<GeoPoint> path, List<Integer> colors) {
-        if (group == null || path.size() < 2)
+        if (path.size() < 2)
             return;
+        final String set = label(storm) + " - Track";
         for (int i = 0; i + 1 < path.size(); i++) {
-            final DrawingShape leg = new DrawingShape(mapView, group,
-                    UUID.randomUUID().toString());
-            leg.setPoints(new GeoPoint[] { path.get(i), path.get(i + 1) });
-            leg.setClosed(false);
-            leg.setStrokeColor(colors.get(i + 1));
-            leg.setStrokeWeight(TRACK_WEIGHT);
-            leg.setTitle(label(storm) + " track");
-            leg.setAltitudeMode(Feature.AltitudeMode.ClampToGround);
-            leg.setMetaBoolean("removable", false);
-            leg.setMetaString("menu", "");
-            group.addItem(leg);
-            grow(storm.bin, new GeoPoint[] { path.get(i), path.get(i + 1) });
+            final GeoPoint[] leg = { path.get(i), path.get(i + 1) };
+            features.addLine(set, label(storm) + " track", leg,
+                    colors.get(i + 1), (float) TRACK_WEIGHT, attrs(storm, null));
+            grow(storm.bin, leg);
         }
     }
 
@@ -393,70 +377,61 @@ public final class TropicalOverlay {
         // tau is the forecast hour, so tau 0 is where the storm is right now.
         final int tau = pr.optInt("tau", -1);
         final String when = pr.optString("datelbl", "");
-        final Marker m = new Marker(p, UUID.randomUUID().toString());
-        // A plain point. Two types were wrong before this one, both because ATAK
-        // decides a marker's symbol from its CoT type (XCover, 2026-09-23):
-        // "a-h-X-i-g" is an ATOM with a HOSTILE affiliation, so every forecast
-        // position drew as a red 2525 diamond; "b-m-p-s-p-loc" is the sensor point
-        // Cam Depot uses precisely because ATAK ships an icon for it, and that icon
-        // won over ours. "u-d-p" carries neither.
-        m.setType("u-d-p");
-        // Ours alone, and it never becomes traffic on the network.
-        m.setMetaBoolean("nevercot", true);
-        m.setMetaBoolean("addToObjList", false);
         final String label = tau == 0 ? storm.display()
                 : (when.isEmpty() ? storm.name : when);
-        m.setTitle(label);
-        m.setMetaString("callsign", label);
-        // The label is drawn into the icon, so ATAK must not draw one of its own: its
-        // engine trims marker labels freely and a plugin cannot give them a priority.
-        m.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);
-        m.setMetaString("remarks", remarks(storm, pr));
-        m.setMetaBoolean("removable", false);
-        m.setMetaBoolean("editable", false);
-        // Tinted by THIS position's forecast category, not the storm's current one,
-        // so a track that strengthens or weakens shows it.
+        // The label is inside the icon; a feature's own label would be trimmed and
+        // two on one point is worse than one.
         final Icon icon = icons.labelled(label,
                 categoryColor(pr.optInt("ssnum", 0), pr.optInt("maxwind", -1)),
                 tau == 0 ? 40 : 26);
-        group.addItem(m);
-        // After the add, not before: joining a group is where ATAK settles a marker's
-        // symbol from its type, and an icon set first is the one that loses.
-        if (icon != null)
-            m.setIcon(icon);
+        if (icon == null)
+            return;
+        final AttributeSet a = attrs(storm, pr);
+        a.setAttribute("Position", label);
+        features.addIcon(label(storm) + " - Positions", label, p,
+                icon.getImageUri(Icon.STATE_DEFAULT),
+                icon.getWidth(), icon.getHeight(), a);
         grow(storm.bin, new GeoPoint[] { p });
     }
 
-    /** Everything the advisory says about this position, for the marker's detail. */
-    private static String remarks(Nhc.Storm storm, JSONObject pr) {
-        final StringBuilder b = new StringBuilder();
-        line(b, "", pr.optString("tcdvlp", ""));
-        line(b, "Valid ", pr.optString("fldatelbl", ""));
+    /**
+     * What a tap on this feature shows. The advisory's own fields where there is a
+     * position to describe, and the storm's line where there is not (a cone has one
+     * polygon and its own advisory header).
+     */
+    private static AttributeSet attrs(Nhc.Storm storm, JSONObject pr) {
+        final AttributeSet a = new AttributeSet();
+        a.setAttribute("Storm", storm.display());
+        if (storm.intensityKt > 0)
+            a.setAttribute("Wind", Math.round(storm.intensityKt * 1.15078) + " mph sustained");
+        if (storm.pressureMb > 0)
+            a.setAttribute("Pressure", storm.pressureMb + " mb");
+        if (pr == null)
+            return a;
+        put(a, "Stage", pr.optString("tcdvlp", ""));
+        put(a, "Valid", pr.optString("fldatelbl", ""));
         final int wind = pr.optInt("maxwind", -1);
         if (wind > 0)
-            line(b, "Wind ", Math.round(wind * 1.15078) + " mph sustained");
+            a.setAttribute("Wind", Math.round(wind * 1.15078) + " mph sustained");
         final int gust = pr.optInt("gust", -1);
         if (gust > 0)
-            line(b, "Gusts ", Math.round(gust * 1.15078) + " mph");
+            a.setAttribute("Gusts", Math.round(gust * 1.15078) + " mph");
         final int mslp = pr.optInt("mslp", -1);
         if (mslp > 0)
-            line(b, "Pressure ", mslp + " mb");
-        final int dir = pr.optInt("tcdir", -1);
-        final int spd = pr.optInt("tcspd", -1);
+            a.setAttribute("Pressure", mslp + " mb");
+        final int dir = pr.optInt("tcdir", -1), spd = pr.optInt("tcspd", -1);
         if (dir >= 0 && spd >= 0)
-            line(b, "Moving ", dir + " deg at " + Math.round(spd * 1.15078) + " mph");
-        line(b, "Advisory ", pr.optString("advisnum", ""));
-        line(b, "", storm.display());
-        return b.toString();
+            a.setAttribute("Moving", dir + " deg at " + Math.round(spd * 1.15078) + " mph");
+        put(a, "Advisory", pr.optString("advisnum", ""));
+        put(a, "Issued", pr.optString("advdate", ""));
+        return a;
     }
 
-    private static void line(StringBuilder b, String prefix, String value) {
-        if (value == null || value.isEmpty() || value.equals("null"))
-            return;
-        if (b.length() > 0)
-            b.append('\n');
-        b.append(prefix).append(value);
+    private static void put(AttributeSet a, String key, String value) {
+        if (value != null && !value.isEmpty() && !value.equals("null"))
+            a.setAttribute(key, value);
     }
+
 
     /**
      * The Saffir-Simpson track-map palette: the colors NHC's own track maps use, and
@@ -496,14 +471,14 @@ public final class TropicalOverlay {
     }
 
     private void fetchShape(final Nhc.Storm storm, final int layer, final int mine,
-            final String title, final int stroke, final int fill, final double weight,
-            final boolean closed) {
+            final String title, final String set, final int stroke, final int fill,
+            final double weight, final boolean closed) {
         if (layer < 0)
             return;
         Http.get(Nhc.queryUrl(layer), egress.userAgent(), null, new Http.Callback() {
             @Override
             public void onSuccess(String body) {
-                if (mine != generation || !on || group == null)
+                if (mine != generation || !on)
                     return;
                 final List<GeoPoint[]> rings = geometry(body);
                 if (rings.isEmpty()) {
@@ -514,24 +489,16 @@ public final class TropicalOverlay {
                 for (GeoPoint[] ring : rings) {
                     if (ring.length < 2)
                         continue;
-                    final DrawingShape shape = new DrawingShape(mapView, group,
-                            UUID.randomUUID().toString());
-                    shape.setPoints(ring);
-                    shape.setClosed(closed);
-                    shape.setStrokeColor(stroke);
-                    shape.setStrokeWeight(weight);
+                    final String name = rings.size() > 1 ? title + " " + (++n) : title;
                     if (closed)
-                        shape.setFillColor(fill);
-                    shape.setTitle(rings.size() > 1 ? title + " " + (++n) : title);
-                    // Without this the shape sinks under the terrain the moment the
-                    // map is tilted or zoomed, and reads as a layer that did nothing.
-                    shape.setAltitudeMode(Feature.AltitudeMode.ClampToGround);
-                    shape.setMetaBoolean("removable", false);
-                    shape.setMetaString("menu", "");
-                    group.addItem(shape);
+                        features.addPolygon(set, name, ring, stroke, (float) weight,
+                                fill, attrs(storm, null));
+                    else
+                        features.addLine(set, name, ring, stroke, (float) weight,
+                                attrs(storm, null));
                     grow(storm.bin, ring);
                     Log.d(TAG, String.format(Locale.US,
-                            "drew %s: %d points, %.2f,%.2f..%.2f,%.2f", shape.getTitle(),
+                            "drew %s: %d points, %.2f,%.2f..%.2f,%.2f", name,
                             ring.length, bound(ring, true, true), bound(ring, false, true),
                             bound(ring, true, false), bound(ring, false, false)));
                 }
@@ -691,8 +658,7 @@ public final class TropicalOverlay {
     private void clear() {
         generation++;
         extents.clear();
-        if (group != null)
-            group.clearItems();
+        features.clear();
     }
 
     private void status(String s) {
