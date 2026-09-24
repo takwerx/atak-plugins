@@ -263,6 +263,11 @@ public final class AtmospherePane {
                     }
 
                     @Override
+                    public String pointLabel() {
+                        return modeLabel();
+                    }
+
+                    @Override
                     public UnitSystem units() {
                         return units;
                     }

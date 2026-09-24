@@ -8,26 +8,34 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.PointF;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.data.Favorites;
 import com.atakmap.android.atmosphere.data.Spot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.units.UnitSystem;
+import com.atakmap.android.maps.MapEvent;
+import com.atakmap.android.maps.MapEventDispatcher;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.user.geocode.GeocodeManager;
+import com.atakmap.android.user.geocode.GeocodingUtil;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoBounds;
 import com.atakmap.coremap.maps.coords.GeoPoint;
+import com.atakmap.coremap.maps.coords.GeoPointMetaData;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -81,6 +89,9 @@ public final class SpotPage {
     public interface Host {
         /** The point the pane is reading, for a request. */
         GeoPoint point();
+
+        /** What the pane calls that point: "My position", "Map center"... */
+        String pointLabel();
 
         UnitSystem units();
     }
@@ -166,6 +177,7 @@ public final class SpotPage {
     public void dispose() {
         listGeneration++;
         detailGeneration++;
+        disarmRequestPick();
         worker.shutdownNow();
     }
 
@@ -654,11 +666,17 @@ public final class SpotPage {
         void picked(int which);
     }
 
+    private void tiles(int titleRes, String[] labels, int current, final Picked picked) {
+        tiles(pluginContext.getString(titleRes), labels, current, 3, picked);
+    }
+
     /**
-     * A compact dialog of TakwerxButton tiles, three across, the current choice green.
+     * A compact dialog of TakwerxButton tiles, the current choice green. Three across
+     * for short names; one across, two lines allowed, for anything longer (an address).
      * On the MapView's context: a dialog on the plugin's context kills ATAK.
      */
-    private void tiles(int titleRes, String[] labels, int current, final Picked picked) {
+    private void tiles(String title, String[] labels, int current, final int columns,
+            final Picked picked) {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
             return;
@@ -668,13 +686,13 @@ public final class SpotPage {
         final ScrollView scroll = new ScrollView(pluginContext);
         scroll.addView(grid);
         final AlertDialog dialog = new AlertDialog.Builder(ctx)
-                .setTitle(pluginContext.getString(titleRes))
+                .setTitle(title)
                 .setView(scroll)
                 .setNegativeButton(pluginContext.getString(R.string.close), null)
                 .create();
         LinearLayout row = null;
         for (int i = 0; i < labels.length; i++) {
-            if (i % 3 == 0) {
+            if (i % columns == 0) {
                 row = new LinearLayout(pluginContext);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 grid.addView(row);
@@ -683,6 +701,10 @@ public final class SpotPage {
                     .inflate(R.layout.trend_chip, row, false);
             b.setText(labels[i]);
             b.setTextSize(14);
+            if (columns == 1) {
+                b.setSingleLine(false);
+                b.setMaxLines(2);
+            }
             green(b, i == current);
             final int which = i;
             b.setOnClickListener(new View.OnClickListener() {
@@ -701,7 +723,7 @@ public final class SpotPage {
         }
         // Keep a short last row's tiles the width of the others.
         if (row != null)
-            for (int i = labels.length % 3; i > 0 && i < 3; i++) {
+            for (int i = labels.length % columns; i > 0 && i < columns; i++) {
                 final View filler = new View(pluginContext);
                 row.addView(filler, new LinearLayout.LayoutParams(0, 1, 1f));
             }
@@ -711,43 +733,321 @@ public final class SpotPage {
     // ---- requesting ----------------------------------------------------------------------
 
     /**
+     * The point a request is for, and what to call it. Starts as the pane's own point
+     * each time the dialog is opened from the page; a source picked inside the dialog
+     * replaces it until the dialog is closed.
+     */
+    private GeoPoint requestPoint;
+    private String requestFrom;
+    /** A map tap armed for the request point; the map's own listeners are pushed. */
+    private MapEventDispatcher.MapEventDispatchListener requestPick;
+
+    /**
      * The program takes requests on its own form only: its API wants a key that is not
-     * ours, and the form reads nothing from a link. So hand over the point to paste and
-     * open the form, which is honest about what the plugin can do.
+     * ours, and the form reads nothing from a link. So the dialog settles WHERE -- your
+     * position, the map center, a tap on the map, a favorite or an address -- and hands
+     * that over to paste, then opens the form (operator, 2026-09-24: "can i tap on the
+     * map ... put in an address ... give all the options").
      */
     private void showRequestDialog() {
+        requestPoint = host.point();
+        requestFrom = host.pointLabel();
+        showRequestDialogFor();
+    }
+
+    private void showRequestDialogFor() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
             return;
-        final GeoPoint p = host.point();
-        if (p == null) {
-            Toast.makeText(ctx, pluginContext.getString(R.string.no_position),
-                    Toast.LENGTH_SHORT).show();
+        final LinearLayout body = new LinearLayout(pluginContext);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(16), dp(8), dp(12), 0);
+        final TextView intro = new TextView(pluginContext);
+        intro.setText(R.string.spot_request_text);
+        intro.setTextColor(Color.WHITE);
+        intro.setTextSize(15);
+        body.addView(intro);
+        body.addView(heading(R.string.spot_point_heading));
+        final TextView where = new TextView(pluginContext);
+        where.setTextColor(Color.WHITE);
+        where.setTextSize(17);
+        where.setText(requestPoint == null ? pluginContext.getString(R.string.no_position)
+                : requestFrom + "\n" + position(requestPoint));
+        body.addView(where);
+        body.addView(heading(R.string.spot_use_heading));
+
+        final ScrollView scroll = new ScrollView(pluginContext);
+        scroll.addView(body);
+        final AlertDialog.Builder b = new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.spot_request_title))
+                .setView(scroll)
+                .setNegativeButton(pluginContext.getString(R.string.close), null);
+        if (requestPoint != null) {
+            final String pos = position(requestPoint);
+            b.setPositiveButton(pluginContext.getString(R.string.spot_open_form),
+                    new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface d, int which) {
+                            copy(ctx, pos);
+                            openUrl(Spot.NEW_REQUEST_URL);
+                        }
+                    });
+            b.setNeutralButton(pluginContext.getString(R.string.spot_copy),
+                    new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface d, int which) {
+                            copy(ctx, pos);
+                        }
+                    });
+        }
+        final AlertDialog dialog = b.create();
+
+        // Five sources, three across then two: each sets the point and redraws.
+        final int[] names = { R.string.spot_my_position, R.string.spot_map_center,
+                R.string.spot_pick_on_map, R.string.spot_favorite, R.string.spot_address };
+        LinearLayout row = null;
+        for (int i = 0; i < names.length; i++) {
+            if (i % 3 == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                body.addView(row);
+            }
+            final Button tile = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            tile.setText(names[i]);
+            tile.setTextSize(14);
+            final int which = i;
+            tile.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    dialog.dismiss();
+                    useSource(which);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = dp(4);
+            tile.setLayoutParams(lp);
+            row.addView(tile);
+        }
+        if (row != null)
+            row.addView(new View(pluginContext), new LinearLayout.LayoutParams(0, 1, 1f));
+        dialog.show();
+    }
+
+    /** 0 my position, 1 map center, 2 a tap on the map, 3 a favorite, 4 an address. */
+    private void useSource(int which) {
+        switch (which) {
+            case 0:
+                setRequestPoint(MapCompat.selfPoint(),
+                        pluginContext.getString(R.string.spot_my_position));
+                break;
+            case 1:
+                setRequestPoint(MapCompat.mapCenter(),
+                        pluginContext.getString(R.string.spot_map_center));
+                break;
+            case 2:
+                pickRequestPoint();
+                break;
+            case 3:
+                pickFavorite();
+                break;
+            default:
+                askAddress();
+                break;
+        }
+    }
+
+    private void setRequestPoint(GeoPoint p, String from) {
+        if (p != null && p.isValid()) {
+            requestPoint = p;
+            requestFrom = from;
+        } else {
+            toast(pluginContext.getString(R.string.no_position));
+        }
+        showRequestDialogFor();
+    }
+
+    /** The dialog steps aside, the next map tap is the point, and it comes back. */
+    private void pickRequestPoint() {
+        final MapEventDispatcher d = mapView.getMapEventDispatcher();
+        if (requestPick != null)
+            return;
+        d.pushListeners();
+        d.clearListeners(MapEvent.MAP_CLICK);
+        d.clearListeners(MapEvent.ITEM_CLICK);
+        requestPick = new MapEventDispatcher.MapEventDispatchListener() {
+            @Override
+            public void onMapEvent(MapEvent event) {
+                final PointF pf = event.getPointF();
+                GeoPoint p = null;
+                if (pf != null) {
+                    final GeoPointMetaData gp = mapView.inverseWithElevation(pf.x, pf.y);
+                    p = gp == null ? null : gp.get();
+                }
+                disarmRequestPick();
+                setRequestPoint(p, pluginContext.getString(R.string.spot_picked));
+            }
+        };
+        d.addMapEventListener(MapEvent.MAP_CLICK, requestPick);
+        d.addMapEventListener(MapEvent.ITEM_CLICK, requestPick);
+        toast(pluginContext.getString(R.string.spot_tap_map));
+    }
+
+    private void disarmRequestPick() {
+        if (requestPick == null)
+            return;
+        requestPick = null;
+        mapView.getMapEventDispatcher().popListeners();
+    }
+
+    private void pickFavorite() {
+        final Context ctx = MapCompat.atakContext();
+        final List<Favorites.Place> all = ctx == null ? new ArrayList<Favorites.Place>()
+                : new Favorites(ctx).all();
+        if (all.isEmpty()) {
+            toast(pluginContext.getString(R.string.favorites_none));
+            showRequestDialogFor();
             return;
         }
-        final String position = String.format(Locale.US, "%.5f, %.5f", p.getLatitude(),
-                p.getLongitude());
+        final String[] labels = new String[all.size()];
+        for (int i = 0; i < labels.length; i++)
+            labels[i] = all.get(i).name;
+        tiles(pluginContext.getString(R.string.spot_pick_favorite), labels, -1, 3,
+                new Picked() {
+                    @Override
+                    public void picked(int which) {
+                        final Favorites.Place f = all.get(which);
+                        setRequestPoint(new GeoPoint(f.latitude, f.longitude),
+                                "\u2605 " + f.name);
+                    }
+                });
+    }
+
+    /**
+     * An address, looked up by ATAK's own address search: the geocoder the operator
+     * picked in ATAK's settings (Android's by default), through {@code GeocodingUtil},
+     * the same path ATAK's Go To uses. The dialog names that geocoder, because the
+     * typed address is sent to it; the plugin sends nothing of its own.
+     */
+    private void askAddress() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final GeocodeManager.Geocoder coder = GeocodeManager.getInstance(ctx)
+                .getSelectedGeocoder();
+        if (coder == null) {
+            toast(pluginContext.getString(R.string.spot_no_geocoder));
+            showRequestDialogFor();
+            return;
+        }
+        final EditText input = new EditText(ctx);
+        input.setSingleLine(true);
+        input.setHint(pluginContext.getString(R.string.spot_address_hint));
         new AlertDialog.Builder(ctx)
-                .setTitle(pluginContext.getString(R.string.spot_request_title))
-                .setMessage(pluginContext.getString(R.string.spot_request_text,
-                        "Latitude, longitude: " + position))
-                .setPositiveButton(pluginContext.getString(R.string.spot_open_form),
+                .setTitle(pluginContext.getString(R.string.spot_address_title))
+                .setMessage(pluginContext.getString(R.string.spot_address_text, coder.getTitle()))
+                .setView(input)
+                .setPositiveButton(pluginContext.getString(R.string.spot_search),
                         new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface d, int which) {
-                                copy(ctx, position);
-                                openUrl(Spot.NEW_REQUEST_URL);
+                                final String text = input.getText().toString().trim();
+                                if (text.isEmpty()) {
+                                    showRequestDialogFor();
+                                    return;
+                                }
+                                lookUp(coder, text);
                             }
                         })
-                .setNeutralButton(pluginContext.getString(R.string.spot_copy),
+                .setNegativeButton(pluginContext.getString(R.string.back),
                         new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface d, int which) {
-                                copy(ctx, position);
+                                showRequestDialogFor();
                             }
                         })
-                .setNegativeButton(pluginContext.getString(R.string.close), null)
                 .show();
+    }
+
+    private void lookUp(GeocodeManager.Geocoder coder, final String text) {
+        toast(pluginContext.getString(R.string.spot_searching, text));
+        // The search is biased to the map on screen; on the globe, the world.
+        final double[] box = viewBox();
+        final GeoBounds bounds = box == null ? new GeoBounds(90, -180, -90, 180)
+                : new GeoBounds(box[0], box[1], box[2], box[3]);
+        final int mine = ++detailGeneration;
+        GeocodingUtil.lookup(coder, bounds, text, 6, new GeocodingUtil.ResultListener() {
+            @Override
+            public void onResult(GeocodeManager.Geocoder c, String original, GeoPoint point,
+                    final List<android.util.Pair<String, GeoPoint>> found,
+                    final GeocodeManager.GeocoderException error) {
+                // Answers on the geocoder's own thread; everything below is UI.
+                mapView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mine != detailGeneration)
+                            return;
+                        if (error != null)
+                            Log.w(TAG, "address search failed", error);
+                        showAddresses(text, found);
+                    }
+                });
+            }
+        });
+    }
+
+    private void showAddresses(String text,
+            final List<android.util.Pair<String, GeoPoint>> found) {
+        final List<android.util.Pair<String, GeoPoint>> usable = new ArrayList<>();
+        if (found != null)
+            for (android.util.Pair<String, GeoPoint> f : found)
+                if (f != null && f.second != null && f.second.isValid())
+                    usable.add(f);
+        if (usable.isEmpty()) {
+            toast(pluginContext.getString(R.string.spot_address_none, text));
+            showRequestDialogFor();
+            return;
+        }
+        if (usable.size() == 1) {
+            setRequestPoint(usable.get(0).second, addressLabel(usable.get(0).first, text));
+            return;
+        }
+        final String[] labels = new String[usable.size()];
+        for (int i = 0; i < labels.length; i++)
+            labels[i] = addressLabel(usable.get(i).first, text);
+        tiles(pluginContext.getString(R.string.spot_pick_address), labels, -1, 1,
+                new Picked() {
+                    @Override
+                    public void picked(int which) {
+                        setRequestPoint(usable.get(which).second, labels[which]);
+                    }
+                });
+    }
+
+    private static String addressLabel(String found, String typed) {
+        return found == null || found.trim().isEmpty() ? typed : found.trim();
+    }
+
+    private static String position(GeoPoint p) {
+        return String.format(Locale.US, "%.5f, %.5f", p.getLatitude(), p.getLongitude());
+    }
+
+    private TextView heading(int res) {
+        final TextView h = new TextView(pluginContext);
+        h.setText(res);
+        h.setTextSize(10);
+        h.setAllCaps(true);
+        h.setAlpha(0.6f);
+        h.setPadding(0, dp(10), 0, dp(2));
+        return h;
+    }
+
+    private void toast(String text) {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx != null)
+            Toast.makeText(ctx, text, Toast.LENGTH_SHORT).show();
     }
 
     private void copy(Context ctx, String text) {
