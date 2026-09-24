@@ -272,6 +272,70 @@
                     android:orientation="horizontal" />
             </LinearLayout>
 
+            <!-- Air quality: EPA AirNow's latest hour, not time-enabled, so it never
+                 takes the strip and can be on beside any of the layers above. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/air_toggle"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/air_off" />
+
+                <ImageButton
+                    android:id="@+id/air_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/air_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- Which hour is on the map, or what went wrong. -->
+                <TextView
+                    android:id="@+id/air_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <!-- EPA's six categories in EPA's colors, built in code from the same
+                     table the map is drawn with. -->
+                <LinearLayout
+                    android:id="@+id/air_scale"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <!-- The category at the pane's own point. -->
+                <TextView
+                    android:id="@+id/air_reading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:text="" />
+            </LinearLayout>
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

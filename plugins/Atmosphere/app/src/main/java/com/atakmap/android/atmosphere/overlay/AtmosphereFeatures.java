@@ -32,7 +32,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * The storms as a read-only map layer, not as drawings.
+ * Somebody else's GIS data as a read-only map layer, not as drawings: the storms,
+ * the air quality contours, and whatever joins them. One instance per layer, each
+ * with its own store and its own entry in Overlay Manager.
+ *
+ * <p>Written for the storms and parameterized when air quality became the second
+ * layer to need it, rather than copied: the ordering rules below cost a day to find
+ * and belong in one place.
  *
  * <p>They were {@code DrawingShape}s and {@code Marker}s, which is how a plugin makes
  * things the operator <em>owns</em>: a radial menu offering color, rename, delete and
@@ -52,13 +58,10 @@ import java.util.Map;
  * Manager lists them the way it lists any other GIS layer and ATAK's own visibility
  * works on each.
  */
-final class TropicalFeatures {
-
-    private static final String TAG = "AtmosphereTropical";
+final class AtmosphereFeatures {
 
     /** The provider column, and what Overlay Manager groups these under. */
     private static final String PROVIDER = "Atmosphere";
-    private static final String TYPE = "tropical";
 
     /**
      * Drawn at every zoom. minResolution is the COARSEST meters-per-pixel a set draws
@@ -82,6 +85,15 @@ final class TropicalFeatures {
 
     private final MapView mapView;
     private final Context pluginContext;
+    private final String tag;
+    /** The layer's name in Overlay Manager and on the vector stack: "Hurricanes". */
+    private final String layerName;
+    /** The store's file under tools/atmosphere/. */
+    private final String storeName;
+    /** The feature sets' type column. */
+    private final String type;
+    /** True for the storms only: an older build of that layer left drawings behind. */
+    private final boolean sweepOldStormDrawings;
 
     private File storeFile;
     private FeatureSetDatabase2 store;
@@ -89,9 +101,15 @@ final class TropicalFeatures {
     private FeatureDataStoreMapOverlay overlay;
     private final Map<String, Long> sets = new HashMap<>();
 
-    TropicalFeatures(MapView mapView, Context pluginContext) {
+    AtmosphereFeatures(MapView mapView, Context pluginContext, String logTag, String layerName,
+            String storeName, String type, boolean sweepOldStormDrawings) {
         this.mapView = mapView;
         this.pluginContext = pluginContext;
+        this.tag = logTag;
+        this.layerName = layerName;
+        this.storeName = storeName;
+        this.type = type;
+        this.sweepOldStormDrawings = sweepOldStormDrawings;
     }
 
     /** Open the store and put the layer on the map. Safe to call twice. */
@@ -99,7 +117,7 @@ final class TropicalFeatures {
         if (store != null)
             return;
         try {
-            storeFile = FileSystemUtils.getItem("tools/atmosphere/storms.sqlite");
+            storeFile = FileSystemUtils.getItem("tools/atmosphere/" + storeName);
             final File dir = storeFile.getParentFile();
             if (dir != null && !dir.isDirectory())
                 //noinspection ResultOfMethodCallIgnored
@@ -114,13 +132,14 @@ final class TropicalFeatures {
             // open question (XCover, 2026-09-23).
             // BEFORE the overlay is built, and that ordering is the whole point --
             // see sweepOldDrawings.
-            sweepOldDrawings();
+            if (sweepOldStormDrawings)
+                sweepOldDrawings();
 
             store = new FeatureSetDatabase2(storeFile);
             final FeatureDataStore2.FeatureQueryParameters visibleOnly =
                     new FeatureDataStore2.FeatureQueryParameters();
             visibleOnly.visibleOnly = true;
-            layer = new FeatureLayer3("Hurricanes", store, visibleOnly);
+            layer = new FeatureLayer3(layerName, store, visibleOnly);
 
             final FeatureDataStoreDeepMapItemQuery query =
                     new FeatureDataStoreDeepMapItemQuery(layer) {
@@ -131,7 +150,7 @@ final class TropicalFeatures {
                                         java.util.Collection<com.atakmap.map.hittest.HitTestControl>> controls) {
                             final java.util.SortedSet<MapItem> hits =
                                     super.deepHitTest(view, params, controls);
-                            Log.d(TAG, "deepHitTest: " + (controls == null ? -1 : controls.size())
+                            Log.d(tag, "deepHitTest: " + (controls == null ? -1 : controls.size())
                                     + " controls, " + (hits == null ? -1 : hits.size()) + " hits");
                             return hits;
                         }
@@ -141,7 +160,7 @@ final class TropicalFeatures {
                                 com.atakmap.coremap.maps.coords.GeoPoint point, MapView view) {
                             final java.util.SortedSet<MapItem> hits =
                                     super.deepHitTestItems(x, y, point, view);
-                            Log.d(TAG, "deepHitTestItems: "
+                            Log.d(tag, "deepHitTestItems: "
                                     + (hits == null ? -1 : hits.size()) + " hits");
                             return hits;
                         }
@@ -190,7 +209,7 @@ final class TropicalFeatures {
                     };
 
             overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
-                    "Hurricanes", "file://asset/nothing", query, null, null);
+                    layerName, "file://asset/nothing", query, null, null);
             // addOverlay, not addFilesOverlay. With addFilesOverlay this overlay did
             // not appear anywhere in Overlay Manager on the XCover, while its polygons
             // drew on the map perfectly well -- the same thing IPAWS found on the same
@@ -199,21 +218,21 @@ final class TropicalFeatures {
             // nothing at all.
             final boolean added = mapView.getMapOverlayManager().addOverlay(overlay);
             final String id = overlay.getIdentifier();
-            Log.d(TAG, "overlay registration: added=" + added + " identifier='" + id
+            Log.d(tag, "overlay registration: added=" + added + " identifier='" + id
                     + "' findable="
                     + (mapView.getMapOverlayManager().getOverlay(id) != null));
             mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             try {
                 final java.util.List<com.atakmap.map.layer.Layer> stack =
                         mapView.getLayers(MapView.RenderStack.VECTOR_OVERLAYS);
-                Log.d(TAG, "vector stack: " + stack.size() + " layers, ours present="
+                Log.d(tag, "vector stack: " + stack.size() + " layers, ours present="
                         + stack.contains(layer) + ", layer='" + layer.getName()
                         + "' visible=" + layer.isVisible());
             } catch (Exception e) {
-                Log.w(TAG, "could not read the vector stack", e);
+                Log.w(tag, "could not read the vector stack", e);
             }
         } catch (Exception e) {
-            Log.w(TAG, "storm store would not open", e);
+            Log.w(tag, layerName + " store would not open", e);
             store = null;
         }
     }
@@ -254,7 +273,7 @@ final class TropicalFeatures {
             final com.atakmap.android.maps.MapGroup mine = root.findMapGroup("Hurricanes");
             if (mine != null) {
                 root.removeGroup(mine);
-                Log.d(TAG, "removed a leftover Hurricanes group");
+                Log.d(tag, "removed a leftover Hurricanes group");
             }
             int n = 0;
             for (String suffix : new String[] { " cone", " track", " watches",
@@ -263,9 +282,9 @@ final class TropicalFeatures {
             // The positions were titled with the storm or the forecast time, so they
             // are found by their own marker type instead.
             if (n > 0)
-                Log.d(TAG, "removed " + n + " drawings left by an older build");
+                Log.d(tag, "removed " + n + " drawings left by an older build");
         } catch (Exception e) {
-            Log.w(TAG, "sweep of old drawings failed", e);
+            Log.w(tag, "sweep of old drawings failed", e);
         }
     }
 
@@ -295,7 +314,7 @@ final class TropicalFeatures {
             if (store != null)
                 store.dispose();
         } catch (Exception e) {
-            Log.w(TAG, "storm store would not close", e);
+            Log.w(tag, layerName + " store would not close", e);
         }
         overlay = null;
         layer = null;
@@ -310,7 +329,7 @@ final class TropicalFeatures {
         try {
             store.deleteFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
         } catch (Exception e) {
-            Log.w(TAG, "storm store would not clear", e);
+            Log.w(tag, layerName + " store would not clear", e);
         }
         sets.clear();
     }
@@ -322,12 +341,12 @@ final class TropicalFeatures {
             return known;
         try {
             final long id = store.insertFeatureSet(
-                    new FeatureSet(PROVIDER, TYPE, name, MIN_GSD, MAX_GSD));
+                    new FeatureSet(PROVIDER, type, name, MIN_GSD, MAX_GSD));
             store.setFeatureSetVisible(id, true);
             sets.put(name, id);
             return id;
         } catch (Exception e) {
-            Log.w(TAG, "feature set " + name, e);
+            Log.w(tag, "feature set " + name, e);
             return -1;
         }
     }
@@ -342,6 +361,19 @@ final class TropicalFeatures {
     void addPolygon(String setName, String name, GeoPoint[] pts, int stroke, float weight,
             int fill, AttributeSet attrs) {
         insert(setName, name, new Polygon(ring(pts)),
+                new CompositeStyle(new Style[] {
+                        new BasicFillStyle(fill), new BasicStrokeStyle(stroke, weight) }),
+                attrs);
+    }
+
+    /**
+     * A shape that arrived already built, holes and all: a contour band is a polygon
+     * with the worse bands cut out of it, and flattening it to its outer ring stacks
+     * every band on top of the ones inside it.
+     */
+    void addShape(String setName, String name, com.atakmap.map.layer.feature.geometry.Geometry g,
+            int stroke, float weight, int fill, AttributeSet attrs) {
+        insert(setName, name, g,
                 new CompositeStyle(new Style[] {
                         new BasicFillStyle(fill), new BasicStrokeStyle(stroke, weight) }),
                 attrs);
@@ -408,7 +440,7 @@ final class TropicalFeatures {
             store.insertFeature(new Feature(fsid, name, g, style, attrs,
                     Feature.AltitudeMode.ClampToGround, 0d));
         } catch (Exception e) {
-            Log.w(TAG, "insert " + setName + "/" + name, e);
+            Log.w(tag, "insert " + setName + "/" + name, e);
         }
     }
 
@@ -433,7 +465,7 @@ final class TropicalFeatures {
                         return e.getKey();
             }
         } catch (Exception e) {
-            Log.w(TAG, "set of " + fid, e);
+            Log.w(tag, "set of " + fid, e);
         } finally {
             if (c != null)
                 try {
@@ -460,7 +492,7 @@ final class TropicalFeatures {
             if (c.moveToNext())
                 return c.get().getAttributes();
         } catch (Exception e) {
-            Log.w(TAG, "attributes of " + fid, e);
+            Log.w(tag, "attributes of " + fid, e);
         } finally {
             if (c != null)
                 try {

@@ -13,6 +13,7 @@ import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.SnapshotStore;
 import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
+import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
 import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
@@ -75,6 +76,7 @@ public class Atmosphere implements IPlugin {
     private StormDetailsReceiver stormDetails;
     private WindOverlay wind;
     private SmokeOverlay smoke;
+    private AirQualityOverlay air;
 
     public Atmosphere(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -129,6 +131,8 @@ public class Atmosphere implements IPlugin {
         wind.start();
         smoke = new SmokeOverlay(mapView, egress);
         smoke.start();
+        air = new AirQualityOverlay(mapView, pluginContext, egress);
+        air.start();
         tropical = new TropicalOverlay(mapView, pluginContext, egress);
         tropical.start();
         if (stormDetails == null) {
@@ -142,6 +146,7 @@ public class Atmosphere implements IPlugin {
             atmospherePane.setRadar(radar);
             atmospherePane.setWind(wind);
             atmospherePane.setSmoke(smoke);
+            atmospherePane.setAirQuality(air);
             atmospherePane.setTropical(tropical);
         }
     }
@@ -167,6 +172,10 @@ public class Atmosphere implements IPlugin {
         if (tropical != null) {
             tropical.stop();
             tropical = null;
+        }
+        if (air != null) {
+            air.stop();
+            air = null;
         }
         if (smoke != null) {
             smoke.stop();
@@ -212,6 +221,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setWind(wind);
             if (smoke != null)
                 atmospherePane.setSmoke(smoke);
+            if (air != null)
+                atmospherePane.setAirQuality(air);
             if (tropical != null)
                 atmospherePane.setTropical(tropical);
         }

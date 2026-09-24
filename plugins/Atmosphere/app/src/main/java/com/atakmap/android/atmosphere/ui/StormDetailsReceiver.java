@@ -30,7 +30,7 @@ import java.util.List;
  * that shape, carried forward.
  *
  * <p>The radial's details button broadcasts {@link #ACTION} with the tapped item's
- * uid. The attributes are already on the item -- {@code TropicalFeatures} puts them
+ * uid. The attributes are already on the item -- {@code AtmosphereFeatures} puts them
  * there during the hit test, where they have to be fetched by feature id because the
  * hit-test query returns features without them.
  */

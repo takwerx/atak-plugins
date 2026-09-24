@@ -55,6 +55,13 @@
     <string name="credit_smoke">Smoke forecast from NOAA (%1$s)</string>
     <string name="smoke_allow_title">Allow smoke</string>
     <string name="smoke_allow_text">Smoke comes from the US National Weather Service\'s forecast model, the same one the wind comes from: where the smoke is and how thick, near the ground or through the whole sky.\n\nTurning it on lets Atmosphere ask them for smoke over the part of the map you are looking at. Nothing else about you is sent.\n\nServer: nomads.ncep.noaa.gov</string>
+    <string name="air_on">Air quality ON</string>
+    <string name="air_off">Air quality OFF</string>
+    <string name="air_here">Here: %1$s, index %2$s</string>
+    <string name="air_here_none">Here: outside the areas EPA has drawn</string>
+    <string name="credit_air">Air quality from the U.S. EPA\'s AirNow (%1$s)</string>
+    <string name="air_allow_title">Allow air quality</string>
+    <string name="air_allow_text">Air quality comes from the U.S. Environmental Protection Agency\'s AirNow: the latest hour of ozone and fine particles, measured at monitors and drawn in the six Air Quality Index colors.\n\nTurning it on lets Atmosphere ask EPA for the map of the whole country. Your position is not sent.\n\nServer: services.arcgis.com</string>
     <string name="radar_allow_title">Allow radar</string>
     <string name="radar_allow_text">Radar comes from the US National Weather Service, the same picture their own radar site draws.\n\nTurning it on lets Atmosphere ask them for radar over the part of the map you are looking at. Nothing else about you is sent.\n\nServer: opengeo.ncep.noaa.gov</string>
     <string name="variables">What to show</string>

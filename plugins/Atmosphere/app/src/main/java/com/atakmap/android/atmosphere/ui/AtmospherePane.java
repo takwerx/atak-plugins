@@ -33,6 +33,8 @@ import com.atakmap.android.atmosphere.model.Reading;
 import com.atakmap.android.atmosphere.model.SeriesEntry;
 import com.atakmap.android.atmosphere.model.Snapshot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
+import com.atakmap.android.atmosphere.data.AirNow;
+import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
 import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
@@ -90,6 +92,7 @@ public final class AtmospherePane {
     private static final String PREF_TROPICAL_OPEN = "weather.tropical.open";
     private static final String PREF_WIND_OPEN = "weather.wind.open";
     private static final String PREF_SMOKE_OPEN = "weather.smoke.open";
+    private static final String PREF_AIR_OPEN = "weather.air.open";
 
     private final View root;
     private final Context pluginContext;
@@ -188,6 +191,14 @@ public final class AtmospherePane {
     private boolean smokeOpen = true;
     private SmokeOverlay smoke;
     private int smokeHours;
+    private final Button airToggle;
+    private final ImageButton airExpand;
+    private final LinearLayout airSettings;
+    private final TextView airStatus;
+    private final LinearLayout airScale;
+    private final TextView airReading;
+    private boolean airOpen = true;
+    private AirQualityOverlay air;
 
     private final List<WxSourceDef> sources;
 
@@ -303,6 +314,13 @@ public final class AtmospherePane {
         smokeReading = find(R.id.smoke_reading);
         smokeHeightRow = find(R.id.smoke_height_row);
         buildSmokeHeightRow();
+        airToggle = find(R.id.air_toggle);
+        airExpand = find(R.id.air_expand);
+        airSettings = find(R.id.air_settings);
+        airStatus = find(R.id.air_status);
+        airScale = find(R.id.air_scale);
+        airReading = find(R.id.air_reading);
+        buildAirScale();
         scrubberDays = find(R.id.scrubber_days);
         scrubberHours = find(R.id.scrubber_hours);
         wireLayers();
@@ -350,6 +368,15 @@ public final class AtmospherePane {
             }
         });
         smokeOpen = prefs == null || prefs.getBoolean(PREF_SMOKE_OPEN, true);
+        airOpen = prefs == null || prefs.getBoolean(PREF_AIR_OPEN, true);
+        airExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                airOpen = !airOpen;
+                rememberFold(PREF_AIR_OPEN, airOpen);
+                updateLayerControls();
+            }
+        });
         smokeExpand.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -388,6 +415,8 @@ public final class AtmospherePane {
         // has actually opened the pane to look.
         if (tropical != null && tropical.isOn())
             tropical.refresh(false);
+        if (air != null && air.isOn())
+            air.refresh(false);
         updateLayerControls();
     }
 
@@ -599,8 +628,31 @@ public final class AtmospherePane {
     }
 
     /**
+     * Air quality, owned by the plugin. The latest hour only, so no strip: its line
+     * says which hour is on the map, and its reading follows the pane's point.
+     */
+    public void setAirQuality(AirQualityOverlay overlay) {
+        air = overlay;
+        if (air == null)
+            return;
+        air.setListener(new AirQualityOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                airStatus.setText(status);
+                airStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+
+            @Override
+            public void onContours() {
+                updateAirReading();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /**
      * When the wind on screen is for, led by how far that is from now, which is what
-     * somebody scrubbing the bar is actually asking. "+0 h" is a modeller's way of
+     * somebody scrubbing the bar is actually asking. "+0 h" is a modeler's way of
      * counting and the model's name is not something a crew can act on.
      */
     private String windLabel(int hour, long validTime) {
@@ -665,6 +717,22 @@ public final class AtmospherePane {
                     turnWindOn();
                 } else {
                     askToAllowWind();
+                }
+            }
+        });
+        airToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (air == null)
+                    return;
+                if (air.isOn()) {
+                    air.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(AirQualityOverlay.LAYER_ID)) {
+                    air.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowAir();
                 }
             }
         });
@@ -1041,6 +1109,48 @@ public final class AtmospherePane {
      * expand the section a color code for the categories"). Swatches come from the
      * same table the map draws with, so the legend cannot drift from the map.
      */
+    /**
+     * EPA's six categories in EPA's colors, from the table the map is drawn with. Two
+     * lines allowed, because "Sensitive groups" and "Very unhealthy" are the words and
+     * six cells across half a pane is not wide.
+     */
+    private void buildAirScale() {
+        airScale.removeAllViews();
+        for (AirNow.Category c : AirNow.Category.values()) {
+            final TextView cell = new TextView(pluginContext);
+            cell.setText(c.shortLabel);
+            cell.setTextSize(10);
+            cell.setMaxLines(2);
+            cell.setGravity(Gravity.CENTER);
+            cell.setPadding(dp(1), dp(3), dp(1), dp(3));
+            cell.setBackgroundColor(c.color);
+            // Green, yellow and orange carry dark text; red and darker carry light.
+            cell.setTextColor(c.ordinal() <= AirNow.Category.SENSITIVE.ordinal()
+                    ? 0xFF101010 : 0xFFFFFFFF);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+            cell.setLayoutParams(lp);
+            airScale.addView(cell);
+        }
+    }
+
+    /** The category at the pane's point, from the contours already on the map. */
+    private void updateAirReading() {
+        if (air == null || !air.isOn()) {
+            airReading.setText(R.string.empty);
+            return;
+        }
+        final GeoPoint p = point();
+        if (p == null) {
+            airReading.setText(R.string.empty);
+            return;
+        }
+        final AirNow.Category c = air.at(p.getLatitude(), p.getLongitude());
+        airReading.setText(c == null
+                ? pluginContext.getString(R.string.air_here_none)
+                : pluginContext.getString(R.string.air_here, c.label, c.range));
+    }
+
     private void buildStormScale() {
         tropicalScale.removeAllViews();
         for (int i = 0; i < TropicalOverlay.SAFFIR_SIMPSON_LABELS.length; i++) {
@@ -1187,6 +1297,27 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    private void askToAllowAir() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.air_allow_title))
+                .setMessage(pluginContext.getString(R.string.air_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(AirQualityOverlay.LAYER_ID, true);
+                                if (air != null)
+                                    air.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowSmoke() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -1246,6 +1377,15 @@ public final class AtmospherePane {
             updateSmokeHeightRow();
             updateSmokeReading();
         }
+        final boolean airOn = air != null && air.isOn();
+        airToggle.setText(airOn ? R.string.air_on : R.string.air_off);
+        airToggle.setTextColor(pluginContext.getResources().getColor(
+                airOn ? R.color.state_on : R.color.state_off));
+        airExpand.setVisibility(airOn ? View.VISIBLE : View.GONE);
+        airExpand.setRotation(airOpen ? 180f : 0f);
+        airSettings.setVisibility(airOn && airOpen ? View.VISIBLE : View.GONE);
+        if (airOn)
+            updateAirReading();
         // A layer with nothing on the map has no settings worth a chevron.
         final boolean tropicalOn = tropical != null && tropical.isOn();
         tropicalToggle.setText(tropicalOn ? R.string.tropical_on : R.string.tropical_off);
@@ -1323,6 +1463,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_radar, RadarOverlay.HOST));
+        }
+        if (air != null && air.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_air, AirQualityOverlay.HOST));
         }
         if (tropical != null && tropical.isOn()) {
             if (out.length() > 0)

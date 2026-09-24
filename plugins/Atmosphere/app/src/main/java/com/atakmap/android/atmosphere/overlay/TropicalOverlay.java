@@ -86,7 +86,7 @@ public final class TropicalOverlay {
     private final Context pluginContext;
     private final EgressPolicy egress;
 
-    private final TropicalFeatures features;
+    private final AtmosphereFeatures features;
     private Listener listener;
     private boolean started;
     private boolean on;
@@ -119,7 +119,8 @@ public final class TropicalOverlay {
         // to a different uid than the process this runs in, so mkdirs there fails and
         // every composite lands on ENOENT (XCover, 2026-09-23). Feature Layer keeps its
         // label composites under tools/ for the same reason.
-        this.features = new TropicalFeatures(mapView, pluginContext);
+        this.features = new AtmosphereFeatures(mapView, pluginContext, TAG, GROUP,
+                "storms.sqlite", "tropical", true);
         this.icons = new StormIcons(pluginContext,
                 com.atakmap.coremap.filesystem.FileSystemUtils.getItem(
                         "tools/atmosphere/storm-icons"));
