@@ -197,6 +197,12 @@ public final class Http {
                 throw new IOException("provider returned HTTP " + status);
 
             in = conn.getInputStream();
+            // Identity is asked for above, so a server only compresses when a caller
+            // asked for gzip in its own headers (the spot list: 717 KB, 79 KB
+            // gzipped). The cap in read() counts what comes OUT of the inflater, so
+            // a small compressed body cannot unpack past it.
+            if ("gzip".equalsIgnoreCase(conn.getContentEncoding()))
+                in = new java.util.zip.GZIPInputStream(in);
             return read(in);
         } finally {
             if (in != null) {

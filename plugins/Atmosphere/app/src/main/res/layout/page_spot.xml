@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Page 3: NWS spot forecasts. Every open request in the country, narrowed by the
+     filters on top; a row opens what was asked and the forecast NWS issued. The list
+     is LinearLayout rows, not a ListView, because it lives in this page's scroller. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fadeScrollbars="false"
+    android:focusableInTouchMode="true"
+    android:descendantFocusability="beforeDescendants">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/heading_spot"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:paddingTop="8dp"
+            android:alpha="0.6" />
+
+        <!-- Before the operator has allowed it: what it is and one button. -->
+        <LinearLayout
+            android:id="@+id/spot_gate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:text="@string/spot_gate_text" />
+
+            <Button
+                android:id="@+id/spot_load"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/spot_load" />
+        </LinearLayout>
+
+        <!-- The list: filters, a status line, the rows. -->
+        <LinearLayout
+            android:id="@+id/spot_browse"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/spot_all"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="4dp"
+                    android:text="@string/spot_all" />
+
+                <Button
+                    android:id="@+id/spot_near"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="4dp"
+                    android:text="@string/spot_near" />
+
+                <Button
+                    android:id="@+id/spot_map"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/spot_map" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/spot_state"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="4dp"
+                    android:text="@string/spot_state" />
+
+                <Button
+                    android:id="@+id/spot_region"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/spot_region" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/spot_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:text="" />
+
+            <LinearLayout
+                android:id="@+id/spot_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <!-- One request: what was asked, then the forecast NWS issued. -->
+        <LinearLayout
+            android:id="@+id/spot_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/spot_back"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="4dp"
+                    android:text="@string/back" />
+
+                <Button
+                    android:id="@+id/spot_goto"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/go_to" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/spot_detail_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/white"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/spot_detail_facts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:lineSpacingExtra="2dp"
+                android:text="" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/heading_spot_forecast"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <!-- The product as NWS wrote it: fixed-width tables of 66 columns, so it
+                 scrolls sideways in a half-width pane rather than wrapping into
+                 nonsense. -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:id="@+id/spot_detail_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/white"
+                    android:textSize="12sp"
+                    android:typeface="monospace"
+                    android:textIsSelectable="true"
+                    android:text="" />
+            </HorizontalScrollView>
+
+            <Button
+                android:id="@+id/spot_open"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/spot_open_browser"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/spot_request"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/spot_request" />
+
+        <TextView
+            android:id="@+id/spot_attribution"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:layout_marginTop="@dimen/auto_margin"
+            android:text="@string/credit_spot" />
+    </LinearLayout>
+</ScrollView>

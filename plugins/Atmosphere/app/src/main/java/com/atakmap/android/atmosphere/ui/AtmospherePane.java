@@ -110,6 +110,8 @@ public final class AtmospherePane {
     private final ViewPager pager;
     private final LinearLayout pageDots;
     private final View[] pages;
+    /** Page 3, its own class; the pane only hosts it. */
+    private final SpotPage spotPage;
     private final ImageButton refreshButton;
     private final ImageButton settingsButton;
     private final TextView positionText;
@@ -242,9 +244,22 @@ public final class AtmospherePane {
         // The pages are their own layouts, inflated here and handed to the pager;
         // every id below is looked up across the root and the pages.
         final LayoutInflater inflater = LayoutInflater.from(pluginContext);
+        spotPage = new SpotPage(pluginContext, MapView.getMapView(), egress,
+                new SpotPage.Host() {
+                    @Override
+                    public GeoPoint point() {
+                        return AtmospherePane.this.point();
+                    }
+
+                    @Override
+                    public UnitSystem units() {
+                        return units;
+                    }
+                });
         pages = new View[] {
                 inflater.inflate(R.layout.page_forecast, null),
-                inflater.inflate(R.layout.page_layers, null)
+                inflater.inflate(R.layout.page_layers, null),
+                spotPage.view()
         };
         pager = root.findViewById(R.id.pager);
         pageDots = root.findViewById(R.id.page_dots);
@@ -417,6 +432,8 @@ public final class AtmospherePane {
             tropical.refresh(false);
         if (air != null && air.isOn())
             air.refresh(false);
+        if (pages[pager.getCurrentItem()] == spotPage.view())
+            spotPage.onShown();
         updateLayerControls();
     }
 
@@ -466,6 +483,8 @@ public final class AtmospherePane {
             @Override
             public void onPageSelected(int position) {
                 updatePageDots(position);
+                if (pages[position] == spotPage.view())
+                    spotPage.onShown();
             }
         });
         for (int i = 0; i < pages.length; i++) {
@@ -1789,6 +1808,12 @@ public final class AtmospherePane {
     public void onClosed() {
         disarmPick();
         updateModeIcons();
+    }
+
+    /** The plugin is going away: stop the spot page's worker and its fetches. */
+    public void dispose() {
+        onClosed();
+        spotPage.dispose();
     }
 
     private void loadSelectedSource(SharedPreferences prefs) {

@@ -130,6 +130,6 @@ public class AtmosphereDropDown extends DropDownReceiver implements OnStateListe
 
     @Override
     protected void disposeImpl() {
-        pane.onClosed();
+        pane.dispose();
     }
 }
