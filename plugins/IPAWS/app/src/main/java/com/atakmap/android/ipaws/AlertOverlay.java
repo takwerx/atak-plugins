@@ -173,8 +173,11 @@ public class AlertOverlay {
                             item.setMetaInteger("iconColor", 0xFFFFFFFF);
                             return item;
                         }
-                        // ATAK hands the same feature back once per hit-test control,
-                        // so an alert appears twice in the chooser unless this is here.
+                        // Two reasons a chooser doubles up. ATAK hands the same
+                        // feature back once per hit-test control; and one alert is
+                        // drawn as TWO features, its area and the point carrying its
+                        // name, which are different feature ids for the same alert.
+                        // So the key is the alert where there is one.
                         @Override
                         public java.util.SortedSet<MapItem> deepHitTest(MapView view,
                                 com.atakmap.map.hittest.HitTestQueryParameters params,
@@ -191,12 +194,14 @@ public class AlertOverlay {
                         private java.util.SortedSet<MapItem> dedupe(java.util.SortedSet<MapItem> hits) {
                             if (hits == null || hits.isEmpty())
                                 return hits;
-                            final java.util.Set<Long> seen = new java.util.HashSet<>();
+                            final java.util.Set<String> seen = new java.util.HashSet<>();
                             final java.util.SortedSet<MapItem> out =
                                     new java.util.TreeSet<>(hits.comparator());
                             for (MapItem m : hits) {
-                                final long fid = m.getMetaLong("featureid", -1);
-                                if (fid < 0 || seen.add(fid))
+                                final String alert = m.getMetaString("ipaws_alert_id", null);
+                                final String key = alert != null ? "a:" + alert
+                                        : "f:" + m.getMetaLong("featureid", -1);
+                                if (seen.add(key))
                                     out.add(m);
                             }
                             return out;

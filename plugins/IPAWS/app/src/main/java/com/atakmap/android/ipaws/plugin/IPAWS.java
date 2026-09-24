@@ -39,6 +39,8 @@ public class IPAWS implements IPlugin {
     Pane detailPane;
     /** True while one detail pane is being replaced by another, so its close is ignored. */
     boolean swappingDetail;
+    /** Whether the list was up when the details opened, so closing can restore it. */
+    boolean listWasVisible;
     MapView mapView;
 
     IServiceController serviceController;
@@ -113,6 +115,13 @@ public class IPAWS implements IPlugin {
         if (mapView != null && manager == null) {
             manager = new AlertManager(mapView, pluginContext);
             manager.start();
+            // Registered here, not when the pane is first opened. Tapping an alert on
+            // the map is a perfectly ordinary thing to do before ever opening the
+            // pane, and while this lived in showPane() the radial's Details button
+            // broadcast into a void -- no receiver, no log line, nothing at all.
+            details = new AlertDetails(pluginContext, manager, detailHost());
+            manager.setDetailsReceiver(
+                    new AlertDetailsReceiver(mapView, manager, details));
         } else if (mapView == null) {
             Log.w(TAG, "no map view at start; the overlay cannot be attached");
         }
@@ -183,6 +192,9 @@ public class IPAWS implements IPlugin {
                         .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
                         .build();
                 detailPane = opened;
+                // Opened from the map with no pane up, closing it should return to the
+                // map, not conjure a list the operator never asked for.
+                listWasVisible = templatePane != null && uiService.isPaneVisible(templatePane);
                 uiService.showPane(opened, new IHostUIService.IPaneLifecycleListener() {
                     @Override
                     public void onPaneVisible(boolean visible) {
@@ -192,7 +204,8 @@ public class IPAWS implements IPlugin {
                     public void onPaneClose() {
                         if (swappingDetail || detailPane != opened)
                             return;   // a newer alert took its place
-                        if (templatePane != null && !uiService.isPaneVisible(templatePane))
+                        if (listWasVisible && templatePane != null
+                                && !uiService.isPaneVisible(templatePane))
                             uiService.showPane(templatePane, null);
                     }
                 });
@@ -214,10 +227,6 @@ public class IPAWS implements IPlugin {
             return;
         }
         if (templatePane == null) {
-            details = new AlertDetails(pluginContext, manager, detailHost());
-            // The map's radial opens the same page the list does.
-            manager.setDetailsReceiver(
-                    new AlertDetailsReceiver(mapView, manager, details));
             paneUi = new IpawsPane(mapView, pluginContext, manager, manager.getCounties(), details);
             templatePane = new PaneBuilder(paneUi.getView())
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
