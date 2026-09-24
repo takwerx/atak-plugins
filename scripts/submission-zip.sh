@@ -282,12 +282,17 @@ EOF
         # build has no .git either. The SDK's getVersionCode() returns 1 here, and
         # a versionCode-1 release is not an update to any MDM -- Watchtower refused
         # Cam Depot 1.2 over 1.1 on 2026-09-06 because both were 1 to it. Every
-        # plugin derives the code from PLUGIN_VERSION as MAJOR*10000+MINOR*100+PATCH
-        # (PLUGIN_VERSION_CODE in app/build.gradle); this checks the APK agrees.
+        # plugin derives the code from PLUGIN_VERSION and the ATAK target as
+        # (MAJOR*10000+MINOR*100+PATCH)*10000 + ATAK major*1000+minor*10+patch
+        # (PLUGIN_VERSION_CODE in app/build.gradle): one code per target, because
+        # an MDM handed two targets of one release under one code and two hashes
+        # reports an incompatible build (takwerx/feature-layer#1, 2026-09-20).
+        # This checks the APK agrees.
         # No `| head -1` after sed: only the package: line matches, and head would
         # close the pipe early under pipefail (see the SIGPIPE note below).
         AAPT="$(ls "$ANDROID_HOME"/build-tools/*/aapt 2>/dev/null | sort -V | tail -1)"
-        EXPECT_CODE="$(printf '%s' "$PLUGIN_VERSION" | awk -F. '{printf "%d", $1*10000 + $2*100 + $3}')"
+        EXPECT_CODE="$(printf '%s %s' "$PLUGIN_VERSION" "$ATAK_VERSION" | awk '{ split($1, p, "."); split($2, a, ".");
+            printf "%d", (p[1]*10000 + p[2]*100 + p[3]) * 10000 + a[1]*1000 + a[2]*10 + a[3] }')"
         GOT_CODE=""
         if [ -n "$AAPT" ] && [ -n "$BUILT_APK" ]; then
             GOT_CODE="$("$AAPT" dump badging "$BUILT_APK" 2>/dev/null \
@@ -297,9 +302,9 @@ EOF
             echo "  FAIL  could not read versionCode from the built APK (aapt: ${AAPT:-none})"
             FAIL=1
         elif [ "$GOT_CODE" = "$EXPECT_CODE" ] && [ "$GOT_CODE" -gt 1 ]; then
-            echo "  PASS  versionCode=$GOT_CODE from PLUGIN_VERSION $PLUGIN_VERSION (no .git needed)"
+            echo "  PASS  versionCode=$GOT_CODE from PLUGIN_VERSION $PLUGIN_VERSION on ATAK $ATAK_VERSION (no .git needed)"
         else
-            echo "  FAIL  versionCode=$GOT_CODE, expected $EXPECT_CODE from PLUGIN_VERSION $PLUGIN_VERSION."
+            echo "  FAIL  versionCode=$GOT_CODE, expected $EXPECT_CODE from PLUGIN_VERSION $PLUGIN_VERSION on ATAK $ATAK_VERSION."
             echo "        A signed release with versionCode 1 cannot be pushed as an update by"
             echo "        any MDM. app/build.gradle must set versionCode = PLUGIN_VERSION_CODE,"
             echo "        not getVersionCode() -- see CLAUDE.md, release checklist."

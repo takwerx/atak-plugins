@@ -96,6 +96,12 @@ public final class AreaPicker implements ToolListener {
         void onPickingStarted();
 
         void onCancelled(String reason);
+
+        /**
+         * The boundary left the map by some route other than Clear — ATAK's own
+         * delete, Overlay Manager, an import wiping the drawing group.
+         */
+        void onAreaRemoved();
     }
 
     private final MapView mapView;
@@ -239,6 +245,7 @@ public final class AreaPicker implements ToolListener {
         // One area at a time: the previous boundary goes when a new one is drawn.
         clearDrawn();
         drawn = made;
+        drawn.addOnGroupChangedListener(watcher);
         drawn.setTitle("Dozer Country area");
         // The boundary is a boundary, not an annotation. ATAK gives a drawn shape a
         // centre dot and a floating name by default, and over an overlay whose whole
@@ -264,13 +271,48 @@ public final class AreaPicker implements ToolListener {
         callback.onAreaPicked(area);
     }
 
+    /**
+     * Notices the boundary being deleted by anything that is not us.
+     *
+     * <p>The shape is an ordinary ATAK drawing object once it is on the map, so it can
+     * be deleted from its radial menu or from Overlay Manager, and the plugin is not
+     * told. It was not told: the operator deleted the area and the painting stayed on
+     * the map with no outline around it and nothing to say what ground it covered --
+     * "uh bugs i delted area its still there". Painted ground with no boundary is
+     * exactly the thing the boundary exists to prevent.
+     */
+    private final MapItem.OnGroupChangedListener watcher =
+            new MapItem.OnGroupChangedListener() {
+        @Override
+        public void onItemAdded(MapItem item, com.atakmap.android.maps.MapGroup group) {
+        }
+
+        @Override
+        public void onItemRemoved(MapItem item, com.atakmap.android.maps.MapGroup group) {
+            // Only our own current boundary counts, and only when we did not do it.
+            if (item != drawn)
+                return;
+            drawn = null;
+            item.removeOnGroupChangedListener(this);
+            mapView.post(new Runnable() {
+                @Override
+                public void run() {
+                    callback.onAreaRemoved();
+                }
+            });
+        }
+    };
+
     /** Takes the boundary off the map. Called when the overlay is cleared. */
     public void clearDrawn() {
         if (drawn == null)
             return;
-        if (drawn.getGroup() != null)
-            drawn.removeFromGroup();
+        final DrawingShape going = drawn;
+        // Null it first so the watcher knows this removal was ours and stays quiet.
         drawn = null;
+        going.removeOnGroupChangedListener(watcher);
+        if (going.getGroup() != null)
+            going.removeFromGroup();
     }
 
     private void closeToolbar() {

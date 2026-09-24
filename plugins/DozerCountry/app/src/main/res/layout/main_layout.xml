@@ -11,6 +11,24 @@
         android:orientation="vertical"
         android:paddingBottom="12dp">
 
+        <!-- ====== MACHINE ======
+             First, and deliberately so. S-236 holds every machine to different
+             slope limits and a dozer is the most capable of them, so an overlay
+             that assumed one would paint the most permissive map in the book for
+             anyone who never touched this control. -->
+        <TextView
+            style="@style/TakwerxSectionHeading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/section_machine" />
+
+        <Button
+            android:id="@+id/pick_machine"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/pick_machine" />
+
         <!-- ====== AREA ====== -->
         <TextView
             style="@style/TakwerxSectionHeading"
@@ -86,6 +104,7 @@
             style="@style/TakwerxSectionHeading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:id="@+id/section_classes"
             android:text="@string/section_classes" />
 
         <!-- One row per band, built in code from dozer_data.json so the pane can

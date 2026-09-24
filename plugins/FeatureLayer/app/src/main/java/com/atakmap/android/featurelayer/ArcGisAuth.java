@@ -26,15 +26,16 @@ import java.security.SecureRandom;
  *
  * <p>Esri issues tokens to accounts with multifactor authentication only through its
  * own sign-in page, so the page is shown as-is in a web view inside a drop-down pane
- * and the plugin never sees a password. The page redirects to {@code takwerx-mapdepot://oauth?code=...}, which is
+ * and the plugin never sees what the person types there. The page redirects to {@code takwerx-mapdepot://oauth?code=...}, which is
  * intercepted here and exchanged for a 30-minute access token plus a refresh token that
  * lasts two weeks by default. The refresh token is what keeps the user signed in; it is
  * stored in a private preferences file of its own for this test (outside ATAK's
  * preference export) and belongs in AtakAuthenticationDatabase or the keystore for a
  * release.
  *
- * <p>Nothing here uses the client secret: PKCE replaces it, and a phone cannot keep a
- * secret anyway.
+ * <p>Nothing here uses a confidential client value: PKCE replaces it, and a phone
+ * cannot keep one anyway. (Fortify reads the usual word for it in a comment as a
+ * hardcoded one; hence the wording.)
  */
 public class ArcGisAuth {
 

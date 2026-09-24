@@ -57,10 +57,39 @@ public final class Standards {
         return cached;
     }
 
-    /** The standard to paint with. The first in the file until there is a picker. */
+    /** Chosen machine id, or null while the operator has not picked one yet. */
+    private static String chosenId;
+
+    /**
+     * The standard to paint with, or null until a machine has been chosen.
+     *
+     * <p><b>Null until chosen is the point, not an oversight.</b> S-236 tables every
+     * machine separately and a dozer is the most capable of them — a feller buncher
+     * is held to 30 percent sidehill where a dozer gets 45, a forwarder to 12. An
+     * overlay that defaulted to the dozer would paint the most permissive map in the
+     * book for whoever never touched the control, which is the same failure as
+     * implying data the plugin does not have. The operator's words: "do you
+     * understand that you have to ask first".
+     */
     public static synchronized DozerStandard active(Context pluginContext) {
         final List<DozerStandard> list = all(pluginContext);
-        return list.isEmpty() ? null : list.get(0);
+        if (list.isEmpty() || chosenId == null)
+            return null;
+        for (int i = 0; i < list.size(); i++) {
+            if (chosenId.equals(list.get(i).id))
+                return list.get(i);
+        }
+        return null;
+    }
+
+    /** True once a machine has been chosen and there is something to paint by. */
+    public static synchronized boolean chosen() {
+        return chosenId != null;
+    }
+
+    /** Choose the machine to paint by. Pass null to go back to nothing chosen. */
+    public static synchronized void choose(String id) {
+        chosenId = id;
     }
 
     /**
