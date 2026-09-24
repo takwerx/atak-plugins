@@ -18,9 +18,9 @@ import java.util.TimeZone;
 
 /**
  * EPA AirNow's latest AQI contours against a real response: the whole country,
- * 2026-09-24 about 05Z, simplified to 0.05 degree for size. 91 polygons, bands 1 to 4
- * present, an Unhealthy area over the Inland Empire cut out of the Sensitive Groups
- * band around it.
+ * fetched 2026-09-24 05:10Z (stamped 00:00Z), simplified to 0.05 degree for size.
+ * 91 polygons, bands 1 to 4 present, an Unhealthy area over the Inland Empire cut out
+ * of the Sensitive Groups band around it.
  */
 public class AirNowTest {
 
@@ -62,29 +62,30 @@ public class AirNowTest {
     }
 
     @Test
-    public void theStampIsEasternTimeWrittenAsUtc() throws Exception {
+    public void theStampIsUtc() throws Exception {
         final AirNow.Contours c = contours();
-        assertEquals(1790208000L, c.unixtime);                   // "2026-09-24 00:00Z"
+        assertEquals(1790208000L, c.unixtime);
         final Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         utc.clear();
-        utc.set(2026, Calendar.SEPTEMBER, 24, 5, 10, 0);
-        final long now = utc.getTimeInMillis();
-        utc.set(2026, Calendar.SEPTEMBER, 24, 4, 0, 0);
-        // 00:00 on the Eastern clock in daylight time is 04:00Z, which is the hour
-        // EPA's monitor layer carried at the same moment.
-        assertEquals(utc.getTimeInMillis(), AirNow.observedAt(c.unixtime, now));
+        utc.set(2026, Calendar.SEPTEMBER, 24, 0, 0, 0);
+        // 00:00Z, read as it stands. The same night it was 05:00Z at 05:53Z, which
+        // settles that the stamp is UTC and not Eastern time written as UTC.
+        assertEquals(utc.getTimeInMillis(), AirNow.observedAt(c.unixtime));
+        assertEquals(0, AirNow.observedAt(0));
     }
 
     @Test
-    public void aTrueUtcStampIsNotPushedIntoTheFuture() {
+    public void anHourEpaDidNotMakeIsSaidToBeStale() throws Exception {
+        final AirNow.Contours c = contours();
         final Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
         utc.clear();
-        utc.set(2026, Calendar.SEPTEMBER, 24, 4, 0, 0);
-        final long stampMs = utc.getTimeInMillis();
-        // Read as Eastern it would be 08:00Z, three hours ahead of this clock.
-        utc.set(2026, Calendar.SEPTEMBER, 24, 5, 0, 0);
-        assertEquals(stampMs, AirNow.observedAt(stampMs / 1000, utc.getTimeInMillis()));
-        assertEquals(0, AirNow.observedAt(0, utc.getTimeInMillis()));
+        // This fixture was fetched at 05:10Z carrying 00:00Z: EPA had re-published the
+        // last hour it made, five hours old.
+        utc.set(2026, Calendar.SEPTEMBER, 24, 5, 10, 0);
+        assertTrue(AirNow.isStale(c.unixtime, utc.getTimeInMillis()));
+        // The next hour landed 53 minutes after the hour, which is not stale.
+        utc.set(2026, Calendar.SEPTEMBER, 24, 0, 53, 0);
+        assertFalse(AirNow.isStale(c.unixtime, utc.getTimeInMillis()));
     }
 
     @Test

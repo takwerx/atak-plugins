@@ -219,7 +219,7 @@ public final class AirQualityOverlay {
 
     private void draw(AirNow.Contours c) {
         features.clear();
-        final String when = clock(AirNow.observedAt(c.unixtime, System.currentTimeMillis()));
+        final String when = clock(AirNow.observedAt(c.unixtime));
         int n = 0, skipped = 0;
         for (AirNow.Contour k : c.contours) {
             final Geometry g;
@@ -267,12 +267,17 @@ public final class AirQualityOverlay {
         return a;
     }
 
-    /** "Measured 9 pm" for what is on the map, or "" with nothing drawn. */
+    /**
+     * "Measured 9 pm" for what is on the map, or "" with nothing drawn. When EPA has
+     * not made a newer hour it re-publishes the old one, so a map five hours old looks
+     * fresh unless the line says otherwise (measured 2026-09-24, 04:57Z).
+     */
     private String statusLine() {
         if (drawn == null)
             return "";
-        return "Measured "
-                + clock(AirNow.observedAt(drawn.unixtime, System.currentTimeMillis()));
+        final String line = "Measured " + clock(AirNow.observedAt(drawn.unixtime));
+        return AirNow.isStale(drawn.unixtime, System.currentTimeMillis())
+                ? line + ". EPA has published nothing newer." : line;
     }
 
     /** "9 pm", or "Tue 9 pm" when it is not today. */

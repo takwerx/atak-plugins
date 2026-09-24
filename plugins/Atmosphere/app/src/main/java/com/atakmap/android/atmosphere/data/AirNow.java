@@ -4,9 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.List;
-import java.util.TimeZone;
 
 /**
  * EPA AirNow's latest Air Quality Index contours: the whole country as polygons, one
@@ -202,31 +200,26 @@ public final class AirNow {
     }
 
     /**
-     * When the contours are for, UTC millis.
+     * When the contours are for, UTC millis: the stamp is plain UTC.
      *
-     * <p>The stamp is <b>US Eastern wall-clock time written as if it were UTC</b>.
-     * Measured 2026-09-24: every contour said 00:00Z while the layer was republished
-     * at 04:57Z, and EPA's PM2.5 monitor layer from the same AirNow pipeline gave
-     * {@code ValidTime} 04:00Z beside {@code LocalTimeString} "2026-09-24 00:00:00
-     * GMT-4" -- GMT-4 even for a Prince Edward Island site, whose own clock is an
-     * hour later, so the pipeline's clock is Eastern. Read as UTC, the pane would call
-     * the air four hours older than it is (five in winter).
-     *
-     * <p>If EPA ever writes true UTC, reading it as Eastern would put it in the
-     * future; that is refused and the stamp taken as it stands.
+     * <p>Measured twice on 2026-09-24. At 04:57Z the layer was republished stamped
+     * 00:00Z while EPA's monitors were at 04:00Z, which looked like Eastern time
+     * written as UTC -- and was read that way for an hour. At 05:53Z it was republished
+     * stamped 05:00Z, which Eastern would put four hours in the future. So the stamp is
+     * UTC, and the first reading was the contours really being five hours old: EPA
+     * re-publishes the last hour it made when a newer one has not been made. That is
+     * what {@link #isStale} is for, and why the pane says so rather than hiding it.
      */
-    public static long observedAt(long unixtimeSeconds, long nowMillis) {
-        if (unixtimeSeconds <= 0)
-            return 0;
-        final long raw = unixtimeSeconds * 1000L;
-        final Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-        utc.setTimeInMillis(raw);
-        final Calendar eastern = Calendar.getInstance(TimeZone.getTimeZone("America/New_York"));
-        eastern.clear();
-        eastern.set(utc.get(Calendar.YEAR), utc.get(Calendar.MONTH),
-                utc.get(Calendar.DAY_OF_MONTH), utc.get(Calendar.HOUR_OF_DAY),
-                utc.get(Calendar.MINUTE), utc.get(Calendar.SECOND));
-        final long t = eastern.getTimeInMillis();
-        return t > nowMillis + 30 * 60_000L ? raw : t;
+    public static long observedAt(long unixtimeSeconds) {
+        return unixtimeSeconds <= 0 ? 0 : unixtimeSeconds * 1000L;
+    }
+
+    /**
+     * True when the newest contours are older than EPA's usual lag. Measured: an hour's
+     * contours land about 55 minutes after the hour, so two hours old is late.
+     */
+    public static boolean isStale(long unixtimeSeconds, long nowMillis) {
+        final long t = observedAt(unixtimeSeconds);
+        return t > 0 && nowMillis - t > 2 * 3_600_000L;
     }
 }
