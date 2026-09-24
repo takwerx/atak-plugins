@@ -83,6 +83,16 @@
                     android:textSize="13sp"
                     android:text="" />
 
+                <!-- What the track colors mean, on the Saffir-Simpson scale every
+                     track map uses. Built in code so the swatches come from the same
+                     table the map draws with and cannot drift from it. -->
+                <LinearLayout
+                    android:id="@+id/tropical_scale"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="horizontal" />
+
                 <LinearLayout
                     android:id="@+id/tropical_rows"
                     android:layout_width="match_parent"

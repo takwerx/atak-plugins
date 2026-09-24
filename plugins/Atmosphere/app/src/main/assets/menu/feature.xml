@@ -1,0 +1,7 @@
+<menu buttonRadius='65' buttonSpan='72' buttonWidth='90' buttonBg='bgs/button.xml'>
+    <button icon='icons/details.png' onClick='actions/showfeature.xml' />
+    <button icon='icons/bloodhound.png' onClick='actions/bloodhound_feature.xml' />
+    <button icon='icons/pairing_line.png' onClick='actions/pairingline.xml' />
+    <button icon='icons/polar_coord.png' onClick='actions/polarCoords.xml' />
+    <button icon='icons/reference_point.png' onClick='actions/markerhere.xml' />
+</menu>

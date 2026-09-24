@@ -135,6 +135,7 @@ public final class AtmospherePane {
     private final Button tropicalToggle;
     private final TextView tropicalStatus;
     private final LinearLayout tropicalRows;
+    private final LinearLayout tropicalScale;
     private TropicalOverlay tropical;
     private boolean tropicalOpen = true;
     /** Which storms are showing their own list of maps. By storm id, not by slot. */
@@ -276,6 +277,8 @@ public final class AtmospherePane {
         tropicalToggle = find(R.id.tropical_toggle);
         tropicalStatus = find(R.id.tropical_status);
         tropicalRows = find(R.id.tropical_rows);
+        tropicalScale = find(R.id.tropical_scale);
+        buildStormScale();
         radarSettings = find(R.id.radar_settings);
         windSettings = find(R.id.wind_settings);
         radarExpand = find(R.id.radar_expand);
@@ -932,6 +935,30 @@ public final class AtmospherePane {
                     chevron.setRotation(open ? 180f : 0f);
                 }
             });
+        }
+    }
+
+    /**
+     * What the track colors mean (operator, 2026-09-23: "on the hurricane when you
+     * expand the section a color code for the categories"). Swatches come from the
+     * same table the map draws with, so the legend cannot drift from the map.
+     */
+    private void buildStormScale() {
+        tropicalScale.removeAllViews();
+        for (int i = 0; i < TropicalOverlay.SAFFIR_SIMPSON_LABELS.length; i++) {
+            final TextView cell = new TextView(pluginContext);
+            cell.setText(TropicalOverlay.SAFFIR_SIMPSON_LABELS[i]);
+            cell.setTextSize(11);
+            cell.setGravity(Gravity.CENTER);
+            cell.setPadding(0, dp(3), 0, dp(3));
+            cell.setBackgroundColor(TropicalOverlay.rungColor(i));
+            // The pale rungs need dark text and the saturated ones light; the scale
+            // runs light-to-dark, so the split is where it stops being readable.
+            cell.setTextColor(i <= 3 ? 0xFF101010 : 0xFFFFFFFF);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            cell.setLayoutParams(lp);
+            tropicalScale.addView(cell);
         }
     }
 

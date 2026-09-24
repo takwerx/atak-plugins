@@ -55,6 +55,14 @@ public final class TropicalOverlay {
 
     /** An advisory is six-hourly; asking again inside this is asking for the same file. */
     private static final long REFRESH_MS = 10 * 60 * 1000L;
+    /**
+     * How often the layer redraws itself while it is on, the way a Feature Layer
+     * source does (operator, 2026-09-23: "can it do an update every 15 minutes if
+     * layer is on it redraws it"). Fixed rather than pickable: advisories are
+     * six-hourly and intermediate ones land on no schedule a person would choose, so
+     * a quarter of an hour catches them without a control nobody would touch twice.
+     */
+    private static final long AUTO_MS = 15 * 60 * 1000L;
 
     /** The cone is a forecast, not a boundary: outlined, barely filled, never solid. */
     private static final int CONE_STROKE = 0xFFFFFFFF;
@@ -87,6 +95,15 @@ public final class TropicalOverlay {
     private int generation;
     private final StormIcons icons;
     private final List<Nhc.Storm> active = new ArrayList<>();
+    private final Runnable autoRefresh = new Runnable() {
+        @Override
+        public void run() {
+            if (!on || !started)
+                return;
+            refresh(true);
+            mapView.postDelayed(this, AUTO_MS);
+        }
+    };
     /**
      * What each storm covers on the map, by slot: minLat, minLon, maxLat, maxLon.
      * Grown as its shapes arrive, so "go to" frames the cone rather than dropping the
@@ -165,6 +182,7 @@ public final class TropicalOverlay {
     public void stop() {
         started = false;
         on = false;
+        mapView.removeCallbacks(autoRefresh);
         clear();
         features.detach();
     }
@@ -182,7 +200,10 @@ public final class TropicalOverlay {
             p.edit().putBoolean(PREF_ON, value).apply();
         if (value) {
             refresh(true);
+            mapView.removeCallbacks(autoRefresh);
+            mapView.postDelayed(autoRefresh, AUTO_MS);
         } else {
+            mapView.removeCallbacks(autoRefresh);
             clear();
             active.clear();
             if (listener != null) {
@@ -408,6 +429,8 @@ public final class TropicalOverlay {
             a.setAttribute("Pressure", storm.pressureMb + " mb");
         if (pr == null)
             return a;
+        // An arrival contour's own hour, and the advisory a cone or a watch is from.
+        put(a, "Winds arrive", pr.optString("arrival_time", ""));
         put(a, "Stage", pr.optString("tcdvlp", ""));
         put(a, "Valid", pr.optString("fldatelbl", ""));
         final int wind = pr.optInt("maxwind", -1);
@@ -462,6 +485,16 @@ public final class TropicalOverlay {
         return 0;
     }
 
+    /** The scale's labels, rung for rung with {@link #SAFFIR_SIMPSON}. */
+    public static final String[] SAFFIR_SIMPSON_LABELS = {
+            "TD", "TS", "1", "2", "3", "4", "5"
+    };
+
+    /** The color of a rung, for a legend that cannot drift from the map. */
+    public static int rungColor(int rung) {
+        return SAFFIR_SIMPSON[Math.max(0, Math.min(rung, SAFFIR_SIMPSON.length - 1))];
+    }
+
     private static int categoryColor(int category, int windKt) {
         return SAFFIR_SIMPSON[rung(category, windKt)];
     }
@@ -480,22 +513,27 @@ public final class TropicalOverlay {
             public void onSuccess(String body) {
                 if (mine != generation || !on)
                     return;
-                final List<GeoPoint[]> rings = geometry(body);
+                final List<Shape> rings = geometry(body);
                 if (rings.isEmpty()) {
                     Log.d(TAG, "no geometry in layer " + layer + " for " + title);
                     return;
                 }
                 int n = 0;
-                for (GeoPoint[] ring : rings) {
+                for (Shape s : rings) {
+                    final GeoPoint[] ring = s.ring;
                     if (ring.length < 2)
                         continue;
-                    final String name = rings.size() > 1 ? title + " " + (++n) : title;
+                    // An arrival contour names its own hour, so let it be the label.
+                    final String own = s.props == null ? ""
+                            : s.props.optString("arrival_time", "");
+                    final String name = !own.isEmpty() ? title + ", " + own
+                            : rings.size() > 1 ? title + " " + (++n) : title;
                     if (closed)
                         features.addPolygon(set, name, ring, stroke, (float) weight,
-                                fill, attrs(storm, null));
+                                fill, attrs(storm, s.props));
                     else
                         features.addLine(set, name, ring, stroke, (float) weight,
-                                attrs(storm, null));
+                                attrs(storm, s.props));
                     grow(storm.bin, ring);
                     Log.d(TAG, String.format(Locale.US,
                             "drew %s: %d points, %.2f,%.2f..%.2f,%.2f", name,
@@ -519,8 +557,8 @@ public final class TropicalOverlay {
      * <p>Only the outer ring of a polygon is taken. A forecast cone has no holes, and
      * an inner ring drawn as another outline would read as a second cone.
      */
-    static List<GeoPoint[]> geometry(String json) {
-        final List<GeoPoint[]> out = new ArrayList<>();
+    static List<Shape> geometry(String json) {
+        final List<Shape> out = new ArrayList<>();
         if (json == null || json.isEmpty())
             return out;
         try {
@@ -538,16 +576,17 @@ public final class TropicalOverlay {
                 final JSONArray c = g.optJSONArray("coordinates");
                 if (c == null)
                     continue;
+                final JSONObject props = f.optJSONObject("properties");
                 if (type.equals("LineString"))
-                    add(out, ring(c));
+                    add(out, ring(c), props);
                 else if (type.equals("MultiLineString") || type.equals("Polygon"))
                     for (int k = 0; k < c.length(); k++)
-                        add(out, ring(c.optJSONArray(k)));
+                        add(out, ring(c.optJSONArray(k)), props);
                 else if (type.equals("MultiPolygon"))
                     for (int k = 0; k < c.length(); k++) {
                         final JSONArray poly = c.optJSONArray(k);
                         if (poly != null && poly.length() > 0)
-                            add(out, ring(poly.optJSONArray(0)));
+                            add(out, ring(poly.optJSONArray(0)), props);
                     }
             }
         } catch (Exception e) {
@@ -556,9 +595,24 @@ public final class TropicalOverlay {
         return out;
     }
 
-    private static void add(List<GeoPoint[]> out, GeoPoint[] ring) {
+    private static void add(List<Shape> out, GeoPoint[] ring, JSONObject props) {
         if (ring != null && ring.length >= 2)
-            out.add(ring);
+            out.add(new Shape(ring, props));
+    }
+
+    /**
+     * One ring, with the fields the service sent alongside it. The properties used to
+     * be dropped here, which is why an arrival contour could not say its own
+     * "Wed 2 pm" and a cone could not say which advisory it came from.
+     */
+    static final class Shape {
+        final GeoPoint[] ring;
+        final JSONObject props;
+
+        Shape(GeoPoint[] ring, JSONObject props) {
+            this.ring = ring;
+            this.props = props;
+        }
     }
 
     /** One ring of [lon, lat] pairs. GeoJSON is lon first; GeoPoint is lat first. */

@@ -4,6 +4,7 @@ package com.atakmap.android.atmosphere.overlay;
 import android.content.Context;
 
 import com.atakmap.android.features.FeatureDataStoreMapOverlay;
+import com.atakmap.android.menu.PluginMenuParser;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.filesystem.FileSystemUtils;
@@ -105,12 +106,45 @@ final class TropicalFeatures {
             final FeatureDataStoreDeepMapItemQuery query =
                     new FeatureDataStoreDeepMapItemQuery(layer) {
                         @Override
+                        public java.util.SortedSet<MapItem> deepHitTest(MapView view,
+                                com.atakmap.map.hittest.HitTestQueryParameters params,
+                                java.util.Map<com.atakmap.map.layer.Layer2,
+                                        java.util.Collection<com.atakmap.map.hittest.HitTestControl>> controls) {
+                            final java.util.SortedSet<MapItem> hits =
+                                    super.deepHitTest(view, params, controls);
+                            Log.d(TAG, "deepHitTest: " + (controls == null ? -1 : controls.size())
+                                    + " controls, " + (hits == null ? -1 : hits.size()) + " hits");
+                            return hits;
+                        }
+
+                        @Override
+                        public java.util.SortedSet<MapItem> deepHitTestItems(int x, int y,
+                                com.atakmap.coremap.maps.coords.GeoPoint point, MapView view) {
+                            final java.util.SortedSet<MapItem> hits =
+                                    super.deepHitTestItems(x, y, point, view);
+                            Log.d(TAG, "deepHitTestItems: "
+                                    + (hits == null ? -1 : hits.size()) + " hits");
+                            return hits;
+                        }
+
+                        @Override
                         protected MapItem featureToMapItem(Feature feature) {
                             final MapItem item = super.featureToMapItem(feature);
-                            // Details only. No menu means no radial, so there is no
-                            // route to recolor, rename, delete or send it: the tap
-                            // opens what the advisory says and stops there.
-                            item.setMetaString("menu", "");
+                            Log.d(TAG, "hit-test reached feature " + feature.getId()
+                                    + " " + feature.getName());
+                            // A READ-ONLY radial, not no radial. Blanking the menu
+                            // removed the radial and with it the only route to the
+                            // details pane, so a tap said nothing at all (operator,
+                            // 2026-09-23: "i have no metadata about the storm at all
+                            // i can read"). These are Feature Layer's own menus:
+                            // details, bloodhound, pairing line, polar coords, drop a
+                            // reference point. Nothing that recolors, renames, deletes
+                            // or sends, which is the whole point.
+                            final boolean point = feature.getGeometry()
+                                    instanceof com.atakmap.map.layer.feature.geometry.Point;
+                            item.setMetaString("menu", PluginMenuParser.getMenu(
+                                    pluginContext,
+                                    point ? "menu/feature.xml" : "menu/feature_shape.xml"));
                             item.setMetaBoolean("removable", false);
                             item.setMetaBoolean("editable", false);
                             item.setMetaBoolean("addToObjList", false);
@@ -125,11 +159,13 @@ final class TropicalFeatures {
 
             overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
                     "Hurricanes", "file://asset/nothing", query, null, null);
-            // addOverlay, not addFilesOverlay: the latter has never listed a plugin's
-            // overlay in Overlay Manager. The add answers whether it took.
-            final boolean added = mapView.getMapOverlayManager().addOverlay(overlay);
-            if (!added)
-                Log.w(TAG, "Overlay Manager refused the storm overlay");
+            // addFilesOverlay, which is what Feature Layer uses for exactly this class.
+            // addOverlay registers the overlay but its query is never consulted on a
+            // map tap: the probe in featureToMapItem below never fired once, so a tap
+            // on a cone said nothing at all (XCover, 2026-09-23). Hit-testing is the
+            // whole point of these being features, so match the configuration that is
+            // known to work rather than the one that reads better.
+            mapView.getMapOverlayManager().addFilesOverlay(overlay);
             mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             sweepOldDrawings();
         } catch (Exception e) {
@@ -194,7 +230,7 @@ final class TropicalFeatures {
     void detach() {
         try {
             if (overlay != null)
-                mapView.getMapOverlayManager().removeOverlay(overlay);
+                mapView.getMapOverlayManager().removeFilesOverlay(overlay);
             if (layer != null)
                 mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             if (store != null)
