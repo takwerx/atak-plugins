@@ -4,12 +4,14 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,124 +19,149 @@ import java.util.regex.Pattern;
  * NWS spot forecasts: every open spot request in the country, and the forecast NWS
  * issued for it. Pure request building and response reading; the page fetches.
  *
- * <h3>Where it lives, measured 2026-09-24</h3>
+ * <h3>Where it comes from, measured 2026-09-24</h3>
  *
- * {@code weather.gov/spot} is 404. The program is the Spot Forecast Monitor at
- * {@code spot.weather.gov}, a web app over {@code /cms/api/1.0}. Exactly one URL of
- * that API answers without the app's own key: {@link #LIST_URL}, every open request
- * (435 that night, 717 KB, 79 KB gzipped). Any added parameter is refused, so all
- * filtering happens here. The key the web app carries is the web app's, not ours,
- * and nothing here uses it.
+ * The list is NWS's published "Fire Weather Spot Web Services" map service,
+ * {@code nws_fire_weather_spot/MapServer/0}: no key, "updated every 15 minutes", one
+ * row per open request (423 that morning, 24 KB gzipped for all of them) with its
+ * name, type, point, office, status and times.
  *
- * <p>The issued forecast is the public FWS product on api.weather.gov: the office's
- * FWS list, then the product whose issuance is within a quarter hour of the
- * request's {@code request_filled_at} and whose first line is "Spot Forecast for
- * &lt;project&gt;". That matched 77 of 77 forecasts inside the week api.weather.gov keeps.
+ * <p>It was not the first source. {@code spot.weather.gov/cms/api/1.0/requests}
+ * answered 200 without a key for an hour and was built on; it is keyed. Akamai caches
+ * that URL for three minutes under a cache key that ignores the Authorization header,
+ * so an unauthenticated request was being handed a copy of the Spot Monitor's own
+ * authorized fetch. Nothing here touches that API, and the web app's key is never used.
+ *
+ * <p>The service carries no state, region or agency. Region comes from the office
+ * ({@link #OFFICES}, built from api.weather.gov/offices); state from the point
+ * ({@link States}). The issued forecast is the public FWS product on api.weather.gov:
+ * the office's FWS list, then the product issued within a quarter hour of the
+ * request's fill time whose first line is "Spot Forecast for &lt;name&gt;".
  */
 public final class Spot {
 
-    public static final String HOST = "spot.weather.gov";
-    public static final String LIST_URL = "https://" + HOST + "/cms/api/1.0/requests?isArchived=false";
-    /** Where a request is made: the program's own form, in the browser. */
-    public static final String NEW_REQUEST_URL = "https://" + HOST + "/new-request";
+    public static final String HOST = "mapservices.weather.noaa.gov";
+    public static final String LIST_URL = "https://" + HOST
+            + "/vector/rest/services/fire_weather/nws_fire_weather_spot/MapServer/0/query"
+            + "?where=1%3D1&outFields=snumunum,name,type,tid,lat,lon,rmade,rfill,stat,"
+            + "stattext,wfo,deliverdtg&returnGeometry=false&f=json";
+    /** Where a request is made, and the program's own page: its web app, in the browser. */
+    public static final String NEW_REQUEST_URL = "https://spot.weather.gov/new-request";
+    public static final String MONITOR_URL = "https://spot.weather.gov/";
     public static final String FWS_HOST = "api.weather.gov";
     /** How far a product's issuance may sit from the request's fill time. */
     static final long MATCH_WINDOW_MS = 15 * 60_000L;
 
-    /** One forecast NWS issued against a request; a request can carry several updates. */
-    public static final class Issued {
-        public final long id;
-        public final int update;
-        /** When NWS filled it, UTC millis; 0 when not stated. */
-        public final long filledAt;
+    /**
+     * Office id, NWS region and the name the office goes by, for the 123 forecast
+     * offices api.weather.gov lists (2026-09-24) and the two national centers that
+     * issue spot forecasts at sea.
+     */
+    static final String OFFICES =
+            "ABQ:SR:Albuquerque;ABR:CR:Aberdeen;AFC:AR:Anchorage;AFG:AR:Fairbanks;"
+            + "AJK:AR:Juneau;AKQ:ER:Wakefield;ALU:AR:Anchorage West;ALY:ER:Albany;"
+            + "AMA:SR:Amarillo;APX:CR:Gaylord;ARX:CR:La Crosse;BGM:ER:Binghamton;"
+            + "BIS:CR:Bismarck;BMX:SR:Birmingham;BOI:WR:Boise;BOU:CR:Denver/Boulder;"
+            + "BOX:ER:Boston / Norton;BRO:SR:Brownsville/Rio Grande Valley;BTV:ER:Burlington;"
+            + "BUF:ER:Buffalo;BYZ:WR:Billings;CAE:ER:Columbia;CAR:ER:Caribou;CHS:ER:Charleston;"
+            + "CLE:ER:Cleveland;CRP:SR:Corpus Christi;CTP:ER:State College;CYS:CR:Cheyenne;"
+            + "DDC:CR:Dodge City;DLH:CR:Duluth;DMX:CR:Des Moines;DTX:CR:Detroit/Pontiac;"
+            + "DVN:CR:Quad Cities;EAX:CR:Kansas City/Pleasant Hill;EKA:WR:Eureka;"
+            + "EPZ:SR:El Paso;EWX:SR:Austin/San Antonio;FFC:SR:Atlanta/Peachtree City;"
+            + "FGF:CR:Grand Forks;FGZ:WR:NWS Flagstaff;FSD:CR:Sioux Falls;"
+            + "FWD:SR:Fort Worth/Dallas;GGW:WR:Glasgow;GID:CR:Hastings;GJT:CR:Grand Junction;"
+            + "GLD:CR:Goodland;GRB:CR:Green Bay;GRR:CR:Grand Rapids;"
+            + "GSP:ER:Greenville-Spartanburg;GUM:PR:Tiyan;GYX:ER:Gray - Portland;"
+            + "HFO:PR:Honolulu;HGX:SR:Houston/Galveston;HNX:WR:San Joaquin Valley;"
+            + "HUN:SR:Huntsville;ICT:CR:Wichita;ILM:ER:NWS Wilmington;ILN:ER:Wilmington;"
+            + "ILX:CR:Central Illinois;IND:CR:Indianapolis;IWX:CR:Northern Indiana;"
+            + "JAN:SR:Jackson;JAX:SR:Jacksonville;JKL:CR:Jackson;KEY:SR:Key West;"
+            + "LBF:CR:North Platte;LCH:SR:Lake Charles;LIX:SR:New Orleans/Baton Rouge;"
+            + "LKN:WR:Elko;LMK:CR:Louisville;LOT:CR:Chicago;LOX:WR:Los Angeles;"
+            + "LSX:CR:St. Louis;LUB:SR:Lubbock;LWX:ER:Baltimore/Washington;LZK:SR:Little Rock;"
+            + "MAF:SR:Midland/Odessa;MEG:SR:Memphis;MFL:SR:Miami - South Florida;"
+            + "MFR:WR:Medford;MHX:ER:Newport/Morehead City;MKX:CR:Milwaukee/Sullivan;"
+            + "MLB:SR:Melbourne;MOB:SR:Mobile/Pensacola;MPX:CR:Twin Cities;MQT:CR:Marquette;"
+            + "MRX:SR:Morristown;MSO:WR:Missoula;MTR:WR:San Francisco Bay Area;"
+            + "OAX:CR:Omaha/Valley;OHX:SR:Nashville;OKX:ER:New York;OTX:WR:Spokane;"
+            + "OUN:SR:Norman;PAH:CR:Paducah;PBZ:ER:Pittsburgh;PDT:WR:Pendleton;"
+            + "PHI:ER:Philadelphia/Mt Holly;PIH:WR:Pocatello;PQR:WR:Portland;"
+            + "PSR:WR:NWS Phoenix;PUB:CR:Pueblo;RAH:ER:Raleigh;REV:WR:Reno;"
+            + "RIW:CR:Western and Central Wyoming;RLX:ER:Charleston;RNK:ER:Blacksburg;"
+            + "SEW:WR:Seattle/Tacoma;SGF:CR:Springfield;SGX:WR:San Diego;SHV:SR:Shreveport;"
+            + "SJT:SR:San Angelo;SJU:SR:San Juan;SLC:WR:Salt Lake City;STO:WR:Sacramento;"
+            + "TAE:SR:Tallahassee;TBW:SR:Tampa Bay Area;TFX:WR:Great Falls;TOP:CR:Topeka;"
+            + "TSA:SR:Tulsa;TWC:WR:NWS Tucson Arizona;UNR:CR:Rapid City;VEF:WR:Las Vegas;"
+            + "NHC:NC:National Hurricane Center;OPC:NC:Ocean Prediction Center";
 
-        Issued(long id, int update, long filledAt) {
-            this.id = id;
-            this.update = update;
-            this.filledAt = filledAt;
+    private static final Map<String, String[]> OFFICE_TABLE = new HashMap<>();
+
+    static {
+        for (String row : OFFICES.split(";")) {
+            final String[] f = row.split(":", 3);
+            if (f.length == 3)
+                OFFICE_TABLE.put(f[0], new String[] { f[1], f[2].replaceFirst("^NWS ", "") });
         }
+    }
+
+    /** The service's type id to what it is; measured against the Monitor's own names. */
+    private static final Map<String, String> KINDS = new HashMap<>();
+
+    static {
+        KINDS.put("0", "Wildfire");
+        KINDS.put("1", "Prescribed Fire");
+        KINDS.put("2", "Marine");
+        KINDS.put("4", "HAZMAT");
+        KINDS.put("5", "Search and Rescue, inland water");
+        KINDS.put("6", "Search and Rescue");
+        KINDS.put("7", "Special event");
+        KINDS.put("9", "Search and Rescue at sea");
     }
 
     /** One spot request, the fields a crew reads. */
     public static final class Request {
         public final String id;
         public final String project;
-        public final String agency;
-        /** "Wildfire", "Prescribed Fire", "HAZMAT Land", "SAR Land"... */
+        /** "Wildfire", "Prescribed Fire", "HAZMAT"... */
         public final String kind;
-        /** The office's id ("EKA") and its name ("Eureka"). */
+        /** The office's id ("EKA") and the name it goes by ("Eureka"). */
         public final String office, officeName;
-        /** NWS region code: WR, SR, CR, ER, AR, PR, NC. */
+        /** NWS region code: WR, SR, CR, ER, AR, PR, NC; "" when the office is unknown. */
         public final String region;
-        /** Two-letter state, or "OC" for ocean. */
+        /** Two-letter state from the point, or "" at sea. */
         public final String state;
         public final double lat, lon;
-        public final int topFt, bottomFt;
-        public final String aspect, fuel, sheltering, drainage, remarks;
-        public final int acres;
-        public final long submittedAt, deliverAt;
-        public final String actionStatus;
-        /** Oldest first. */
-        public final List<Issued> issued;
+        public final long requestedAt, filledAt, deliverAt;
+        /** True while NWS has the request open: not yet filled, or an update asked for. */
+        public final boolean pending;
 
-        Request(JSONObject r) {
-            id = r.optString("id", "");
-            project = clean(r.optString("projectName", ""));
-            agency = clean(r.optString("requesterAgency", ""));
-            final JSONObject inc = r.optJSONObject("incident");
-            kind = inc == null ? "" : clean(inc.optString("name", ""));
-            final JSONObject off = r.optJSONObject("office");
-            office = off == null ? "" : off.optString("nativeSiteId", "");
-            officeName = off == null ? "" : clean(off.optString("name", ""));
-            region = off == null ? "" : off.optString("region", "");
-            state = r.optString("state", "");
-            lat = r.optDouble("latitude", Double.NaN);
-            lon = r.optDouble("longitude", Double.NaN);
-            topFt = r.optInt("topElevation", 0);
-            bottomFt = r.optInt("bottomElevation", 0);
-            aspect = clean(r.optString("aspect", ""));
-            fuel = clean(r.optString("fuelType", ""));
-            sheltering = clean(r.optString("sheltering", ""));
-            drainage = clean(r.optString("drainage", ""));
-            remarks = clean(r.optString("remarks", ""));
-            acres = r.optInt("size", 0);
-            submittedAt = IsoTime.parse(r.optString("submittedAt", ""));
-            deliverAt = IsoTime.parse(r.optString("deliverAt", ""));
-            actionStatus = r.optString("actionStatus", "");
-            final List<Issued> out = new ArrayList<>();
-            final JSONArray fs = r.optJSONArray("spotForecasts");
-            for (int i = 0; fs != null && i < fs.length(); i++) {
-                final JSONObject f = fs.optJSONObject(i);
-                if (f == null)
-                    continue;
-                out.add(new Issued(f.optLong("id", 0), f.optInt("update_number", 0),
-                        IsoTime.parse(f.optString("request_filled_at", ""))));
-            }
-            Collections.sort(out, new Comparator<Issued>() {
-                @Override
-                public int compare(Issued a, Issued b) {
-                    return Long.compare(a.filledAt, b.filledAt);
-                }
-            });
-            issued = Collections.unmodifiableList(out);
-        }
-
-        /** The newest forecast issued, or null while NWS has not filled it. */
-        public Issued latest() {
-            return issued.isEmpty() ? null : issued.get(issued.size() - 1);
+        Request(JSONObject a, States states) {
+            id = a.optString("snumunum", "").trim();
+            project = clean(a.optString("name", ""));
+            final String k = KINDS.get(a.optString("tid", ""));
+            kind = k != null ? k : kindFromType(a.optString("type", ""));
+            office = a.optString("wfo", "").trim().toUpperCase(Locale.US);
+            final String[] o = OFFICE_TABLE.get(office);
+            region = o == null ? "" : o[0];
+            officeName = o == null ? office : o[1];
+            lat = number(a.optString("lat", ""));
+            lon = number(a.optString("lon", ""));
+            state = states == null || !hasPosition() ? "" : states.at(lat, lon);
+            requestedAt = localTime(a.optString("rmade", ""));
+            filledAt = localTime(a.optString("rfill", ""));
+            deliverAt = localTime(a.optString("deliverdtg", ""));
+            pending = "P".equals(a.optString("stat", ""));
         }
 
         /**
-         * Where the request stands, in words. Measured statuses: ST_COMPLETE with a
-         * forecast (395 of 435), ST_STARTRQST and ST_CHANGERQST with or without one,
-         * AS_NEWOBS and AS_FEEDBACK after one.
+         * Where the request stands, in words. Measured: C "Completed" (388 of 423) and
+         * P "Request pending", which is either never filled (the fill time reads
+         * "Incomplete") or an update asked for after one was.
          */
         public String status() {
-            if (issued.isEmpty())
+            if (filledAt <= 0)
                 return "Waiting for the forecast";
-            if ("ST_STARTRQST".equals(actionStatus) || "ST_CHANGERQST".equals(actionStatus))
-                return "Update requested";
-            return "Forecast issued";
+            return pending ? "Update requested" : "Forecast issued";
         }
 
         public boolean hasPosition() {
@@ -146,19 +173,71 @@ public final class Spot {
     private Spot() {
     }
 
-    /** Every request in a {@link #LIST_URL} answer; one that will not read is skipped. */
-    public static List<Request> parse(String body) throws Exception {
-        final JSONArray a = new JSONArray(body);
-        final List<Request> out = new ArrayList<>(a.length());
-        for (int i = 0; i < a.length(); i++) {
-            final JSONObject r = a.optJSONObject(i);
-            if (r == null)
+    /** Every request in a {@link #LIST_URL} answer; one without an id or a point is skipped. */
+    public static List<Request> parse(String body, States states) throws Exception {
+        final JSONArray fs = new JSONObject(body).optJSONArray("features");
+        final List<Request> out = new ArrayList<>();
+        for (int i = 0; fs != null && i < fs.length(); i++) {
+            final JSONObject f = fs.optJSONObject(i);
+            final JSONObject a = f == null ? null : f.optJSONObject("attributes");
+            if (a == null)
                 continue;
-            final Request q = new Request(r);
+            final Request q = new Request(a, states);
             if (!q.id.isEmpty() && q.hasPosition())
                 out.add(q);
         }
         return out;
+    }
+
+    private static final Pattern LOCAL = Pattern.compile(
+            "(\\d{4})-(\\d{2})-(\\d{2}) (\\d{2}):(\\d{2}):(\\d{2}) [AP]M ([A-Za-z]+)");
+
+    /** Hours from UTC. Seen 2026-09-24: AKDT CDT EDT GMT HST MDT MST PDT; the rest by name. */
+    private static final Map<String, Integer> ZONES = new HashMap<>();
+
+    static {
+        final Object[] z = { "GMT", 0, "UTC", 0, "EDT", -4, "EST", -5, "CDT", -5, "CST", -6,
+                "MDT", -6, "MST", -7, "PDT", -7, "PST", -8, "AKDT", -8, "AKST", -9,
+                "HDT", -9, "HST", -10, "AST", -4, "ADT", -3, "ChST", 10, "SST", -11 };
+        for (int i = 0; i + 1 < z.length; i += 2)
+            ZONES.put((String) z[i], (Integer) z[i + 1]);
+    }
+
+    /**
+     * The service's times: "2026-09-18 14:00:18 PM MDT". The hour is already on a
+     * 24-hour clock and the AM/PM beside it is decoration ("20:13:14 PM PDT" is 8 pm,
+     * checked against the fill time the Monitor recorded); the zone is an abbreviation.
+     * 0 for "Incomplete" or anything else unreadable.
+     */
+    static long localTime(String s) {
+        final Matcher m = LOCAL.matcher(s == null ? "" : s.trim());
+        if (!m.matches())
+            return 0;
+        final Integer offset = ZONES.get(m.group(7));
+        if (offset == null)
+            return 0;
+        final Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        c.clear();
+        c.set(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)) - 1,
+                Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4)),
+                Integer.parseInt(m.group(5)), Integer.parseInt(m.group(6)));
+        return c.getTimeInMillis() - offset * 3_600_000L;
+    }
+
+    private static final Pattern TYPE_DATE = Pattern.compile("^(.*?)\\s+\\d{4}-\\d{2}-\\d{2}");
+
+    /** "Fire 2026-09-17 15:00:00 PM MDT" to "Fire": the type with its date taken off. */
+    private static String kindFromType(String type) {
+        final Matcher m = TYPE_DATE.matcher(type == null ? "" : type);
+        return clean(m.find() ? m.group(1) : type);
+    }
+
+    private static double number(String s) {
+        try {
+            return Double.parseDouble(s.trim());
+        } catch (RuntimeException e) {
+            return Double.NaN;
+        }
     }
 
     // ---- filters -----------------------------------------------------------------
@@ -185,6 +264,7 @@ public final class Spot {
         return out;
     }
 
+    /** In a state; "" is at sea. */
     public static List<Request> inState(List<Request> all, String state) {
         final List<Request> out = new ArrayList<>();
         for (Request r : all)
@@ -208,7 +288,7 @@ public final class Spot {
         Collections.sort(list, new Comparator<Request>() {
             @Override
             public int compare(Request a, Request b) {
-                return Long.compare(b.submittedAt, a.submittedAt);
+                return Long.compare(b.requestedAt, a.requestedAt);
             }
         });
     }
@@ -223,17 +303,18 @@ public final class Spot {
         });
     }
 
-    /** How many requests each state has, states in name order. */
+    /** How many requests each state has, states in name order, at sea last. */
     public static Map<String, Integer> countByState(List<Request> all) {
         final Map<String, Integer> out = new java.util.TreeMap<>(new Comparator<String>() {
             @Override
             public int compare(String a, String b) {
+                if (a.isEmpty() != b.isEmpty())
+                    return a.isEmpty() ? 1 : -1;
                 return stateName(a).compareToIgnoreCase(stateName(b));
             }
         });
         for (Request r : all)
-            if (!r.state.isEmpty())
-                out.put(r.state, out.containsKey(r.state) ? out.get(r.state) + 1 : 1);
+            out.put(r.state, out.containsKey(r.state) ? out.get(r.state) + 1 : 1);
         return out;
     }
 
@@ -380,25 +461,25 @@ public final class Spot {
                 "OR", "Oregon", "PA", "Pennsylvania", "RI", "Rhode Island", "SC", "South Carolina",
                 "SD", "South Dakota", "TN", "Tennessee", "TX", "Texas", "UT", "Utah",
                 "VT", "Vermont", "VA", "Virginia", "WA", "Washington", "WV", "West Virginia",
-                "WI", "Wisconsin", "WY", "Wyoming", "PR", "Puerto Rico", "GU", "Guam",
-                "VI", "Virgin Islands", "AS", "American Samoa", "MP", "Northern Mariana Islands",
-                "OC", "At sea",
+                "WI", "Wisconsin", "WY", "Wyoming", "PR", "Puerto Rico",
         };
         for (int i = 0; i + 1 < pairs.length; i += 2)
             STATES.put(pairs[i], pairs[i + 1]);
     }
 
-    /** "California" for "CA"; the code itself when it is not one NWS uses here. */
+    /** "California" for "CA"; "At sea" for no state. */
     public static String stateName(String code) {
-        final String n = STATES.get(code == null ? "" : code.toUpperCase(Locale.US));
-        return n != null ? n : code == null ? "" : code;
+        if (code == null || code.isEmpty())
+            return "At sea";
+        final String n = STATES.get(code.toUpperCase(Locale.US));
+        return n != null ? n : code;
     }
 
     private static String squash(String s) {
         return s == null ? "" : s.toLowerCase(Locale.US).replaceAll("[^a-z0-9]", "");
     }
 
-    /** Requesters type tabs, runs of spaces and stray whitespace; the list shows one line. */
+    /** Requesters type tabs and runs of spaces; the list shows one line. */
     private static String clean(String s) {
         return s == null || "null".equals(s) ? "" : s.replaceAll("\\s+", " ").trim();
     }

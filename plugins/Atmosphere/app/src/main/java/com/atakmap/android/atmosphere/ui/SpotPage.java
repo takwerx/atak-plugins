@@ -55,7 +55,13 @@ import java.util.concurrent.Executors;
 public final class SpotPage {
 
     private static final String TAG = "AtmosphereSpot";
-    public static final String LAYER_ID = "spot";
+    /**
+     * "spotforecasts", not "spot": the first build asked to be allowed to reach
+     * spot.weather.gov, and the list now comes from another server. Being allowed is
+     * per server by name, so the operator is asked again rather than having the old
+     * yes carried over to a host it did not name.
+     */
+    public static final String LAYER_ID = "spotforecasts";
 
     private static final String PREF_FILTER = "weather.spot.filter";
     private static final String PREF_STATE = "weather.spot.state";
@@ -93,6 +99,8 @@ public final class SpotPage {
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private List<Spot.Request> requests = new ArrayList<>();
+    /** The state outlines, read from the plugin's assets once, on the worker. */
+    private com.atakmap.android.atmosphere.data.States states;
     private long fetchedAt;
     private boolean inFlight;
     /** Bumped per list fetch and per forecast shown, separately, so neither cancels the other. */
@@ -269,7 +277,9 @@ public final class SpotPage {
                     public void run() {
                         List<Spot.Request> parsed = null;
                         try {
-                            parsed = Spot.parse(body);
+                            if (states == null)
+                                states = loadStates();
+                            parsed = Spot.parse(body, states);
                         } catch (Exception e) {
                             Log.w(TAG, "spot list unreadable", e);
                         }
@@ -306,6 +316,21 @@ public final class SpotPage {
                                 + clock(fetchedAt));
             }
         });
+    }
+
+    /** assets/us_states.json; null (every request "at sea") if it will not read. Worker only. */
+    private com.atakmap.android.atmosphere.data.States loadStates() {
+        try (java.io.InputStream in = pluginContext.getAssets().open("us_states.json")) {
+            final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            final byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0)
+                out.write(buf, 0, n);
+            return com.atakmap.android.atmosphere.data.States.parse(out.toString("UTF-8"));
+        } catch (Exception e) {
+            Log.w(TAG, "state outlines unreadable", e);
+            return null;
+        }
     }
 
     /** Apply the filter, label the buttons with what each would show, draw the rows. */
@@ -418,19 +443,18 @@ public final class SpotPage {
         row.addView(title);
 
         final TextView who = new TextView(pluginContext);
-        who.setText(join(" · ", r.kind, r.agency));
+        who.setText(r.kind);
         who.setTextColor(0xFFD0D0D0);
         who.setTextSize(13);
         row.addView(who);
 
         final TextView where = new TextView(pluginContext);
-        final Spot.Issued latest = r.latest();
-        final String when = latest == null ? r.status()
-                : r.status() + " " + clock(latest.filledAt);
+        final String when = r.filledAt <= 0 ? r.status()
+                : r.status() + " " + clock(r.filledAt);
         where.setText(join(" · ", when, r.officeName,
                 self == null ? "" : distanceLabel(Spot.distanceMeters(self.getLatitude(),
                         self.getLongitude(), r.lat, r.lon))));
-        where.setTextColor(latest == null ? 0xFFFFC040 : 0xFFA0A0A0);
+        where.setTextColor(r.filledAt <= 0 ? 0xFFFFC040 : 0xFFA0A0A0);
         where.setTextSize(12);
         row.addView(where);
 
@@ -452,8 +476,8 @@ public final class SpotPage {
         detailFacts.setText(facts(r));
         openBrowser.setVisibility(View.GONE);
         scrollToTop();
-        final Spot.Issued latest = r.latest();
-        if (latest == null) {
+        final long filledAt = r.filledAt;
+        if (filledAt <= 0) {
             detailText.setText("NWS has not issued a forecast for this request yet.");
             return;
         }
@@ -466,17 +490,17 @@ public final class SpotPage {
                     return;
                 final List<String> ids;
                 try {
-                    ids = Spot.candidates(listJson, latest.filledAt);
+                    ids = Spot.candidates(listJson, filledAt);
                 } catch (Exception e) {
                     Log.w(TAG, "FWS list unreadable", e);
-                    notOnline(r, latest, 0);
+                    notOnline(r, 0);
                     return;
                 }
                 if (ids.isEmpty()) {
-                    notOnline(r, latest, Spot.oldestListed(listJson));
+                    notOnline(r, Spot.oldestListed(listJson));
                     return;
                 }
-                fetchProduct(r, latest, ids, 0, mine);
+                fetchProduct(r, ids, 0, mine);
             }
 
             @Override
@@ -489,10 +513,10 @@ public final class SpotPage {
     }
 
     /** Try each product issued near the fill time until one names this project. */
-    private void fetchProduct(final Spot.Request r, final Spot.Issued latest,
-            final List<String> ids, final int i, final int mine) {
+    private void fetchProduct(final Spot.Request r, final List<String> ids, final int i,
+            final int mine) {
         if (i >= ids.size()) {
-            notOnline(r, latest, 0);
+            notOnline(r, 0);
             return;
         }
         Http.get(ids.get(i), egress.userAgent(), null, new Http.Callback() {
@@ -505,14 +529,14 @@ public final class SpotPage {
                     detailText.setText(text.trim());
                     return;
                 }
-                fetchProduct(r, latest, ids, i + 1, mine);
+                fetchProduct(r, ids, i + 1, mine);
             }
 
             @Override
             public void onFailure(String error) {
                 if (mine != detailGeneration || showing != r)
                     return;
-                fetchProduct(r, latest, ids, i + 1, mine);
+                fetchProduct(r, ids, i + 1, mine);
             }
         });
     }
@@ -522,56 +546,45 @@ public final class SpotPage {
      * forecast older than about a week looks like. The program's own page still has
      * it, so offer that rather than a dead end.
      */
-    private void notOnline(Spot.Request r, final Spot.Issued latest, long oldest) {
-        detailText.setText(oldest > 0 && latest.filledAt < oldest
-                ? "This forecast was issued " + clock(latest.filledAt) + ". The Weather Service"
+    private void notOnline(Spot.Request r, long oldest) {
+        detailText.setText(oldest > 0 && r.filledAt < oldest
+                ? "This forecast was issued " + clock(r.filledAt) + ". The Weather Service"
                         + " keeps about a week of them in its feed and this one is older."
-                : "The forecast issued " + clock(latest.filledAt) + " was not found in the"
+                : "The forecast issued " + clock(r.filledAt) + " was not found in the"
                         + " Weather Service's feed.");
+        // The program's own page still has it; it cannot be linked to by this
+        // request, so the Monitor's front page, where the request is listed.
         openBrowser.setVisibility(View.VISIBLE);
         openBrowser.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                openUrl("https://" + Spot.HOST + "/forecasts/" + latest.id);
+                openUrl(Spot.MONITOR_URL);
             }
         });
     }
 
-    /** What was asked, in the order a crew reads it; blanks are left out. */
+    /**
+     * What was asked, in the order a crew reads it. The public service carries the
+     * kind, the office, the point and the times; who asked, the site and the fuels
+     * are in the forecast text itself, under this.
+     */
     private String facts(Spot.Request r) {
         final List<String> lines = new ArrayList<>();
-        lines.add(join(", requested by ", r.kind, r.agency));
+        lines.add(r.kind);
         lines.add(join(", ", r.officeName.isEmpty() ? "" : r.officeName + " office",
                 Spot.stateName(r.state)));
-        final Spot.Issued latest = r.latest();
-        if (latest != null)
-            lines.add((latest.update > 0 ? "Update " + latest.update + " issued " : "Issued ")
-                    + clock(latest.filledAt) + (r.status().equals("Forecast issued") ? ""
-                            : "; " + r.status().toLowerCase(Locale.US)));
+        if (r.filledAt > 0)
+            lines.add("Issued " + clock(r.filledAt) + (r.status().equals("Forecast issued")
+                    ? "" : "; " + r.status().toLowerCase(Locale.US)));
         else
             lines.add(r.status());
+        if (r.requestedAt > 0)
+            lines.add("Requested " + clock(r.requestedAt));
         if (r.deliverAt > 0)
             lines.add("Wanted by " + clock(r.deliverAt));
-        final List<String> site = new ArrayList<>();
-        if (r.topFt > 0)
-            site.add(r.bottomFt > 0 && r.bottomFt != r.topFt
-                    ? String.format(Locale.US, "%,d to %,d ft", r.bottomFt, r.topFt)
-                    : String.format(Locale.US, "%,d ft", r.topFt));
-        if (!r.aspect.isEmpty())
-            site.add("aspect " + r.aspect.toLowerCase(Locale.US));
-        if (!r.fuel.isEmpty())
-            site.add(r.fuel.toLowerCase(Locale.US));
-        if (r.acres > 0)
-            site.add(String.format(Locale.US, "%,d acres", r.acres));
-        if (!site.isEmpty())
-            lines.add(capitalize(join(", ", site.toArray(new String[0]))));
-        if (!r.drainage.isEmpty())
-            lines.add("Drainage: " + r.drainage);
-        if (!r.remarks.isEmpty())
-            lines.add("Remarks: " + r.remarks);
         final StringBuilder b = new StringBuilder();
         for (String l : lines) {
-            if (l.isEmpty())
+            if (l == null || l.isEmpty())
                 continue;
             if (b.length() > 0)
                 b.append('\n');
@@ -843,10 +856,6 @@ public final class SpotPage {
             b.append(p);
         }
         return b.toString();
-    }
-
-    private static String capitalize(String s) {
-        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     private void scrollToTop() {

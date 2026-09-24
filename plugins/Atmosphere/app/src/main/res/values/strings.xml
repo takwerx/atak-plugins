@@ -91,9 +91,9 @@
     <string name="spot_pick_state">Pick a state</string>
     <string name="spot_pick_region">Pick a region</string>
     <string name="spot_pick_distance">How far from you</string>
-    <string name="credit_spot">Spot forecasts from the US National Weather Service (spot.weather.gov, api.weather.gov)</string>
+    <string name="credit_spot">Spot forecasts from the US National Weather Service (mapservices.weather.noaa.gov, api.weather.gov)</string>
     <string name="spot_allow_title">Allow spot forecasts</string>
-    <string name="spot_allow_text">Spot forecasts come from the US National Weather Service: the list of open requests from their Spot Forecast Monitor, and each forecast from their weather API.\n\nTurning it on lets Atmosphere download the whole country\'s list and filter it on this phone. Your position is not sent.\n\nServers: spot.weather.gov, api.weather.gov</string>
+    <string name="spot_allow_text">Spot forecasts come from the US National Weather Service: the open requests from their spot forecast map service, and each forecast from their weather API.\n\nTurning it on lets Atmosphere download the whole country\'s list and filter it on this phone. Your position is not sent.\n\nServers: mapservices.weather.noaa.gov, api.weather.gov</string>
     <string name="radar_allow_title">Allow radar</string>
     <string name="radar_allow_text">Radar comes from the US National Weather Service, the same picture their own radar site draws.\n\nTurning it on lets Atmosphere ask them for radar over the part of the map you are looking at. Nothing else about you is sent.\n\nServer: opengeo.ncep.noaa.gov</string>
     <string name="variables">What to show</string>

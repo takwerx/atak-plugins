@@ -76,6 +76,11 @@ public final class GeoRings {
         return out.isEmpty() ? null : new Area(out.toArray(new double[0][][]));
     }
 
+    /** An area from rings already flat, {@code polygons[p][r] = lon, lat, ...}; null if empty. */
+    public static Area fromFlat(double[][][] polygons) {
+        return polygons == null || polygons.length == 0 ? null : new Area(polygons);
+    }
+
     /** Several geometries as one area, skipping any that are not areas. */
     public static Area of(List<JSONObject> parts) {
         final List<double[][]> out = new ArrayList<>();
