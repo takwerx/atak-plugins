@@ -7,6 +7,7 @@ import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.ipaws.AlertManager;
 import com.atakmap.android.ipaws.ui.AlertDetails;
+import com.atakmap.android.ipaws.ui.AlertDetailsReceiver;
 import com.atakmap.android.ipaws.ui.IpawsPane;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
@@ -214,6 +215,9 @@ public class IPAWS implements IPlugin {
         }
         if (templatePane == null) {
             details = new AlertDetails(pluginContext, manager, detailHost());
+            // The map's radial opens the same page the list does.
+            manager.setDetailsReceiver(
+                    new AlertDetailsReceiver(mapView, manager, details));
             paneUi = new IpawsPane(mapView, pluginContext, manager, manager.getCounties(), details);
             templatePane = new PaneBuilder(paneUi.getView())
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)

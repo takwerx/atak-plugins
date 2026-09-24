@@ -5,6 +5,7 @@ import android.content.Context;
 import com.atakmap.android.features.FeatureDataStoreDeepMapItemQuery;
 import com.atakmap.android.features.FeatureDataStoreMapOverlay;
 import com.atakmap.android.maps.MapItem;
+import com.atakmap.android.menu.PluginMenuParser;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.map.layer.feature.AttributeSet;
@@ -91,6 +92,11 @@ public class AlertOverlay {
                             final MapItem item = super.featureToMapItem(feature);
                             item.setMetaLong("featureid", feature.getId());
                             item.setMetaString("ipaws_overlay", "1");
+                            // Our own radial, or ATAK shows its built-in feature
+                            // metadata instead -- a second details screen with no way
+                            // back, and nothing like the one the list opens.
+                            item.setMetaString("menu", PluginMenuParser.getMenu(
+                                    pluginContext, "menu/alert_shape.xml"));
                             String title = feature.getName();
                             final AttributeSet a = feature.getAttributes();
                             if (a != null) {
@@ -104,7 +110,51 @@ public class AlertOverlay {
                             }
                             item.setMetaString("title", title);
                             item.setMetaString("callsign", title);
+                            if (a != null) {
+                                try {
+                                    // Which alert this shape is, so the radial can open
+                                    // it without re-reading attributes the hit-test
+                                    // query does not return.
+                                    final String id = a.getStringAttribute("id");
+                                    if (id != null)
+                                        item.setMetaString("ipaws_alert_id", id);
+                                } catch (Exception ignored) {
+                                    // Without it the radial says so rather than guessing.
+                                }
+                            }
+                            // Tap two overlapping alerts and ATAK offers a chooser;
+                            // without an icon those rows come up blank.
+                            item.setMetaString("iconUri", "asset://icons/details.png");
+                            item.setMetaInteger("iconColor", 0xFFFFFFFF);
                             return item;
+                        }
+                        // ATAK hands the same feature back once per hit-test control,
+                        // so an alert appears twice in the chooser unless this is here.
+                        @Override
+                        public java.util.SortedSet<MapItem> deepHitTest(MapView view,
+                                com.atakmap.map.hittest.HitTestQueryParameters params,
+                                java.util.Map<com.atakmap.map.layer.Layer2, java.util.Collection<com.atakmap.map.hittest.HitTestControl>> controls) {
+                            return dedupe(super.deepHitTest(view, params, controls));
+                        }
+
+                        @Override
+                        public java.util.SortedSet<MapItem> deepHitTestItems(int xpos, int ypos,
+                                com.atakmap.coremap.maps.coords.GeoPoint point, MapView view) {
+                            return dedupe(super.deepHitTestItems(xpos, ypos, point, view));
+                        }
+
+                        private java.util.SortedSet<MapItem> dedupe(java.util.SortedSet<MapItem> hits) {
+                            if (hits == null || hits.isEmpty())
+                                return hits;
+                            final java.util.Set<Long> seen = new java.util.HashSet<>();
+                            final java.util.SortedSet<MapItem> out =
+                                    new java.util.TreeSet<>(hits.comparator());
+                            for (MapItem m : hits) {
+                                final long fid = m.getMetaLong("featureid", -1);
+                                if (fid < 0 || seen.add(fid))
+                                    out.add(m);
+                            }
+                            return out;
                         }
                     };
             overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,

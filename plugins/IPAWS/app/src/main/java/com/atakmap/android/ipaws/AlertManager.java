@@ -148,6 +148,32 @@ public class AlertManager {
 
     // ---- lifecycle -----------------------------------------------------------------
 
+    /** Set by the plugin once the pane exists, so the map's radial can reach it. */
+    public void setDetailsReceiver(android.content.BroadcastReceiver r) {
+        if (detailsReceiver != null)
+            unregisterDetails();
+        detailsReceiver = r;
+        if (r == null)
+            return;
+        final com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter f =
+                new com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter();
+        f.addAction(com.atakmap.android.ipaws.ui.AlertDetailsReceiver.ACTION,
+                "show one alert's metadata");
+        com.atakmap.android.ipc.AtakBroadcast.getInstance().registerReceiver(r, f);
+    }
+
+    private void unregisterDetails() {
+        try {
+            com.atakmap.android.ipc.AtakBroadcast.getInstance()
+                    .unregisterReceiver(detailsReceiver);
+        } catch (Exception ignored) {
+            // Never registered, or already gone.
+        }
+        detailsReceiver = null;
+    }
+
+    private android.content.BroadcastReceiver detailsReceiver;
+
     public void start() {
         started = true;
         try {
@@ -192,6 +218,7 @@ public class AlertManager {
     public void stop() {
         started = false;
         MainThread.remove(timer);
+        unregisterDetails();
         overlay.detach();
     }
 

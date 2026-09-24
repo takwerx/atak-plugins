@@ -17,6 +17,7 @@ import com.atakmap.android.ipaws.data.Areas;
 import com.atakmap.android.ipaws.data.Counties;
 import com.atakmap.android.ipaws.data.Events;
 import com.atakmap.android.ipaws.data.Filter;
+import com.atakmap.android.ipaws.data.Regions;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.ipaws.plugin.R;
 
@@ -52,6 +53,7 @@ public class IpawsPane {
     private final AlertRows rows;
     private final AlertDetails details;
     private final TextView status;
+    private final Button regionsButton;
     private final Button statesButton;
     private final Button countiesButton;
     private final Button categoriesButton;
@@ -90,6 +92,7 @@ public class IpawsPane {
             }
         });
 
+        regionsButton = header.findViewById(R.id.btn_regions);
         statesButton = header.findViewById(R.id.btn_states);
         countiesButton = header.findViewById(R.id.btn_counties);
         categoriesButton = header.findViewById(R.id.btn_categories);
@@ -98,6 +101,12 @@ public class IpawsPane {
         intervalButton = header.findViewById(R.id.btn_interval);
         notifyButton = header.findViewById(R.id.btn_notify);
 
+        regionsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseRegions();
+            }
+        });
         statesButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -156,6 +165,7 @@ public class IpawsPane {
     public void refresh() {
         final Filter f = manager.getFilter();
         status.setText(manager.statusLine());
+        regionsButton.setText(regionsLabel(f));
         statesButton.setText(statesLabel(f));
         countiesButton.setText(countiesLabel(f));
         categoriesButton.setText(categoriesLabel(f));
@@ -246,6 +256,67 @@ public class IpawsPane {
                         f.notify = false;
                         manager.saveFilter();
                         refresh();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // ---- regions --------------------------------------------------------------------
+
+    /**
+     * A region is ticked only when every one of its areas is selected, so the label
+     * reports what is actually true rather than what was last tapped.
+     */
+    private String regionsLabel(Filter f) {
+        final List<String> on = new ArrayList<>();
+        for (String r : Regions.names())
+            if (Regions.isFullySelected(r, f.areas))
+                on.add(r);
+        if (on.isEmpty())
+            return "Regions";
+        if (on.size() == 1)
+            return on.get(0);
+        return String.format(Locale.US, "%d regions", on.size());
+    }
+
+    /**
+     * Regions add and remove states; they are not stored. Ticking one adds its areas
+     * to whatever is already selected and unticking removes them, so a region and the
+     * state list can never disagree -- there is nothing kept to disagree with.
+     */
+    private void chooseRegions() {
+        final Filter f = manager.getFilter();
+        final List<String> regions = Regions.names();
+        final String[] names = regions.toArray(new String[0]);
+        final boolean[] ticked = new boolean[names.length];
+        final boolean[] before = new boolean[names.length];
+        for (int i = 0; i < names.length; i++) {
+            ticked[i] = Regions.isFullySelected(names[i], f.areas);
+            before[i] = ticked[i];
+        }
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Regions")
+                .setMultiChoiceItems(names, ticked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which, boolean isChecked) {
+                                ticked[which] = isChecked;
+                            }
+                        })
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        final Set<String> areas = new LinkedHashSet<>(f.areas);
+                        for (int i = 0; i < names.length; i++) {
+                            if (ticked[i] == before[i])
+                                continue;   // untouched: leave its states alone
+                            if (ticked[i])
+                                areas.addAll(Regions.areasIn(names[i]));
+                            else
+                                areas.removeAll(Regions.areasIn(names[i]));
+                        }
+                        applyStates(areas);
                     }
                 })
                 .setNegativeButton("Cancel", null)
@@ -343,7 +414,14 @@ public class IpawsPane {
             toast("Choose a state first");
             return;
         }
-        final List<String> states = new ArrayList<>(f.areas);
+        final List<String> states = new ArrayList<>();
+        for (String a : f.areas)
+            if (Areas.isKnown(a))
+                states.add(a);   // marine areas have no counties to narrow to
+        if (states.isEmpty()) {
+            toast("Choose a state first");
+            return;
+        }
         if (states.size() == 1) {
             chooseCounties(states.get(0));
             return;

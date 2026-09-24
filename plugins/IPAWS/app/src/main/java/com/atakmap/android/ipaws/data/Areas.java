@@ -103,7 +103,37 @@ public final class Areas {
         put("PW", "Palau", "70");
     }
 
-    /** Every code the picker offers, in the order it shows them: alphabetical by name. */
+    /**
+     * Marine areas. Not offered as individual rows -- naming all 15 correctly needs a
+     * source that has not been checked -- but reachable through the water regions,
+     * which group them under names a person would look for. The names here are only a
+     * fallback for anywhere one is printed; the picker shows the region.
+     */
+    private static final Map<String, String> MARINE = new LinkedHashMap<>();
+
+    static {
+        MARINE.put("AN", "Atlantic coastal waters");
+        MARINE.put("AM", "Caribbean waters");
+        MARINE.put("GM", "Gulf waters");
+        MARINE.put("LC", "Lake St. Clair");
+        MARINE.put("LE", "Lake Erie");
+        MARINE.put("LH", "Lake Huron");
+        MARINE.put("LM", "Lake Michigan");
+        MARINE.put("LO", "Lake Ontario");
+        MARINE.put("LS", "Lake Superior");
+        MARINE.put("SL", "St. Lawrence River");
+        MARINE.put("PZ", "Pacific coastal waters");
+        MARINE.put("PK", "Alaska coastal waters");
+        MARINE.put("PH", "Hawaii waters");
+        MARINE.put("PM", "Mariana waters");
+        MARINE.put("PS", "Samoa waters");
+    }
+
+    public static boolean isMarine(String code) {
+        return code != null && MARINE.containsKey(code.toUpperCase(java.util.Locale.US));
+    }
+
+    /** Every code the picker offers as a state, in the order it shows them. */
     public static List<String> codes() {
         final List<String> out = new ArrayList<>(NAMES.keySet());
         Collections.sort(out, new java.util.Comparator<String>() {
@@ -117,12 +147,24 @@ public final class Areas {
 
     /** The name a person would recognise; the code itself if we do not have one. */
     public static String name(String code) {
-        final String n = code == null ? null : NAMES.get(code.toUpperCase(java.util.Locale.US));
-        return n == null ? String.valueOf(code) : n;
+        if (code == null)
+            return "null";
+        final String up = code.toUpperCase(java.util.Locale.US);
+        final String n = NAMES.get(up);
+        if (n != null)
+            return n;
+        final String m = MARINE.get(up);
+        return m == null ? code : m;
     }
 
+    /** A state or territory: what the county drill-down and the FIPS table apply to. */
     public static boolean isKnown(String code) {
         return code != null && NAMES.containsKey(code.toUpperCase(java.util.Locale.US));
+    }
+
+    /** Anything the feed will accept as an area, marine included. */
+    public static boolean isArea(String code) {
+        return isKnown(code) || isMarine(code);
     }
 
     /**

@@ -27,4 +27,5 @@
     <string name="manual_title">IPAWS Alerts user manual</string>
     <string name="manual_summary">How to choose states, counties and alert types</string>
     <string name="prefs_summary">Public alerts on the map, filtered on this device</string>
+    <string name="heading_metadata">Metadata</string>
 </resources>
