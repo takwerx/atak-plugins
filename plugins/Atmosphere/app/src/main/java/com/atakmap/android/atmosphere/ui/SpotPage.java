@@ -912,13 +912,28 @@ public final class SpotPage {
         tiles(pluginContext.getString(titleRes), labels, current, 3, picked);
     }
 
+    private void tiles(String title, String[] labels, int current, final int columns,
+            final Picked picked) {
+        tiles(title, labels, current, columns, picked, null);
+    }
+
     /**
      * A compact dialog of TakwerxButton tiles, the current choice green. Three across
      * for short names; one across, two lines allowed, for anything longer (an address).
      * On the MapView's context: a dialog on the plugin's context kills ATAK.
      */
+    /**
+     * @param abandoned run when the dialog goes away without a choice -- Close, Back
+     *                  or a tap outside. A picker opened from somewhere has to put
+     *                  the operator back there: these dialogs step in front of the
+     *                  request dialog, which is dismissed while they are up, so
+     *                  closing one with nothing to hand back left the operator with
+     *                  no dialog at all and the point they were setting gone
+     *                  (operator, 2026-09-25, on the favorites list). Null where
+     *                  there is nothing to go back to.
+     */
     private void tiles(String title, String[] labels, int current, final int columns,
-            final Picked picked) {
+            final Picked picked, final Runnable abandoned) {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
             return;
@@ -930,8 +945,23 @@ public final class SpotPage {
         final AlertDialog dialog = new AlertDialog.Builder(ctx)
                 .setTitle(title)
                 .setView(scroll)
-                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .setNegativeButton(pluginContext.getString(R.string.close),
+                        abandoned == null ? null : new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                abandoned.run();
+                            }
+                        })
                 .create();
+        // Back, or a tap outside. Picking dismisses without cancelling, so this does
+        // not fire on the way through.
+        if (abandoned != null)
+            dialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+                @Override
+                public void onCancel(DialogInterface d) {
+                    abandoned.run();
+                }
+            });
         LinearLayout row = null;
         for (int i = 0; i < labels.length; i++) {
             if (i % columns == 0) {
@@ -1119,6 +1149,16 @@ public final class SpotPage {
         }
     }
 
+    /** Reopen the request dialog: what every step of the request flow falls back to. */
+    private Runnable backToRequest() {
+        return new Runnable() {
+            @Override
+            public void run() {
+                showRequestDialogFor();
+            }
+        };
+    }
+
     private void setRequestPoint(GeoPoint p, String from) {
         if (p != null && p.isValid()) {
             requestPoint = p;
@@ -1182,7 +1222,7 @@ public final class SpotPage {
                         setRequestPoint(new GeoPoint(f.latitude, f.longitude),
                                 "\u2605 " + f.name);
                     }
-                });
+                }, backToRequest());
     }
 
     /**
@@ -1236,6 +1276,12 @@ public final class SpotPage {
                                 showRequestDialogFor();
                             }
                         })
+                .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                    @Override
+                    public void onCancel(DialogInterface d) {
+                        showRequestDialogFor();
+                    }
+                })
                 .show();
     }
 
@@ -1357,7 +1403,7 @@ public final class SpotPage {
                     public void picked(int which) {
                         setRequestPoint(usable.get(which).second, labels[which]);
                     }
-                });
+                }, backToRequest());
     }
 
     /**
@@ -1392,6 +1438,12 @@ public final class SpotPage {
                                 askAddress(typed);
                             }
                         })
+                .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                    @Override
+                    public void onCancel(DialogInterface d) {
+                        showRequestDialogFor();
+                    }
+                })
                 .show();
     }
 
