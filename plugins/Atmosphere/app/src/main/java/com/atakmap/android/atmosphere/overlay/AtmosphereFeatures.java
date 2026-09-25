@@ -112,7 +112,6 @@ final class AtmosphereFeatures {
      * discs stacked under the one that was current, all at the same coordinates
      * (2026-09-25: "now its listed 4 times").
      */
-    private final java.util.List<Long> adopted = new java.util.ArrayList<>();
     /** Held by a rewrite on the worker and by detach, so a store is never closed mid-write. */
     private final Object lock = new Object();
 
@@ -169,16 +168,23 @@ final class AtmosphereFeatures {
     }
 
     /**
-     * Remember every set the store already holds, so the first rewrite can retire it.
+     * Remove the store and its journals, so a session never inherits old features.
      *
-     * <p>Adopted rather than deleted here: the layer is built over this store moments
-     * later, and emptying it first is the one structural difference from IPAWS and
-     * Feature Layer, whose stores always carry the last session's features.
+     * <p>This is the one structural difference from IPAWS and Feature Layer, whose
+     * stores open holding the last session's features. Theirs can: they write sets
+     * the store hands back when asked. This one could not -- see {@link #attach}.
      */
-    private void adoptExistingSets() {
-        adopted.clear();
-        adopted.addAll(existingSetIds());
-        Log.d(tag, layerName + ": store opened holding " + adopted.size() + " set(s)");
+    private void deleteStoreFile() {
+        if (storeFile == null)
+            return;
+        int gone = 0;
+        for (String suffix : new String[] { "", "-journal", "-wal", "-shm" }) {
+            final File f = new File(storeFile.getPath() + suffix);
+            if (f.isFile() && f.delete())
+                gone++;
+        }
+        if (gone > 0)
+            Log.d(tag, layerName + ": removed " + gone + " old store file(s)");
     }
 
     /** Every feature set id in the store, as the store reports it. */
@@ -188,7 +194,14 @@ final class AtmosphereFeatures {
             return ids;
         FeatureSetCursor c = null;
         try {
-            c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
+            // Named by provider and type, NOT the default parameters: those hand
+            // back a handful of the sets the file actually holds -- six of sixty,
+            // measured -- so a delete driven by them clears a fraction each pass.
+            final FeatureDataStore2.FeatureSetQueryParameters ours =
+                    new FeatureDataStore2.FeatureSetQueryParameters();
+            ours.providers = java.util.Collections.singleton(PROVIDER);
+            ours.types = java.util.Collections.singleton(type);
+            c = store.queryFeatureSets(ours);
             while (c.moveToNext())
                 ids.add(c.get().getId());
         } catch (Exception e) {
@@ -227,8 +240,21 @@ final class AtmosphereFeatures {
             if (sweepOldStormDrawings)
                 sweepOldDrawings();
 
+            // Start from an empty file.
+            //
+            // The store accumulates feature sets its own API cannot enumerate: the
+            // file held sixty while queryFeatureSets returned six, however the
+            // parameters were framed, so fifty-four were unreachable and undeletable
+            // and their features kept drawing. That is why the same incident came
+            // back twice after every attempt to clear it (operator, 2026-09-25, four
+            // rounds of it). There is no API that reaches them, so the file goes.
+            //
+            // It costs nothing: the layer is replaced whole on the next refresh,
+            // which is seconds away, and the alternative is a file that grows
+            // garbage forever -- this one reached 7.7 MB and 1,887 features to draw
+            // roughly 224.
+            deleteStoreFile();
             store = new FeatureSetDatabase2(storeFile);
-            adoptExistingSets();
             final FeatureDataStore2.FeatureQueryParameters visibleOnly =
                     new FeatureDataStore2.FeatureQueryParameters();
             visibleOnly.visibleOnly = true;
@@ -326,6 +352,32 @@ final class AtmosphereFeatures {
             Log.d(tag, "overlay registration: added=" + added + " identifier='" + id
                     + "' findable="
                     + (mapView.getMapOverlayManager().getOverlay(id) != null));
+            // Sweep any layer a previous instance of this plugin left on the map.
+            //
+            // A reinstall does not reliably run the old instance's detach: disposal
+            // is a posted Runnable that may never run once its context is gone. Its
+            // FeatureLayer3 keeps drawing from this same store file, so every reload
+            // stacked another copy -- the vector stack measured 9 layers, then 15
+            // across two reinstalls (2026-09-25). Feature Layer empties a found
+            // MapGroup for the same reason; this is that, for layers.
+            //
+            // It is not what put the same incident on the map twice -- an empty
+            // store file is -- so do not read this as that fix.
+            int swept = 0;
+            try {
+                for (com.atakmap.map.layer.Layer other : new java.util.ArrayList<>(
+                        mapView.getLayers(MapView.RenderStack.VECTOR_OVERLAYS))) {
+                    if (other != layer && layerName.equals(other.getName())) {
+                        mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, other);
+                        swept++;
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(tag, "could not sweep old layers", e);
+            }
+            if (swept > 0)
+                Log.d(tag, layerName + ": swept " + swept
+                        + " layer(s) left by an earlier instance");
             mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             try {
                 final java.util.List<com.atakmap.map.layer.Layer> stack =
@@ -422,8 +474,22 @@ final class AtmosphereFeatures {
                 mapView.getMapOverlayManager().removeOverlay(overlay);
             if (layer != null)
                 mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
-            if (store != null)
-                store.dispose();
+            // The store is deliberately NOT disposed.
+            //
+            // Removing the layer does not stop a query already running on the
+            // renderer's own worker thread. That thread calls back into Java, the
+            // closed store throws DataStoreException, and JNI aborts the PROCESS --
+            // signal 6, "CallVoidMethodV called with pending exception", inside
+            // GLAsynchronousMapRenderable3::WorkerThread. It took ATAK down on every
+            // reinstall (08:38:38 and 08:45:42 on 2026-09-25, and on 2026-09-23),
+            // which is what made this layer look unfixable: the crash landed a second
+            // or two after each write, so the next build went into a dead process and
+            // the same duplicate incident kept coming back however it was chased.
+            //
+            // Delaying the dispose only moves the window; there is no point at which
+            // the renderer is known to be finished. So it is left open. ATAK owns the
+            // process and closes the file when it exits; a leaked handle costs
+            // nothing next to aborting the host.
         } catch (Exception e) {
             Log.w(tag, layerName + " store would not close", e);
         }
@@ -451,15 +517,18 @@ final class AtmosphereFeatures {
             try {
                 store.acquireModifyLock(true);
                 bulk = true;
-                // Every set the store holds right now, asked of the store rather than
-                // remembered. An in-memory list of "ours" is wrong the moment the
-                // plugin is reinstalled -- the file outlives the instance -- and it
-                // left stale copies of a storm or an incident stacked under the
-                // current one (operator, 2026-09-25, twice). Reading it back is
-                // self-healing: whatever is in there, however it got there, is
-                // replaced by this write.
+                // Write the new sets first, then delete the ones that were here on
+                // the way in, both inside the modify lock, so the layer is never
+                // momentarily empty on the map.
+                //
+                // What to delete is asked of the store, not remembered: an in-memory
+                // list of "ours" is empty after a reinstall, and the file outlives
+                // the instance. That is only sound because attach now starts from an
+                // empty file -- while it did not, this query saw six of the sixty
+                // sets the file held and each pass cleared a sixth of the problem
+                // (2026-09-25).
                 final java.util.List<Long> old = existingSetIds();
-                adopted.clear();
+                sets.clear();
                 final Map<String, Long> fresh = new HashMap<>();
                 for (Drawn d : drawn) {
                     Long fsid = fresh.get(d.setName);
@@ -472,17 +541,23 @@ final class AtmosphereFeatures {
                     store.insertFeature(new Feature(fsid, d.name, d.geometry, d.style,
                             d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
                 }
-                int retired = 0;
+                // One at a time. deleteFeatureSets(params) is a silent no-op on this
+                // store -- the file held sixty sets before and sixty after, every
+                // pass, while reporting success -- so the operator kept finding the
+                // same incident twice (2026-09-25). deleteFeatureSet(id) does work;
+                // what was broken was the enumeration feeding it, which with default
+                // query parameters returned six of the sixty.
+                int cleared = 0;
                 for (Long id : old) {
                     try {
                         store.deleteFeatureSet(id);
-                        retired++;
+                        cleared++;
                     } catch (Exception e) {
                         Log.w(tag, "old set " + id, e);
                     }
                 }
-                Log.d(tag, layerName + ": wrote " + fresh.size() + " set(s), retired "
-                        + retired + " of " + old.size());
+                Log.d(tag, layerName + ": cleared " + cleared + " of " + old.size()
+                        + " old set(s), wrote " + fresh.size());
                 sets.clear();
                 sets.putAll(fresh);
             } catch (Exception e) {
