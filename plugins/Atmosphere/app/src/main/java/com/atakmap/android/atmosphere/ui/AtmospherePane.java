@@ -35,6 +35,7 @@ import com.atakmap.android.atmosphere.model.Snapshot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.data.AirNow;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
+import com.atakmap.android.atmosphere.overlay.SpotOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
 import com.atakmap.android.atmosphere.data.NwsAlerts;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -96,6 +97,7 @@ public final class AtmospherePane {
     private static final String PREF_SMOKE_OPEN = "weather.smoke.open";
     private static final String PREF_AIR_OPEN = "weather.air.open";
     private static final String PREF_WARN_OPEN = "weather.warn.open";
+    private static final String PREF_SPOT_OPEN = "weather.spotlayer.open";
 
     private final View root;
     private final Context pluginContext;
@@ -206,6 +208,14 @@ public final class AtmospherePane {
     private AirQualityOverlay air;
     private final Button warnToggle;
     private final ImageButton warnExpand;
+    private final Button spotToggle;
+    private final ImageButton spotExpand;
+    private final Button spotOpenOnly;
+    private final TextView spotLayerStatus;
+    private final LinearLayout spotLegend;
+    private final View spotSettings;
+    private SpotOverlay spotLayer;
+    private boolean spotOpen = true;
     private final LinearLayout warnSettings;
     private final TextView warnHere;
     private final TextView warnStatus;
@@ -354,6 +364,12 @@ public final class AtmospherePane {
         buildAirScale();
         warnToggle = find(R.id.warn_toggle);
         warnExpand = find(R.id.warn_expand);
+        spotToggle = find(R.id.spot_toggle);
+        spotExpand = find(R.id.spot_expand);
+        spotOpenOnly = find(R.id.spot_open_only);
+        spotLayerStatus = find(R.id.spot_layer_status);
+        spotLegend = find(R.id.spot_legend);
+        spotSettings = find(R.id.spot_settings);
         warnSettings = find(R.id.warn_settings);
         warnHere = find(R.id.warn_here);
         warnStatus = find(R.id.warn_status);
@@ -408,6 +424,24 @@ public final class AtmospherePane {
         smokeOpen = prefs == null || prefs.getBoolean(PREF_SMOKE_OPEN, true);
         airOpen = prefs == null || prefs.getBoolean(PREF_AIR_OPEN, true);
         warnOpen = prefs == null || prefs.getBoolean(PREF_WARN_OPEN, true);
+        spotOpen = prefs == null || prefs.getBoolean(PREF_SPOT_OPEN, true);
+        spotExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                spotOpen = !spotOpen;
+                rememberFold(PREF_SPOT_OPEN, spotOpen);
+                updateLayerControls();
+            }
+        });
+        spotOpenOnly.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (spotLayer == null)
+                    return;
+                spotLayer.setOpenOnly(!spotLayer.isOpenOnly());
+                updateLayerControls();
+            }
+        });
         warnExpand.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -790,6 +824,21 @@ public final class AtmospherePane {
                     turnWindOn();
                 } else {
                     askToAllowWind();
+                }
+            }
+        });
+        spotToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (spotLayer == null)
+                    return;
+                if (spotLayer.isOn()) {
+                    spotLayer.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SpotOverlay.LAYER_ID)) {
+                    turnSpotLayerOn();
+                } else {
+                    askToAllowSpotLayer();
                 }
             }
         });
@@ -1404,6 +1453,99 @@ public final class AtmospherePane {
                 .show();
     }
 
+    /**
+     * What the layer draws, hooked to the pane. Not time-enabled: a spot request is
+     * a standing thing, not a frame, so it never touches the time strip.
+     */
+    public void setSpotLayer(SpotOverlay overlay) {
+        spotLayer = overlay;
+        if (spotLayer == null)
+            return;
+        spotLayer.setListener(new SpotOverlay.Listener() {
+            @Override
+            public void onStatus(String s) {
+                if (!s.isEmpty())
+                    spotLayerStatus.setText(s);
+            }
+
+            @Override
+            public void onDrawn(int drawn, int total) {
+                spotLayerStatus.setText(total == 0 ? ""
+                        : drawn + " on the map, of " + total + " in the country");
+                updateLayerControls();
+            }
+        });
+        updateLayerControls();
+    }
+
+    private void turnSpotLayerOn() {
+        if (spotLayer != null)
+            spotLayer.setOn(true);
+        updateLayerControls();
+    }
+
+    private void askToAllowSpotLayer() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.spot_layer_allow_title))
+                .setMessage(pluginContext.getString(R.string.spot_layer_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SpotOverlay.LAYER_ID, true);
+                                turnSpotLayerOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /**
+     * NWS's own legend, drawn from the same art the map is using so the two can
+     * never disagree: a letter for what the request is, a color for how far along.
+     */
+    private void buildSpotLegend() {
+        if (spotLegend.getChildCount() > 0)
+            return;
+        final String[][] kinds = {
+                { "W", "Wildfire" }, { "P", "Prescribed fire" }, { "M", "Marine" },
+                { "H", "HAZMAT" }, { "S", "Search and rescue" }, { "O", "Other" } };
+        final StringBuilder letters = new StringBuilder();
+        for (String[] k : kinds) {
+            if (letters.length() > 0)
+                letters.append("   ");
+            letters.append(k[0]).append(' ').append(k[1]);
+        }
+        spotLegend.addView(legendLine(letters.toString(), 0));
+        spotLegend.addView(legendLine("Forecast issued", SpotOverlay.DONE));
+        spotLegend.addView(legendLine("Update requested", SpotOverlay.WAITING));
+        spotLegend.addView(legendLine("Waiting for the forecast", SpotOverlay.PENDING));
+    }
+
+    /** One legend row: a swatch in the status color, or none for the letter key. */
+    private View legendLine(String text, int color) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, dp(3), 0, dp(3));
+        if (color != 0) {
+            final View swatch = new View(pluginContext);
+            swatch.setBackgroundColor(color);
+            final LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(14), dp(14));
+            sp.rightMargin = dp(8);
+            sp.topMargin = dp(2);
+            row.addView(swatch, sp);
+        }
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(12);
+        t.setTextColor(Color.WHITE);
+        row.addView(t);
+        return row;
+    }
+
     /** The egress gate: the host, by name, once. */
     private void askToAllowRadar() {
         final Context ctx = MapCompat.atakContext();
@@ -1563,6 +1705,20 @@ public final class AtmospherePane {
             updateSmokeScale();
             updateSmokeHeightRow();
             updateSmokeReading();
+        }
+        final boolean spotOn = spotLayer != null && spotLayer.isOn();
+        spotToggle.setText(spotOn ? R.string.spot_layer_on : R.string.spot_layer_off);
+        spotToggle.setTextColor(pluginContext.getResources().getColor(
+                spotOn ? R.color.state_on : R.color.state_off));
+        spotExpand.setVisibility(spotOn ? View.VISIBLE : View.GONE);
+        spotExpand.setRotation(spotOpen ? 180f : 0f);
+        spotSettings.setVisibility(spotOn && spotOpen ? View.VISIBLE : View.GONE);
+        if (spotOn) {
+            final boolean openOnly = spotLayer.isOpenOnly();
+            spotOpenOnly.setText(openOnly ? "Still open only  ON" : "Still open only  OFF");
+            spotOpenOnly.setTextColor(pluginContext.getResources().getColor(
+                    openOnly ? R.color.state_on : R.color.state_off));
+            buildSpotLegend();
         }
         final boolean airOn = air != null && air.isOn();
         airToggle.setText(airOn ? R.string.air_on : R.string.air_off);
