@@ -244,7 +244,11 @@ silently trimmed map reads as the whole picture.
 
 ## The SDK lives outside this repo
 
-- Path: `~/atak-sdk/ATAK-CIV-<version>/` (currently `ATAK-CIV-5.6.0.8`).
+- Path: `~/atak-sdk/ATAK-CIV-<version>/`, one per target, all from tak.gov:
+  `5.6.0.23`, `5.7.0.14`, `5.8.0.3` (`local-properties.sh` picks the newest per
+  target). `5.6.0.8` is older and only still supplies `takdev.plugin`. The open
+  source at `TAK-Product-Center/atak-civ` (checked out at `~/atak-sdk/atak-civ-source`)
+  stops at 5.5.1.10 and is not what any plugin builds against.
 - Contains `main.jar` (the ATAK API you compile against), `atak-gradle-takdev.jar`
   (the Gradle plugin), `android_keystore` (shared dev signing key), `atak.apk`
   (the matching ATAK build to sideload), `ATAK_Plugin_Development_Guide.pdf`, and
@@ -688,6 +692,24 @@ Policy the scrub enforces, in words:
   device serials, test locations, credentials custody, hashes of signed builds.
 - The notes repo is where a denylist entry is added the moment something
   sensitive shows up anywhere; the scrub then holds the line mechanically.
+
+## Our own skill — `takwerx/atak-plugin-pipeline`
+
+`skills/atak-plugin-pipeline/` is this pipeline packaged for developers outside
+takwerx, published as the public repo `takwerx/atak-plugin-pipeline` (MIT). It
+reaches that repo the way a plugin reaches its own, by subtree push from `main`:
+
+```bash
+git subtree split --prefix=skills/atak-plugin-pipeline -b pipeline-export
+git push https://github.com/takwerx/atak-plugin-pipeline.git pipeline-export:refs/heads/main
+```
+
+Its scripts are **deliberate forks** of `scripts/`, not links: they drop the
+worktrees, the notes repo, the depot catalog and `/ship`, and resolve a plugin
+through `plugin_dir()` instead of assuming `plugins/<Name>/`. So a fix to a gate
+here is a fix there too, in the same tooling branch, or the public copy drifts.
+It must never carry an SDK artifact, a takwerx server, catalog or fleet detail,
+or a notes-repo path; its own CI refuses binaries and SDK file names.
 
 ## The `atak-plugin` skill — useful, but this file wins
 
