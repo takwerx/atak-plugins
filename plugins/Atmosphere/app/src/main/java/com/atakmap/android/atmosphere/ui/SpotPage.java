@@ -1014,9 +1014,31 @@ public final class SpotPage {
         where.setTextColor(Color.WHITE);
         where.setTextSize(17);
         where.setText(requestPoint == null ? pluginContext.getString(R.string.no_position)
-                : requestFrom + "\n" + position(requestPoint)
-                        + "\nUSNG " + usng(requestPoint));
+                : requestFrom + "\n" + position(requestPoint));
         body.addView(where);
+
+        // The grid reference is a button, not a line of text, because pressing it is
+        // the whole job: the form takes a position in one box and nothing hands it
+        // over automatically. A copy hidden behind a dialog button reading "Copy
+        // position" was there and was not found (operator, 2026-09-25).
+        final String grid = usng(requestPoint);
+        if (!grid.isEmpty()) {
+            final Button copyGrid = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, body, false);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = dp(8);
+            copyGrid.setLayoutParams(lp);
+            copyGrid.setText(pluginContext.getString(R.string.spot_copy_usng, grid));
+            copyGrid.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    copyForForm(ctx, grid, position(requestPoint));
+                }
+            });
+            body.addView(copyGrid);
+        }
         body.addView(heading(R.string.spot_use_heading));
 
         final ScrollView scroll = new ScrollView(pluginContext);
@@ -1026,9 +1048,8 @@ public final class SpotPage {
                 .setView(scroll)
                 .setNegativeButton(pluginContext.getString(R.string.close), null);
         if (requestPoint != null) {
-            // The grid reference, because that is the one box on the form that takes
-            // a whole position in one paste. See usng().
-            final String grid = usng(requestPoint);
+            // Opening the form copies too, so the clipboard is loaded whichever way
+            // the operator gets there.
             final String pos = position(requestPoint);
             b.setPositiveButton(pluginContext.getString(R.string.spot_open_form),
                     new DialogInterface.OnClickListener() {
@@ -1036,13 +1057,6 @@ public final class SpotPage {
                         public void onClick(DialogInterface d, int which) {
                             copyForForm(ctx, grid, pos);
                             openUrl(Spot.NEW_REQUEST_URL);
-                        }
-                    });
-            b.setNeutralButton(pluginContext.getString(R.string.spot_copy),
-                    new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface d, int which) {
-                            copyForForm(ctx, grid, pos);
                         }
                     });
         }

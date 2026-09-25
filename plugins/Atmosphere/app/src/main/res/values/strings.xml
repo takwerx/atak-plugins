@@ -92,10 +92,10 @@
     <string name="spot_region">Region</string>
     <string name="spot_request">Request a spot forecast</string>
     <string name="spot_open_browser">Open on spot.weather.gov</string>
-    <string name="spot_copy">Copy position</string>
+    <string name="spot_copy_usng">Copy %1$s</string>
     <string name="spot_open_form">Open the form</string>
     <string name="spot_request_title">Request a spot forecast</string>
-    <string name="spot_request_text">Spot forecasts are requested on the National Weather Service\'s own form, which opens in your browser. It cannot be filled in from here: pick the point below, then copy it and paste it where the form asks for the location.</string>
+    <string name="spot_request_text">The National Weather Service takes spot requests on their own form and it cannot be filled in from here. Copy the point, open the form, then hold its USNG box, paste, and press Plot USNG.</string>
     <string name="spot_point_heading">Point</string>
     <string name="spot_use_heading">Use</string>
     <string name="spot_my_position">My position</string>
