@@ -43,6 +43,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -486,6 +487,35 @@ public final class SpotPage {
     }
 
     /**
+     * Collapse a list to the newest request per incident, counting what was folded in.
+     *
+     * <p>Keyed by name AND office: two unrelated fires can share a plain name like
+     * "Dry River", and merging them because a word matched would hide one of them.
+     */
+    private static List<Spot.Request> newestPerIncident(List<Spot.Request> all,
+            Map<String, Integer> countsOut) {
+        final Map<String, Spot.Request> newest = new LinkedHashMap<>();
+        for (Spot.Request r : all) {
+            final String key = incidentKey(r);
+            final Spot.Request had = newest.get(key);
+            countsOut.put(key, (countsOut.containsKey(key) ? countsOut.get(key) : 0) + 1);
+            if (had == null || when(r) > when(had))
+                newest.put(key, r);
+        }
+        return new ArrayList<>(newest.values());
+    }
+
+    private static String incidentKey(Spot.Request r) {
+        return (r.project == null ? "" : r.project.trim().toLowerCase(Locale.US))
+                + "|" + (r.office == null ? "" : r.office);
+    }
+
+    /** Filled if it has been, else when it was asked for. */
+    private static long when(Spot.Request r) {
+        return r.filledAt > 0 ? r.filledAt : r.requestedAt;
+    }
+
+    /**
      * Whether a request answers to what was typed. The incident name is what a crew
      * knows, so that is matched first; the office and state are matched too because
      * "LOX" and "CA" are the other things somebody types into a box like this.
@@ -560,6 +590,15 @@ public final class SpotPage {
             what = what + " matching \u201c" + query + "\u201d";
         }
 
+        // One row per incident, the newest. A fire gets a fresh spot forecast every
+        // operational period, so 44 of the 346 projects running on 2026-09-25 had
+        // more than one request open and "Widemouth 2" had seven. The operator wants
+        // the current one: "i dont care about past forecasts, why cant i get the
+        // latest?" The older ones are counted on the row rather than silently
+        // dropped.
+        final Map<String, Integer> perIncident = new LinkedHashMap<>();
+        shown = newestPerIncident(shown, perIncident);
+
         // Beside the box, so a search that is working says so while the keyboard is
         // still covering the rows.
         searchCount.setText(query.isEmpty() ? ""
@@ -572,12 +611,18 @@ public final class SpotPage {
             status.setText("No open spot requests " + what);
         else if (shown.size() > MAX_ROWS)
             status.setText("Showing the " + order + " " + MAX_ROWS + " of " + shown.size()
-                    + " " + what + ". Narrow it down to see the rest.");
+                    + " incidents " + what + ". Narrow it down to see the rest.");
         else
-            status.setText(shown.size() + (shown.size() == 1 ? " request " : " requests ")
-                    + what + ", list from " + clock(fetchedAt));
-        for (int i = 0; i < shown.size() && i < MAX_ROWS; i++)
-            list.addView(row(shown.get(i), self));
+            // Incidents, not requests: the rows have been collapsed to the newest
+            // forecast each, and the scope buttons above still count requests, so
+            // saying "requests" here would read as a number that did not add up.
+            status.setText(shown.size() + (shown.size() == 1 ? " incident " : " incidents ")
+                    + what + ", newest forecast each, list from " + clock(fetchedAt));
+        for (int i = 0; i < shown.size() && i < MAX_ROWS; i++) {
+            final Spot.Request r = shown.get(i);
+            final Integer n = perIncident.get(incidentKey(r));
+            list.addView(row(r, self, n == null ? 1 : n));
+        }
     }
 
     /** Each filter says what it would show before it is tapped. */
@@ -612,6 +657,10 @@ public final class SpotPage {
 
     /** One request as a row: what it is, who asked, where it stands. */
     private View row(final Spot.Request r, GeoPoint self) {
+        return row(r, self, 1);
+    }
+
+    private View row(final Spot.Request r, GeoPoint self, int forecasts) {
         final LinearLayout row = new LinearLayout(pluginContext);
         row.setOrientation(LinearLayout.VERTICAL);
         row.setBackgroundResource(R.drawable.btn_gray);
@@ -630,7 +679,8 @@ public final class SpotPage {
         row.addView(title);
 
         final TextView who = new TextView(pluginContext);
-        who.setText(r.kind);
+        who.setText(forecasts > 1 ? r.kind + " \u00b7 " + forecasts + " forecasts, newest"
+                : r.kind);
         who.setTextColor(0xFFD0D0D0);
         who.setTextSize(13);
         row.addView(who);
@@ -1312,13 +1362,28 @@ public final class SpotPage {
     }
 
     /** "8:13 pm" today, "Tue 8:13 pm" otherwise, in the phone's zone. */
+    /**
+     * When, with the date on it unless it was today.
+     *
+     * <p>A weekday alone is ambiguous by the end of the week: an incident with
+     * forecasts on Tuesday, Wednesday and Friday read as "Tue", "Wed" and a bare time,
+     * and there was no way to tell Tuesday of this week from any other (operator,
+     * 2026-09-25: "its friday and i see a tuesday, a wed and a today ... it needs the
+     * date and day in there"). Today says so in words rather than by omission.
+     */
     private static String clock(long when) {
         if (when <= 0)
             return "at an unknown time";
-        final boolean today = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date(when))
-                .equals(new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date()));
-        return new SimpleDateFormat(today ? "h:mm a" : "EEE h:mm a", Locale.US)
+        final SimpleDateFormat key = new SimpleDateFormat("yyyyMMdd", Locale.US);
+        final String time = new SimpleDateFormat("h:mm a", Locale.US)
                 .format(new Date(when)).replace("AM", "am").replace("PM", "pm");
+        final String on = key.format(new Date(when));
+        if (on.equals(key.format(new Date())))
+            return "today " + time;
+        if (on.equals(key.format(new Date(System.currentTimeMillis() - 86_400_000L))))
+            return "yesterday " + time;
+        return new SimpleDateFormat("EEE MMM d", Locale.US).format(new Date(when))
+                + ", " + time;
     }
 
     private static String join(String sep, String... parts) {
