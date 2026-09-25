@@ -57,6 +57,16 @@ public class Filter {
     public boolean notify = false;
     public final Set<String> notifySeverities = new LinkedHashSet<>();
     /**
+     * Where a new alert has to be to notify: {@code "states"} (everything in the states
+     * and counties picked under Where, whatever the map is showing -- the default),
+     * {@code "near"} (within {@link #notifyRadiusM} of the device), or {@code "map"}
+     * (exactly what the list and the map show, distance setting included).
+     */
+    public String notifyWhere = "states";
+    public double notifyRadiusM = 25 * 1609.344;
+    /** Also notify when an alert already out is updated. Off: new alerts only. */
+    public boolean notifyUpdates = false;
+    /**
      * All ON / All OFF, Feature Layer's switch: off takes every alert off the map and
      * leaves the rest running -- the list, the poll, notifications -- and the layer is
      * hidden rather than emptied, so switching it back on is instant.
@@ -268,8 +278,16 @@ public class Filter {
         counties.addAll(chosen);
     }
 
+    /**
+     * On, at a chosen severity, and news: a cancellation never notifies, and an update
+     * of an alert already out only when asked for.
+     */
     public boolean shouldNotify(Alert a) {
-        return notify && notifySeverities.contains(a.severity);
+        if (!notify || !notifySeverities.contains(a.severity))
+            return false;
+        if ("Cancel".equalsIgnoreCase(a.messageType))
+            return false;
+        return notifyUpdates || a.isNew();
     }
 
     public JSONObject toJson() throws Exception {
@@ -282,6 +300,9 @@ public class Filter {
         o.put("pollMinutes", pollMinutes);
         o.put("notify", notify);
         o.put("notifySeverities", new JSONArray(notifySeverities));
+        o.put("notifyWhere", notifyWhere);
+        o.put("notifyRadiusM", notifyRadiusM);
+        o.put("notifyUpdates", notifyUpdates);
         o.put("mapOn", mapOn);
         o.put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd);
         o.put("scope", scope);
@@ -303,6 +324,11 @@ public class Filter {
         readInto(o.optJSONArray("notifySeverities"), f.notifySeverities);
         f.pollMinutes = Math.max(1, o.optInt("pollMinutes", DEFAULT_POLL_MINUTES));
         f.notify = o.optBoolean("notify", false);
+        final String nw = o.optString("notifyWhere", "states");
+        f.notifyWhere = "near".equals(nw) || "map".equals(nw) ? nw : "states";
+        final double nr = o.optDouble("notifyRadiusM", 25 * 1609.344);
+        f.notifyRadiusM = nr > 0 ? nr : 25 * 1609.344;
+        f.notifyUpdates = o.optBoolean("notifyUpdates", false);
         f.mapOn = o.optBoolean("mapOn", true);
         final double gate = o.optDouble("gateGsd", -1);
         f.gateGsd = gate > 0 ? gate : Double.MAX_VALUE;

@@ -804,8 +804,11 @@ public class AlertManager {
         final List<Alert> fresh = new ArrayList<>();
         for (Alert a : raw)
             if (announced.add(a.id) && primed && !areasChanged
-                    && keptIds.contains(a.id) && filter.shouldNotify(a))
+                    && filter.shouldNotify(a) && notifyWhereAccepts(a, keptIds))
                 fresh.add(a);
+        // Worst first, so the message names the worst of them rather than whichever
+        // the feed happened to list first.
+        Collections.sort(fresh, BY_SEVERITY_THEN_SOONEST);
         primed = true;
         // Ids the FEED has dropped are forgotten, or the set grows all day; one that
         // comes back after expiring is genuinely new again.
@@ -835,6 +838,38 @@ public class AlertManager {
                 }
             }
         });
+    }
+
+    /**
+     * The Where of the notification settings, which is not the map's: "In my states"
+     * is everything in the states and counties picked under Where, whatever distance
+     * the map is set to; "Within N of me" measures from the device; "Same as the map"
+     * is exactly what the list shows. The event-type picks apply to all three -- a
+     * category switched off is not wanted as a chime either.
+     */
+    private boolean notifyWhereAccepts(Alert a, Set<String> keptIds) {
+        if ("map".equals(filter.notifyWhere))
+            return keptIds.contains(a.id);
+        if (!filter.acceptsType(a.event))
+            return false;
+        if (!"near".equals(filter.notifyWhere))
+            return filter.acceptsCounties(a) != Filter.Verdict.NO;
+        final double[] me = ownPosition();
+        if (me == null)
+            return true;   // no fix: tell rather than stay silent on a guess
+        Geometry g = null;
+        try {
+            if (a.hasOwnGeometry())
+                g = GeoJson.parse(a.geometry);
+        } catch (Exception e) {
+            Log.w(TAG, "unreadable geometry on " + a.event, e);
+        }
+        if (g == null)
+            g = fromZones(a, new LinkedHashSet<String>());
+        g = Geo.flatten(g);
+        // No area yet: told, not dropped. A chime about something a little further
+        // than asked beats silence about something close.
+        return g == null || Geo.withinDistance(g, me[0], me[1], filter.notifyRadiusM);
     }
 
     /** One id, so a second notification replaces the first rather than stacking up. */

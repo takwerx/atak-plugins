@@ -208,27 +208,11 @@
         android:layout_height="wrap_content"
         android:text="@string/heading_updates" />
 
-    <LinearLayout
+    <Button
+        android:id="@+id/btn_interval"
+        style="@style/TakwerxButton"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/btn_interval"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:layout_marginRight="3dp" />
-
-        <Button
-            android:id="@+id/btn_notify"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="3dp" />
-    </LinearLayout>
+        android:layout_height="wrap_content" />
 
     <Button
         android:id="@+id/btn_refresh"
@@ -237,6 +221,42 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:text="@string/refresh_now" />
+
+    <!-- How notifications are set, on their own: which severities, where (not the
+         map's distance unless asked), and whether an update of an alert already out
+         counts. -->
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/heading_notifications" />
+
+    <Button
+        android:id="@+id/btn_notify"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
+
+    <Button
+        android:id="@+id/btn_notify_severity"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
+
+    <Button
+        android:id="@+id/btn_notify_where"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
+
+    <Button
+        android:id="@+id/btn_notify_updates"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
 
     <TextView
         android:id="@+id/alerts_heading"

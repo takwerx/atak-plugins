@@ -67,6 +67,9 @@ public class IpawsPane {
     private final Button severityButton;
     private final Button intervalButton;
     private final Button notifyButton;
+    private final Button notifySeverityButton;
+    private final Button notifyWhereButton;
+    private final Button notifyUpdatesButton;
     private final Button allButton;
     private final Button gateButton;
     private final TextView scopeLabel;
@@ -168,6 +171,27 @@ public class IpawsPane {
         severityButton = header.findViewById(R.id.btn_severity);
         intervalButton = header.findViewById(R.id.btn_interval);
         notifyButton = header.findViewById(R.id.btn_notify);
+        notifySeverityButton = header.findViewById(R.id.btn_notify_severity);
+        notifyWhereButton = header.findViewById(R.id.btn_notify_where);
+        notifyUpdatesButton = header.findViewById(R.id.btn_notify_updates);
+        notifySeverityButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseNotifySeverities();
+            }
+        });
+        notifyWhereButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseNotifyWhere();
+            }
+        });
+        notifyUpdatesButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseNotifyUpdates();
+            }
+        });
 
         regionsButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -214,7 +238,7 @@ public class IpawsPane {
         notifyButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                chooseNotify();
+                toggleNotify();
             }
         });
         header.findViewById(R.id.btn_refresh).setOnClickListener(new View.OnClickListener() {
@@ -256,7 +280,7 @@ public class IpawsPane {
         eventsButton.setText(eventsLabel(f));
         severityButton.setText(severityLabel(f));
         intervalButton.setText(intervalLabel(f));
-        setNotifyLabel(f);
+        setNotifyLabels(f);
         setAllLabel(f);
         gateButton.setText(gateLabel(f.gateGsd));
         showScope(f);
@@ -532,19 +556,63 @@ public class IpawsPane {
                 .show();
     }
 
-    /** ON green, OFF red, on a plain button -- the same toggle every takwerx plugin has. */
-    private void setNotifyLabel(Filter f) {
+
+    // ---- notifications --------------------------------------------------------------
+
+    /** Radius choices for "Within N of me", in the large unit. */
+    private static final int[] NOTIFY_RADII = { 2, 5, 10, 25, 50 };
+
+    private void setNotifyLabels(Filter f) {
         notifyButton.setText(pluginContext.getString(
                 f.notify ? R.string.notify_on : R.string.notify_off));
         notifyButton.setTextColor(f.notify ? 0xFF40D040 : 0xFFE05050);
+        notifySeverityButton.setText("Severity: " + severityList(f.notifySeverities));
+        notifyWhereButton.setText("Where: " + notifyWhereText(f));
+        notifyUpdatesButton.setText(f.notifyUpdates ? "Updates: New and updated"
+                : "Updates: New alerts only");
+    }
+
+    private static String severityList(java.util.Set<String> s) {
+        if (s.isEmpty())
+            return "none";
+        final List<String> out = new ArrayList<>();
+        for (String sev : Alert.SEVERITIES)
+            if (s.contains(sev))
+                out.add(sev);
+        // Unknown is left out of "all": nearly nothing is Unknown, and every real
+        // severity ticked is what a person means by all of them.
+        final boolean all = s.contains("Extreme") && s.contains("Severe")
+                && s.contains("Moderate") && s.contains("Minor");
+        return all ? "all" : android.text.TextUtils.join(", ", out);
+    }
+
+    private static String notifyWhereText(Filter f) {
+        if ("near".equals(f.notifyWhere))
+            return "Within " + bigOf(f.notifyRadiusM) + " " + Units.bigLabel() + " of me";
+        if ("map".equals(f.notifyWhere))
+            return "Same as the map";
+        return "In my states";
+    }
+
+    /** ON green, OFF red, a plain tap -- the same toggle every takwerx plugin has. */
+    private void toggleNotify() {
+        final Filter f = manager.getFilter();
+        f.notify = !f.notify;
+        // On with nothing to be told about would be a switch that does nothing.
+        if (f.notify && f.notifySeverities.isEmpty()) {
+            f.notifySeverities.add("Extreme");
+            f.notifySeverities.add("Severe");
+        }
+        manager.saveFilter();
+        refresh();
     }
 
     /**
-     * Off, or on at the severities the operator picks. Defaulting to Extreme and
-     * Severe is the whole reason this is usable: a notification for a Winter Weather
-     * Advisory in the next county gets the plugin switched off within a day.
+     * Which severities chime. Defaulting to Extreme and Severe is the whole reason this
+     * is usable: a notification for a Winter Weather Advisory in the next county gets
+     * the plugin switched off within a day.
      */
-    private void chooseNotify() {
+    private void chooseNotifySeverities() {
         final Filter f = manager.getFilter();
         final String[] names = Alert.SEVERITIES;
         final boolean[] ticked = new boolean[names.length];
@@ -559,7 +627,7 @@ public class IpawsPane {
                                 ticked[which] = isChecked;
                             }
                         })
-                .setPositiveButton("Notify me", new DialogInterface.OnClickListener() {
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
                         f.notifySeverities.clear();
@@ -568,19 +636,72 @@ public class IpawsPane {
                                 f.notifySeverities.add(names[i]);
                         // Nothing ticked and notifications on would be a control that
                         // does nothing, so that is off.
-                        f.notify = !f.notifySeverities.isEmpty();
+                        if (f.notifySeverities.isEmpty())
+                            f.notify = false;
                         manager.saveFilter();
                         refresh();
                     }
                 })
-                .setNeutralButton("Turn off", new DialogInterface.OnClickListener() {
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /** Where a new alert has to be to chime. Not the map's distance unless asked. */
+    private void chooseNotifyWhere() {
+        final Filter f = manager.getFilter();
+        final String[] items = new String[NOTIFY_RADII.length + 2];
+        items[0] = "In my states";
+        int checked = "states".equals(f.notifyWhere) ? 0 : -1;
+        for (int i = 0; i < NOTIFY_RADII.length; i++) {
+            items[i + 1] = "Within " + NOTIFY_RADII[i] + " " + Units.bigLabel() + " of me";
+            if ("near".equals(f.notifyWhere) && NOTIFY_RADII[i] == bigOf(f.notifyRadiusM))
+                checked = i + 1;
+        }
+        items[items.length - 1] = "Same as the map";
+        if ("map".equals(f.notifyWhere))
+            checked = items.length - 1;
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Notify me about alerts")
+                .setSingleChoiceItems(items, checked, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
-                        f.notify = false;
+                        d.dismiss();
+                        if (w == 0) {
+                            f.notifyWhere = "states";
+                        } else if (w == items.length - 1) {
+                            f.notifyWhere = "map";
+                        } else {
+                            f.notifyWhere = "near";
+                            f.notifyRadiusM = Units.bigToMeters(NOTIFY_RADII[w - 1]);
+                        }
                         manager.saveFilter();
                         refresh();
                     }
                 })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /**
+     * Whether an alert already out that is revised -- extended, reworded, a new expiry
+     * -- chimes again. NWS gives every revision an id of its own, so without this one
+     * warning notified again at every update.
+     */
+    private void chooseNotifyUpdates() {
+        final Filter f = manager.getFilter();
+        final String[] items = { "New alerts only", "New and updated" };
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Notify me about")
+                .setSingleChoiceItems(items, f.notifyUpdates ? 1 : 0,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int w) {
+                                d.dismiss();
+                                f.notifyUpdates = w == 1;
+                                manager.saveFilter();
+                                refresh();
+                            }
+                        })
                 .setNegativeButton("Cancel", null)
                 .show();
     }

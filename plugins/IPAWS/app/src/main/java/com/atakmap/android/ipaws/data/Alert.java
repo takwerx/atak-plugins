@@ -34,6 +34,13 @@ public class Alert {
     public final String headline;
     public final String description;
     public final String instruction;
+    /**
+     * CAP's msgType: {@code Alert} for a new one, {@code Update} for a revision of one
+     * already out (extended, reworded, a new expiry) and {@code Cancel}. An update has
+     * an id of its own, so without this every revision of the same warning read as new
+     * weather and notified again.
+     */
+    public final String messageType;
     /** Millis since epoch, or 0 when the feed did not say. */
     public final long effective;
     public final long expires;
@@ -65,6 +72,7 @@ public class Alert {
         headline = props.optString("headline", "");
         description = props.optString("description", "");
         instruction = props.optString("instruction", "");
+        messageType = props.optString("messageType", "Alert");
         effective = parseTime(props.optString("effective", null));
         expires = parseTime(props.optString("expires", null));
         ends = parseTime(props.optString("ends", null));
@@ -112,6 +120,11 @@ public class Alert {
                 out.add(a);
         }
         return out;
+    }
+
+    /** A brand-new alert, not an update or a cancellation of one already out. */
+    public boolean isNew() {
+        return !"Update".equalsIgnoreCase(messageType) && !"Cancel".equalsIgnoreCase(messageType);
     }
 
     /** 0 is the most severe, so a plain sort puts the worst first. */
