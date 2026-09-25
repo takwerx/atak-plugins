@@ -464,7 +464,7 @@ public class IpawsPane {
                     if (SCOPE_PRESETS[i] == now)
                         checked = i + 2;
                 }
-                new AlertDialog.Builder(mapView.getContext())
+                fromTop(new AlertDialog.Builder(mapView.getContext())
                         .setTitle("Show alerts within")
                         .setSingleChoiceItems(items, checked, new DialogInterface.OnClickListener() {
                             @Override
@@ -480,7 +480,7 @@ public class IpawsPane {
                             }
                         })
                         .setNegativeButton("Cancel", null)
-                        .show();
+                        .show());
             }
         });
     }
@@ -525,6 +525,24 @@ public class IpawsPane {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /**
+     * Opens a pick-one list at its top, with the current choice still ticked.
+     * Android scrolls the list to the ticked row, which on a phone in landscape put
+     * Everything, first in the distance presets, above the top of the dialog -- the
+     * operator read that as there being no Everything at all.
+     */
+    private static void fromTop(AlertDialog d) {
+        final android.widget.ListView lv = d.getListView();
+        if (lv == null)
+            return;
+        lv.post(new Runnable() {
+            @Override
+            public void run() {
+                lv.setSelection(0);
+            }
+        });
     }
 
     // ---- map key --------------------------------------------------------------------
@@ -597,7 +615,7 @@ public class IpawsPane {
             if (INTERVALS[i] == f.pollMinutes)
                 checked = i;
         }
-        new AlertDialog.Builder(mapView.getContext())
+        fromTop(new AlertDialog.Builder(mapView.getContext())
                 .setTitle("Check for alerts")
                 .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
                     @Override
@@ -609,7 +627,7 @@ public class IpawsPane {
                     }
                 })
                 .setNegativeButton("Cancel", null)
-                .show();
+                .show());
     }
 
 
@@ -716,7 +734,7 @@ public class IpawsPane {
         items[items.length - 1] = "Same as the map";
         if ("map".equals(f.notifyWhere))
             checked = items.length - 1;
-        new AlertDialog.Builder(mapView.getContext())
+        fromTop(new AlertDialog.Builder(mapView.getContext())
                 .setTitle("Notify me about alerts")
                 .setSingleChoiceItems(items, checked, new DialogInterface.OnClickListener() {
                     @Override
@@ -735,7 +753,7 @@ public class IpawsPane {
                     }
                 })
                 .setNegativeButton("Cancel", null)
-                .show();
+                .show());
     }
 
     /**
@@ -746,7 +764,7 @@ public class IpawsPane {
     private void chooseNotifyUpdates() {
         final Filter f = manager.getFilter();
         final String[] items = { "New alerts only", "New and updated" };
-        new AlertDialog.Builder(mapView.getContext())
+        fromTop(new AlertDialog.Builder(mapView.getContext())
                 .setTitle("Notify me about")
                 .setSingleChoiceItems(items, f.notifyUpdates ? 1 : 0,
                         new DialogInterface.OnClickListener() {
@@ -759,7 +777,7 @@ public class IpawsPane {
                             }
                         })
                 .setNegativeButton("Cancel", null)
-                .show();
+                .show());
     }
 
     // ---- regions --------------------------------------------------------------------
