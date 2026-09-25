@@ -29,7 +29,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -634,6 +636,8 @@ public class AlertManager {
      * @param missingBefore what was still outstanding when the previous round started
      */
     private void rebuild(final int round, final int missingBefore) {
+        final long t0 = System.currentTimeMillis();
+        assembling = new HashMap<>();
         final List<Alert> current;
         synchronized (this) {
             current = new ArrayList<>(raw);
@@ -687,19 +691,8 @@ public class AlertManager {
                 if (env != null && !overlaps(env, inView))
                     continue;
             }
-            Geometry g = null;
-            if (a.hasOwnGeometry()) {
-                try {
-                    g = GeoJson.parse(a.geometry);
-                } catch (Exception e) {
-                    Log.w(TAG, "unreadable geometry on " + a.event, e);
-                }
-            }
-            if (g == null)
-                g = fromZones(a, missing);
-            // Before anything reads it: the store writes a nested collection as a
-            // point at 0,0, and the county test and label point should see what is drawn.
-            g = Geo.flatten(g);
+            final Assembled asm = assemble(a, missing);
+            final Geometry g = asm.area;
             // No area yet is kept, as everywhere: an alert we cannot place is shown
             // rather than scoped away on a guess.
             if (scopePoint != null && g != null
@@ -738,7 +731,7 @@ public class AlertManager {
             // The name goes on a point in the middle of the area, because a label on
             // the polygon itself renders along its edge and reads as a name for a
             // line. Same attributes, so tapping the words opens the same alert.
-            final double[] at = Geo.labelPoint(g);
+            final double[] at = asm.labelAt();
             if (at != null)
                 drawn.add(new AlertOverlay.Drawn(a.severity, a.event,
                         new com.atakmap.map.layer.feature.geometry.Point(at[0], at[1]),
@@ -755,7 +748,13 @@ public class AlertManager {
         announce(current, kept);
         // Written whether or not the map is on: All OFF hides the layer, it does not
         // empty it, so All ON shows the current picture the moment it is tapped.
+        // Only what this rebuild used is kept for the next.
+        assembled = assembling;
+        assembling = new HashMap<>();
+        final long t1 = System.currentTimeMillis();
         overlay.rewrite(drawn);
+        Log.d(TAG, "rebuild: " + kept.size() + " alerts assembled in " + (t1 - t0)
+                + " ms, written in " + (System.currentTimeMillis() - t1) + " ms");
         zonesPending = missing.size();
         this.undrawable = undrawable;
         this.placedAtCenter = placed;
@@ -1094,9 +1093,79 @@ public class AlertManager {
     /** True while any of an alert's zones is neither held nor known to be absent. */
     private boolean zonesStillComing(Alert a) {
         for (String url : a.zoneUrls)
-            if (zones.envelope(url) == null && !zones.isKnownAbsent(url))
+            if (!zones.isHeld(url) && !zones.isKnownAbsent(url))
                 return true;
         return false;
+    }
+
+    /** One alert's area as drawn, and where its name goes, kept between rebuilds. */
+    private static final class Assembled {
+        /** Which of its zones were held when it was built; a change means rebuild it. */
+        final String sig;
+        final Geometry area;
+        private double[] labelAt;
+        private boolean labelDone;
+
+        Assembled(String sig, Geometry area) {
+            this.sig = sig;
+            this.area = area;
+        }
+
+        double[] labelAt() {
+            if (!labelDone) {
+                labelAt = Geo.labelPoint(area);
+                labelDone = true;
+            }
+            return labelAt;
+        }
+    }
+
+    /**
+     * The last rebuild's assembled alerts, by id. Worker thread only.
+     *
+     * <p>A national rebuild was eleven seconds on s10-dev-1, measured: reading 949 zone
+     * files 2.5 s, parsing their JSON 2.8 s, building geometry 2.0 s, placing labels
+     * 2.4 s -- all of it redone at every poll and every filter change for alerts that
+     * had not changed. Kept here, only new alerts and ones whose zones changed are
+     * built again. Only what the latest rebuild used is kept, so this holds no more
+     * than the rebuild itself already held at once.
+     */
+    private Map<String, Assembled> assembled = new HashMap<>();
+    private Map<String, Assembled> assembling = new HashMap<>();
+
+    /** An alert's flattened area, from the last rebuild when nothing about it changed. */
+    private Assembled assemble(Alert a, Set<String> missing) {
+        final String sig;
+        if (a.hasOwnGeometry()) {
+            sig = "own";
+        } else {
+            final StringBuilder b = new StringBuilder(a.zoneUrls.size());
+            for (String url : a.zoneUrls) {
+                final boolean held = zones.isHeld(url);
+                b.append(held ? '1' : '0');
+                if (!held && !zones.isKnownAbsent(url))
+                    missing.add(url);
+            }
+            sig = b.toString();
+        }
+        Assembled c = assembled.get(a.id);
+        if (c == null || !c.sig.equals(sig)) {
+            Geometry g = null;
+            if (a.hasOwnGeometry()) {
+                try {
+                    g = GeoJson.parse(a.geometry);
+                } catch (Exception e) {
+                    Log.w(TAG, "unreadable geometry on " + a.event, e);
+                }
+            }
+            if (g == null)
+                g = fromZones(a, missing);
+            // Before anything reads it: the store writes a nested collection as a
+            // point at 0,0, and the county test and label point should see what is drawn.
+            c = new Assembled(sig, Geo.flatten(g));
+        }
+        assembling.put(a.id, c);
+        return c;
     }
 
     /**

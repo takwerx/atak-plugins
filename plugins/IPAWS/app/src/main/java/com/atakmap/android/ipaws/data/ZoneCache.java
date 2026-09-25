@@ -130,6 +130,17 @@ public class ZoneCache {
     }
 
     /**
+     * Whether a zone's geometry is held, without reading it: from memory when it has
+     * been read this session, else whether a fresh cache file exists. Worker thread.
+     */
+    public boolean isHeld(String url) {
+        if (envelopes.containsKey(url))
+            return true;
+        final File f = hitFile(url);
+        return f != null && f.isFile() && System.currentTimeMillis() - f.lastModified() <= HIT_TTL_MS;
+    }
+
+    /**
      * A zone's extent, {@code {south, west, north, east}}, from memory when it has been
      * read this session, else read once. Null when the zone is not held. Worker thread.
      */
