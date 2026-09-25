@@ -75,8 +75,8 @@ public class IpawsPane {
     /** True while a finger is on the slider, so a poll's refresh does not yank it back. */
     private boolean scopeDragging;
 
-    /** Feature Layer's presets, in the large unit; 0 is "What is in view". */
-    private static final int[] SCOPE_PRESETS = { 0, 2, 5, 10, 25, 50 };
+    /** Radius presets in the large unit, after Everything and What is in view. */
+    private static final int[] SCOPE_PRESETS = { 2, 5, 10, 25, 50 };
     /** The radius a "Measuring from" tap gives when there was none, as Feature Layer's does. */
     private static final int DEFAULT_SCOPE_BIG = 25;
 
@@ -308,18 +308,18 @@ public class IpawsPane {
     }
 
     /**
-     * Feature Layer's controls, one for one: the slider is the radius with 0 as "What
-     * is in view", the From button names the point and rotates it, Use this extent
-     * takes the radius from the map, and Presets is the list. IPAWS adds only
-     * Everything to the presets, because unlike a Feature Layer feed it starts with no
-     * limit at all and needs a way back to it.
+     * Feature Layer's controls: the slider is the radius, the From button names the
+     * point and rotates it, Use this extent takes the radius from the map, and Presets
+     * is the list. One difference, the operator's: the slider's far left is Everything,
+     * no limit at all -- "all the way left is all on" -- where Feature Layer's is What
+     * is in view. What is in view stays, as a preset.
      */
     private void bindScope(View header) {
         scopeSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(android.widget.SeekBar sb, int p, boolean fromUser) {
                 if (fromUser)
-                    scopeLabel.setText(p == 0 ? "What is in view"
+                    scopeLabel.setText(p == 0 ? "Everything"
                             : "Within " + p + " " + Units.bigLabel() + " of "
                                     + fromName(manager.getFilter().scopeFrom));
             }
@@ -338,9 +338,9 @@ public class IpawsPane {
         scopeFromButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // Rotates between the two points. From "what is in view" or Everything
-                // it also needs a radius, or the button would change nothing anyone
-                // could see.
+                // Rotates between the two points. From Everything or What is in view it
+                // also needs a radius, or the button would change nothing anyone could
+                // see.
                 final Filter f = manager.getFilter();
                 final int p = "radius".equals(f.scope) ? bigOf(f.scopeRadiusM) : DEFAULT_SCOPE_BIG;
                 applyScope(p, "center".equals(f.scopeFrom) ? "me" : "center");
@@ -373,16 +373,15 @@ public class IpawsPane {
             @Override
             public void onClick(View v) {
                 final Filter f = manager.getFilter();
-                final String[] items = new String[SCOPE_PRESETS.length + 1];
+                final String[] items = new String[SCOPE_PRESETS.length + 2];
                 items[0] = "Everything";
-                int checked = "all".equals(f.scope) ? 0 : -1;
-                final int now = "view".equals(f.scope) ? 0
-                        : "radius".equals(f.scope) ? bigOf(f.scopeRadiusM) : -1;
+                items[1] = "What is in view";
+                int checked = "view".equals(f.scope) ? 1 : "radius".equals(f.scope) ? -1 : 0;
+                final int now = "radius".equals(f.scope) ? bigOf(f.scopeRadiusM) : -1;
                 for (int i = 0; i < SCOPE_PRESETS.length; i++) {
-                    items[i + 1] = SCOPE_PRESETS[i] == 0 ? "What is in view"
-                            : SCOPE_PRESETS[i] + " " + Units.bigLabel();
+                    items[i + 2] = SCOPE_PRESETS[i] + " " + Units.bigLabel();
                     if (SCOPE_PRESETS[i] == now)
-                        checked = i + 1;
+                        checked = i + 2;
                 }
                 new AlertDialog.Builder(mapView.getContext())
                         .setTitle("Show alerts within")
@@ -390,11 +389,12 @@ public class IpawsPane {
                             @Override
                             public void onClick(DialogInterface d, int w) {
                                 d.dismiss();
-                                if (w == 0) {
-                                    manager.setScope("all", manager.getFilter().scopeFrom, 0);
+                                final String from = manager.getFilter().scopeFrom;
+                                if (w == 1) {
+                                    manager.setScope("view", from, 0);
                                     refresh();
                                 } else {
-                                    applyScope(SCOPE_PRESETS[w - 1], manager.getFilter().scopeFrom);
+                                    applyScope(w == 0 ? 0 : SCOPE_PRESETS[w - 2], from);
                                 }
                             }
                         })
@@ -404,10 +404,10 @@ public class IpawsPane {
         });
     }
 
-    /** Feature Layer's applyScope: 0 is what is in view, anything else a radius. */
+    /** The slider's value: 0 is Everything, anything else a radius. */
     private void applyScope(int big, String from) {
         if (big <= 0)
-            manager.setScope("view", from, 0);
+            manager.setScope("all", from, 0);
         else
             manager.setScope("radius", from, Units.bigToMeters(big));
         refresh();
