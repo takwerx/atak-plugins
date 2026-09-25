@@ -52,8 +52,6 @@ public class AlertOverlay {
     private int count;
     /** All ON / All OFF. Read by every set this writes, so a rewrite cannot undo it. */
     private volatile boolean visible = true;
-    /** Zoom gate in meters per pixel, the coarsest the sets draw at. Same rule. */
-    private volatile double gateGsd = Double.MAX_VALUE;
     /**
      * Its own thread, not the rebuild worker: a store-settings write waits for a
      * rewrite in progress (eleven seconds at national scale) and must not also wait
@@ -321,32 +319,6 @@ public class AlertOverlay {
         });
     }
 
-    /**
-     * Zoom gate: nothing draws when the map is zoomed out further than this, in meters
-     * per pixel; {@code Double.MAX_VALUE} draws at every zoom. Each set's resolution
-     * range is changed in place, so no feature is rewritten and the change shows on
-     * the next frame once the store is free.
-     */
-    public void setGate(double metersPerPixel) {
-        gateGsd = metersPerPixel;
-        settings.execute(new Runnable() {
-            @Override
-            public void run() {
-                synchronized (lock) {
-                    if (store == null)
-                        return;
-                    for (Long id : existingSets()) {
-                        try {
-                            store.updateFeatureSet(id, gateGsd, 0d);
-                        } catch (Exception e) {
-                            Log.w(TAG, "zoom gate on set " + id + " failed", e);
-                        }
-                    }
-                }
-            }
-        });
-    }
-
     public FeatureDataStore2 getStore() {
         return store;
     }
@@ -425,7 +397,7 @@ public class AlertOverlay {
         // zoom. The store fills up, the log says the overlay was rewritten, and the
         // map stays empty.
         final long id = store.insertFeatureSet(
-                new FeatureSet("IPAWS", "alerts", name, gateGsd, 0d));
+                new FeatureSet("IPAWS", "alerts", name, Double.MAX_VALUE, 0d));
         store.setFeatureSetVisible(id, visible);
         return id;
     }

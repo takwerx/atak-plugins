@@ -66,55 +66,8 @@
             android:minWidth="110dp" />
     </LinearLayout>
 
-    <!-- The map key. Closed by default so the filters are still on the first
-         screen; its lines are built in code from the same color call the map
-         draws with. -->
-    <Button
-        android:id="@+id/btn_map_key"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:visibility="gone"
-        android:text="@string/map_key_show" />
-
-    <LinearLayout
-        android:id="@+id/map_key"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="6dp"
-        android:paddingLeft="4dp"
-        android:visibility="gone" />
-
-    <TextView
-        style="@style/TakwerxSectionHeading"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/heading_where" />
-
-    <Button
-        android:id="@+id/btn_regions"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp" />
-
-    <Button
-        android:id="@+id/btn_states"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp" />
-
-    <Button
-        android:id="@+id/btn_counties"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp" />
-
-    <!-- Distance scope, Feature Layer's block: what it is now, a slider, where it is
+    <!-- Distance scope, Feature Layer's block, beside the zoom gate because the
+         operator reads the two together: what it is now, a slider, where it is
          measured from, and "Use this extent" / "Presets". Narrows the list, the map
          and notifications alike. -->
     <TextView
@@ -167,6 +120,54 @@
             android:layout_marginLeft="4dp"
             android:text="@string/presets" />
     </LinearLayout>
+
+    <!-- The map key. Closed by default so the filters are still on the first
+         screen; its lines are built in code from the same color call the map
+         draws with. -->
+    <Button
+        android:id="@+id/btn_map_key"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:visibility="gone"
+        android:text="@string/map_key_show" />
+
+    <LinearLayout
+        android:id="@+id/map_key"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="6dp"
+        android:paddingLeft="4dp"
+        android:visibility="gone" />
+
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/heading_where" />
+
+    <Button
+        android:id="@+id/btn_regions"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
+
+    <Button
+        android:id="@+id/btn_states"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
+
+    <Button
+        android:id="@+id/btn_counties"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp" />
 
     <TextView
         style="@style/TakwerxSectionHeading"

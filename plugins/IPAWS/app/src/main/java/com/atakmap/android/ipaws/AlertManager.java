@@ -185,20 +185,46 @@ public class AlertManager {
     public void setMapOn(boolean on) {
         filter.mapOn = on;
         saveFilter();
-        overlay.setVisible(on);
+        applyVisibility();
         changed();
     }
 
     /**
      * Zoom gate, Feature Layer's: alerts draw only when zoomed in at least this far,
-     * in meters per pixel; {@code Double.MAX_VALUE} is Always. Changes the sets in
-     * place, so it needs no poll and no rebuild.
+     * in meters per pixel; {@code Double.MAX_VALUE} is Always.
+     *
+     * <p>Applied here, from {@code getMapResolution()} on every settled map move, and
+     * not as the feature sets' resolution range. That was the first version, and on
+     * s10-dev-1 the map went empty at a zoom the status line called close enough:
+     * ATAK's renderer tests the range against its own draw resolution, which is not
+     * the map resolution the scale bar and "Use this zoom" read, and rounds it to a
+     * whole tile level besides. One number now decides the map, the status line and
+     * the button, so they cannot disagree.
      */
     public void setGate(double metersPerPixel) {
         filter.gateGsd = metersPerPixel;
         saveFilter();
-        overlay.setGate(metersPerPixel);
+        gatedOut = pastGate();
+        applyVisibility();
         changed();
+    }
+
+    /** Zoomed out past the gate right now: whatever the switch, nothing should draw. */
+    private boolean gatedOut;
+    /** What was last handed to the overlay, so a map move that changes nothing writes nothing. */
+    private Boolean shown;
+
+    private boolean pastGate() {
+        return filter.gateGsd != Double.MAX_VALUE && mapView.getMapResolution() > filter.gateGsd;
+    }
+
+    /** The one place the overlay is shown or hidden: All ON/OFF and the zoom gate together. */
+    private void applyVisibility() {
+        final boolean on = filter.mapOn && !gatedOut;
+        if (shown != null && shown == on)
+            return;
+        shown = on;
+        overlay.setVisible(on);
     }
 
     /**
@@ -307,15 +333,22 @@ public class AlertManager {
                 @Override
                 public void onMapMoved(com.atakmap.map.AtakMapView view, boolean animate) {
                     MainThread.remove(scopeTick);
-                    MainThread.postDelayed(scopeTick, 500);
+                    MainThread.postDelayed(scopeTick, 300);
                 }
             };
 
     private final Runnable scopeTick = new Runnable() {
         @Override
         public void run() {
-            if (started)
-                followScope();
+            if (!started)
+                return;
+            final boolean past = pastGate();
+            if (past != gatedOut) {
+                gatedOut = past;
+                applyVisibility();
+                changed();   // the status line says "zoom in" from the same test
+            }
+            followScope();
         }
     };
 
@@ -380,8 +413,7 @@ public class AlertManager {
 
     /** True when a zoom gate is set and the map is zoomed out past it. Main thread. */
     public boolean zoomedOutPastGate() {
-        return filter.mapOn && filter.gateGsd != Double.MAX_VALUE
-                && mapView.getMapResolution() > filter.gateGsd;
+        return filter.mapOn && pastGate();
     }
 
     /** The current picture, most severe first. A copy: the poll rewrites the original. */
@@ -423,8 +455,9 @@ public class AlertManager {
         started = true;
         try {
             overlay.attach();
-            overlay.setVisible(filter.mapOn);
-            overlay.setGate(filter.gateGsd);
+            gatedOut = pastGate();
+            shown = null;
+            applyVisibility();
         } catch (Exception e) {
             Log.e(TAG, "could not attach the overlay", e);
         }

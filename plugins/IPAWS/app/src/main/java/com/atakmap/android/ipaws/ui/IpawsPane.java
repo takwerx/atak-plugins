@@ -23,7 +23,6 @@ import com.atakmap.android.ipaws.data.Areas;
 import com.atakmap.android.ipaws.data.Counties;
 import com.atakmap.android.ipaws.data.Events;
 import com.atakmap.android.ipaws.data.Filter;
-import com.atakmap.android.ipaws.data.MainThread;
 import com.atakmap.android.ipaws.data.Regions;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.ipaws.plugin.R;
@@ -80,31 +79,6 @@ public class IpawsPane {
     private static final int[] SCOPE_PRESETS = { 0, 2, 5, 10, 25, 50 };
     /** The radius a "Measuring from" tap gives when there was none, as Feature Layer's does. */
     private static final int DEFAULT_SCOPE_BIG = 25;
-    /** Whether the status line last said "zoom in", so a map move only redraws a change. */
-    private boolean saidZoomIn;
-
-    /**
-     * Keeps the status line's "zoom in" true while the map moves: it is read from the
-     * zoom, and the pane otherwise only refreshes on a poll. Cam Depot's pattern --
-     * onMapMoved runs on the GL thread every frame of a pinch, so it only posts, and
-     * the posts are coalesced.
-     */
-    private final com.atakmap.map.AtakMapView.OnMapMovedListener moved =
-            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
-                @Override
-                public void onMapMoved(com.atakmap.map.AtakMapView view, boolean animate) {
-                    MainThread.remove(gateTick);
-                    MainThread.postDelayed(gateTick, 150);
-                }
-            };
-
-    private final Runnable gateTick = new Runnable() {
-        @Override
-        public void run() {
-            if (manager.zoomedOutPastGate() != saidZoomIn)
-                refreshStatus();
-        }
-    };
 
     /** Feature Layer's presets, in the operator's large unit, as the scale bar reads them. */
     private static final double[] GATE_BIG = { 0.25, 1, 5, 15, 50 };
@@ -250,7 +224,6 @@ public class IpawsPane {
             }
         });
 
-        mapView.addOnMapMovedListener(moved);
         manager.setListener(new AlertManager.Listener() {
             @Override
             public void onChanged() {
@@ -266,12 +239,9 @@ public class IpawsPane {
 
     public void dispose() {
         manager.setListener(null);
-        mapView.removeOnMapMovedListener(moved);
-        MainThread.remove(gateTick);
     }
 
     private void refreshStatus() {
-        saidZoomIn = manager.zoomedOutPastGate();
         status.setText(manager.statusLine());
     }
 
