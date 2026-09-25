@@ -24,6 +24,7 @@ import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.Favorites;
 import com.atakmap.android.atmosphere.data.Spot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
+import com.atakmap.android.atmosphere.data.Census;
 import com.atakmap.android.atmosphere.net.Http;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.units.UnitSystem;
@@ -148,7 +149,7 @@ public final class SpotPage {
     private long fetchedAt;
     private boolean inFlight;
     /** Bumped per list fetch and per forecast shown, separately, so neither cancels the other. */
-    private int listGeneration, detailGeneration;
+    private int listGeneration, detailGeneration, addressGeneration;
     private Filter filter = Filter.ALL;
     private String stateCode = "";
     private String regionCode = "";
@@ -1171,6 +1172,10 @@ public final class SpotPage {
      * typed address is sent to it; the plugin sends nothing of its own.
      */
     private void askAddress() {
+        askAddress("");
+    }
+
+    private void askAddress(String prefill) {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
             return;
@@ -1184,6 +1189,10 @@ public final class SpotPage {
         final EditText input = new EditText(ctx);
         input.setSingleLine(true);
         input.setHint(pluginContext.getString(R.string.spot_address_hint));
+        if (prefill != null && !prefill.isEmpty()) {
+            input.setText(prefill);
+            input.setSelection(prefill.length());
+        }
         new AlertDialog.Builder(ctx)
                 .setTitle(pluginContext.getString(R.string.spot_address_title))
                 .setMessage(pluginContext.getString(R.string.spot_address_text, coder.getTitle()))
@@ -1210,29 +1219,94 @@ public final class SpotPage {
                 .show();
     }
 
-    private void lookUp(GeocodeManager.Geocoder coder, final String text) {
+    /**
+     * The Census first, then the geocoder ATAK is set to.
+     *
+     * <p>Not a preference for one service over another: they fail differently. The
+     * Census answers with the address or with nothing, and takes a street written
+     * without its suffix. Android's answers a house number it does not hold with the
+     * town, at the town's center, and calls it one confident match -- which is what a
+     * residential address in Murrieta came back as, six miles out, with nothing in
+     * the answer to say so (operator, 2026-09-25).
+     *
+     * <p>So the Census is asked first and ATAK's geocoder catches what it declines:
+     * anything outside the United States, and a place name rather than an address.
+     * Both answers go through the same confirmation, because a town is a perfectly
+     * good place to ask for a forecast as long as the operator meant to.
+     */
+    private void lookUp(final GeocodeManager.Geocoder coder, final String text) {
         toast(pluginContext.getString(R.string.spot_searching, text));
+        final int mine = ++addressGeneration;
+        Http.get(Census.lookupUrl(text), egress.userAgent(), null, new Http.Callback() {
+            @Override
+            public void onSuccess(String body) {
+                final List<Census.Match> matches = Census.parse(body);
+                Log.d(TAG, "census: " + matches.size() + " match(es) for the address");
+                if (matches.isEmpty()) {
+                    askAtakGeocoder(coder, text, mine);
+                    return;
+                }
+                final List<android.util.Pair<String, GeoPoint>> found = new ArrayList<>();
+                for (Census.Match m : matches)
+                    found.add(new android.util.Pair<>(m.address,
+                            new GeoPoint(m.latitude, m.longitude)));
+                deliver(text, found, mine);
+            }
+
+            @Override
+            public void onFailure(String error) {
+                // No network, or the service is down. ATAK's geocoder may still be
+                // able to answer, and saying nothing here would look like no match.
+                Log.w(TAG, "census lookup failed: " + error);
+                askAtakGeocoder(coder, text, mine);
+            }
+        });
+    }
+
+    private void deliver(final String text,
+            final List<android.util.Pair<String, GeoPoint>> found, final int mine) {
+        mapView.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mine != addressGeneration)
+                    return;
+                Log.d(TAG, "address search: " + (found == null ? 0 : found.size())
+                        + " match(es)");
+                if (found != null)
+                    for (android.util.Pair<String, GeoPoint> f : found)
+                        Log.d(TAG, "  match: " + (f == null ? "null" : f.first
+                                + " at " + (f.second == null ? "no point"
+                                        : position(f.second))));
+                showAddresses(text, found);
+            }
+        });
+    }
+
+    private void askAtakGeocoder(GeocodeManager.Geocoder coder, final String text,
+            final int mine) {
         // The search is biased to the map on screen; on the globe, the world.
         final double[] box = viewBox();
         final GeoBounds bounds = box == null ? new GeoBounds(90, -180, -90, 180)
                 : new GeoBounds(box[0], box[1], box[2], box[3]);
-        final int mine = ++detailGeneration;
+        // The limit is what GeocodingUtil takes; ATAK's own Android geocoder ignores
+        // it and asks getFromLocationName for 1, bounded by the view, then 1
+        // worldwide if that came back empty (GeocodeManager, 5.8.0.3). So expect one
+        // match from that one, and more only from Nominatim.
+        //
+        // The generation is the caller's: this is the same search continuing, not a
+        // new one. It must not be detailGeneration, which the forecast detail loader
+        // owns -- sharing it meant a detail request in flight cancelled the address
+        // result, and the operator got no dialog, no toast and no point, which reads
+        // exactly like a geocoder that found nothing (2026-09-25).
         GeocodingUtil.lookup(coder, bounds, text, 6, new GeocodingUtil.ResultListener() {
             @Override
             public void onResult(GeocodeManager.Geocoder c, String original, GeoPoint point,
                     final List<android.util.Pair<String, GeoPoint>> found,
                     final GeocodeManager.GeocoderException error) {
                 // Answers on the geocoder's own thread; everything below is UI.
-                mapView.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (mine != detailGeneration)
-                            return;
-                        if (error != null)
-                            Log.w(TAG, "address search failed", error);
-                        showAddresses(text, found);
-                    }
-                });
+                if (error != null)
+                    Log.w(TAG, "address search failed", error);
+                deliver(text, found, mine);
             }
         });
     }
@@ -1245,12 +1319,13 @@ public final class SpotPage {
                 if (f != null && f.second != null && f.second.isValid())
                     usable.add(f);
         if (usable.isEmpty()) {
+            // Back to the search box with the text still in it, not back to the top.
             toast(pluginContext.getString(R.string.spot_address_none, text));
-            showRequestDialogFor();
+            askAddress(text);
             return;
         }
         if (usable.size() == 1) {
-            setRequestPoint(usable.get(0).second, addressLabel(usable.get(0).first, text));
+            confirmAddress(text, usable.get(0));
             return;
         }
         final String[] labels = new String[usable.size()];
@@ -1263,6 +1338,41 @@ public final class SpotPage {
                         setRequestPoint(usable.get(which).second, labels[which]);
                     }
                 });
+    }
+
+    /**
+     * Show the one match and let the operator judge it.
+     *
+     * <p>Never accepted silently. A geocoder given a house number it does not hold
+     * answers with the street, or the town, and reports one confident match either
+     * way -- so the only way to tell the house from the town is to read back what it
+     * resolved to, with the position under it. Taking it quietly puts a fire weather
+     * forecast at the middle of a city and says nothing (operator, 2026-09-25).
+     */
+    private void confirmAddress(final String typed,
+            final android.util.Pair<String, GeoPoint> match) {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final String label = addressLabel(match.first, typed);
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.spot_address_found_title))
+                .setMessage(label + "\n" + position(match.second))
+                .setPositiveButton(pluginContext.getString(R.string.spot_address_use),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                setRequestPoint(match.second, label);
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.spot_address_retry),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                askAddress(typed);
+                            }
+                        })
+                .show();
     }
 
     private static String addressLabel(String found, String typed) {
