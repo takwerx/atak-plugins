@@ -11,6 +11,7 @@ import com.atakmap.coremap.filesystem.FileSystemUtils;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 import com.atakmap.map.layer.feature.AttributeSet;
+import com.atakmap.map.layer.feature.FeatureSetCursor;
 import com.atakmap.map.layer.feature.Feature;
 import com.atakmap.map.layer.feature.FeatureDataStore2;
 import com.atakmap.map.layer.feature.FeatureLayer3;
@@ -100,6 +101,18 @@ final class AtmosphereFeatures {
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
     private final Map<String, Long> sets = new java.util.concurrent.ConcurrentHashMap<>();
+    /**
+     * Feature sets already in the store when this instance opened it, retired by the
+     * first rewrite.
+     *
+     * <p>The store file outlives the plugin instance and {@link #sets} does not, so a
+     * reinstall used to start with nothing to delete: the previous instance's
+     * features stayed on the map forever and the new instance drew its own on top.
+     * Every reinstall added a layer. The operator found three stale Wheeler Incident
+     * discs stacked under the one that was current, all at the same coordinates
+     * (2026-09-25: "now its listed 4 times").
+     */
+    private final java.util.List<Long> adopted = new java.util.ArrayList<>();
     /** Held by a rewrite on the worker and by detach, so a store is never closed mid-write. */
     private final Object lock = new Object();
 
@@ -155,6 +168,34 @@ final class AtmosphereFeatures {
         this.sweepOldStormDrawings = sweepOldStormDrawings;
     }
 
+    /**
+     * Remember every set the store already holds, so the first rewrite can retire it.
+     *
+     * <p>Adopted rather than deleted here: the layer is built over this store moments
+     * later, and emptying it first is the one structural difference from IPAWS and
+     * Feature Layer, whose stores always carry the last session's features.
+     */
+    private void adoptExistingSets() {
+        adopted.clear();
+        FeatureSetCursor c = null;
+        try {
+            c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
+            while (c.moveToNext())
+                adopted.add(c.get().getId());
+            Log.d(tag, layerName + ": adopted " + adopted.size()
+                    + " set(s) left by an earlier instance");
+        } catch (Exception e) {
+            Log.w(tag, "could not read existing sets", e);
+        } finally {
+            if (c != null)
+                try {
+                    c.close();
+                } catch (Exception ignored) {
+                    // nothing to do
+                }
+        }
+    }
+
     /** Open the store and put the layer on the map. Safe to call twice. */
     void attach() {
         if (store != null)
@@ -179,6 +220,7 @@ final class AtmosphereFeatures {
                 sweepOldDrawings();
 
             store = new FeatureSetDatabase2(storeFile);
+            adoptExistingSets();
             final FeatureDataStore2.FeatureQueryParameters visibleOnly =
                     new FeatureDataStore2.FeatureQueryParameters();
             visibleOnly.visibleOnly = true;
@@ -402,6 +444,9 @@ final class AtmosphereFeatures {
                 store.acquireModifyLock(true);
                 bulk = true;
                 final java.util.List<Long> old = new java.util.ArrayList<>(sets.values());
+                // Anything a previous instance of the plugin left behind goes with them.
+                old.addAll(adopted);
+                adopted.clear();
                 final Map<String, Long> fresh = new HashMap<>();
                 for (Drawn d : drawn) {
                     Long fsid = fresh.get(d.setName);
