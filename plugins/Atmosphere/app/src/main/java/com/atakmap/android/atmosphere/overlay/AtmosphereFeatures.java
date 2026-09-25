@@ -177,13 +177,20 @@ final class AtmosphereFeatures {
      */
     private void adoptExistingSets() {
         adopted.clear();
+        adopted.addAll(existingSetIds());
+        Log.d(tag, layerName + ": store opened holding " + adopted.size() + " set(s)");
+    }
+
+    /** Every feature set id in the store, as the store reports it. */
+    private java.util.List<Long> existingSetIds() {
+        final java.util.List<Long> ids = new java.util.ArrayList<>();
+        if (store == null)
+            return ids;
         FeatureSetCursor c = null;
         try {
             c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
             while (c.moveToNext())
-                adopted.add(c.get().getId());
-            Log.d(tag, layerName + ": adopted " + adopted.size()
-                    + " set(s) left by an earlier instance");
+                ids.add(c.get().getId());
         } catch (Exception e) {
             Log.w(tag, "could not read existing sets", e);
         } finally {
@@ -194,6 +201,7 @@ final class AtmosphereFeatures {
                     // nothing to do
                 }
         }
+        return ids;
     }
 
     /** Open the store and put the layer on the map. Safe to call twice. */
@@ -443,9 +451,14 @@ final class AtmosphereFeatures {
             try {
                 store.acquireModifyLock(true);
                 bulk = true;
-                final java.util.List<Long> old = new java.util.ArrayList<>(sets.values());
-                // Anything a previous instance of the plugin left behind goes with them.
-                old.addAll(adopted);
+                // Every set the store holds right now, asked of the store rather than
+                // remembered. An in-memory list of "ours" is wrong the moment the
+                // plugin is reinstalled -- the file outlives the instance -- and it
+                // left stale copies of a storm or an incident stacked under the
+                // current one (operator, 2026-09-25, twice). Reading it back is
+                // self-healing: whatever is in there, however it got there, is
+                // replaced by this write.
+                final java.util.List<Long> old = existingSetIds();
                 adopted.clear();
                 final Map<String, Long> fresh = new HashMap<>();
                 for (Drawn d : drawn) {
@@ -459,13 +472,17 @@ final class AtmosphereFeatures {
                     store.insertFeature(new Feature(fsid, d.name, d.geometry, d.style,
                             d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
                 }
+                int retired = 0;
                 for (Long id : old) {
                     try {
                         store.deleteFeatureSet(id);
+                        retired++;
                     } catch (Exception e) {
                         Log.w(tag, "old set " + id, e);
                     }
                 }
+                Log.d(tag, layerName + ": wrote " + fresh.size() + " set(s), retired "
+                        + retired + " of " + old.size());
                 sets.clear();
                 sets.putAll(fresh);
             } catch (Exception e) {
