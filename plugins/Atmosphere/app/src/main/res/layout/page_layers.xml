@@ -508,6 +508,21 @@
                     android:textSize="13sp"
                     android:text="" />
 
+                <!-- The filters live on the spot page, not here. Say so: without it
+                     the layer looks like the only place to narrow what is drawn, and
+                     its one toggle looks like the only filter there is (operator,
+                     2026-09-25: "i have no way to filter on map or close to me, its
+                     like that went away"). -->
+                <TextView
+                    android:id="@+id/spot_where_filters"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="2dp"
+                    android:textSize="12sp"
+                    android:alpha="0.7"
+                    android:text="@string/spot_filters_elsewhere" />
+
                 <Button
                     android:id="@+id/spot_open_only"
                     style="@style/TakwerxButton"

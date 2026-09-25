@@ -113,6 +113,59 @@
                     android:text="@string/spot_region" />
             </LinearLayout>
 
+            <!-- By name, on top of whichever area is picked. A crew looking for one
+                 incident knows its name and not which of five scopes it falls in
+                 (operator, 2026-09-25: "can we have a search for incident name?").
+                 Cam Depot's search row, carried forward. -->
+            <LinearLayout
+                android:id="@+id/spot_search_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+
+                <!-- flagNoExtractUi on the imeOptions below is the whole point: in
+                     landscape a Samsung keyboard otherwise opens a FULL SCREEN
+                     extract editor, a white box with a Search button that replaces
+                     the pane entirely, so the list being filtered is gone while it
+                     is being filtered (XCover, 2026-09-25). -->
+                <EditText
+                    android:id="@+id/spot_search"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:hint="@string/spot_search_hint"
+                    android:inputType="text"
+                    android:imeOptions="actionSearch|flagNoExtractUi"
+                    android:maxLines="1"
+                    android:textSize="14sp" />
+
+                <!-- The count, right beside the box. In landscape the keyboard takes
+                     most of the screen and no amount of resizing leaves room for the
+                     rows, so this is what tells you the search is working while you
+                     are still typing (XCover, 2026-09-25). -->
+                <TextView
+                    android:id="@+id/spot_search_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:minWidth="64dp"
+                    android:gravity="center"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    android:text="" />
+
+                <Button
+                    android:id="@+id/spot_search_clear"
+                    style="@style/TakwerxButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="@string/clear" />
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/spot_status"
                 android:layout_width="match_parent"

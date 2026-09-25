@@ -104,6 +104,10 @@ public final class SpotPage {
     private final View gate, browse, detail;
     private final Button all, near, onMap, state, region;
     private final TextView status;
+    private final android.widget.EditText search;
+    private final TextView searchCount;
+    /** What has been typed, lowercased. Applied on top of whichever scope is picked. */
+    private String query = "";
     private final LinearLayout list;
     private final TextView detailTitle, detailFacts, detailText;
     private final Button openBrowser;
@@ -140,6 +144,53 @@ public final class SpotPage {
         state = root.findViewById(R.id.spot_state);
         region = root.findViewById(R.id.spot_region);
         status = root.findViewById(R.id.spot_status);
+        search = root.findViewById(R.id.spot_search);
+        searchCount = root.findViewById(R.id.spot_search_count);
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence c, int a, int b, int d) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence c, int a, int b, int d) {
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable e) {
+                final String next = e == null ? ""
+                        : e.toString().trim().toLowerCase(Locale.US);
+                if (next.equals(query))
+                    return;
+                query = next;
+                // Typing narrows the list that is already there; it never refetches.
+                if (showing == null)
+                    render();
+            }
+        });
+        // Keep the list visible while typing into the box that filters it.
+        //
+        // ATAK's window pans by default, so the soft keyboard slides over the pane and
+        // the operator is typing a filter at a list they can no longer see (operator,
+        // 2026-09-25: "can we make it so when your typing we can still see the tab?").
+        // Resizing instead shortens the pane above the keyboard, so the rows stay on
+        // screen and stay scrollable. It is the host activity's setting, so it is put
+        // back the moment the field loses focus rather than left changed for all of
+        // ATAK.
+        search.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                resizeForKeyboard(hasFocus);
+                if (hasFocus)
+                    bringSearchToTop();
+            }
+        });
+        root.findViewById(R.id.spot_search_clear).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        search.setText("");
+                    }
+                });
         list = root.findViewById(R.id.spot_list);
         detailTitle = root.findViewById(R.id.spot_detail_title);
         detailFacts = root.findViewById(R.id.spot_detail_facts);
@@ -204,6 +255,7 @@ public final class SpotPage {
     }
 
     public void dispose() {
+        resizeForKeyboard(false);
         listGeneration++;
         detailGeneration++;
         disarmRequestPick();
@@ -384,6 +436,74 @@ public final class SpotPage {
     }
 
     /** Apply the filter, label the buttons with what each would show, draw the rows. */
+    /**
+     * Put the search box at the top of the pane while it is focused.
+     *
+     * <p>Resizing for the keyboard leaves the pane short, and the icon row and the
+     * area buttons above the box fill what is left, so the rows being filtered end up
+     * below the fold -- visible pane, invisible list. Scrolling the box to the top
+     * hands the remaining height to the list, which is the half worth seeing while
+     * typing.
+     */
+    private void bringSearchToTop() {
+        final View row = root.findViewById(R.id.spot_search_row);
+        if (!(root instanceof ScrollView) || row == null)
+            return;
+        final ScrollView scroller = (ScrollView) root;
+        // After the resize has happened, not before it.
+        scroller.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                scroller.smoothScrollTo(0, row.getTop());
+            }
+        }, 250L);
+    }
+
+    /** ATAK's own soft-input mode, so it can be handed back unchanged. */
+    private int softInputWas = -1;
+
+    private void resizeForKeyboard(boolean on) {
+        try {
+            final android.content.Context ctx = mapView.getContext();
+            if (!(ctx instanceof android.app.Activity))
+                return;
+            final android.view.Window w = ((android.app.Activity) ctx).getWindow();
+            if (w == null)
+                return;
+            if (on) {
+                if (softInputWas == -1)
+                    softInputWas = w.getAttributes().softInputMode;
+                w.setSoftInputMode(android.view.WindowManager.LayoutParams
+                        .SOFT_INPUT_ADJUST_RESIZE);
+            } else if (softInputWas != -1) {
+                w.setSoftInputMode(softInputWas);
+                softInputWas = -1;
+            }
+        } catch (Exception e) {
+            // Not worth failing a search over; the keyboard just covers the pane.
+            Log.w(TAG, "soft input mode", e);
+        }
+    }
+
+    /**
+     * Whether a request answers to what was typed. The incident name is what a crew
+     * knows, so that is matched first; the office and state are matched too because
+     * "LOX" and "CA" are the other things somebody types into a box like this.
+     */
+    private static boolean matches(Spot.Request r, String q) {
+        if (contains(r.project, q))
+            return true;
+        if (contains(r.kind, q))
+            return true;
+        if (contains(r.office, q) || contains(r.officeName, q))
+            return true;
+        return contains(r.state, q);
+    }
+
+    private static boolean contains(String field, String q) {
+        return field != null && field.toLowerCase(Locale.US).contains(q);
+    }
+
     private void render() {
         paintFilters();
         list.removeAllViews();
@@ -428,6 +548,23 @@ public final class SpotPage {
                 what = "in the country";
                 break;
         }
+        // The name search narrows whatever the scope chose, rather than replacing it:
+        // "HATCHERY within 250 miles" is a question somebody asks; "HATCHERY, and also
+        // forget where you were looking" is not.
+        if (!query.isEmpty()) {
+            final List<Spot.Request> hits = new ArrayList<>();
+            for (Spot.Request r : shown)
+                if (matches(r, query))
+                    hits.add(r);
+            shown = hits;
+            what = what + " matching \u201c" + query + "\u201d";
+        }
+
+        // Beside the box, so a search that is working says so while the keyboard is
+        // still covering the rows.
+        searchCount.setText(query.isEmpty() ? ""
+                : (shown.isEmpty() ? "none" : String.valueOf(shown.size())));
+
         // Say what is not being shown: a trimmed list reads as the whole picture.
         final String order = filter == Filter.NEAR || filter == Filter.MAP
                 ? "nearest" : "newest";

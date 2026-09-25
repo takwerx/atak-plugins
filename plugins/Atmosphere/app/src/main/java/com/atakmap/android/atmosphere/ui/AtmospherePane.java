@@ -1734,7 +1734,11 @@ public final class AtmospherePane {
         spotSettings.setVisibility(spotOn && spotOpen ? View.VISIBLE : View.GONE);
         if (spotOn) {
             final boolean openOnly = spotLayer.isOpenOnly();
-            spotOpenOnly.setText(openOnly ? "Still open only  ON" : "Still open only  OFF");
+            // "Still open only" meant nothing to the operator, who read it and asked
+            // "what is that?" (2026-09-25). It hides requests NWS has already filled,
+            // so that is what it says.
+            spotOpenOnly.setText(openOnly
+                    ? "Hide finished requests  ON" : "Hide finished requests  OFF");
             spotOpenOnly.setTextColor(pluginContext.getResources().getColor(
                     openOnly ? R.color.state_on : R.color.state_off));
             buildSpotLegend();

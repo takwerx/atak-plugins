@@ -25,6 +25,9 @@
     <string name="spot_layer_on">Spot forecasts ON</string>
     <string name="spot_layer_off">Spot forecasts OFF</string>
     <string name="heading_legend">Legend</string>
+    <string name="spot_search_hint">Search by incident name</string>
+    <string name="clear">Clear</string>
+    <string name="spot_filters_elsewhere">Near me, on the map, by state or region: swipe on to the Spot forecasts page.</string>
     <string name="spot_layer_allow_title">Show spot forecasts on the map?</string>
     <string name="spot_layer_allow_text">Atmosphere will ask the National Weather Service for the open spot forecast requests and draw them on the map. Your position is not sent. Server: mapservices.weather.noaa.gov</string>
     <string name="back">Back</string>
