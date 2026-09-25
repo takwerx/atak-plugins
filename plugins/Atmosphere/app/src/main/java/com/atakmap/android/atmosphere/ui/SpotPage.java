@@ -25,6 +25,8 @@ import com.atakmap.android.atmosphere.data.Favorites;
 import com.atakmap.android.atmosphere.data.Spot;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.data.Census;
+import com.atakmap.coremap.maps.coords.Ellipsoid;
+import com.atakmap.coremap.maps.coords.MGRSPoint;
 import com.atakmap.android.atmosphere.net.Http;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.units.UnitSystem;
@@ -1012,7 +1014,8 @@ public final class SpotPage {
         where.setTextColor(Color.WHITE);
         where.setTextSize(17);
         where.setText(requestPoint == null ? pluginContext.getString(R.string.no_position)
-                : requestFrom + "\n" + position(requestPoint));
+                : requestFrom + "\n" + position(requestPoint)
+                        + "\nUSNG " + usng(requestPoint));
         body.addView(where);
         body.addView(heading(R.string.spot_use_heading));
 
@@ -1023,12 +1026,15 @@ public final class SpotPage {
                 .setView(scroll)
                 .setNegativeButton(pluginContext.getString(R.string.close), null);
         if (requestPoint != null) {
+            // The grid reference, because that is the one box on the form that takes
+            // a whole position in one paste. See usng().
+            final String grid = usng(requestPoint);
             final String pos = position(requestPoint);
             b.setPositiveButton(pluginContext.getString(R.string.spot_open_form),
                     new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface d, int which) {
-                            copy(ctx, pos);
+                            copyForForm(ctx, grid, pos);
                             openUrl(Spot.NEW_REQUEST_URL);
                         }
                     });
@@ -1036,7 +1042,7 @@ public final class SpotPage {
                     new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface d, int which) {
-                            copy(ctx, pos);
+                            copyForForm(ctx, grid, pos);
                         }
                     });
         }
@@ -1379,6 +1385,54 @@ public final class SpotPage {
         return found == null || found.trim().isEmpty() ? typed : found.trim();
     }
 
+    /**
+     * The point as US National Grid, the one box on the NWS form that takes a
+     * position in a single paste.
+     *
+     * <p>The form cannot be prefilled -- it is a single page app and reads nothing
+     * from the URL, so a point cannot be handed to it by link (checked against its
+     * own bundle, 2026-09-25). What it offers is an address box, separate latitude
+     * and longitude boxes, and one USNG box with a "Plot USNG" button. A decimal
+     * pair copied as "lat, lon" fits none of them, which is why the point did not
+     * come over.
+     *
+     * <p>Not the address: the form would geocode it again, and geocoding a house
+     * number is exactly what lands on the middle of a town. The grid reference is the
+     * position itself.
+     *
+     * <p>Built by hand rather than with {@code CoordinateFormatUtilities}, whose MGRS
+     * string separates the fields with a left-to-right mark -- an invisible character
+     * that travels through a clipboard and into a web form that has no idea what to
+     * do with it.
+     *
+     * <p>Four digits each, which is ten meters and the form's own documented example
+     * ("18S UJ 2348 0647"); five is finer than the request needs and its parser is
+     * not ours to test. USNG is NAD83 where MGRS is WGS84, about a meter apart in the
+     * United States, which does not survive the rounding above.
+     */
+    private static String usng(GeoPoint p) {
+        if (p == null || !p.isValid())
+            return "";
+        try {
+            final MGRSPoint m = MGRSPoint.fromLatLng(Ellipsoid.WGS_84,
+                    p.getLatitude(), p.getLongitude(), null);
+            return m.getZoneDescriptor() + " " + m.getGridDescriptor() + " "
+                    + tenMeters(m.getEastingDescriptor()) + " "
+                    + tenMeters(m.getNorthingDescriptor());
+        } catch (Exception e) {
+            Log.w(TAG, "no USNG for this point", e);
+            return "";
+        }
+    }
+
+    /** The first four digits of a five digit descriptor: meters to tens of meters. */
+    private static String tenMeters(String fiveDigits) {
+        if (fiveDigits == null)
+            return "";
+        final String s = fiveDigits.trim();
+        return s.length() <= 4 ? s : s.substring(0, 4);
+    }
+
     private static String position(GeoPoint p) {
         return String.format(Locale.US, "%.5f, %.5f", p.getLatitude(), p.getLongitude());
     }
@@ -1397,6 +1451,23 @@ public final class SpotPage {
         final Context ctx = MapCompat.atakContext();
         if (ctx != null)
             Toast.makeText(ctx, text, Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Copy the grid reference and say where it goes, falling back to the decimal pair
+     * if this point has no grid reference.
+     */
+    private void copyForForm(Context ctx, String grid, String pos) {
+        if (grid == null || grid.isEmpty()) {
+            copy(ctx, pos);
+            return;
+        }
+        final ClipboardManager cm = (ClipboardManager) ctx.getSystemService(
+                Context.CLIPBOARD_SERVICE);
+        if (cm != null)
+            cm.setPrimaryClip(ClipData.newPlainText("Spot forecast point", grid));
+        Toast.makeText(ctx, pluginContext.getString(R.string.spot_usng_copied, grid),
+                Toast.LENGTH_LONG).show();
     }
 
     private void copy(Context ctx, String text) {

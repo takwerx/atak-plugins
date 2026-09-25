@@ -113,6 +113,7 @@
     <string name="spot_search">Search</string>
     <string name="spot_searching">Looking up %1$s\u2026</string>
     <string name="spot_address_none">Nothing found for %1$s</string>
+    <string name="spot_usng_copied">Copied %1$s \u2014 on the form, paste it into the USNG box and press Plot USNG</string>
     <string name="spot_address_found_title">Is this the place?</string>
     <string name="spot_address_use">Use this point</string>
     <string name="spot_address_retry">Search again</string>
