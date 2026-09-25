@@ -522,35 +522,6 @@ public final class SpotPage {
     }
 
     /**
-     * Collapse a list to the newest request per incident, counting what was folded in.
-     *
-     * <p>Keyed by name AND office: two unrelated fires can share a plain name like
-     * "Dry River", and merging them because a word matched would hide one of them.
-     */
-    private static List<Spot.Request> newestPerIncident(List<Spot.Request> all,
-            Map<String, Integer> countsOut) {
-        final Map<String, Spot.Request> newest = new LinkedHashMap<>();
-        for (Spot.Request r : all) {
-            final String key = incidentKey(r);
-            final Spot.Request had = newest.get(key);
-            countsOut.put(key, (countsOut.containsKey(key) ? countsOut.get(key) : 0) + 1);
-            if (had == null || when(r) > when(had))
-                newest.put(key, r);
-        }
-        return new ArrayList<>(newest.values());
-    }
-
-    private static String incidentKey(Spot.Request r) {
-        return (r.project == null ? "" : r.project.trim().toLowerCase(Locale.US))
-                + "|" + (r.office == null ? "" : r.office);
-    }
-
-    /** Filled if it has been, else when it was asked for. */
-    private static long when(Spot.Request r) {
-        return r.filledAt > 0 ? r.filledAt : r.requestedAt;
-    }
-
-    /**
      * Whether a request answers to what was typed. The incident name is what a crew
      * knows, so that is matched first; the office and state are matched too because
      * "LOX" and "CA" are the other things somebody types into a box like this.
@@ -635,7 +606,8 @@ public final class SpotPage {
         // latest?" The older ones are counted on the row rather than silently
         // dropped.
         final Map<String, Integer> perIncident = new LinkedHashMap<>();
-        shown = newestPerIncident(shown, perIncident);
+        shown = com.atakmap.android.atmosphere.overlay.SpotOverlay
+                .newestPerIncident(shown, perIncident);
 
         // Beside the box, so a search that is working says so while the keyboard is
         // still covering the rows.
@@ -658,7 +630,8 @@ public final class SpotPage {
                     + what + ", newest forecast each, list from " + clock(fetchedAt));
         for (int i = 0; i < shown.size() && i < MAX_ROWS; i++) {
             final Spot.Request r = shown.get(i);
-            final Integer n = perIncident.get(incidentKey(r));
+            final Integer n = perIncident.get(com.atakmap.android.atmosphere.overlay.SpotOverlay
+                    .incidentKey(r));
             list.addView(row(r, self, n == null ? 1 : n));
         }
     }

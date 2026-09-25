@@ -265,8 +265,11 @@ public final class SpotOverlay {
             return;
         final List<Spot.Request> held = requests;
         final long now = System.currentTimeMillis();
+        // One disc per incident, the newest. Three Wheeler requests otherwise stack
+        // on the same point and a tap offers all three.
+        final List<Spot.Request> one = newestPerIncident(held, null);
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
-        for (Spot.Request r : held) {
+        for (Spot.Request r : one) {
             if (recentOnly && !isRecent(r, now))
                 continue;
             if (Double.isNaN(r.lat) || Double.isNaN(r.lon))
@@ -321,6 +324,44 @@ public final class SpotOverlay {
      * (operator, 2026-09-25). Age is the axis that means "I do not care about past
      * forecasts"; status never was.
      */
+    /**
+     * Collapse to the newest request per incident, counting what was folded in.
+     *
+     * <p>Lives here so the map and the list share it. It was on the page alone, which
+     * left three Wheeler Incident discs stacked on the map and ATAK's Select Item
+     * chooser offering all three while the list beside it had already folded them
+     * into one (operator, 2026-09-25: "you are listing all the forecasts, i just want
+     * the latest").
+     *
+     * <p>Keyed by name AND office: two unrelated fires can share a plain name --
+     * there were five "Dry River" requests -- and merging them because a word matched
+     * would hide one of them.
+     */
+    public static List<Spot.Request> newestPerIncident(List<Spot.Request> all,
+            Map<String, Integer> countsOut) {
+        final Map<String, Spot.Request> newest = new java.util.LinkedHashMap<>();
+        for (Spot.Request r : all) {
+            final String key = incidentKey(r);
+            if (countsOut != null)
+                countsOut.put(key,
+                        (countsOut.containsKey(key) ? countsOut.get(key) : 0) + 1);
+            final Spot.Request had = newest.get(key);
+            if (had == null || when(r) > when(had))
+                newest.put(key, r);
+        }
+        return new ArrayList<>(newest.values());
+    }
+
+    public static String incidentKey(Spot.Request r) {
+        return (r.project == null ? "" : r.project.trim().toLowerCase(Locale.US))
+                + "|" + (r.office == null ? "" : r.office);
+    }
+
+    /** Filled if it has been, else when it was asked for. */
+    public static long when(Spot.Request r) {
+        return r.filledAt > 0 ? r.filledAt : r.requestedAt;
+    }
+
     public static boolean isRecent(Spot.Request r, long now) {
         final long when = r.filledAt > 0 ? r.filledAt : r.requestedAt;
         return when > 0 && now - when <= RECENT_MS;
