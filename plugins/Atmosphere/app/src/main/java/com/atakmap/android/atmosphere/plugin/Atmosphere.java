@@ -150,6 +150,18 @@ public class Atmosphere implements IPlugin {
                     "show what the advisory says about a tapped storm feature");
             AtakBroadcast.getInstance().registerReceiver(stormDetails, f);
         }
+        // A spot tapped on the map opens its forecast, not its own fields. Registered
+        // whether or not the pane exists yet: the overlays start with the plugin and
+        // the pane is not built until it is first shown, so anything set inside that
+        // check is set only on the paths where the pane already happens to be there.
+        com.atakmap.android.atmosphere.ui.StormDetailsReceiver.setSpotOpener(
+                new com.atakmap.android.atmosphere.ui.StormDetailsReceiver.SpotOpener() {
+                    @Override
+                    public void openSpot(String spotId) {
+                        if (atmospherePane != null)
+                            atmospherePane.openSpot(spotId);
+                    }
+                });
         if (atmospherePane != null) {
             atmospherePane.setRadar(radar);
             atmospherePane.setWind(wind);

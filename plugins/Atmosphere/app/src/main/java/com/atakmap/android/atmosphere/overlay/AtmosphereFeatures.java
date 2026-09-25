@@ -120,6 +120,24 @@ final class AtmosphereFeatures {
         }
     }
 
+    /**
+     * A point drawn as an already-composed icon, as a style for {@link #rewrite}.
+     * The label is inside the bitmap, so the composite carries an EMPTY label style
+     * beside it: a named feature otherwise draws its name as well, and ATAK's Select
+     * Item chooser reads that name, so it cannot simply be left off.
+     */
+    static Style icon(String iconUri, int width, int height) {
+        return new CompositeStyle(new Style[] {
+                new IconPointStyle(0xFFFFFFFF, iconUri, width, height, 0, 0, 0f, true),
+                new LabelPointStyle("", 0x00FFFFFF, 0x00000000,
+                        LabelPointStyle.ScrollMode.DEFAULT) });
+    }
+
+    /** A point geometry, for building a {@link Drawn} off the worker. */
+    static com.atakmap.map.layer.feature.geometry.Geometry point(double lat, double lon) {
+        return new Point(lon, lat);
+    }
+
     /** An area's style: a faint fill under a full-color edge. */
     static Style area(int stroke, float weight, int fill) {
         return new CompositeStyle(new Style[] {
@@ -229,6 +247,18 @@ final class AtmosphereFeatures {
                             item.setMetaString("title", title);
                             item.setMetaString("callsign", title);
                             item.setMetaString("storm_set", setOf(feature.getId()));
+                            // A spot request knows how to open something better than
+                            // a list of its own fields: the forecast NWS wrote for it.
+                            // Carried as plain meta so the details receiver can route
+                            // on it without knowing anything about spot forecasts.
+                            if (a != null)
+                                try {
+                                    final String spotId = a.getStringAttribute("spotId");
+                                    if (spotId != null && !spotId.isEmpty())
+                                        item.setMetaString("spotId", spotId);
+                                } catch (Exception ignored) {
+                                    // not a spot feature
+                                }
                             return item;
                         }
                     };

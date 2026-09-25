@@ -114,7 +114,7 @@ public final class SpotOverlay {
         // The store outlives the session: last week's requests would otherwise draw
         // now, hours after they were filled.
         if (!on)
-            features.clear();
+            clearOffMain();
     }
 
     public void stop() {
@@ -145,7 +145,7 @@ public final class SpotOverlay {
             mapView.postDelayed(autoPoll, POLL_MS);
         } else {
             requests = new ArrayList<>();
-            features.clear();
+            clearOffMain();
             status("");
             drawn(0, 0);
         }
@@ -162,8 +162,15 @@ public final class SpotOverlay {
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
             p.edit().putBoolean(PREF_OPEN_ONLY, value).apply();
-        if (on)
-            rebuild(generation);
+        if (!on)
+            return;
+        final int mine = generation;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                rebuild(mine);
+            }
+        });
     }
 
     /** Ask for the country's spot requests, unless that was done very recently. */
@@ -202,19 +209,25 @@ public final class SpotOverlay {
                         } catch (Exception e) {
                             Log.w(TAG, "spot list unreadable", e);
                         }
-                        final List<Spot.Request> got = parsed;
+                        if (parsed == null) {
+                            mapView.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    inFlight = false;
+                                    if (mine == generation && on)
+                                        status("Could not read the spot list");
+                                }
+                            });
+                            return;
+                        }
+                        requests = parsed;
+                        // Still on the worker: composing icons and writing the
+                        // feature store are both too slow for main.
+                        rebuild(mine);
                         mapView.post(new Runnable() {
                             @Override
                             public void run() {
                                 inFlight = false;
-                                if (mine != generation || !on)
-                                    return;
-                                if (got == null) {
-                                    status("Could not read the spot list");
-                                    return;
-                                }
-                                requests = got;
-                                rebuild(mine);
                             }
                         });
                     }
@@ -232,13 +245,22 @@ public final class SpotOverlay {
         });
     }
 
-    /** Draw what is held, under the switch that is set. */
+    /**
+     * Draw what is held, under the switch that is set. <b>Worker thread only.</b>
+     *
+     * <p>This was a loop of {@code addIcon} on the main thread and it hung ATAK: 417
+     * requests is 417 SQLite inserts, and the ANR trace on 2026-09-25 was exactly
+     * that stack -- rebuild, addIcon, insertFeature, StatementImpl.execute, on main.
+     * {@code rewrite} is the API the other layers use and it says worker-only on the
+     * tin: one modify lock for the whole write, the new sets in before the old come
+     * out, so the map never blanks between two polls.
+     */
     private void rebuild(int mine) {
         if (mine != generation || !on)
             return;
-        features.clear();
-        int n = 0;
-        for (Spot.Request r : requests) {
+        final List<Spot.Request> held = requests;
+        final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
+        for (Spot.Request r : held) {
             if (openOnly && !isOpen(r))
                 continue;
             if (Double.isNaN(r.lat) || Double.isNaN(r.lon))
@@ -249,14 +271,40 @@ public final class SpotOverlay {
                 continue;
             // The set is the kind, so Overlay Manager lists Wildfire and HAZMAT
             // separately and ATAK's own switches work on one at a time.
-            features.addIcon(setName(r), label(r), new GeoPoint(r.lat, r.lon), uri,
-                    SpotIcons.size(), SpotIcons.size(), attrs(r, color));
-            n++;
+            drawn.add(new AtmosphereFeatures.Drawn(setName(r), label(r),
+                    AtmosphereFeatures.point(r.lat, r.lon),
+                    AtmosphereFeatures.icon(uri, SpotIcons.size(), SpotIcons.size()),
+                    attrs(r, color)));
         }
-        status("");
-        drawn(n, requests.size());
+        if (mine != generation || !on)
+            return;
+        features.rewrite(drawn);
+        final int n = drawn.size();
+        final int total = held.size();
+        mapView.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mine != generation || !on)
+                    return;
+                status("");
+                drawn(n, total);
+            }
+        });
         Log.d(TAG, String.format(Locale.US, "drew %d of %d spot requests, openOnly=%b",
-                n, requests.size(), openOnly));
+                n, total, openOnly));
+    }
+
+    /**
+     * Empty the store without holding the UI. Clearing is a database write like any
+     * other and 417 features is not work for the thread that draws the map.
+     */
+    private void clearOffMain() {
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                features.clear();
+            }
+        });
     }
 
     /** Open means NWS still owes a forecast: not filled, or an update asked for. */

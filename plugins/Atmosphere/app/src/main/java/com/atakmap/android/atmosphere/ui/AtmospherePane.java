@@ -1546,6 +1546,25 @@ public final class AtmospherePane {
         return row;
     }
 
+    /**
+     * A spot request tapped on the map: bring its page forward and open the forecast.
+     * The details receiver routes here rather than showing the request's own fields,
+     * which the row already carries (operator, 2026-09-25: "when i click on it from
+     * the map it should bring up the forecast").
+     */
+    public void openSpot(final String spotId) {
+        if (spotId == null || spotId.isEmpty())
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == spotPage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.show();
+        spotPage.showById(spotId);
+    }
+
     /** The egress gate: the host, by name, once. */
     private void askToAllowRadar() {
         final Context ctx = MapCompat.atakContext();

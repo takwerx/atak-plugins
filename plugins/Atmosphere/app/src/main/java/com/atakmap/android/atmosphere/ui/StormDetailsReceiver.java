@@ -55,6 +55,17 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         });
     }
 
+    /** Something that can open a spot request's forecast; the pane sets it. */
+    public interface SpotOpener {
+        void openSpot(String spotId);
+    }
+
+    private static SpotOpener spotOpener;
+
+    public static void setSpotOpener(SpotOpener opener) {
+        spotOpener = opener;
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         final String uid = intent.getStringExtra("targetUID");
@@ -62,6 +73,14 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
                 : getMapView().getRootGroup().deepFindItem("uid", uid);
         if (item == null) {
             Log.d(TAG, "storm details: no map item for " + uid);
+            return;
+        }
+        // A spot request opens its forecast rather than a list of its own fields:
+        // kind and office are on the row already, and the forecast is the thing
+        // somebody tapped it for (operator, 2026-09-25).
+        final String spotId = item.getMetaString("spotId", "");
+        if (!spotId.isEmpty() && spotOpener != null) {
+            spotOpener.openSpot(spotId);
             return;
         }
         final String title = item.getMetaString("title", item.getMetaString("callsign", ""));

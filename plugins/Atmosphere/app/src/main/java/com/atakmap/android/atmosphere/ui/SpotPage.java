@@ -110,6 +110,8 @@ public final class SpotPage {
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private List<Spot.Request> requests = new ArrayList<>();
+    /** A request tapped on the map before the list had been read. */
+    private String pendingId;
     /** The state outlines, read from the plugin's assets once, on the worker. */
     private com.atakmap.android.atmosphere.data.States states;
     private long fetchedAt;
@@ -164,6 +166,33 @@ public final class SpotPage {
     }
 
     /** The page came into view, or the pane opened on it. */
+    /**
+     * Open one request's forecast by its id, for a tap on the map layer.
+     *
+     * <p>The list may not have been read yet -- the layer can be on with this page
+     * never opened -- so a miss asks for the list once and tries again rather than
+     * showing nothing.
+     */
+    public void showById(final String spotId) {
+        if (spotId == null || spotId.isEmpty())
+            return;
+        final Spot.Request found = byId(spotId);
+        if (found != null) {
+            showDetail(found);
+            return;
+        }
+        status.setText("Getting spot forecasts\u2026");
+        pendingId = spotId;
+        fetch();
+    }
+
+    private Spot.Request byId(String spotId) {
+        for (Spot.Request r : requests)
+            if (spotId.equals(r.id))
+                return r;
+        return null;
+    }
+
     public void onShown() {
         showGateOrList();
         if (!egress.isLayerEnabled(LAYER_ID))
@@ -309,6 +338,15 @@ public final class SpotPage {
                                 requests = got;
                                 fetchedAt = System.currentTimeMillis();
                                 Log.d(TAG, "spot list: " + got.size() + " open requests");
+                                // A map tap that arrived before the list did.
+                                if (pendingId != null) {
+                                    final Spot.Request waiting = byId(pendingId);
+                                    pendingId = null;
+                                    if (waiting != null) {
+                                        showDetail(waiting);
+                                        return;
+                                    }
+                                }
                                 if (showing == null)
                                     render();
                             }
