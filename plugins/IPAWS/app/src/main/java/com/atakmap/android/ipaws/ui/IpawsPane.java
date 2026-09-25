@@ -67,6 +67,7 @@ public class IpawsPane {
     private final Button severityButton;
     private final Button intervalButton;
     private final Button notifyButton;
+    private final Button allButton;
     private final Button keyButton;
     private final LinearLayout mapKey;
     /** What the key last drew, so a poll that changed nothing does not rebuild it. */
@@ -108,6 +109,17 @@ public class IpawsPane {
 
         prefs = PreferenceManager.getDefaultSharedPreferences(mapView.getContext());
         keyOpen = prefs.getBoolean(PREF_KEY_OPEN, false);
+        allButton = header.findViewById(R.id.btn_all);
+        allButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final Filter f = manager.getFilter();
+                f.mapOn = !f.mapOn;
+                manager.saveFilter();
+                refresh();
+                manager.reapplyFilter();
+            }
+        });
         keyButton = header.findViewById(R.id.btn_map_key);
         mapKey = header.findViewById(R.id.map_key);
         keyButton.setOnClickListener(new View.OnClickListener() {
@@ -212,8 +224,20 @@ public class IpawsPane {
         severityButton.setText(severityLabel(f));
         intervalButton.setText(intervalLabel(f));
         setNotifyLabel(f);
+        setAllLabel(f);
         rows.set(manager.snapshot());
         refreshKey();
+    }
+
+    // ---- map ------------------------------------------------------------------------
+
+    /**
+     * Feature Layer's switch, word for word: the button says what it will do, red to
+     * take everything off the map and green to put it back.
+     */
+    private void setAllLabel(Filter f) {
+        allButton.setText(pluginContext.getString(f.mapOn ? R.string.all_off : R.string.all_on));
+        allButton.setTextColor(f.mapOn ? 0xFFF44336 : 0xFF4CAF50);
     }
 
     // ---- map key --------------------------------------------------------------------

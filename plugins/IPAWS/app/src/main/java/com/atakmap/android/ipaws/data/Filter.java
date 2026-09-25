@@ -56,6 +56,12 @@ public class Filter {
      */
     public boolean notify = false;
     public final Set<String> notifySeverities = new LinkedHashSet<>();
+    /**
+     * All ON / All OFF, Feature Layer's switch: off takes every alert off the map and
+     * leaves the rest running -- the list, the poll, notifications -- so switching it
+     * back on is instant and needs no request.
+     */
+    public boolean mapOn = true;
 
     /**
      * A fresh install: the state the phone is in, every severity showing.
@@ -260,6 +266,7 @@ public class Filter {
         o.put("pollMinutes", pollMinutes);
         o.put("notify", notify);
         o.put("notifySeverities", new JSONArray(notifySeverities));
+        o.put("mapOn", mapOn);
         return o;
     }
 
@@ -276,6 +283,7 @@ public class Filter {
         readInto(o.optJSONArray("notifySeverities"), f.notifySeverities);
         f.pollMinutes = Math.max(1, o.optInt("pollMinutes", DEFAULT_POLL_MINUTES));
         f.notify = o.optBoolean("notify", false);
+        f.mapOn = o.optBoolean("mapOn", true);
         // A stored filter that selects nothing is a stored filter, not a broken one:
         // the user may have turned everything off on purpose. Only a missing key
         // falls back.

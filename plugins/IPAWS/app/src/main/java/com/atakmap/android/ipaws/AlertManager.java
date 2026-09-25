@@ -330,7 +330,11 @@ public class AlertManager {
                 }
                 if (!haveAnything) {
                     // Nothing has come back yet, so there is nothing to re-filter and
-                    // the overlay must not be emptied on the strength of it.
+                    // the overlay must not be emptied on the strength of it -- unless
+                    // the operator asked for exactly that with All OFF, which has to
+                    // clear last session's shapes before the first poll is back.
+                    if (!filter.mapOn)
+                        overlay.rewrite(new ArrayList<AlertOverlay.Drawn>());
                     changed();
                     return;
                 }
@@ -419,14 +423,17 @@ public class AlertManager {
         }
 
         Collections.sort(kept, BY_SEVERITY_THEN_SOONEST);
-        final List<String> key = new ArrayList<>(onMap);
+        // All OFF draws nothing and keys nothing. Everything above still ran: the list,
+        // the county test and the zone chase do not depend on the map being on.
+        final boolean mapOn = filter.mapOn;
+        final List<String> key = mapOn ? new ArrayList<>(onMap) : new ArrayList<String>();
         Collections.sort(key, BY_NWS_PRIORITY);
         synchronized (this) {
             alerts = kept;
             mapKey = key;
         }
         announce(current, kept);
-        overlay.rewrite(drawn);
+        overlay.rewrite(mapOn ? drawn : new ArrayList<AlertOverlay.Drawn>());
         zonesPending = missing.size();
         this.undrawable = undrawable;
         changed();
@@ -718,6 +725,9 @@ public class AlertManager {
         final String age = ago(System.currentTimeMillis() - lastGoodAt);
         if (lastError != null)
             return "Last updated " + age + " - " + lastError;
+        // An empty map has to say it was asked to be, or it reads as no weather.
+        if (!filter.mapOn)
+            return "Updated " + age + " - map off";
         // An alert we cannot draw has to be said out loud. Dropping it silently
         // leaves a confident-looking map that is missing an alert, which is the
         // worst way to be wrong; and this happens with no attacker anywhere, on an

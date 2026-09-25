@@ -22,6 +22,9 @@
     <string name="d_do">What to do</string>
     <string name="heading_alerts">Alerts</string>
     <string name="heading_updates">Updates</string>
+    <string name="heading_map">Map</string>
+    <string name="all_on">All ON</string>
+    <string name="all_off">All OFF</string>
     <string name="map_key_show">Show map key</string>
     <string name="map_key_hide">Hide map key</string>
     <string name="notify_off">Notify: OFF</string>

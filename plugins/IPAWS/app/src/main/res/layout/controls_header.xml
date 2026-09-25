@@ -7,9 +7,34 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <!-- The map key, first because it is what gets looked up from the map. Closed
-         by default so the filters are still on the first screen; its lines are
-         built in code from the same color call the map draws with. -->
+    <!-- What is on the map, first: Feature Layer's heading row with its All ON / All
+         OFF switch at the end, then the key. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="6dp">
+
+        <TextView
+            style="@style/TakwerxSectionHeading"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:paddingTop="0dp"
+            android:text="@string/heading_map" />
+
+        <Button
+            android:id="@+id/btn_all"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="90dp" />
+    </LinearLayout>
+
+    <!-- The map key. Closed by default so the filters are still on the first
+         screen; its lines are built in code from the same color call the map
+         draws with. -->
     <Button
         android:id="@+id/btn_map_key"
         style="@style/TakwerxButton"
