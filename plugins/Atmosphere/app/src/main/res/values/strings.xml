@@ -24,6 +24,12 @@
     <string name="go_to">Go to</string>
     <string name="spot_layer_on">Spot forecasts ON</string>
     <string name="spot_layer_off">Spot forecasts OFF</string>
+    <string name="stations_on">Weather stations ON</string>
+    <string name="stations_off">Weather stations OFF</string>
+    <string name="stations_around_heading">Around</string>
+    <string name="stations_distance_heading">Distance</string>
+    <string name="stations_from_me">My position</string>
+    <string name="stations_from_map">Map center</string>
     <string name="heading_legend">Legend</string>
     <string name="spot_search_hint">Search by incident name</string>
     <string name="clear">Clear</string>

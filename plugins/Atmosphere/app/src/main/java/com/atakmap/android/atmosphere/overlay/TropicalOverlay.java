@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Live tropical cyclones on the map: the forecast cone, the forecast track, and where
@@ -110,6 +112,80 @@ public final class TropicalOverlay {
      * operator on a point inside it.
      */
     private final Map<String, double[]> extents = new HashMap<>();
+    private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private Batch batch;
+
+    /**
+     * Everything one refresh will draw, gathered before any of it is written.
+     *
+     * <p>A storm layer is not one request: it is the storm list, then a cone, a track,
+     * the forecast positions, the watches and the arrival times for <b>each</b> storm,
+     * arriving separately. Each answer used to be parsed and inserted as it landed, on
+     * whatever thread delivered it -- which is the main thread, because that is where
+     * {@link Http} posts. Two hurricanes was enough to stop ATAK answering for ten
+     * seconds and raise "ATAK isn't responding" (operator, 2026-09-25; the ANR trace
+     * is TropicalOverlay.addPoint -> addIcon -> insertFeature -> StatementImpl.execute
+     * on main).
+     *
+     * <p>So each answer is parsed on the worker and appended here, and the last one in
+     * writes the lot with a single {@link AtmosphereFeatures#rewrite}: one transaction
+     * instead of hundreds, off the thread that draws the map, and the map never blanks
+     * between a clear and a redraw because the replacement is atomic.
+     *
+     * <p>Counted with a latch rather than by working out in advance how many requests
+     * a set of storms implies: the orchestrator holds one count of its own until it
+     * has issued them all, so a batch can never finish early on a fast first answer.
+     */
+    private final class Batch {
+        private final int mine;
+        private final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
+        private int outstanding = 1;
+        private boolean flushed;
+
+        Batch(int mine) {
+            this.mine = mine;
+        }
+
+        synchronized void expect() {
+            outstanding++;
+        }
+
+        synchronized void add(AtmosphereFeatures.Drawn d) {
+            if (d != null)
+                drawn.add(d);
+        }
+
+        /** One answer in, or one request that never arrived. The last one writes. */
+        void done() {
+            final List<AtmosphereFeatures.Drawn> all;
+            synchronized (this) {
+                if (--outstanding > 0 || flushed)
+                    return;
+                flushed = true;
+                all = new ArrayList<>(drawn);
+            }
+            if (mine != generation || !on)
+                return;
+            run(new Runnable() {
+                @Override
+                public void run() {
+                    if (mine != generation || !on)
+                        return;
+                    features.rewrite(all);
+                    Log.d(TAG, "storms: wrote " + all.size() + " features in one pass");
+                }
+            });
+        }
+    }
+
+    /** Off the main thread, and never after stop() has shut the worker down. */
+    private void run(Runnable r) {
+        try {
+            worker.execute(r);
+        } catch (RuntimeException shuttingDown) {
+            Log.d(TAG, "worker is gone, dropping a storm write");
+        }
+    }
 
     public TropicalOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
         this.mapView = mapView;

@@ -150,6 +150,31 @@ final class AtmosphereFeatures {
         return new Point(lon, lat);
     }
 
+    /** A line's geometry, for building a {@link Drawn} off the worker. */
+    static com.atakmap.map.layer.feature.geometry.Geometry path(GeoPoint[] pts) {
+        return ring(pts);
+    }
+
+    /** A closed shape's geometry, for building a {@link Drawn} off the worker. */
+    static com.atakmap.map.layer.feature.geometry.Geometry polygon(GeoPoint[] pts) {
+        return new Polygon(ring(pts));
+    }
+
+    /**
+     * A line's style, with its name drawn along it when {@code labelled}.
+     *
+     * <p>ATAK does not label a line feature from its name the way it labels a point,
+     * so a LabelPointStyle in the composite is what puts text on a line.
+     */
+    static Style stroke(String name, int color, float weight, boolean labelled) {
+        final Style stroked = new BasicStrokeStyle(color, weight);
+        if (!labelled || name == null || name.isEmpty())
+            return stroked;
+        return new CompositeStyle(new Style[] { stroked,
+                new LabelPointStyle(name, 0xFFFFFFFF, 0x99000000,
+                        LabelPointStyle.ScrollMode.DEFAULT) });
+    }
+
     /** An area's style: a faint fill under a full-color edge. */
     static Style area(int stroke, float weight, int fill) {
         return new CompositeStyle(new Style[] {

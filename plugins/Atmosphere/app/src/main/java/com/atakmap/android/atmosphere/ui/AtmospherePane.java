@@ -36,6 +36,7 @@ import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.data.AirNow;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
+import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
 import com.atakmap.android.atmosphere.data.NwsAlerts;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -215,6 +216,8 @@ public final class AtmospherePane {
     private final LinearLayout spotLegend;
     private final View spotSettings;
     private SpotOverlay spotLayer;
+    private StationOverlay stationLayer;
+    private TextView stationsStatus;
     private boolean spotOpen = true;
     private final LinearLayout warnSettings;
     private final TextView warnHere;
@@ -368,6 +371,7 @@ public final class AtmospherePane {
         spotExpand = find(R.id.spot_expand);
         spotOpenOnly = find(R.id.spot_open_only);
         spotLayerStatus = find(R.id.spot_layer_status);
+        stationsStatus = find(R.id.stations_status);
         spotLegend = find(R.id.spot_legend);
         spotSettings = find(R.id.spot_settings);
         warnSettings = find(R.id.warn_settings);
@@ -1460,6 +1464,30 @@ public final class AtmospherePane {
      * What the layer draws, hooked to the pane. Not time-enabled: a spot request is
      * a standing thing, not a frame, so it never touches the time strip.
      */
+    /**
+     * The station layer. Its controls on this page are not built yet; it is held so
+     * the plugin can hand it over once, and turned on from the layer's own toggle.
+     */
+    public void setStations(StationOverlay overlay) {
+        stationLayer = overlay;
+        if (stationLayer == null)
+            return;
+        stationLayer.setListener(new StationOverlay.Listener() {
+            @Override
+            public void onStationsStatus(String s) {
+                if (!s.isEmpty() && stationsStatus != null)
+                    stationsStatus.setText(s);
+            }
+
+            @Override
+            public void onStationsDrawn(int drawn, int total, int critical) {
+                if (stationsStatus != null)
+                    stationsStatus.setText(total == 0 ? ""
+                            : drawn + " stations, " + critical + " at criteria");
+            }
+        });
+    }
+
     public void setSpotLayer(SpotOverlay overlay) {
         spotLayer = overlay;
         if (spotLayer == null)
