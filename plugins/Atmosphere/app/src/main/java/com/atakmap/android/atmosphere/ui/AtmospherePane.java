@@ -439,6 +439,9 @@ public final class AtmospherePane {
                 if (spotLayer == null)
                     return;
                 spotLayer.setOpenOnly(!spotLayer.isOpenOnly());
+                // One setting, both surfaces: the list reads the same preference, so
+                // it has to be told to redraw when this changes.
+                spotPage.onFilterChanged();
                 updateLayerControls();
             }
         });

@@ -117,6 +117,37 @@ public final class SpotPage {
     private List<Spot.Request> requests = new ArrayList<>();
     /** A request tapped on the map before the list had been read. */
     private String pendingId;
+
+    /**
+     * Whether finished requests are hidden, shared with the map layer.
+     *
+     * <p>It has to be shared. The list had no status filter at all while the layer
+     * hid finished requests, so a finished incident was in the list and not on the
+     * map, and "Go to" flew the operator to an empty patch of ground -- which is
+     * exactly what happened with the Wheeler Incident (2026-09-25). Read from the
+     * layer's own preference every time rather than cached, so the two can never
+     * drift apart.
+     */
+    private static boolean hideFinished() {
+        final android.content.SharedPreferences p = MapCompat.prefs();
+        return p == null || p.getBoolean("weather.layer.spot.openonly", true);
+    }
+
+    /** Still open means NWS owes a forecast: never filled, or an update asked for. */
+    private static boolean isOpen(Spot.Request r) {
+        return r.filledAt <= 0 || r.pending;
+    }
+
+    /** The requests the page is willing to show, under the shared status filter. */
+    private List<Spot.Request> visible() {
+        if (!hideFinished())
+            return requests;
+        final List<Spot.Request> out = new ArrayList<>();
+        for (Spot.Request r : requests)
+            if (isOpen(r))
+                out.add(r);
+        return out;
+    }
     /** The state outlines, read from the plugin's assets once, on the worker. */
     private com.atakmap.android.atmosphere.data.States states;
     private long fetchedAt;
@@ -215,6 +246,15 @@ public final class SpotPage {
 
     public View view() {
         return root;
+    }
+
+    /**
+     * The shared status filter changed on the layers page; redraw what is listed.
+     * Nothing is refetched -- it is the same requests, a different slice of them.
+     */
+    public void onFilterChanged() {
+        if (showing == null)
+            render();
     }
 
     /** The page came into view, or the pane opened on it. */
@@ -540,6 +580,9 @@ public final class SpotPage {
         if (requests.isEmpty())
             return;
         final GeoPoint self = MapCompat.selfPoint();
+        // The same list the map layer draws from, so the two can never disagree about
+        // whether an incident exists.
+        final List<Spot.Request> pool = visible();
         List<Spot.Request> shown;
         String what;
         switch (filter) {
@@ -548,32 +591,32 @@ public final class SpotPage {
                     status.setText("No position for you yet");
                     return;
                 }
-                shown = Spot.near(requests, self.getLatitude(), self.getLongitude(),
+                shown = Spot.near(pool, self.getLatitude(), self.getLongitude(),
                         radiusMeters());
                 what = "within " + radiusLabel(radiusIndex) + " of you";
                 break;
             case MAP: {
                 final double[] box = viewBox();
                 if (box == null) {
-                    shown = new ArrayList<>(requests);
+                    shown = new ArrayList<>(pool);
                     Spot.sortNewest(shown);
                     what = "in the country (zoom in to use the map)";
                 } else {
-                    shown = Spot.inBox(requests, box[0], box[1], box[2], box[3]);
+                    shown = Spot.inBox(pool, box[0], box[1], box[2], box[3]);
                     what = "on the map";
                 }
                 break;
             }
             case STATE:
-                shown = Spot.inState(requests, stateCode);
+                shown = Spot.inState(pool, stateCode);
                 what = "in " + Spot.stateName(stateCode);
                 break;
             case REGION:
-                shown = Spot.inRegion(requests, regionCode);
+                shown = Spot.inRegion(pool, regionCode);
                 what = "in the " + Spot.regionName(regionCode) + " region";
                 break;
             default:
-                shown = new ArrayList<>(requests);
+                shown = new ArrayList<>(pool);
                 Spot.sortNewest(shown);
                 what = "in the country";
                 break;
@@ -628,18 +671,21 @@ public final class SpotPage {
     /** Each filter says what it would show before it is tapped. */
     private void paintFilters() {
         final GeoPoint self = MapCompat.selfPoint();
-        all.setText(pluginContext.getString(R.string.spot_all) + count(requests.size()));
-        near.setText(self == null || requests.isEmpty()
+        // Counted off the same list the rows come from, so a button never promises
+        // more than the list beneath it will show.
+        final List<Spot.Request> can = visible();
+        all.setText(pluginContext.getString(R.string.spot_all) + count(can.size()));
+        near.setText(self == null || can.isEmpty()
                 ? pluginContext.getString(R.string.spot_near)
-                : radiusLabel(radiusIndex) + count(Spot.near(requests, self.getLatitude(),
+                : radiusLabel(radiusIndex) + count(Spot.near(can, self.getLatitude(),
                         self.getLongitude(), radiusMeters()).size()));
         final double[] box = viewBox();
         onMap.setText(pluginContext.getString(R.string.spot_map) + (box == null ? ""
-                : count(Spot.inBox(requests, box[0], box[1], box[2], box[3]).size())));
+                : count(Spot.inBox(can, box[0], box[1], box[2], box[3]).size())));
         state.setText(stateCode.isEmpty() ? pluginContext.getString(R.string.spot_state)
-                : Spot.stateName(stateCode) + count(Spot.inState(requests, stateCode).size()));
+                : Spot.stateName(stateCode) + count(Spot.inState(can, stateCode).size()));
         region.setText(regionCode.isEmpty() ? pluginContext.getString(R.string.spot_region)
-                : Spot.regionName(regionCode) + count(Spot.inRegion(requests, regionCode).size()));
+                : Spot.regionName(regionCode) + count(Spot.inRegion(can, regionCode).size()));
         green(all, filter == Filter.ALL);
         green(near, filter == Filter.NEAR);
         green(onMap, filter == Filter.MAP);
