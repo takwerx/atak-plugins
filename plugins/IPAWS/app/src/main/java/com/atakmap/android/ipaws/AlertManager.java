@@ -823,18 +823,76 @@ public class AlertManager {
                 ? worst.event + " - " + worst.areaDesc
                 : fresh.size() + " new alerts, worst " + worst.severity + ": " + worst.event;
         Log.d(TAG, "notify: " + msg);
+        postNotification(msg);
+    }
+
+    /** What the test button sends: the real path, so what is seen is what will arrive. */
+    public void testNotification() {
+        Log.d(TAG, "notify: test");
+        postNotification("Test: new alerts will arrive like this. Tap to go to ATAK.");
+    }
+
+    private static final String CHANNEL_ID = "ipaws_alerts";
+
+    /**
+     * Posts on a channel of IPAWS's own, at high importance: it pops up over whatever
+     * is on screen, with sound and vibration, and the operator can tune it in Android's
+     * settings under ATAK as "IPAWS Alerts".
+     *
+     * <p>Not ATAK's NotificationUtil, which is what this used to call. That posts on
+     * "TAK Notifications", which on s10-dev-1 is default importance with no sound and
+     * no vibration: two notifications fired on 2026-09-25 and the operator saw neither.
+     * A public alert that arrives silently in the shade has not been delivered.
+     */
+    private void postNotification(final String msg) {
         MainThread.post(new Runnable() {
             @Override
             public void run() {
                 try {
-                    com.atakmap.android.util.NotificationUtil.getInstance().postNotification(
-                            NOTIFY_ID,
-                            com.atakmap.android.util.NotificationUtil.GeneralIcon.STATUS_RED.getID(),
-                            "IPAWS Alerts", msg, msg);
-                } catch (LinkageError | RuntimeException notThisBuild) {
-                    // A build without the notification helper still gets the overlay
-                    // and the list; it just does not chime.
-                    Log.w(TAG, "could not post a notification: " + notThisBuild);
+                    final Context ctx = mapView.getContext();
+                    final android.app.NotificationManager nm = (android.app.NotificationManager)
+                            ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+                    if (nm == null)
+                        return;
+                    final android.app.Notification.Builder b;
+                    if (android.os.Build.VERSION.SDK_INT >= 26) {
+                        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+                            final android.app.NotificationChannel ch =
+                                    new android.app.NotificationChannel(CHANNEL_ID, "IPAWS Alerts",
+                                            android.app.NotificationManager.IMPORTANCE_HIGH);
+                            ch.setDescription("New public alerts, at the severities and places"
+                                    + " set in the IPAWS Alerts pane");
+                            ch.enableVibration(true);
+                            nm.createNotificationChannel(ch);
+                        }
+                        b = new android.app.Notification.Builder(ctx, CHANNEL_ID);
+                    } else {
+                        b = new android.app.Notification.Builder(ctx)
+                                .setPriority(android.app.Notification.PRIORITY_HIGH)
+                                .setDefaults(android.app.Notification.DEFAULT_ALL);
+                    }
+                    // Tapping it brings ATAK forward; nothing from the feed goes in it.
+                    final android.content.Intent open = ctx.getPackageManager()
+                            .getLaunchIntentForPackage(ctx.getPackageName());
+                    if (open != null) {
+                        final int flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT
+                                | (android.os.Build.VERSION.SDK_INT >= 23
+                                        ? android.app.PendingIntent.FLAG_IMMUTABLE : 0);
+                        b.setContentIntent(android.app.PendingIntent.getActivity(ctx, NOTIFY_ID,
+                                open, flags));
+                    }
+                    // The small icon has to be a resource of the posting app, which is
+                    // ATAK, so it is ATAK's own red status icon rather than the plugin's.
+                    b.setSmallIcon(com.atakmap.android.util.NotificationUtil.GeneralIcon.STATUS_RED.getID())
+                            .setContentTitle("IPAWS Alerts")
+                            .setContentText(msg)
+                            .setStyle(new android.app.Notification.BigTextStyle().bigText(msg))
+                            .setAutoCancel(true)
+                            .setShowWhen(true);
+                    nm.notify(NOTIFY_ID, b.build());
+                } catch (LinkageError | RuntimeException e) {
+                    // The overlay and the list still work; it just does not chime.
+                    Log.w(TAG, "could not post a notification: " + e);
                 }
             }
         });

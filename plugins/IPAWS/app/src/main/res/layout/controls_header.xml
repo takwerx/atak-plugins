@@ -370,7 +370,15 @@
             android:id="@+id/btn_notify_updates"
             style="@style/TakwerxButton"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp" />
+
+        <Button
+            android:id="@+id/btn_notify_test"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/notify_test" />
     </LinearLayout>
 
     <TextView

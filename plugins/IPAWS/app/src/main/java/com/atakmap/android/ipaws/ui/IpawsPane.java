@@ -241,6 +241,14 @@ public class IpawsPane {
                 chooseNotifyUpdates();
             }
         });
+        // The real path, on demand: waiting for new weather is not a way to find out
+        // what a notification looks and sounds like.
+        header.findViewById(R.id.btn_notify_test).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.testNotification();
+            }
+        });
 
         regionsButton.setOnClickListener(new View.OnClickListener() {
             @Override
