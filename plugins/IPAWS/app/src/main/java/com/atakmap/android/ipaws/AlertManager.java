@@ -104,6 +104,12 @@ public class AlertManager {
      */
     private final Set<String> announced = new java.util.HashSet<>();
     private boolean primed;
+    /**
+     * The areas the last announced poll asked for. When this changes, the next poll
+     * brings back weather that was always there and is merely newly visible, so it
+     * re-primes instead of announcing.
+     */
+    private Set<String> announcedAreas = new LinkedHashSet<>();
 
     private final Runnable timer = new Runnable() {
         @Override
@@ -397,7 +403,7 @@ public class AlertManager {
         synchronized (this) {
             alerts = kept;
         }
-        announce(kept);
+        announce(current, kept);
         overlay.rewrite(drawn);
         zonesPending = missing.size();
         this.undrawable = undrawable;
@@ -443,16 +449,33 @@ public class AlertManager {
      * every alert in the current filter would announce itself the moment ATAK opens,
      * which is noise, not news.
      */
-    private void announce(List<Alert> current) {
+    private void announce(List<Alert> raw, List<Alert> kept) {
+        // Seen-ness is tracked against everything the FEED returned, not against what
+        // the filter kept. Tracking the kept set meant an alert the filter dropped was
+        // forgotten, so switching a severity or a category off and on again announced
+        // weather that had been sitting on the map all along -- the one thing this was
+        // built not to do.
+        final Set<String> keptIds = new java.util.HashSet<>();
+        for (Alert a : kept)
+            keptIds.add(a.id);
+
+        // Asking for different states brings back alerts we have genuinely never seen
+        // which are nonetheless not news: they were always there, we just were not
+        // looking. So an area change re-primes rather than announcing.
+        final Set<String> areasNow = new LinkedHashSet<>(filter.areas);
+        final boolean areasChanged = !areasNow.equals(announcedAreas);
+        announcedAreas = areasNow;
+
         final List<Alert> fresh = new ArrayList<>();
-        for (Alert a : current)
-            if (announced.add(a.id) && primed && filter.shouldNotify(a))
+        for (Alert a : raw)
+            if (announced.add(a.id) && primed && !areasChanged
+                    && keptIds.contains(a.id) && filter.shouldNotify(a))
                 fresh.add(a);
         primed = true;
-        // Ids of alerts that have gone are forgotten, or the set grows all day; one
-        // that comes back after expiring is genuinely new again.
+        // Ids the FEED has dropped are forgotten, or the set grows all day; one that
+        // comes back after expiring is genuinely new again.
         final Set<String> live = new java.util.HashSet<>();
-        for (Alert a : current)
+        for (Alert a : raw)
             live.add(a.id);
         announced.retainAll(live);
         if (fresh.isEmpty())
