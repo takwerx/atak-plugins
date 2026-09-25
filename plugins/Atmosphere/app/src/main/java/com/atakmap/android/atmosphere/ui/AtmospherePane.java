@@ -36,6 +36,7 @@ import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.data.AirNow;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
+import com.atakmap.android.atmosphere.data.RedFlag;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
 import com.atakmap.android.atmosphere.data.NwsAlerts;
@@ -98,6 +99,7 @@ public final class AtmospherePane {
     private static final String PREF_SMOKE_OPEN = "weather.smoke.open";
     private static final String PREF_AIR_OPEN = "weather.air.open";
     private static final String PREF_WARN_OPEN = "weather.warn.open";
+    private static final String PREF_STATIONS_OPEN = "weather.layers.stations.open";
     private static final String PREF_SPOT_OPEN = "weather.spotlayer.open";
 
     private final View root;
@@ -217,7 +219,12 @@ public final class AtmospherePane {
     private final View spotSettings;
     private SpotOverlay spotLayer;
     private StationOverlay stationLayer;
-    private TextView stationsStatus;
+    private TextView stationsStatus, stationsBasis;
+    private Button stationsToggle;
+    private ImageButton stationsExpand;
+    private View stationsSettings;
+    private LinearLayout stationsOriginRow, stationsDistanceRow, stationsLegend;
+    private boolean stationsOpen;
     private boolean spotOpen = true;
     private final LinearLayout warnSettings;
     private final TextView warnHere;
@@ -372,6 +379,13 @@ public final class AtmospherePane {
         spotOpenOnly = find(R.id.spot_open_only);
         spotLayerStatus = find(R.id.spot_layer_status);
         stationsStatus = find(R.id.stations_status);
+        stationsBasis = find(R.id.stations_basis);
+        stationsToggle = find(R.id.stations_toggle);
+        stationsExpand = find(R.id.stations_expand);
+        stationsSettings = find(R.id.stations_settings);
+        stationsOriginRow = find(R.id.stations_origin_row);
+        stationsDistanceRow = find(R.id.stations_distance_row);
+        stationsLegend = find(R.id.stations_legend);
         spotLegend = find(R.id.spot_legend);
         spotSettings = find(R.id.spot_settings);
         warnSettings = find(R.id.warn_settings);
@@ -429,6 +443,31 @@ public final class AtmospherePane {
         airOpen = prefs == null || prefs.getBoolean(PREF_AIR_OPEN, true);
         warnOpen = prefs == null || prefs.getBoolean(PREF_WARN_OPEN, true);
         spotOpen = prefs == null || prefs.getBoolean(PREF_SPOT_OPEN, true);
+        stationsOpen = prefs == null || prefs.getBoolean(PREF_STATIONS_OPEN, true);
+        stationsExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                stationsOpen = !stationsOpen;
+                rememberFold(PREF_STATIONS_OPEN, stationsOpen);
+                updateLayerControls();
+            }
+        });
+        stationsToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (stationLayer == null)
+                    return;
+                if (stationLayer.isOn()) {
+                    stationLayer.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(StationOverlay.LAYER_ID)) {
+                    stationLayer.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowStations();
+                }
+            }
+        });
         spotExpand.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1515,6 +1554,99 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    private void askToAllowStations() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.stations_allow_title))
+                .setMessage(pluginContext.getString(R.string.stations_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(StationOverlay.LAYER_ID, true);
+                                if (stationLayer != null)
+                                    stationLayer.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /**
+     * Measured from the operator or from the middle of the map -- the second is how a
+     * crew looks at a fire they are not standing on.
+     */
+    private void buildStationsOriginRow() {
+        stationsOriginRow.removeAllViews();
+        final boolean fromMe = stationLayer.isFromMe();
+        stationsOriginRow.addView(choiceTile(
+                pluginContext.getString(R.string.stations_from_me), fromMe,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        stationLayer.setFromMe(true);
+                        updateLayerControls();
+                    }
+                }));
+        stationsOriginRow.addView(choiceTile(
+                pluginContext.getString(R.string.stations_from_map), !fromMe,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        stationLayer.setFromMe(false);
+                        updateLayerControls();
+                    }
+                }));
+    }
+
+    private void buildStationsDistanceRow() {
+        stationsDistanceRow.removeAllViews();
+        final int current = stationLayer.miles();
+        for (final int m : StationOverlay.RADII)
+            stationsDistanceRow.addView(choiceTile(m + " mi", m == current,
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            stationLayer.setMiles(m);
+                            updateLayerControls();
+                        }
+                    }));
+    }
+
+    /** One tile of a row of choices: the chosen one green, the Traffic convention. */
+    private View choiceTile(String label, boolean chosen, final Runnable onPick) {
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, stationsOriginRow, false);
+        b.setText(label);
+        b.setTextSize(13);
+        // Green text on a plain face for the chosen one, never a colored button.
+        b.setTextColor(chosen
+                ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onPick.run();
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    /** What the diamond's color means, from the map's own palette. */
+    private void buildStationsLegend() {
+        if (stationsLegend.getChildCount() > 0)
+            return;
+        stationsLegend.addView(legendLine("At Red Flag criteria", StationOverlay.CRITICAL));
+        stationsLegend.addView(legendLine("Close to criteria", StationOverlay.NEAR));
+        stationsLegend.addView(legendLine("Below criteria", StationOverlay.NORMAL));
+    }
+
     private void askToAllowSpotLayer() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -1756,6 +1888,20 @@ public final class AtmospherePane {
             updateSmokeHeightRow();
             updateSmokeReading();
         }
+        final boolean stationsOn = stationLayer != null && stationLayer.isOn();
+        stationsToggle.setText(stationsOn ? R.string.stations_on : R.string.stations_off);
+        stationsToggle.setTextColor(pluginContext.getResources().getColor(
+                stationsOn ? R.color.state_on : R.color.state_off));
+        stationsExpand.setVisibility(stationsOn ? View.VISIBLE : View.GONE);
+        stationsExpand.setRotation(stationsOpen ? 180f : 0f);
+        stationsSettings.setVisibility(stationsOn && stationsOpen ? View.VISIBLE : View.GONE);
+        if (stationsOn) {
+            buildStationsOriginRow();
+            buildStationsDistanceRow();
+            buildStationsLegend();
+            stationsBasis.setText(RedFlag.basis());
+        }
+
         final boolean spotOn = spotLayer != null && spotLayer.isOn();
         spotToggle.setText(spotOn ? R.string.spot_layer_on : R.string.spot_layer_off);
         spotToggle.setTextColor(pluginContext.getResources().getColor(

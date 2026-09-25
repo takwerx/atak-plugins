@@ -212,7 +212,12 @@ public final class StationOverlay {
             status("Getting stations…");
         final Map<String, String> headers = new HashMap<>();
         headers.put("Accept", "application/json");
-        final String url = Raws.nearUrl(from.getLatitude(), from.getLongitude(), miles);
+        // Rounded the way every other outbound coordinate in this plugin is rounded.
+        // This layer is the one that sends the operator's own position -- the others
+        // send a map extent or nothing -- so the precision setting has to reach it,
+        // and a radius of tens of miles loses nothing to a coarser origin.
+        final String url = Raws.nearUrl(Double.parseDouble(egress.latitude(from)),
+                Double.parseDouble(egress.longitude(from)), miles);
         Http.get(url, egress.userAgent(), headers, new Http.Callback() {
             @Override
             public void onSuccess(final String body) {
