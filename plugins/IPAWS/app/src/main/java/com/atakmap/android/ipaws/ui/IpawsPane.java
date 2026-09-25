@@ -137,6 +137,18 @@ public class IpawsPane {
                 chooseSeverities();
             }
         });
+        intervalButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseInterval();
+            }
+        });
+        notifyButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseNotify();
+            }
+        });
         header.findViewById(R.id.btn_refresh).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
