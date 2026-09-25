@@ -53,7 +53,8 @@ STATUS
 _________________________________________________________________
 POINT OF CONTACTS
 
-TAKWERX. Issues and questions through the plugin's GitHub repository.
+Andreas Johansson, takwerx
+https://github.com/takwerx/ipaws-alerts/issues
 
 _________________________________________________________________
 PORTS REQUIRED
