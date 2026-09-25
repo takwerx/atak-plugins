@@ -113,7 +113,6 @@ public final class TropicalOverlay {
      */
     private final Map<String, double[]> extents = new HashMap<>();
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private Batch batch;
 
     /**
      * Everything one refresh will draw, gathered before any of it is written.
@@ -235,9 +234,17 @@ public final class TropicalOverlay {
         if (!on || !started)
             return;
         final List<Nhc.Storm> storms = new ArrayList<>(active);
-        clear();
+        // No clear first: the batch's own write replaces the layer in one pass, so
+        // turning a storm's cone off does not blank every other storm on the way.
+        newGeneration();
+        if (storms.isEmpty()) {
+            clearFeaturesOffMain();
+            return;
+        }
+        final Batch b = new Batch(generation);
         for (Nhc.Storm s : storms)
-            draw(s, generation);
+            draw(s, generation, b);
+        b.done();
     }
 
     public void setListener(Listener l) {
@@ -261,6 +268,7 @@ public final class TropicalOverlay {
         on = false;
         mapView.removeCallbacks(autoRefresh);
         clear();
+        worker.shutdownNow();
         features.detach();
     }
 
@@ -315,19 +323,25 @@ public final class TropicalOverlay {
                 if (mine != generation || !on)
                     return;
                 final List<Nhc.Storm> storms = Nhc.parseActive(body);
-                clear();
+                newGeneration();
                 active.clear();
                 if (storms.isEmpty()) {
                     // Saying so is the point: an empty map and a broken layer look
                     // identical, and most of the year this is the true answer.
+                    clearFeaturesOffMain();
                     status("No storms right now");
                     if (listener != null)
                         listener.onStorms(new ArrayList<Nhc.Storm>());
                     return;
                 }
                 active.addAll(storms);
+                final Batch b = new Batch(generation);
                 for (Nhc.Storm s : storms)
-                    draw(s, generation);
+                    draw(s, generation, b);
+                // The orchestrator's own count, released now that every request for
+                // this refresh has been issued. Without it a batch whose first answer
+                // beats the second request out of the gate would write and close.
+                b.done();
                 status("");
                 if (listener != null)
                     listener.onStorms(new ArrayList<>(active));
@@ -357,7 +371,7 @@ public final class TropicalOverlay {
         return b.toString();
     }
 
-    private void draw(final Nhc.Storm storm, final int mine) {
+    private void draw(final Nhc.Storm storm, final int mine, final Batch batch) {
         final String name = label(storm);
         for (Nhc.Product product : Nhc.Product.values()) {
             if (!isEnabled(storm, product))
@@ -365,7 +379,7 @@ public final class TropicalOverlay {
             final int layer = product.layer(storm.bin);
             switch (product) {
                 case CONE:
-                    fetchShape(storm, layer, mine, name + " cone", name + " - Cone",
+                    fetchShape(storm, layer, mine, batch, name + " cone", name + " - Cone",
                             CONE_STROKE, CONE_FILL, CONE_WEIGHT, true);
                     break;
                 case TRACK:
@@ -374,20 +388,20 @@ public final class TropicalOverlay {
                     // which is how every track map anybody has read is drawn. The
                     // points layer answers both; POINTS asks for it too and the second
                     // ask is a few KB.
-                    fetchPoints(storm, Nhc.Product.POINTS.layer(storm.bin), mine,
+                    fetchPoints(storm, Nhc.Product.POINTS.layer(storm.bin), mine, batch,
                             true, isEnabled(storm, Nhc.Product.POINTS));
                     break;
                 case POINTS:
                     if (!isEnabled(storm, Nhc.Product.TRACK))
-                        fetchPoints(storm, layer, mine, false, true);
+                        fetchPoints(storm, layer, mine, batch, false, true);
                     break;
                 case WATCHES:
-                    fetchShape(storm, layer, mine, name + " watches",
+                    fetchShape(storm, layer, mine, batch, name + " watches",
                             name + " - Watches and warnings", WATCH_STROKE, 0,
                             TRACK_WEIGHT, false);
                     break;
                 case ARRIVAL:
-                    fetchShape(storm, layer, mine, name + " wind arrival",
+                    fetchShape(storm, layer, mine, batch, name + " wind arrival",
                             name + " - Wind arrival times", ARRIVAL_STROKE, 0,
                             CONE_WEIGHT, false);
                     break;
@@ -405,12 +419,29 @@ public final class TropicalOverlay {
      * per pixel and ATAK otherwise holds a marker's name back until 10 m/px.
      */
     private void fetchPoints(final Nhc.Storm storm, final int layer, final int mine,
-            final boolean drawTrack, final boolean drawMarkers) {
+            final Batch batch, final boolean drawTrack, final boolean drawMarkers) {
         if (layer < 0)
             return;
+        batch.expect();
         Http.get(Nhc.queryUrl(layer), egress.userAgent(), null, new Http.Callback() {
             @Override
-            public void onSuccess(String body) {
+            public void onSuccess(final String body) {
+                // The worker, because this composes a labelled bitmap per forecast
+                // position -- a PNG encode and a file write each -- on top of the
+                // parsing and the inserts.
+                run(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            build(body);
+                        } finally {
+                            batch.done();
+                        }
+                    }
+                });
+            }
+
+            private void build(String body) {
                 if (mine != generation || !on)
                     return;
                 try {
@@ -436,10 +467,10 @@ public final class TropicalOverlay {
                         colors.add(categoryColor(pr.optInt("ssnum", 0),
                                 pr.optInt("maxwind", -1)));
                         if (drawMarkers)
-                            addPoint(storm, p, pr);
+                            addPoint(storm, p, pr, batch);
                     }
                     if (drawTrack)
-                        drawLegs(storm, path, colors);
+                        drawLegs(storm, path, colors, batch);
                 } catch (Exception e) {
                     Log.w(TAG, "forecast points unreadable", e);
                 }
@@ -447,6 +478,7 @@ public final class TropicalOverlay {
 
             @Override
             public void onFailure(String error) {
+                batch.done();
                 if (mine == generation && on)
                     Log.w(TAG, "points layer " + layer + " failed: " + error);
             }
@@ -459,19 +491,24 @@ public final class TropicalOverlay {
      * stroke, and a track whose color never changes throws away the thing the map is
      * for: seeing where it becomes a major hurricane.
      */
-    private void drawLegs(Nhc.Storm storm, List<GeoPoint> path, List<Integer> colors) {
+    private void drawLegs(Nhc.Storm storm, List<GeoPoint> path, List<Integer> colors,
+            Batch batch) {
         if (path.size() < 2)
             return;
         final String set = label(storm) + " - Track";
+        final String name = label(storm) + " track";
         for (int i = 0; i + 1 < path.size(); i++) {
             final GeoPoint[] leg = { path.get(i), path.get(i + 1) };
-            features.addLine(set, label(storm) + " track", leg,
-                    colors.get(i + 1), (float) TRACK_WEIGHT, attrs(storm, null));
+            batch.add(new AtmosphereFeatures.Drawn(set, name,
+                    AtmosphereFeatures.path(leg),
+                    AtmosphereFeatures.stroke(name, colors.get(i + 1),
+                            (float) TRACK_WEIGHT, false),
+                    attrs(storm, null)));
             grow(storm.bin, leg);
         }
     }
 
-    private void addPoint(Nhc.Storm storm, GeoPoint p, JSONObject pr) {
+    private void addPoint(Nhc.Storm storm, GeoPoint p, JSONObject pr, Batch batch) {
         // tau is the forecast hour, so tau 0 is where the storm is right now.
         final int tau = pr.optInt("tau", -1);
         final String when = pr.optString("datelbl", "");
@@ -486,9 +523,11 @@ public final class TropicalOverlay {
             return;
         final AttributeSet a = attrs(storm, pr);
         a.setAttribute("Position", label);
-        features.addIcon(label(storm) + " - Positions", label, p,
-                icon.getImageUri(Icon.STATE_DEFAULT),
-                icon.getWidth(), icon.getHeight(), a);
+        batch.add(new AtmosphereFeatures.Drawn(label(storm) + " - Positions", label,
+                AtmosphereFeatures.point(p.getLatitude(), p.getLongitude()),
+                AtmosphereFeatures.icon(icon.getImageUri(Icon.STATE_DEFAULT),
+                        icon.getWidth(), icon.getHeight()),
+                a));
         grow(storm.bin, new GeoPoint[] { p });
     }
 
@@ -581,13 +620,29 @@ public final class TropicalOverlay {
     }
 
     private void fetchShape(final Nhc.Storm storm, final int layer, final int mine,
-            final String title, final String set, final int stroke, final int fill,
-            final double weight, final boolean closed) {
+            final Batch batch, final String title, final String set, final int stroke,
+            final int fill, final double weight, final boolean closed) {
         if (layer < 0)
             return;
+        batch.expect();
         Http.get(Nhc.queryUrl(layer), egress.userAgent(), null, new Http.Callback() {
             @Override
-            public void onSuccess(String body) {
+            public void onSuccess(final String body) {
+                // Straight to the worker: a cone is thousands of coordinates to parse
+                // and this callback is delivered on the main thread.
+                run(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            build(body);
+                        } finally {
+                            batch.done();
+                        }
+                    }
+                });
+            }
+
+            private void build(String body) {
                 if (mine != generation || !on)
                     return;
                 final List<Shape> rings = geometry(body);
@@ -612,13 +667,18 @@ public final class TropicalOverlay {
                     final String name = !own.isEmpty() ? own
                             : rings.size() > 1 ? title + " " + (++n) : title;
                     if (closed)
-                        features.addPolygon(set, name, ring, stroke, (float) weight,
-                                fill, attrs(storm, s.props));
+                        batch.add(new AtmosphereFeatures.Drawn(set, name,
+                                AtmosphereFeatures.polygon(ring),
+                                AtmosphereFeatures.area(stroke, (float) weight, fill),
+                                attrs(storm, s.props)));
                     else
                         // An arrival contour carries its hour as its name, so it is
                         // the one line worth labeling on the map.
-                        features.addLine(set, name, ring, stroke, (float) weight,
-                                attrs(storm, s.props), !own.isEmpty());
+                        batch.add(new AtmosphereFeatures.Drawn(set, name,
+                                AtmosphereFeatures.path(ring),
+                                AtmosphereFeatures.stroke(name, stroke, (float) weight,
+                                        !own.isEmpty()),
+                                attrs(storm, s.props)));
                     grow(storm.bin, ring);
                     Log.d(TAG, String.format(Locale.US,
                             "drew %s: %d points, %.2f,%.2f..%.2f,%.2f", name,
@@ -629,6 +689,8 @@ public final class TropicalOverlay {
 
             @Override
             public void onFailure(String error) {
+                // Released either way, or a batch never writes what did arrive.
+                batch.done();
                 if (mine != generation || !on)
                     return;
                 Log.w(TAG, "layer " + layer + " failed: " + error);
@@ -729,18 +791,26 @@ public final class TropicalOverlay {
     }
 
     /** Widen what a storm is known to cover, as each of its shapes lands. */
+    /**
+     * Widen a storm's extent, so "Go to" can frame it.
+     *
+     * <p>Guarded: this is filled on the worker as each answer is parsed and read on
+     * main when the operator presses Go to.
+     */
     private void grow(String bin, GeoPoint[] ring) {
-        double[] e = extents.get(bin);
-        if (e == null) {
-            e = new double[] { Double.MAX_VALUE, Double.MAX_VALUE,
-                    -Double.MAX_VALUE, -Double.MAX_VALUE };
-            extents.put(bin, e);
-        }
-        for (GeoPoint p : ring) {
-            e[0] = Math.min(e[0], p.getLatitude());
-            e[1] = Math.min(e[1], p.getLongitude());
-            e[2] = Math.max(e[2], p.getLatitude());
-            e[3] = Math.max(e[3], p.getLongitude());
+        synchronized (extents) {
+            double[] e = extents.get(bin);
+            if (e == null) {
+                e = new double[] { Double.MAX_VALUE, Double.MAX_VALUE,
+                        -Double.MAX_VALUE, -Double.MAX_VALUE };
+                extents.put(bin, e);
+            }
+            for (GeoPoint p : ring) {
+                e[0] = Math.min(e[0], p.getLatitude());
+                e[1] = Math.min(e[1], p.getLongitude());
+                e[2] = Math.max(e[2], p.getLatitude());
+                e[3] = Math.max(e[3], p.getLongitude());
+            }
         }
     }
 
@@ -755,7 +825,11 @@ public final class TropicalOverlay {
     public void goTo(Nhc.Storm storm) {
         if (storm == null)
             return;
-        final double[] e = extents.get(storm.bin);
+        final double[] e;
+        synchronized (extents) {
+            final double[] held = extents.get(storm.bin);
+            e = held == null ? null : held.clone();
+        }
         final GeoPoint here = Double.isNaN(storm.latitude) || Double.isNaN(storm.longitude)
                 ? null : new GeoPoint(storm.latitude, storm.longitude);
         if (e == null || e[0] > e[2]) {
@@ -794,10 +868,27 @@ public final class TropicalOverlay {
     }
 
     /** Drop everything drawn and make any response in flight land nowhere. */
-    private void clear() {
+    /** Everything in flight for the last refresh is now stale. Cheap, stays on main. */
+    private void newGeneration() {
         generation++;
-        extents.clear();
-        features.clear();
+        synchronized (extents) {
+            extents.clear();
+        }
+    }
+
+    /** Emptying the store is a database write like any other: never on main. */
+    private void clearFeaturesOffMain() {
+        run(new Runnable() {
+            @Override
+            public void run() {
+                features.clear();
+            }
+        });
+    }
+
+    private void clear() {
+        newGeneration();
+        clearFeaturesOffMain();
     }
 
     private void status(String s) {
