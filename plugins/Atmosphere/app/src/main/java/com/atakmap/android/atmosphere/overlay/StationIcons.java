@@ -3,8 +3,10 @@ package com.atakmap.android.atmosphere.overlay;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 
+import com.atakmap.android.atmosphere.data.WindBarb;
 import com.atakmap.android.maps.MapTextFormat;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.filesystem.FileSystemUtils;
@@ -62,18 +64,23 @@ final class StationIcons {
     static final int CRITICAL = 0xFFE53935;
 
     /** The barb, and the outline that keeps it visible on anything. */
-    private static final int BARB = 0xFF2E7BD6;
+    private static final int BARB = 0xFF1B3B8B;
     private static final int BARB_EDGE = 0xFFFFFFFF;
 
-    /** The disc the barb turns on: dark, like the label, with a white edge. */
-    private static final int DISC = 0xE6141414;
+    /** The disc the barb turns on: the NWCG symbol's own blue, with a white edge. */
+    private static final int DISC = 0xFF1B3B8B;
     private static final int DISC_EDGE = 0xFFFFFFFF;
 
     private static final int LABEL_BG = 0x99000000;
     private static final int PAD_X = 6, PAD_Y = 3, GAP = 3, RADIUS = 4;
 
-    /** Device-independent sizes, scaled by ATAK's own display scaling. */
-    private static final float DISC_R = 13f, BARB_LEN = 30f;
+    /**
+     * Device-independent sizes, scaled by ATAK's own display scaling. The disc is the
+     * width the NWCG diamond was, so the symbol did not shrink when it became round.
+     */
+    private static final float DISC_R = 21f;
+    /** How far the staff reaches past the disc, and how long a full feather is. */
+    private static final float STAFF = 34f, FEATHER = 14f, FEATHER_GAP = 7.5f;
 
     private final File dir;
     private final Map<String, Composed> cache = new HashMap<>();
@@ -137,10 +144,11 @@ final class StationIcons {
      * @param unit      what that speed is in, e.g. "mph"
      * @param humidity  relative humidity in percent, or NaN
      * @param windFrom  degrees the wind is coming from, or NaN for no barb
+     * @param knots     the same wind in knots, which is what the feathers count in
      * @param state     {@link #NORMAL}, {@link #NEAR} or {@link #CRITICAL}
      */
     Composed compose(String name, double speed, String unit, double humidity,
-            double windFrom, int state) {
+            double windFrom, double knots, int state) {
         final float scale = Math.max(1f,
                 gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling());
         final MapTextFormat tf = MapView.getDefaultTextFormat();
@@ -150,8 +158,11 @@ final class StationIcons {
 
         final String readings = readings(speed, unit, humidity);
         final String title = name == null ? "" : name.trim();
+        // The feathers change only in steps of five knots, so that is what the name
+        // needs to carry -- not the raw speed, which would be a new file every hour.
+        final long fives = Double.isNaN(knots) ? -1 : Math.round(knots / 5.0);
         final String key = Integer.toHexString((readings + "|" + title).hashCode())
-                + "_" + bucket(windFrom) + "_" + Integer.toHexString(state)
+                + "_" + bucket(windFrom) + "_k" + fives + "_" + Integer.toHexString(state)
                 + "_v" + VERSION + "_s" + Math.round(scale * 100)
                 + "_f" + Math.round(textPx * 10);
         final Composed hit = cache.get(key);
@@ -169,9 +180,9 @@ final class StationIcons {
         final int pillW = textW + 2 * PAD_X;
         final int pillH = lineOne + lineTwo + 2 * PAD_Y;
 
-        // The barb reaches BARB_LEN in any direction, so the disc and its barb occupy
-        // a circle of that radius whatever the wind is doing.
-        final int reach = Math.round(BARB_LEN * scale) + 4;
+        // The disc plus the staff, so the drawing occupies a circle of that radius
+        // whatever the wind is doing and nothing is clipped at any angle.
+        final int reach = Math.round((DISC_R + STAFF + FEATHER) * scale) + 4;
         // Below the disc: the barb's reach, then the pill. The same is left above, so
         // the disc ends up at the middle of the bitmap and therefore on the station.
         final int below = reach + GAP + pillH;
@@ -180,7 +191,7 @@ final class StationIcons {
         final int cx = w / 2, cy = h / 2;
 
         final File out = new File(dir, "wx_" + key + ".png");
-        if (!out.isFile() && !draw(out, w, h, cx, cy, scale, windFrom, state,
+        if (!out.isFile() && !draw(out, w, h, cx, cy, scale, windFrom, knots, state,
                 readings, title, big, small, bm, sm, pillW, pillH, reach))
             return null;
         // Composed at device pixels and asked back at the same pixels, so nothing is
@@ -219,7 +230,7 @@ final class StationIcons {
     }
 
     private boolean draw(File out, int w, int h, int cx, int cy, float scale,
-            double windFrom, int state, String readings, String title,
+            double windFrom, double knots, int state, String readings, String title,
             Paint big, Paint small, Paint.FontMetricsInt bm, Paint.FontMetricsInt sm,
             int pillW, int pillH, int reach) {
         Bitmap bmp = null;
@@ -228,7 +239,7 @@ final class StationIcons {
             final Canvas c = new Canvas(bmp);
             final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-            barb(c, p, cx, cy, scale, windFrom);
+            barb(c, p, cx, cy, scale, windFrom, knots);
             disc(c, p, cx, cy, scale);
             anemometer(c, p, cx, cy, scale, state);
             pill(c, p, w, cy, reach, pillW, pillH, readings, title, big, small, bm, sm);
@@ -255,34 +266,97 @@ final class StationIcons {
     }
 
     /**
-     * The barb, drawn out of the disc toward where the wind is blowing FROM -- the
-     * meteorological convention, and the opposite of an arrow showing where it goes.
-     * A north wind puts the barb at the top.
+     * A wind barb, drawn the way every station plot draws one.
+     *
+     * <p>The staff points toward where the wind is blowing <b>from</b>, so a north
+     * wind puts it at the top, and the feathers at its far end give the speed:
+     * <b>a short feather is 5 knots, a long one 10, a solid triangle 50</b>, added
+     * together, with the speed rounded to the nearest 5. Calm is the bare disc with no
+     * staff at all. That is the convention a fire weather forecaster already reads and
+     * it is not ours to reinterpret (operator, 2026-09-25, with windy.app's guide).
+     *
+     * <p><b>The feathers are knots, and the pill is in the operator's own unit.</b>
+     * Those disagree by a factor of 1.15 and both are correct: a barb has meant knots
+     * since before anyone read one on a phone, and the number beside it is what a
+     * crew says out loud. The layer says which is which under its legend.
+     *
+     * <p>Feathers sit on the counter-clockwise side of the staff, the northern
+     * hemisphere convention, and are laid from the far end inward: triangles first,
+     * then full feathers, then a half.
      *
      * <p>White underneath and blue on top: one stroke laid over a wider one is an
-     * outline, and it is what keeps the line readable over water, snow and shaded
-     * relief without a halo behind the whole symbol.
+     * outline, and it is what keeps the whole barb readable over water, snow and
+     * shaded relief without putting a halo behind the symbol.
      */
-    private void barb(Canvas c, Paint p, int cx, int cy, float scale, double windFrom) {
-        if (Double.isNaN(windFrom))
-            return;
+    private void barb(Canvas c, Paint p, int cx, int cy, float scale, double windFrom,
+            double knots) {
+        if (Double.isNaN(windFrom) || WindBarb.isCalm(knots))
+            return;                     // calm, or as good as: the disc says it alone
+
         final double r = Math.toRadians(windFrom);
-        final float ex = cx + (float) (Math.sin(r) * BARB_LEN * scale);
-        final float ey = cy - (float) (Math.cos(r) * BARB_LEN * scale);
+        // Along the staff, pointing out of the disc toward where the wind is from.
+        final float ux = (float) Math.sin(r), uy = (float) -Math.cos(r);
+        // The counter-clockwise perpendicular, which is the side feathers go on.
+        final float px = uy, py = -ux;
+
+        final float from = DISC_R * scale;
+        final float to = (DISC_R + STAFF) * scale;
+        final Path lines = new Path();
+        lines.moveTo(cx + ux * from, cy + uy * from);
+        lines.lineTo(cx + ux * to, cy + uy * to);
+
+        final WindBarb.Feathers f = WindBarb.of(knots);
+        final int flags = f.flags, fulls = f.fulls, halves = f.halves;
+
+        final float gap = FEATHER_GAP * scale;
+        final float full = FEATHER * scale;
+        float at = to;
+        final java.util.List<float[]> triangles = new java.util.ArrayList<>();
+        for (int i = 0; i < flags; i++) {
+            // A triangle standing on the staff, its base along it.
+            triangles.add(new float[] {
+                    cx + ux * at, cy + uy * at,
+                    cx + ux * (at - gap * 1.6f), cy + uy * (at - gap * 1.6f),
+                    cx + ux * at + px * full, cy + uy * at + py * full });
+            at -= gap * 1.9f;
+        }
+        for (int i = 0; i < fulls; i++) {
+            lines.moveTo(cx + ux * at, cy + uy * at);
+            lines.lineTo(cx + ux * at + px * full, cy + uy * at + py * full);
+            at -= gap;
+        }
+        if (halves > 0) {
+            // A half feather never sits at the very tip: at the tip it reads as a
+            // full one that was drawn short.
+            if (flags == 0 && fulls == 0)
+                at -= gap;
+            lines.moveTo(cx + ux * at, cy + uy * at);
+            lines.lineTo(cx + ux * at + px * full * 0.5f, cy + uy * at + py * full * 0.5f);
+        }
+
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeCap(Paint.Cap.ROUND);
-        p.setColor(BARB_EDGE);
-        p.setStrokeWidth(7.5f * scale);
-        c.drawLine(cx, cy, ex, ey, p);
-        p.setColor(BARB);
-        p.setStrokeWidth(4f * scale);
-        c.drawLine(cx, cy, ex, ey, p);
-        // A head at the far end, so which way it points survives at small sizes.
-        p.setStyle(Paint.Style.FILL);
-        p.setColor(BARB_EDGE);
-        c.drawCircle(ex, ey, 5.5f * scale, p);
-        p.setColor(BARB);
-        c.drawCircle(ex, ey, 3.6f * scale, p);
+        p.setStrokeJoin(Paint.Join.ROUND);
+        for (int pass = 0; pass < 2; pass++) {
+            final boolean outline = pass == 0;
+            p.setColor(outline ? BARB_EDGE : BARB);
+            p.setStrokeWidth((outline ? 7.5f : 4f) * scale);
+            p.setStyle(Paint.Style.STROKE);
+            c.drawPath(lines, p);
+            for (float[] t : triangles) {
+                final Path tri = new Path();
+                tri.moveTo(t[0], t[1]);
+                tri.lineTo(t[2], t[3]);
+                tri.lineTo(t[4], t[5]);
+                tri.close();
+                // Stroked first at the outline width, then filled, so the triangle
+                // carries the same white edge the staff does.
+                c.drawPath(tri, p);
+                final Paint fill = new Paint(p);
+                fill.setStyle(Paint.Style.FILL);
+                c.drawPath(tri, fill);
+            }
+        }
     }
 
     private void disc(Canvas c, Paint p, int cx, int cy, float scale) {

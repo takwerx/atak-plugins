@@ -276,9 +276,11 @@ public final class StationOverlay {
             final int color = color(level);
             if (level == RedFlag.CRITICAL)
                 critical++;
+            // The pill gets the operator's unit; the feathers get knots, which is
+            // what a barb has always counted in.
             final StationIcons.Composed icon = icons.compose(s.name,
                     speed(s.windMph, system), speedUnit(), s.relativeHumidity,
-                    s.windFromDeg, color);
+                    s.windFromDeg, knots(s.windMph), color);
             if (icon == null)
                 continue;
             // The set is the state, so Overlay Manager can show the stations at
@@ -314,6 +316,11 @@ public final class StationOverlay {
         if (level == RedFlag.NEAR)
             return StationIcons.NEAR;
         return StationIcons.NORMAL;
+    }
+
+    /** Miles per hour as knots, for the barb's feathers. */
+    private static double knots(double mph) {
+        return Double.isNaN(mph) ? Double.NaN : mph / 1.15078;
     }
 
     /** The speed printed on the icon, in whatever unit the rest of the plugin shows. */
