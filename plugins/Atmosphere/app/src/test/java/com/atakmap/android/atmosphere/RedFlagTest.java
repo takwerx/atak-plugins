@@ -17,14 +17,26 @@ public class RedFlagTest {
     }
 
     @Test
-    public void oneOfThemAloneIsWorthWatchingButIsNotRedFlag() {
-        assertEquals(RedFlag.NEAR, RedFlag.state(10, 5));
-        assertEquals(RedFlag.NEAR, RedFlag.state(60, 35));
+    public void oneOfThemAloneIsNotFlirtingWithAnything() {
+        // The criteria are a pair, so approaching one of them is not approaching
+        // them. A station at 87% humidity gusting 30 was drawn yellow by a rule that
+        // accepted either on its own -- soaking wet, and the symbol said it was close
+        // to Red Flag (found on the map, 2026-09-25).
+        assertEquals(RedFlag.BELOW, RedFlag.state(87, 30));
+        assertEquals(RedFlag.BELOW, RedFlag.state(10, 5));
+        assertEquals(RedFlag.BELOW, RedFlag.state(60, 35));
+        // Even one of them fully met, with the other nowhere.
+        assertEquals(RedFlag.BELOW, RedFlag.state(12, 3));
+        assertEquals(RedFlag.BELOW, RedFlag.state(70, 40));
     }
 
     @Test
-    public void bothWithinReachIsWorthWatching() {
+    public void approachingBothIsFlirting() {
         assertEquals(RedFlag.NEAR, RedFlag.state(18, 22));
+        assertEquals(RedFlag.NEAR, RedFlag.state(20, 20));
+        // One fully met and the other within reach is still flirting.
+        assertEquals(RedFlag.NEAR, RedFlag.state(12, 21));
+        assertEquals(RedFlag.NEAR, RedFlag.state(19, 30));
         // Near on one and nowhere on the other is not.
         assertEquals(RedFlag.BELOW, RedFlag.state(18, 4));
         assertEquals(RedFlag.BELOW, RedFlag.state(55, 21));
@@ -40,8 +52,9 @@ public class RedFlagTest {
     public void aMissingValueNeverMakesAStationCritical() {
         // The danger is a station that sent no humidity reading being colored red on
         // its wind alone -- a red diamond with nothing behind it.
-        assertEquals(RedFlag.NEAR, RedFlag.state(Double.NaN, 40));
-        assertEquals(RedFlag.NEAR, RedFlag.state(8, Double.NaN));
+        // And a missing value cannot be "approaching" either, so it is not yellow.
+        assertEquals(RedFlag.BELOW, RedFlag.state(Double.NaN, 40));
+        assertEquals(RedFlag.BELOW, RedFlag.state(8, Double.NaN));
         assertEquals(RedFlag.BELOW, RedFlag.state(Double.NaN, Double.NaN));
         assertEquals(RedFlag.BELOW, RedFlag.state(Double.NaN, 10));
         assertEquals(RedFlag.BELOW, RedFlag.state(40, Double.NaN));

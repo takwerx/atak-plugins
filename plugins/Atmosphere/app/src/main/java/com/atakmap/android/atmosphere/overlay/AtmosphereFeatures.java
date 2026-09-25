@@ -121,9 +121,24 @@ final class AtmosphereFeatures {
         final com.atakmap.map.layer.feature.geometry.Geometry geometry;
         final Style style;
         final AttributeSet attrs;
+        /**
+         * The zoom band this feature's set draws in, coarsest and finest meters per
+         * pixel. Taken from the first feature of a set. The defaults draw at every
+         * zoom; a layer that wants a gate -- stations that would be a wall of icons
+         * on a state-wide view, or labels that only earn their space close in --
+         * names its own.
+         */
+        final double minGsd, maxGsd;
 
         Drawn(String setName, String name, com.atakmap.map.layer.feature.geometry.Geometry geometry,
                 Style style, AttributeSet attrs) {
+            this(setName, name, geometry, style, attrs, MIN_GSD, MAX_GSD);
+        }
+
+        Drawn(String setName, String name, com.atakmap.map.layer.feature.geometry.Geometry geometry,
+                Style style, AttributeSet attrs, double minGsd, double maxGsd) {
+            this.minGsd = minGsd;
+            this.maxGsd = maxGsd;
             this.setName = setName;
             this.name = name;
             this.geometry = geometry;
@@ -559,7 +574,8 @@ final class AtmosphereFeatures {
                     Long fsid = fresh.get(d.setName);
                     if (fsid == null) {
                         fsid = store.insertFeatureSet(
-                                new FeatureSet(PROVIDER, type, d.setName, MIN_GSD, MAX_GSD));
+                                new FeatureSet(PROVIDER, type, d.setName,
+                                        d.minGsd, d.maxGsd));
                         store.setFeatureSetVisible(fsid, true);
                         fresh.put(d.setName, fsid);
                     }

@@ -224,6 +224,7 @@ public final class AtmospherePane {
     private ImageButton stationsExpand;
     private View stationsSettings;
     private LinearLayout stationsOriginRow, stationsDistanceRow, stationsLegend;
+    private Button stationsLabels;
     private boolean stationsOpen;
     private boolean spotOpen = true;
     private final LinearLayout warnSettings;
@@ -386,6 +387,7 @@ public final class AtmospherePane {
         stationsOriginRow = find(R.id.stations_origin_row);
         stationsDistanceRow = find(R.id.stations_distance_row);
         stationsLegend = find(R.id.stations_legend);
+        stationsLabels = find(R.id.stations_labels);
         spotLegend = find(R.id.spot_legend);
         spotSettings = find(R.id.spot_settings);
         warnSettings = find(R.id.warn_settings);
@@ -449,6 +451,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 stationsOpen = !stationsOpen;
                 rememberFold(PREF_STATIONS_OPEN, stationsOpen);
+                updateLayerControls();
+            }
+        });
+        stationsLabels.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (stationLayer == null)
+                    return;
+                stationLayer.setLabels(!stationLayer.hasLabels());
                 updateLayerControls();
             }
         });
@@ -1642,8 +1653,11 @@ public final class AtmospherePane {
     private void buildStationsLegend() {
         if (stationsLegend.getChildCount() > 0)
             return;
-        stationsLegend.addView(legendLine("At Red Flag criteria", StationOverlay.CRITICAL));
-        stationsLegend.addView(legendLine("Close to criteria", StationOverlay.NEAR));
+        // The Fire Weather Snooper's own legend, word for word.
+        stationsLegend.addView(legendLine("Hitting Red Flag criteria",
+                StationOverlay.CRITICAL));
+        stationsLegend.addView(legendLine("Flirting with Red Flag criteria",
+                StationOverlay.NEAR));
         stationsLegend.addView(legendLine("Below criteria", StationOverlay.NORMAL));
     }
 
@@ -1896,6 +1910,10 @@ public final class AtmospherePane {
         stationsExpand.setRotation(stationsOpen ? 180f : 0f);
         stationsSettings.setVisibility(stationsOn && stationsOpen ? View.VISIBLE : View.GONE);
         if (stationsOn) {
+            final boolean withLabels = stationLayer.hasLabels();
+            stationsLabels.setText(withLabels ? "Readings and names  ON" : "Readings and names  OFF");
+            stationsLabels.setTextColor(pluginContext.getResources().getColor(
+                    withLabels ? R.color.state_on : R.color.state_off));
             buildStationsOriginRow();
             buildStationsDistanceRow();
             buildStationsLegend();

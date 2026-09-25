@@ -57,6 +57,7 @@ public final class StationOverlay {
     private static final String PREF_ON = "weather.layer.stations.on";
     private static final String PREF_MILES = "weather.layer.stations.miles";
     private static final String PREF_FROM_ME = "weather.layer.stations.fromme";
+    private static final String PREF_LABELS = "weather.layer.stations.labels";
     private static final String PREF_UNITS = "weather.units";
 
     /** RAWS report hourly, so there is nothing to gain from asking more often. */
@@ -66,6 +67,24 @@ public final class StationOverlay {
     /** What the distance buttons offer, in miles. */
     public static final int[] RADII = { 25, 50, 100, 250 };
     private static final int DEFAULT_MILES = 50;
+
+    /**
+     * The zoom bands, in meters per pixel, coarsest first.
+     *
+     * <p>ATAK gates a feature set by resolution itself, so these need no listener and
+     * cost nothing to hold: a set outside its band is simply not drawn. Two bands that
+     * meet at {@link #LABEL_GSD} mean exactly one of them is on screen at any zoom --
+     * bare symbols when the view is wide, the same symbols carrying their readings and
+     * name once it is close enough for them to be worth the space. This is how Feature
+     * Layer gates its own points, and the reason it is done with resolutions rather
+     * than by redrawing on every zoom is that redrawing is a database write.
+     *
+     * <p>Past {@link #STATION_GSD} nothing is drawn at all: at a state-wide view a
+     * hundred stations is a wall of symbols with no map left under it.
+     */
+    private static final double STATION_GSD = 600d;
+    private static final double LABEL_GSD = 90d;
+    private static final double FINEST = 0d;
 
     public interface Listener {
         void onStationsStatus(String message);
@@ -85,7 +104,7 @@ public final class StationOverlay {
     private int generation;
     private long lastPoll;
     private int miles;
-    private boolean fromMe;
+    private boolean fromMe, labels;
     private List<Raws.Station> stations = new ArrayList<>();
 
     private final Runnable autoPoll = new Runnable() {
@@ -105,6 +124,36 @@ public final class StationOverlay {
         final SharedPreferences p = MapCompat.prefs();
         miles = p == null ? DEFAULT_MILES : p.getInt(PREF_MILES, DEFAULT_MILES);
         fromMe = p == null || p.getBoolean(PREF_FROM_ME, true);
+        labels = p == null || p.getBoolean(PREF_LABELS, true);
+    }
+
+    /** Whether the readings and name are drawn beside each station. */
+    public boolean hasLabels() {
+        return labels;
+    }
+
+    /** Switch them; redrawn from what is already held, no new request. */
+    public void setLabels(boolean value) {
+        if (labels == value)
+            return;
+        labels = value;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putBoolean(PREF_LABELS, value).apply();
+        redraw();
+    }
+
+    /** Rebuild the map from the stations already held. */
+    private void redraw() {
+        if (!on)
+            return;
+        final int mine = generation;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                rebuild(mine);
+            }
+        });
     }
 
     public void setListener(Listener l) {
@@ -278,17 +327,21 @@ public final class StationOverlay {
                 critical++;
             // The pill gets the operator's unit; the feathers get knots, which is
             // what a barb has always counted in.
-            final StationIcons.Composed icon = icons.compose(s.name,
-                    speed(s.windMph, system), speedUnit(), s.relativeHumidity,
-                    s.windFromDeg, knots(s.windMph), color);
-            if (icon == null)
-                continue;
+            // The feathers count the sustained wind, which is what a barb shows; the
+            // color is decided by the strongest wind the station has, gust included,
+            // so the gust is printed beside it or the color has nothing behind it.
+            final AttributeSet a = attrs(s, color, now, system);
             // The set is the state, so Overlay Manager can show the stations at
             // criteria on their own and ATAK's own switches work on one at a time.
-            drawn.add(new AtmosphereFeatures.Drawn(StationIcons.stateLabel(color), s.name,
-                    AtmosphereFeatures.point(s.latitude, s.longitude),
-                    AtmosphereFeatures.icon(icon.uri, icon.width, icon.height),
-                    attrs(s, color, now, system)));
+            final String set = StationIcons.stateLabel(color);
+            // Bare, for the wide view -- and for the whole range when labels are off.
+            add(drawn, s, set, a, color, system, false,
+                    STATION_GSD, labels ? LABEL_GSD : FINEST);
+            if (labels)
+                // The same station again, carrying its pill, for the close view. The
+                // two bands meet, so only ever one of them is on screen.
+                add(drawn, s, set + " \u00b7 labelled", a, color, system, true,
+                        LABEL_GSD, FINEST);
         }
         if (mine != generation || !on)
             return;
@@ -308,6 +361,24 @@ public final class StationOverlay {
         Log.d(TAG, String.format(Locale.US,
                 "drew %d of %d stations within %d mi of %s, %d at criteria",
                 n, total, miles, fromMe ? "me" : "the map", red));
+    }
+
+    /** One station in one zoom band, with or without its pill. */
+    private void add(List<AtmosphereFeatures.Drawn> drawn, Raws.Station s, String set,
+            AttributeSet a, int color, UnitSystem system, boolean withLabel,
+            double minGsd, double maxGsd) {
+        // The feathers count the sustained wind, which is what a barb shows; the
+        // color is decided by the strongest wind the station has, gust included, so
+        // the gust is printed beside it or the color has nothing behind it.
+        final StationIcons.Composed icon = icons.compose(s.name,
+                speed(s.windMph, system), speed(s.gustMph, system), speedUnit(),
+                s.relativeHumidity, s.windFromDeg, knots(s.windMph), color, withLabel);
+        if (icon == null)
+            return;
+        drawn.add(new AtmosphereFeatures.Drawn(set, s.name,
+                AtmosphereFeatures.point(s.latitude, s.longitude),
+                AtmosphereFeatures.icon(icon.uri, icon.width, icon.height),
+                a, minGsd, maxGsd));
     }
 
     private static int color(int level) {
@@ -341,27 +412,93 @@ public final class StationOverlay {
                 UnitSystem.IMPERIAL);
     }
 
+    /**
+     * Everything the station has to say, in words.
+     *
+     * <p>Written as strings on purpose: the details pane prints an attribute only when
+     * it is a string, so a number stored as a number is silently dropped and a tap
+     * shows an empty pane. It is also the right shape -- "20 mph from 250 (WSW)" is
+     * what somebody tapping a station wants, not three fields to assemble themselves.
+     */
     private AttributeSet attrs(Raws.Station s, int color, long now, UnitSystem system) {
         final AttributeSet a = new AttributeSet();
-        a.setAttribute("stationId", s.wxId);
-        a.setAttribute("mesowestId", s.mesowestId);
-        a.setAttribute("name", s.name);
-        a.setAttribute("state", StationIcons.stateLabel(color));
-        a.setAttribute("agency", s.agency);
-        a.setAttribute("unit", s.unit);
-        a.setAttribute("county", s.county);
-        a.setAttribute("elevationFt", s.elevation);
-        a.setAttribute("observedAt", s.observedAt);
-        a.setAttribute("ageHours", s.ageHours(now));
-        a.setAttribute("relativeHumidity", s.relativeHumidity);
-        a.setAttribute("windMph", s.windMph);
-        a.setAttribute("gustMph", s.gustMph);
-        a.setAttribute("windFromDeg", s.windFromDeg);
-        a.setAttribute("airTempF", s.airTempF);
-        a.setAttribute("fuelMoisture", s.fuelMoisture);
-        a.setAttribute("speedShown", speed(s.windMph, system));
-        a.setAttribute("speedUnit", Units.displayUnit(Quantity.SPEED, system));
+        put(a, "Station", s.name);
+        put(a, "Status", StationIcons.stateLabel(color));
+        put(a, "Wind", wind(s, system));
+        put(a, "Gust", Double.isNaN(s.gustMph) ? ""
+                : Units.format(Quantity.SPEED, s.gustMph * 0.44704, system)
+                        + direction(s.gustFromDeg));
+        put(a, "Humidity", percent(s.relativeHumidity));
+        put(a, "Temperature", fahrenheit(s.airTempF, system));
+        put(a, "Fuel moisture", percent(s.fuelMoisture));
+        put(a, "Fuel temperature", fahrenheit(s.fuelTempF, system));
+        put(a, "Observed", observed(s, now));
+        put(a, "Elevation", s.elevation <= 0 ? ""
+                : Units.format(Quantity.LENGTH, s.elevation * 0.3048, system));
+        put(a, "Agency", s.agency);
+        put(a, "Unit", s.unit);
+        put(a, "County", s.county);
+        put(a, "State", s.state);
+        put(a, "Station status", s.status);
+        put(a, "Station id", s.wxId);
+        put(a, "MesoWest id", s.mesowestId);
+        put(a, "Position", String.format(Locale.US, "%.5f, %.5f",
+                s.latitude, s.longitude));
         return a;
+    }
+
+    /** Only what the station actually sent; an empty field is not a field. */
+    private static void put(AttributeSet a, String key, String value) {
+        if (value != null && !value.trim().isEmpty())
+            a.setAttribute(key, value.trim());
+    }
+
+    private static String wind(Raws.Station s, UnitSystem system) {
+        if (Double.isNaN(s.windMph))
+            return "";
+        if (s.windMph < 1)
+            return "Calm";
+        return Units.format(Quantity.SPEED, s.windMph * 0.44704, system)
+                + direction(s.windFromDeg);
+    }
+
+    /** " from 250 (WSW)", or nothing when the station did not report a direction. */
+    private static String direction(double deg) {
+        if (Double.isNaN(deg))
+            return "";
+        return String.format(Locale.US, " from %d\u00b0 (%s)", Math.round(deg),
+                Units.degreesToCompass(deg));
+    }
+
+    private static String percent(double v) {
+        return Double.isNaN(v) ? "" : String.format(Locale.US, "%s%%", trim(v));
+    }
+
+    private static String fahrenheit(double f, UnitSystem system) {
+        if (Double.isNaN(f))
+            return "";
+        return Units.format(Quantity.TEMPERATURE, (f - 32) * 5.0 / 9.0, system);
+    }
+
+    private static String trim(double v) {
+        return v == Math.rint(v) ? String.valueOf(Math.round(v))
+                : String.format(Locale.US, "%.1f", v);
+    }
+
+    /** "35 minutes ago", and the hour it was, because stale is the thing to notice. */
+    private static String observed(Raws.Station s, long now) {
+        if (s.observedAt <= 0)
+            return "Never reported";
+        final double hours = s.ageHours(now);
+        final String ago;
+        if (hours < 1.5)
+            ago = Math.max(1, Math.round(hours * 60)) + " minutes ago";
+        else if (hours < 48)
+            ago = Math.round(hours) + " hours ago";
+        else
+            ago = Math.round(hours / 24) + " days ago";
+        return ago + ", " + new java.text.SimpleDateFormat("EEE MMM d, h:mm a",
+                Locale.US).format(new java.util.Date(s.observedAt));
     }
 
     private void clearOffMain() {

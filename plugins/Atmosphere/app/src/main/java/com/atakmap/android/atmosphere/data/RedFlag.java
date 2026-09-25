@@ -57,11 +57,16 @@ public final class RedFlag {
         if (dry && windy)
             return CRITICAL;
 
+        // Flirting means approaching on BOTH axes, because the criteria are a pair.
+        // Either one alone used to be enough here, which lit a station up yellow at
+        // 87% humidity because it was gusting 30 -- soaking wet and nowhere near Red
+        // Flag, and the symbol said otherwise (found on the map, 2026-09-25). Wind
+        // without dryness is a windy day; dryness without wind is a dry one. Neither
+        // is this.
         final boolean nearlyDry = !Double.isNaN(relativeHumidity)
                 && relativeHumidity <= RH_NEAR;
         final boolean nearlyWindy = !Double.isNaN(windMph) && windMph >= WIND_NEAR;
-        // One of them at the full threshold, or both within reach of it.
-        if (dry || windy || (nearlyDry && nearlyWindy))
+        if (nearlyDry && nearlyWindy)
             return NEAR;
         return BELOW;
     }

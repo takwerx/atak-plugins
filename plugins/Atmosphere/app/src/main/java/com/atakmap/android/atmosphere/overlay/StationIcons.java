@@ -23,8 +23,8 @@ import java.util.Map;
  * the readings and the station's name in a pill beneath it.
  *
  * <p><b>The symbol's white marks carry the state, not the shape around them.</b> The
- * anemometer inside the disc is white below criteria, amber close to them and red at
- * them. That is the Comms convention -- there a repeater's own marks light up when a
+ * anemometer inside the disc is white below criteria, yellow when it is flirting with
+ * them and red when it is hitting them -- the Fire Weather Snooper's own three. That is the Comms convention -- there a repeater's own marks light up when a
  * handheld can likely open it -- and it is what the operator asked for here
  * (2026-09-25: "the actual white part the weather station should turn yellow or red").
  * A ring or a halo reads as a selection; a symbol whose marks change color reads as a
@@ -54,13 +54,18 @@ final class StationIcons {
     private static final String TAG = "AtmosphereStations";
 
     /** Bump when the drawing changes, or stale files are served under the same names. */
-    private static final int VERSION = 2;
+    private static final int VERSION = 8;
 
     /** Below criteria: the symbol as it normally reads. */
     static final int NORMAL = 0xFFFFFFFF;
-    /** Close to its criteria. Comms' warn amber. */
-    static final int NEAR = 0xFFFFB74D;
-    /** Meeting its Red Flag criteria. */
+    /**
+     * Flirting with its criteria. Yellow, not amber: the Fire Weather Snooper's own
+     * legend is "yellow -- station is flirting with Red Flag Criteria", and a crew
+     * that reads the Snooper should not have to learn a second palette here
+     * (operator, 2026-09-25: "yellow not amber man follow what fire snooper has").
+     */
+    static final int NEAR = 0xFFFFEB3B;
+    /** Hitting its Red Flag criteria. The Snooper's red. */
     static final int CRITICAL = 0xFFE53935;
 
     /** The barb, and the outline that keeps it visible on anything. */
@@ -78,9 +83,22 @@ final class StationIcons {
      * Device-independent sizes, scaled by ATAK's own display scaling. The disc is the
      * width the NWCG diamond was, so the symbol did not shrink when it became round.
      */
-    private static final float DISC_R = 21f;
+    private static final float DISC_R = 17f;
+    /**
+     * How much of the disc the anemometer spans, edge to edge inside the ring. Near
+     * enough to 1 that the symbol reads as a weather station at a glance rather than
+     * as a small mark inside a big circle -- the same reason a toolbar glyph fills its
+     * square (operator, 2026-09-25: "the inner weather station icon should fill the
+     * circle").
+     */
+    private static final float GLYPH_FILL = 0.80f;
     /** How far the staff reaches past the disc, and how long a full feather is. */
-    private static final float STAFF = 34f, FEATHER = 14f, FEATHER_GAP = 7.5f;
+    private static final float STAFF = 38f, FEATHER = 17f, FEATHER_GAP = 8.5f;
+    /**
+     * How far a feather is swept back toward the station, in degrees off square.
+     * Drawn at a right angle they read as the bit of a key rather than as a barb.
+     */
+    private static final float SWEEP_DEG = 22f;
 
     private final File dir;
     private final Map<String, Composed> cache = new HashMap<>();
@@ -127,12 +145,15 @@ final class StationIcons {
             Log.d(TAG, "cleared " + gone + " station icon(s) from a past session");
     }
 
-    /** What a color means, for the legend under the layer's toggle. */
+    /**
+     * What a color means, in the Snooper's own words. These are also the feature set
+     * names, so Overlay Manager reads the same way the Snooper's legend does.
+     */
     static String stateLabel(int color) {
         if (color == CRITICAL)
-            return "Red Flag criteria met";
+            return "Hitting Red Flag criteria";
         if (color == NEAR)
-            return "Close to criteria";
+            return "Flirting with Red Flag criteria";
         return "Below criteria";
     }
 
@@ -140,15 +161,17 @@ final class StationIcons {
      * One station's symbol, readings and name, composed once and kept.
      *
      * @param name      the station's name, drawn under the readings
-     * @param speed     wind speed in the operator's unit, or NaN
+     * @param speed     sustained wind in the operator's unit, or NaN
+     * @param gust      the gust in the same unit, or NaN when there is none
      * @param unit      what that speed is in, e.g. "mph"
      * @param humidity  relative humidity in percent, or NaN
      * @param windFrom  degrees the wind is coming from, or NaN for no barb
      * @param knots     the same wind in knots, which is what the feathers count in
      * @param state     {@link #NORMAL}, {@link #NEAR} or {@link #CRITICAL}
      */
-    Composed compose(String name, double speed, String unit, double humidity,
-            double windFrom, double knots, int state) {
+    Composed compose(String name, double speed, double gust, String unit,
+            double humidity, double windFrom, double knots, int state,
+            boolean withLabel) {
         final float scale = Math.max(1f,
                 gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling());
         final MapTextFormat tf = MapView.getDefaultTextFormat();
@@ -156,12 +179,13 @@ final class StationIcons {
         if (textPx <= 0f)
             textPx = 14f * scale;
 
-        final String readings = readings(speed, unit, humidity);
-        final String title = name == null ? "" : name.trim();
+        final String readings = withLabel ? readings(speed, gust, unit, humidity) : "";
+        final String title = !withLabel || name == null ? "" : name.trim();
         // The feathers change only in steps of five knots, so that is what the name
         // needs to carry -- not the raw speed, which would be a new file every hour.
         final long fives = Double.isNaN(knots) ? -1 : Math.round(knots / 5.0);
-        final String key = Integer.toHexString((readings + "|" + title).hashCode())
+        final String key = (withLabel ? "L" : "n")
+                + Integer.toHexString((readings + "|" + title).hashCode())
                 + "_" + bucket(windFrom) + "_k" + fives + "_" + Integer.toHexString(state)
                 + "_v" + VERSION + "_s" + Math.round(scale * 100)
                 + "_f" + Math.round(textPx * 10);
@@ -173,26 +197,47 @@ final class StationIcons {
         final Paint small = text(tf, textPx * 0.85f, false);
         final Paint.FontMetricsInt bm = big.getFontMetricsInt();
         final Paint.FontMetricsInt sm = small.getFontMetricsInt();
-        final int lineOne = bm.descent - bm.ascent;
+        final int lineOne = readings.isEmpty() ? 0 : bm.descent - bm.ascent;
         final int lineTwo = title.isEmpty() ? 0 : sm.descent - sm.ascent;
         final int textW = (int) Math.ceil(Math.max(big.measureText(readings),
                 title.isEmpty() ? 0 : small.measureText(title)));
-        final int pillW = textW + 2 * PAD_X;
-        final int pillH = lineOne + lineTwo + 2 * PAD_Y;
+        final boolean hasPill = lineOne + lineTwo > 0;
+        final int pillW = hasPill ? textW + 2 * PAD_X : 0;
+        final int pillH = hasPill ? lineOne + lineTwo + 2 * PAD_Y : 0;
 
-        // The disc plus the staff, so the drawing occupies a circle of that radius
-        // whatever the wind is doing and nothing is clipped at any angle.
+        // The pill goes on the side the barb is not, tucked against the disc.
+        //
+        // It used to hang below the barb's whole sweep, which is the only place that
+        // is clear of a staff that could point anywhere -- and that left the name
+        // stranded a barb's length from the station it belongs to (operator,
+        // 2026-09-25: "can the label just automatically be on the opposite side of the
+        // wind so it can be close to the icon?"). The wind direction is known when
+        // this is drawn, so the one place the barb is guaranteed not to be is
+        // directly opposite it.
+        float ox = 0f, oy = 1f;             // below, when there is no wind to oppose
+        if (!Double.isNaN(windFrom) && !WindBarb.isCalm(knots)) {
+            final double rad = Math.toRadians(windFrom);
+            ox = -(float) Math.sin(rad);
+            oy = (float) Math.cos(rad);
+        }
+        // Far enough out that the pill's own box clears the disc in that direction.
+        final float away = !hasPill ? 0f : DISC_R * scale + GAP
+                + (Math.abs(ox) * pillW + Math.abs(oy) * pillH) / 2f;
+        // The disc plus its staff, so nothing is clipped at any angle.
         final int reach = Math.round((DISC_R + STAFF + FEATHER) * scale) + 4;
-        // Below the disc: the barb's reach, then the pill. The same is left above, so
-        // the disc ends up at the middle of the bitmap and therefore on the station.
-        final int below = reach + GAP + pillH;
-        final int h = 2 * below;
-        final int w = Math.max(pillW, 2 * reach) + 2;
-        final int cx = w / 2, cy = h / 2;
+        // Symmetric about the disc, so the disc lands on the station rather than the
+        // middle of the drawing.
+        final int halfW = (int) Math.ceil(Math.max(reach,
+                Math.abs(ox) * away + pillW / 2f)) + 2;
+        final int halfH = (int) Math.ceil(Math.max(reach,
+                Math.abs(oy) * away + pillH / 2f)) + 2;
+        final int w = 2 * halfW, h = 2 * halfH;
+        final int cx = halfW, cy = halfH;
+        final float pillCx = cx + ox * away, pillCy = cy + oy * away;
 
         final File out = new File(dir, "wx_" + key + ".png");
         if (!out.isFile() && !draw(out, w, h, cx, cy, scale, windFrom, knots, state,
-                readings, title, big, small, bm, sm, pillW, pillH, reach))
+                readings, title, big, small, bm, sm, pillW, pillH, pillCx, pillCy))
             return null;
         // Composed at device pixels and asked back at the same pixels, so nothing is
         // resampled: ATAK scales an icon by dp, and these are already scaled.
@@ -202,10 +247,27 @@ final class StationIcons {
         return made;
     }
 
-    /** "6 mph · 37%", with a dash for anything the station did not send. */
-    private static String readings(double speed, String unit, double humidity) {
-        return value(speed) + (unit == null || unit.isEmpty() ? "" : " " + unit)
-                + "  ·  " + value(humidity) + "%";
+    /**
+     * "6 mph · 37%", or "20G28 mph · 42%" when the station is gusting.
+     *
+     * <p>The gust is shown because it is what decides the color: the state is taken
+     * from the strongest wind a station has, gust included. With only the sustained
+     * wind printed, an operator reads "20 mph" beside a yellow symbol and has nothing
+     * to reconcile it with. The numbers have to be able to explain the color.
+     *
+     * <p>Written the way a forecast writes it -- sustained, G, gust -- rather than as
+     * another field, which is a whole column for something most stations are not
+     * doing at any given hour.
+     */
+    private static String readings(double speed, double gust, String unit,
+            double humidity) {
+        final StringBuilder b = new StringBuilder(value(speed));
+        if (!Double.isNaN(gust) && !Double.isNaN(speed)
+                && Math.round(gust) > Math.round(speed))
+            b.append('G').append(value(gust));
+        if (unit != null && !unit.isEmpty())
+            b.append(' ').append(unit);
+        return b + "  ·  " + value(humidity) + "%";
     }
 
     private static String value(double v) {
@@ -232,7 +294,7 @@ final class StationIcons {
     private boolean draw(File out, int w, int h, int cx, int cy, float scale,
             double windFrom, double knots, int state, String readings, String title,
             Paint big, Paint small, Paint.FontMetricsInt bm, Paint.FontMetricsInt sm,
-            int pillW, int pillH, int reach) {
+            int pillW, int pillH, float pillCx, float pillCy) {
         Bitmap bmp = null;
         try {
             bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
@@ -242,7 +304,7 @@ final class StationIcons {
             barb(c, p, cx, cy, scale, windFrom, knots);
             disc(c, p, cx, cy, scale);
             anemometer(c, p, cx, cy, scale, state);
-            pill(c, p, w, cy, reach, pillW, pillH, readings, title, big, small, bm, sm);
+            pill(c, p, pillCx, pillCy, pillW, pillH, readings, title, big, small, bm, sm);
 
             final File tmp = new File(out.getPath() + ".tmp");
             final FileOutputStream o = new FileOutputStream(tmp);
@@ -296,8 +358,11 @@ final class StationIcons {
         final double r = Math.toRadians(windFrom);
         // Along the staff, pointing out of the disc toward where the wind is from.
         final float ux = (float) Math.sin(r), uy = (float) -Math.cos(r);
-        // The counter-clockwise perpendicular, which is the side feathers go on.
-        final float px = uy, py = -ux;
+        // The counter-clockwise perpendicular, which is the side feathers go on,
+        // swept back toward the station so the barb reads as one.
+        final double sweep = Math.toRadians(SWEEP_DEG);
+        final float cos = (float) Math.cos(sweep), sin = (float) Math.sin(sweep);
+        final float px = uy * cos - ux * sin, py = -ux * cos - uy * sin;
 
         final float from = DISC_R * scale;
         final float to = (DISC_R + STAFF) * scale;
@@ -340,7 +405,9 @@ final class StationIcons {
         for (int pass = 0; pass < 2; pass++) {
             final boolean outline = pass == 0;
             p.setColor(outline ? BARB_EDGE : BARB);
-            p.setStrokeWidth((outline ? 7.5f : 4f) * scale);
+            // Thinner than the staff's own weight would suggest: a feather is short,
+            // and a heavy stroke on a short line closes the gap to the next one.
+            p.setStrokeWidth((outline ? 5.2f : 2.6f) * scale);
             p.setStyle(Paint.Style.STROKE);
             c.drawPath(lines, p);
             for (float[] t : triangles) {
@@ -370,35 +437,52 @@ final class StationIcons {
     }
 
     /**
-     * The NWCG weather unit's mark -- a mast with a cup on top and two arms -- in the
-     * state's color. This is the part that turns amber and red.
+     * The NWCG weather unit's mark -- a mast with a cup on top and two on a crossarm --
+     * in the state's color. This is the part that turns yellow and red.
+     *
+     * <p>Every measurement is a fraction of the disc's radius, so the glyph fills the
+     * disc at any size and shrinking the symbol shrinks the mark with it. It was drawn
+     * at fixed pixels, which left it adrift in the middle of the circle.
      */
     private void anemometer(Canvas c, Paint p, int cx, int cy, float scale, int state) {
+        final float r = DISC_R * scale;
+        final float g = r * GLYPH_FILL;     // the glyph's half extent inside the ring
+        final float cup = g * 0.26f;
+        final float arm = g - cup;          // so a cup's edge lands on the glyph's edge
+
         p.setColor(state);
         p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(2.2f * scale);
+        p.setStrokeWidth(Math.max(1.6f, r * 0.15f));
         p.setStrokeCap(Paint.Cap.ROUND);
-        c.drawLine(cx, cy - 5f * scale, cx, cy + 6f * scale, p);
-        c.drawLine(cx - 5.5f * scale, cy + 1f * scale, cx + 5.5f * scale, cy + 1f * scale, p);
+        // The mast, from under the top cup down to the foot.
+        c.drawLine(cx, cy - g + cup, cx, cy + g * 0.82f, p);
+        // The crossarm, sitting a little below center the way the symbol has it.
+        c.drawLine(cx - arm, cy + g * 0.10f, cx + arm, cy + g * 0.10f, p);
+
         p.setStyle(Paint.Style.FILL);
-        c.drawCircle(cx, cy - 6.5f * scale, 2.4f * scale, p);
-        c.drawCircle(cx - 6.5f * scale, cy + 1f * scale, 2.1f * scale, p);
-        c.drawCircle(cx + 6.5f * scale, cy + 1f * scale, 2.1f * scale, p);
+        c.drawCircle(cx, cy - g + cup, cup, p);
+        c.drawCircle(cx - arm, cy + g * 0.10f, cup * 0.88f, p);
+        c.drawCircle(cx + arm, cy + g * 0.10f, cup * 0.88f, p);
     }
 
     /** The readings over the station's name, in the pill the rest of the plugin uses. */
-    private void pill(Canvas c, Paint p, int w, int cy, int reach, int pillW, int pillH,
+    private void pill(Canvas c, Paint p, float pillCx, float pillCy, int pillW, int pillH,
             String readings, String title, Paint big, Paint small,
             Paint.FontMetricsInt bm, Paint.FontMetricsInt sm) {
-        final float left = (w - pillW) / 2f;
-        final float top = cy + reach + GAP;
+        if (pillW <= 0)
+            return;
+        final float left = pillCx - pillW / 2f;
+        final float top = pillCy - pillH / 2f;
         p.setStyle(Paint.Style.FILL);
         p.setColor(LABEL_BG);
         c.drawRoundRect(new RectF(left, top, left + pillW, top + pillH),
                 RADIUS, RADIUS, p);
-        c.drawText(readings, left + PAD_X, top + PAD_Y - bm.ascent, big);
+        // Both lines centered on the pill: the name is shorter than the readings
+        // almost always, and left-aligned under them it reads as a stray caption.
+        c.drawText(readings, pillCx - big.measureText(readings) / 2f,
+                top + PAD_Y - bm.ascent, big);
         if (!title.isEmpty())
-            c.drawText(title, left + PAD_X,
+            c.drawText(title, pillCx - small.measureText(title) / 2f,
                     top + PAD_Y + (bm.descent - bm.ascent) - sm.ascent, small);
     }
 }
