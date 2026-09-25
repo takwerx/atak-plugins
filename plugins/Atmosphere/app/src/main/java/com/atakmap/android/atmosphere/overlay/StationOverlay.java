@@ -276,15 +276,16 @@ public final class StationOverlay {
             final int color = color(level);
             if (level == RedFlag.CRITICAL)
                 critical++;
-            final String uri = icons.uri(speed(s.windMph, system), s.relativeHumidity,
+            final StationIcons.Composed icon = icons.compose(s.name,
+                    speed(s.windMph, system), speedUnit(), s.relativeHumidity,
                     s.windFromDeg, color);
-            if (uri == null)
+            if (icon == null)
                 continue;
             // The set is the state, so Overlay Manager can show the stations at
             // criteria on their own and ATAK's own switches work on one at a time.
             drawn.add(new AtmosphereFeatures.Drawn(StationIcons.stateLabel(color), s.name,
                     AtmosphereFeatures.point(s.latitude, s.longitude),
-                    AtmosphereFeatures.icon(uri, StationIcons.size(), StationIcons.size()),
+                    AtmosphereFeatures.icon(icon.uri, icon.width, icon.height),
                     attrs(s, color, now, system)));
         }
         if (mine != generation || !on)
