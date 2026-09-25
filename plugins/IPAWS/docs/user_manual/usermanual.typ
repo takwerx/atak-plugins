@@ -106,8 +106,8 @@ and one tick, and everything else carries on as it was.
 CAP severity, as the issuing office set it: Extreme, Severe, Moderate, Minor,
 Unknown.
 
-A new install starts at Extreme and Severe. Widen it when you want the whole
-picture and narrow it when the map is busy.
+A new install shows all of them. Toggle off what you do not want - the usual
+move is to drop Minor and Unknown once the map gets busy.
 
 Severity is also the colour on the map and the bar down the side of each row in
 the list, so it reads before the words do:

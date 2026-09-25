@@ -58,18 +58,30 @@ public class Filter {
     public final Set<String> notifySeverities = new LinkedHashSet<>();
 
     /**
-     * A fresh install: the state the phone is in, at Extreme and Severe.
+     * A fresh install: the state the phone is in, every severity showing.
      *
      * <p>The state is not known here -- it is resolved once from the self marker when
      * the plugin starts, so this leaves it empty and the pane says "Choose states"
      * until either that lookup lands or the operator picks. A phone with no position
      * therefore shows nothing rather than guessing a state, which is the right way
      * round: an empty map that says so beats a map full of another state's weather.
+     *
+     * <p>Severity starts wide, on the operator's instruction: "it should start with
+     * all severities on then you can toggle off what you dont want". Starting at
+     * Extreme and Severe meant a new install often showed an empty map -- California
+     * had nothing at either level the day this changed -- and an empty map is a poor
+     * way to learn what a tool does. Showing everything and letting the operator trim
+     * is the right direction to be wrong in.
+     *
+     * <p>Empty means every severity and sends no severity parameter at all, which is
+     * also the shape that cannot trip the enum's case-sensitivity.
+     *
+     * <p>Notifications are untouched by this: they stay OFF, and when switched on they
+     * still offer Extreme and Severe. Showing an alert on a map and chiming about it
+     * are different questions.
      */
     public static Filter defaults() {
         final Filter f = new Filter();
-        f.severities.add("Extreme");
-        f.severities.add("Severe");
         f.notifySeverities.add("Extreme");
         f.notifySeverities.add("Severe");
         return f;
