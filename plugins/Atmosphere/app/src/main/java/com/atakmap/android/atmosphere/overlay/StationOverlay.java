@@ -58,6 +58,8 @@ public final class StationOverlay {
     private static final String PREF_MILES = "weather.layer.stations.miles";
     private static final String PREF_FROM_ME = "weather.layer.stations.fromme";
     private static final String PREF_LABELS = "weather.layer.stations.labels";
+    private static final String PREF_GATE_STATIONS = "weather.layer.stations.gate";
+    private static final String PREF_GATE_LABELS = "weather.layer.stations.labelgate";
     private static final String PREF_UNITS = "weather.units";
 
     /** RAWS report hourly, so there is nothing to gain from asking more often. */
@@ -82,9 +84,22 @@ public final class StationOverlay {
      * <p>Past {@link #STATION_GSD} nothing is drawn at all: at a state-wide view a
      * hundred stations is a wall of symbols with no map left under it.
      */
-    private static final double STATION_GSD = 600d;
-    private static final double LABEL_GSD = 90d;
+    private static final double ALWAYS = 100_000d;
     private static final double FINEST = 0d;
+
+    /**
+     * What the gate rows offer, as <b>how wide the map is on screen</b>, in miles.
+     * Zero is "always".
+     *
+     * <p>Said that way because that is the number already on the operator's screen:
+     * the scale bar. A gate in meters per pixel is the same fact in a unit nobody
+     * reads off a map. The resolution is worked out from the live map width, so the
+     * label on the button is true on whatever screen it is running on.
+     */
+    public static final int[] STATION_GATES = { 10, 50, 150, 0 };
+    public static final int[] LABEL_GATES = { 2, 10, 30, 0 };
+    private static final int DEFAULT_STATION_GATE = 150;
+    private static final int DEFAULT_LABEL_GATE = 10;
 
     /** How long the map must sit still before a band change is acted on. */
     private static final long SETTLE_MS = 400L;
@@ -108,6 +123,7 @@ public final class StationOverlay {
     private long lastPoll;
     private int miles;
     private boolean fromMe, labels;
+    private int stationGate, labelGate;
     /** Whether the pills are on the icons as drawn right now. */
     private boolean labelsWanted;
     private List<Raws.Station> stations = new ArrayList<>();
@@ -130,6 +146,53 @@ public final class StationOverlay {
         miles = p == null ? DEFAULT_MILES : p.getInt(PREF_MILES, DEFAULT_MILES);
         fromMe = p == null || p.getBoolean(PREF_FROM_ME, true);
         labels = p == null || p.getBoolean(PREF_LABELS, true);
+        stationGate = p == null ? DEFAULT_STATION_GATE
+                : p.getInt(PREF_GATE_STATIONS, DEFAULT_STATION_GATE);
+        labelGate = p == null ? DEFAULT_LABEL_GATE
+                : p.getInt(PREF_GATE_LABELS, DEFAULT_LABEL_GATE);
+    }
+
+    /** How wide the map may be, in miles, and still draw the stations. 0 is always. */
+    public int stationGate() {
+        return stationGate;
+    }
+
+    /** The same for the readings and names beside them. */
+    public int labelGate() {
+        return labelGate;
+    }
+
+    public void setStationGate(int milesAcross) {
+        if (stationGate == milesAcross)
+            return;
+        stationGate = milesAcross;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putInt(PREF_GATE_STATIONS, milesAcross).apply();
+        redraw();               // the gate lives on the feature set, so rewrite it
+    }
+
+    public void setLabelGate(int milesAcross) {
+        if (labelGate == milesAcross)
+            return;
+        labelGate = milesAcross;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putInt(PREF_GATE_LABELS, milesAcross).apply();
+        applyLabelBand();
+    }
+
+    /**
+     * A gate expressed as the map's width in miles, in meters per pixel.
+     *
+     * <p>Worked out from the live map width so the button's label is true: "under 10
+     * miles" has to mean ten miles on this screen, not on the one it was tuned on.
+     */
+    private double gsdFor(int milesAcross) {
+        if (milesAcross <= 0)
+            return ALWAYS;
+        final int px = Math.max(320, mapView.getWidth());
+        return milesAcross * 1609.344 / px;
     }
 
     /** Whether the readings and name are drawn beside each station. */
@@ -161,7 +224,8 @@ public final class StationOverlay {
      * the zoom decides which.
      */
     private void applyLabelBand() {
-        final boolean wanted = labels && mapView.getMapResolution() <= LABEL_GSD;
+        final boolean wanted = labels
+                && mapView.getMapResolution() <= gsdFor(labelGate);
         if (wanted == labelsWanted)
             return;
         labelsWanted = wanted;
@@ -207,7 +271,7 @@ public final class StationOverlay {
     public void start() {
         started = true;
         features.attach();
-        labelsWanted = labels && mapView.getMapResolution() <= LABEL_GSD;
+        labelsWanted = labels && mapView.getMapResolution() <= gsdFor(labelGate);
         mapView.addOnMapMovedListener(moved);
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
@@ -362,6 +426,7 @@ public final class StationOverlay {
         final long now = System.currentTimeMillis();
         final UnitSystem system = units();
         final boolean withLabels = labelsWanted;
+        final double gate = gsdFor(stationGate);
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         int critical = 0;
         for (Raws.Station s : held) {
@@ -383,7 +448,7 @@ public final class StationOverlay {
             // The set is the state, so Overlay Manager can show the stations at
             // criteria on their own and ATAK's own switches work on one at a time.
             add(drawn, s, StationIcons.stateLabel(color), a, color, system, withLabels,
-                    STATION_GSD, FINEST);
+                    gate, FINEST);
         }
         if (mine != generation || !on)
             return;

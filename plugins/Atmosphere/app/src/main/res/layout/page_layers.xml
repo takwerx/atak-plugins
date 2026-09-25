@@ -31,6 +31,34 @@
             android:paddingTop="8dp"
             android:alpha="0.6" />
 
+        <!-- Everything at once. "All off" is the one a crew actually reaches for:
+             the map has filled up and they want it back. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/layers_all_on"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="4dp"
+                android:textSize="13sp"
+                android:text="@string/layers_all_on" />
+
+            <Button
+                android:id="@+id/layers_all_off"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:text="@string/layers_all_off" />
+        </LinearLayout>
+
         <!-- One layer per row, full width, so the list grows downward as layers
              land rather than squeezing more buttons across. Each layer's own
              controls sit under its toggle: wind's speed legend here, radar's
@@ -627,6 +655,36 @@
 
                 <LinearLayout
                     android:id="@+id/stations_distance_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/stations_gate_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/stations_gate_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/stations_label_gate_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/stations_label_gate_row"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal" />

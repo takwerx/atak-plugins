@@ -226,6 +226,7 @@ public final class AtmospherePane {
     private ImageButton stationsExpand;
     private View stationsSettings;
     private LinearLayout stationsOriginRow, stationsDistanceRow, stationsLegend;
+    private LinearLayout stationsGateRow, stationsLabelGateRow;
     private Button stationsLabels, stationsGuideToggle;
     private ImageButton stationsGuideExpand;
     private LinearLayout stationsGuide;
@@ -392,6 +393,8 @@ public final class AtmospherePane {
         stationsOriginRow = find(R.id.stations_origin_row);
         stationsDistanceRow = find(R.id.stations_distance_row);
         stationsLegend = find(R.id.stations_legend);
+        stationsGateRow = find(R.id.stations_gate_row);
+        stationsLabelGateRow = find(R.id.stations_label_gate_row);
         stationsLabels = find(R.id.stations_labels);
         stationsGuide = find(R.id.stations_guide);
         stationsGuideToggle = find(R.id.stations_guide_toggle);
@@ -470,6 +473,18 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         };
+        ((Button) find(R.id.layers_all_off)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                allLayers(false);
+            }
+        });
+        ((Button) find(R.id.layers_all_on)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                allLayers(true);
+            }
+        });
         stationsGuideToggle.setOnClickListener(guide);
         stationsGuideExpand.setOnClickListener(guide);
         stationsGuideOpen = prefs != null && prefs.getBoolean(PREF_STATIONS_GUIDE_OPEN, false);
@@ -1646,6 +1661,94 @@ public final class AtmospherePane {
                     }));
     }
 
+    /**
+     * Every layer at once.
+     *
+     * <p>Off is unconditional. <b>On only turns on the layers whose server the
+     * operator has already allowed</b>: each of these asks once, by name, before it
+     * talks to anything, and a button that quietly said yes on behalf of all of them
+     * would be a way around that rather than a convenience. The ones still waiting
+     * on an answer stay off and are counted, so nothing happens silently.
+     */
+    private void allLayers(boolean on) {
+        int blocked = 0;
+        if (radar != null && on == allowed(RadarOverlay.LAYER_ID))
+            radar.setOn(on);
+        else if (radar != null && on)
+            blocked++;
+        if (wind != null && on == allowed(WindOverlay.LAYER_ID))
+            wind.setOn(on);
+        else if (wind != null && on)
+            blocked++;
+        if (smoke != null && on == allowed(SmokeOverlay.LAYER_ID))
+            smoke.setOn(on);
+        else if (smoke != null && on)
+            blocked++;
+        if (air != null && on == allowed(AirQualityOverlay.LAYER_ID))
+            air.setOn(on);
+        else if (air != null && on)
+            blocked++;
+        if (warnings != null && on == allowed(WarningsOverlay.LAYER_ID))
+            warnings.setOn(on);
+        else if (warnings != null && on)
+            blocked++;
+        if (spotLayer != null && on == allowed(SpotOverlay.LAYER_ID))
+            spotLayer.setOn(on);
+        else if (spotLayer != null && on)
+            blocked++;
+        if (tropical != null && on == allowed(TropicalOverlay.LAYER_ID))
+            tropical.setOn(on);
+        else if (tropical != null && on)
+            blocked++;
+        if (stationLayer != null && on == allowed(StationOverlay.LAYER_ID))
+            stationLayer.setOn(on);
+        else if (stationLayer != null && on)
+            blocked++;
+        final Context ctx = MapCompat.atakContext();
+        if (blocked > 0 && ctx != null)
+            Toast.makeText(ctx, blocked + (blocked == 1 ? " layer is" : " layers are")
+                    + " still waiting to be allowed \u2014 turn those on one at a time",
+                    Toast.LENGTH_LONG).show();
+        updateLayerControls();
+    }
+
+    /** True when the operator has already allowed that layer's server, or off is asked. */
+    private boolean allowed(String layerId) {
+        return egress.isLayerEnabled(layerId);
+    }
+
+    /**
+     * When the stations draw, and when their readings do -- each as how wide the map
+     * is on screen, which is the number already on the scale bar.
+     */
+    private void buildStationsGateRows() {
+        stationsGateRow.removeAllViews();
+        for (final int miles : StationOverlay.STATION_GATES)
+            stationsGateRow.addView(choiceTile(gateLabel(miles),
+                    miles == stationLayer.stationGate(), new Runnable() {
+                        @Override
+                        public void run() {
+                            stationLayer.setStationGate(miles);
+                            updateLayerControls();
+                        }
+                    }));
+        stationsLabelGateRow.removeAllViews();
+        for (final int miles : StationOverlay.LABEL_GATES)
+            stationsLabelGateRow.addView(choiceTile(gateLabel(miles),
+                    miles == stationLayer.labelGate(), new Runnable() {
+                        @Override
+                        public void run() {
+                            stationLayer.setLabelGate(miles);
+                            updateLayerControls();
+                        }
+                    }));
+    }
+
+    private String gateLabel(int miles) {
+        return miles <= 0 ? pluginContext.getString(R.string.stations_always)
+                : miles + " mi";
+    }
+
     /** One tile of a row of choices: the chosen one green, the Traffic convention. */
     private View choiceTile(String label, boolean chosen, final Runnable onPick) {
         final Button b = (Button) LayoutInflater.from(pluginContext)
@@ -1708,13 +1811,22 @@ public final class AtmospherePane {
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
         row.setPadding(0, dp(4), 0, dp(4));
         final ImageView art = new ImageView(pluginContext);
-        art.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(40)));
-        art.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        art.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        // Drawn at the size the map draws it, pixel for pixel. Squeezed into a fixed
+        // box it was a smudge, which is no use in a guide whose whole job is to let
+        // you count feathers (operator, 2026-09-25).
+        art.setScaleType(ImageView.ScaleType.CENTER);
         if (uri != null) {
             final android.graphics.Bitmap bmp = android.graphics.BitmapFactory
                     .decodeFile(uri.replace("file://", ""));
-            if (bmp != null)
+            if (bmp != null) {
+                // The file has no density of its own; without this Android rescales
+                // it by the screen's, and the guide stops matching the map.
+                bmp.setDensity(android.graphics.Bitmap.DENSITY_NONE);
                 art.setImageBitmap(bmp);
+            }
         }
         row.addView(art);
         final TextView t = new TextView(pluginContext);
@@ -2015,6 +2127,7 @@ public final class AtmospherePane {
                     withLabels ? R.color.state_on : R.color.state_off));
             buildStationsOriginRow();
             buildStationsDistanceRow();
+            buildStationsGateRows();
             buildStationsLegend();
             stationsGuideExpand.setRotation(stationsGuideOpen ? 180f : 0f);
             stationsGuide.setVisibility(stationsGuideOpen ? View.VISIBLE : View.GONE);
