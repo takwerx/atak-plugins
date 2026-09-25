@@ -113,11 +113,8 @@ public class IpawsPane {
         allButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final Filter f = manager.getFilter();
-                f.mapOn = !f.mapOn;
-                manager.saveFilter();
+                manager.setMapOn(!manager.getFilter().mapOn);
                 refresh();
-                manager.reapplyFilter();
             }
         });
         keyButton = header.findViewById(R.id.btn_map_key);

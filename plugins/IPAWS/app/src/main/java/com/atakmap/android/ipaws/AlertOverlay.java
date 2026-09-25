@@ -50,6 +50,23 @@ public class AlertOverlay {
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
     private int count;
+    /** All ON / All OFF. Read by every set this writes, so a rewrite cannot undo it. */
+    private volatile boolean visible = true;
+    /**
+     * Its own thread, not the rebuild worker: a set-visibility write waits for a
+     * rewrite in progress (eleven seconds at national scale) and must not also wait
+     * for the rebuilds queued behind it, or the labels outlive the switch by minutes.
+     */
+    private final java.util.concurrent.ExecutorService visibility =
+            java.util.concurrent.Executors.newSingleThreadExecutor(
+                    new java.util.concurrent.ThreadFactory() {
+                        @Override
+                        public Thread newThread(Runnable r) {
+                            final Thread t = new Thread(r, "ipaws-visibility");
+                            t.setDaemon(true);
+                            return t;
+                        }
+                    });
 
     /** One thing to draw: an alert's area, or a point when no area could be resolved. */
     public static class Drawn {
@@ -192,6 +209,10 @@ public class AlertOverlay {
                         }
 
                         private java.util.SortedSet<MapItem> dedupe(java.util.SortedSet<MapItem> hits) {
+                            // All OFF keeps the features, so a tap must not find them,
+                            // including in the moment before the store has caught up.
+                            if (!visible && hits != null)
+                                return new java.util.TreeSet<>(hits.comparator());
                             if (hits == null || hits.isEmpty())
                                 return hits;
                             final java.util.Set<String> seen = new java.util.HashSet<>();
@@ -250,6 +271,52 @@ public class AlertOverlay {
             overlay = null;
             store = null;
         }
+    }
+
+    /**
+     * All ON / All OFF: shows or hides every alert at once, and keeps the features.
+     *
+     * <p>The sets are what really switch: the store marks them hidden, and the
+     * visibleOnly renderer (see {@link #attach}) re-reads and drops them, labels
+     * included. That write waits for any rewrite in progress -- eleven seconds at
+     * national scale -- so it runs on a thread of its own.
+     *
+     * <p>Off also hides the whole layer at once, so the areas go on the next frame
+     * however busy the store is. That alone is not enough, measured on s10-dev-1:
+     * a hidden layer is not re-read, so ATAK kept drawing its labels over an empty
+     * map indefinitely. Once the store has caught up, the layer is shown again; the
+     * renderer re-reads it, finds nothing visible, and the labels go with it.
+     */
+    public void setVisible(final boolean on) {
+        visible = on;
+        final FeatureLayer3 l = layer;
+        if (!on && l != null)
+            l.setVisible(false);
+        visibility.execute(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock) {
+                    if (store == null)
+                        return;
+                    try {
+                        // The latest wish, not the one this task was queued with: two
+                        // quick taps must end where the button says.
+                        store.setFeatureSetsVisible(
+                                new FeatureDataStore2.FeatureSetQueryParameters(), visible);
+                    } catch (Exception e) {
+                        Log.w(TAG, "set visibility failed", e);
+                    }
+                }
+                com.atakmap.android.ipaws.data.MainThread.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        final FeatureLayer3 shown = layer;
+                        if (shown != null)
+                            shown.setVisible(true);
+                    }
+                });
+            }
+        });
     }
 
     public FeatureDataStore2 getStore() {
@@ -331,7 +398,7 @@ public class AlertOverlay {
         // map stays empty.
         final long id = store.insertFeatureSet(
                 new FeatureSet("IPAWS", "alerts", name, Double.MAX_VALUE, 0d));
-        store.setFeatureSetVisible(id, true);
+        store.setFeatureSetVisible(id, visible);
         return id;
     }
 

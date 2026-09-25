@@ -155,8 +155,24 @@ public class AlertManager {
      */
     public List<String> mapKey() {
         synchronized (this) {
-            return new ArrayList<>(mapKey);
+            // All OFF: nothing is on the map, so there is nothing to explain.
+            return filter.mapOn ? new ArrayList<>(mapKey) : new ArrayList<String>();
         }
+    }
+
+    /**
+     * All ON / All OFF. Instant, on the main thread: it hides or shows the layer and
+     * touches nothing else. The first version emptied the store instead and waited
+     * for a rebuild, which at national scale is eleven seconds behind the rebuilds
+     * already queued -- so nothing happened when it was tapped, a second tap turned
+     * it back on before the first had landed, and the operator reported it as not
+     * working at all.
+     */
+    public void setMapOn(boolean on) {
+        filter.mapOn = on;
+        saveFilter();
+        overlay.setVisible(on);
+        changed();
     }
 
     /** The current picture, most severe first. A copy: the poll rewrites the original. */
@@ -198,6 +214,7 @@ public class AlertManager {
         started = true;
         try {
             overlay.attach();
+            overlay.setVisible(filter.mapOn);
         } catch (Exception e) {
             Log.e(TAG, "could not attach the overlay", e);
         }
@@ -330,11 +347,7 @@ public class AlertManager {
                 }
                 if (!haveAnything) {
                     // Nothing has come back yet, so there is nothing to re-filter and
-                    // the overlay must not be emptied on the strength of it -- unless
-                    // the operator asked for exactly that with All OFF, which has to
-                    // clear last session's shapes before the first poll is back.
-                    if (!filter.mapOn)
-                        overlay.rewrite(new ArrayList<AlertOverlay.Drawn>());
+                    // the overlay must not be emptied on the strength of it.
                     changed();
                     return;
                 }
@@ -423,17 +436,16 @@ public class AlertManager {
         }
 
         Collections.sort(kept, BY_SEVERITY_THEN_SOONEST);
-        // All OFF draws nothing and keys nothing. Everything above still ran: the list,
-        // the county test and the zone chase do not depend on the map being on.
-        final boolean mapOn = filter.mapOn;
-        final List<String> key = mapOn ? new ArrayList<>(onMap) : new ArrayList<String>();
+        final List<String> key = new ArrayList<>(onMap);
         Collections.sort(key, BY_NWS_PRIORITY);
         synchronized (this) {
             alerts = kept;
             mapKey = key;
         }
         announce(current, kept);
-        overlay.rewrite(mapOn ? drawn : new ArrayList<AlertOverlay.Drawn>());
+        // Written whether or not the map is on: All OFF hides the layer, it does not
+        // empty it, so All ON shows the current picture the moment it is tapped.
+        overlay.rewrite(drawn);
         zonesPending = missing.size();
         this.undrawable = undrawable;
         changed();

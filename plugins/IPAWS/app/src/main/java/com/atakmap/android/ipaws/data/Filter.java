@@ -58,8 +58,8 @@ public class Filter {
     public final Set<String> notifySeverities = new LinkedHashSet<>();
     /**
      * All ON / All OFF, Feature Layer's switch: off takes every alert off the map and
-     * leaves the rest running -- the list, the poll, notifications -- so switching it
-     * back on is instant and needs no request.
+     * leaves the rest running -- the list, the poll, notifications -- and the layer is
+     * hidden rather than emptied, so switching it back on is instant.
      */
     public boolean mapOn = true;
 
