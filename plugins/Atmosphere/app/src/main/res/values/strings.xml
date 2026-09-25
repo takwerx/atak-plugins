@@ -24,6 +24,7 @@
     <string name="go_to">Go to</string>
     <string name="spot_layer_on">Spot forecasts ON</string>
     <string name="spot_layer_off">Spot forecasts OFF</string>
+    <string name="stations_guide">Reading a station</string>
     <string name="stations_allow_title">Show weather stations?</string>
     <string name="stations_allow_text">Atmosphere will ask the National Interagency Fire Center for the fire weather stations around you and what they are reading.\n\nUnlike the other layers, this one sends a position: the point you measure from, rounded as far as your precision setting says. Switch it to Map center if you would rather it never send where you are.\n\nServer: services3.arcgis.com</string>
     <string name="stations_on">Weather stations ON</string>

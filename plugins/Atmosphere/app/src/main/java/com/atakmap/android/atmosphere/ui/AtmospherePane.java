@@ -15,6 +15,7 @@ import android.view.ViewParent;
 import android.widget.HorizontalScrollView;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -100,6 +101,7 @@ public final class AtmospherePane {
     private static final String PREF_AIR_OPEN = "weather.air.open";
     private static final String PREF_WARN_OPEN = "weather.warn.open";
     private static final String PREF_STATIONS_OPEN = "weather.layers.stations.open";
+    private static final String PREF_STATIONS_GUIDE_OPEN = "weather.layers.stations.guide";
     private static final String PREF_SPOT_OPEN = "weather.spotlayer.open";
 
     private final View root;
@@ -224,7 +226,10 @@ public final class AtmospherePane {
     private ImageButton stationsExpand;
     private View stationsSettings;
     private LinearLayout stationsOriginRow, stationsDistanceRow, stationsLegend;
-    private Button stationsLabels;
+    private Button stationsLabels, stationsGuideToggle;
+    private ImageButton stationsGuideExpand;
+    private LinearLayout stationsGuide;
+    private boolean stationsGuideOpen;
     private boolean stationsOpen;
     private boolean spotOpen = true;
     private final LinearLayout warnSettings;
@@ -388,6 +393,9 @@ public final class AtmospherePane {
         stationsDistanceRow = find(R.id.stations_distance_row);
         stationsLegend = find(R.id.stations_legend);
         stationsLabels = find(R.id.stations_labels);
+        stationsGuide = find(R.id.stations_guide);
+        stationsGuideToggle = find(R.id.stations_guide_toggle);
+        stationsGuideExpand = find(R.id.stations_guide_expand);
         spotLegend = find(R.id.spot_legend);
         spotSettings = find(R.id.spot_settings);
         warnSettings = find(R.id.warn_settings);
@@ -454,6 +462,17 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        final View.OnClickListener guide = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                stationsGuideOpen = !stationsGuideOpen;
+                rememberFold(PREF_STATIONS_GUIDE_OPEN, stationsGuideOpen);
+                updateLayerControls();
+            }
+        };
+        stationsGuideToggle.setOnClickListener(guide);
+        stationsGuideExpand.setOnClickListener(guide);
+        stationsGuideOpen = prefs != null && prefs.getBoolean(PREF_STATIONS_GUIDE_OPEN, false);
         stationsLabels.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1649,7 +1668,87 @@ public final class AtmospherePane {
         return b;
     }
 
-    /** What the diamond's color means, from the map's own palette. */
+    /**
+     * How to read a station: the barb's own feathers at real speeds, then what the
+     * three colors mean.
+     *
+     * <p>The examples are composed by the same code that draws the map, so the guide
+     * cannot drift from what is on it. A legend redrawn by hand is a legend that is
+     * eventually wrong.
+     */
+    private void buildStationsGuide() {
+        if (stationsGuide.getChildCount() > 0 || stationLayer == null)
+            return;
+        stationsGuide.addView(guideNote(
+                "The staff points at where the wind is coming from."));
+        final double[] examples = { 5, 10, 15, 25, 50, 65 };
+        final String[] what = { "short feather", "long feather", "long and short",
+                "two long, one short", "triangle", "triangle, long and short" };
+        for (int i = 0; i < examples.length; i++)
+            stationsGuide.addView(guideRow(stationLayer.exampleBarb(examples[i]),
+                    stationLayer.exampleSpeed(examples[i]), what[i]));
+        stationsGuide.addView(guideNote("No staff at all means calm."));
+        stationsGuide.addView(guideNote(
+                "Feathers are counted in knots, the way every station plot does it. "
+                        + "The numbers beside a station are in your own unit."));
+
+        stationsGuide.addView(guideHeading("What the color means"));
+        stationsGuide.addView(guideRow(stationLayer.exampleSymbol(StationOverlay.NORMAL),
+                "Below criteria", "neither humidity nor wind is there"));
+        stationsGuide.addView(guideRow(stationLayer.exampleSymbol(StationOverlay.NEAR),
+                "Flirting", "one of the two criteria is met"));
+        stationsGuide.addView(guideRow(stationLayer.exampleSymbol(StationOverlay.CRITICAL),
+                "Red Flag", "both are met at once"));
+    }
+
+    /** One guide row: the real symbol on the left, what it means on the right. */
+    private View guideRow(String uri, String title, String detail) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(4), 0, dp(4));
+        final ImageView art = new ImageView(pluginContext);
+        art.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(40)));
+        art.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        if (uri != null) {
+            final android.graphics.Bitmap bmp = android.graphics.BitmapFactory
+                    .decodeFile(uri.replace("file://", ""));
+            if (bmp != null)
+                art.setImageBitmap(bmp);
+        }
+        row.addView(art);
+        final TextView t = new TextView(pluginContext);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(13);
+        t.setPadding(dp(8), 0, 0, 0);
+        t.setText(detail == null || detail.isEmpty() ? title : title + " \u2014 " + detail);
+        row.addView(t);
+        return row;
+    }
+
+    /** A small caps heading inside the guide, the pane's own convention. */
+    private View guideHeading(String text) {
+        final TextView t = new TextView(pluginContext);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(10);
+        t.setAllCaps(true);
+        t.setAlpha(0.6f);
+        t.setPadding(0, dp(10), 0, dp(2));
+        t.setText(text);
+        return t;
+    }
+
+    private View guideNote(String text) {
+        final TextView t = new TextView(pluginContext);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(12);
+        t.setAlpha(0.75f);
+        t.setPadding(0, dp(4), 0, dp(2));
+        t.setText(text);
+        return t;
+    }
+
+    /** What the symbol's color means, from the map's own palette. */
     private void buildStationsLegend() {
         if (stationsLegend.getChildCount() > 0)
             return;
@@ -1917,6 +2016,10 @@ public final class AtmospherePane {
             buildStationsOriginRow();
             buildStationsDistanceRow();
             buildStationsLegend();
+            stationsGuideExpand.setRotation(stationsGuideOpen ? 180f : 0f);
+            stationsGuide.setVisibility(stationsGuideOpen ? View.VISIBLE : View.GONE);
+            if (stationsGuideOpen)
+                buildStationsGuide();
             stationsBasis.setText(RedFlag.basis());
         }
 

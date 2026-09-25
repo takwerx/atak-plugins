@@ -640,6 +640,39 @@
                     android:gravity="center_vertical|left"
                     android:textSize="13sp" />
 
+                <!-- The guide, folded away: it is read once and then never again. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/stations_guide_toggle"
+                        style="@style/TakwerxButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical|left"
+                        android:textSize="13sp"
+                        android:text="@string/stations_guide" />
+
+                    <ImageButton
+                        android:id="@+id/stations_guide_expand"
+                        style="@style/TakwerxIconButton"
+                        android:layout_width="44dp"
+                        android:layout_weight="0"
+                        android:contentDescription="@string/show_settings"
+                        android:src="@drawable/ic_expand" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/stations_guide"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

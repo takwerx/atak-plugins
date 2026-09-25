@@ -86,6 +86,9 @@ public final class StationOverlay {
     private static final double LABEL_GSD = 90d;
     private static final double FINEST = 0d;
 
+    /** How long the map must sit still before a band change is acted on. */
+    private static final long SETTLE_MS = 400L;
+
     public interface Listener {
         void onStationsStatus(String message);
 
@@ -105,6 +108,8 @@ public final class StationOverlay {
     private long lastPoll;
     private int miles;
     private boolean fromMe, labels;
+    /** Whether the pills are on the icons as drawn right now. */
+    private boolean labelsWanted;
     private List<Raws.Station> stations = new ArrayList<>();
 
     private final Runnable autoPoll = new Runnable() {
@@ -140,8 +145,47 @@ public final class StationOverlay {
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
             p.edit().putBoolean(PREF_LABELS, value).apply();
+        applyLabelBand();
+    }
+
+    /**
+     * Put the pills on or take them off, if the zoom has crossed the line.
+     *
+     * <p>Two feature sets in complementary zoom bands would be the cheap way to do
+     * this -- ATAK would gate them itself and nothing would have to watch the map.
+     * It was written that way and it put <b>two features on every station</b>: the
+     * resolution gate decides what is <i>drawn</i>, not what is <i>hit</i>, so a tap
+     * found both copies and ATAK offered a Select Item chooser with the same station
+     * twice (operator, 2026-09-25: "i clicked on a station, two things are coming
+     * up"). One station is one feature, so the label has to be baked in or not, and
+     * the zoom decides which.
+     */
+    private void applyLabelBand() {
+        final boolean wanted = labels && mapView.getMapResolution() <= LABEL_GSD;
+        if (wanted == labelsWanted)
+            return;
+        labelsWanted = wanted;
         redraw();
     }
+
+    /** Coalesced: a pinch is hundreds of callbacks and each redraw is a DB write. */
+    private final Runnable bandSettled = new Runnable() {
+        @Override
+        public void run() {
+            if (on)
+                applyLabelBand();
+        }
+    };
+
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener moved =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView v, boolean animate) {
+                    // GL thread. Nothing is touched here but the callback queue.
+                    mapView.removeCallbacks(bandSettled);
+                    mapView.postDelayed(bandSettled, SETTLE_MS);
+                }
+            };
 
     /** Rebuild the map from the stations already held. */
     private void redraw() {
@@ -163,6 +207,8 @@ public final class StationOverlay {
     public void start() {
         started = true;
         features.attach();
+        labelsWanted = labels && mapView.getMapResolution() <= LABEL_GSD;
+        mapView.addOnMapMovedListener(moved);
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
             setOn(true);
@@ -173,6 +219,8 @@ public final class StationOverlay {
         on = false;
         generation++;
         mapView.removeCallbacks(autoPoll);
+        mapView.removeCallbacks(bandSettled);
+        mapView.removeOnMapMovedListener(moved);
         worker.shutdownNow();
         features.detach();
     }
@@ -313,6 +361,7 @@ public final class StationOverlay {
         final List<Raws.Station> held = stations;
         final long now = System.currentTimeMillis();
         final UnitSystem system = units();
+        final boolean withLabels = labelsWanted;
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         int critical = 0;
         for (Raws.Station s : held) {
@@ -333,15 +382,8 @@ public final class StationOverlay {
             final AttributeSet a = attrs(s, color, now, system);
             // The set is the state, so Overlay Manager can show the stations at
             // criteria on their own and ATAK's own switches work on one at a time.
-            final String set = StationIcons.stateLabel(color);
-            // Bare, for the wide view -- and for the whole range when labels are off.
-            add(drawn, s, set, a, color, system, false,
-                    STATION_GSD, labels ? LABEL_GSD : FINEST);
-            if (labels)
-                // The same station again, carrying its pill, for the close view. The
-                // two bands meet, so only ever one of them is on screen.
-                add(drawn, s, set + " \u00b7 labelled", a, color, system, true,
-                        LABEL_GSD, FINEST);
+            add(drawn, s, StationIcons.stateLabel(color), a, color, system, withLabels,
+                    STATION_GSD, FINEST);
         }
         if (mine != generation || !on)
             return;
@@ -392,6 +434,37 @@ public final class StationOverlay {
     /** Miles per hour as knots, for the barb's feathers. */
     private static double knots(double mph) {
         return Double.isNaN(mph) ? Double.NaN : mph / 1.15078;
+    }
+
+    /**
+     * A bare example barb at a given speed, for the guide under the layer.
+     *
+     * <p>Drawn by the same composer the map uses, so the guide can never drift from
+     * what is on the map -- a legend that is redrawn by hand is a legend that is
+     * eventually wrong.
+     *
+     * @return a {@code file://} uri, or null if it could not be composed
+     */
+    public String exampleBarb(double knots) {
+        final StationIcons.Composed c = icons.compose(null, Double.NaN, Double.NaN, "",
+                Double.NaN, 270, knots, StationIcons.NORMAL, false);
+        return c == null ? null : c.uri;
+    }
+
+    /** An example station symbol in one of the three states, for the guide. */
+    public String exampleSymbol(int stateColor) {
+        final StationIcons.Composed c = icons.compose(null, Double.NaN, Double.NaN, "",
+                Double.NaN, Double.NaN, Double.NaN, stateColor, false);
+        return c == null ? null : c.uri;
+    }
+
+    /** What the speed of an example barb reads as, in the operator's unit. */
+    public String exampleSpeed(double knots) {
+        final UnitSystem system = units();
+        final int shown = (int) Math.round(Units.toDisplay(Quantity.SPEED,
+                knots * 0.514444, system));
+        return Math.round(knots) + " kt" + (system == UnitSystem.AVIATION ? ""
+                : "  (" + shown + " " + Units.displayUnit(Quantity.SPEED, system) + ")");
     }
 
     /** The speed printed on the icon, in whatever unit the rest of the plugin shows. */

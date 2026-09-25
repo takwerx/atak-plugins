@@ -30,10 +30,6 @@ public final class RedFlag {
     /** Sustained wind at or above this, with the humidity, is critical. Miles per hour. */
     public static final double WIND_CRITICAL = 25.0;
 
-    /** Within reach: not there, but close enough to watch. */
-    public static final double RH_NEAR = 20.0;
-    public static final double WIND_NEAR = 20.0;
-
     /** Below anything worth coloring. */
     public static final int BELOW = 0;
     /** Meeting one of the two, or close to both. */
@@ -42,32 +38,28 @@ public final class RedFlag {
     public static final int CRITICAL = 2;
 
     /**
-     * The state of one reading.
+     * The state of one reading: red when every criterion is met, yellow when one of
+     * them already is, and nothing when neither.
      *
-     * <p>A missing value never makes a station critical: a station that did not send a
-     * humidity is not a dry station, and coloring it red because its wind alone is up
-     * would put a red diamond on the map with nothing behind it. It can still be
-     * {@link #NEAR} on the value it did send, which is what a reading of 31 mph and no
-     * humidity deserves.
+     * <p>Yellow is one leg of Red Flag being there on its own -- the wind is up but
+     * the air is damp, or the air is dry but nothing is moving. That is the operator's
+     * definition and the one that matters on a fire: "flirting, one of the criteria
+     * for red flag met; red, all categories met" (2026-09-25). It does mean a
+     * saturated station gusting hard draws yellow, which looks odd until you read it
+     * as what it is -- half of Red Flag, waiting on the other half.
+     *
+     * <p>A missing value is not a met criterion: a station that sent no humidity is
+     * not a dry station, and coloring it on the wind alone would put a warning on the
+     * map with nothing behind it.
      */
     public static int state(double relativeHumidity, double windMph) {
         final boolean dry = !Double.isNaN(relativeHumidity)
                 && relativeHumidity <= RH_CRITICAL;
         final boolean windy = !Double.isNaN(windMph) && windMph >= WIND_CRITICAL;
         if (dry && windy)
-            return CRITICAL;
-
-        // Flirting means approaching on BOTH axes, because the criteria are a pair.
-        // Either one alone used to be enough here, which lit a station up yellow at
-        // 87% humidity because it was gusting 30 -- soaking wet and nowhere near Red
-        // Flag, and the symbol said otherwise (found on the map, 2026-09-25). Wind
-        // without dryness is a windy day; dryness without wind is a dry one. Neither
-        // is this.
-        final boolean nearlyDry = !Double.isNaN(relativeHumidity)
-                && relativeHumidity <= RH_NEAR;
-        final boolean nearlyWindy = !Double.isNaN(windMph) && windMph >= WIND_NEAR;
-        if (nearlyDry && nearlyWindy)
-            return NEAR;
+            return CRITICAL;                    // every criterion met
+        if (dry || windy)
+            return NEAR;                        // one of them already there
         return BELOW;
     }
 
