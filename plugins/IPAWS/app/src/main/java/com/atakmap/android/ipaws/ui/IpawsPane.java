@@ -3,7 +3,9 @@ package com.atakmap.android.ipaws.ui;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.preference.PreferenceManager;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.AdapterView;
@@ -65,10 +67,14 @@ public class IpawsPane {
     private final Button severityButton;
     private final Button intervalButton;
     private final Button notifyButton;
-    private final View keyHeading;
+    private final Button keyButton;
     private final LinearLayout mapKey;
     /** What the key last drew, so a poll that changed nothing does not rebuild it. */
     private List<String> keyShown = new ArrayList<>();
+    private final SharedPreferences prefs;
+    private boolean keyOpen;
+
+    private static final String PREF_KEY_OPEN = "ipaws.map_key_open";
 
     public IpawsPane(MapView mapView, Context pluginContext, AlertManager manager,
             Counties counties, AlertDetails details) {
@@ -86,13 +92,6 @@ public class IpawsPane {
         final View header = PluginLayoutInflater.inflate(pluginContext,
                 R.layout.controls_header, null);
         list.addHeaderView(header, null, false);
-        // The key goes under the list rather than above it: the alerts are what the
-        // pane is opened for, and the key is what is looked up from the map.
-        final View footer = PluginLayoutInflater.inflate(pluginContext,
-                R.layout.map_key, null);
-        list.addFooterView(footer, null, false);
-        keyHeading = footer.findViewById(R.id.map_key_heading);
-        mapKey = footer.findViewById(R.id.map_key);
         rows = new AlertRows(pluginContext);
         list.setAdapter(rows);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -104,6 +103,19 @@ public class IpawsPane {
                 // says so by returning nothing.
                 if (a != null)
                     IpawsPane.this.details.show(a);
+            }
+        });
+
+        prefs = PreferenceManager.getDefaultSharedPreferences(mapView.getContext());
+        keyOpen = prefs.getBoolean(PREF_KEY_OPEN, false);
+        keyButton = header.findViewById(R.id.btn_map_key);
+        mapKey = header.findViewById(R.id.map_key);
+        keyButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                keyOpen = !keyOpen;
+                prefs.edit().putBoolean(PREF_KEY_OPEN, keyOpen).apply();
+                showKey();
             }
         });
 
@@ -213,13 +225,25 @@ public class IpawsPane {
      */
     private void refreshKey() {
         final List<String> events = manager.mapKey();
-        if (events.equals(keyShown))
-            return;
-        keyShown = events;
-        mapKey.removeAllViews();
-        for (String e : events)
-            mapKey.addView(legendLine(e, AlertStyles.color(e)));
-        keyHeading.setVisibility(events.isEmpty() ? View.GONE : View.VISIBLE);
+        if (!events.equals(keyShown)) {
+            keyShown = events;
+            mapKey.removeAllViews();
+            for (String e : events)
+                mapKey.addView(legendLine(e, AlertStyles.color(e)));
+        }
+        showKey();
+    }
+
+    /**
+     * Open or closed as the operator left it, and no button at all when nothing is
+     * on the map -- a key to an empty map is a control that does nothing.
+     */
+    private void showKey() {
+        final boolean any = !keyShown.isEmpty();
+        keyButton.setVisibility(any ? View.VISIBLE : View.GONE);
+        keyButton.setText(pluginContext.getString(
+                keyOpen ? R.string.map_key_hide : R.string.map_key_show));
+        mapKey.setVisibility(any && keyOpen ? View.VISIBLE : View.GONE);
     }
 
     /** One key line: a swatch in the map's color, then the event name. */
