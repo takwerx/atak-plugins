@@ -97,6 +97,12 @@ public class AlertManager {
     private List<String> mapKey = new ArrayList<>();
     /** Where the last rebuild measured the distance scope from, {lat, lon}; null when off. */
     private volatile double[] scopeAt;
+    /**
+     * "What is in view": the padded box the last rebuild kept alerts in, {south, west,
+     * north, east}, and the unpadded width it came from; null when off or unknown.
+     */
+    private volatile double[] scopeBox;
+    private volatile double scopeViewWidth;
     /** The last rebuild wanted My Location and had no fix, so it used the map center. */
     private volatile boolean scopeNoFix;
     private long lastScopeRebuild;
@@ -200,9 +206,14 @@ public class AlertManager {
      * of My Location ({@code "me"}) or the map center ({@code "center"}); 0 is
      * Everywhere. Re-filters what is in hand, no request.
      */
-    public void setScope(String from, double radiusM) {
+    public void setScope(String mode, String from, double radiusM) {
         filter.scopeFrom = "center".equals(from) ? "center" : "me";
-        filter.scopeRadiusM = Math.max(0, radiusM);
+        if ("radius".equals(mode) && radiusM > 0) {
+            filter.scope = "radius";
+            filter.scopeRadiusM = radiusM;
+        } else {
+            filter.scope = "view".equals(mode) ? "view" : "all";
+        }
         saveFilter();
         lastScopeRebuild = System.currentTimeMillis();
         reapplyFilter();
@@ -211,7 +222,7 @@ public class AlertManager {
 
     /** The last rebuild wanted My Location, had no GPS fix, and measured from the map center. */
     public boolean scopeHasNoFix() {
-        return scopeNoFix && filter.scopeRadiusM > 0;
+        return scopeNoFix && "radius".equals(filter.scope);
     }
 
     /**
@@ -221,16 +232,7 @@ public class AlertManager {
      * seconds, because a pinch fires this every frame.
      */
     private void followScope() {
-        if (filter.scopeRadiusM <= 0 || scopeRebuildQueued)
-            return;
-        final double[] was = scopeAt;
-        double[] now = "center".equals(filter.scopeFrom) ? null : ownPosition();
-        if (now == null)
-            now = mapCenter();
-        if (was == null || now == null)
-            return;
-        final double moved = Geo.envelopeDistanceM(was[0], was[1], was[0], was[1], now[0], now[1]);
-        if (moved <= Math.max(250d, filter.scopeRadiusM * 0.2))
+        if (scopeRebuildQueued || !scopeMoved())
             return;
         final long t = System.currentTimeMillis();
         if (t - lastScopeRebuild < SCOPE_MIN_GAP_MS)
@@ -252,6 +254,49 @@ public class AlertManager {
     }
 
     private static final long SCOPE_MIN_GAP_MS = 3_000L;
+
+    /** Whether what the last rebuild kept no longer answers the scope. Main thread. */
+    private boolean scopeMoved() {
+        if ("view".equals(filter.scope)) {
+            // Feature Layer's rule for the view: the last rebuild kept a padded box,
+            // and a pan that stays inside it has nothing new to show. Zooming well in
+            // narrows the list, so that counts too.
+            final double[] now = viewBox(0);
+            if (now == null)
+                return false;
+            final double[] box = scopeBox;
+            if (box == null)
+                return true;   // the last rebuild had no view (the globe); now it does
+            return now[0] < box[0] || now[1] < box[1] || now[2] > box[2] || now[3] > box[3]
+                    || (now[3] - now[1]) < scopeViewWidth * 0.5;
+        }
+        if (!"radius".equals(filter.scope))
+            return false;
+        final double[] was = scopeAt;
+        double[] now = "center".equals(filter.scopeFrom) ? null : ownPosition();
+        if (now == null)
+            now = mapCenter();
+        if (was == null || now == null)
+            return false;
+        final double moved = Geo.envelopeDistanceM(was[0], was[1], was[0], was[1], now[0], now[1]);
+        return moved > Math.max(250d, filter.scopeRadiusM * 0.2);
+    }
+
+    /**
+     * The map's view, {south, west, north, east}, widened by {@code pad} of its size on
+     * every side; null when ATAK has none. On the globe {@code getBounds()} can be NaN,
+     * and "what is in view" then means everything rather than nothing.
+     */
+    private double[] viewBox(double pad) {
+        final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+        if (b == null)
+            return null;
+        final double s = b.getSouth(), w = b.getWest(), n = b.getNorth(), e = b.getEast();
+        if (Double.isNaN(s) || Double.isNaN(w) || Double.isNaN(n) || Double.isNaN(e) || n <= s || e <= w)
+            return null;
+        final double py = Math.max(0.01, (n - s) * pad), px = Math.max(0.01, (e - w) * pad);
+        return new double[] { s - py, w - px, n + py, e + px };
+    }
 
     /**
      * onMapMoved runs on the GL thread, every frame of a pinch: it only posts, and the
@@ -293,6 +338,25 @@ public class AlertManager {
         if (c == null || !c.isValid())
             return null;
         return new double[] { c.getLatitude(), c.getLongitude() };
+    }
+
+    /** A {south, west, north, east} box as a polygon, for the exact in-view test. */
+    private static Geometry boxShape(double[] b) {
+        final com.atakmap.map.layer.feature.geometry.LineString ring =
+                new com.atakmap.map.layer.feature.geometry.LineString(2);
+        ring.addPoint(b[1], b[0]);
+        ring.addPoint(b[3], b[0]);
+        ring.addPoint(b[3], b[2]);
+        ring.addPoint(b[1], b[2]);
+        ring.addPoint(b[1], b[0]);
+        final com.atakmap.map.layer.feature.geometry.Polygon p =
+                new com.atakmap.map.layer.feature.geometry.Polygon(2);
+        p.addRing(ring);
+        return p;
+    }
+
+    private static boolean overlaps(double[] a, double[] b) {
+        return a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
     }
 
     /**
@@ -545,13 +609,23 @@ public class AlertManager {
         final List<Geometry> selectedCounties = countyShapes(missing);
         final Set<String> onMap = new LinkedHashSet<>();
         int undrawable = 0;
+        Geometry viewShape = null;
         // The distance scope, resolved once for this rebuild: where "me" or the map
         // center is now, not where it was when the control was set.
+        final String mode = filter.scope;
         final double radius = filter.scopeRadiusM;
         final boolean wantMe = !"center".equals(filter.scopeFrom);
         double[] scopePoint = null;
+        double[] inView = null;
         boolean noFix = false;
-        if (radius > 0) {
+        if ("view".equals(mode)) {
+            // A fifth of the view each side, so a small pan has alerts under it
+            // before the next re-filter, as Feature Layer pads its fetch.
+            inView = viewBox(0.2);
+            final double[] bare = viewBox(0);
+            scopeViewWidth = bare == null ? 0 : bare[3] - bare[1];
+            viewShape = inView == null ? null : boxShape(inView);
+        } else if ("radius".equals(mode) && radius > 0) {
             scopePoint = wantMe ? ownPosition() : null;
             if (scopePoint == null) {
                 noFix = wantMe;
@@ -559,6 +633,7 @@ public class AlertManager {
             }
         }
         scopeAt = scopePoint;
+        scopeBox = inView;
         scopeNoFix = noFix;
 
         for (Alert a : current) {
@@ -570,6 +645,10 @@ public class AlertManager {
                 final double[] env = extentOf(a);
                 if (env != null && Geo.envelopeDistanceM(env[0], env[1], env[2], env[3],
                         scopePoint[0], scopePoint[1]) > radius)
+                    continue;
+            } else if (inView != null) {
+                final double[] env = extentOf(a);
+                if (env != null && !overlaps(env, inView))
                     continue;
             }
             Geometry g = null;
@@ -589,6 +668,11 @@ public class AlertManager {
             // rather than scoped away on a guess.
             if (scopePoint != null && g != null
                     && !Geo.withinDistance(g, scopePoint[0], scopePoint[1], radius))
+                continue;
+            // The shape, not its box: a coastal strip from Orange County to San Diego
+            // has a box that takes in Murrieta, 18 mi inland, and was listed as "in
+            // view" there with nothing of it on the screen.
+            if (viewShape != null && g != null && !Geo.intersects(g, viewShape))
                 continue;
 
             if (!countyAccepts(a, g, selectedCounties))

@@ -135,7 +135,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="44dp"
-        android:max="49" />
+        android:max="50" />
 
     <Button
         android:id="@+id/btn_scope_from"

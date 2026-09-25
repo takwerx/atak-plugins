@@ -68,10 +68,13 @@ public class Filter {
      */
     public double gateGsd = Double.MAX_VALUE;
     /**
-     * Distance scope, Feature Layer's: only alerts that reach to within this many
-     * meters of the point. 0 is Everywhere, the default. Applies to the list, the map
-     * and notifications alike, so the three never disagree about what is in scope.
+     * Distance scope, Feature Layer's: {@code "all"} (Everything, the default),
+     * {@code "view"} (What is in view -- the slider's far left), or {@code "radius"}
+     * (within {@link #scopeRadiusM} of {@link #scopeFrom}). Applies to the list, the
+     * map and notifications alike, so the three never disagree about what is in scope.
      */
+    public String scope = "all";
+    /** The radius when {@link #scope} is {@code "radius"}. */
     public double scopeRadiusM = 0;
     /** Where the scope is measured from: {@code "me"} (the default) or {@code "center"}. */
     public String scopeFrom = "me";
@@ -281,6 +284,7 @@ public class Filter {
         o.put("notifySeverities", new JSONArray(notifySeverities));
         o.put("mapOn", mapOn);
         o.put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd);
+        o.put("scope", scope);
         o.put("scopeRadiusM", scopeRadiusM);
         o.put("scopeFrom", scopeFrom);
         return o;
@@ -303,6 +307,8 @@ public class Filter {
         final double gate = o.optDouble("gateGsd", -1);
         f.gateGsd = gate > 0 ? gate : Double.MAX_VALUE;
         f.scopeRadiusM = Math.max(0, o.optDouble("scopeRadiusM", 0));
+        final String sc = o.optString("scope", f.scopeRadiusM > 0 ? "radius" : "all");
+        f.scope = "view".equals(sc) || ("radius".equals(sc) && f.scopeRadiusM > 0) ? sc : "all";
         f.scopeFrom = "center".equals(o.optString("scopeFrom")) ? "center" : "me";
         // A stored filter that selects nothing is a stored filter, not a broken one:
         // the user may have turned everything off on purpose. Only a missing key
