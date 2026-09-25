@@ -13,6 +13,7 @@ import com.atakmap.android.atmosphere.units.Units;
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
+import com.atakmap.coremap.maps.coords.GeoCalculations;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 import com.atakmap.map.layer.feature.AttributeSet;
 
@@ -127,6 +128,8 @@ public final class StationOverlay {
     /** Whether the pills are on the icons as drawn right now. */
     private boolean labelsWanted;
     private List<Raws.Station> stations = new ArrayList<>();
+    /** Where the stations currently on the map were asked for. */
+    private GeoPoint fetchedFrom;
 
     private final Runnable autoPoll = new Runnable() {
         @Override
@@ -236,10 +239,39 @@ public final class StationOverlay {
     private final Runnable bandSettled = new Runnable() {
         @Override
         public void run() {
-            if (on)
-                applyLabelBand();
+            if (!on)
+                return;
+            applyLabelBand();
+            followMapCenter();
         }
     };
+
+    /**
+     * Ask again when the map has been moved somewhere else.
+     *
+     * <p>Scoped to the map center, the layer fetched once and then never again until
+     * the ten minute poll: the origin moved under it and nothing asked. Panning to a
+     * fire two counties away left southern California's stations sitting on the map
+     * (operator, 2026-09-25: "seems locked to so cal").
+     *
+     * <p>Only past a third of the radius, because the answer barely changes before
+     * that and each one is a request and a full redraw. Measured from where the
+     * stations on screen were actually fetched, not from the last check, so a slow
+     * drag still triggers exactly once when it has gone far enough.
+     */
+    private void followMapCenter() {
+        if (fromMe || inFlight)
+            return;
+        final GeoPoint now = origin();
+        if (now == null)
+            return;
+        if (fetchedFrom != null) {
+            final double movedMiles = GeoCalculations.distanceTo(fetchedFrom, now) / 1609.344;
+            if (movedMiles < miles / 3.0)
+                return;
+        }
+        refresh(true);
+    }
 
     private final com.atakmap.map.AtakMapView.OnMapMovedListener moved =
             new com.atakmap.map.AtakMapView.OnMapMovedListener() {
@@ -328,6 +360,7 @@ public final class StationOverlay {
         if (miles == value)
             return;
         miles = value;
+        fetchedFrom = null;
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
             p.edit().putInt(PREF_MILES, value).apply();
@@ -339,6 +372,7 @@ public final class StationOverlay {
         if (fromMe == value)
             return;
         fromMe = value;
+        fetchedFrom = null;
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
             p.edit().putBoolean(PREF_FROM_ME, value).apply();
@@ -368,6 +402,7 @@ public final class StationOverlay {
         }
         lastPoll = now;
         inFlight = true;
+        fetchedFrom = from;
         final int mine = generation;
         if (stations.isEmpty())
             status("Getting stations…");
