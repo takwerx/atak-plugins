@@ -1783,14 +1783,16 @@ public final class AtmospherePane {
         if (stationsGuide.getChildCount() > 0 || stationLayer == null)
             return;
         stationsGuide.addView(guideNote(
-                "The staff points at where the wind is coming from."));
-        final double[] examples = { 5, 10, 15, 25, 50, 65 };
-        final String[] what = { "short feather", "long feather", "long and short",
-                "two long, one short", "triangle", "triangle, long and short" };
-        for (int i = 0; i < examples.length; i++)
-            stationsGuide.addView(guideRow(stationLayer.exampleBarb(examples[i]),
-                    stationLayer.exampleSpeed(examples[i]), what[i]));
-        stationsGuide.addView(guideNote("No staff at all means calm."));
+                "The staff points at where the wind is coming from. Short feather 5, "
+                        + "long feather 10, triangle 50 \u2014 added up."));
+        stationsGuide.addView(guideRow(stationLayer.exampleSymbol(StationOverlay.NORMAL),
+                "Calm", "no staff at all"));
+        // The whole ladder, not a handful of examples: this is the chart a crew would
+        // otherwise go and look up, and it is generated from the same arithmetic the
+        // map draws with, so it cannot disagree with what is on screen.
+        for (int kt = 5; kt <= 100; kt += 5)
+            stationsGuide.addView(guideRow(stationLayer.exampleBarb(kt),
+                    stationLayer.exampleSpeed(kt), feathers(kt)));
         stationsGuide.addView(guideNote(
                 "Feathers are counted in knots, the way every station plot does it. "
                         + "The numbers beside a station are in your own unit."));
@@ -1802,6 +1804,25 @@ public final class AtmospherePane {
                 "Flirting", "one of the two criteria is met"));
         stationsGuide.addView(guideRow(stationLayer.exampleSymbol(StationOverlay.CRITICAL),
                 "Red Flag", "both are met at once"));
+    }
+
+    /** "1 triangle, 1 long, 1 short" -- what is actually drawn at that speed. */
+    private static String feathers(int knots) {
+        final com.atakmap.android.atmosphere.data.WindBarb.Feathers f =
+                com.atakmap.android.atmosphere.data.WindBarb.of(knots);
+        final StringBuilder b = new StringBuilder();
+        append(b, f.flags, "triangle", "triangles");
+        append(b, f.fulls, "long", "long");
+        append(b, f.halves, "short", "short");
+        return b.toString();
+    }
+
+    private static void append(StringBuilder b, int n, String one, String many) {
+        if (n <= 0)
+            return;
+        if (b.length() > 0)
+            b.append(", ");
+        b.append(n).append(' ').append(n == 1 ? one : many);
     }
 
     /** One guide row: the real symbol on the left, what it means on the right. */
