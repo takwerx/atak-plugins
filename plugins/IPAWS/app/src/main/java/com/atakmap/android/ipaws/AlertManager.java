@@ -393,6 +393,9 @@ public class AlertManager {
             }
             if (g == null)
                 g = fromZones(a, missing);
+            // Before anything reads it: the store writes a nested collection as a
+            // point at 0,0, and the county test and label point should see what is drawn.
+            g = Geo.flatten(g);
 
             if (!countyAccepts(a, g, selectedCounties))
                 continue;

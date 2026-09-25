@@ -144,6 +144,44 @@ public final class Geo {
         return best <= 0 ? null : new double[] { bestMid, lat };
     }
 
+    /**
+     * One flat collection of shapes, never a collection inside a collection.
+     *
+     * <p>An alert's area is built from zones, and a zone arrives as a Polygon, a
+     * MultiPolygon or a GeometryCollection of both, so assembling them nested
+     * collections up to three deep. ATAK's feature store does not survive that: on
+     * 2026-09-25, 69 of 465 stored areas had been written as a single point at 0,0,
+     * every one of them nested two or three deep, while all 369 at one level or none
+     * were intact. The Houston Air Quality Alert was one -- its label drawn over Houston
+     * from the geometry in hand, and no area under it, because the area in the store
+     * was that point. Mostly coastal alerts, whose zones are MultiPolygons.
+     *
+     * @return the single shape when there is one, otherwise a collection of shapes
+     */
+    public static Geometry flatten(Geometry g) {
+        if (!(g instanceof GeometryCollection))
+            return g;
+        final List<Geometry> leaves = new ArrayList<>();
+        leaves(g, leaves);
+        if (leaves.isEmpty())
+            return null;
+        if (leaves.size() == 1)
+            return leaves.get(0);
+        final GeometryCollection flat = new GeometryCollection(2);
+        for (Geometry leaf : leaves)
+            flat.addGeometry(leaf);
+        return flat;
+    }
+
+    private static void leaves(Geometry g, List<Geometry> out) {
+        if (g instanceof GeometryCollection) {
+            for (Geometry child : ((GeometryCollection) g).getGeometries())
+                leaves(child, out);
+        } else if (g != null) {
+            out.add(g);
+        }
+    }
+
     /** True when the two areas touch at all. Null geometry never touches anything. */
     public static boolean intersects(Geometry a, Geometry b) {
         if (a == null || b == null)
