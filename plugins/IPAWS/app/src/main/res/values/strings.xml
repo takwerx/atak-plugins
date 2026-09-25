@@ -31,6 +31,7 @@
     <string name="heading_distance">Distance from a point</string>
     <string name="use_this_extent">Use this extent</string>
     <string name="presets">Presets</string>
+    <string name="show_settings">Show settings</string>
     <string name="map_key_show">Show map key</string>
     <string name="map_key_hide">Hide map key</string>
     <string name="notify_off">Notify: OFF</string>

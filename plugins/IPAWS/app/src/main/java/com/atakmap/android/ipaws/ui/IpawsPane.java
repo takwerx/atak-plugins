@@ -85,14 +85,61 @@ public class IpawsPane {
 
     /** Feature Layer's presets, in the operator's large unit, as the scale bar reads them. */
     private static final double[] GATE_BIG = { 0.25, 1, 5, 15, 50 };
-    private final Button keyButton;
     private final LinearLayout mapKey;
+    private final Fold gateFold;
+    private final Fold scopeFold;
+    private final Fold keyFold;
+    private final Fold whereFold;
+    private final Fold typesFold;
+    private final Fold notifyFold;
     /** What the key last drew, so a poll that changed nothing does not rebuild it. */
     private List<String> keyShown = new ArrayList<>();
     private final SharedPreferences prefs;
-    private boolean keyOpen;
 
-    private static final String PREF_KEY_OPEN = "ipaws.map_key_open";
+    /**
+     * Atmosphere's drop-down: a row that names the section and what it is set to, and
+     * an arrow that opens its controls. Open or closed is remembered per section, and
+     * everything starts closed, so the pane opens as a screen of settings at a glance.
+     * A section whose row is a switch (Notify) passes no title button: its arrow alone
+     * opens it, and shows only while the switch is on, as Atmosphere's layers do.
+     */
+    private final class Fold {
+        final View row;
+        final Button head;
+        final android.widget.ImageButton chevron;
+        final View body;
+        final String pref;
+        boolean open;
+
+        Fold(View header, int rowId, int headId, int chevronId, int bodyId, String pref,
+                boolean headOpens) {
+            row = header.findViewById(rowId);
+            head = header.findViewById(headId);
+            chevron = header.findViewById(chevronId);
+            body = header.findViewById(bodyId);
+            this.pref = pref;
+            open = prefs.getBoolean(pref, false);
+            final View.OnClickListener flip = new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    open = !open;
+                    prefs.edit().putBoolean(Fold.this.pref, open).apply();
+                    show(true);
+                }
+            };
+            chevron.setOnClickListener(flip);
+            if (headOpens)
+                head.setOnClickListener(flip);
+            show(true);
+        }
+
+        /** @param available false hides the arrow and the controls, as a switched-off layer does */
+        void show(boolean available) {
+            chevron.setVisibility(available ? View.VISIBLE : View.GONE);
+            chevron.setRotation(open ? 180f : 0f);
+            body.setVisibility(available && open ? View.VISIBLE : View.GONE);
+        }
+    }
 
     public IpawsPane(MapView mapView, Context pluginContext, AlertManager manager,
             Counties counties, AlertDetails details) {
@@ -125,7 +172,6 @@ public class IpawsPane {
         });
 
         prefs = PreferenceManager.getDefaultSharedPreferences(mapView.getContext());
-        keyOpen = prefs.getBoolean(PREF_KEY_OPEN, false);
         allButton = header.findViewById(R.id.btn_all);
         allButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -152,16 +198,19 @@ public class IpawsPane {
                 refresh();
             }
         });
-        keyButton = header.findViewById(R.id.btn_map_key);
         mapKey = header.findViewById(R.id.map_key);
-        keyButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                keyOpen = !keyOpen;
-                prefs.edit().putBoolean(PREF_KEY_OPEN, keyOpen).apply();
-                showKey();
-            }
-        });
+        gateFold = new Fold(header, R.id.fold_gate_row, R.id.fold_gate_head,
+                R.id.fold_gate_chev, R.id.fold_gate_body, "ipaws.fold.gate", true);
+        scopeFold = new Fold(header, R.id.fold_scope_row, R.id.fold_scope_head,
+                R.id.fold_scope_chev, R.id.fold_scope_body, "ipaws.fold.scope", true);
+        keyFold = new Fold(header, R.id.fold_key_row, R.id.btn_map_key,
+                R.id.fold_key_chev, R.id.map_key, "ipaws.map_key_open", true);
+        whereFold = new Fold(header, R.id.fold_where_row, R.id.fold_where_head,
+                R.id.fold_where_chev, R.id.fold_where_body, "ipaws.fold.where", true);
+        typesFold = new Fold(header, R.id.fold_types_row, R.id.fold_types_head,
+                R.id.fold_types_chev, R.id.fold_types_body, "ipaws.fold.types", true);
+        notifyFold = new Fold(header, R.id.fold_notify_row, R.id.btn_notify,
+                R.id.fold_notify_chev, R.id.fold_notify_body, "ipaws.fold.notify", false);
 
         regionsButton = header.findViewById(R.id.btn_regions);
         statesButton = header.findViewById(R.id.btn_states);
@@ -284,6 +333,14 @@ public class IpawsPane {
         setAllLabel(f);
         gateButton.setText(gateLabel(f.gateGsd));
         showScope(f);
+        // Each drop-down's row says what it is set to, so a closed pane still reads
+        // as the whole picture.
+        gateFold.head.setText("Zoom gate: " + gateLabel(f.gateGsd));
+        scopeFold.head.setText("Distance: " + scopeText(f));
+        whereFold.head.setText("Where: " + statesLabel(f)
+                + (f.counties.isEmpty() ? "" : ", " + countiesLabel(f)));
+        typesFold.head.setText("Types: " + categoriesLabel(f));
+        notifyFold.show(f.notify);
         rows.set(manager.snapshot());
         refreshKey();
     }
@@ -489,15 +546,14 @@ public class IpawsPane {
     }
 
     /**
-     * Open or closed as the operator left it, and no button at all when nothing is
-     * on the map -- a key to an empty map is a control that does nothing.
+     * Open or closed as the operator left it, and no row at all when nothing is on the
+     * map -- a key to an empty map is a control that does nothing.
      */
     private void showKey() {
         final boolean any = !keyShown.isEmpty();
-        keyButton.setVisibility(any ? View.VISIBLE : View.GONE);
-        keyButton.setText(pluginContext.getString(
-                keyOpen ? R.string.map_key_hide : R.string.map_key_show));
-        mapKey.setVisibility(any && keyOpen ? View.VISIBLE : View.GONE);
+        keyFold.row.setVisibility(any ? View.VISIBLE : View.GONE);
+        keyFold.head.setText("Map key");
+        keyFold.show(any);
     }
 
     /** One key line: a swatch in the map's color, then the event name. */
