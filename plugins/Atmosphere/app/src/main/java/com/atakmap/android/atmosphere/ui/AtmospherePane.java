@@ -1785,25 +1785,44 @@ public final class AtmospherePane {
         stationsGuide.addView(guideNote(
                 "The staff points at where the wind is coming from. Short feather 5, "
                         + "long feather 10, triangle 50 \u2014 added up."));
-        stationsGuide.addView(guideRow(stationLayer.exampleSymbol(StationOverlay.NORMAL),
+        stationsGuide.addView(guideRow(example(StationOverlay.NORMAL),
                 "Calm", "no staff at all"));
         // The whole ladder, not a handful of examples: this is the chart a crew would
         // otherwise go and look up, and it is generated from the same arithmetic the
         // map draws with, so it cannot disagree with what is on screen.
         for (int kt = 5; kt <= 100; kt += 5)
-            stationsGuide.addView(guideRow(stationLayer.exampleBarb(kt),
+            stationsGuide.addView(guideRow(barbExample(kt),
                     stationLayer.exampleSpeed(kt), feathers(kt)));
         stationsGuide.addView(guideNote(
                 "Feathers are counted in knots, the way every station plot does it. "
                         + "The numbers beside a station are in your own unit."));
 
         stationsGuide.addView(guideHeading("What the color means"));
-        stationsGuide.addView(guideRow(stationLayer.exampleSymbol(StationOverlay.NORMAL),
+        stationsGuide.addView(guideRow(example(StationOverlay.NORMAL),
                 "Below criteria", "neither humidity nor wind is there"));
-        stationsGuide.addView(guideRow(stationLayer.exampleSymbol(StationOverlay.NEAR),
+        stationsGuide.addView(guideRow(example(StationOverlay.NEAR),
                 "Flirting", "one of the two criteria is met"));
-        stationsGuide.addView(guideRow(stationLayer.exampleSymbol(StationOverlay.CRITICAL),
+        stationsGuide.addView(guideRow(example(StationOverlay.CRITICAL),
                 "Red Flag", "both are met at once"));
+    }
+
+    private Example example(final int stateColor) {
+        return new Example() {
+            @Override
+            public String compose() {
+                return stationLayer == null ? null
+                        : stationLayer.exampleSymbol(stateColor);
+            }
+        };
+    }
+
+    private Example barbExample(final int knots) {
+        return new Example() {
+            @Override
+            public String compose() {
+                return stationLayer == null ? null : stationLayer.exampleBarb(knots);
+            }
+        };
     }
 
     /** "1 triangle, 1 long, 1 short" -- what is actually drawn at that speed. */
@@ -1825,8 +1844,52 @@ public final class AtmospherePane {
         b.append(n).append(' ').append(n == 1 ? one : many);
     }
 
+    /**
+     * Compose the legend's artwork off the main thread and fill it in as it lands.
+     *
+     * <p>Twenty-one barbs is twenty-one PNG encodes, twenty-one file writes and
+     * twenty-one full-bitmap scans to trim them. Done where the row is built -- which
+     * is the thread that draws the map -- that is seconds of nothing happening, and
+     * the same mistake as the spot layer's inserts and the storm layer's icons
+     * earlier today. The rows go up immediately with their text; the pictures arrive.
+     */
+    private final java.util.concurrent.ExecutorService guideWorker =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+
+    private void art(final ImageView into, final Example example) {
+        guideWorker.execute(new Runnable() {
+            @Override
+            public void run() {
+                final String uri = example.compose();
+                if (uri == null)
+                    return;
+                final android.graphics.Bitmap raw = android.graphics.BitmapFactory
+                        .decodeFile(uri.replace("file://", ""));
+                if (raw == null)
+                    return;
+                final android.graphics.Bitmap shown = trimmed(raw);
+                // The file has no density of its own; without this Android rescales
+                // it by the screen's, and the legend stops matching the map.
+                shown.setDensity(android.graphics.Bitmap.DENSITY_NONE);
+                // The view itself is the handler: no MapView reference is held here,
+                // and a row that has gone away simply never gets its picture.
+                into.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        into.setImageBitmap(shown);
+                    }
+                });
+            }
+        });
+    }
+
+    /** Something the legend needs drawn, composed only when the worker gets to it. */
+    private interface Example {
+        String compose();
+    }
+
     /** One guide row: the real symbol on the left, what it means on the right. */
-    private View guideRow(String uri, String title, String detail) {
+    private View guideRow(final Example example, String title, String detail) {
         final LinearLayout row = new LinearLayout(pluginContext);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -1839,17 +1902,9 @@ public final class AtmospherePane {
         // box it was a smudge, which is no use in a guide whose whole job is to let
         // you count feathers (operator, 2026-09-25).
         art.setScaleType(ImageView.ScaleType.CENTER);
-        if (uri != null) {
-            final android.graphics.Bitmap bmp = android.graphics.BitmapFactory
-                    .decodeFile(uri.replace("file://", ""));
-            if (bmp != null) {
-                final android.graphics.Bitmap shown = trimmed(bmp);
-                // The file has no density of its own; without this Android rescales
-                // it by the screen's, and the legend stops matching the map.
-                shown.setDensity(android.graphics.Bitmap.DENSITY_NONE);
-                art.setImageBitmap(shown);
-            }
-        }
+        art.setMinimumWidth(dp(56));
+        art.setMinimumHeight(dp(26));
+        art(art, example);
         row.addView(art);
         final TextView t = new TextView(pluginContext);
         t.setTextColor(Color.WHITE);
