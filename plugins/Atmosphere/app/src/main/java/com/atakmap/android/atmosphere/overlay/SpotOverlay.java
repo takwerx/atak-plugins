@@ -51,7 +51,12 @@ public final class SpotOverlay {
     public static final int PENDING = SpotIcons.PENDING;
 
     private static final String PREF_ON = "weather.layer.spot.on";
-    private static final String PREF_OPEN_ONLY = "weather.layer.spot.openonly";
+    private static final String PREF_RECENT_ONLY = "weather.layer.spot.recentonly";
+    /**
+     * How far back a request still counts as current. Three days covers a fire's
+     * operational periods without dragging in last week's.
+     */
+    public static final long RECENT_MS = 3 * 24 * 60 * 60 * 1000L;
 
     /** The service says it republishes every fifteen minutes; match it, no faster. */
     private static final long POLL_MS = 15 * 60 * 1000L;
@@ -73,7 +78,7 @@ public final class SpotOverlay {
 
     private Listener listener;
     private boolean started, on, inFlight;
-    private boolean openOnly;
+    private boolean recentOnly;
     private long lastPoll;
     private int generation;
     private States states;
@@ -98,7 +103,7 @@ public final class SpotOverlay {
         final SharedPreferences p = MapCompat.prefs();
         // Most of the list is finished work from the past week. A crew looking at the
         // map wants what is still open, so that is where this starts.
-        openOnly = p == null || p.getBoolean(PREF_OPEN_ONLY, true);
+        recentOnly = p == null || p.getBoolean(PREF_RECENT_ONLY, true);
     }
 
     public void setListener(Listener l) {
@@ -151,17 +156,17 @@ public final class SpotOverlay {
         }
     }
 
-    /** Whether only requests NWS still has open are drawn. */
-    public boolean isOpenOnly() {
-        return openOnly;
+    /** Whether only requests from the last few days are drawn. */
+    public boolean isRecentOnly() {
+        return recentOnly;
     }
 
     /** Switch it; redrawn from what is already held, no new request. */
-    public void setOpenOnly(boolean value) {
-        openOnly = value;
+    public void setRecentOnly(boolean value) {
+        recentOnly = value;
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
-            p.edit().putBoolean(PREF_OPEN_ONLY, value).apply();
+            p.edit().putBoolean(PREF_RECENT_ONLY, value).apply();
         if (!on)
             return;
         final int mine = generation;
@@ -259,9 +264,10 @@ public final class SpotOverlay {
         if (mine != generation || !on)
             return;
         final List<Spot.Request> held = requests;
+        final long now = System.currentTimeMillis();
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         for (Spot.Request r : held) {
-            if (openOnly && !isOpen(r))
+            if (recentOnly && !isRecent(r, now))
                 continue;
             if (Double.isNaN(r.lat) || Double.isNaN(r.lon))
                 continue;
@@ -290,8 +296,8 @@ public final class SpotOverlay {
                 drawn(n, total);
             }
         });
-        Log.d(TAG, String.format(Locale.US, "drew %d of %d spot requests, openOnly=%b",
-                n, total, openOnly));
+        Log.d(TAG, String.format(Locale.US, "drew %d of %d spot requests, recentOnly=%b",
+                n, total, recentOnly));
     }
 
     /**
@@ -307,9 +313,17 @@ public final class SpotOverlay {
         });
     }
 
-    /** Open means NWS still owes a forecast: not filled, or an update asked for. */
-    private static boolean isOpen(Spot.Request r) {
-        return r.filledAt <= 0 || r.pending;
+    /**
+     * Recent, not "unfilled". Nearly every spot request is filled within the hour, so
+     * a status filter hid the very thing a crew wants: today's issued forecast for an
+     * active fire. The Wheeler Incident had three requests, all completed, and the
+     * newest was an hour old when it was being looked for and could not be found
+     * (operator, 2026-09-25). Age is the axis that means "I do not care about past
+     * forecasts"; status never was.
+     */
+    public static boolean isRecent(Spot.Request r, long now) {
+        final long when = r.filledAt > 0 ? r.filledAt : r.requestedAt;
+        return when > 0 && now - when <= RECENT_MS;
     }
 
     private static String setName(Spot.Request r) {

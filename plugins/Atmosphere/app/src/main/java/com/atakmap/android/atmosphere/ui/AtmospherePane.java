@@ -438,7 +438,7 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 if (spotLayer == null)
                     return;
-                spotLayer.setOpenOnly(!spotLayer.isOpenOnly());
+                spotLayer.setRecentOnly(!spotLayer.isRecentOnly());
                 // One setting, both surfaces: the list reads the same preference, so
                 // it has to be told to redraw when this changes.
                 spotPage.onFilterChanged();
@@ -1736,14 +1736,14 @@ public final class AtmospherePane {
         spotExpand.setRotation(spotOpen ? 180f : 0f);
         spotSettings.setVisibility(spotOn && spotOpen ? View.VISIBLE : View.GONE);
         if (spotOn) {
-            final boolean openOnly = spotLayer.isOpenOnly();
-            // "Still open only" meant nothing to the operator, who read it and asked
-            // "what is that?" (2026-09-25). It hides requests NWS has already filled,
-            // so that is what it says.
-            spotOpenOnly.setText(openOnly
-                    ? "Hide finished requests  ON" : "Hide finished requests  OFF");
+            final boolean recentOnly = spotLayer.isRecentOnly();
+            // Age, not status. Nearly every request is filled within the hour, so
+            // hiding filled ones hid today's forecast for an active fire -- which is
+            // the one a crew is looking for (operator, 2026-09-25).
+            spotOpenOnly.setText(recentOnly
+                    ? "Last 3 days only  ON" : "Last 3 days only  OFF");
             spotOpenOnly.setTextColor(pluginContext.getResources().getColor(
-                    openOnly ? R.color.state_on : R.color.state_off));
+                    recentOnly ? R.color.state_on : R.color.state_off));
             buildSpotLegend();
         }
         final boolean airOn = air != null && air.isOn();

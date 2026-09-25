@@ -119,32 +119,27 @@ public final class SpotPage {
     private String pendingId;
 
     /**
-     * Whether finished requests are hidden, shared with the map layer.
+     * Whether only recent requests are shown, shared with the map layer.
      *
-     * <p>It has to be shared. The list had no status filter at all while the layer
-     * hid finished requests, so a finished incident was in the list and not on the
-     * map, and "Go to" flew the operator to an empty patch of ground -- which is
-     * exactly what happened with the Wheeler Incident (2026-09-25). Read from the
-     * layer's own preference every time rather than cached, so the two can never
-     * drift apart.
+     * <p>It has to be shared. The list had no filter at all while the layer had one,
+     * so an incident could be in the list and not on the map, and "Go to" flew the
+     * operator to an empty patch of ground -- which is what happened with the Wheeler
+     * Incident (2026-09-25). Read from the layer's own preference every time rather
+     * than cached, so the two can never drift apart.
      */
-    private static boolean hideFinished() {
+    private static boolean recentOnly() {
         final android.content.SharedPreferences p = MapCompat.prefs();
-        return p == null || p.getBoolean("weather.layer.spot.openonly", true);
+        return p == null || p.getBoolean("weather.layer.spot.recentonly", true);
     }
 
-    /** Still open means NWS owes a forecast: never filled, or an update asked for. */
-    private static boolean isOpen(Spot.Request r) {
-        return r.filledAt <= 0 || r.pending;
-    }
-
-    /** The requests the page is willing to show, under the shared status filter. */
+    /** The requests the page is willing to show, under the shared age filter. */
     private List<Spot.Request> visible() {
-        if (!hideFinished())
+        if (!recentOnly())
             return requests;
+        final long now = System.currentTimeMillis();
         final List<Spot.Request> out = new ArrayList<>();
         for (Spot.Request r : requests)
-            if (isOpen(r))
+            if (com.atakmap.android.atmosphere.overlay.SpotOverlay.isRecent(r, now))
                 out.add(r);
         return out;
     }
