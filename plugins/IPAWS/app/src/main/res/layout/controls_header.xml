@@ -114,6 +114,60 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="6dp" />
 
+    <!-- Distance scope, Feature Layer's block: what it is now, a slider, where it is
+         measured from, and "Use this extent" / "Presets". Narrows the list, the map
+         and notifications alike. -->
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/heading_distance" />
+
+    <TextView
+        android:id="@+id/scope_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="@color/white" />
+
+    <SeekBar
+        android:id="@+id/scope_seek"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="44dp"
+        android:max="49" />
+
+    <Button
+        android:id="@+id/btn_scope_from"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp">
+
+        <Button
+            android:id="@+id/btn_scope_extent"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="@string/use_this_extent" />
+
+        <Button
+            android:id="@+id/btn_scope_presets"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="4dp"
+            android:text="@string/presets" />
+    </LinearLayout>
+
     <TextView
         style="@style/TakwerxSectionHeading"
         android:layout_width="match_parent"

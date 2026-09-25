@@ -27,6 +27,9 @@
     <string name="all_off">All OFF</string>
     <string name="zoom_gate">Zoom gate</string>
     <string name="use_this_zoom">Use this zoom</string>
+    <string name="heading_distance">Distance from a point</string>
+    <string name="use_this_extent">Use this extent</string>
+    <string name="presets">Presets</string>
     <string name="map_key_show">Show map key</string>
     <string name="map_key_hide">Hide map key</string>
     <string name="notify_off">Notify: OFF</string>

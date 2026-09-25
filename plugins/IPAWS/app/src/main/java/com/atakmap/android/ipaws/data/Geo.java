@@ -182,6 +182,128 @@ public final class Geo {
         }
     }
 
+    /**
+     * True when any part of the area is within {@code radiusM} of the point, or the
+     * point is inside it. For the distance scope: "within 25 mi of me" means the alert
+     * reaches to within 25 mi, not that its middle does -- a statewide Heat Advisory
+     * you are standing in is zero miles away.
+     *
+     * <p>Measured on a local flat projection around the point, which at the radii the
+     * scope offers (50 mi at most) is off by well under a percent. Holes are not
+     * holes, as everywhere in this class: wrong in that direction shows an alert.
+     */
+    public static boolean withinDistance(Geometry g, double lat, double lon, double radiusM) {
+        if (g == null)
+            return false;
+        final Envelope e = g.getEnvelope();
+        if (e != null && envelopeDistanceM(e.minY, e.minX, e.maxY, e.maxX, lat, lon) > radiusM)
+            return false;
+        final double kx = Math.cos(Math.toRadians(lat)) * M_PER_DEG_LAT;
+        final double r2 = radiusM * radiusM;
+        for (double[][] ring : rings(g)) {
+            final int n = ring.length;
+            if (n == 1) {
+                final double x = (ring[0][0] - lon) * kx, y = (ring[0][1] - lat) * M_PER_DEG_LAT;
+                if (x * x + y * y <= r2)
+                    return true;
+                continue;
+            }
+            if (n >= 3 && contains(ring, lon, lat))
+                return true;
+            for (int i = 0; i + 1 < n; i++) {
+                final double ax = (ring[i][0] - lon) * kx, ay = (ring[i][1] - lat) * M_PER_DEG_LAT;
+                final double bx = (ring[i + 1][0] - lon) * kx, by = (ring[i + 1][1] - lat) * M_PER_DEG_LAT;
+                if (segmentToOriginSq(ax, ay, bx, by) <= r2)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Meters from a point to the nearest edge of a lat/lon box, 0 when inside it. The
+     * cheap first test for the scope: most alerts are nowhere near, and this rejects
+     * them without building their geometry.
+     */
+    public static double envelopeDistanceM(double south, double west, double north,
+            double east, double lat, double lon) {
+        final double cy = Math.max(south, Math.min(north, lat));
+        final double cx = Math.max(west, Math.min(east, lon));
+        final double dy = (cy - lat) * M_PER_DEG_LAT;
+        final double dx = (cx - lon) * Math.cos(Math.toRadians(lat)) * M_PER_DEG_LAT;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    private static final double M_PER_DEG_LAT = 111_320d;
+
+    /**
+     * A GeoJSON geometry's extent straight from its numbers, {@code {south, west,
+     * north, east}}, or null when it has none -- without building ATAK geometry, which
+     * is the expensive part. Out-of-range numbers are skipped, as the parser skips them.
+     */
+    public static double[] envelopeOf(org.json.JSONObject g) {
+        if (g == null)
+            return null;
+        final double[] e = { Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE };
+        final org.json.JSONArray gs = g.optJSONArray("geometries");
+        if (gs != null) {
+            for (int i = 0; i < gs.length(); i++)
+                grow(e, envelopeOf(gs.optJSONObject(i)));
+        } else {
+            walk(g.optJSONArray("coordinates"), e);
+        }
+        return e[0] > e[2] ? null : e;
+    }
+
+    /** Widens {@code into} to take in {@code e}; either may be null or empty. */
+    public static void grow(double[] into, double[] e) {
+        if (into == null || e == null)
+            return;
+        into[0] = Math.min(into[0], e[0]);
+        into[1] = Math.min(into[1], e[1]);
+        into[2] = Math.max(into[2], e[2]);
+        into[3] = Math.max(into[3], e[3]);
+    }
+
+    private static void walk(org.json.JSONArray a, double[] e) {
+        if (a == null || a.length() == 0)
+            return;
+        if (a.opt(0) instanceof org.json.JSONArray) {
+            for (int i = 0; i < a.length(); i++)
+                walk(a.optJSONArray(i), e);
+            return;
+        }
+        final double lon = a.optDouble(0), lat = a.optDouble(1);
+        if (Double.isNaN(lon) || Double.isNaN(lat) || Math.abs(lon) > 180 || Math.abs(lat) > 90)
+            return;
+        e[0] = Math.min(e[0], lat);
+        e[1] = Math.min(e[1], lon);
+        e[2] = Math.max(e[2], lat);
+        e[3] = Math.max(e[3], lon);
+    }
+
+    /** Squared distance from the origin to the segment a-b. */
+    private static double segmentToOriginSq(double ax, double ay, double bx, double by) {
+        final double dx = bx - ax, dy = by - ay;
+        final double len2 = dx * dx + dy * dy;
+        double t = len2 == 0 ? 0 : -(ax * dx + ay * dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        final double px = ax + t * dx, py = ay + t * dy;
+        return px * px + py * py;
+    }
+
+    /** Even-odd point in ring, {@code [lon, lat]} pairs. */
+    private static boolean contains(double[][] ring, double lon, double lat) {
+        boolean in = false;
+        for (int i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            final double xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+            if ((yi > lat) != (yj > lat)
+                    && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)
+                in = !in;
+        }
+        return in;
+    }
+
     /** True when the two areas touch at all. Null geometry never touches anything. */
     public static boolean intersects(Geometry a, Geometry b) {
         if (a == null || b == null)

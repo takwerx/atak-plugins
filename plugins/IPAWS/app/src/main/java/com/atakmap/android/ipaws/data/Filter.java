@@ -67,6 +67,14 @@ public class Filter {
      * this far, in meters per pixel. {@code Double.MAX_VALUE} is Always, the default.
      */
     public double gateGsd = Double.MAX_VALUE;
+    /**
+     * Distance scope, Feature Layer's: only alerts that reach to within this many
+     * meters of the point. 0 is Everywhere, the default. Applies to the list, the map
+     * and notifications alike, so the three never disagree about what is in scope.
+     */
+    public double scopeRadiusM = 0;
+    /** Where the scope is measured from: {@code "me"} (the default) or {@code "center"}. */
+    public String scopeFrom = "me";
 
     /**
      * A fresh install: the state the phone is in, every severity showing.
@@ -273,6 +281,8 @@ public class Filter {
         o.put("notifySeverities", new JSONArray(notifySeverities));
         o.put("mapOn", mapOn);
         o.put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd);
+        o.put("scopeRadiusM", scopeRadiusM);
+        o.put("scopeFrom", scopeFrom);
         return o;
     }
 
@@ -292,6 +302,8 @@ public class Filter {
         f.mapOn = o.optBoolean("mapOn", true);
         final double gate = o.optDouble("gateGsd", -1);
         f.gateGsd = gate > 0 ? gate : Double.MAX_VALUE;
+        f.scopeRadiusM = Math.max(0, o.optDouble("scopeRadiusM", 0));
+        f.scopeFrom = "center".equals(o.optString("scopeFrom")) ? "center" : "me";
         // A stored filter that selects nothing is a stored filter, not a broken one:
         // the user may have turned everything off on purpose. Only a missing key
         // falls back.

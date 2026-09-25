@@ -69,6 +69,14 @@ public class ZoneCache {
     private final File dir;
     private final AlertSource source;
     private final Set<String> inFlight = new LinkedHashSet<>();
+    /**
+     * Each zone's extent, {@code {south, west, north, east}}, kept in memory once the
+     * zone has been read. The distance scope rejects far-away alerts on this alone, so
+     * a scoped rebuild never opens their files: reading and parsing every cached zone
+     * -- some of them 1.7 MB -- is what makes a national rebuild take eleven seconds.
+     */
+    private final java.util.Map<String, double[]> envelopes =
+            new java.util.concurrent.ConcurrentHashMap<>();
     private final ExecutorService disk = Executors.newSingleThreadExecutor(
             new ThreadFactory() {
                 @Override
@@ -107,14 +115,29 @@ public class ZoneCache {
             }
             final JSONObject o = new JSONObject(s);
             // A file that parsed but holds nothing drawable is corruption, not a zone.
-            return o.optJSONArray("coordinates") == null
-                    && o.optJSONArray("geometries") == null ? null : o;
+            if (o.optJSONArray("coordinates") == null && o.optJSONArray("geometries") == null)
+                return null;
+            final double[] env = Geo.envelopeOf(o);
+            if (env != null)
+                envelopes.put(url, env);
+            return o;
         } catch (Exception e) {
             Log.w(TAG, "unreadable cached zone " + f.getName() + ", dropping", e);
             if (!f.delete())
                 Log.w(TAG, "could not delete " + f);
             return null;
         }
+    }
+
+    /**
+     * A zone's extent, {@code {south, west, north, east}}, from memory when it has been
+     * read this session, else read once. Null when the zone is not held. Worker thread.
+     */
+    public double[] envelope(String url) {
+        final double[] hit = envelopes.get(url);
+        if (hit != null)
+            return hit;
+        return geometry(url) == null ? null : envelopes.get(url);
     }
 
     /**

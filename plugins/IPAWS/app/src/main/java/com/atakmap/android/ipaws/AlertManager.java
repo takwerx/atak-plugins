@@ -95,6 +95,12 @@ public class AlertManager {
     private List<Alert> alerts = new ArrayList<>();
     /** Event types with an area on the map, NWS priority first. */
     private List<String> mapKey = new ArrayList<>();
+    /** Where the last rebuild measured the distance scope from, {lat, lon}; null when off. */
+    private volatile double[] scopeAt;
+    /** The last rebuild wanted My Location and had no fix, so it used the map center. */
+    private volatile boolean scopeNoFix;
+    private long lastScopeRebuild;
+    private volatile boolean scopeRebuildQueued;
     private long lastGoodAt;
     private long lastPollAttempt;
     private String lastError;
@@ -122,6 +128,8 @@ public class AlertManager {
             final long due = Math.max(1, filter.pollMinutes) * 60_000L;
             if (!polling && System.currentTimeMillis() - lastPollAttempt >= due)
                 poll();
+            else
+                followScope();   // My Location moves without the map moving
             MainThread.postDelayed(this, TICK_MS);
         }
     };
@@ -187,6 +195,125 @@ public class AlertManager {
         changed();
     }
 
+    /**
+     * Distance scope, Feature Layer's: only alerts reaching to within {@code radiusM}
+     * of My Location ({@code "me"}) or the map center ({@code "center"}); 0 is
+     * Everywhere. Re-filters what is in hand, no request.
+     */
+    public void setScope(String from, double radiusM) {
+        filter.scopeFrom = "center".equals(from) ? "center" : "me";
+        filter.scopeRadiusM = Math.max(0, radiusM);
+        saveFilter();
+        lastScopeRebuild = System.currentTimeMillis();
+        reapplyFilter();
+        changed();
+    }
+
+    /** The last rebuild wanted My Location, had no GPS fix, and measured from the map center. */
+    public boolean scopeHasNoFix() {
+        return scopeNoFix && filter.scopeRadiusM > 0;
+    }
+
+    /**
+     * Keeps the scope where it says it is. Feature Layer's rule: re-filter once the
+     * point has moved a fifth of the radius, never less than 250 m -- panning half a
+     * screen should bring the circle along -- and not more often than every few
+     * seconds, because a pinch fires this every frame.
+     */
+    private void followScope() {
+        if (filter.scopeRadiusM <= 0 || scopeRebuildQueued)
+            return;
+        final double[] was = scopeAt;
+        double[] now = "center".equals(filter.scopeFrom) ? null : ownPosition();
+        if (now == null)
+            now = mapCenter();
+        if (was == null || now == null)
+            return;
+        final double moved = Geo.envelopeDistanceM(was[0], was[1], was[0], was[1], now[0], now[1]);
+        if (moved <= Math.max(250d, filter.scopeRadiusM * 0.2))
+            return;
+        final long t = System.currentTimeMillis();
+        if (t - lastScopeRebuild < SCOPE_MIN_GAP_MS)
+            return;
+        lastScopeRebuild = t;
+        scopeRebuildQueued = true;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                scopeRebuildQueued = false;
+                final boolean haveAnything;
+                synchronized (AlertManager.this) {
+                    haveAnything = !raw.isEmpty();
+                }
+                if (haveAnything)
+                    rebuild(0, Integer.MAX_VALUE);
+            }
+        });
+    }
+
+    private static final long SCOPE_MIN_GAP_MS = 3_000L;
+
+    /**
+     * onMapMoved runs on the GL thread, every frame of a pinch: it only posts, and the
+     * posts are coalesced, so the check runs once the map has settled (Cam Depot's).
+     */
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener moved =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView view, boolean animate) {
+                    MainThread.remove(scopeTick);
+                    MainThread.postDelayed(scopeTick, 500);
+                }
+            };
+
+    private final Runnable scopeTick = new Runnable() {
+        @Override
+        public void run() {
+            if (started)
+                followScope();
+        }
+    };
+
+    /**
+     * A usable own position, {lat, lon}, or null. The self marker reads 0,0 before a
+     * fix and calls itself valid, which put Feature Layer's "near me" in the Gulf of
+     * Guinea.
+     */
+    private double[] ownPosition() {
+        final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
+        final com.atakmap.coremap.maps.coords.GeoPoint p = self == null ? null : self.getPoint();
+        if (p == null || !p.isValid()
+                || (Math.abs(p.getLatitude()) < 0.01 && Math.abs(p.getLongitude()) < 0.01))
+            return null;
+        return new double[] { p.getLatitude(), p.getLongitude() };
+    }
+
+    private double[] mapCenter() {
+        final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+        if (c == null || !c.isValid())
+            return null;
+        return new double[] { c.getLatitude(), c.getLongitude() };
+    }
+
+    /**
+     * An alert's extent without building its geometry: its own, or the union of its
+     * zones'. Null when any zone is not held -- unknown is kept, not scoped away.
+     */
+    private double[] extentOf(Alert a) {
+        if (a.hasOwnGeometry())
+            return Geo.envelopeOf(a.geometry);
+        if (a.zoneUrls.isEmpty())
+            return null;
+        final double[] e = { Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE };
+        for (String url : a.zoneUrls) {
+            final double[] z = zones.envelope(url);
+            if (z == null)
+                return null;
+            Geo.grow(e, z);
+        }
+        return e[0] > e[2] ? null : e;
+    }
+
     /** True when a zoom gate is set and the map is zoomed out past it. Main thread. */
     public boolean zoomedOutPastGate() {
         return filter.mapOn && filter.gateGsd != Double.MAX_VALUE
@@ -246,6 +373,7 @@ public class AlertManager {
         resolveHomeStateIfUnset();
         poll();
         MainThread.postDelayed(timer, TICK_MS);
+        mapView.addOnMapMovedListener(moved);
     }
 
     /**
@@ -274,6 +402,8 @@ public class AlertManager {
     public void stop() {
         started = false;
         MainThread.remove(timer);
+        MainThread.remove(scopeTick);
+        mapView.removeOnMapMovedListener(moved);
         unregisterDetails();
         overlay.detach();
     }
@@ -415,10 +545,33 @@ public class AlertManager {
         final List<Geometry> selectedCounties = countyShapes(missing);
         final Set<String> onMap = new LinkedHashSet<>();
         int undrawable = 0;
+        // The distance scope, resolved once for this rebuild: where "me" or the map
+        // center is now, not where it was when the control was set.
+        final double radius = filter.scopeRadiusM;
+        final boolean wantMe = !"center".equals(filter.scopeFrom);
+        double[] scopePoint = null;
+        boolean noFix = false;
+        if (radius > 0) {
+            scopePoint = wantMe ? ownPosition() : null;
+            if (scopePoint == null) {
+                noFix = wantMe;
+                scopePoint = mapCenter();
+            }
+        }
+        scopeAt = scopePoint;
+        scopeNoFix = noFix;
 
         for (Alert a : current) {
             if (!filter.accepts(a))
                 continue;
+            // Far away on its extent alone: rejected without reading its zones, which
+            // is what keeps a scoped rebuild fast enough to follow the map.
+            if (scopePoint != null) {
+                final double[] env = extentOf(a);
+                if (env != null && Geo.envelopeDistanceM(env[0], env[1], env[2], env[3],
+                        scopePoint[0], scopePoint[1]) > radius)
+                    continue;
+            }
             Geometry g = null;
             if (a.hasOwnGeometry()) {
                 try {
@@ -432,6 +585,11 @@ public class AlertManager {
             // Before anything reads it: the store writes a nested collection as a
             // point at 0,0, and the county test and label point should see what is drawn.
             g = Geo.flatten(g);
+            // No area yet is kept, as everywhere: an alert we cannot place is shown
+            // rather than scoped away on a guess.
+            if (scopePoint != null && g != null
+                    && !Geo.withinDistance(g, scopePoint[0], scopePoint[1], radius))
+                continue;
 
             if (!countyAccepts(a, g, selectedCounties))
                 continue;

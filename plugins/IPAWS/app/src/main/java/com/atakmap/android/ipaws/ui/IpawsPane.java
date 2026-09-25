@@ -70,6 +70,16 @@ public class IpawsPane {
     private final Button notifyButton;
     private final Button allButton;
     private final Button gateButton;
+    private final TextView scopeLabel;
+    private final android.widget.SeekBar scopeSeek;
+    private final Button scopeFromButton;
+    /** True while a finger is on the slider, so a poll's refresh does not yank it back. */
+    private boolean scopeDragging;
+
+    /** Feature Layer's presets, in the large unit; 0 here is Everywhere. */
+    private static final int[] SCOPE_PRESETS = { 0, 2, 5, 10, 25, 50 };
+    /** The radius a "Measuring from" tap gives when there was none, as Feature Layer's does. */
+    private static final int DEFAULT_SCOPE_BIG = 25;
     /** Whether the status line last said "zoom in", so a map move only redraws a change. */
     private boolean saidZoomIn;
 
@@ -147,6 +157,10 @@ public class IpawsPane {
                 refresh();
             }
         });
+        scopeLabel = header.findViewById(R.id.scope_label);
+        scopeSeek = header.findViewById(R.id.scope_seek);
+        scopeFromButton = header.findViewById(R.id.btn_scope_from);
+        bindScope(header);
         gateButton = header.findViewById(R.id.btn_gate);
         gateButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -275,6 +289,7 @@ public class IpawsPane {
         setNotifyLabel(f);
         setAllLabel(f);
         gateButton.setText(gateLabel(f.gateGsd));
+        showScope(f);
         rows.set(manager.snapshot());
         refreshKey();
     }
@@ -288,6 +303,126 @@ public class IpawsPane {
     private void setAllLabel(Filter f) {
         allButton.setText(pluginContext.getString(f.mapOn ? R.string.all_off : R.string.all_on));
         allButton.setTextColor(f.mapOn ? 0xFFF44336 : 0xFF4CAF50);
+    }
+
+    // ---- distance scope -------------------------------------------------------------
+
+    private static String fromName(String from) {
+        return "center".equals(from) ? "Map Center" : "My Location";
+    }
+
+    /** Whole large units in a radius, e.g. 25 for 25 mi. */
+    private static int bigOf(double meters) {
+        return (int) Math.round(meters / Units.bigToMeters(1));
+    }
+
+    private String scopeText(Filter f) {
+        if (f.scopeRadiusM <= 0)
+            return "Everywhere";
+        final String s = "Within " + bigOf(f.scopeRadiusM) + " " + Units.bigLabel() + " of "
+                + fromName(f.scopeFrom);
+        // Said out loud: a circle quietly drawn around the map center when the operator
+        // asked for their own position is the wrong picture looking right.
+        return manager.scopeHasNoFix() ? s + " - no GPS fix, measuring from the map center" : s;
+    }
+
+    private void showScope(Filter f) {
+        scopeLabel.setText(scopeText(f));
+        scopeFromButton.setText("Measuring from: " + fromName(f.scopeFrom));
+        if (!scopeDragging)
+            scopeSeek.setProgress(f.scopeRadiusM <= 0 ? scopeSeek.getMax()
+                    : Math.max(0, Math.min(scopeSeek.getMax(), bigOf(f.scopeRadiusM) - 1)));
+    }
+
+    /** Feature Layer's controls, one for one. The slider runs 1 to 50 in the large unit. */
+    private void bindScope(View header) {
+        scopeSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar sb, int p, boolean fromUser) {
+                if (fromUser)
+                    scopeLabel.setText("Within " + (p + 1) + " " + Units.bigLabel() + " of "
+                            + fromName(manager.getFilter().scopeFrom));
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar sb) {
+                scopeDragging = true;
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar sb) {
+                scopeDragging = false;
+                manager.setScope(manager.getFilter().scopeFrom,
+                        Units.bigToMeters(sb.getProgress() + 1));
+                refresh();
+            }
+        });
+        scopeFromButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Rotates between the two points. From Everywhere it also needs a
+                // radius, or the button would change nothing anyone could see.
+                final Filter f = manager.getFilter();
+                final double r = f.scopeRadiusM > 0 ? f.scopeRadiusM
+                        : Units.bigToMeters(DEFAULT_SCOPE_BIG);
+                manager.setScope("center".equals(f.scopeFrom) ? "me" : "center", r);
+                refresh();
+            }
+        });
+        header.findViewById(R.id.btn_scope_extent).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // "What I am looking at", as a radius: center to corner, so the whole
+                // visible rectangle is inside the circle.
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+                if (b == null || c == null || Double.isNaN(b.getNorth()) || Double.isNaN(b.getEast())) {
+                    Toast.makeText(mapView.getContext(), "The map has no extent yet",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                final double m = c.distanceTo(
+                        new com.atakmap.coremap.maps.coords.GeoPoint(b.getNorth(), b.getEast()));
+                final int max = scopeSeek.getMax() + 1;
+                int big = (int) Math.max(1, Math.round(m / Units.bigToMeters(1)));
+                if (big > max) {
+                    Toast.makeText(mapView.getContext(), String.format(Locale.US,
+                            "That view is wider than %d %s, radius set to the maximum",
+                            max, Units.bigLabel()), Toast.LENGTH_SHORT).show();
+                    big = max;
+                }
+                manager.setScope("center", Units.bigToMeters(big));
+                refresh();
+            }
+        });
+        header.findViewById(R.id.btn_scope_presets).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final Filter f = manager.getFilter();
+                final int now = f.scopeRadiusM <= 0 ? 0 : bigOf(f.scopeRadiusM);
+                final String[] items = new String[SCOPE_PRESETS.length];
+                int checked = -1;
+                for (int i = 0; i < SCOPE_PRESETS.length; i++) {
+                    items[i] = SCOPE_PRESETS[i] == 0 ? "Everywhere"
+                            : "Within " + SCOPE_PRESETS[i] + " " + Units.bigLabel();
+                    if (SCOPE_PRESETS[i] == now)
+                        checked = i;
+                }
+                new AlertDialog.Builder(mapView.getContext())
+                        .setTitle("Show alerts within")
+                        .setSingleChoiceItems(items, checked, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int w) {
+                                d.dismiss();
+                                manager.setScope(manager.getFilter().scopeFrom,
+                                        SCOPE_PRESETS[w] == 0 ? 0 : Units.bigToMeters(SCOPE_PRESETS[w]));
+                                refresh();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
     }
 
     /** What the gate button reads: the scale-bar reading and "or closer", or Always. */
