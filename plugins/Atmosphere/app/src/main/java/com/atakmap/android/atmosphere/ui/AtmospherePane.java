@@ -1809,7 +1809,7 @@ public final class AtmospherePane {
         final LinearLayout row = new LinearLayout(pluginContext);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        row.setPadding(0, dp(4), 0, dp(4));
+        row.setPadding(0, dp(2), 0, dp(2));
         final ImageView art = new ImageView(pluginContext);
         art.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -1822,10 +1822,11 @@ public final class AtmospherePane {
             final android.graphics.Bitmap bmp = android.graphics.BitmapFactory
                     .decodeFile(uri.replace("file://", ""));
             if (bmp != null) {
+                final android.graphics.Bitmap shown = trimmed(bmp);
                 // The file has no density of its own; without this Android rescales
-                // it by the screen's, and the guide stops matching the map.
-                bmp.setDensity(android.graphics.Bitmap.DENSITY_NONE);
-                art.setImageBitmap(bmp);
+                // it by the screen's, and the legend stops matching the map.
+                shown.setDensity(android.graphics.Bitmap.DENSITY_NONE);
+                art.setImageBitmap(shown);
             }
         }
         row.addView(art);
@@ -1848,6 +1849,45 @@ public final class AtmospherePane {
         t.setPadding(0, dp(10), 0, dp(2));
         t.setText(text);
         return t;
+    }
+
+    /**
+     * The same bitmap with its empty margin cut off.
+     *
+     * <p>A station icon is composed on a canvas big enough for a barb pointing any
+     * direction and symmetric about the disc, so that the disc lands on the station.
+     * On the map that is invisible. In a list it is most of the row: the examples all
+     * point west, so the entire east half is blank and the rows sat a long way apart
+     * (operator, 2026-09-25: "why so much buffer between the lines"). The pixels are
+     * not resized, only the empty ones dropped, so the legend still matches the map.
+     */
+    private static android.graphics.Bitmap trimmed(android.graphics.Bitmap src) {
+        final int w = src.getWidth(), h = src.getHeight();
+        final int[] row = new int[w];
+        int top = -1, bottom = -1, left = w, right = -1;
+        for (int y = 0; y < h; y++) {
+            src.getPixels(row, 0, w, 0, y, w, 1);
+            for (int x = 0; x < w; x++) {
+                if ((row[x] >>> 24) == 0)
+                    continue;
+                if (top < 0)
+                    top = y;
+                bottom = y;
+                if (x < left)
+                    left = x;
+                if (x > right)
+                    right = x;
+            }
+        }
+        if (top < 0 || right < left)
+            return src;                 // nothing drawn; hand it back untouched
+        final int pad = 2;
+        left = Math.max(0, left - pad);
+        top = Math.max(0, top - pad);
+        right = Math.min(w - 1, right + pad);
+        bottom = Math.min(h - 1, bottom + pad);
+        return android.graphics.Bitmap.createBitmap(src, left, top,
+                right - left + 1, bottom - top + 1);
     }
 
     private View guideNote(String text) {
