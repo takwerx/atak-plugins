@@ -65,9 +65,16 @@ public final class AlertStyles {
      * kind of wrong.
      */
     public static Style point(String event, String label) {
+        // Label to the right, its left edge on the point: centered, as on an area's
+        // middle, it covered the dot entirely and the point read as a floating name
+        // (s10-dev-1, 2026-09-25). Alignment is by sign only, so 1 is "right of".
+        // A dark ring under the color: a tan or pale dot alone vanished on a desert
+        // basemap.
         return new CompositeStyle(new Style[] {
-                new BasicPointStyle(color(event), 12f),
-                label(label) });
+                new BasicPointStyle(0xFF000000, 24f),
+                new BasicPointStyle(color(event), 18f),
+                new LabelPointStyle(label == null ? "" : label, LABEL_TEXT, LABEL_BACKING,
+                        LabelPointStyle.ScrollMode.OFF, 0f, 1, 0, 0f, false) });
     }
 
     /** The label alone, for the point at an area's middle. No dot: just the words. */

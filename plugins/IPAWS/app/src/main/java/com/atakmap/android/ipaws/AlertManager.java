@@ -112,6 +112,8 @@ public class AlertManager {
     private String lastError;
     private int zonesPending;
     private int undrawable;
+    /** Of those, drawn as a point at their state's middle. */
+    private int placedAtCenter;
     /**
      * Alert ids seen on a previous poll. Notifications fire for what is new to this,
      * never for what was already active when the filter changed -- switching a state
@@ -642,6 +644,7 @@ public class AlertManager {
         final List<Geometry> selectedCounties = countyShapes(missing);
         final Set<String> onMap = new LinkedHashSet<>();
         int undrawable = 0;
+        int placed = 0;
         Geometry viewShape = null;
         // The distance scope, resolved once for this rebuild: where "me" or the map
         // center is now, not where it was when the control was set.
@@ -714,6 +717,19 @@ public class AlertManager {
 
             if (g == null) {
                 undrawable++;
+                // Nothing more is coming for it: put it at its state's middle rather
+                // than leave it off the map. One still waiting on a zone is left alone,
+                // or it would jump from a point to its area a round later.
+                if (!zonesStillComing(a)) {
+                    final double[] c = com.atakmap.android.ipaws.data.StateCenters.of(a);
+                    if (c != null) {
+                        drawn.add(new AlertOverlay.Drawn(a.severity, a.event,
+                                new com.atakmap.map.layer.feature.geometry.Point(c[0], c[1]),
+                                AlertStyles.point(a.event, a.event), attributesOf(a)));
+                        onMap.add(a.event);
+                        placed++;
+                    }
+                }
                 continue;
             }
             drawn.add(new AlertOverlay.Drawn(a.severity, a.event,
@@ -742,6 +758,7 @@ public class AlertManager {
         overlay.rewrite(drawn);
         zonesPending = missing.size();
         this.undrawable = undrawable;
+        this.placedAtCenter = placed;
         changed();
         if (undrawable > 0)
             Log.d(TAG, undrawable + " alerts have no area yet, " + missing.size()
@@ -1057,6 +1074,14 @@ public class AlertManager {
         }
     };
 
+    /** True while any of an alert's zones is neither held nor known to be absent. */
+    private boolean zonesStillComing(Alert a) {
+        for (String url : a.zoneUrls)
+            if (zones.envelope(url) == null && !zones.isKnownAbsent(url))
+                return true;
+        return false;
+    }
+
     /**
      * An alert's area assembled from whichever of its zones are cached. Zone URLs that
      * are not held yet are added to {@code missing}; one the server has said it does
@@ -1137,8 +1162,14 @@ public class AlertManager {
             return undrawable > 0
                     ? "Updated " + age + " - " + count(undrawable) + " still being drawn"
                     : "Updated " + age + ", still drawing areas";
+        // Placed, and said so: a point in the middle of a state is not where the alert
+        // is, and the operator should know which dots are guesses.
+        if (placedAtCenter > 0 && placedAtCenter == undrawable)
+            return "Updated " + age + " - " + count(placedAtCenter) + " shown at the state's center";
         if (undrawable > 0)
-            return "Updated " + age + " - " + count(undrawable) + " with no map area";
+            return "Updated " + age + " - " + count(undrawable - placedAtCenter)
+                    + " with no map area" + (placedAtCenter > 0
+                            ? ", " + placedAtCenter + " at the state's center" : "");
         return "Updated " + age;
     }
 

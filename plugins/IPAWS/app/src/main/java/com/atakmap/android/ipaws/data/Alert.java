@@ -56,6 +56,11 @@ public class Alert {
      * be a second request per toggle to learn what the response already says.
      */
     public final List<String> counties;
+    /**
+     * The zones as UGC codes ({@code CAZ562}, {@code PZZ655}). Only the first two
+     * letters are read, to place an alert with no area at its state's middle.
+     */
+    public final List<String> ugc;
     /** The alert's own geometry when it has one, else null and {@link #zoneUrls} applies. */
     public final JSONObject geometry;
 
@@ -101,6 +106,16 @@ public class Alert {
                     same.add(c);
             }
         counties = same;
+
+        final List<String> zonesUgc = new ArrayList<>();
+        final JSONArray ugcCodes = geocode == null ? null : geocode.optJSONArray("UGC");
+        if (ugcCodes != null)
+            for (int i = 0; i < ugcCodes.length(); i++) {
+                final String c = ugcCodes.optString(i, null);
+                if (c != null && c.length() >= 2)
+                    zonesUgc.add(c);
+            }
+        ugc = zonesUgc;
     }
 
     /** Every feature of an {@code /alerts/active} FeatureCollection, in feed order. */
