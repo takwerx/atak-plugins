@@ -27,6 +27,11 @@ public class AlertDetailsReceiver extends BroadcastReceiver {
 
     private static final String TAG = "IPAWS";
     public static final String ACTION = "com.atakmap.android.ipaws.ALERT_DETAILS";
+    /**
+     * The alert's own id, for a caller with no map item to point at: a tapped
+     * notification, which ATAK hands on here as its "internalIntent".
+     */
+    public static final String EXTRA_ALERT_ID = "alertId";
 
     private final MapView mapView;
     private final AlertManager manager;
@@ -40,17 +45,20 @@ public class AlertDetailsReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        final String uid = intent.getStringExtra("targetUID");
-        final MapItem item = uid == null ? null
-                : mapView.getRootGroup().deepFindItem("uid", uid);
-        if (item == null) {
-            Log.d(TAG, "details: no map item for " + uid);
-            return;
-        }
-        final String id = item.getMetaString("ipaws_alert_id", null);
+        String id = intent.getStringExtra(EXTRA_ALERT_ID);
         if (id == null) {
-            Log.d(TAG, "details: map item carries no alert id");
-            return;
+            final String uid = intent.getStringExtra("targetUID");
+            final MapItem item = uid == null ? null
+                    : mapView.getRootGroup().deepFindItem("uid", uid);
+            if (item == null) {
+                Log.d(TAG, "details: no map item for " + uid);
+                return;
+            }
+            id = item.getMetaString("ipaws_alert_id", null);
+            if (id == null) {
+                Log.d(TAG, "details: map item carries no alert id");
+                return;
+            }
         }
         for (Alert a : manager.snapshot())
             if (id.equals(a.id)) {

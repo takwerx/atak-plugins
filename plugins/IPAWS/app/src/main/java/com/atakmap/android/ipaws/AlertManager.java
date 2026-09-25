@@ -840,13 +840,21 @@ public class AlertManager {
                 ? worst.event + " - " + worst.areaDesc
                 : fresh.size() + " new alerts, worst " + worst.severity + ": " + worst.event;
         Log.d(TAG, "notify: " + msg);
-        postNotification(msg);
+        postNotification(msg, worst.id);
     }
 
-    /** What the test button sends: the real path, so what is seen is what will arrive. */
+    /**
+     * What the test button sends: the real path, so what is seen is what will arrive.
+     * Tapping it opens the worst alert in the list, so the tap is tested too.
+     */
     public void testNotification() {
+        final List<Alert> now = snapshot();
+        final Alert worst = now.isEmpty() ? null : now.get(0);
         Log.d(TAG, "notify: test");
-        postNotification("Test: new alerts will arrive like this. Tap to go to ATAK.");
+        postNotification(worst == null
+                ? "Test: new alerts will arrive like this."
+                : "Test: new alerts will arrive like this. Tap to open " + worst.event + ".",
+                worst == null ? null : worst.id);
     }
 
     private static final String CHANNEL_ID = "ipaws_alerts";
@@ -861,7 +869,7 @@ public class AlertManager {
      * no vibration: two notifications fired on 2026-09-25 and the operator saw neither.
      * A public alert that arrives silently in the shade has not been delivered.
      */
-    private void postNotification(final String msg) {
+    private void postNotification(final String msg, final String alertId) {
         MainThread.post(new Runnable() {
             @Override
             public void run() {
@@ -888,10 +896,19 @@ public class AlertManager {
                                 .setPriority(android.app.Notification.PRIORITY_HIGH)
                                 .setDefaults(android.app.Notification.DEFAULT_ALL);
                     }
-                    // Tapping it brings ATAK forward; nothing from the feed goes in it.
+                    // Tapping it brings ATAK forward and opens the worst of the new
+                    // alerts, through ATAK's own route: an "internalIntent" extra on its
+                    // launch intent is re-sent inside ATAK as an ordinary broadcast
+                    // (ATAKActivity.onNewIntent), which is how NotificationUtil does it.
+                    // The receiver only looks the id up among current alerts.
                     final android.content.Intent open = ctx.getPackageManager()
                             .getLaunchIntentForPackage(ctx.getPackageName());
                     if (open != null) {
+                        if (alertId != null)
+                            open.putExtra("internalIntent", new android.content.Intent(
+                                    com.atakmap.android.ipaws.ui.AlertDetailsReceiver.ACTION)
+                                    .putExtra(com.atakmap.android.ipaws.ui.AlertDetailsReceiver.EXTRA_ALERT_ID,
+                                            alertId));
                         final int flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT
                                 | (android.os.Build.VERSION.SDK_INT >= 23
                                         ? android.app.PendingIntent.FLAG_IMMUTABLE : 0);
