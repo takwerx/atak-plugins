@@ -10,7 +10,7 @@
     android:gravity="center_vertical">
 
     <View
-        android:id="@+id/severity_bar"
+        android:id="@+id/color_bar"
         android:layout_width="5dp"
         android:layout_height="match_parent"
         android:minHeight="40dp"

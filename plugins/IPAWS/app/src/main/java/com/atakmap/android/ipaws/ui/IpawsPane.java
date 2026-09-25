@@ -3,15 +3,19 @@ package com.atakmap.android.ipaws.ui;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.Color;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.ipaws.AlertManager;
+import com.atakmap.android.ipaws.AlertStyles;
 import com.atakmap.android.ipaws.data.Alert;
 import com.atakmap.android.ipaws.data.Areas;
 import com.atakmap.android.ipaws.data.Counties;
@@ -61,6 +65,10 @@ public class IpawsPane {
     private final Button severityButton;
     private final Button intervalButton;
     private final Button notifyButton;
+    private final View keyHeading;
+    private final LinearLayout mapKey;
+    /** What the key last drew, so a poll that changed nothing does not rebuild it. */
+    private List<String> keyShown = new ArrayList<>();
 
     public IpawsPane(MapView mapView, Context pluginContext, AlertManager manager,
             Counties counties, AlertDetails details) {
@@ -78,6 +86,13 @@ public class IpawsPane {
         final View header = PluginLayoutInflater.inflate(pluginContext,
                 R.layout.controls_header, null);
         list.addHeaderView(header, null, false);
+        // The key goes under the list rather than above it: the alerts are what the
+        // pane is opened for, and the key is what is looked up from the map.
+        final View footer = PluginLayoutInflater.inflate(pluginContext,
+                R.layout.map_key, null);
+        list.addFooterView(footer, null, false);
+        keyHeading = footer.findViewById(R.id.map_key_heading);
+        mapKey = footer.findViewById(R.id.map_key);
         rows = new AlertRows(pluginContext);
         list.setAdapter(rows);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -186,6 +201,48 @@ public class IpawsPane {
         intervalButton.setText(intervalLabel(f));
         setNotifyLabel(f);
         rows.set(manager.snapshot());
+        refreshKey();
+    }
+
+    // ---- map key --------------------------------------------------------------------
+
+    /**
+     * One line per event type drawn on the map, in NWS's priority order, colored by
+     * the same call the map uses. Only what is on the map: the full table is 111
+     * rows, which is a reference, not a key.
+     */
+    private void refreshKey() {
+        final List<String> events = manager.mapKey();
+        if (events.equals(keyShown))
+            return;
+        keyShown = events;
+        mapKey.removeAllViews();
+        for (String e : events)
+            mapKey.addView(legendLine(e, AlertStyles.color(e)));
+        keyHeading.setVisibility(events.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    /** One key line: a swatch in the map's color, then the event name. */
+    private View legendLine(String text, int color) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(3), 0, dp(3));
+        final View swatch = new View(pluginContext);
+        swatch.setBackgroundColor(color);
+        final LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(dp(14), dp(14));
+        sp.rightMargin = dp(8);
+        row.addView(swatch, sp);
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(13);
+        t.setTextColor(Color.WHITE);
+        row.addView(t);
+        return row;
+    }
+
+    private int dp(int v) {
+        return Math.round(v * pluginContext.getResources().getDisplayMetrics().density);
     }
 
     // ---- updates --------------------------------------------------------------------

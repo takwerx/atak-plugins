@@ -6,6 +6,7 @@ import android.preference.PreferenceManager;
 
 import com.atakmap.android.ipaws.data.Alert;
 import com.atakmap.android.ipaws.data.Areas;
+import com.atakmap.android.ipaws.data.EventColors;
 import com.atakmap.android.ipaws.data.AlertSource;
 import com.atakmap.android.ipaws.data.Filter;
 import com.atakmap.android.ipaws.data.Geo;
@@ -92,6 +93,8 @@ public class AlertManager {
     private List<Alert> raw = new ArrayList<>();
     /** The last set the feed actually gave us, filtered. Never cleared by a failure. */
     private List<Alert> alerts = new ArrayList<>();
+    /** Event types with an area on the map, NWS priority first. */
+    private List<String> mapKey = new ArrayList<>();
     private long lastGoodAt;
     private long lastPollAttempt;
     private String lastError;
@@ -143,6 +146,17 @@ public class AlertManager {
 
     public Filter getFilter() {
         return filter;
+    }
+
+    /**
+     * The event types drawn on the map right now, in NWS's priority order, for the
+     * pane's key. Only what is drawn: an alert still waiting for its area is in the
+     * list but not here, because the key explains colors that are on the screen.
+     */
+    public List<String> mapKey() {
+        synchronized (this) {
+            return new ArrayList<>(mapKey);
+        }
     }
 
     /** The current picture, most severe first. A copy: the poll rewrites the original. */
@@ -363,6 +377,7 @@ public class AlertManager {
         final List<Alert> kept = new ArrayList<>();
         final Set<String> missing = new LinkedHashSet<>();
         final List<Geometry> selectedCounties = countyShapes(missing);
+        final Set<String> onMap = new LinkedHashSet<>();
         int undrawable = 0;
 
         for (Alert a : current) {
@@ -388,7 +403,8 @@ public class AlertManager {
                 continue;
             }
             drawn.add(new AlertOverlay.Drawn(a.severity, a.event,
-                    g, AlertStyles.area(a.severity), attributesOf(a)));
+                    g, AlertStyles.area(a.event), attributesOf(a)));
+            onMap.add(a.event);
             // The name goes on a point in the middle of the area, because a label on
             // the polygon itself renders along its edge and reads as a name for a
             // line. Same attributes, so tapping the words opens the same alert.
@@ -400,8 +416,11 @@ public class AlertManager {
         }
 
         Collections.sort(kept, BY_SEVERITY_THEN_SOONEST);
+        final List<String> key = new ArrayList<>(onMap);
+        Collections.sort(key, BY_NWS_PRIORITY);
         synchronized (this) {
             alerts = kept;
+            mapKey = key;
         }
         announce(current, kept);
         overlay.rewrite(drawn);
@@ -607,6 +626,14 @@ public class AlertManager {
                 return true;
         return false;
     }
+
+    private static final Comparator<String> BY_NWS_PRIORITY = new Comparator<String>() {
+        @Override
+        public int compare(String a, String b) {
+            final int p = Integer.compare(EventColors.priority(a), EventColors.priority(b));
+            return p != 0 ? p : a.compareTo(b);
+        }
+    };
 
     private static final Comparator<Alert> BY_SEVERITY_THEN_SOONEST = new Comparator<Alert>() {
         @Override

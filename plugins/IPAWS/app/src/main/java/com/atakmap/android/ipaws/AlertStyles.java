@@ -1,5 +1,6 @@
 package com.atakmap.android.ipaws;
 
+import com.atakmap.android.ipaws.data.EventColors;
 import com.atakmap.map.layer.feature.style.BasicFillStyle;
 import com.atakmap.map.layer.feature.style.BasicPointStyle;
 import com.atakmap.map.layer.feature.style.BasicStrokeStyle;
@@ -8,8 +9,14 @@ import com.atakmap.map.layer.feature.style.LabelPointStyle;
 import com.atakmap.map.layer.feature.style.Style;
 
 /**
- * Severity drawn as color, which is the one thing about an alert that has to read
- * before it is tapped.
+ * What an alert is, drawn as NWS's own color for it -- the one thing about an alert
+ * that has to read before it is tapped. The colors are {@link EventColors}, and the
+ * pane's map key is built from the same call, so the key and the map cannot disagree.
+ *
+ * <p>Not severity. CAP severity reads as the warning / watch / advisory tier and does
+ * not track it: every Watch is Severe while most Warnings are Moderate. Coloring by it
+ * put a Watch above a Warning, and so would drawing it thicker, which is why every
+ * edge is the same width.
  *
  * <p>Fills are kept faint on purpose. Alert areas overlap constantly -- a county can
  * be inside a Red Flag Warning, a Heat Advisory and an Air Quality Alert at once --
@@ -22,30 +29,22 @@ public final class AlertStyles {
     private AlertStyles() {
     }
 
-    private static final int EXTREME = 0xFFE01020;
-    private static final int SEVERE = 0xFFF07000;
-    private static final int MODERATE = 0xFFF0C000;
-    private static final int MINOR = 0xFF40B0F0;
-    private static final int UNKNOWN = 0xFFB0B0B0;
-
     private static final int LABEL_TEXT = 0xFFFFFFFF;
     private static final int LABEL_BACKING = 0xA0000000;
 
     /** Edge at full alpha over a fill at this much of it. */
     private static final int FILL_ALPHA = 0x38;
 
-    public static int color(String severity) {
-        if (severity == null)
-            return UNKNOWN;
-        if ("Extreme".equalsIgnoreCase(severity))
-            return EXTREME;
-        if ("Severe".equalsIgnoreCase(severity))
-            return SEVERE;
-        if ("Moderate".equalsIgnoreCase(severity))
-            return MODERATE;
-        if ("Minor".equalsIgnoreCase(severity))
-            return MINOR;
-        return UNKNOWN;
+    private static final float EDGE_WIDTH = 3f;
+
+    /** The color an alert of this event type is drawn in, everywhere it is drawn. */
+    public static int color(String event) {
+        return EventColors.color(event);
+    }
+
+    /** The faint fill that goes with {@link #color}. */
+    private static int fill(String event) {
+        return (FILL_ALPHA << 24) | (color(event) & 0x00FFFFFF);
     }
 
     /**
@@ -54,14 +53,10 @@ public final class AlertStyles {
      * for the area. The label is a separate point feature at the middle of the shape
      * -- see {@link #label} and {@code Geo.labelPoint}.
      */
-    public static Style area(String severity) {
-        final int c = color(severity);
-        final int fill = (FILL_ALPHA << 24) | (c & 0x00FFFFFF);
-        final float width = "Extreme".equalsIgnoreCase(severity)
-                || "Severe".equalsIgnoreCase(severity) ? 4f : 3f;
+    public static Style area(String event) {
         return new CompositeStyle(new Style[] {
-                new BasicFillStyle(fill),
-                new BasicStrokeStyle(c, width) });
+                new BasicFillStyle(fill(event)),
+                new BasicStrokeStyle(color(event), EDGE_WIDTH) });
     }
 
     /**
@@ -69,9 +64,9 @@ public final class AlertStyles {
      * resolved. It is still an alert, and dropping it silently would be the worst
      * kind of wrong.
      */
-    public static Style point(String severity, String label) {
+    public static Style point(String event, String label) {
         return new CompositeStyle(new Style[] {
-                new BasicPointStyle(color(severity), 12f),
+                new BasicPointStyle(color(event), 12f),
                 label(label) });
     }
 

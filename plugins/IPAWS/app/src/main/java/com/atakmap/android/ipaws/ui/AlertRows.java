@@ -54,18 +54,6 @@ public class AlertRows extends BaseAdapter {
             this.event = event;
             this.alerts = alerts;
         }
-
-        /** The worst severity in the group, which is what colours the header. */
-        String severity() {
-            String worst = null;
-            int rank = Integer.MAX_VALUE;
-            for (Alert a : alerts)
-                if (a.severityRank() < rank) {
-                    rank = a.severityRank();
-                    worst = a.severity;
-                }
-            return worst;
-        }
     }
 
     public AlertRows(Context pluginContext) {
@@ -159,7 +147,7 @@ public class AlertRows extends BaseAdapter {
         View v = convertView;
         if (v == null)
             v = PluginLayoutInflater.inflate(pluginContext, R.layout.alert_group_row, null);
-        v.findViewById(R.id.severity_bar).setBackgroundColor(AlertStyles.color(g.severity()));
+        v.findViewById(R.id.color_bar).setBackgroundColor(AlertStyles.color(g.event));
         ((TextView) v.findViewById(R.id.event)).setText(g.event);
         final TextView count = v.findViewById(R.id.count);
         final TextView expander = v.findViewById(R.id.expander);
@@ -181,7 +169,7 @@ public class AlertRows extends BaseAdapter {
             v = PluginLayoutInflater.inflate(pluginContext, R.layout.alert_child_row, null);
         if (a == null)
             return v;
-        v.findViewById(R.id.severity_bar).setBackgroundColor(AlertStyles.color(a.severity));
+        v.findViewById(R.id.color_bar).setBackgroundColor(AlertStyles.color(a.event));
         ((TextView) v.findViewById(R.id.area)).setText(a.areaDesc);
         ((TextView) v.findViewById(R.id.timing)).setText(timing(a));
         return v;

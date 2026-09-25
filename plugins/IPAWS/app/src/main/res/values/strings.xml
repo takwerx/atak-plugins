@@ -22,6 +22,7 @@
     <string name="d_do">What to do</string>
     <string name="heading_alerts">Alerts</string>
     <string name="heading_updates">Updates</string>
+    <string name="heading_map_key">Map key</string>
     <string name="notify_off">Notify: OFF</string>
     <string name="notify_on">Notify: ON</string>
     <string name="manual_title">IPAWS Alerts user manual</string>
