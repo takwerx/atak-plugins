@@ -23,6 +23,7 @@ import com.atakmap.android.ipaws.data.Areas;
 import com.atakmap.android.ipaws.data.Counties;
 import com.atakmap.android.ipaws.data.Events;
 import com.atakmap.android.ipaws.data.Filter;
+import com.atakmap.android.ipaws.data.MainThread;
 import com.atakmap.android.ipaws.data.Regions;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.ipaws.plugin.R;
@@ -68,6 +69,35 @@ public class IpawsPane {
     private final Button intervalButton;
     private final Button notifyButton;
     private final Button allButton;
+    private final Button gateButton;
+    /** Whether the status line last said "zoom in", so a map move only redraws a change. */
+    private boolean saidZoomIn;
+
+    /**
+     * Keeps the status line's "zoom in" true while the map moves: it is read from the
+     * zoom, and the pane otherwise only refreshes on a poll. Cam Depot's pattern --
+     * onMapMoved runs on the GL thread every frame of a pinch, so it only posts, and
+     * the posts are coalesced.
+     */
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener moved =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView view, boolean animate) {
+                    MainThread.remove(gateTick);
+                    MainThread.postDelayed(gateTick, 150);
+                }
+            };
+
+    private final Runnable gateTick = new Runnable() {
+        @Override
+        public void run() {
+            if (manager.zoomedOutPastGate() != saidZoomIn)
+                refreshStatus();
+        }
+    };
+
+    /** Feature Layer's presets, in the operator's large unit, as the scale bar reads them. */
+    private static final double[] GATE_BIG = { 0.25, 1, 5, 15, 50 };
     private final Button keyButton;
     private final LinearLayout mapKey;
     /** What the key last drew, so a poll that changed nothing does not rebuild it. */
@@ -114,6 +144,20 @@ public class IpawsPane {
             @Override
             public void onClick(View v) {
                 manager.setMapOn(!manager.getFilter().mapOn);
+                refresh();
+            }
+        });
+        gateButton = header.findViewById(R.id.btn_gate);
+        gateButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseGate();
+            }
+        });
+        header.findViewById(R.id.btn_use_zoom).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setGate(IpawsPane.this.mapView.getMapResolution());
                 refresh();
             }
         });
@@ -192,6 +236,7 @@ public class IpawsPane {
             }
         });
 
+        mapView.addOnMapMovedListener(moved);
         manager.setListener(new AlertManager.Listener() {
             @Override
             public void onChanged() {
@@ -207,12 +252,19 @@ public class IpawsPane {
 
     public void dispose() {
         manager.setListener(null);
+        mapView.removeOnMapMovedListener(moved);
+        MainThread.remove(gateTick);
+    }
+
+    private void refreshStatus() {
+        saidZoomIn = manager.zoomedOutPastGate();
+        status.setText(manager.statusLine());
     }
 
     /** Re-reads everything the pane shows. Main thread. */
     public void refresh() {
         final Filter f = manager.getFilter();
-        status.setText(manager.statusLine());
+        refreshStatus();
         regionsButton.setText(regionsLabel(f));
         statesButton.setText(statesLabel(f));
         countiesButton.setText(countiesLabel(f));
@@ -222,6 +274,7 @@ public class IpawsPane {
         intervalButton.setText(intervalLabel(f));
         setNotifyLabel(f);
         setAllLabel(f);
+        gateButton.setText(gateLabel(f.gateGsd));
         rows.set(manager.snapshot());
         refreshKey();
     }
@@ -235,6 +288,39 @@ public class IpawsPane {
     private void setAllLabel(Filter f) {
         allButton.setText(pluginContext.getString(f.mapOn ? R.string.all_off : R.string.all_on));
         allButton.setTextColor(f.mapOn ? 0xFFF44336 : 0xFF4CAF50);
+    }
+
+    /** What the gate button reads: the scale-bar reading and "or closer", or Always. */
+    private static String gateLabel(double gsd) {
+        return gsd == Double.MAX_VALUE ? "Always" : Units.barReading(gsd) + " or closer";
+    }
+
+    private static String gateName(double big) {
+        final String num = big == Math.floor(big)
+                ? String.format(Locale.US, "%.0f", big)
+                : String.format(Locale.US, "%.2f", big);
+        return num + " " + Units.bigLabel() + " or closer";
+    }
+
+    /** Feature Layer's picker, word for word. */
+    private void chooseGate() {
+        final String[] labels = new String[GATE_BIG.length + 1];
+        for (int i = 0; i < GATE_BIG.length; i++)
+            labels[i] = gateName(GATE_BIG[i]);
+        labels[GATE_BIG.length] = "Always";
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Draw when the scale bar reads")
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        final double gsd = which == GATE_BIG.length ? Double.MAX_VALUE
+                                : Units.bigToMeters(GATE_BIG[which]) / Units.BAR_PIXELS;
+                        manager.setGate(gsd);
+                        refresh();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     // ---- map key --------------------------------------------------------------------

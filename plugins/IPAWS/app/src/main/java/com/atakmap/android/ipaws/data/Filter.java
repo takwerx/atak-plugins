@@ -62,6 +62,11 @@ public class Filter {
      * hidden rather than emptied, so switching it back on is instant.
      */
     public boolean mapOn = true;
+    /**
+     * Zoom gate, Feature Layer's: alerts draw only when the map is zoomed in at least
+     * this far, in meters per pixel. {@code Double.MAX_VALUE} is Always, the default.
+     */
+    public double gateGsd = Double.MAX_VALUE;
 
     /**
      * A fresh install: the state the phone is in, every severity showing.
@@ -267,6 +272,7 @@ public class Filter {
         o.put("notify", notify);
         o.put("notifySeverities", new JSONArray(notifySeverities));
         o.put("mapOn", mapOn);
+        o.put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd);
         return o;
     }
 
@@ -284,6 +290,8 @@ public class Filter {
         f.pollMinutes = Math.max(1, o.optInt("pollMinutes", DEFAULT_POLL_MINUTES));
         f.notify = o.optBoolean("notify", false);
         f.mapOn = o.optBoolean("mapOn", true);
+        final double gate = o.optDouble("gateGsd", -1);
+        f.gateGsd = gate > 0 ? gate : Double.MAX_VALUE;
         // A stored filter that selects nothing is a stored filter, not a broken one:
         // the user may have turned everything off on purpose. Only a missing key
         // falls back.

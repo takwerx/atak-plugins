@@ -175,6 +175,24 @@ public class AlertManager {
         changed();
     }
 
+    /**
+     * Zoom gate, Feature Layer's: alerts draw only when zoomed in at least this far,
+     * in meters per pixel; {@code Double.MAX_VALUE} is Always. Changes the sets in
+     * place, so it needs no poll and no rebuild.
+     */
+    public void setGate(double metersPerPixel) {
+        filter.gateGsd = metersPerPixel;
+        saveFilter();
+        overlay.setGate(metersPerPixel);
+        changed();
+    }
+
+    /** True when a zoom gate is set and the map is zoomed out past it. Main thread. */
+    public boolean zoomedOutPastGate() {
+        return filter.mapOn && filter.gateGsd != Double.MAX_VALUE
+                && mapView.getMapResolution() > filter.gateGsd;
+    }
+
     /** The current picture, most severe first. A copy: the poll rewrites the original. */
     public List<Alert> snapshot() {
         synchronized (this) {
@@ -215,6 +233,7 @@ public class AlertManager {
         try {
             overlay.attach();
             overlay.setVisible(filter.mapOn);
+            overlay.setGate(filter.gateGsd);
         } catch (Exception e) {
             Log.e(TAG, "could not attach the overlay", e);
         }
@@ -740,6 +759,8 @@ public class AlertManager {
         // An empty map has to say it was asked to be, or it reads as no weather.
         if (!filter.mapOn)
             return "Updated " + age + " - map off";
+        if (zoomedOutPastGate())
+            return "Updated " + age + " - zoom in to see alerts on the map";
         // An alert we cannot draw has to be said out loud. Dropping it silently
         // leaves a confident-looking map that is missing an alert, which is the
         // worst way to be wrong; and this happens with no attacker anywhere, on an

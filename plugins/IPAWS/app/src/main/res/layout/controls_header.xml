@@ -32,6 +32,40 @@
             android:minWidth="90dp" />
     </LinearLayout>
 
+    <!-- Zoom gate, Feature Layer's row: set it by example, or pick what the scale
+         bar reads. Nothing draws when zoomed out further than that. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="6dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/white"
+            android:text="@string/zoom_gate" />
+
+        <Button
+            android:id="@+id/btn_use_zoom"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="72dp"
+            android:text="@string/use_this_zoom" />
+
+        <Button
+            android:id="@+id/btn_gate"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:minWidth="110dp" />
+    </LinearLayout>
+
     <!-- The map key. Closed by default so the filters are still on the first
          screen; its lines are built in code from the same color call the map
          draws with. -->

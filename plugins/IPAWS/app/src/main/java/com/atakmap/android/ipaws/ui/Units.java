@@ -1,0 +1,94 @@
+package com.atakmap.android.ipaws.ui;
+
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
+
+import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.conversions.Span;
+import com.atakmap.coremap.conversions.SpanUtilities;
+
+/**
+ * Distances in whatever units the operator has already told ATAK they want, and the
+ * number ATAK's scale bar would show for a zoom level.
+ *
+ * <p>Feature Layer's {@code Units} and {@code ScaleBar.describe}, carried forward
+ * (there is no shared module) and cut to what the zoom gate needs, so the two plugins
+ * word the same setting the same way.
+ *
+ * <p>ATAK keeps the choice in {@code rab_rng_units_pref}, and the stored value is the
+ * {@link Span} constant itself: "0" is {@link Span#ENGLISH}, "1" {@link Span#METRIC},
+ * "2" {@link Span#NM}. Note that 0 is English, not metric -- assuming the obvious
+ * ordering gets it exactly backwards. Read on each call, because it can change in
+ * ATAK's settings while the pane is open.
+ */
+public final class Units {
+
+    private Units() {
+    }
+
+    /**
+     * Roughly the scale bar's own width in pixels. A zoom level is quoted as what the
+     * bar would read at it, through this one nominal length: the live bar's length
+     * differs per phone and per zoom, and the same 40 m/px read "5 mi" on one phone
+     * and "9.38 mi" on another (Feature Layer, 2026-09-19).
+     */
+    public static final double BAR_PIXELS = 200;
+
+    /** @return one of {@link Span#ENGLISH}, {@link Span#METRIC}, {@link Span#NM} */
+    public static int type() {
+        try {
+            final MapView mv = MapView.getMapView();
+            if (mv != null) {
+                final SharedPreferences p = PreferenceManager
+                        .getDefaultSharedPreferences(mv.getContext());
+                return Integer.parseInt(p.getString("rab_rng_units_pref",
+                        String.valueOf(Span.ENGLISH)));
+            }
+        } catch (RuntimeException e) {
+            // A malformed preference must not stop the pane drawing.
+        }
+        return Span.ENGLISH;
+    }
+
+    /** The large unit the operator thinks in: miles, kilometers or nautical miles. */
+    public static Span bigSpan() {
+        switch (type()) {
+            case Span.METRIC:
+                return Span.KILOMETER;
+            case Span.NM:
+                return Span.NAUTICALMILE;
+            default:
+                return Span.MILE;
+        }
+    }
+
+    public static String bigLabel() {
+        switch (type()) {
+            case Span.METRIC:
+                return "km";
+            case Span.NM:
+                return "NM";
+            default:
+                return "mi";
+        }
+    }
+
+    /** Convert a count of {@link #bigSpan()} units into meters. */
+    public static double bigToMeters(double n) {
+        try {
+            return SpanUtilities.convert(n, bigSpan(), Span.METER);
+        } catch (RuntimeException e) {
+            return n * 1609.344;
+        }
+    }
+
+    /** What the scale bar would read at this resolution, e.g. "5 mi". */
+    public static String barReading(double metersPerPixel) {
+        final double meters = metersPerPixel * BAR_PIXELS;
+        try {
+            return SpanUtilities.formatType(type(), meters, Span.METER);
+        } catch (RuntimeException e) {
+            return Math.round(meters) + " m";
+        }
+    }
+}
