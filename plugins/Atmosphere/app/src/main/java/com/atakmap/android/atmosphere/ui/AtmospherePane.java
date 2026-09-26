@@ -1800,7 +1800,7 @@ public final class AtmospherePane {
         gaugeShowTile("All", GaugeOverlay.SHOW_ALL, 0);
         gaugeShowTile("High water only", GaugeOverlay.SHOW_HIGH,
                 GaugeOverlay.legendColor(com.atakmap.android.atmosphere.data.Nwps.ACTION));
-        gaugeShowTile("\u2605 Starred only", GaugeOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
+        gaugeShowTile("\u2605 Favorites only", GaugeOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
     }
 
     private void gaugeShowTile(String label, final int value, int color) {
@@ -1983,7 +1983,7 @@ public final class AtmospherePane {
         showTile("Flirting and Red Flag", StationOverlay.SHOW_WATCH,
                 StationOverlay.NEAR);
         showTile("Red Flag only", StationOverlay.SHOW_RED, StationOverlay.CRITICAL);
-        showTile("\u2605 Starred only", StationOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
+        showTile("\u2605 Favorites only", StationOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
     }
 
     private void showTile(String label, final int value, int color) {

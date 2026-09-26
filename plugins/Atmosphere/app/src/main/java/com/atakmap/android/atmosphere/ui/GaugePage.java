@@ -301,7 +301,7 @@ public final class GaugePage {
             }
         }));
         final boolean starred = layer != null && layer.isFavorite(g);
-        final Button star = (Button) action(starred ? "★ Starred" : "☆ Star",
+        final Button star = (Button) action(starred ? "★ Favorite" : "☆ Favorite",
                 new Runnable() {
                     @Override
                     public void run() {

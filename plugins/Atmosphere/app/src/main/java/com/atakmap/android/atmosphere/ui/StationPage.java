@@ -153,7 +153,7 @@ public final class StationPage {
         final int far = layer.favoritesBeyond();
         return shown.size() + " of " + total + " stations, nearest first, within "
                 + layer.miles() + " mi of " + (layer.isFromMe() ? "you" : "the map")
-                + (far == 0 ? "" : ", and " + far + " starred beyond that");
+                + (far == 0 ? "" : ", and " + far + " favorites beyond that");
     }
 
     /** All, the two that matter, and the starred, each with what it costs. */
@@ -377,7 +377,7 @@ public final class StationPage {
         }));
         // The star, where it is on the row: gold when it is on, and it says so.
         final boolean starred = layer != null && layer.isFavorite(s);
-        final Button star = (Button) action(starred ? "\u2605 Starred" : "\u2606 Star",
+        final Button star = (Button) action(starred ? "\u2605 Favorite" : "\u2606 Favorite",
                 new Runnable() {
                     @Override
                     public void run() {
