@@ -25,10 +25,13 @@
     <string name="spot_layer_on">Spot forecasts ON</string>
     <string name="spot_layer_off">Spot forecasts OFF</string>
     <string name="stations_guide">Station legend</string>
+    <string name="stations_open_list">Open the station list</string>
+    <string name="spot_open_list">Open the spot forecast list</string>
     <string name="stations_page_heading">Weather stations</string>
     <string name="credit_stations">Fire weather stations from the National Interagency Fire Center (services3.arcgis.com). Red Flag colors use common national thresholds, not your local office\'s zone criteria.</string>
     <string name="layers_all_on">All on</string>
     <string name="layers_all_off">All off</string>
+    <string name="stations_show_heading">Draw on the map</string>
     <string name="stations_gate_heading">Draw stations at this zoom or closer</string>
     <string name="stations_label_gate_heading">Draw their readings at this zoom or closer</string>
     <string name="stations_always">Always</string>

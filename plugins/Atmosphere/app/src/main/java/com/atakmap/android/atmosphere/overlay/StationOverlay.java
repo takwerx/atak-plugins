@@ -60,6 +60,14 @@ public final class StationOverlay {
     private static final String PREF_MILES = "weather.layer.stations.miles";
     private static final String PREF_FROM_ME = "weather.layer.stations.fromme";
     private static final String PREF_LABELS = "weather.layer.stations.labels";
+    private static final String PREF_SHOW = "weather.layer.stations.show";
+
+    /** Every station the feed gives back. */
+    public static final int SHOW_ALL = 0;
+    /** Only the ones with a criterion already met, either one. */
+    public static final int SHOW_WATCH = 1;
+    /** Only the ones at Red Flag: both criteria at once. */
+    public static final int SHOW_RED = 2;
     /**
      * New keys on purpose.
      *
@@ -151,6 +159,7 @@ public final class StationOverlay {
     private long lastPoll;
     private int miles;
     private boolean fromMe, labels;
+    private int show;
     /** Coarsest meters per pixel at which each still draws. */
     private double stationGate, labelGate;
     /** Whether the pills are on the icons as drawn right now. */
@@ -177,6 +186,7 @@ public final class StationOverlay {
         miles = p == null ? DEFAULT_MILES : p.getInt(PREF_MILES, DEFAULT_MILES);
         fromMe = p == null || p.getBoolean(PREF_FROM_ME, true);
         labels = p == null || p.getBoolean(PREF_LABELS, true);
+        show = p == null ? SHOW_ALL : p.getInt(PREF_SHOW, SHOW_ALL);
         stationGate = storedGate(p, PREF_GATE_STATIONS, ALWAYS_GATE);
         // Worked out against this device's own scale bar, not a nominal width. A
         // threshold derived from an assumed 200 pixel bar is wrong by whatever the
@@ -283,6 +293,36 @@ public final class StationOverlay {
     /** The map's current resolution, for describing a gate in the operator's terms. */
     public double resolution() {
         return mapView.getMapResolution();
+    }
+
+    /** Which stations are drawn: all of them, the ones worth watching, or Red Flag. */
+    public int show() {
+        return show;
+    }
+
+    public void setShow(int value) {
+        if (show == value)
+            return;
+        show = value;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putInt(PREF_SHOW, value).apply();
+        redraw();
+    }
+
+    /**
+     * Whether a station passes the map's own filter.
+     *
+     * <p>Public and static so the list can ask the same question. A filter that lives
+     * on one surface is a filter the other one disagrees with.
+     */
+    public static boolean passes(int show, Raws.Station s) {
+        final int state = stateOf(s);
+        if (show == SHOW_RED)
+            return state == RedFlag.CRITICAL;
+        if (show == SHOW_WATCH)
+            return state != RedFlag.BELOW;
+        return true;
     }
 
     /** Whether the readings and name are drawn beside each station. */
@@ -584,6 +624,8 @@ public final class StationOverlay {
             // weather however much it looks like it.
             if (s.silent() || s.stale(now))
                 continue;
+            if (!passes(show, s))
+                continue;
             final int level = RedFlag.state(s.relativeHumidity, s.strongestMph());
             final int color = color(level);
             if (level == RedFlag.CRITICAL)
@@ -628,7 +670,8 @@ public final class StationOverlay {
         // the gust is printed beside it or the color has nothing behind it.
         final StationIcons.Composed icon = icons.compose(s.name,
                 speed(s.windMph, system), speed(s.gustMph, system), speedUnit(),
-                s.relativeHumidity, s.windFromDeg, knots(s.windMph), color, withLabel);
+                s.relativeHumidity, s.fuelMoisture, s.windFromDeg, knots(s.windMph),
+                color, withLabel);
         if (icon == null)
             return;
         drawn.add(new AtmosphereFeatures.Drawn(set, s.name,
@@ -661,14 +704,14 @@ public final class StationOverlay {
      */
     public String exampleBarb(double knots) {
         final StationIcons.Composed c = icons.compose(null, Double.NaN, Double.NaN, "",
-                Double.NaN, 270, knots, StationIcons.NORMAL, false);
+                Double.NaN, Double.NaN, 270, knots, StationIcons.NORMAL, false);
         return c == null ? null : c.uri;
     }
 
     /** An example station symbol in one of the three states, for the guide. */
     public String exampleSymbol(int stateColor) {
         final StationIcons.Composed c = icons.compose(null, Double.NaN, Double.NaN, "",
-                Double.NaN, Double.NaN, Double.NaN, stateColor, false);
+                Double.NaN, Double.NaN, Double.NaN, Double.NaN, stateColor, false);
         return c == null ? null : c.uri;
     }
 

@@ -228,7 +228,7 @@ public final class AtmospherePane {
     private ImageButton stationsExpand;
     private View stationsSettings;
     private LinearLayout stationsOriginRow, stationsDistanceRow, stationsLegend;
-    private LinearLayout stationsGateRow, stationsLabelGateRow;
+    private LinearLayout stationsGateRow, stationsLabelGateRow, stationsShowRow;
     private TextView stationsGateText, stationsLabelGateText;
     private Button stationsLabels, stationsGuideToggle;
     private ImageButton stationsGuideExpand;
@@ -404,6 +404,7 @@ public final class AtmospherePane {
         stationsDistanceRow = find(R.id.stations_distance_row);
         stationsLegend = find(R.id.stations_legend);
         stationsGateRow = find(R.id.stations_gate_row);
+        stationsShowRow = find(R.id.stations_show_row);
         stationsLabelGateRow = find(R.id.stations_label_gate_row);
         stationsGateText = find(R.id.stations_gate_text);
         stationsLabelGateText = find(R.id.stations_label_gate_text);
@@ -500,6 +501,20 @@ public final class AtmospherePane {
         stationsGuideToggle.setOnClickListener(guide);
         stationsGuideExpand.setOnClickListener(guide);
         stationsGuideOpen = prefs != null && prefs.getBoolean(PREF_STATIONS_GUIDE_OPEN, false);
+        ((Button) find(R.id.stations_open_list)).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        openPage(stationPage == null ? null : stationPage.view());
+                    }
+                });
+        ((Button) find(R.id.spot_open_list)).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        openPage(spotPage == null ? null : spotPage.view());
+                    }
+                });
         stationsLabels.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1756,6 +1771,42 @@ public final class AtmospherePane {
      * a reading when you are not. Both quote ATAK's own scale bar, which is the
      * reference already on screen.
      */
+    /**
+     * Which stations reach the map at all. The same three the list filters by, so a
+     * map showing only Red Flag and a list showing everything cannot happen.
+     */
+    private void buildStationsShowRow() {
+        stationsShowRow.removeAllViews();
+        showTile("All", StationOverlay.SHOW_ALL, 0);
+        showTile("Flirting and Red Flag", StationOverlay.SHOW_WATCH,
+                StationOverlay.NEAR);
+        showTile("Red Flag only", StationOverlay.SHOW_RED, StationOverlay.CRITICAL);
+    }
+
+    private void showTile(String label, final int value, int color) {
+        final boolean chosen = stationLayer.show() == value;
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, stationsShowRow, false);
+        b.setText(label);
+        b.setTextSize(12);
+        b.setTextColor(chosen
+                ? (color != 0 ? color
+                        : pluginContext.getResources().getColor(R.color.state_on))
+                : Color.WHITE);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                stationLayer.setShow(value);
+                updateLayerControls();
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        b.setLayoutParams(lp);
+        stationsShowRow.addView(b);
+    }
+
     private void buildStationsGateRows() {
         gateRow(stationsGateRow, stationsGateText, "Stations",
                 stationLayer.stationGate(), new Gate() {
@@ -2162,6 +2213,23 @@ public final class AtmospherePane {
      * which the row already carries (operator, 2026-09-25: "when i click on it from
      * the map it should bring up the forecast").
      */
+    /**
+     * Jump to the page that lists what a layer is drawing.
+     *
+     * <p>A layer's settings and its list are two ends of the same thing, and the only
+     * way between them was to know which page it was on and swipe there (operator,
+     * 2026-09-25: "can we have a hot link from the layer to the list").
+     */
+    private void openPage(View page) {
+        if (page == null)
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == page) {
+                pager.setCurrentItem(i, true);
+                return;
+            }
+    }
+
     public void openSpot(final String spotId) {
         if (spotId == null || spotId.isEmpty())
             return;
@@ -2349,6 +2417,7 @@ public final class AtmospherePane {
                     withLabels ? R.color.state_on : R.color.state_off));
             buildStationsOriginRow();
             buildStationsDistanceRow();
+            buildStationsShowRow();
             buildStationsGateRows();
             buildStationsLegend();
             stationsGuideExpand.setRotation(stationsGuideOpen ? 180f : 0f);

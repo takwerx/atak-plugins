@@ -6,6 +6,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
 
+import com.atakmap.android.atmosphere.data.Snooper;
 import com.atakmap.android.atmosphere.data.WindBarb;
 import com.atakmap.android.maps.MapTextFormat;
 import com.atakmap.android.maps.MapView;
@@ -14,8 +15,10 @@ import com.atakmap.coremap.log.Log;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -54,7 +57,7 @@ final class StationIcons {
     private static final String TAG = "AtmosphereStations";
 
     /** Bump when the drawing changes, or stale files are served under the same names. */
-    private static final int VERSION = 8;
+    private static final int VERSION = 9;
 
     /** Below criteria: the symbol as it normally reads. */
     static final int NORMAL = 0xFFFFFFFF;
@@ -77,6 +80,21 @@ final class StationIcons {
     private static final int DISC_EDGE = 0xFFFFFFFF;
 
     private static final int LABEL_BG = 0x99000000;
+
+    /**
+     * The Snooper's emphasis, as colors that work on a dark pill.
+     *
+     * <p>It prints bold black, bold purple and bold red on white paper. Black is not
+     * available here, so the first band is plain white -- which is still the change
+     * from the dimmer weight everything else carries -- and the other two keep their
+     * meaning in lighter shades.
+     */
+    private static final int[] BAND = {
+            0xFFBFC7D0,     // plain: dimmer than the rest, so emphasis reads as such
+            0xFFFFFFFF,     // worth noticing
+            0xFFCE93D8,     // likely near critical
+            0xFFFF6E6E      // extreme
+    };
     private static final int PAD_X = 6, PAD_Y = 3, GAP = 3, RADIUS = 4;
 
     /**
@@ -165,12 +183,13 @@ final class StationIcons {
      * @param gust      the gust in the same unit, or NaN when there is none
      * @param unit      what that speed is in, e.g. "mph"
      * @param humidity  relative humidity in percent, or NaN
+     * @param fuel      ten hour fuel moisture in percent, or NaN
      * @param windFrom  degrees the wind is coming from, or NaN for no barb
      * @param knots     the same wind in knots, which is what the feathers count in
      * @param state     {@link #NORMAL}, {@link #NEAR} or {@link #CRITICAL}
      */
     Composed compose(String name, double speed, double gust, String unit,
-            double humidity, double windFrom, double knots, int state,
+            double humidity, double fuel, double windFrom, double knots, int state,
             boolean withLabel) {
         final float scale = Math.max(1f,
                 gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling());
@@ -179,7 +198,14 @@ final class StationIcons {
         if (textPx <= 0f)
             textPx = 14f * scale;
 
-        final String readings = withLabel ? readings(speed, gust, unit, humidity) : "";
+        // Each reading carries its own emphasis, so the pill says which one is the
+        // concerning one rather than only that something is.
+        final List<Piece> pieces = withLabel
+                ? pieces(speed, gust, unit, humidity, fuel) : new ArrayList<Piece>();
+        final StringBuilder flat = new StringBuilder();
+        for (Piece piece : pieces)
+            flat.append(piece.text);
+        final String readings = flat.toString();
         final String title = !withLabel || name == null ? "" : name.trim();
         // The feathers change only in steps of five knots, so that is what the name
         // needs to carry -- not the raw speed, which would be a new file every hour.
@@ -237,7 +263,7 @@ final class StationIcons {
 
         final File out = new File(dir, "wx_" + key + ".png");
         if (!out.isFile() && !draw(out, w, h, cx, cy, scale, windFrom, knots, state,
-                readings, title, big, small, bm, sm, pillW, pillH, pillCx, pillCy))
+                pieces, title, big, small, bm, sm, pillW, pillH, pillCx, pillCy))
             return null;
         // Composed at device pixels and asked back at the same pixels, so nothing is
         // resampled: ATAK scales an icon by dp, and these are already scaled.
@@ -270,6 +296,52 @@ final class StationIcons {
         return b + "  ·  " + value(humidity) + "%";
     }
 
+    /** One run of the readings line, with the emphasis it carries. */
+    private static final class Piece {
+        final String text;
+        final int band;
+
+        Piece(String text, int band) {
+            this.text = text;
+            this.band = band;
+        }
+    }
+
+    private static float measure(Paint p, List<Piece> pieces) {
+        float w = 0;
+        for (Piece piece : pieces)
+            w += p.measureText(piece.text);
+        return w;
+    }
+
+    /**
+     * "10G28 mph · 19% · 7", each number carrying the Snooper's own emphasis.
+     *
+     * <p>The gust is shown when there is one, because it is what decides the color;
+     * the fuel stick when the station has one, because it is the third thing the
+     * Snooper prints and the operator reads it.
+     */
+    private static List<Piece> pieces(double speed, double gust, String unit,
+            double humidity, double fuel) {
+        final List<Piece> out = new ArrayList<>();
+        final boolean gusting = !Double.isNaN(gust) && !Double.isNaN(speed)
+                && Math.round(gust) > Math.round(speed);
+        out.add(new Piece(value(speed), Snooper.windBand(speed)));
+        if (gusting) {
+            out.add(new Piece("G", Snooper.PLAIN));
+            out.add(new Piece(value(gust), Snooper.windBand(gust)));
+        }
+        if (unit != null && !unit.isEmpty())
+            out.add(new Piece(" " + unit, Snooper.PLAIN));
+        out.add(new Piece("  \u00b7  ", Snooper.PLAIN));
+        out.add(new Piece(value(humidity) + "%", Snooper.humidityBand(humidity)));
+        if (!Double.isNaN(fuel)) {
+            out.add(new Piece("  \u00b7  ", Snooper.PLAIN));
+            out.add(new Piece(value(fuel), Snooper.fuelBand(fuel)));
+        }
+        return out;
+    }
+
     private static String value(double v) {
         return Double.isNaN(v) ? "–" : String.format(Locale.US, "%d", Math.round(v));
     }
@@ -292,7 +364,7 @@ final class StationIcons {
     }
 
     private boolean draw(File out, int w, int h, int cx, int cy, float scale,
-            double windFrom, double knots, int state, String readings, String title,
+            double windFrom, double knots, int state, List<Piece> pieces, String title,
             Paint big, Paint small, Paint.FontMetricsInt bm, Paint.FontMetricsInt sm,
             int pillW, int pillH, float pillCx, float pillCy) {
         Bitmap bmp = null;
@@ -304,7 +376,7 @@ final class StationIcons {
             barb(c, p, cx, cy, scale, windFrom, knots);
             disc(c, p, cx, cy, scale);
             anemometer(c, p, cx, cy, scale, state);
-            pill(c, p, pillCx, pillCy, pillW, pillH, readings, title, big, small, bm, sm);
+            pill(c, p, pillCx, pillCy, pillW, pillH, pieces, title, big, small, bm, sm);
 
             final File tmp = new File(out.getPath() + ".tmp");
             final FileOutputStream o = new FileOutputStream(tmp);
@@ -467,7 +539,7 @@ final class StationIcons {
 
     /** The readings over the station's name, in the pill the rest of the plugin uses. */
     private void pill(Canvas c, Paint p, float pillCx, float pillCy, int pillW, int pillH,
-            String readings, String title, Paint big, Paint small,
+            List<Piece> pieces, String title, Paint big, Paint small,
             Paint.FontMetricsInt bm, Paint.FontMetricsInt sm) {
         if (pillW <= 0)
             return;
@@ -479,8 +551,14 @@ final class StationIcons {
                 RADIUS, RADIUS, p);
         // Both lines centered on the pill: the name is shorter than the readings
         // almost always, and left-aligned under them it reads as a stray caption.
-        c.drawText(readings, pillCx - big.measureText(readings) / 2f,
-                top + PAD_Y - bm.ascent, big);
+        float x = pillCx - measure(big, pieces) / 2f;
+        final float baseline = top + PAD_Y - bm.ascent;
+        for (Piece piece : pieces) {
+            big.setColor(BAND[piece.band]);
+            c.drawText(piece.text, x, baseline, big);
+            x += big.measureText(piece.text);
+        }
+        big.setColor(0xFFFFFFFF);
         if (!title.isEmpty())
             c.drawText(title, pillCx - small.measureText(title) / 2f,
                     top + PAD_Y + (bm.descent - bm.ascent) - sm.ascent, small);

@@ -541,6 +541,15 @@
                      its one toggle looks like the only filter there is (operator,
                      2026-09-25: "i have no way to filter on map or close to me, its
                      like that went away"). -->
+                <Button
+                    android:id="@+id/spot_open_list"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="13sp"
+                    android:text="@string/spot_open_list" />
+
                 <TextView
                     android:id="@+id/spot_where_filters"
                     android:layout_width="match_parent"
@@ -618,6 +627,15 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
+                <Button
+                    android:id="@+id/stations_open_list"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="13sp"
+                    android:text="@string/stations_open_list" />
+
                 <TextView
                     android:id="@+id/stations_status"
                     android:layout_width="match_parent"
@@ -655,6 +673,21 @@
 
                 <LinearLayout
                     android:id="@+id/stations_distance_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/stations_show_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/stations_show_row"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal" />
