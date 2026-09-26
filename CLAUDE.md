@@ -204,6 +204,13 @@ and a status line naming everything that is not shown. It was worked out across
 Feature Layer, Atmosphere, IPAWS, Evac Zone and Traffic, so a new plugin should
 not have to be taught it again. The rules below are the base it builds on.
 
+**When the operator likes something and says it should be the standard** ("make
+this the standard", "I want this in my other plugins"), add it to the skill the
+same day, from any session: a `tooling-<topic>` branch in `atak-plugins-tooling`,
+then `/ship tooling`. A memory alone is not enough; memory is recalled by chance,
+the skill is loaded for every new plugin. It changes new plugins only, never the
+existing ones unless the operator asks there.
+
 **Use ATAK's own button drawables.** `new-plugin.sh` already copies them out of the
 SDK template — `btn_gray` is a selector over `new_dark_button_bg` /
 `_selected` / `_disabled`: black-to-`#383838` gradient, `#585858` border, green
