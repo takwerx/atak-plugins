@@ -156,14 +156,35 @@ public class HydrographView extends View {
         }
         c.drawText(units == UnitSystem.METRIC ? "m" : "ft", dp(4), top - dp(2), dim);
 
-        // Days along the bottom, in site-local time.
-        final SimpleDateFormat day = new SimpleDateFormat("EEE d", Locale.US);
+        // Days along the bottom, in site-local time. A grid line at every midnight;
+        // a label only as often as there is room for one, so thirty days at the
+        // pane's width does not print thirty overlapping weekdays (operator,
+        // 2026-09-26). Past a day apart the label carries the date, since a bare
+        // weekday between unlabeled days reads as the wrong day.
         final long msSpan = to - from;
-        final long firstMidnight = from - (from % DAY) + DAY;
-        for (long t = firstMidnight; t < to; t += DAY) {
+        final float pxPerDay = (right - left) * DAY / (float) msSpan;
+        final float need = dim.measureText("Wed 30") + dp(10);
+        int step = 1;
+        while (pxPerDay * step < need && step < 7)
+            step = step == 1 ? 2 : step == 2 ? 4 : 7;
+        final SimpleDateFormat day = new SimpleDateFormat(step == 1 ? "EEE d" : "MMM d",
+                Locale.US);
+        final java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.setTimeInMillis(from);
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        cal.add(java.util.Calendar.DAY_OF_MONTH, 1);
+        int n = 0;
+        while (cal.getTimeInMillis() < to) {
+            final long t = cal.getTimeInMillis();
             final float x = left + (right - left) * (t - from) / (float) msSpan;
             c.drawLine(x, top, x, bottom, grid);
-            c.drawText(day.format(new Date(t)), x + dp(3), h - dp(8), dim);
+            if (n % step == 0)
+                c.drawText(day.format(new Date(t)), x + dp(3), h - dp(8), dim);
+            cal.add(java.util.Calendar.DAY_OF_MONTH, 1);
+            n++;
         }
 
         // Now.
