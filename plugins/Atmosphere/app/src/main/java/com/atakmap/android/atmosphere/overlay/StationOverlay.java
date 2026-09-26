@@ -3,7 +3,9 @@ package com.atakmap.android.atmosphere.overlay;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.atakmap.android.atmosphere.data.FireZones;
 import com.atakmap.android.atmosphere.data.RedFlag;
+import com.atakmap.android.atmosphere.data.RedFlagCriteria;
 import com.atakmap.android.atmosphere.data.Raws;
 import com.atakmap.android.atmosphere.data.StationFavorites;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
@@ -175,6 +177,11 @@ public final class StationOverlay {
      */
     private List<Raws.Station> beyond = new ArrayList<>();
     private final StationFavorites favorites;
+    /** The fire weather zones around the origin, and where they were asked for. */
+    private List<FireZones.Zone> zones = new ArrayList<>();
+    private GeoPoint zonesFrom;
+    /** Each held station's zone, by station id. Replaced whole on the worker. */
+    private volatile Map<String, FireZones.Zone> zoneOf = new HashMap<>();
     /** Where the stations currently on the map were asked for. */
     private GeoPoint fetchedFrom;
 
@@ -611,6 +618,9 @@ public final class StationOverlay {
         } else {
             stations = new ArrayList<>();
             beyond = new ArrayList<>();
+            zones = new ArrayList<>();
+            zonesFrom = null;
+            zoneOf = new HashMap<>();
             clearOffMain();
             status("");
             drawn(0, 0, 0);
@@ -660,9 +670,84 @@ public final class StationOverlay {
         return new ArrayList<>(held());
     }
 
-    /** What a station's state is, by the same rule the map colors it with. */
-    public static int stateOf(Raws.Station s) {
-        return RedFlag.state(s.relativeHumidity, s.strongestMph());
+    /**
+     * What a station's state is, by the same rule the map colors it with: its zone's
+     * criteria when the table has them, the common pair when it does not.
+     */
+    public int stateOf(Raws.Station s) {
+        return RedFlag.state(s.relativeHumidity, s.windMph, s.gustMph, criteriaFor(s));
+    }
+
+    /** The zone a held station stands in, or null before the zones have arrived. */
+    public FireZones.Zone zoneOf(Raws.Station s) {
+        return s == null ? null : zoneOf.get(s.wxId);
+    }
+
+    /** The pair a station is held against; never null. */
+    public RedFlag.Criteria criteriaFor(Raws.Station s) {
+        final RedFlag.Criteria c = RedFlagCriteria.forZone(zoneOf(s));
+        return c == null ? RedFlag.Criteria.NATIONAL : c;
+    }
+
+    /**
+     * Join every held station to its zone. Worker only: three hundred stations
+     * against ninety outlines is tens of milliseconds, and it runs at the top of
+     * every rebuild so the colors and the records agree.
+     */
+    private void joinZones(List<Raws.Station> held) {
+        final List<FireZones.Zone> z = zones;
+        final Map<String, FireZones.Zone> joined = new HashMap<>();
+        if (!z.isEmpty())
+            for (Raws.Station s : held) {
+                final FireZones.Zone in = FireZones.at(s.latitude, s.longitude, z);
+                if (in != null)
+                    joined.put(s.wxId, in);
+            }
+        zoneOf = joined;
+    }
+
+    /**
+     * Ask for the zones around the origin, once per place: they are asked for again
+     * only when the origin has moved the same third of the radius that refetches the
+     * stations, never on the ten-minute poll.
+     */
+    private void fetchZones(final GeoPoint from, final int mine) {
+        if (zonesFrom != null && !zones.isEmpty()
+                && GeoCalculations.distanceTo(zonesFrom, from) / 1609.344 < miles / 3.0)
+            return;
+        final Map<String, String> headers = new HashMap<>();
+        headers.put("Accept", "application/json");
+        final String url = FireZones.nearUrl(Double.parseDouble(egress.latitude(from)),
+                Double.parseDouble(egress.longitude(from)), miles);
+        Http.get(url, egress.userAgent(), headers, new Http.Callback() {
+            @Override
+            public void onSuccess(final String body) {
+                if (mine != generation || !on)
+                    return;
+                worker.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        final List<FireZones.Zone> parsed = FireZones.parse(body);
+                        if (parsed.isEmpty()) {
+                            Log.w(TAG, "fire weather zones: empty answer");
+                            return;
+                        }
+                        zones = parsed;
+                        zonesFrom = from;
+                        Log.d(TAG, "holding " + parsed.size() + " fire weather zones ("
+                                + parsed.get(0).source + ")");
+                        // The colors may change now that the zones are known.
+                        rebuild(mine);
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(final String error) {
+                // The stations draw on the common pair, and the record says so.
+                Log.w(TAG, "fire weather zones: " + error);
+            }
+        });
     }
 
     /** Where distances are measured from right now: the operator, or the map. */
@@ -695,6 +780,7 @@ public final class StationOverlay {
         inFlight = true;
         fetchedFrom = from;
         final int mine = generation;
+        fetchZones(from, mine);
         if (stations.isEmpty())
             status("Getting stations…");
         final Map<String, String> headers = new HashMap<>();
@@ -759,6 +845,7 @@ public final class StationOverlay {
             return;
         final long began = android.os.SystemClock.elapsedRealtime();
         final List<Raws.Station> held = held();
+        joinZones(held);
         final long now = System.currentTimeMillis();
         final UnitSystem system = units();
         final boolean withLabels = labelsWanted;
@@ -950,9 +1037,16 @@ public final class StationOverlay {
      * <p>One list, used by the map tap and by the list page's details. Two copies
      * drift, and the operator is the one who notices that a tap and a row disagree.
      */
-    public static List<String[]> describe(Raws.Station s, UnitSystem system, long now) {
+    public List<String[]> describe(Raws.Station s, UnitSystem system, long now) {
         final List<String[]> out = new ArrayList<>();
         row(out, "Status", StationIcons.stateLabel(colorFor(s)));
+        // Which zone it stands in, and the pair it is held against -- with where the
+        // pair came from, because a color that claims to be the zone's criteria and
+        // is the common rule of thumb is worse than one that says which it is.
+        final FireZones.Zone zone = zoneOf(s);
+        row(out, "Fire weather zone", zone == null ? "" : zone.label());
+        final RedFlag.Criteria c = criteriaFor(s);
+        row(out, "Red Flag criteria", c.describe() + " (" + c.source + ")");
         row(out, "Wind", wind(s, system));
         row(out, "Gust", Double.isNaN(s.gustMph) ? ""
                 : Units.format(Quantity.SPEED, s.gustMph * 0.44704, system)
@@ -979,7 +1073,7 @@ public final class StationOverlay {
     }
 
     /** The color the map would draw this station, without needing the map. */
-    public static int colorFor(Raws.Station s) {
+    public int colorFor(Raws.Station s) {
         return color(stateOf(s));
     }
 

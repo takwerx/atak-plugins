@@ -115,7 +115,7 @@ public final class StationPage {
             // not a reading, and one that stopped reporting days ago is not weather.
             if (s.silent() || s.stale(now))
                 continue;
-            final int state = StationOverlay.stateOf(s);
+            final int state = layer.stateOf(s);
             counts[state]++;
             final boolean fav = layer.isFavorite(s);
             if (fav)
@@ -275,7 +275,7 @@ public final class StationPage {
             final View row = convert != null ? convert
                     : PluginLayoutInflater.inflate(pluginContext, R.layout.station_row, null);
             final Raws.Station s = shown.get(i);
-            final int state = StationOverlay.stateOf(s);
+            final int state = layer == null ? RedFlag.BELOW : layer.stateOf(s);
             row.findViewById(R.id.state).setBackgroundColor(colorOf(state));
             ((TextView) row.findViewById(R.id.name)).setText(s.name);
             ((TextView) row.findViewById(R.id.detail)).setText(detail(s));
@@ -397,9 +397,9 @@ public final class StationPage {
         detailBody.addView(title);
 
         // The same fields the map's own tap shows, from the same list.
-        for (String[] r : StationOverlay.describe(s, host.units(),
-                System.currentTimeMillis()))
-            detailBody.addView(field(r[0], r[1]));
+        if (layer != null)
+            for (String[] r : layer.describe(s, host.units(), System.currentTimeMillis()))
+                detailBody.addView(field(r[0], r[1]));
 
         detail.setVisibility(View.VISIBLE);
         list.setVisibility(View.GONE);

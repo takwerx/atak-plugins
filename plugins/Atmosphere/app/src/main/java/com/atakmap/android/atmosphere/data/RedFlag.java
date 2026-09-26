@@ -30,6 +30,88 @@ public final class RedFlag {
     /** Sustained wind at or above this, with the humidity, is critical. Miles per hour. */
     public static final double WIND_CRITICAL = 25.0;
 
+    /**
+     * One way a zone's criteria can be met: a humidity ceiling with a wind floor,
+     * sustained or gust. An office writes "RH 15% or less with sustained wind 25 mph
+     * or more or gusts 35 mph or more", and that is one leg.
+     */
+    public static final class Leg {
+        /** Relative humidity at or below this, percent. */
+        public final double rhMax;
+        /** Sustained wind at or above this, mph; NaN when the leg has no sustained floor. */
+        public final double sustainedMin;
+        /** Gusts at or above this, mph; NaN when the leg has no gust floor. */
+        public final double gustMin;
+
+        public Leg(double rhMax, double sustainedMin, double gustMin) {
+            this.rhMax = rhMax;
+            this.sustainedMin = sustainedMin;
+            this.gustMin = gustMin;
+        }
+
+        boolean dry(double rh) {
+            return !Double.isNaN(rh) && rh <= rhMax;
+        }
+
+        boolean windy(double sustained, double gust) {
+            return (!Double.isNaN(sustainedMin) && !Double.isNaN(sustained)
+                    && sustained >= sustainedMin)
+                    || (!Double.isNaN(gustMin) && !Double.isNaN(gust) && gust >= gustMin);
+        }
+
+        /** "Humidity 15% or less with wind 25 mph or more or gusts 35 mph or more" */
+        String describe() {
+            final StringBuilder b = new StringBuilder("Humidity ")
+                    .append(Math.round(rhMax)).append("% or less with ");
+            if (!Double.isNaN(sustainedMin))
+                b.append("wind ").append(Math.round(sustainedMin)).append(" mph or more");
+            if (!Double.isNaN(sustainedMin) && !Double.isNaN(gustMin))
+                b.append(" or ");
+            if (!Double.isNaN(gustMin))
+                b.append("gusts ").append(Math.round(gustMin)).append(" mph or more");
+            return b.toString();
+        }
+    }
+
+    /**
+     * One zone's criteria: the legs an office lists, any one of which is Red Flag,
+     * and where they were transcribed from.
+     *
+     * <p>What an AOP adds beyond this -- a duration, a fuel dryness level, a
+     * lightning forecast -- is not something one observation can judge, so the
+     * record names the source and the rest is read there.
+     */
+    public static final class Criteria {
+        public final Leg[] legs;
+        /** Where it came from, said in the record: an AOP and its year, or "common". */
+        public final String source;
+
+        public Criteria(String source, Leg... legs) {
+            this.legs = legs;
+            this.source = source;
+        }
+
+        /** The legs, joined with "; or". */
+        public String describe() {
+            final StringBuilder b = new StringBuilder();
+            for (Leg l : legs) {
+                if (b.length() > 0)
+                    b.append("; or ");
+                b.append(l.describe());
+            }
+            return b.toString();
+        }
+
+        /**
+         * The widely used pair, for a zone whose office's table is not loaded. The
+         * gust floor matches the sustained one, which is how the layer read the
+         * wind before there were zones: the strongest wind the station had.
+         */
+        public static final Criteria NATIONAL = new Criteria(
+                "common thresholds; this zone's own criteria are not loaded",
+                new Leg(RH_CRITICAL, WIND_CRITICAL, WIND_CRITICAL));
+    }
+
     /** Below anything worth coloring. */
     public static final int BELOW = 0;
     /** Meeting one of the two, or close to both. */
@@ -53,21 +135,38 @@ public final class RedFlag {
      * map with nothing behind it.
      */
     public static int state(double relativeHumidity, double windMph) {
-        final boolean dry = !Double.isNaN(relativeHumidity)
-                && relativeHumidity <= RH_CRITICAL;
-        final boolean windy = !Double.isNaN(windMph) && windMph >= WIND_CRITICAL;
-        if (dry && windy)
-            return CRITICAL;                    // every criterion met
-        if (dry || windy)
-            return NEAR;                        // one of them already there
+        return state(relativeHumidity, windMph, Double.NaN, Criteria.NATIONAL);
+    }
+
+    /**
+     * The same, held against one zone's own criteria: red when any leg is met in
+     * full, yellow when any leg has one side met, nothing otherwise.
+     */
+    public static int state(double relativeHumidity, double sustainedMph, double gustMph,
+            Criteria c) {
+        if (c == null)
+            c = Criteria.NATIONAL;
+        boolean anyDry = false, anyWindy = false;
+        for (Leg l : c.legs) {
+            final boolean dry = l.dry(relativeHumidity);
+            final boolean windy = l.windy(sustainedMph, gustMph);
+            if (dry && windy)
+                return CRITICAL;                // every criterion of this leg met
+            anyDry |= dry;
+            anyWindy |= windy;
+        }
+        if (anyDry || anyWindy)
+            return NEAR;                        // one side of some leg already there
         return BELOW;
     }
 
     /** What the coloring is based on, said plainly under the layer. */
     public static String basis() {
-        return "Humidity " + (int) RH_CRITICAL + "% or less with wind "
-                + (int) WIND_CRITICAL + " mph or more. Your local office sets its own "
-                + "criteria by zone; these are the common thresholds.";
+        return "Each station is held against its fire weather zone's own criteria "
+                + "where its office's table is loaded (California, 2026 AOP). Elsewhere it "
+                + "is humidity " + (int) RH_CRITICAL + "% or less with wind "
+                + (int) WIND_CRITICAL + " mph or more, the common thresholds, not the "
+                + "zone's own criteria. A station's record says which.";
     }
 
     private RedFlag() {
