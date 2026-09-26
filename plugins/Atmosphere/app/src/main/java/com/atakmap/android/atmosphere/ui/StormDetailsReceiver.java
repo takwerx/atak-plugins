@@ -97,6 +97,16 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
     public static String render(AttributeSet attrs) {
         if (attrs == null)
             return "";
+        // A layer that has already written its fields in a deliberate order says so
+        // here, and that order is kept. Sorting is only the fallback, for layers
+        // whose attributes come straight off a service and have no order of their own.
+        try {
+            final String ready = attrs.getStringAttribute("_details");
+            if (ready != null && !ready.trim().isEmpty())
+                return ready;
+        } catch (Exception none) {
+            // no pre-rendered text; fall through to sorting
+        }
         final List<String> keys = new ArrayList<>(attrs.getAttributeNames());
         Collections.sort(keys, String.CASE_INSENSITIVE_ORDER);
         final StringBuilder sb = new StringBuilder();
@@ -110,6 +120,10 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
                 continue;
             }
             if (v == null || v.isEmpty() || v.equals("null"))
+                continue;
+            // Underscored keys are plumbing -- a glyph path, a pre-rendered block --
+            // and are never shown.
+            if (k.startsWith("_"))
                 continue;
             if (sb.length() > 0)
                 sb.append('\n');

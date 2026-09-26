@@ -430,7 +430,7 @@ final class AtmosphereFeatures {
                             // the same for its own chooser rows.
                             if (a != null)
                                 try {
-                                    final String glyph = a.getStringAttribute("chooserIcon");
+                                    final String glyph = a.getStringAttribute("_chooserIcon");
                                     if (glyph != null && !glyph.isEmpty()) {
                                         // iconUri is read for a shape. A point comes
                                         // back as a Marker, which draws from its Icon

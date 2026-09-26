@@ -768,8 +768,10 @@ public final class StationOverlay {
         row(out, "Fuel moisture", percent(s.fuelMoisture));
         row(out, "Fuel temperature", fahrenheit(s.fuelTempF, system));
         row(out, "Observed", observed(s, now));
-        row(out, "Elevation", s.elevation <= 0 ? ""
-                : Units.format(Quantity.LENGTH, s.elevation * 0.3048, system));
+        // Feet or meters, never miles. Quantity.LENGTH formats in the big unit, so a
+        // 2,000 foot station read "0.4 mi" -- true, and useless (operator,
+        // 2026-09-25).
+        row(out, "Elevation", s.elevation <= 0 ? "" : elevation(s.elevation, system));
         row(out, "Agency", s.agency);
         row(out, "Unit", s.unit);
         row(out, "County", s.county);
@@ -797,9 +799,20 @@ public final class StationOverlay {
         put(a, "Station", s.name);
         for (String[] r : describe(s, system, now))
             put(a, r[0], r[1]);
-        // Not a field anyone reads: the tight symbol ATAK's Select Item chooser
-        // should use instead of scaling the map icon down to a speck.
-        put(a, "chooserIcon", icons.chooser(color));
+        // Plumbing, not a field. Underscored so the details pane skips it: it was
+        // printing the icon's whole file path in among the readings (operator,
+        // 2026-09-25).
+        put(a, "_chooserIcon", icons.chooser(color));
+        // The details pane sorts what it is given, which turned a list that starts
+        // with the wind into one that starts with the agency. Pre-rendered in the
+        // order it was written, and the pane prefers this when it is there.
+        final StringBuilder text = new StringBuilder();
+        for (String[] r : describe(s, system, now)) {
+            if (text.length() > 0)
+                text.append('\n');
+            text.append(r[0]).append(": ").append(r[1]);
+        }
+        put(a, "_details", text.toString());
         return a;
     }
 
@@ -824,6 +837,13 @@ public final class StationOverlay {
             return "";
         return String.format(Locale.US, " from %d\u00b0 (%s)", Math.round(deg),
                 Units.degreesToCompass(deg));
+    }
+
+    /** A height above sea level, in the small unit of whichever system is in use. */
+    private static String elevation(int feet, UnitSystem system) {
+        if (system == UnitSystem.METRIC)
+            return String.format(Locale.US, "%,d m", Math.round(feet * 0.3048));
+        return String.format(Locale.US, "%,d ft", feet);
     }
 
     private static String percent(double v) {
