@@ -810,6 +810,113 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- River gauges from the National Water Prediction Service, colored by
+             flood category the way water.noaa.gov colors them. Scoped by distance
+             like the stations, and asked for the same way. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/gauges_toggle"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/gauges_off" />
+
+                <ImageButton
+                    android:id="@+id/gauges_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/gauges_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/gauges_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/stations_around_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/gauges_origin_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/stations_distance_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/gauges_distance_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/heading_legend"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <!-- water.noaa.gov's legend, built in code so the swatches are the
+                     same colors the map is drawing. -->
+                <LinearLayout
+                    android:id="@+id/gauges_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="12sp"
+                    android:alpha="0.7"
+                    android:text="@string/gauges_credit" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- Credits what this page draws, which is not what the forecast page draws:
              the wind comes from NOAA's model files and the radar from an NWS map
              service, neither of them the forecast API. The forecast's own credit

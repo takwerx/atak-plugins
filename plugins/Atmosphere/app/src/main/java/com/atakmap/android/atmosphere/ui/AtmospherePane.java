@@ -39,6 +39,7 @@ import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
 import com.atakmap.android.atmosphere.compat.ScaleBar;
 import com.atakmap.android.atmosphere.data.RedFlag;
+import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
 import com.atakmap.android.atmosphere.data.NwsAlerts;
@@ -102,6 +103,7 @@ public final class AtmospherePane {
     private static final String PREF_AIR_OPEN = "weather.air.open";
     private static final String PREF_WARN_OPEN = "weather.warn.open";
     private static final String PREF_STATIONS_OPEN = "weather.layers.stations.open";
+    private static final String PREF_GAUGES_OPEN = "weather.layers.gauges.open";
     private static final String PREF_STATIONS_GUIDE_OPEN = "weather.layers.stations.guide";
     private static final String PREF_SPOT_OPEN = "weather.spotlayer.open";
 
@@ -235,6 +237,13 @@ public final class AtmospherePane {
     private LinearLayout stationsGuide;
     private boolean stationsGuideOpen;
     private boolean stationsOpen;
+    private GaugeOverlay gaugeLayer;
+    private TextView gaugesStatus;
+    private Button gaugesToggle;
+    private ImageButton gaugesExpand;
+    private View gaugesSettings;
+    private LinearLayout gaugesOriginRow, gaugesDistanceRow, gaugesLegend;
+    private boolean gaugesOpen;
     private boolean spotOpen = true;
     private final LinearLayout warnSettings;
     private final TextView warnHere;
@@ -412,6 +421,13 @@ public final class AtmospherePane {
         stationsGuide = find(R.id.stations_guide);
         stationsGuideToggle = find(R.id.stations_guide_toggle);
         stationsGuideExpand = find(R.id.stations_guide_expand);
+        gaugesToggle = find(R.id.gauges_toggle);
+        gaugesExpand = find(R.id.gauges_expand);
+        gaugesSettings = find(R.id.gauges_settings);
+        gaugesStatus = find(R.id.gauges_status);
+        gaugesOriginRow = find(R.id.gauges_origin_row);
+        gaugesDistanceRow = find(R.id.gauges_distance_row);
+        gaugesLegend = find(R.id.gauges_legend);
         spotLegend = find(R.id.spot_legend);
         spotSettings = find(R.id.spot_settings);
         warnSettings = find(R.id.warn_settings);
@@ -470,6 +486,31 @@ public final class AtmospherePane {
         warnOpen = prefs == null || prefs.getBoolean(PREF_WARN_OPEN, true);
         spotOpen = prefs == null || prefs.getBoolean(PREF_SPOT_OPEN, true);
         stationsOpen = prefs == null || prefs.getBoolean(PREF_STATIONS_OPEN, true);
+        gaugesOpen = prefs == null || prefs.getBoolean(PREF_GAUGES_OPEN, true);
+        gaugesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                gaugesOpen = !gaugesOpen;
+                rememberFold(PREF_GAUGES_OPEN, gaugesOpen);
+                updateLayerControls();
+            }
+        });
+        gaugesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (gaugeLayer == null)
+                    return;
+                if (gaugeLayer.isOn()) {
+                    gaugeLayer.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(GaugeOverlay.LAYER_ID)) {
+                    gaugeLayer.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowGauges();
+                }
+            }
+        });
         stationsExpand.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1613,6 +1654,28 @@ public final class AtmospherePane {
             stationPage.setLayer(stationLayer);
     }
 
+    public void setGauges(GaugeOverlay overlay) {
+        gaugeLayer = overlay;
+        if (gaugeLayer == null)
+            return;
+        gaugeLayer.setListener(new GaugeOverlay.Listener() {
+            @Override
+            public void onGaugesStatus(String s) {
+                if (!s.isEmpty() && gaugesStatus != null)
+                    gaugesStatus.setText(s);
+            }
+
+            @Override
+            public void onGaugesDrawn(int drawn, int total, int flooding) {
+                if (gaugesStatus != null)
+                    gaugesStatus.setText(total == 0 ? "" : drawn + " gauges, "
+                            + (flooding == 0 ? "none at action stage or above"
+                                    : flooding + " at action stage or above"));
+                updateLayerControls();
+            }
+        });
+    }
+
     public void setSpotLayer(SpotOverlay overlay) {
         spotLayer = overlay;
         if (spotLayer == null)
@@ -1638,6 +1701,74 @@ public final class AtmospherePane {
         if (spotLayer != null)
             spotLayer.setOn(true);
         updateLayerControls();
+    }
+
+    private void askToAllowGauges() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.gauges_allow_title))
+                .setMessage(pluginContext.getString(R.string.gauges_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(GaugeOverlay.LAYER_ID, true);
+                                if (gaugeLayer != null)
+                                    gaugeLayer.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void buildGaugesOriginRow() {
+        gaugesOriginRow.removeAllViews();
+        final boolean fromMe = gaugeLayer.isFromMe();
+        gaugesOriginRow.addView(choiceTile(
+                pluginContext.getString(R.string.stations_from_me), fromMe,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        gaugeLayer.setFromMe(true);
+                        updateLayerControls();
+                    }
+                }));
+        gaugesOriginRow.addView(choiceTile(
+                pluginContext.getString(R.string.stations_from_map), !fromMe,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        gaugeLayer.setFromMe(false);
+                        updateLayerControls();
+                    }
+                }));
+    }
+
+    private void buildGaugesDistanceRow() {
+        gaugesDistanceRow.removeAllViews();
+        final int current = gaugeLayer.miles();
+        for (final int m : GaugeOverlay.RADII)
+            gaugesDistanceRow.addView(choiceTile(m + " mi", m == current,
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            gaugeLayer.setMiles(m);
+                            updateLayerControls();
+                        }
+                    }));
+    }
+
+    /** water.noaa.gov's legend, in its own colors and its own order. */
+    private void buildGaugesLegend() {
+        if (gaugesLegend.getChildCount() > 0)
+            return;
+        for (String category : GaugeOverlay.LEGEND)
+            gaugesLegend.addView(legendLine(
+                    com.atakmap.android.atmosphere.data.Nwps.label(category),
+                    GaugeOverlay.legendColor(category)));
     }
 
     private void askToAllowStations() {
@@ -1744,6 +1875,10 @@ public final class AtmospherePane {
         if (stationLayer != null && on == allowed(StationOverlay.LAYER_ID))
             stationLayer.setOn(on);
         else if (stationLayer != null && on)
+            blocked++;
+        if (gaugeLayer != null && on == allowed(GaugeOverlay.LAYER_ID))
+            gaugeLayer.setOn(on);
+        else if (gaugeLayer != null && on)
             blocked++;
         final Context ctx = MapCompat.atakContext();
         if (blocked > 0 && ctx != null)
@@ -2428,6 +2563,18 @@ public final class AtmospherePane {
             stationsBasis.setText(RedFlag.basis());
         }
 
+        final boolean gaugesOn = gaugeLayer != null && gaugeLayer.isOn();
+        gaugesToggle.setText(gaugesOn ? R.string.gauges_on : R.string.gauges_off);
+        gaugesToggle.setTextColor(pluginContext.getResources().getColor(
+                gaugesOn ? R.color.state_on : R.color.state_off));
+        gaugesExpand.setVisibility(gaugesOn ? View.VISIBLE : View.GONE);
+        gaugesExpand.setRotation(gaugesOpen ? 180f : 0f);
+        gaugesSettings.setVisibility(gaugesOn && gaugesOpen ? View.VISIBLE : View.GONE);
+        if (gaugesOn) {
+            buildGaugesOriginRow();
+            buildGaugesDistanceRow();
+            buildGaugesLegend();
+        }
         final boolean spotOn = spotLayer != null && spotLayer.isOn();
         spotToggle.setText(spotOn ? R.string.spot_layer_on : R.string.spot_layer_off);
         spotToggle.setTextColor(pluginContext.getResources().getColor(

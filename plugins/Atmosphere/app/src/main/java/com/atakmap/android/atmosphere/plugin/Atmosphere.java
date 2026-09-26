@@ -15,6 +15,7 @@ import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
+import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -83,6 +84,7 @@ public class Atmosphere implements IPlugin {
     private WarningsOverlay warnings;
     private SpotOverlay spotLayer;
     private StationOverlay stations;
+    private GaugeOverlay gauges;
 
     public Atmosphere(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -145,6 +147,8 @@ public class Atmosphere implements IPlugin {
         spotLayer.start();
         stations = new StationOverlay(mapView, pluginContext, egress);
         stations.start();
+        gauges = new GaugeOverlay(mapView, pluginContext, egress);
+        gauges.start();
         tropical = new TropicalOverlay(mapView, pluginContext, egress);
         tropical.start();
         if (stormDetails == null) {
@@ -174,6 +178,7 @@ public class Atmosphere implements IPlugin {
             atmospherePane.setWarnings(warnings);
             atmospherePane.setSpotLayer(spotLayer);
             atmospherePane.setStations(stations);
+            atmospherePane.setGauges(gauges);
             atmospherePane.setTropical(tropical);
         }
     }
@@ -195,6 +200,10 @@ public class Atmosphere implements IPlugin {
             }
             stormDetails.dispose();
             stormDetails = null;
+        }
+        if (gauges != null) {
+            gauges.stop();
+            gauges = null;
         }
         if (tropical != null) {
             tropical.stop();
@@ -266,6 +275,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setSpotLayer(spotLayer);
             if (stations != null)
                 atmospherePane.setStations(stations);
+            if (gauges != null)
+                atmospherePane.setGauges(gauges);
             if (tropical != null)
                 atmospherePane.setTropical(tropical);
         }

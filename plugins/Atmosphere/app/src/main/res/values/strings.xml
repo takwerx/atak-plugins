@@ -39,6 +39,11 @@
     <string name="stations_allow_title">Show weather stations?</string>
     <string name="stations_allow_text">Atmosphere will ask the National Interagency Fire Center for the fire weather stations around you and what they are reading.\n\nUnlike the other layers, this one sends a position: the point you measure from, rounded as far as your precision setting says. Switch it to Map center if you would rather it never send where you are.\n\nServer: services3.arcgis.com</string>
     <string name="stations_on">Weather stations ON</string>
+    <string name="gauges_on">River gauges ON</string>
+    <string name="gauges_off">River gauges OFF</string>
+    <string name="gauges_allow_title">Show river gauges?</string>
+    <string name="gauges_allow_text">Atmosphere will ask the National Water Prediction Service for the river gauges around you, what they read and what they forecast.\n\nLike the weather stations, this one sends a position: a box around the point you measure from, rounded as far as your precision setting says. Switch it to Map center if you would rather it never send where you are.\n\nServer: api.water.noaa.gov</string>
+    <string name="gauges_credit">River gauges and forecasts from the National Water Prediction Service (api.water.noaa.gov)</string>
     <string name="stations_off">Weather stations OFF</string>
     <string name="stations_around_heading">Around</string>
     <string name="stations_distance_heading">Distance</string>
