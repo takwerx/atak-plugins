@@ -57,7 +57,7 @@ final class StationIcons {
     private static final String TAG = "AtmosphereStations";
 
     /** Bump when the drawing changes, or stale files are served under the same names. */
-    private static final int VERSION = 9;
+    private static final int VERSION = 10;
 
     /** Below criteria: the symbol as it normally reads. */
     static final int NORMAL = 0xFFFFFFFF;
@@ -79,7 +79,15 @@ final class StationIcons {
     private static final int DISC = 0xFF1B3B8B;
     private static final int DISC_EDGE = 0xFFFFFFFF;
 
-    private static final int LABEL_BG = 0x99000000;
+    /**
+     * Nearly opaque.
+     *
+     * <p>It was 60% black, which let the basemap through and washed the emphasis
+     * colors out to the point of being unreadable (operator, 2026-09-25: "really hard
+     * to see the colors in the pill box"). A label that has to carry color cannot
+     * also be a window.
+     */
+    private static final int LABEL_BG = 0xE6000000;
 
     /**
      * The Snooper's emphasis, as colors that work on a dark pill.
@@ -90,10 +98,10 @@ final class StationIcons {
      * meaning in lighter shades.
      */
     private static final int[] BAND = {
-            0xFFBFC7D0,     // plain: dimmer than the rest, so emphasis reads as such
+            0xFF9FA8B2,     // plain: dimmer than the rest, so emphasis reads as such
             0xFFFFFFFF,     // worth noticing
-            0xFFCE93D8,     // likely near critical
-            0xFFFF6E6E      // extreme
+            0xFFE87CFF,     // likely near critical
+            0xFFFF5252      // extreme
     };
     private static final int PAD_X = 6, PAD_Y = 3, GAP = 3, RADIUS = 4;
 
@@ -353,10 +361,15 @@ final class StationIcons {
         }
     }
 
+    /** Measured the way it will be drawn: the bold runs are wider than the rest. */
     private static float measure(Paint p, List<Piece> pieces) {
         float w = 0;
-        for (Piece piece : pieces)
+        final boolean was = p.isFakeBoldText();
+        for (Piece piece : pieces) {
+            p.setFakeBoldText(piece.band > Snooper.PLAIN);
             w += p.measureText(piece.text);
+        }
+        p.setFakeBoldText(was);
         return w;
     }
 
@@ -597,13 +610,18 @@ final class StationIcons {
                 RADIUS, RADIUS, p);
         // Both lines centered on the pill: the name is shorter than the readings
         // almost always, and left-aligned under them it reads as a stray caption.
+        // Weight as well as color, which is how the Snooper does it: an emphasized
+        // reading is bold against a lighter default, so it still reads as the one
+        // that matters even where the color is hard to tell apart.
         float x = pillCx - measure(big, pieces) / 2f;
         final float baseline = top + PAD_Y - bm.ascent;
         for (Piece piece : pieces) {
             big.setColor(BAND[piece.band]);
+            big.setFakeBoldText(piece.band > Snooper.PLAIN);
             c.drawText(piece.text, x, baseline, big);
             x += big.measureText(piece.text);
         }
+        big.setFakeBoldText(true);
         big.setColor(0xFFFFFFFF);
         if (!title.isEmpty())
             c.drawText(title, pillCx - small.measureText(title) / 2f,
