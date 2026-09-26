@@ -3288,6 +3288,28 @@ public final class AtmospherePane {
         attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
     }
 
+    /** True when no hour of the whole forecast has a value for the element. */
+    private boolean neverIssued(String key) {
+        if (snapshot == null)
+            return false;
+        for (SeriesEntry e : snapshot.series) {
+            final Reading r = e.reading(key);
+            if (r != null && !Double.isNaN(r.value))
+                return false;
+        }
+        return true;
+    }
+
+    /** A tile whose value is a sentence, not a number: smaller, dimmer, allowed to wrap. */
+    private View noteTile(String label, String note) {
+        final LinearLayout t = (LinearLayout) tile(label, note);
+        final TextView v = (TextView) t.getChildAt(0);
+        v.setTextSize(13);
+        v.setAlpha(0.7f);
+        v.setTypeface(Typeface.DEFAULT);
+        return t;
+    }
+
     /** The first hour's 10 m wind, or null when the source has none or it is blank. */
     private Reading tenMeterWind() {
         if (snapshot == null || snapshot.series.isEmpty())
@@ -3324,6 +3346,12 @@ public final class AtmospherePane {
                 // 2026-09-26). The 10 m wind for the hour, labeled as such, beats a
                 // dash -- and beats a number that does not say which wind it is.
                 row.addView(tile("Wind (10 m)", tenMeterWind().format(units)));
+            } else if (Double.isNaN(r.value) && neverIssued(r.key)) {
+                // The grid defines every element for every office and each office
+                // fills the ones it issues: WBGT is there at SGX, LOX, REV and PDT and
+                // empty at MTR and BOI (measured 2026-09-26). A dash would read as
+                // "no value this hour"; the truth is that this office never has one.
+                row.addView(noteTile(tileLabel(r), "Not issued by this office"));
             } else {
                 row.addView(tile(tileLabel(r), r.format(units)));
             }
@@ -3348,7 +3376,11 @@ public final class AtmospherePane {
             case WIND: return "Wind (10 m)";
             case WIND20: return "20-ft wind";
             case GUST: return "Gusts";
+            case TRANSPORT: return "Transport wind";
             case DIR: return "Wind from";
+            case TDIR: return "Transport from";
+            case MIXING: return "Mixing height";
+            case WBGT: return "Wet bulb globe";
             case POP: return "Precip chance";
             case PRECIP: return "Precip";
             case SKY: return "Sky cover";
@@ -3421,7 +3453,7 @@ public final class AtmospherePane {
         final List<Reading> chips = new ArrayList<>();
         for (Reading r : order) {
             final Kind k = kind(r);
-            if (k != Kind.DIR && k != Kind.SKY && k != Kind.OTHER)
+            if (k != Kind.DIR && k != Kind.TDIR && k != Kind.SKY && k != Kind.OTHER)
                 chips.add(r);
         }
         final boolean any = !chips.isEmpty() && !snapshot.series.isEmpty();
@@ -3510,6 +3542,9 @@ public final class AtmospherePane {
             case WIND: return "Wind (10 m) " + Units.displayUnit(Quantity.SPEED, units);
             case WIND20: return "20-ft wind " + Units.displayUnit(Quantity.SPEED, units);
             case GUST: return "Gusts " + Units.displayUnit(Quantity.SPEED, units);
+            case TRANSPORT: return "Transport wind " + Units.displayUnit(Quantity.SPEED, units);
+            case MIXING: return "Mixing height " + Units.displayUnit(Quantity.HEIGHT, units);
+            case WBGT: return "Wet bulb globe";
             case POP: return "Precip chance";
             case PRECIP: return "Precip " + Units.displayUnit(Quantity.PRECIPITATION, units);
             default: return r.label;
@@ -3703,7 +3738,8 @@ public final class AtmospherePane {
 
     /** What a reading is, from its quantity and its name, so days can be aggregated. */
     private enum Kind {
-        TEMP, DEW, FEELS, RH, WIND, WIND20, GUST, DIR, POP, PRECIP, SKY, OTHER;
+        TEMP, DEW, FEELS, WBGT, RH, WIND, WIND20, GUST, TRANSPORT, DIR, TDIR, MIXING, POP,
+        PRECIP, SKY, OTHER;
 
         static Kind fromName(String n) {
             if (n == null) return TEMP;
@@ -3718,8 +3754,11 @@ public final class AtmospherePane {
         switch (r.quantity) {
             case TEMPERATURE:
                 if (k.contains("dew")) return Kind.DEW;
+                if (k.contains("wet bulb") || k.contains("wetbulb")) return Kind.WBGT;
                 if (k.contains("feel") || k.contains("apparent")) return Kind.FEELS;
                 return Kind.TEMP;
+            case HEIGHT:
+                return k.contains("mixing") ? Kind.MIXING : Kind.OTHER;
             case PERCENT:
                 if (k.contains("humid")) return Kind.RH;
                 if (k.contains("precip")) return Kind.POP;
@@ -3728,13 +3767,15 @@ public final class AtmospherePane {
             case SPEED:
                 if (k.contains("gust"))
                     return Kind.GUST;
+                if (k.contains("transport"))
+                    return Kind.TRANSPORT;
                 // The fire weather wind: every prescription and spot forecast is
                 // written in 20-foot winds, and this is the one the readout quotes.
                 if (k.contains("twentyfoot") || k.contains("20-ft"))
                     return Kind.WIND20;
                 return Kind.WIND;
             case ANGLE:
-                return Kind.DIR;
+                return k.contains("transport") ? Kind.TDIR : Kind.DIR;
             case PRECIPITATION:
                 return Kind.PRECIP;
             default:
@@ -3752,7 +3793,11 @@ public final class AtmospherePane {
             case WIND: return "10 m";
             case WIND20: return "20-ft";
             case GUST: return "Gust";
+            case TRANSPORT: return "Transp";
             case DIR: return "Dir";
+            case TDIR: return "T dir";
+            case MIXING: return "Mix ht";
+            case WBGT: return "WBGT";
             case POP: return "Precip %";
             case PRECIP: return "Precip";
             case SKY: return "Sky";

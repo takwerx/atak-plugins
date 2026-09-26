@@ -210,7 +210,10 @@ public class ResponseMapperTest {
                 + "\"twentyFootWindDirection\": {\"uom\": \"wmoUnit:degree_(angle)\", \"values\": ["
                 + "  {\"validTime\": \"2026-09-26T12:00:00+00:00/PT3H\", \"value\": 240}]},"
                 + "\"skyCover\": {\"uom\": \"wmoUnit:percent\", \"values\": ["
-                + "  {\"validTime\": \"2026-09-26T12:00:00+00:00/P1D\", \"value\": 37}]}"
+                + "  {\"validTime\": \"2026-09-26T12:00:00+00:00/P1D\", \"value\": 37}]},"
+                + "\"mixingHeight\": {\"uom\": \"wmoUnit:m\", \"values\": ["
+                + "  {\"validTime\": \"2026-09-26T13:00:00+00:00/PT1H\", \"value\": 1658.7216}]},"
+                + "\"wetBulbGlobeTemperature\": {\"uom\": \"wmoUnit:degC\", \"values\": []}"
                 + "}}";
         // Fetched at 13:20Z: the 12Z hour is gone, 13Z is now.
         final long fetchedAt = IsoTime.parse("2026-09-26T13:20:00Z");
@@ -224,6 +227,9 @@ public class ResponseMapperTest {
         assertEquals(10.0, now.reading("twentyFootWindSpeed").value, EPS); // 36 km/h -> m/s
         assertEquals(240.0, now.reading("twentyFootWindDirection").value, EPS);
         assertEquals(37.0, now.reading("skyCover").value, EPS);
+        assertEquals(1658.7216, now.reading("mixingHeight").value, EPS);
+        // Defined for the office, never filled: a reading, NaN, on every hour.
+        assertTrue(Double.isNaN(now.reading("wetBulbGlobeTemperature").value));
 
         final SeriesEntry next = snap.series.get(1);
         assertEquals(22.0, next.reading("temperature").value, EPS);

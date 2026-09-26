@@ -60,6 +60,15 @@ public final class Units {
                     return value * 0.514444;
                 return value;
 
+            case HEIGHT:
+                if (u.equals("m") || u.equals("meter") || u.equals("meters"))
+                    return value;
+                if (u.equals("km"))
+                    return value * 1000.0;
+                if (u.equals("ft") || u.equals("feet"))
+                    return value * 0.3048;
+                return value;
+
             case LENGTH:
                 if (u.equals("m"))
                     return value;
@@ -119,6 +128,8 @@ public final class Units {
                 if (system == UnitSystem.AVIATION)
                     return canonical / 1852.0;              // nautical miles
                 return canonical / 1609.344;                // statute miles
+            case HEIGHT:
+                return metric ? canonical : canonical / 0.3048;   // feet, aviation too
             case PRECIPITATION:
                 return metric ? canonical : canonical / 25.4;
             case PRESSURE:
@@ -144,6 +155,8 @@ public final class Units {
                 if (metric)
                     return "km";
                 return system == UnitSystem.AVIATION ? "NM" : "mi";
+            case HEIGHT:
+                return metric ? "m" : "ft";
             case PRECIPITATION:
                 return metric ? "mm" : "in";
             case PRESSURE:
@@ -180,6 +193,8 @@ public final class Units {
                 return system == UnitSystem.AVIATION ? 2 : 0;
             case LENGTH:
                 return 1;
+            case HEIGHT:
+                return 0;
             // Whole degrees and whole speeds: a crew reads "72 °F" and "10 mph" off a
             // mount; the tenth is noise the forecast does not have anyway.
             case TEMPERATURE:

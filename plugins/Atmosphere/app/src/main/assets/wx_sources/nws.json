@@ -74,6 +74,38 @@
       "defaultOn": false
     },
     {
+      "key": "mixingHeight",
+      "label": "Mixing height",
+      "quantity": "height",
+      "unitPath": "uom",
+      "seriesPath": "mixingHeight",
+      "defaultOn": true
+    },
+    {
+      "key": "transportWindSpeed",
+      "label": "Transport wind",
+      "quantity": "speed",
+      "unitPath": "uom",
+      "seriesPath": "transportWindSpeed",
+      "defaultOn": true
+    },
+    {
+      "key": "transportWindDirection",
+      "label": "Transport wind direction",
+      "quantity": "angle",
+      "unitPath": "uom",
+      "seriesPath": "transportWindDirection",
+      "defaultOn": false
+    },
+    {
+      "key": "wetBulbGlobeTemperature",
+      "label": "Wet bulb globe temperature",
+      "quantity": "temperature",
+      "unitPath": "uom",
+      "seriesPath": "wetBulbGlobeTemperature",
+      "defaultOn": true
+    },
+    {
       "key": "probabilityOfPrecipitation",
       "label": "Chance of precipitation",
       "quantity": "percent",
@@ -95,22 +127,6 @@
       "quantity": "temperature",
       "unitPath": "uom",
       "seriesPath": "dewpoint",
-      "defaultOn": false
-    },
-    {
-      "key": "transportWindSpeed",
-      "label": "Transport wind",
-      "quantity": "speed",
-      "unitPath": "uom",
-      "seriesPath": "transportWindSpeed",
-      "defaultOn": false
-    },
-    {
-      "key": "transportWindDirection",
-      "label": "Transport wind direction",
-      "quantity": "angle",
-      "unitPath": "uom",
-      "seriesPath": "transportWindDirection",
       "defaultOn": false
     }
   ]

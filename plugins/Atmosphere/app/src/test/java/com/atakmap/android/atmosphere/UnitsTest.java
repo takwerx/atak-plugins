@@ -28,6 +28,15 @@ public class UnitsTest {
 
     /** NWS reports units as UCUM codes; they must not fall through as "unknown". */
     @Test
+    public void heightIsFeetOrMetersNeverMiles() {
+        assertEquals(1659.0, Units.toCanonical(Quantity.HEIGHT, "wmoUnit:m", 1659.0), EPS);
+        assertEquals(304.8, Units.toCanonical(Quantity.HEIGHT, "ft", 1000.0), EPS);
+        assertEquals("5443 ft", Units.format(Quantity.HEIGHT, 1659.0, UnitSystem.IMPERIAL));
+        assertEquals("5443 ft", Units.format(Quantity.HEIGHT, 1659.0, UnitSystem.AVIATION));
+        assertEquals("1659 m", Units.format(Quantity.HEIGHT, 1659.0, UnitSystem.METRIC));
+    }
+
+    @Test
     public void wmoUnitCodesAreUnderstood() {
         assertEquals(20.0, Units.toCanonical(Quantity.TEMPERATURE, "wmoUnit:degC", 20.0), EPS);
         assertEquals(10.0, Units.toCanonical(Quantity.SPEED, "wmoUnit:m_s-1", 10.0), EPS);

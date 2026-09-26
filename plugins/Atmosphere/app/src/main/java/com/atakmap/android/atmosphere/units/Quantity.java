@@ -9,6 +9,8 @@ public enum Quantity {
     TEMPERATURE,
     SPEED,
     LENGTH,
+    /** A height above ground -- a mixing height -- in feet or meters, never miles. */
+    HEIGHT,
     PRECIPITATION,
     PRESSURE,
     ANGLE,
