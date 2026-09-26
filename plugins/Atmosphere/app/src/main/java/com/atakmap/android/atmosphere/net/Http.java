@@ -57,6 +57,42 @@ public final class Http {
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
+    /**
+     * A megabytes-once download -- a station list -- on a thread of its own, with a
+     * read timeout to match. The shared pool is three threads, and on 2026-09-26 all
+     * three sat asleep on stalled polls while a page waited on this queue behind
+     * them, silently, for minutes.
+     */
+    private static final ExecutorService LARGE = Executors.newSingleThreadExecutor(
+            new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable r) {
+                    final Thread t = new Thread(r, "wx-http-large");
+                    t.setDaemon(true);
+                    return t;
+                }
+            });
+    private static final int LARGE_READ_TIMEOUT_MS = 60_000;
+
+    public static void getLarge(final String url, final String userAgent,
+            final Map<String, String> headers, final Callback callback) {
+        LARGE.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    deliver(callback, new String(requestBytes(url, userAgent, headers,
+                            LARGE_READ_TIMEOUT_MS), "UTF-8"), null);
+                } catch (IOException e) {
+                    Log.w(TAG, "GET (large) failed: " + safeUrl(url), e);
+                    deliver(callback, null, describe(e));
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "GET (large) failed hard: " + safeUrl(url), e);
+                    deliver(callback, null, "request failed");
+                }
+            }
+        });
+    }
+
     private Http() {
     }
 
@@ -227,7 +263,14 @@ public final class Http {
 
     private static byte[] requestBytes(String url, String userAgent,
             Map<String, String> headers) throws IOException {
+        return requestBytes(url, userAgent, headers, READ_TIMEOUT_MS);
+    }
 
+    private static byte[] requestBytes(String url, String userAgent,
+            Map<String, String> headers, int readTimeoutMs) throws IOException {
+
+        // Said at the start, so a request that never answers is still in the log.
+        Log.d(TAG, "GET " + safeUrl(url));
         final URL parsed = new URL(url);
         if (!"https".equalsIgnoreCase(parsed.getProtocol()))
             throw new IOException("refusing a non-https request");
@@ -238,7 +281,7 @@ public final class Http {
             conn = (HttpsURLConnection) parsed.openConnection();
             conn.setRequestMethod("GET");
             conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            conn.setReadTimeout(READ_TIMEOUT_MS);
+            conn.setReadTimeout(readTimeoutMs);
             conn.setInstanceFollowRedirects(true);
             conn.setRequestProperty("User-Agent", userAgent);
             conn.setRequestProperty("Accept-Encoding", "identity");

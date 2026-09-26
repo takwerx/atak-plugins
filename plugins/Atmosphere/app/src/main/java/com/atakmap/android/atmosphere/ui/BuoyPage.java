@@ -477,11 +477,11 @@ public final class BuoyPage {
         listsRequested = true;
         final EgressPolicy egress = host.egress();
         final java.util.Map<String, String> h = new java.util.HashMap<>();
-        Http.get(Coops.TIDE_STATIONS_URL, egress.userAgent(), h, new Http.Callback() {
+        Http.getLarge(Coops.TIDE_STATIONS_URL, egress.userAgent(), h, new Http.Callback() {
             @Override
             public void onSuccess(String body) {
                 tideStations = Coops.parseStations(body);
-                Http.get(Coops.CURRENT_STATIONS_URL, egress.userAgent(), h, new Http.Callback() {
+                Http.getLarge(Coops.CURRENT_STATIONS_URL, egress.userAgent(), h, new Http.Callback() {
                     @Override
                     public void onSuccess(String body2) {
                         currentStations = Coops.parseStations(body2);
