@@ -48,9 +48,12 @@ public final class ResponseMapper {
             current.add(readingAt(root, p, p.currentPath, root));
         }
 
-        final List<SeriesEntry> series = def.layout == WxSourceDef.Layout.RECORDS
-                ? mapRecords(def, root)
-                : mapColumns(def, root);
+        final List<SeriesEntry> series;
+        switch (def.layout) {
+            case RECORDS: series = mapRecords(def, root); break;
+            case GRID: series = mapGrid(def, root, fetchedAt); break;
+            default: series = mapColumns(def, root); break;
+        }
 
         return new Snapshot(def.id, def.displayName, def.attribution, latitude, longitude,
                 fetchedAt, current, series);
@@ -76,6 +79,82 @@ public final class ResponseMapper {
             }
             final String timeRaw = times.optString(i, null);
             out.add(new SeriesEntry(IsoTime.parse(timeRaw), timeRaw, readings));
+        }
+        return out;
+    }
+
+    /**
+     * One object of elements, each a series of timed spans -- the NWS forecast grid.
+     *
+     * <p>A value there is "11 km/h from 00Z for two hours", so every span is spread
+     * over the hours it covers and the hours are joined across elements. Hours before
+     * the fetch are dropped: the grid holds the current day from midnight, and the
+     * first entry is what the readout shows as now. An element with no value for an
+     * hour still gets a reading, NaN, so the readout shows a dash and not a different
+     * variable in its place.
+     */
+    private static List<SeriesEntry> mapGrid(WxSourceDef def, JSONObject root, long fetchedAt) {
+        final List<SeriesEntry> out = new ArrayList<>();
+        final Object elementsObj = JsonPath.get(root, def.recordsPath);
+        if (!(elementsObj instanceof JSONObject))
+            return out;
+        final JSONObject elements = (JSONObject) elementsObj;
+        final long hour = 3_600_000L;
+        final long start = fetchedAt <= 0 ? 0 : (fetchedAt / hour) * hour;
+        final long end = start + MAX_SERIES * hour;
+
+        // hour millis -> readings by param key, in time order
+        final java.util.TreeMap<Long, java.util.Map<String, Reading>> hours =
+                new java.util.TreeMap<>();
+        for (WxParam p : def.params) {
+            if (p.seriesPath == null)
+                continue;
+            final JSONObject el = elements.optJSONObject(p.seriesPath);
+            if (el == null)
+                continue;
+            final JSONArray values = el.optJSONArray("values");
+            if (values == null)
+                continue;
+            final String unit = unitFor(p, el, root);
+            for (int i = 0; i < values.length(); i++) {
+                final JSONObject v = values.optJSONObject(i);
+                if (v == null)
+                    continue;
+                final String validTime = v.optString("validTime", "");
+                final int slash = validTime.indexOf('/');
+                final long from = IsoTime.parse(slash < 0 ? validTime
+                        : validTime.substring(0, slash));
+                if (from == 0)
+                    continue;
+                final int span = slash < 0 ? 1
+                        : IsoTime.durationHours(validTime.substring(slash + 1));
+                final Reading r = reading(p, v.opt("value"), unit);
+                for (int h = 0; h < span; h++) {
+                    final long at = from + h * hour;
+                    if (at < start || at >= end)
+                        continue;
+                    java.util.Map<String, Reading> byKey = hours.get(at);
+                    if (byKey == null) {
+                        byKey = new java.util.HashMap<>();
+                        hours.put(at, byKey);
+                    }
+                    byKey.put(p.key, r);
+                }
+            }
+        }
+        for (java.util.Map.Entry<Long, java.util.Map<String, Reading>> e : hours.entrySet()) {
+            final List<Reading> readings = new ArrayList<>();
+            for (WxParam p : def.params) {
+                if (p.seriesPath == null)
+                    continue;
+                final Reading r = e.getValue().get(p.key);
+                readings.add(r != null ? r
+                        : new Reading(p.key, p.label, p.quantity, Double.NaN));
+            }
+            final long at = e.getKey();
+            out.add(new SeriesEntry(at, IsoTime.formatHourUtc(at), readings));
+            if (out.size() >= MAX_SERIES)
+                break;
         }
         return out;
     }

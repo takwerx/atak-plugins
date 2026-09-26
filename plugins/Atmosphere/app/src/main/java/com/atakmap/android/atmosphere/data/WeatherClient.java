@@ -73,7 +73,7 @@ public final class WeatherClient {
 
         final String lat = egress.latitude(point);
         final String lon = egress.longitude(point);
-        final String cacheKey = SnapshotStore.key(def.id, lat, lon);
+        final String cacheKey = SnapshotStore.key(def.id + "@" + def.shape(), lat, lon);
         final long now = System.currentTimeMillis();
 
         final SnapshotStore.Entry cached = store.read(cacheKey);
@@ -106,7 +106,10 @@ public final class WeatherClient {
             final String lat, final String lon, final String cacheKey,
             final SnapshotStore.Entry cached, final Listener listener) {
 
-        final String resolveKey = SnapshotStore.key(def.id + "-resolve", lat, lon);
+        // The shape is in the key: a definition that now resolves a different product
+        // must not be handed the URL the old one cached (see WxSourceDef.shape).
+        final String resolveKey = SnapshotStore.key(def.id + "@" + def.shape() + "-resolve",
+                lat, lon);
         final SnapshotStore.Entry resolved = store.read(resolveKey);
         final long now = System.currentTimeMillis();
 

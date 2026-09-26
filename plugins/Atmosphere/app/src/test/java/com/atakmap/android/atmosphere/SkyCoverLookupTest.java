@@ -24,17 +24,42 @@ import java.nio.file.Paths;
  */
 public class SkyCoverLookupTest {
 
+    /**
+     * The hourly-periods definition this table lived in until 2026-09-26. The bundled
+     * NWS source reads the forecast grid now, where sky cover is a plain percentage;
+     * the lookup parse is still a feature of the schema, so the table is pinned here.
+     */
+    private static final String NWS_HOURLY = "{\"schemaVersion\": 1, \"sourceId\": \"nws-hourly\", \"displayName\": \"NWS hourly\","
+            + " \"resolveUrl\": \"https://api.weather.gov/points/{lat},{lon}\","
+            + " \"resolvePath\": \"properties.forecastHourly\","
+            + " \"headers\": {\"Accept\": \"application/geo+json\"},"
+            + " \"layout\": \"records\", \"recordsPath\": \"properties.periods\","
+            + " \"timePath\": \"startTime\", \"parameters\": ["
+            + "  {\"key\": \"temperature\", \"label\": \"Temperature\", \"quantity\": \"temperature\","
+            + "   \"unitPath\": \"temperatureUnit\", \"seriesPath\": \"temperature\", \"defaultOn\": true},"
+            + "  {\"key\": \"relativeHumidity\", \"label\": \"Relative humidity\", \"quantity\": \"percent\","
+            + "   \"seriesPath\": \"relativeHumidity.value\", \"defaultOn\": true},"
+            + "  {\"key\": \"windSpeed\", \"label\": \"Wind\", \"quantity\": \"speed\", \"unit\": \"mph\","
+            + "   \"parse\": \"leadingNumber\", \"seriesPath\": \"windSpeed\", \"defaultOn\": true},"
+            + "  {\"key\": \"windDirection\", \"label\": \"Wind direction\", \"quantity\": \"angle\","
+            + "   \"parse\": \"compass\", \"seriesPath\": \"windDirection\", \"defaultOn\": true},"
+            + "  {\"key\": \"probabilityOfPrecipitation\", \"label\": \"Chance of precipitation\","
+            + "   \"quantity\": \"percent\", \"seriesPath\": \"probabilityOfPrecipitation.value\", \"defaultOn\": true},"
+            + "  {\"key\": \"skyCover\", \"label\": \"Sky cover\", \"quantity\": \"percent\", \"seriesPath\": \"icon\","
+            + "   \"parse\": \"lookup\", \"defaultOn\": true, \"lookup\": [[\"skc\", 0], [\"few\", 15], [\"sct\", 37],"
+            + "   [\"bkn\", 69], [\"ovc\", 94], [\"blizzard\", 100], [\"snow\", 88], [\"sleet\", 88],"
+            + "   [\"fzra\", 88], [\"tsra\", 69], [\"rain\", 69]]}"
+            + "]}";
+
     private static WxParam skyCover() throws IOException {
-        final String json = new String(Files.readAllBytes(
-                Paths.get("src/main/assets/wx_sources/nws.json")), StandardCharsets.UTF_8);
-        final WxSourceParser.Result r = WxSourceParser.parse(json, WxSourceDef.Origin.BUNDLED,
-                "nws.json");
-        assertTrue("nws.json must parse: " + r.errors, r.errors.isEmpty());
+        final WxSourceParser.Result r = WxSourceParser.parse(NWS_HOURLY,
+                WxSourceDef.Origin.BUNDLED, "nws-hourly.json");
+        assertTrue("the hourly definition must parse: " + r.errors, r.errors.isEmpty());
         for (WxParam p : r.def.params) {
             if (p.key.equals("skyCover"))
                 return p;
         }
-        throw new AssertionError("nws.json has no skyCover parameter");
+        throw new AssertionError("no skyCover parameter");
     }
 
     @Test

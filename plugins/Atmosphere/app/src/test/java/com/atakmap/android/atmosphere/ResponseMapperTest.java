@@ -7,6 +7,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.atakmap.android.atmosphere.data.ResponseMapper;
 import com.atakmap.android.atmosphere.model.Reading;
+import com.atakmap.android.atmosphere.data.IsoTime;
 import com.atakmap.android.atmosphere.model.SeriesEntry;
 import com.atakmap.android.atmosphere.model.Snapshot;
 import com.atakmap.android.atmosphere.source.WxSourceDef;
@@ -33,6 +34,39 @@ import java.nio.file.Files;
 public class ResponseMapperTest {
 
     private static final double EPS = 1e-6;
+
+    /**
+     * The NWS hourly-periods shape the bundled definition had until 2026-09-26, kept
+     * here because the records layout and the string parses it exercises still exist.
+     */
+    private static final String NWS_HOURLY = "{\"schemaVersion\": 1, \"sourceId\": \"nws-hourly\", \"displayName\": \"NWS hourly\","
+            + " \"resolveUrl\": \"https://api.weather.gov/points/{lat},{lon}\","
+            + " \"resolvePath\": \"properties.forecastHourly\","
+            + " \"headers\": {\"Accept\": \"application/geo+json\"},"
+            + " \"layout\": \"records\", \"recordsPath\": \"properties.periods\","
+            + " \"timePath\": \"startTime\", \"parameters\": ["
+            + "  {\"key\": \"temperature\", \"label\": \"Temperature\", \"quantity\": \"temperature\","
+            + "   \"unitPath\": \"temperatureUnit\", \"seriesPath\": \"temperature\", \"defaultOn\": true},"
+            + "  {\"key\": \"relativeHumidity\", \"label\": \"Relative humidity\", \"quantity\": \"percent\","
+            + "   \"seriesPath\": \"relativeHumidity.value\", \"defaultOn\": true},"
+            + "  {\"key\": \"windSpeed\", \"label\": \"Wind\", \"quantity\": \"speed\", \"unit\": \"mph\","
+            + "   \"parse\": \"leadingNumber\", \"seriesPath\": \"windSpeed\", \"defaultOn\": true},"
+            + "  {\"key\": \"windDirection\", \"label\": \"Wind direction\", \"quantity\": \"angle\","
+            + "   \"parse\": \"compass\", \"seriesPath\": \"windDirection\", \"defaultOn\": true},"
+            + "  {\"key\": \"probabilityOfPrecipitation\", \"label\": \"Chance of precipitation\","
+            + "   \"quantity\": \"percent\", \"seriesPath\": \"probabilityOfPrecipitation.value\", \"defaultOn\": true},"
+            + "  {\"key\": \"skyCover\", \"label\": \"Sky cover\", \"quantity\": \"percent\", \"seriesPath\": \"icon\","
+            + "   \"parse\": \"lookup\", \"defaultOn\": true, \"lookup\": [[\"skc\", 0], [\"few\", 15], [\"sct\", 37],"
+            + "   [\"bkn\", 69], [\"ovc\", 94], [\"blizzard\", 100], [\"snow\", 88], [\"sleet\", 88],"
+            + "   [\"fzra\", 88], [\"tsra\", 69], [\"rain\", 69]]}"
+            + "]}";
+
+    private static WxSourceDef inline(String json, String name) {
+        final WxSourceParser.Result r = WxSourceParser.parse(json,
+                WxSourceDef.Origin.BUNDLED, name);
+        assertTrue(r.errors.toString(), r.ok());
+        return r.def;
+    }
 
     private static WxSourceDef def(String file) throws Exception {
         final String json = new String(Files.readAllBytes(
@@ -94,7 +128,8 @@ public class ResponseMapperTest {
                 + " \"probabilityOfPrecipitation\": {\"value\": 20}}"
                 + "]}}";
 
-        final Snapshot s = ResponseMapper.map(def("nws.json"), body, 39.5, -120.25, 1L);
+        final Snapshot s = ResponseMapper.map(inline(NWS_HOURLY, "nws-hourly.json"), body,
+                39.5, -120.25, 1L);
 
         assertTrue("NWS has no current block", s.current.isEmpty());
         assertEquals(2, s.series.size());
@@ -161,5 +196,39 @@ public class ResponseMapperTest {
     public void bundledNwsNamesThePlacePaths() throws Exception {
         final WxSourceDef nws = def("nws.json");
         assertEquals(NWS_PLACE, nws.placePaths);
+    }
+
+    /** NWS forecast grid: elements of timed spans, joined by the hour from the fetch on. */
+    @Test
+    public void gridLayout() throws Exception {
+        final String body = "{\"properties\": {"
+                + "\"temperature\": {\"uom\": \"wmoUnit:degC\", \"values\": ["
+                + "  {\"validTime\": \"2026-09-26T12:00:00+00:00/PT2H\", \"value\": 20},"
+                + "  {\"validTime\": \"2026-09-26T14:00:00+00:00/PT1H\", \"value\": 22}]},"
+                + "\"twentyFootWindSpeed\": {\"uom\": \"wmoUnit:km_h-1\", \"values\": ["
+                + "  {\"validTime\": \"2026-09-26T13:00:00+00:00/PT1H\", \"value\": 36}]},"
+                + "\"twentyFootWindDirection\": {\"uom\": \"wmoUnit:degree_(angle)\", \"values\": ["
+                + "  {\"validTime\": \"2026-09-26T12:00:00+00:00/PT3H\", \"value\": 240}]},"
+                + "\"skyCover\": {\"uom\": \"wmoUnit:percent\", \"values\": ["
+                + "  {\"validTime\": \"2026-09-26T12:00:00+00:00/P1D\", \"value\": 37}]}"
+                + "}}";
+        // Fetched at 13:20Z: the 12Z hour is gone, 13Z is now.
+        final long fetchedAt = IsoTime.parse("2026-09-26T13:20:00Z");
+        final Snapshot snap = ResponseMapper.map(def("nws.json"), body, 33.5, -117.2, fetchedAt);
+
+        assertEquals(24 - 1, snap.series.size());   // sky cover spans the day from 12Z
+        final SeriesEntry now = snap.series.get(0);
+        assertEquals(IsoTime.parse("2026-09-26T13:00:00Z"), now.timeMillis);
+        assertEquals("2026-09-26T13:00:00Z", now.timeRaw);
+        assertEquals(20.0, now.reading("temperature").value, EPS);        // 12Z span, 2 h
+        assertEquals(10.0, now.reading("twentyFootWindSpeed").value, EPS); // 36 km/h -> m/s
+        assertEquals(240.0, now.reading("twentyFootWindDirection").value, EPS);
+        assertEquals(37.0, now.reading("skyCover").value, EPS);
+
+        final SeriesEntry next = snap.series.get(1);
+        assertEquals(22.0, next.reading("temperature").value, EPS);
+        // No 20-ft wind at 14Z: a reading, NaN, not a missing key.
+        assertTrue(Double.isNaN(next.reading("twentyFootWindSpeed").value));
+        assertEquals(240.0, next.reading("twentyFootWindDirection").value, EPS);
     }
 }

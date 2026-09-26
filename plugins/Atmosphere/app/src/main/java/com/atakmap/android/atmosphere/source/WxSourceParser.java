@@ -131,6 +131,8 @@ public final class WxSourceParser {
         if (layoutName != null) {
             if (layoutName.equalsIgnoreCase("records"))
                 layout = WxSourceDef.Layout.RECORDS;
+            else if (layoutName.equalsIgnoreCase("grid"))
+                layout = WxSourceDef.Layout.GRID;
             else if (!layoutName.equalsIgnoreCase("columns"))
                 errors.add(file + ": layout \"" + layoutName
                         + "\" is not \"columns\" or \"records\"");
@@ -139,6 +141,8 @@ public final class WxSourceParser {
         final String recordsPath = str(root, "recordsPath");
         if (layout == WxSourceDef.Layout.RECORDS && recordsPath == null)
             errors.add(file + ": layout \"records\" needs recordsPath");
+        if (layout == WxSourceDef.Layout.GRID && recordsPath == null)
+            errors.add(file + ": layout \"grid\" needs recordsPath (the elements object)");
 
         final Map<String, String> headers = new LinkedHashMap<>();
         final JSONObject headerObj = root.optJSONObject("headers");

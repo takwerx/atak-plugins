@@ -24,7 +24,14 @@ public final class WxSourceDef {
 
     public enum Layout {
         COLUMNS,
-        RECORDS
+        RECORDS,
+        /**
+         * One object of elements, each a series of timed spans -- the NWS forecast
+         * grid: {@code properties.<element>.values[] = {validTime: "ISO/PT2H", value}}.
+         * {@code recordsPath} names the elements object; a param's {@code seriesPath}
+         * is the element; {@code unitPath} is read inside it ({@code uom}).
+         */
+        GRID
     }
 
     /** Where the definition came from — shown in the UI so overrides are never a mystery. */
@@ -147,5 +154,23 @@ public final class WxSourceDef {
     @Override
     public String toString() {
         return id + " [" + origin + " " + originFile + "]";
+    }
+
+    /**
+     * A short token for what this definition reads: layout, URLs, paths and every
+     * parameter's key and path. Two definitions with the same id and a different
+     * shape must not share a cache -- the NWS source moved from the hourly periods to
+     * the forecast grid and the resolved URL cached under "nws" kept serving the old
+     * product to the new mapper, which made an empty readout (2026-09-26).
+     */
+    public String shape() {
+        final StringBuilder b = new StringBuilder();
+        b.append(layout).append('|').append(resolveUrl).append('|').append(resolvePath)
+                .append('|').append(requestUrl).append('|').append(recordsPath)
+                .append('|').append(timePath);
+        for (WxParam p : params)
+            b.append('|').append(p.key).append(':').append(p.seriesPath).append(':')
+                    .append(p.currentPath);
+        return Integer.toHexString(b.toString().hashCode());
     }
 }

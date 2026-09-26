@@ -10,6 +10,21 @@ import org.junit.Test;
 public class IsoTimeTest {
 
     @Test
+    public void durationsInHours() {
+        assertEquals(1, IsoTime.durationHours("PT1H"));
+        assertEquals(12, IsoTime.durationHours("PT12H"));
+        assertEquals(24, IsoTime.durationHours("P1D"));
+        assertEquals(30, IsoTime.durationHours("P1DT6H"));
+        assertEquals(1, IsoTime.durationHours("garbage"));
+        assertEquals(1, IsoTime.durationHours(null));
+    }
+
+    @Test
+    public void formatsAnHourUtc() {
+        assertEquals("2026-09-26T13:00:00Z", IsoTime.formatHourUtc(IsoTime.parse("2026-09-26T13:00:00Z")));
+    }
+
+    @Test
     public void bareTimestampIsUtc() {
         // Open-Meteo queried with timezone=UTC returns no offset at all.
         assertEquals(1755871200000L, IsoTime.parse("2025-08-22T14:00"));

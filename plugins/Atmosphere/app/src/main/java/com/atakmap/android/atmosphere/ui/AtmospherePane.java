@@ -3288,6 +3288,16 @@ public final class AtmospherePane {
         attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
     }
 
+    /** The first hour's 10 m wind, or null when the source has none or it is blank. */
+    private Reading tenMeterWind() {
+        if (snapshot == null || snapshot.series.isEmpty())
+            return null;
+        for (Reading r : snapshot.series.get(0).readings)
+            if (kind(r) == Kind.WIND && !Double.isNaN(r.value))
+                return r;
+        return null;
+    }
+
     private static final int TILE_COLUMNS = 3;
     /** Roboto Medium: the readout face. Not monospace, which spaced the digits like a terminal. */
     private static final Typeface VALUE_FACE = Typeface.create("sans-serif-medium", Typeface.NORMAL);
@@ -3307,10 +3317,16 @@ public final class AtmospherePane {
                 currentContainer.addView(row);
                 inRow = 0;
             }
-            if (kind(r) == Kind.SKY)
+            if (kind(r) == Kind.SKY) {
                 row.addView(skyTile(r));
-            else
+            } else if (kind(r) == Kind.WIND20 && Double.isNaN(r.value) && tenMeterWind() != null) {
+                // The grid has hours with no 20-foot wind (76 of 87 at SGX, measured
+                // 2026-09-26). The 10 m wind for the hour, labeled as such, beats a
+                // dash -- and beats a number that does not say which wind it is.
+                row.addView(tile("Wind (10 m)", tenMeterWind().format(units)));
+            } else {
                 row.addView(tile(tileLabel(r), r.format(units)));
+            }
             inRow++;
         }
         // Pad a short last row so its tiles keep the width of the others.
@@ -3329,7 +3345,8 @@ public final class AtmospherePane {
             case DEW: return "Dew point";
             case FEELS: return "Feels like";
             case RH: return "Humidity";
-            case WIND: return "Wind";
+            case WIND: return "Wind (10 m)";
+            case WIND20: return "20-ft wind";
             case GUST: return "Gusts";
             case DIR: return "Wind from";
             case POP: return "Precip chance";
@@ -3490,7 +3507,8 @@ public final class AtmospherePane {
             case DEW: return "Dew point";
             case FEELS: return "Feels like";
             case RH: return "Humidity";
-            case WIND: return "Wind " + Units.displayUnit(Quantity.SPEED, units);
+            case WIND: return "Wind (10 m) " + Units.displayUnit(Quantity.SPEED, units);
+            case WIND20: return "20-ft wind " + Units.displayUnit(Quantity.SPEED, units);
             case GUST: return "Gusts " + Units.displayUnit(Quantity.SPEED, units);
             case POP: return "Precip chance";
             case PRECIP: return "Precip " + Units.displayUnit(Quantity.PRECIPITATION, units);
@@ -3685,7 +3703,7 @@ public final class AtmospherePane {
 
     /** What a reading is, from its quantity and its name, so days can be aggregated. */
     private enum Kind {
-        TEMP, DEW, FEELS, RH, WIND, GUST, DIR, POP, PRECIP, SKY, OTHER;
+        TEMP, DEW, FEELS, RH, WIND, WIND20, GUST, DIR, POP, PRECIP, SKY, OTHER;
 
         static Kind fromName(String n) {
             if (n == null) return TEMP;
@@ -3708,7 +3726,13 @@ public final class AtmospherePane {
                 if (k.contains("cloud") || k.contains("sky")) return Kind.SKY;
                 return Kind.OTHER;
             case SPEED:
-                return k.contains("gust") ? Kind.GUST : Kind.WIND;
+                if (k.contains("gust"))
+                    return Kind.GUST;
+                // The fire weather wind: every prescription and spot forecast is
+                // written in 20-foot winds, and this is the one the readout quotes.
+                if (k.contains("twentyfoot") || k.contains("20-ft"))
+                    return Kind.WIND20;
+                return Kind.WIND;
             case ANGLE:
                 return Kind.DIR;
             case PRECIPITATION:
@@ -3725,7 +3749,8 @@ public final class AtmospherePane {
             case DEW: return "Dew pt";
             case FEELS: return "Feels";
             case RH: return "RH";
-            case WIND: return "Wind";
+            case WIND: return "10 m";
+            case WIND20: return "20-ft";
             case GUST: return "Gust";
             case DIR: return "Dir";
             case POP: return "Precip %";
@@ -3752,7 +3777,8 @@ public final class AtmospherePane {
                     tLo = Double.isNaN(tLo) ? r.value : Math.min(tLo, r.value);
                     break;
                 case RH: rhLo = Double.isNaN(rhLo) ? r.value : Math.min(rhLo, r.value); break;
-                case WIND: windHi = Double.isNaN(windHi) ? r.value : Math.max(windHi, r.value); break;
+                case WIND: case WIND20:
+                    windHi = Double.isNaN(windHi) ? r.value : Math.max(windHi, r.value); break;
                 case GUST: gustHi = Double.isNaN(gustHi) ? r.value : Math.max(gustHi, r.value); break;
                 case POP: popHi = Double.isNaN(popHi) ? r.value : Math.max(popHi, r.value); break;
                 case PRECIP: precipSum = Double.isNaN(precipSum) ? r.value : precipSum + r.value; break;

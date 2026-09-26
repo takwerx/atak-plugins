@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "sourceId": "nws",
   "displayName": "NWS (United States)",
-  "description": "National Weather Service hourly forecast. US coverage only, public domain, no API key. Two-step: the point lookup returns the gridpoint forecast URL.",
+  "description": "National Weather Service forecast grid (NDFD), hourly for seven days. US coverage only, public domain, no API key. Two-step: the point lookup returns the gridpoint URL. The grid carries the fire weather elements the hourly product does not: the 20-foot wind, gusts, transport wind, mixing height.",
   "attribution": "Forecast from the US National Weather Service (api.weather.gov)",
   "termsUrl": "https://www.weather.gov/documentation/services-web-api",
   "resolveUrl": "https://api.weather.gov/points/{lat},{lon}",
-  "resolvePath": "properties.forecastHourly",
+  "resolvePath": "properties.forecastGridData",
   "placePaths": [
     "properties.relativeLocation.properties.city",
     "properties.relativeLocation.properties.state"
@@ -14,15 +14,14 @@
   "headers": {
     "Accept": "application/geo+json"
   },
-  "layout": "records",
-  "recordsPath": "properties.periods",
-  "timePath": "startTime",
+  "layout": "grid",
+  "recordsPath": "properties",
   "parameters": [
     {
       "key": "temperature",
       "label": "Temperature",
       "quantity": "temperature",
-      "unitPath": "temperatureUnit",
+      "unitPath": "uom",
       "seriesPath": "temperature",
       "defaultOn": true
     },
@@ -30,93 +29,88 @@
       "key": "relativeHumidity",
       "label": "Relative humidity",
       "quantity": "percent",
-      "seriesPath": "relativeHumidity.value",
+      "unitPath": "uom",
+      "seriesPath": "relativeHumidity",
+      "defaultOn": true
+    },
+    {
+      "key": "twentyFootWindSpeed",
+      "label": "20-ft wind",
+      "quantity": "speed",
+      "unitPath": "uom",
+      "seriesPath": "twentyFootWindSpeed",
+      "defaultOn": true
+    },
+    {
+      "key": "twentyFootWindDirection",
+      "label": "20-ft wind direction",
+      "quantity": "angle",
+      "unitPath": "uom",
+      "seriesPath": "twentyFootWindDirection",
+      "defaultOn": true
+    },
+    {
+      "key": "windGust",
+      "label": "Gusts",
+      "quantity": "speed",
+      "unitPath": "uom",
+      "seriesPath": "windGust",
       "defaultOn": true
     },
     {
       "key": "windSpeed",
-      "label": "Wind",
+      "label": "Wind (10 m)",
       "quantity": "speed",
-      "unit": "mph",
-      "parse": "leadingNumber",
+      "unitPath": "uom",
       "seriesPath": "windSpeed",
-      "defaultOn": true
+      "defaultOn": false
     },
     {
       "key": "windDirection",
-      "label": "Wind direction",
+      "label": "Wind direction (10 m)",
       "quantity": "angle",
-      "parse": "compass",
+      "unitPath": "uom",
       "seriesPath": "windDirection",
-      "defaultOn": true
+      "defaultOn": false
     },
     {
       "key": "probabilityOfPrecipitation",
       "label": "Chance of precipitation",
       "quantity": "percent",
-      "seriesPath": "probabilityOfPrecipitation.value",
+      "unitPath": "uom",
+      "seriesPath": "probabilityOfPrecipitation",
       "defaultOn": true
     },
     {
       "key": "skyCover",
       "label": "Sky cover",
       "quantity": "percent",
-      "seriesPath": "icon",
-      "parse": "lookup",
-      "lookup": [
-        [
-          "skc",
-          0
-        ],
-        [
-          "few",
-          15
-        ],
-        [
-          "sct",
-          37
-        ],
-        [
-          "bkn",
-          69
-        ],
-        [
-          "ovc",
-          94
-        ],
-        [
-          "blizzard",
-          100
-        ],
-        [
-          "snow",
-          88
-        ],
-        [
-          "sleet",
-          88
-        ],
-        [
-          "fzra",
-          88
-        ],
-        [
-          "tsra",
-          69
-        ],
-        [
-          "rain",
-          69
-        ]
-      ],
+      "unitPath": "uom",
+      "seriesPath": "skyCover",
       "defaultOn": true
     },
     {
       "key": "dewpoint",
       "label": "Dew point",
       "quantity": "temperature",
-      "unitPath": "dewpoint.unitCode",
-      "seriesPath": "dewpoint.value",
+      "unitPath": "uom",
+      "seriesPath": "dewpoint",
+      "defaultOn": false
+    },
+    {
+      "key": "transportWindSpeed",
+      "label": "Transport wind",
+      "quantity": "speed",
+      "unitPath": "uom",
+      "seriesPath": "transportWindSpeed",
+      "defaultOn": false
+    },
+    {
+      "key": "transportWindDirection",
+      "label": "Transport wind direction",
+      "quantity": "angle",
+      "unitPath": "uom",
+      "seriesPath": "transportWindDirection",
       "defaultOn": false
     }
   ]

@@ -63,7 +63,11 @@ public class WxSourceParserTest {
         final WxSourceParser.Result r = WxSourceParser.parse(read("nws.json"),
                 WxSourceDef.Origin.BUNDLED, "nws.json");
         assertTrue(r.ok());
-        assertEquals(WxSourceDef.Layout.RECORDS, r.def.layout);
+        assertEquals(WxSourceDef.Layout.GRID, r.def.layout);
+        assertEquals("properties", r.def.recordsPath);
+        assertNotNull(r.def.param("twentyFootWindSpeed"));
+        assertTrue(r.def.param("twentyFootWindSpeed").defaultOn);
+        assertFalse(r.def.param("windSpeed").defaultOn);
         assertTrue(r.def.hasResolveStep());
         // A two-step source has no "current" block; the first forecast step stands in.
         assertFalse(r.def.hasCurrent());
