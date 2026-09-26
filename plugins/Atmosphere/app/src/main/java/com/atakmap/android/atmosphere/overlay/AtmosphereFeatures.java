@@ -524,6 +524,9 @@ final class AtmosphereFeatures {
                                     final String spotId = a.getStringAttribute("spotId");
                                     if (spotId != null && !spotId.isEmpty())
                                         item.setMetaString("spotId", spotId);
+                                    if (a.containsAttribute("_gaugeId"))
+                                        item.setMetaString("gaugeId",
+                                                a.getStringAttribute("_gaugeId"));
                                 } catch (Exception ignored) {
                                     // not a spot feature
                                 }

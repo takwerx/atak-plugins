@@ -295,6 +295,17 @@ public final class GaugePage {
         return Math.round(hours / 24) + " d ago";
     }
 
+    /** Open one gauge's record by id, from a tap on the map. */
+    public void showById(String lid) {
+        if (layer == null || lid == null)
+            return;
+        for (Nwps.Gauge g : layer.gauges())
+            if (lid.equals(g.lid)) {
+                showDetail(g);
+                return;
+            }
+    }
+
     private void showDetail(final Nwps.Gauge g) {
         showing = g;
         detailBody.removeAllViews();

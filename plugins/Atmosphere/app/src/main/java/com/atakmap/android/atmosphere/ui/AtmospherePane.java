@@ -2484,6 +2484,20 @@ public final class AtmospherePane {
         spotPage.showById(spotId);
     }
 
+    /** A gauge tapped on the map: its page, its record, its hydrograph. */
+    public void openGauge(final String lid) {
+        if (lid == null || lid.isEmpty() || gaugePage == null)
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == gaugePage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.show();
+        gaugePage.showById(lid);
+    }
+
     /** The egress gate: the host, by name, once. */
     private void askToAllowRadar() {
         final Context ctx = MapCompat.atakContext();

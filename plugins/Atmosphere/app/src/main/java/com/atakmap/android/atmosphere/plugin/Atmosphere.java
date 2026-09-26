@@ -169,6 +169,14 @@ public class Atmosphere implements IPlugin {
                         if (atmospherePane != null)
                             atmospherePane.openSpot(spotId);
                     }
+
+                    @Override
+                    public void openGauge(String lid) {
+                        if (atmospherePane == null)
+                            showPane();
+                        if (atmospherePane != null)
+                            atmospherePane.openGauge(lid);
+                    }
                 });
         if (atmospherePane != null) {
             atmospherePane.setRadar(radar);

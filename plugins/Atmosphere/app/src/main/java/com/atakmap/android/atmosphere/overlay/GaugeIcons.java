@@ -39,7 +39,7 @@ final class GaugeIcons {
     private static final String TAG = "AtmosphereGauges";
 
     /** Bump when the drawing changes, or a stale file is served under the same name. */
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
 
     static final int MAJOR = 0xFFCC33FF;
     static final int MODERATE = 0xFFFF0000;
@@ -180,9 +180,16 @@ final class GaugeIcons {
                     bmp.recycle();
             }
         }
+        // Reported the way the station composer reports its bitmap: at the map's
+        // relative scaling (1.0), NOT divided by density. The text is already the
+        // density-adjusted size ATAK draws labels at, and the renderer scales the
+        // feature icon by density again, so dividing here drew the pill at 1/density
+        // -- "way too small" beside a station pill (operator, 2026-09-26).
+        final float scale = Math.max(1f,
+                gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling());
         final Composed made = new Composed("file://" + out.getAbsolutePath(),
-                Math.round(w / density), Math.round(h / density),
-                (w / 2f - cx) / density, (cy - h / 2f) / density);
+                Math.round(w / scale), Math.round(h / scale),
+                (w / 2f - cx) / scale, (cy - h / 2f) / scale);
         labeled.put(key, made);
         return made;
     }

@@ -599,6 +599,8 @@ public final class GaugeOverlay {
     private AttributeSet attrs(Nwps.Gauge g, long now, UnitSystem system) {
         final AttributeSet a = new AttributeSet();
         put(a, "Gauge", g.name);
+        // Plumbing: the details button routes a gauge to its page (hydrograph).
+        put(a, "_gaugeId", g.lid);
         final StringBuilder text = new StringBuilder();
         for (String[] r : describe(g, system, now)) {
             put(a, r[0], r[1]);

@@ -58,6 +58,9 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
     /** Something that can open a spot request's forecast; the pane sets it. */
     public interface SpotOpener {
         void openSpot(String spotId);
+
+        /** A river gauge opens its record with the hydrograph, not its fields. */
+        void openGauge(String lid);
     }
 
     private static SpotOpener spotOpener;
@@ -81,6 +84,11 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         final String spotId = item.getMetaString("spotId", "");
         if (!spotId.isEmpty() && spotOpener != null) {
             spotOpener.openSpot(spotId);
+            return;
+        }
+        final String gaugeId = item.getMetaString("gaugeId", "");
+        if (!gaugeId.isEmpty() && spotOpener != null) {
+            spotOpener.openGauge(gaugeId);
             return;
         }
         final String title = item.getMetaString("title", item.getMetaString("callsign", ""));
