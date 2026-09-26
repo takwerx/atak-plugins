@@ -919,6 +919,63 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
+                    android:text="@string/gauges_gate_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/gauges_gate_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/gauges_gate_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textSize="12sp"
+                    android:alpha="0.75"
+                    android:text="" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/stations_label_gate_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/gauges_label_gate_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/gauges_label_gate_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textSize="12sp"
+                    android:alpha="0.75"
+                    android:text="" />
+
+                <Button
+                    android:id="@+id/gauges_labels"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center_vertical|left"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
                     android:text="@string/heading_legend"
                     android:textSize="10sp"
                     android:textAllCaps="true"

@@ -43,6 +43,7 @@
     <string name="gauges_open_list">Open the gauge list</string>
     <string name="gauges_page_heading">River gauges</string>
     <string name="gauges_show_heading">Show on the map</string>
+    <string name="gauges_gate_heading">Draw gauges at this zoom or closer</string>
     <string name="gauges_off">River gauges OFF</string>
     <string name="gauges_allow_title">Show river gauges?</string>
     <string name="gauges_allow_text">Atmosphere will ask the National Water Prediction Service for the river gauges around you, what they read and what they forecast.\n\nLike the weather stations, this one sends a position: a box around the point you measure from, rounded as far as your precision setting says. Switch it to Map center if you would rather it never send where you are.\n\nServer: api.water.noaa.gov</string>

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.compat.ScaleBar;
 import com.atakmap.android.atmosphere.data.GaugeFavorites;
 import com.atakmap.android.atmosphere.data.Nwps;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
@@ -73,6 +74,14 @@ public final class GaugeOverlay {
     /** Only the starred ones. */
     public static final int SHOW_FAVORITES = 2;
     private static final String PREF_SHOW = "weather.layer.gauges.show";
+    private static final String PREF_GATE = "weather.layer.gauges.gate";
+    private static final String PREF_LABEL_GATE = "weather.layer.gauges.labelgate";
+    private static final String PREF_LABELS = "weather.layer.gauges.labels";
+    /** No gate: drawn at every zoom. */
+    public static final double ALWAYS_GATE = Double.MAX_VALUE;
+    /** The labels start at a scale bar of about thirty miles. */
+    private static final double DEFAULT_LABEL_BIG = 30d;
+    private static final double FINEST = 0d;
 
     public interface Listener {
         void onGaugesStatus(String message);
@@ -96,6 +105,11 @@ public final class GaugeOverlay {
     private int miles;
     private boolean fromMe;
     private int show;
+    private boolean labels;
+    /** Coarsest meters per pixel at which each still draws. */
+    private double gate, labelGate;
+    /** Whether the pills are on the icons as drawn right now. */
+    private boolean labelsWanted;
     private final GaugeFavorites favorites;
     private List<Nwps.Gauge> gauges = new ArrayList<>();
     /** Where the gauges currently on the map were asked for. */
@@ -120,7 +134,100 @@ public final class GaugeOverlay {
         miles = p == null ? DEFAULT_MILES : p.getInt(PREF_MILES, DEFAULT_MILES);
         fromMe = p == null || p.getBoolean(PREF_FROM_ME, true);
         show = p == null ? SHOW_ALL : p.getInt(PREF_SHOW, SHOW_ALL);
+        labels = p == null || p.getBoolean(PREF_LABELS, true);
+        gate = storedGate(p, PREF_GATE, ALWAYS_GATE);
+        labelGate = storedGate(p, PREF_LABEL_GATE, gsdForBig(DEFAULT_LABEL_BIG));
         favorites = new GaugeFavorites(mapView.getContext());
+    }
+
+    public static boolean isAlways(double gate) {
+        return !(gate < 1e12);
+    }
+
+    public double gate() {
+        return gate;
+    }
+
+    public double labelGate() {
+        return labelGate;
+    }
+
+    public void setGate(double metersPerPixel) {
+        if (gate == metersPerPixel)
+            return;
+        gate = metersPerPixel;
+        remember(PREF_GATE, metersPerPixel);
+        redraw();
+    }
+
+    public void setLabelGate(double metersPerPixel) {
+        if (labelGate == metersPerPixel)
+            return;
+        labelGate = metersPerPixel;
+        remember(PREF_LABEL_GATE, metersPerPixel);
+        applyLabelBand();
+    }
+
+    public boolean hasLabels() {
+        return labels;
+    }
+
+    public void setLabels(boolean value) {
+        if (labels == value)
+            return;
+        labels = value;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putBoolean(PREF_LABELS, value).apply();
+        applyLabelBand();
+    }
+
+    private static void remember(String key, double metersPerPixel) {
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putFloat(key, (float) Math.min(metersPerPixel, Float.MAX_VALUE)).apply();
+    }
+
+    private static double storedGate(SharedPreferences p, String key, double fallback) {
+        if (p == null)
+            return fallback;
+        try {
+            return p.getFloat(key, (float) Math.min(fallback, Float.MAX_VALUE));
+        } catch (ClassCastException oldFormat) {
+            p.edit().remove(key).apply();
+            return fallback;
+        }
+    }
+
+    /** A scale-bar distance as a map resolution, against this device's own bar. */
+    public double gsdForBig(double big) {
+        return ScaleBar.bigToMeters(big) / barPixels();
+    }
+
+    public double barPixels() {
+        final double res = mapView.getMapResolution();
+        if (res <= 0)
+            return ScaleBar.FALLBACK_BAR_PIXELS;
+        final double m = ScaleBar.meters(mapView);
+        return m > 0 ? m / res : ScaleBar.FALLBACK_BAR_PIXELS;
+    }
+
+    public boolean drawingNow(double gate) {
+        return gate >= mapView.getMapResolution();
+    }
+
+    public double resolution() {
+        return mapView.getMapResolution();
+    }
+
+    /** Put the pills on or take them off, if the zoom has crossed the line. */
+    private boolean applyLabelBand() {
+        final boolean wanted = labels && mapView.getMapResolution() <= labelGate;
+        if (wanted == labelsWanted)
+            return false;
+        labelsWanted = wanted;
+        redraw();
+        return true;
     }
 
     public int show() {
@@ -185,6 +292,7 @@ public final class GaugeOverlay {
     public void start() {
         started = true;
         features.attach();
+        labelsWanted = labels && mapView.getMapResolution() <= labelGate;
         mapView.addOnMapMovedListener(moved);
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
@@ -217,6 +325,14 @@ public final class GaugeOverlay {
         generation++;
         inFlight = false;
         if (value) {
+            // Everything, every time the layer comes on: a filter left on from
+            // last time is a map with holes in it and no sign why (operator,
+            // 2026-09-26, "when you turn it on it should default to All").
+            if (show != SHOW_ALL) {
+                show = SHOW_ALL;
+                if (p != null)
+                    p.edit().putInt(PREF_SHOW, SHOW_ALL).apply();
+            }
             refresh(true);
             mapView.postDelayed(autoPoll, POLL_MS);
         } else {
@@ -336,23 +452,44 @@ public final class GaugeOverlay {
         final List<Nwps.Gauge> held = gauges;
         final long now = System.currentTimeMillis();
         final UnitSystem system = units();
+        final boolean withLabels = labelsWanted;
+        final double[] view = viewBounds();
+        // A feature set's coarsest resolution has to be a real number.
+        final double maxGsd = isAlways(gate) ? 100_000d : gate;
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         int flooding = 0;
         for (Nwps.Gauge g : held) {
             if (!passes(show, g))
                 continue;
             final String category = g.category();
-            final String uri = icons.uri(GaugeIcons.color(category));
-            if (uri == null)
-                continue;
+            final int color = GaugeIcons.color(category);
             if (Nwps.severity(category) >= Nwps.severity(Nwps.ACTION))
                 flooding++;
+            // A label is composed only for a gauge on screen: each is a PNG encode
+            // and a file write, and the box holds hundreds.
+            final AtmosphereFeatures.Drawn d;
+            if (withLabels && onScreen(g, view)) {
+                final GaugeIcons.Composed c = icons.labeled(color,
+                        pillReading(g, system), g.name);
+                if (c == null)
+                    continue;
+                d = new AtmosphereFeatures.Drawn(Nwps.label(category), g.name,
+                        AtmosphereFeatures.point(g.latitude, g.longitude),
+                        AtmosphereFeatures.icon(c.uri, c.width, c.height, c.offsetX,
+                                c.offsetY),
+                        attrs(g, now, system), maxGsd, FINEST);
+            } else {
+                final String uri = icons.uri(color);
+                if (uri == null)
+                    continue;
+                d = new AtmosphereFeatures.Drawn(Nwps.label(category), g.name,
+                        AtmosphereFeatures.point(g.latitude, g.longitude),
+                        AtmosphereFeatures.icon(uri, GaugeIcons.SIZE_DP, GaugeIcons.SIZE_DP),
+                        attrs(g, now, system), maxGsd, FINEST);
+            }
             // The set is the category, so Overlay Manager lists "Minor flooding" on
             // its own and ATAK's own switches work on one at a time.
-            drawn.add(new AtmosphereFeatures.Drawn(Nwps.label(category), g.name,
-                    AtmosphereFeatures.point(g.latitude, g.longitude),
-                    AtmosphereFeatures.icon(uri, GaugeIcons.SIZE_DP, GaugeIcons.SIZE_DP),
-                    attrs(g, now, system)));
+            drawn.add(d);
         }
         if (mine != generation || !on)
             return;
@@ -501,12 +638,50 @@ public final class GaugeOverlay {
         refresh(true);
     }
 
+    /** "2.84 ft · 16 cfs", or what the gauge says about itself when it has no number. */
+    private static String pillReading(Nwps.Gauge g, UnitSystem system) {
+        final StringBuilder b = new StringBuilder();
+        append(b, stage(g.observed.stage, system));
+        append(b, flow(g.observed.flow, system));
+        if (b.length() == 0)
+            return Nwps.label(g.category());
+        if (Nwps.severity(g.category()) >= Nwps.severity(Nwps.ACTION))
+            append(b, Nwps.label(g.category()));
+        return b.toString();
+    }
+
+    private double[] viewBounds() {
+        try {
+            final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+            if (b == null)
+                return null;
+            final double s = b.getSouth(), w = b.getWest(), n = b.getNorth(), e = b.getEast();
+            if (Double.isNaN(s) || Double.isNaN(w) || Double.isNaN(n) || Double.isNaN(e))
+                return null;
+            final double padLat = Math.abs(n - s) / 2.0, padLon = Math.abs(e - w) / 2.0;
+            return new double[] { s - padLat, w - padLon, n + padLat, e + padLon };
+        } catch (Exception noBounds) {
+            return null;
+        }
+    }
+
+    private static boolean onScreen(Nwps.Gauge g, double[] view) {
+        if (view == null)
+            return true;
+        return g.latitude >= view[0] && g.latitude <= view[2]
+                && g.longitude >= view[1] && g.longitude <= view[3];
+    }
+
     private final Runnable settled = new Runnable() {
         @Override
         public void run() {
             if (!on)
                 return;
+            final boolean crossed = applyLabelBand();
             followMapCenter();
+            // Which gauges are on screen decides which carry a label; once.
+            if (labelsWanted && !crossed)
+                redraw();
             final Listener l = listener;
             if (l != null)
                 l.onOriginMoved();

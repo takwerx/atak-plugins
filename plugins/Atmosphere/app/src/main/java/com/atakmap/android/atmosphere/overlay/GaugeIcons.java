@@ -3,6 +3,10 @@ package com.atakmap.android.atmosphere.overlay;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.RectF;
+
+import com.atakmap.android.maps.MapTextFormat;
+import com.atakmap.android.maps.MapView;
 
 import com.atakmap.android.atmosphere.data.Nwps;
 import com.atakmap.coremap.filesystem.FileSystemUtils;
@@ -35,7 +39,7 @@ final class GaugeIcons {
     private static final String TAG = "AtmosphereGauges";
 
     /** Bump when the drawing changes, or a stale file is served under the same name. */
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
 
     static final int MAJOR = 0xFFCC33FF;
     static final int MODERATE = 0xFFFF0000;
@@ -76,6 +80,120 @@ final class GaugeIcons {
             case Nwps.OUT_OF_SERVICE: return OUT_OF_SERVICE;
             default: return NOT_CURRENT;
         }
+    }
+
+    /** One composed icon: where it is and how it is placed. */
+    static final class Composed {
+        final String uri;
+        /** dp, as the feature renderer wants them. */
+        final int width, height;
+        /** dp, the shift that puts the disc on the point; zero for a bare disc. */
+        final float offsetX, offsetY;
+
+        Composed(String uri, int width, int height, float offsetX, float offsetY) {
+            this.uri = uri;
+            this.width = width;
+            this.height = height;
+            this.offsetX = offsetX;
+            this.offsetY = offsetY;
+        }
+    }
+
+    private final Map<String, Composed> labeled = new HashMap<>();
+
+    /**
+     * The disc with a pill under it: the reading on the first line, the gauge's
+     * name on the second, the station pill's shape. The bitmap is trimmed to its
+     * ink and placed by offset, the way the station icon is, with the same signs
+     * (x = middle relative to the disc, y = disc relative to the middle).
+     */
+    Composed labeled(int color, String reading, String name) {
+        final String r = reading == null ? "" : reading.trim();
+        final String n = name == null ? "" : name.trim();
+        final String key = String.format(Locale.US, "L%08x_%s_v%d_s%d", color,
+                Integer.toHexString((r + "|" + n).hashCode()), VERSION,
+                Math.round(density * 100));
+        final Composed hit = labeled.get(key);
+        if (hit != null)
+            return hit;
+        if (dir == null)
+            return null;
+        final File out = new File(dir, "gauge_" + key + ".png");
+
+        final MapTextFormat tf = MapView.getDefaultTextFormat();
+        float textPx = tf == null ? 0f : tf.getDensityAdjustedFontSize();
+        if (textPx <= 0f)
+            textPx = 14f * density;
+        final Paint big = text(tf, textPx, true);
+        final Paint small = text(tf, textPx * 0.85f, false);
+        final Paint.FontMetricsInt bm = big.getFontMetricsInt();
+        final Paint.FontMetricsInt sm = small.getFontMetricsInt();
+        final int padX = Math.round(6 * density), padY = Math.round(3 * density);
+        final int gap = Math.round(3 * density);
+        final int lineOne = r.isEmpty() ? 0 : bm.descent - bm.ascent;
+        final int lineTwo = n.isEmpty() ? 0 : sm.descent - sm.ascent;
+        final int textW = Math.round(Math.max(r.isEmpty() ? 0 : big.measureText(r),
+                n.isEmpty() ? 0 : small.measureText(n)));
+        final int pillW = textW + 2 * padX, pillH = lineOne + lineTwo + 2 * padY;
+        final int disc = Math.max(8, Math.round(SIZE_DP * density));
+        final int pad = 2;
+        final int w = Math.max(disc, pillW) + 2 * pad;
+        final int h = disc + gap + pillH + 2 * pad;
+        final int cx = w / 2, cy = pad + disc / 2;
+
+        if (!out.isFile()) {
+            Bitmap bmp = null;
+            try {
+                bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+                final Canvas c = new Canvas(bmp);
+                final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+                final float rad = disc / 2f;
+                p.setColor(0xB3000000);
+                c.drawCircle(cx, cy, rad - 0.5f, p);
+                p.setColor(color);
+                c.drawCircle(cx, cy, rad - 1.5f * density, p);
+                final float top = cy + rad + gap, left = cx - pillW / 2f;
+                p.setColor(0xE6000000);
+                c.drawRoundRect(new RectF(left, top, left + pillW, top + pillH),
+                        4 * density, 4 * density, p);
+                if (!r.isEmpty())
+                    c.drawText(r, cx - big.measureText(r) / 2f, top + padY - bm.ascent, big);
+                if (!n.isEmpty())
+                    c.drawText(n, cx - small.measureText(n) / 2f,
+                            top + padY + lineOne - sm.ascent, small);
+                final File tmp = new File(out.getPath() + ".tmp");
+                final FileOutputStream o = new FileOutputStream(tmp);
+                try {
+                    bmp.compress(Bitmap.CompressFormat.PNG, 100, o);
+                } finally {
+                    o.close();
+                }
+                //noinspection ResultOfMethodCallIgnored
+                tmp.renameTo(out);
+                if (!out.isFile())
+                    return null;
+            } catch (Exception e) {
+                Log.w(TAG, "could not compose a gauge label", e);
+                return null;
+            } finally {
+                if (bmp != null)
+                    bmp.recycle();
+            }
+        }
+        final Composed made = new Composed("file://" + out.getAbsolutePath(),
+                Math.round(w / density), Math.round(h / density),
+                (w / 2f - cx) / density, (cy - h / 2f) / density);
+        labeled.put(key, made);
+        return made;
+    }
+
+    private static Paint text(MapTextFormat tf, float px, boolean bold) {
+        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
+        p.setTypeface(tf == null || tf.getTypeface() == null ? null : tf.getTypeface());
+        p.setTextSize(px);
+        p.setFakeBoldText(bold);
+        p.setColor(0xFFFFFFFF);
+        return p;
     }
 
     /** A {@code file://} uri for a disc in this color, composed once and kept. */

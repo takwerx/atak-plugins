@@ -239,7 +239,9 @@ public final class AtmospherePane {
     private boolean stationsOpen;
     private GaugeOverlay gaugeLayer;
     private GaugePage gaugePage;
-    private LinearLayout gaugesShowRow;
+    private LinearLayout gaugesShowRow, gaugesGateRow, gaugesLabelGateRow;
+    private TextView gaugesGateText, gaugesLabelGateText;
+    private Button gaugesLabels;
     private TextView gaugesStatus;
     private Button gaugesToggle;
     private ImageButton gaugesExpand;
@@ -438,6 +440,20 @@ public final class AtmospherePane {
         gaugesDistanceRow = find(R.id.gauges_distance_row);
         gaugesLegend = find(R.id.gauges_legend);
         gaugesShowRow = find(R.id.gauges_show_row);
+        gaugesGateRow = find(R.id.gauges_gate_row);
+        gaugesLabelGateRow = find(R.id.gauges_label_gate_row);
+        gaugesGateText = find(R.id.gauges_gate_text);
+        gaugesLabelGateText = find(R.id.gauges_label_gate_text);
+        gaugesLabels = find(R.id.gauges_labels);
+        gaugesLabels.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (gaugeLayer == null)
+                    return;
+                gaugeLayer.setLabels(!gaugeLayer.hasLabels());
+                updateLayerControls();
+            }
+        });
         ((Button) find(R.id.gauges_open_list)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -2031,6 +2047,23 @@ public final class AtmospherePane {
         void set(double metersPerPixel);
     }
 
+    /** Which layer's scale-bar arithmetic a gate row quotes; they are all the same. */
+    private void buildGaugesGateRows() {
+        gateRow(gaugesGateRow, gaugesGateText, "Gauges", gaugeLayer.gate(), new Gate() {
+            @Override
+            public void set(double gsd) {
+                gaugeLayer.setGate(gsd);
+            }
+        });
+        gateRow(gaugesLabelGateRow, gaugesLabelGateText, "Readings",
+                gaugeLayer.labelGate(), new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        gaugeLayer.setLabelGate(gsd);
+                    }
+                });
+    }
+
     /** Feature Layer's ladder, as scale-bar readings in the operator's big unit. */
     private static final double[] GATE_BIG = { 0.25, 1, 5, 15, 50 };
 
@@ -2641,6 +2674,11 @@ public final class AtmospherePane {
             buildGaugesOriginRow();
             buildGaugesDistanceRow();
             buildGaugesShowRow();
+            buildGaugesGateRows();
+            final boolean gl = gaugeLayer.hasLabels();
+            gaugesLabels.setText(gl ? "Readings and names  ON" : "Readings and names  OFF");
+            gaugesLabels.setTextColor(pluginContext.getResources().getColor(
+                    gl ? R.color.state_on : R.color.state_off));
             buildGaugesLegend();
         }
         final boolean spotOn = spotLayer != null && spotLayer.isOn();
