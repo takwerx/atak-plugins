@@ -166,51 +166,75 @@ final class StationIcons {
     }
 
     StationIcons() {
-        dir = FileSystemUtils.getItem("tools/atmosphere/station-icons");
-        if (dir != null && !dir.isDirectory())
+        final File live = FileSystemUtils.getItem("tools/atmosphere/station-icons");
+        dir = live;
+        if (live == null)
+            return;
+        // What a past session left is moved aside in one rename, and only then is
+        // the folder this session composes into created. Deleting the old files in
+        // place, on a thread, raced this session's compose(): a station whose reading
+        // had not changed since the last session found its icon already on disk by
+        // name, reused it, ATAK loaded it -- and the sweep, going by age, unlinked
+        // it. Both labeled icons on screen were dangling paths in the feature store
+        // within a minute of loading (2026-09-26), drawn only for as long as ATAK's
+        // texture cache remembered them. A rename is one syscall, so it belongs on
+        // the load thread; the unlinking does not, and runs on a thread of its own
+        // over a folder nothing will look in again.
+        if (live.isDirectory()) {
+            final String[] left = live.list();
+            if (left != null && left.length > 0) {
+                final File aside = new File(live.getPath() + ".old-"
+                        + System.currentTimeMillis());
+                if (!live.renameTo(aside))
+                    Log.w(TAG, "could not move " + left.length
+                            + " old station icon(s) aside; leaving them");
+            }
+        }
+        if (!live.isDirectory())
             //noinspection ResultOfMethodCallIgnored
-            dir.mkdirs();
-        clearOldFiles(System.currentTimeMillis());
+            live.mkdirs();
+        deleteSetAside(live.getParentFile(), live.getName() + ".old-");
     }
 
     /**
-     * Empty the folder of what a past session left, on a thread of its own.
+     * Delete every folder a past session set aside, on a thread of its own.
      *
      * <p>Every reading is its own file -- a station's numbers and its wind direction
-     * are both in the name -- so a folder kept across sessions accumulates one icon
-     * per station per hour and never reads any of them again. They cost nothing to
-     * compose and are written on a worker.
+     * are both in the name -- so a session accumulates one icon per station per hour
+     * and the next never reads any of them again. They cost nothing to compose and
+     * are written on a worker.
      *
-     * <p><b>Never on the calling thread.</b> This constructor runs under
-     * {@code onStart}, which ATAK calls on the thread it loads plugins on -- the main
-     * one -- and the sweep is an unlink syscall per file over a folder holding a day
-     * of testing. Bumping {@link #VERSION} 11 -> 13 orphaned two versions of icons at
-     * once, and ATAK sat in File.delete long enough to be killed for not answering a
-     * tap (ANR, 2026-09-26, the fifth thing in this plugin to be slow on the load
-     * thread). A VERSION bump is exactly when this folder is at its largest, so the
-     * sweep is at its slowest on the build that most needs to start.
+     * <p><b>Never on the calling thread.</b> This runs under {@code onStart}, which
+     * ATAK calls on the thread it loads plugins on -- the main one -- and the work is
+     * an unlink syscall per file over a day of testing: 597 files, 7.7 MB, and ATAK
+     * was killed for not answering the tap that started the load (ANR, 2026-09-26,
+     * the fifth thing in this plugin to be slow on the load thread). A
+     * {@link #VERSION} bump is exactly when the pile is largest.
      *
-     * @param before delete only what is older than this, so the sweep cannot race a
-     *               fresh icon: everything a past session wrote predates start-up,
-     *               and nothing this one composes does.
+     * <p>More than one folder can be waiting: a session killed mid-sweep leaves its
+     * folder behind, and the next picks it up along with its own.
      */
-    private void clearOldFiles(final long before) {
-        // Captured into a local rather than read off the field: the thread starts
-        // while this constructor is still running, and handing it `this` would let it
-        // read fields that are not published yet.
-        final File folder = dir;
-        if (folder == null)
+    private static void deleteSetAside(final File parent, final String prefix) {
+        if (parent == null)
             return;
         final Thread t = new Thread(new Runnable() {
             @Override
             public void run() {
-                final File[] old = folder.listFiles();
-                if (old == null)
+                final File[] folders = parent.listFiles();
+                if (folders == null)
                     return;
                 int gone = 0;
-                for (File f : old)
-                    if (f.isFile() && f.lastModified() < before && f.delete())
-                        gone++;
+                for (File folder : folders) {
+                    if (!folder.isDirectory() || !folder.getName().startsWith(prefix))
+                        continue;
+                    final File[] old = folder.listFiles();
+                    if (old != null)
+                        for (File f : old)
+                            if (f.delete())
+                                gone++;
+                    //noinspection ResultOfMethodCallIgnored
+                    folder.delete();
+                }
                 if (gone > 0)
                     Log.d(TAG, "cleared " + gone
                             + " station icon(s) from a past session");
