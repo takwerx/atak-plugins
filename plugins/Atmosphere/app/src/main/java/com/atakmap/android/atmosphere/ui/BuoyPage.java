@@ -11,7 +11,10 @@ import android.widget.ListView;
 import android.widget.TextView;
 
 import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.atmosphere.data.Coops;
 import com.atakmap.android.atmosphere.data.Ndbc;
+import com.atakmap.android.atmosphere.net.EgressPolicy;
+import com.atakmap.android.atmosphere.net.Http;
 import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.units.Quantity;
@@ -34,7 +37,15 @@ public final class BuoyPage {
 
     public interface Host {
         UnitSystem units();
+
+        EgressPolicy egress();
     }
+
+    /** CO-OPS station lists, fetched once a session; null until they land. */
+    private static List<Coops.Station> tideStations, currentStations;
+    private static boolean listsRequested;
+    private LinearLayout tideBlock;
+    private String tideFor;
 
 
     private final Context pluginContext;
@@ -343,6 +354,14 @@ public final class BuoyPage {
         title.setPadding(0, dp(8), 0, dp(2));
         title.setText(g.label());
         detailBody.addView(title);
+        // Tides and currents from the nearest CO-OPS stations, under the name and
+        // above the buoy's own fields: what the water is about to do is read
+        // before what the air is doing. Filled in when the answers land.
+        tideBlock = new LinearLayout(pluginContext);
+        tideBlock.setOrientation(LinearLayout.VERTICAL);
+        detailBody.addView(tideBlock);
+        tideFor = g.id;
+        fillTides(g);
         for (String[] r : BuoyOverlay.describe(g, host.units(), System.currentTimeMillis()))
             detailBody.addView(field(r[0], r[1]));
 
@@ -352,6 +371,143 @@ public final class BuoyPage {
         filterRow.setVisibility(View.GONE);
         scopeRow.setVisibility(View.GONE);
         status.setVisibility(View.GONE);
+    }
+
+    private static final double TIDE_REACH_MI = 40, CURRENT_REACH_MI = 15;
+
+    private void fillTides(final Ndbc.Buoy g) {
+        if (tideStations == null || currentStations == null) {
+            tideBlock.addView(field("Tides and currents", "Finding the nearest stations\u2026"));
+            fetchStationLists(g);
+            return;
+        }
+        final Coops.Station tide = Coops.nearest(tideStations, g.latitude, g.longitude, TIDE_REACH_MI);
+        final Coops.Station cur = Coops.nearest(currentStations, g.latitude, g.longitude, CURRENT_REACH_MI);
+        if (tide == null && cur == null) {
+            tideBlock.addView(field("Tides and currents", "No CO-OPS station within "
+                    + (int) TIDE_REACH_MI + " mi"));
+            return;
+        }
+        final EgressPolicy egress = host.egress();
+        final java.util.Map<String, String> h = new java.util.HashMap<>();
+        if (tide != null) {
+            final TextView row = (TextView) ((LinearLayout) field("Tide at " + tide.name + " ("
+                    + Math.round(Coops.milesBetween(g.latitude, g.longitude, tide.latitude, tide.longitude))
+                    + " mi)", "Getting the tide\u2026")).getChildAt(1);
+            tideBlock.addView((View) row.getParent());
+            Http.get(Coops.hiloUrl(tide.id), egress.userAgent(), h, new Http.Callback() {
+                @Override
+                public void onSuccess(String body) {
+                    if (!g.id.equals(tideFor))
+                        return;
+                    final List<Coops.Tide> t = Coops.parseHilo(body);
+                    final StringBuilder b = new StringBuilder();
+                    for (Coops.Tide x : t) {
+                        if (b.length() > 0)
+                            b.append('\n');
+                        b.append(x.high ? "High " : "Low  ").append(Coops.clock(x.at)).append(' ')
+                                .append(Coops.day(x.at)).append(String.format(java.util.Locale.US,
+                                        "  \u00b7  %.1f ft", x.feet));
+                    }
+                    row.setText(b.length() == 0 ? "No predictions" : b.toString());
+                    if (tide.measures())
+                        Http.get(Coops.waterLevelUrl(tide.id), egress.userAgent(), h,
+                                new Http.Callback() {
+                                    @Override
+                                    public void onSuccess(String wl) {
+                                        final Coops.Tide now = Coops.parseWaterLevel(wl);
+                                        if (now != null && g.id.equals(tideFor))
+                                            row.setText(String.format(java.util.Locale.US,
+                                                    "Now %.1f ft above MLLW at %s\n", now.feet,
+                                                    Coops.clock(now.at)) + row.getText());
+                                    }
+
+                                    @Override
+                                    public void onFailure(String error) {
+                                    }
+                                });
+                }
+
+                @Override
+                public void onFailure(String error) {
+                    if (g.id.equals(tideFor))
+                        row.setText("Could not get the tide: " + error);
+                }
+            });
+        }
+        if (cur != null) {
+            final TextView row = (TextView) ((LinearLayout) field("Current at " + cur.name
+                    + (Double.isNaN(cur.depthFt) ? "" : String.format(java.util.Locale.US, ", %.0f ft deep", cur.depthFt))
+                    + " (" + Math.round(Coops.milesBetween(g.latitude, g.longitude, cur.latitude, cur.longitude))
+                    + " mi)", "Getting the current\u2026")).getChildAt(1);
+            tideBlock.addView((View) row.getParent());
+            Http.get(Coops.currentsUrl(cur.id, cur.bin), egress.userAgent(), h, new Http.Callback() {
+                @Override
+                public void onSuccess(String body) {
+                    if (!g.id.equals(tideFor))
+                        return;
+                    final List<Coops.Current> c = Coops.parseCurrents(body);
+                    final StringBuilder b = new StringBuilder();
+                    for (Coops.Current x : c) {
+                        if (b.length() > 0)
+                            b.append('\n');
+                        final String what = x.type.equals("slack") ? "Slack"
+                                : x.type.equals("ebb") ? "Ebb  " : "Flood";
+                        b.append(what).append(' ').append(Coops.clock(x.at));
+                        if (!x.type.equals("slack") && !Double.isNaN(x.knots))
+                            b.append(String.format(java.util.Locale.US, "  \u00b7  %.1f kt toward %d\u00b0",
+                                    Math.abs(x.knots), Math.round(x.type.equals("ebb") ? x.ebbDir : x.floodDir)));
+                    }
+                    row.setText(b.length() == 0 ? "No predictions" : b.toString());
+                }
+
+                @Override
+                public void onFailure(String error) {
+                    if (g.id.equals(tideFor))
+                        row.setText("Could not get the current: " + error);
+                }
+            });
+        }
+    }
+
+    /** Two megabytes each, once; the record is filled when they land. */
+    private void fetchStationLists(final Ndbc.Buoy g) {
+        if (listsRequested)
+            return;
+        listsRequested = true;
+        final EgressPolicy egress = host.egress();
+        final java.util.Map<String, String> h = new java.util.HashMap<>();
+        Http.get(Coops.TIDE_STATIONS_URL, egress.userAgent(), h, new Http.Callback() {
+            @Override
+            public void onSuccess(String body) {
+                tideStations = Coops.parseStations(body);
+                Http.get(Coops.CURRENT_STATIONS_URL, egress.userAgent(), h, new Http.Callback() {
+                    @Override
+                    public void onSuccess(String body2) {
+                        currentStations = Coops.parseStations(body2);
+                        if (showing != null && showing.id.equals(tideFor))
+                            showDetail(showing);
+                    }
+
+                    @Override
+                    public void onFailure(String error) {
+                        currentStations = new ArrayList<>();
+                        listsRequested = false;
+                        if (showing != null && showing.id.equals(tideFor))
+                            showDetail(showing);
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(String error) {
+                listsRequested = false;
+                if (tideBlock != null && showing != null && showing.id.equals(g.id)) {
+                    tideBlock.removeAllViews();
+                    tideBlock.addView(field("Tides and currents", "Could not reach CO-OPS: " + error));
+                }
+            }
+        });
     }
 
     private void showList() {

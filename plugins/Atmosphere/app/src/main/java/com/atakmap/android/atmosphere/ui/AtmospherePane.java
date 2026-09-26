@@ -350,6 +350,11 @@ public final class AtmospherePane {
             public UnitSystem units() {
                 return units;
             }
+
+            @Override
+            public EgressPolicy egress() {
+                return egress;
+            }
         });
         pages = new View[] {
                 inflater.inflate(R.layout.page_forecast, null),

@@ -454,6 +454,14 @@ public final class GaugeOverlay {
         final UnitSystem system = units();
         final boolean withLabels = labelsWanted;
         final double[] view = viewBounds();
+        {
+            final java.util.Set<String> labeled = new java.util.HashSet<>();
+            if (withLabels)
+                for (Nwps.Gauge b : held)
+                    if (onScreen(b, view))
+                        labeled.add(b.lid);
+            lastLabeled = labeled;
+        }
         // A feature set's coarsest resolution has to be a real number.
         final double maxGsd = isAlways(gate) ? 100_000d : gate;
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
@@ -652,6 +660,26 @@ public final class GaugeOverlay {
         return b.toString();
     }
 
+
+    /** The ids that carried a label at the last rebuild, so a pan that changes none of them is not a rewrite. */
+    private java.util.Set<String> lastLabeled = new java.util.HashSet<>();
+
+    /**
+     * Whether the set of items that would carry a label differs from the last
+     * rebuild. A tap makes ATAK nudge the map, the settle fires, and a redraw
+     * rewrote the store under the radial before it opened -- the operator's
+     * "I click and nothing happens" (2026-09-26). A pan that leaves the same
+     * items on screen is not a reason to rewrite.
+     */
+    private boolean labeledSetChanged() {
+        final double[] view = viewBounds();
+        final java.util.Set<String> now = new java.util.HashSet<>();
+        for (Nwps.Gauge b : gauges)
+            if (onScreen(b, view))
+                now.add(b.lid);
+        return !now.equals(lastLabeled);
+    }
+
     private double[] viewBounds() {
         try {
             final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
@@ -682,7 +710,7 @@ public final class GaugeOverlay {
             final boolean crossed = applyLabelBand();
             followMapCenter();
             // Which gauges are on screen decides which carry a label; once.
-            if (labelsWanted && !crossed)
+            if (labelsWanted && !crossed && labeledSetChanged())
                 redraw();
             final Listener l = listener;
             if (l != null)

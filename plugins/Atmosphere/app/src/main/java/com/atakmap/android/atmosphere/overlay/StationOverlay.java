@@ -513,7 +513,7 @@ public final class StationOverlay {
             // here was the same compose-and-rewrite of every station again. Every
             // crossing paid twice -- the log showed them in pairs, 19,280 ms then
             // 1,436 ms, 1,351 then 1,135 (XCover, 2026-09-26).
-            if (labelsWanted && !crossed)
+            if (labelsWanted && !crossed && labeledSetChanged())
                 redraw();
             // Even when nothing is refetched, anything ordered by distance from the
             // map is now in the wrong order.
@@ -850,6 +850,14 @@ public final class StationOverlay {
         final UnitSystem system = units();
         final boolean withLabels = labelsWanted;
         final double[] view = viewBounds();
+        {
+            final java.util.Set<String> labeled = new java.util.HashSet<>();
+            if (withLabels)
+                for (Raws.Station s : held)
+                    if (onScreen(s, view))
+                        labeled.add(s.wxId);
+            lastLabeled = labeled;
+        }
         // A feature set's coarsest resolution has to be a real number: MAX_VALUE has
         // no level of detail to become, and the hit test then never reaches the layer.
         final double gate = isAlways(stationGate) ? 100_000d : stationGate;
@@ -939,6 +947,26 @@ public final class StationOverlay {
      * when it is panned to, rather than arriving a redraw later. Null on the globe,
      * where the bounds read as NaN.
      */
+
+    /** The ids that carried a label at the last rebuild, so a pan that changes none of them is not a rewrite. */
+    private java.util.Set<String> lastLabeled = new java.util.HashSet<>();
+
+    /**
+     * Whether the set of items that would carry a label differs from the last
+     * rebuild. A tap makes ATAK nudge the map, the settle fires, and a redraw
+     * rewrote the store under the radial before it opened -- the operator's
+     * "I click and nothing happens" (2026-09-26). A pan that leaves the same
+     * items on screen is not a reason to rewrite.
+     */
+    private boolean labeledSetChanged() {
+        final double[] view = viewBounds();
+        final java.util.Set<String> now = new java.util.HashSet<>();
+        for (Raws.Station b : held())
+            if (onScreen(b, view))
+                now.add(b.wxId);
+        return !now.equals(lastLabeled);
+    }
+
     private double[] viewBounds() {
         try {
             final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
