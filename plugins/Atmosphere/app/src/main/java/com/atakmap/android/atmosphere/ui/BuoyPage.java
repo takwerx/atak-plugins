@@ -128,9 +128,9 @@ public final class BuoyPage {
         filterRow.addView(tile("All (" + total + ")", filter == BuoyOverlay.SHOW_ALL, 0,
                 BuoyOverlay.SHOW_ALL));
         filterRow.addView(tile("Wind (" + wind + ")", filter == BuoyOverlay.SHOW_WIND,
-                0xFF1E88E5, BuoyOverlay.SHOW_WIND));
+                0, BuoyOverlay.SHOW_WIND));
         filterRow.addView(tile("Seas (" + waves + ")", filter == BuoyOverlay.SHOW_WAVES,
-                0xFF00ACC1, BuoyOverlay.SHOW_WAVES));
+                0, BuoyOverlay.SHOW_WAVES));
         final View fav = tile("\u2605 (" + starred + ")", filter == BuoyOverlay.SHOW_FAVORITES,
                 StationPage.STAR_ON, BuoyOverlay.SHOW_FAVORITES);
         ((LinearLayout.LayoutParams) fav.getLayoutParams()).weight = 0.6f;

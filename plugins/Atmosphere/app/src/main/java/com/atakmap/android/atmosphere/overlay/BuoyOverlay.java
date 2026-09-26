@@ -57,11 +57,10 @@ public final class BuoyOverlay {
     public static final int[] RADII = { 25, 50, 100, 250 };
     private static final int DEFAULT_MILES = 100;
 
-    /** The legend: what the three colors mean. */
+    /** NDBC's legend, in its words. */
     public static final String[][] LEGEND = {
-            { "Wind, air and sea reported", String.valueOf(BuoyIcons.WIND) },
-            { "Seas only (a wave buoy)", String.valueOf(BuoyIcons.WAVES) },
-            { "Nothing current", String.valueOf(BuoyIcons.QUIET) } };
+            { "Recent data", String.valueOf(BuoyIcons.RECENT) },
+            { "No data in the last 8 hours", String.valueOf(BuoyIcons.SILENT) } };
     /** The station table, fetched once and kept for the session. */
     private java.util.Map<String, Ndbc.Station> stations;
     /** The whole file's stations, so a scope change needs no request. */
@@ -284,12 +283,9 @@ public final class BuoyOverlay {
         });
     }
 
-    /** The disc color for a buoy, for the list's swatch. */
+    /** The diamond's color for a buoy, for the list's swatch: NDBC's rule. */
     public static int colorFor(Ndbc.Buoy b) {
-        final long now = System.currentTimeMillis();
-        if (b.silent() || b.stale(now))
-            return BuoyIcons.QUIET;
-        return BuoyIcons.color(b.hasWind(), b.hasWaves());
+        return BuoyIcons.color(b.ageHours(System.currentTimeMillis()));
     }
 
     public void setListener(Listener l) {
@@ -517,11 +513,12 @@ public final class BuoyOverlay {
         for (Ndbc.Buoy g : held) {
             if (!passes(show, g))
                 continue;
-            final boolean live = !g.silent() && !g.stale(now);
-            final int color = live ? BuoyIcons.color(g.hasWind(), g.hasWaves()) : BuoyIcons.QUIET;
-            if (live && g.hasWind())
+            final double age = g.ageHours(now);
+            final int color = BuoyIcons.color(age);
+            final boolean recent = age <= BuoyIcons.SILENT_HOURS;
+            if (recent && g.hasWind())
                 windy++;
-            final String set = !live ? "Nothing current" : g.hasWind() ? "Wind reported" : "Seas only";
+            final String set = !recent ? "No data in 8 hours" : g.hasWind() ? "Wind reported" : "Seas only";
             final AtmosphereFeatures.Drawn d;
             if (withLabels && onScreen(g, view)) {
                 final BuoyIcons.Composed c = icons.labeled(color, pillReading(g, system), g.label());

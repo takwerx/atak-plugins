@@ -18,9 +18,12 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * The buoy symbol, drawn here: a filled disc, blue for a station reporting wind,
- * teal for a waverider reporting seas only, grey for one that has gone quiet,
- * with a dark ring so the pale ones read on water.
+ * NDBC's own map symbol, drawn here: a small diamond, yellow for a station with
+ * recent data and red for one with nothing in the last eight hours -- their
+ * legend, word for word, so a crew that reads ndbc.noaa.gov reads this. (Their
+ * third color, orange for historical-only stations, never appears: those are
+ * not in the observation file.) What a station carries -- wind, seas, both --
+ * is on the pill and in the list, not in the color.
  *
  * <p>Composed on the worker that rebuilds the layer, never on the thread that
  * draws the map or loads the plugin.
@@ -30,14 +33,14 @@ final class BuoyIcons {
     private static final String TAG = "AtmosphereBuoys";
 
     /** Bump when the drawing changes, or a stale file is served under the same name. */
-    private static final int VERSION = 3;
+    private static final int VERSION = 4;
 
-    /** Reporting wind (a met buoy or coastal station). */
-    static final int WIND = 0xFF1E88E5;
-    /** Reporting seas only (a waverider). */
-    static final int WAVES = 0xFF00ACC1;
-    /** Nothing current. */
-    static final int QUIET = 0xFFBDC2BB;
+    /** NDBC's yellow diamond: a station with recent data. */
+    static final int RECENT = 0xFFFFD700;
+    /** NDBC's red diamond: no data in the last eight hours. */
+    static final int SILENT = 0xFFE53935;
+    /** NDBC's own line between the two, hours. */
+    static final double SILENT_HOURS = 8.0;
 
     /** Across, in density-independent pixels; the map is asked for the same size back. */
     static final int SIZE_DP = 22;
@@ -54,11 +57,9 @@ final class BuoyIcons {
             dir.mkdirs();
     }
 
-    /** Which of the three a buoy draws as. */
-    static int color(boolean wind, boolean waves) {
-        if (wind)
-            return WIND;
-        return waves ? WAVES : QUIET;
+    /** NDBC's rule: yellow with data in the last eight hours, red without. */
+    static int color(double ageHours) {
+        return ageHours <= SILENT_HOURS ? RECENT : SILENT;
     }
 
     /** One composed icon: where it is and how it is placed. */
@@ -127,10 +128,7 @@ final class BuoyIcons {
                 final Canvas c = new Canvas(bmp);
                 final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
                 final float rad = disc / 2f;
-                p.setColor(0xB3000000);
-                c.drawCircle(cx, cy, rad - 0.5f, p);
-                p.setColor(color);
-                c.drawCircle(cx, cy, rad - 1.5f * density, p);
+                diamond(c, p, cx, cy, rad, color);
                 final float top = cy + rad + gap, left = cx - pillW / 2f;
                 p.setColor(0xE6000000);
                 c.drawRoundRect(new RectF(left, top, left + pillW, top + pillH),
@@ -173,6 +171,28 @@ final class BuoyIcons {
         return made;
     }
 
+    /** NDBC's diamond: a dark edge so yellow holds on sand and sea, the fill inside. */
+    private void diamond(Canvas c, Paint p, float cx, float cy, float r, int color) {
+        final android.graphics.Path d = new android.graphics.Path();
+        d.moveTo(cx, cy - r + 0.5f);
+        d.lineTo(cx + r - 0.5f, cy);
+        d.lineTo(cx, cy + r - 0.5f);
+        d.lineTo(cx - r + 0.5f, cy);
+        d.close();
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(0xB3000000);
+        c.drawPath(d, p);
+        final float in = r - 1.5f * density;
+        d.reset();
+        d.moveTo(cx, cy - in);
+        d.lineTo(cx + in, cy);
+        d.lineTo(cx, cy + in);
+        d.lineTo(cx - in, cy);
+        d.close();
+        p.setColor(color);
+        c.drawPath(d, p);
+    }
+
     private static Paint text(MapTextFormat tf, float px, boolean bold) {
         final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
         p.setTypeface(tf == null || tf.getTypeface() == null ? null : tf.getTypeface());
@@ -207,12 +227,7 @@ final class BuoyIcons {
             final Canvas c = new Canvas(bmp);
             final float r = px / 2f;
             final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-            // A dark ring so yellow, green and the greys hold their edge over a
-            // pale basemap; water.noaa.gov's tiles give it that for free.
-            p.setColor(0xB3000000);
-            c.drawCircle(r, r, r - 0.5f, p);
-            p.setColor(color);
-            c.drawCircle(r, r, r - 1.5f * density, p);
+            diamond(c, p, r, r, r, color);
             final File tmp = new File(out.getPath() + ".tmp");
             final FileOutputStream o = new FileOutputStream(tmp);
             try {

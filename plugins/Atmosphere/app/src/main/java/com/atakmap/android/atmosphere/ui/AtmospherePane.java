@@ -1921,8 +1921,8 @@ public final class AtmospherePane {
     private void buildBuoysShowRow() {
         buoysShowRow.removeAllViews();
         buoyShowTile("All", BuoyOverlay.SHOW_ALL, 0);
-        buoyShowTile("Wind", BuoyOverlay.SHOW_WIND, 0xFF1E88E5);
-        buoyShowTile("Seas", BuoyOverlay.SHOW_WAVES, 0xFF00ACC1);
+        buoyShowTile("Wind", BuoyOverlay.SHOW_WIND, 0);
+        buoyShowTile("Seas", BuoyOverlay.SHOW_WAVES, 0);
         buoyShowTile("\u2605 Favorites", BuoyOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
     }
 
