@@ -78,6 +78,23 @@ final class WindView extends View {
      */
     private static final int FADES = 8;
     private final Paint[][] paints = new Paint[6][FADES];
+    /**
+     * A dark stroke laid under the bright half of each trail.
+     *
+     * <p>The field is drawn in the speed colors and nothing else, which disappears
+     * over anything of a similar tone -- pale green terrain, tan desert, a light
+     * satellite tile (operator, 2026-09-25: "really hard to see on certain base
+     * maps"). An outline is what makes a thin line survive an unknown background;
+     * it is what the station barb does for the same reason.
+     *
+     * <p>Only the brighter steps get one. The tail is faint by design and outlining
+     * it would double the cost of the whole field for something nobody is reading --
+     * and this view has starved the UI thread before, so its per-frame work is not
+     * something to spend without looking.
+     */
+    private final Paint[] outline = new Paint[FADES];
+    /** Below this step a trail is tail, and is left alone. */
+    private static final int OUTLINE_FROM = FADES / 2;
     /** Segment endpoints per (color, fade) bucket, grown once and reused every frame. */
     private final float[][] batch = new float[6 * FADES][];
     private final int[] batchCount = new int[6 * FADES];
@@ -106,7 +123,7 @@ final class WindView extends View {
             for (int k = 0; k < FADES; k++) {
                 final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
                 p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(1.6f);
+                p.setStrokeWidth(1.9f);
                 // Butt, not round: a round cap puts a filled semicircle on both ends of
                 // every segment, and the field is thousands of them blended over each
                 // other. The joins are a few pixels apart along a smooth curve, so the
@@ -118,6 +135,17 @@ final class WindView extends View {
                 p.setAlpha(Math.round(235f * (float) Math.pow((k + 1f) / FADES, 1.6)));
                 paints[b][k] = p;
             }
+        }
+        for (int k = OUTLINE_FROM; k < FADES; k++) {
+            final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(3.4f);
+            p.setStrokeCap(Paint.Cap.BUTT);
+            p.setColor(0xFF000000);
+            // Fainter than the color it carries, so it reads as a shadow rather than
+            // as a second field of black worms.
+            p.setAlpha(Math.round(150f * (float) Math.pow((k + 1f) / FADES, 1.6)));
+            outline[k] = p;
         }
         setClickable(false);
         setFocusable(false);
@@ -241,6 +269,12 @@ final class WindView extends View {
             }
         }
         // One canvas call per color and fade step rather than one per segment.
+        // Every outline first, so a trail is never drawn over its neighbour's shadow.
+        for (int b = 0; b < batch.length; b++) {
+            final int fade = b % FADES;
+            if (batchCount[b] > 0 && outline[fade] != null)
+                canvas.drawLines(batch[b], 0, batchCount[b], outline[fade]);
+        }
         for (int b = 0; b < batch.length; b++)
             if (batchCount[b] > 0)
                 canvas.drawLines(batch[b], 0, batchCount[b], paints[b / FADES][b % FADES]);
