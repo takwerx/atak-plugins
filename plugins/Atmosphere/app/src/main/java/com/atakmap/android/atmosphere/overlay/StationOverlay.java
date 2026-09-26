@@ -353,13 +353,14 @@ public final class StationOverlay {
      * up"). One station is one feature, so the label has to be baked in or not, and
      * the zoom decides which.
      */
-    private void applyLabelBand() {
+    private boolean applyLabelBand() {
         final boolean wanted = labels
                 && mapView.getMapResolution() <= labelGate;
         if (wanted == labelsWanted)
-            return;
+            return false;
         labelsWanted = wanted;
         redraw();
+        return true;
     }
 
     /** Coalesced: a pinch is hundreds of callbacks and each redraw is a DB write. */
@@ -368,11 +369,15 @@ public final class StationOverlay {
         public void run() {
             if (!on)
                 return;
-            applyLabelBand();
+            final boolean crossed = applyLabelBand();
             followMapCenter();
             // Which stations are on screen has changed, and that is what decides
-            // which ones carry a label.
-            if (labelsWanted)
+            // which ones carry a label. Once, though: crossing the band has already
+            // queued a redraw, and it reads the view when it runs, so a second one
+            // here was the same compose-and-rewrite of every station again. Every
+            // crossing paid twice -- the log showed them in pairs, 19,280 ms then
+            // 1,436 ms, 1,351 then 1,135 (XCover, 2026-09-26).
+            if (labelsWanted && !crossed)
                 redraw();
             // Even when nothing is refetched, anything ordered by distance from the
             // map is now in the wrong order.
