@@ -163,7 +163,8 @@ public final class RedFlag {
     /** What the coloring is based on, said plainly under the layer. */
     public static String basis() {
         return "Each station is held against its fire weather zone's own criteria "
-                + "where its office's table is loaded (California, 2026 AOP). Elsewhere it "
+                + "where its office's plan is loaded (California, Great Basin, Southwest, "
+                + "Northwest). Elsewhere it "
                 + "is humidity " + (int) RH_CRITICAL + "% or less with wind "
                 + (int) WIND_CRITICAL + " mph or more, the common thresholds, not the "
                 + "zone's own criteria. A station's record says which.";

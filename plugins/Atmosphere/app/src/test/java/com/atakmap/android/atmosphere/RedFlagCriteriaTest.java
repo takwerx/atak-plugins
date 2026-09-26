@@ -75,6 +75,50 @@ public class RedFlagCriteriaTest {
     }
 
     @Test
+    public void greatBasinReadsTheMapsColors() {
+        // Boise's forest zones are purple (gusts 25), its BLM zones green (gusts 30).
+        assertEquals(RedFlag.CRITICAL, RedFlag.state(15, 5, 25, RedFlagCriteria.forZoneId("ID401")));
+        assertEquals(RedFlag.NEAR, RedFlag.state(15, 5, 25, RedFlagCriteria.forZoneId("ID400")));
+        assertEquals(RedFlag.CRITICAL, RedFlag.state(15, 5, 30, RedFlagCriteria.forZoneId("ID400")));
+        // Riverton takes sustained or gusts at 25.
+        assertEquals(RedFlag.CRITICAL, RedFlag.state(12, 25, Double.NaN, RedFlagCriteria.forZoneId("WY415")));
+        // Las Vegas: sustained 20 or gusts 35.
+        assertEquals(RedFlag.CRITICAL, RedFlag.state(10, 20, Double.NaN, RedFlagCriteria.forZoneId("NV462")));
+        assertEquals(RedFlag.NEAR, RedFlag.state(10, 19, 34, RedFlagCriteria.forZoneId("NV462")));
+    }
+
+    @Test
+    public void anOfficeRuleAppliesToItsStatesOnly() {
+        // Portland's rule reaches an Oregon zone with no entry of its own...
+        final RedFlag.Criteria pqr = RedFlagCriteria.forZone("OR606", "PQR");
+        assertNotNull(pqr);
+        assertEquals(RedFlag.CRITICAL, RedFlag.state(25, 10, Double.NaN, pqr));    // day leg
+        assertEquals(RedFlag.CRITICAL, RedFlag.state(33, 5, 25, pqr));             // night leg
+        assertEquals(RedFlag.NEAR, RedFlag.state(33, 5, 22, pqr));
+        // ... but a zone's own entry wins over it ...
+        assertTrue(RedFlagCriteria.forZone("OR604", "PQR").source.contains("valley"));
+        // ... and an office that spans two plans keeps them apart: Boise's Oregon
+        // zones use the Northwest matrix, its Idaho zones the Great Basin map.
+        assertTrue(RedFlagCriteria.forZone("OR636", "BOI").source.contains("matrix"));
+        assertTrue(RedFlagCriteria.forZone("ID401", "BOI").source.contains("Great Basin"));
+        // Midland's New Mexico zones follow a plan that is not loaded.
+        assertNull(RedFlagCriteria.forZone("NM117", "MAF"));
+        assertNull(RedFlagCriteria.forZone("CO205", "GJT"));
+    }
+
+    @Test
+    public void lessThanIsOneBelow() {
+        // Medford 616: "Min RH < 15%": 14 qualifies, 15 does not.
+        final RedFlag.Criteria mfr = RedFlagCriteria.forZoneId("OR616");
+        assertEquals(RedFlag.CRITICAL, RedFlag.state(14, 10, Double.NaN, mfr));
+        assertEquals(RedFlag.NEAR, RedFlag.state(15, 10, Double.NaN, mfr));
+        // Spokane basin: "exceeding 15 mph" with RH "less than 15%".
+        final RedFlag.Criteria otx = RedFlagCriteria.forZoneId("WA706");
+        assertEquals(RedFlag.CRITICAL, RedFlag.state(14, 16, Double.NaN, otx));
+        assertEquals(RedFlag.NEAR, RedFlag.state(14, 15, Double.NaN, otx));
+    }
+
+    @Test
     public void sanDiegoIsTheSupersetForTheSharedDesertZones() {
         assertTrue(RedFlagCriteria.forZoneId("CA261").source.contains("San Diego"));
         assertTrue(RedFlagCriteria.forZoneId("CA281").source.contains("Reno"));
