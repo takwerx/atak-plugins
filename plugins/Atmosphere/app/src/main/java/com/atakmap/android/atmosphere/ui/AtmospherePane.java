@@ -1904,6 +1904,12 @@ public final class AtmospherePane {
                 "Flirting", "one of the two criteria is met"));
         stationsGuide.addView(guideRow(example(StationOverlay.CRITICAL),
                 "Red Flag", "both are met at once"));
+
+        // The source lives here rather than on the list page: there it was three
+        // lines of credit above the fold, and in landscape that is most of the rows
+        // the operator can see (2026-09-25).
+        stationsGuide.addView(guideHeading("Where this comes from"));
+        stationsGuide.addView(guideNote(pluginContext.getString(R.string.credit_stations)));
     }
 
     private Example example(final int stateColor) {

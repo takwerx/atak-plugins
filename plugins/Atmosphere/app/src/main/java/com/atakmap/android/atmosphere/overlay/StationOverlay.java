@@ -707,30 +707,53 @@ public final class StationOverlay {
      * shows an empty pane. It is also the right shape -- "20 mph from 250 (WSW)" is
      * what somebody tapping a station wants, not three fields to assemble themselves.
      */
+    /**
+     * Everything a station has to say, as ordered label/value pairs.
+     *
+     * <p>One list, used by the map tap and by the list page's details. Two copies
+     * drift, and the operator is the one who notices that a tap and a row disagree.
+     */
+    public static List<String[]> describe(Raws.Station s, UnitSystem system, long now) {
+        final List<String[]> out = new ArrayList<>();
+        row(out, "Status", StationIcons.stateLabel(colorFor(s)));
+        row(out, "Wind", wind(s, system));
+        row(out, "Gust", Double.isNaN(s.gustMph) ? ""
+                : Units.format(Quantity.SPEED, s.gustMph * 0.44704, system)
+                        + direction(s.gustFromDeg));
+        row(out, "Humidity", percent(s.relativeHumidity));
+        row(out, "Temperature", fahrenheit(s.airTempF, system));
+        row(out, "Fuel moisture", percent(s.fuelMoisture));
+        row(out, "Fuel temperature", fahrenheit(s.fuelTempF, system));
+        row(out, "Observed", observed(s, now));
+        row(out, "Elevation", s.elevation <= 0 ? ""
+                : Units.format(Quantity.LENGTH, s.elevation * 0.3048, system));
+        row(out, "Agency", s.agency);
+        row(out, "Unit", s.unit);
+        row(out, "County", s.county);
+        row(out, "State", s.state);
+        row(out, "Station status", s.status);
+        row(out, "Station id", s.wxId);
+        row(out, "MesoWest id", s.mesowestId);
+        row(out, "Position", String.format(Locale.US, "%.5f, %.5f",
+                s.latitude, s.longitude));
+        return out;
+    }
+
+    /** The color the map would draw this station, without needing the map. */
+    public static int colorFor(Raws.Station s) {
+        return color(stateOf(s));
+    }
+
+    private static void row(List<String[]> out, String label, String value) {
+        if (value != null && !value.trim().isEmpty())
+            out.add(new String[] { label, value.trim() });
+    }
+
     private AttributeSet attrs(Raws.Station s, int color, long now, UnitSystem system) {
         final AttributeSet a = new AttributeSet();
         put(a, "Station", s.name);
-        put(a, "Status", StationIcons.stateLabel(color));
-        put(a, "Wind", wind(s, system));
-        put(a, "Gust", Double.isNaN(s.gustMph) ? ""
-                : Units.format(Quantity.SPEED, s.gustMph * 0.44704, system)
-                        + direction(s.gustFromDeg));
-        put(a, "Humidity", percent(s.relativeHumidity));
-        put(a, "Temperature", fahrenheit(s.airTempF, system));
-        put(a, "Fuel moisture", percent(s.fuelMoisture));
-        put(a, "Fuel temperature", fahrenheit(s.fuelTempF, system));
-        put(a, "Observed", observed(s, now));
-        put(a, "Elevation", s.elevation <= 0 ? ""
-                : Units.format(Quantity.LENGTH, s.elevation * 0.3048, system));
-        put(a, "Agency", s.agency);
-        put(a, "Unit", s.unit);
-        put(a, "County", s.county);
-        put(a, "State", s.state);
-        put(a, "Station status", s.status);
-        put(a, "Station id", s.wxId);
-        put(a, "MesoWest id", s.mesowestId);
-        put(a, "Position", String.format(Locale.US, "%.5f, %.5f",
-                s.latitude, s.longitude));
+        for (String[] r : describe(s, system, now))
+            put(a, r[0], r[1]);
         return a;
     }
 

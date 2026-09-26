@@ -10,6 +10,7 @@
     android:paddingRight="@dimen/auto_margin">
 
     <TextView
+        android:id="@+id/stations_page_heading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/stations_page_heading"
@@ -43,24 +44,34 @@
         android:textSize="13sp"
         android:text="" />
 
-    <!-- A ListView cannot live inside a ScrollView, so the page is the list and
-         anything above it would have to be a header. Here nothing does: the controls
-         are fixed and the rows scroll under them. -->
-    <ListView
-        android:id="@+id/stations_list"
+    <!-- The list and one station's details share the space: the details replace the
+         list rather than sitting under it, because in landscape there is only room
+         for a few rows and a panel below would leave none. -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="6dp"
-        android:divider="@null"
-        android:dividerHeight="0dp"
-        android:scrollbarStyle="outsideOverlay" />
+        android:layout_marginTop="6dp">
 
-    <TextView
-        android:id="@+id/stations_page_credit"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="11sp"
-        android:alpha="0.7"
-        android:text="@string/credit_stations" />
+        <ListView
+            android:id="@+id/stations_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:scrollbarStyle="outsideOverlay" />
+
+        <ScrollView
+            android:id="@+id/stations_detail"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/stations_detail_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+    </FrameLayout>
 </LinearLayout>

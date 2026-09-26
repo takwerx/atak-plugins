@@ -58,7 +58,11 @@ public final class StationPage {
     private final LinearLayout filterRow, scopeRow;
     private final TextView status;
     private final ListView list;
+    private final View detail;
+    private final LinearLayout detailBody;
+    private final View heading;
     private final Adapter adapter = new Adapter();
+    private Raws.Station showing;
 
     private StationOverlay layer;
     private int filter = ALL;
@@ -74,6 +78,9 @@ public final class StationPage {
         status = root.findViewById(R.id.stations_page_status);
         list = root.findViewById(R.id.stations_list);
         list.setAdapter(adapter);
+        detail = root.findViewById(R.id.stations_detail);
+        detailBody = root.findViewById(R.id.stations_detail_body);
+        heading = root.findViewById(R.id.stations_page_heading);
     }
 
     public View view() {
@@ -118,6 +125,9 @@ public final class StationPage {
         buildScopeRow();
         status.setText(summary(counts, from));
         adapter.notifyDataSetChanged();
+        // A station being looked at stays looked at while the map moves around it.
+        if (showing != null)
+            showDetail(showing);
     }
 
     private String summary(int[] counts, GeoPoint from) {
@@ -240,6 +250,14 @@ public final class StationPage {
                     goTo(s);
                 }
             });
+            // The row itself opens the record; the button beside it is the shortcut
+            // for when that is all you wanted.
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showDetail(s);
+                }
+            });
             return row;
         }
     }
@@ -286,6 +304,101 @@ public final class StationPage {
         if (hours < 1.5)
             return Math.max(1, Math.round(hours * 60)) + " min ago";
         return Math.round(hours) + " h ago";
+    }
+
+    /**
+     * One station's full record, in place of the list.
+     *
+     * <p>Back and Go to are in the panel itself: the pane's own back gesture belongs
+     * to the pager, and a details view you can only leave by swiping pages is one the
+     * operator has to learn rather than read.
+     */
+    private void showDetail(final Raws.Station s) {
+        showing = s;
+        detailBody.removeAllViews();
+
+        final LinearLayout buttons = new LinearLayout(pluginContext);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.addView(action("Back", new Runnable() {
+            @Override
+            public void run() {
+                showList();
+            }
+        }));
+        buttons.addView(action("Go to", new Runnable() {
+            @Override
+            public void run() {
+                goTo(s);
+            }
+        }));
+        detailBody.addView(buttons);
+
+        final TextView title = new TextView(pluginContext);
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(17);
+        title.setPadding(0, dp(8), 0, dp(2));
+        title.setText(s.name);
+        detailBody.addView(title);
+
+        // The same fields the map's own tap shows, from the same list.
+        for (String[] r : StationOverlay.describe(s, host.units(),
+                System.currentTimeMillis()))
+            detailBody.addView(field(r[0], r[1]));
+
+        detail.setVisibility(View.VISIBLE);
+        list.setVisibility(View.GONE);
+        heading.setVisibility(View.GONE);
+        filterRow.setVisibility(View.GONE);
+        scopeRow.setVisibility(View.GONE);
+        status.setVisibility(View.GONE);
+    }
+
+    private void showList() {
+        showing = null;
+        detail.setVisibility(View.GONE);
+        list.setVisibility(View.VISIBLE);
+        heading.setVisibility(View.VISIBLE);
+        filterRow.setVisibility(View.VISIBLE);
+        scopeRow.setVisibility(View.VISIBLE);
+        status.setVisibility(View.VISIBLE);
+    }
+
+    private View action(String label, final Runnable onPress) {
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, filterRow, false);
+        b.setText(label);
+        b.setTextSize(14);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onPress.run();
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        b.setLayoutParams(lp);
+        return b;
+    }
+
+    /** One field: its name small and dim, its value plain. */
+    private View field(String label, String value) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, dp(5), 0, dp(1));
+        final TextView l = new TextView(pluginContext);
+        l.setTextSize(10);
+        l.setAllCaps(true);
+        l.setAlpha(0.6f);
+        l.setTextColor(0xFFFFFFFF);
+        l.setText(label);
+        final TextView v = new TextView(pluginContext);
+        v.setTextSize(15);
+        v.setTextColor(0xFFFFFFFF);
+        v.setText(value);
+        row.addView(l);
+        row.addView(v);
+        return row;
     }
 
     /** Put the station in the middle of the map, without changing the zoom. */
