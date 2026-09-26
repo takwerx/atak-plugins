@@ -188,7 +188,21 @@ public repos. `/ship` covers the subtree push and the per-plugin release.
 ## Plugin UI standard — look like ATAK, not like a plugin
 
 Every takwerx plugin uses the same controls, so a user moving between them is not
-learning a new dialect each time. `CamDepot` is the reference implementation.
+learning a new dialect each time.
+
+**The pane itself has one shape, and it is written down in the `plugin-ui` skill
+(`.claude/skills/plugin-ui/SKILL.md`). It is the baseline a new plugin starts
+from: load it when writing a new plugin's PLAN and building its pane. Existing
+plugins keep what they have unless the operator asks to change them.** The short
+version: a main screen
+of three buttons (map switch | Settings | Notify) with the list straight under
+it; everything set once and left on a Settings page of drop-down rows reading
+`Name: value`; switches that say `<Thing> ON` / `OFF` in green or red text; a
+zoom gate stored and compared as the distance ATAK's scale bar reads; Area and
+Where as separate filters; one rule behind the list, the map and the map key;
+and a status line naming everything that is not shown. It was worked out across
+Feature Layer, Atmosphere, IPAWS, Evac Zone and Traffic, so a new plugin should
+not have to be taught it again. The rules below are the base it builds on.
 
 **Use ATAK's own button drawables.** `new-plugin.sh` already copies them out of the
 SDK template — `btn_gray` is a selector over `new_dark_button_bg` /
