@@ -1,6 +1,7 @@
 package com.atakmap.android.atmosphere;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -18,12 +19,14 @@ public class CoopsTest {
                 + "{\"id\":\"9410230\",\"name\":\"La Jolla\",\"lat\":32.8669,\"lng\":-117.2571,\"type\":\"H\"},"
                 + "{\"id\":\"9410032\",\"name\":\"Wilson Cove\",\"lat\":33.005,\"lng\":-118.557,\"type\":\"S\"},"
                 + "{\"id\":\"PCT0026\",\"name\":\"Point Loma\",\"lat\":32.66583,\"lng\":-117.22617,\"type\":\"S\",\"currbin\":2,\"depth\":33},"
-                + "{\"id\":\"PCT0026\",\"name\":\"Point Loma\",\"lat\":32.66583,\"lng\":-117.22617,\"type\":\"S\",\"currbin\":1,\"depth\":15}]}";
+                + "{\"id\":\"PCT0026\",\"name\":\"Point Loma\",\"lat\":32.66583,\"lng\":-117.22617,\"type\":\"S\",\"currbin\":1,\"depth\":15},"
+                + "{\"id\":\"PCT0076\",\"name\":\"B St. Pier\",\"lat\":32.7,\"lng\":-117.24,\"type\":\"W\",\"currbin\":1,\"depth\":34}]}";
         final List<Coops.Station> st = Coops.parseStations(body);
-        assertEquals(4, st.size());
+        assertEquals(5, st.size());
         assertTrue(st.get(0).measures());
+        assertFalse(st.get(4).predicts());
         final Coops.Station n = Coops.nearest(st, 32.7, -117.24, 30);
-        assertEquals("PCT0026", n.id);
+        assertEquals("PCT0026", n.id);                     // the weak station on the point is passed over
         assertEquals(1, n.bin);                            // bin 1 wins the tie
         assertNull(Coops.nearest(st, 40.0, -124.0, 30));   // nothing within 30 mi
     }

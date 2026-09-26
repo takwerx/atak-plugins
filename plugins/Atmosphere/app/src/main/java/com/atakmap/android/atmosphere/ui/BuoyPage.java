@@ -48,6 +48,15 @@ public final class BuoyPage {
     private static final long LIST_RETRY_MS = 90_000L;
     private LinearLayout tideBlock;
     private String tideFor;
+    /**
+     * CO-OPS answers by URL. Every buoy redraw rebuilds the open record, which was
+     * asking for the same tide twice a minute on 2026-09-26. Predictions do not
+     * change; the observed level is six-minute data, so ten minutes holds for all
+     * three, and a failure is held the same length so a station with no water
+     * level is not asked again at every redraw either.
+     */
+    private static final java.util.Map<String, Object[]> coopsCache = new java.util.HashMap<>();
+    private static final long COOPS_CACHE_MS = 10 * 60_000L;
 
 
     private final Context pluginContext;
@@ -394,10 +403,10 @@ public final class BuoyPage {
         final java.util.Map<String, String> h = new java.util.HashMap<>();
         if (tide != null) {
             final TextView row = (TextView) ((LinearLayout) field("Tide at " + tide.name + " ("
-                    + Math.round(Coops.milesBetween(g.latitude, g.longitude, tide.latitude, tide.longitude))
-                    + " mi)", "Getting the tide\u2026")).getChildAt(1);
+                    + miles(Coops.milesBetween(g.latitude, g.longitude, tide.latitude, tide.longitude))
+                    + ")", "Getting the tide\u2026")).getChildAt(1);
             tideBlock.addView((View) row.getParent());
-            Http.get(Coops.hiloUrl(tide.id, Coops.today()), egress.userAgent(), h, new Http.Callback() {
+            coops(Coops.hiloUrl(tide.id, Coops.today()), egress.userAgent(), h, new Http.Callback() {
                 @Override
                 public void onSuccess(String body) {
                     if (!g.id.equals(tideFor))
@@ -413,7 +422,7 @@ public final class BuoyPage {
                     }
                     row.setText(b.length() == 0 ? "No predictions" : b.toString());
                     // Asked of every station: the type does not say who measures.
-                    Http.get(Coops.waterLevelUrl(tide.id), egress.userAgent(), h,
+                    coops(Coops.waterLevelUrl(tide.id), egress.userAgent(), h,
                                 new Http.Callback() {
                                     @Override
                                     public void onSuccess(String wl) {
@@ -444,10 +453,10 @@ public final class BuoyPage {
         if (cur != null) {
             final TextView row = (TextView) ((LinearLayout) field("Current at " + cur.name
                     + (Double.isNaN(cur.depthFt) ? "" : String.format(java.util.Locale.US, ", %.0f ft deep", cur.depthFt))
-                    + " (" + Math.round(Coops.milesBetween(g.latitude, g.longitude, cur.latitude, cur.longitude))
-                    + " mi)", "Getting the current\u2026")).getChildAt(1);
+                    + " (" + miles(Coops.milesBetween(g.latitude, g.longitude, cur.latitude, cur.longitude))
+                    + ")", "Getting the current\u2026")).getChildAt(1);
             tideBlock.addView((View) row.getParent());
-            Http.get(Coops.currentsUrl(cur.id, cur.bin), egress.userAgent(), h, new Http.Callback() {
+            coops(Coops.currentsUrl(cur.id, cur.bin), egress.userAgent(), h, new Http.Callback() {
                 @Override
                 public void onSuccess(String body) {
                     if (!g.id.equals(tideFor))
@@ -474,6 +483,44 @@ public final class BuoyPage {
                 }
             });
         }
+    }
+
+    /** "0.4 mi" for a pier across the harbor, "18 mi" up the coast; never "0 mi". */
+    private static String miles(double d) {
+        return d < 10 ? String.format(java.util.Locale.US, "%.1f mi", d)
+                : Math.round(d) + " mi";
+    }
+
+    /** {@link Http#get} through {@link #coopsCache}. */
+    private static void coops(final String url, String userAgent, java.util.Map<String, String> h,
+            final Http.Callback cb) {
+        synchronized (coopsCache) {
+            final Object[] hit = coopsCache.get(url);
+            if (hit != null && System.currentTimeMillis() - (Long) hit[1] < COOPS_CACHE_MS) {
+                if (hit[0] != null)
+                    cb.onSuccess((String) hit[0]);
+                else
+                    cb.onFailure((String) hit[2]);
+                return;
+            }
+        }
+        Http.get(url, userAgent, h, new Http.Callback() {
+            @Override
+            public void onSuccess(String body) {
+                synchronized (coopsCache) {
+                    coopsCache.put(url, new Object[] { body, System.currentTimeMillis(), null });
+                }
+                cb.onSuccess(body);
+            }
+
+            @Override
+            public void onFailure(String error) {
+                synchronized (coopsCache) {
+                    coopsCache.put(url, new Object[] { null, System.currentTimeMillis(), error });
+                }
+                cb.onFailure(error);
+            }
+        });
     }
 
     /** Two megabytes each, once; the record is filled when they land. */

@@ -66,7 +66,10 @@ public final class Coops {
     public static final class Station {
         public final String id, name;
         public final double latitude, longitude;
-        /** H harmonic (measured), S subordinate (predicted from a reference), W weak/variable. */
+        /**
+         * R reference / S subordinate for a tide station; H harmonic, S subordinate or
+         * W weak-and-variable for a current station.
+         */
         public final String type;
         /** Current stations only: which depth bin, and its depth in feet. */
         public final int bin;
@@ -90,6 +93,16 @@ public final class Coops {
          */
         public boolean measures() {
             return "R".equals(type) || "H".equals(type);
+        }
+
+        /**
+         * False for a "weak and variable" current station: CO-OPS lists 279 of them
+         * (2026-09-26) and predicts none. B St. Pier in San Diego, 0.2 mi from the
+         * SDBC1 buoy, answered "Currents predictions are not available from the
+         * requested station" -- with HTTP 200 and an error body.
+         */
+        public boolean predicts() {
+            return !"W".equals(type);
         }
     }
 
@@ -120,11 +133,16 @@ public final class Coops {
         return out;
     }
 
-    /** The station nearest a point within {@code miles}, or null. Bin 1 wins a tie. */
+    /**
+     * The station nearest a point within {@code miles} that has predictions, or null.
+     * Bin 1 wins a tie.
+     */
     public static Station nearest(List<Station> stations, double lat, double lon, double miles) {
         Station best = null;
         double bestD = miles;
         for (Station s : stations) {
+            if (!s.predicts())
+                continue;
             final double d = milesBetween(lat, lon, s.latitude, s.longitude);
             if (d < bestD || (best != null && d == bestD && s.bin < best.bin)) {
                 best = s;

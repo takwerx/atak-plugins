@@ -642,8 +642,21 @@ public final class BuoyOverlay {
             append(b, height(g.waveHeightM, system)
                     + (Double.isNaN(g.dominantPeriodS) ? "" : " @ " + Math.round(g.dominantPeriodS) + " s"));
         }
-        if (b.length() == 0)
-            append(b, Double.isNaN(g.airTempC) ? "No current reading" : temp(g.airTempC, system));
+        if (b.length() == 0) {
+            // A pier with no anemometer or wave sensor still reports something --
+            // San Diego (SDBC1) carries only pressure and water temperature -- and
+            // a "recent" diamond over "No current reading" contradicts itself.
+            if (!Double.isNaN(g.airTempC))
+                append(b, temp(g.airTempC, system));
+            else if (!Double.isNaN(g.waterTempC))
+                append(b, "Water " + temp(g.waterTempC, system));
+            else if (!Double.isNaN(g.pressureHpa))
+                append(b, Units.format(Quantity.PRESSURE, g.pressureHpa, system));
+            else if (!Double.isNaN(g.tideFt))
+                append(b, String.format(Locale.US, "Tide %.1f ft", g.tideFt));
+            else
+                append(b, "No current reading");
+        }
         return b.toString();
     }
 
