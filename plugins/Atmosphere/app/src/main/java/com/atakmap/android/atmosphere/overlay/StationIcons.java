@@ -428,11 +428,22 @@ final class StationIcons {
         final float pillCx = cx + ox * away, pillCy = cy + oy * away;
         // What the renderer must shift so the disc, not the box, is on the station.
         //
-        // The bitmap is placed by its middle, so to bring a disc that sits LEFT of
-        // that middle onto the point the bitmap moves LEFT -- a negative offset.
-        // Written the other way round first, which moved every station off its
-        // coordinates by however far its barb reached (operator, 2026-09-25).
-        final float offX = cx - w / 2f, offY = cy - h / 2f;
+        // The two axes take opposite signs, and both were measured against the
+        // radial menu, which ATAK centers on the feature's true point (2026-09-26):
+        //
+        //   x: the renderer adds the offset (GLBatchPoint3: xpos = x + offsetX), so
+        //      a disc LEFT of the bitmap's middle needs the middle relative to the
+        //      disc, w/2 - cx. As cx - w/2 every labeled station drew twice its
+        //      pill's reach to one side: Jarbo Gap sat 79 px left of its point.
+        //   y: the renderer subtracts on a GL lower-left origin (ypos = y - offsetY),
+        //      which is the disc relative to the middle in the bitmap's own
+        //      y-down terms, cy - h/2. Negated to match x, Santa Rosa Plateau sat
+        //      33 px above its point.
+        //
+        // The bare icon's offsets are small (a barb), the labeled one's are not (a
+        // pill), so a wrong sign shows as a station that JUMPS when the label band
+        // crosses -- the operator's "stations move when I zoom".
+        final float offX = w / 2f - cx, offY = cy - h / 2f;
         // Where the disc is inside the icon, for anything that anchors rather than
         // offsets -- the hit test's own marker does.
         final float anchorX = cx, anchorY = cy;
