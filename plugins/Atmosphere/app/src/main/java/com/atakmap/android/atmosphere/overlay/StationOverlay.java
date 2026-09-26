@@ -857,30 +857,20 @@ public final class StationOverlay {
             put(a, r[0], r[1]);
         // Plumbing, not a field. Underscored so the details pane skips it.
         //
-        // The station's OWN icon, not a substitute: a tap materializes a map item
-        // that is drawn, so an icon here has to be the one the station already wears
-        // or the tapped station changes shape under the operator's finger -- which is
-        // what a bare disc did (2026-09-25). Now that the bitmap is trimmed to its
-        // ink it is also small enough to read in the Select Item chooser, which was
-        // the reason for wanting a substitute in the first place.
-        //
-        // And it is the icon THIS station is drawn with -- the per-station label
-        // switch rebuild() worked out, not the layer's. Written against the layer's
-        // switch, this composed a labeled icon for every station in the radius, on
-        // screen or not, and quietly undid the on-screen gate three lines above the
-        // call: 389 labeled files for a dozen visible stations, and a 19 s wait for
-        // the labels after zooming in (measured 2026-09-26, the operator's "takes way
-        // too long"). Same key as add() composes, so it is one PNG per station, once.
+        // The icon THIS station is drawn with, for the map item a tap materializes:
+        // same key as add() composes, so one PNG per station. In the bitmap's own
+        // pixels, because a Marker icon is sized in pixels and not scaled by density
+        // the way the feature's width is (StationIcons.Composed).
         final StationIcons.Composed own = icons.compose(s.name,
                 speed(s.windMph, system), speed(s.gustMph, system), speedUnit(),
                 s.relativeHumidity, s.fuelMoisture, s.windFromDeg, knots(s.windMph),
                 color, withLabel);
         if (own != null) {
             put(a, "_chooserIcon", own.uri);
-            a.setAttribute("_chooserW", own.width);
-            a.setAttribute("_chooserH", own.height);
-            a.setAttribute("_chooserAnchorX", own.anchorX);
-            a.setAttribute("_chooserAnchorY", own.anchorY);
+            a.setAttribute("_chooserW", own.pxWidth);
+            a.setAttribute("_chooserH", own.pxHeight);
+            a.setAttribute("_chooserAnchorX", own.pxAnchorX);
+            a.setAttribute("_chooserAnchorY", own.pxAnchorY);
         }
         // The details pane sorts what it is given, which turned a list that starts
         // with the wind into one that starts with the agency. Pre-rendered in the

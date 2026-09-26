@@ -417,7 +417,37 @@ final class AtmosphereFeatures {
 
                         @Override
                         protected MapItem featureToMapItem(Feature feature) {
-                            final MapItem item = super.featureToMapItem(feature);
+                            final AttributeSet a = attributesOf(feature.getId());
+                            // Built through ATAK's public static with NO store behind
+                            // it, whenever the attributes are at hand.
+                            //
+                            // featureToMapItem hangs an OnIconChangedListener on the
+                            // marker it makes, and that listener writes the marker's
+                            // icon BACK INTO THE STORE as a bare IconPointStyle(color,
+                            // uri): no width, no offset, no transparent label style.
+                            // Every setIcon on the proxy fired it, and the tapped
+                            // feature was redrawn by the map at "original" size,
+                            // centered, with its name over it -- the small disc under
+                            // ATAK's "MALLORY RIDGE" (2026-09-26), and the day before
+                            // the substitute chooser icon turning the tapped station
+                            // into a bare disc. The feature's style being rewritten,
+                            // both times, not the proxy being drawn. The static takes
+                            // a null store and updateFeatureStyle returns on null, so
+                            // the listener is harmless there (read from 5.8). It needs
+                            // the attributes on the feature -- the hit test's copy has
+                            // none -- so they are fetched by id and put on a copy.
+                            final boolean own = a != null;
+                            final MapItem item = own
+                                    ? FeatureDataStoreDeepMapItemQuery.featureToMapItem(
+                                            new Feature(feature.getFeatureSetId(),
+                                                    feature.getId(), feature.getName(),
+                                                    feature.getGeometry(), feature.getStyle(),
+                                                    a, feature.getAltitudeMode(),
+                                                    feature.getExtrude(),
+                                                    feature.getTimestamp(),
+                                                    feature.getVersion()),
+                                            uidPrefix)
+                                    : super.featureToMapItem(feature);
                             // A READ-ONLY radial, not no radial. Blanking the menu
                             // removed the radial and with it the only route to the
                             // details pane, so a tap said nothing at all (operator,
@@ -436,43 +466,33 @@ final class AtmosphereFeatures {
                             item.setMetaBoolean("addToObjList", false);
                             item.setMetaBoolean("nevercot", true);
                             item.setMetaLong("featureid", feature.getId());
-                            final AttributeSet a = attributesOf(feature.getId());
-                            // A glyph for ATAK's Select Item chooser.
-                            //
-                            // Without one the chooser scales the map icon into its
-                            // small box, and a station's icon is a large, mostly
-                            // transparent canvas -- room for a barb pointing any
-                            // direction -- so the symbol itself lands a few pixels
-                            // across and is unreadable beside ATAK's own entries
-                            // (operator, 2026-09-25). A layer that has something
-                            // tighter says so in this attribute; Feature Layer does
-                            // the same for its own chooser rows.
-                            // The item a tap creates is DRAWN on the map, so an icon
-                            // here must be the one the feature already wears -- a
-                            // substitute changes the tapped symbol under the
-                            // operator's finger, which a bare disc did (2026-09-25).
-                            // Given that, it also makes ATAK's Select Item chooser
-                            // legible, since the chooser scales this icon into a
-                            // small row and the feature's own is now trimmed to its
-                            // ink rather than centered in a mostly empty square.
-                            if (a != null)
+                            // The station's own icon, in its own pixels, and no ATAK
+                            // label -- the pill already carries the name. Only on a
+                            // proxy with no store behind it; on the fallback any icon
+                            // change would rewrite the feature's style.
+                            if (own && item instanceof com.atakmap.android.maps.Marker)
                                 try {
+                                    final com.atakmap.android.maps.Marker m =
+                                            (com.atakmap.android.maps.Marker) item;
+                                    m.setTextRenderFlag(
+                                            com.atakmap.android.maps.Marker.TEXT_STATE_NEVER_SHOW);
                                     final String glyph = a.getStringAttribute("_chooserIcon");
-                                    if (glyph != null && !glyph.isEmpty()
-                                            && item instanceof com.atakmap.android.maps.Marker) {
-                                        ((com.atakmap.android.maps.Marker) item).setIcon(
-                                                new com.atakmap.coremap.maps.assets.Icon
-                                                        .Builder()
-                                                        .setImageUri(com.atakmap.coremap.maps
-                                                                .assets.Icon.STATE_DEFAULT, glyph)
-                                                        .setSize(a.getIntAttribute("_chooserW"),
-                                                                a.getIntAttribute("_chooserH"))
-                                                        .setAnchor(
-                                                                a.getIntAttribute("_chooserAnchorX"),
-                                                                a.getIntAttribute("_chooserAnchorY"))
-                                                        .setColor(com.atakmap.coremap.maps.assets
-                                                                .Icon.STATE_DEFAULT, 0xFFFFFFFF)
-                                                        .build());
+                                    if (glyph != null && !glyph.isEmpty()) {
+                                        final int w = a.getIntAttribute("_chooserW");
+                                        final int h = a.getIntAttribute("_chooserH");
+                                        final int ax = a.getIntAttribute("_chooserAnchorX");
+                                        final int ay = a.getIntAttribute("_chooserAnchorY");
+                                        m.setIcon(new com.atakmap.coremap.maps.assets.Icon
+                                                .Builder()
+                                                .setImageUri(com.atakmap.coremap.maps.assets
+                                                        .Icon.STATE_DEFAULT, glyph)
+                                                .setSize(w, h)
+                                                .setAnchor(ax, ay)
+                                                .setColor(com.atakmap.coremap.maps.assets
+                                                        .Icon.STATE_DEFAULT, 0xFFFFFFFF)
+                                                .build());
+                                        Log.d(tag, "proxy icon " + w + "x" + h + " anchor "
+                                                + ax + "," + ay);
                                     }
                                 } catch (Exception noGlyph) {
                                     Log.d(tag, "no icon for this item", noGlyph);

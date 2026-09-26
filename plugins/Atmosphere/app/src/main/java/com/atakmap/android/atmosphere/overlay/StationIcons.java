@@ -152,9 +152,17 @@ final class StationIcons {
         final float offsetX, offsetY;
         /** Where the disc is inside the icon, for whatever anchors instead. */
         final int anchorX, anchorY;
+        /**
+         * The same in the bitmap's own pixels, for a Marker icon: those are sized in
+         * pixels (Icon.Builder.setSize) and scaled only by ATAK's relative-scaling
+         * option, never by density, which is what the feature renderer applies to
+         * {@code width}. The anchor is in the final image's pixels likewise.
+         */
+        final int pxWidth, pxHeight, pxAnchorX, pxAnchorY;
 
         Composed(String uri, int width, int height, float offsetX, float offsetY,
-                int anchorX, int anchorY) {
+                int anchorX, int anchorY, int pxWidth, int pxHeight, int pxAnchorX,
+                int pxAnchorY) {
             this.uri = uri;
             this.width = width;
             this.height = height;
@@ -162,6 +170,10 @@ final class StationIcons {
             this.offsetY = offsetY;
             this.anchorX = anchorX;
             this.anchorY = anchorY;
+            this.pxWidth = pxWidth;
+            this.pxHeight = pxHeight;
+            this.pxAnchorX = pxAnchorX;
+            this.pxAnchorY = pxAnchorY;
         }
     }
 
@@ -287,7 +299,8 @@ final class StationIcons {
             }
         }
         final String uri = "file://" + out.getAbsolutePath();
-        cache.put(key, new Composed(uri, size, size, 0f, 0f, size / 2, size / 2));
+        cache.put(key, new Composed(uri, size, size, 0f, 0f, size / 2, size / 2,
+                size, size, size / 2, size / 2));
         return uri;
     }
 
@@ -433,7 +446,8 @@ final class StationIcons {
         final Composed made = new Composed("file://" + out.getAbsolutePath(),
                 Math.round(w / scale), Math.round(h / scale),
                 offX / scale, offY / scale,
-                Math.round(anchorX / scale), Math.round(anchorY / scale));
+                Math.round(anchorX / scale), Math.round(anchorY / scale),
+                w, h, cx, cy);
         cache.put(key, made);
         return made;
     }
