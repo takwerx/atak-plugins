@@ -29,6 +29,14 @@ public class CoopsTest {
     }
 
     @Test
+    public void theHiloUrlBeginsOnADate() {
+        final String u = Coops.hiloUrl("TWC0419", "20260926");
+        assertTrue(u.contains("begin_date=20260926&range=48"));
+        assertTrue(u.contains("interval=hilo"));
+        assertEquals(8, Coops.today().length());
+    }
+
+    @Test
     public void tidesAndLevels() {
         final List<Coops.Tide> t = Coops.parseHilo("{\"predictions\":[{\"t\":\"2026-09-26 03:15\",\"v\":\"0.426\",\"type\":\"L\"},"
                 + "{\"t\":\"2026-09-26 09:26\",\"v\":\"5.493\",\"type\":\"H\"}]}");

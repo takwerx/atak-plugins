@@ -397,7 +397,7 @@ public final class BuoyPage {
                     + Math.round(Coops.milesBetween(g.latitude, g.longitude, tide.latitude, tide.longitude))
                     + " mi)", "Getting the tide\u2026")).getChildAt(1);
             tideBlock.addView((View) row.getParent());
-            Http.get(Coops.hiloUrl(tide.id), egress.userAgent(), h, new Http.Callback() {
+            Http.get(Coops.hiloUrl(tide.id, Coops.today()), egress.userAgent(), h, new Http.Callback() {
                 @Override
                 public void onSuccess(String body) {
                     if (!g.id.equals(tideFor))
@@ -412,8 +412,8 @@ public final class BuoyPage {
                                         "  \u00b7  %.1f ft", x.feet));
                     }
                     row.setText(b.length() == 0 ? "No predictions" : b.toString());
-                    if (tide.measures())
-                        Http.get(Coops.waterLevelUrl(tide.id), egress.userAgent(), h,
+                    // Asked of every station: the type does not say who measures.
+                    Http.get(Coops.waterLevelUrl(tide.id), egress.userAgent(), h,
                                 new Http.Callback() {
                                     @Override
                                     public void onSuccess(String wl) {
@@ -436,6 +436,10 @@ public final class BuoyPage {
                         row.setText("Could not get the tide: " + error);
                 }
             });
+        }
+        if (cur == null) {
+            tideBlock.addView(field("Current", "No current station within " + (int) CURRENT_REACH_MI
+                    + " mi"));
         }
         if (cur != null) {
             final TextView row = (TextView) ((LinearLayout) field("Current at " + cur.name

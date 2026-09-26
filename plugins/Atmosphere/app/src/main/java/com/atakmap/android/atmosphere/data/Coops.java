@@ -33,10 +33,21 @@ public final class Coops {
     public static final String TIDE_STATIONS_URL = MD + "?type=tidepredictions";
     public static final String CURRENT_STATIONS_URL = MD + "?type=currentpredictions";
 
-    /** The next 36 hours of highs and lows, station-local time. */
-    public static String hiloUrl(String id) {
+    /**
+     * Today's and tomorrow's highs and lows, station-local time. {@code range} on its
+     * own counts back a day; {@code begin_date} must be a date, not "today" (the API
+     * rejects the word), so the caller passes the device's local date as YYYYMMDD --
+     * a day off only at midnight for a station in another zone.
+     */
+    public static String hiloUrl(String id, String beginYyyymmdd) {
         return DATA + "?station=" + id + "&product=predictions&datum=MLLW&units=english"
-                + "&time_zone=lst_ldt&interval=hilo&range=36&format=json";
+                + "&time_zone=lst_ldt&interval=hilo&begin_date=" + beginYyyymmdd
+                + "&range=48&format=json";
+    }
+
+    /** The device's local date as the API wants it. */
+    public static String today() {
+        return new java.text.SimpleDateFormat("yyyyMMdd", Locale.US).format(new java.util.Date());
     }
 
     /** The latest observed water level, where the station measures one. */
@@ -72,9 +83,13 @@ public final class Coops {
             this.depthFt = depthFt;
         }
 
-        /** A harmonic station measures water; a subordinate one only predicts. */
+        /**
+         * The list's types are R (reference) and S (subordinate) for tides, H/S/W for
+         * currents. Neither says whether a water level is measured -- Mission Bay is R
+         * with none -- so a level is asked for and shown when it answers.
+         */
         public boolean measures() {
-            return "H".equals(type);
+            return "R".equals(type) || "H".equals(type);
         }
     }
 
