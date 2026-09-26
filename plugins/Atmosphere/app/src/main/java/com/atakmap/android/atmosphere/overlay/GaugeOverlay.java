@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.data.GaugeFavorites;
 import com.atakmap.android.atmosphere.data.Nwps;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
@@ -65,10 +66,21 @@ public final class GaugeOverlay {
             Nwps.ACTION, Nwps.NO_FLOODING, Nwps.NOT_DEFINED, Nwps.LOW_THRESHOLD,
             Nwps.OBS_NOT_CURRENT, Nwps.OUT_OF_SERVICE };
 
+    /** Every gauge the box returned. */
+    public static final int SHOW_ALL = 0;
+    /** At action stage or worse. */
+    public static final int SHOW_HIGH = 1;
+    /** Only the starred ones. */
+    public static final int SHOW_FAVORITES = 2;
+    private static final String PREF_SHOW = "weather.layer.gauges.show";
+
     public interface Listener {
         void onGaugesStatus(String message);
 
         void onGaugesDrawn(int drawn, int total, int flooding);
+
+        /** The map moved: anything ordered by distance needs reordering. */
+        void onOriginMoved();
     }
 
     private final MapView mapView;
@@ -83,6 +95,8 @@ public final class GaugeOverlay {
     private long lastPoll;
     private int miles;
     private boolean fromMe;
+    private int show;
+    private final GaugeFavorites favorites;
     private List<Nwps.Gauge> gauges = new ArrayList<>();
     /** Where the gauges currently on the map were asked for. */
     private GeoPoint fetchedFrom;
@@ -105,6 +119,58 @@ public final class GaugeOverlay {
         final SharedPreferences p = MapCompat.prefs();
         miles = p == null ? DEFAULT_MILES : p.getInt(PREF_MILES, DEFAULT_MILES);
         fromMe = p == null || p.getBoolean(PREF_FROM_ME, true);
+        show = p == null ? SHOW_ALL : p.getInt(PREF_SHOW, SHOW_ALL);
+        favorites = new GaugeFavorites(mapView.getContext());
+    }
+
+    public int show() {
+        return show;
+    }
+
+    public void setShow(int value) {
+        if (show == value)
+            return;
+        show = value;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putInt(PREF_SHOW, value).apply();
+        redraw();
+    }
+
+    /**
+     * Whether a gauge passes the map's filter. Public so the list asks the same
+     * question; a filter on one surface is a filter the other disagrees with.
+     */
+    public boolean passes(int show, Nwps.Gauge g) {
+        if (show == SHOW_FAVORITES)
+            return favorites.contains(g.lid);
+        if (show == SHOW_HIGH)
+            return Nwps.severity(g.category()) >= Nwps.severity(Nwps.ACTION);
+        return true;
+    }
+
+    public boolean isFavorite(Nwps.Gauge g) {
+        return g != null && favorites.contains(g.lid);
+    }
+
+    /** @return true if the gauge is starred afterwards */
+    public boolean toggleFavorite(Nwps.Gauge g) {
+        final boolean now = favorites.toggle(g.lid);
+        if (show == SHOW_FAVORITES)
+            redraw();
+        return now;
+    }
+
+    private void redraw() {
+        if (!on)
+            return;
+        final int mine = generation;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                rebuild(mine);
+            }
+        });
     }
 
     /** The legend's color for a category, for the pane's swatches. */
@@ -273,6 +339,8 @@ public final class GaugeOverlay {
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         int flooding = 0;
         for (Nwps.Gauge g : held) {
+            if (!passes(show, g))
+                continue;
             final String category = g.category();
             final String uri = icons.uri(GaugeIcons.color(category));
             if (uri == null)
@@ -355,7 +423,7 @@ public final class GaugeOverlay {
     }
 
     /** A stage to the hundredth, in feet or meters: the gauge reads to that. */
-    static String stage(double feet, UnitSystem system) {
+    public static String stage(double feet, UnitSystem system) {
         if (Double.isNaN(feet))
             return "";
         if (system == UnitSystem.METRIC)
@@ -364,7 +432,7 @@ public final class GaugeOverlay {
     }
 
     /** A flow in whole cubic feet per second, or cubic meters. */
-    static String flow(double kcfs, UnitSystem system) {
+    public static String flow(double kcfs, UnitSystem system) {
         if (Double.isNaN(kcfs))
             return "";
         if (system == UnitSystem.METRIC)
@@ -436,8 +504,12 @@ public final class GaugeOverlay {
     private final Runnable settled = new Runnable() {
         @Override
         public void run() {
-            if (on)
-                followMapCenter();
+            if (!on)
+                return;
+            followMapCenter();
+            final Listener l = listener;
+            if (l != null)
+                l.onOriginMoved();
         }
     };
 

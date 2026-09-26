@@ -849,6 +849,15 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
+                <Button
+                    android:id="@+id/gauges_open_list"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="13sp"
+                    android:text="@string/gauges_open_list" />
+
                 <TextView
                     android:id="@+id/gauges_status"
                     android:layout_width="match_parent"
@@ -885,6 +894,22 @@
 
                 <LinearLayout
                     android:id="@+id/gauges_distance_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/gauges_show_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/gauges_show_row"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"

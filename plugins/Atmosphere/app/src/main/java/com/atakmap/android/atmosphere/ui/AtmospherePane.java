@@ -238,6 +238,8 @@ public final class AtmospherePane {
     private boolean stationsGuideOpen;
     private boolean stationsOpen;
     private GaugeOverlay gaugeLayer;
+    private GaugePage gaugePage;
+    private LinearLayout gaugesShowRow;
     private TextView gaugesStatus;
     private Button gaugesToggle;
     private ImageButton gaugesExpand;
@@ -317,11 +319,18 @@ public final class AtmospherePane {
                 return units;
             }
         });
+        gaugePage = new GaugePage(pluginContext, mapView(), new GaugePage.Host() {
+            @Override
+            public UnitSystem units() {
+                return units;
+            }
+        });
         pages = new View[] {
                 inflater.inflate(R.layout.page_forecast, null),
                 inflater.inflate(R.layout.page_layers, null),
                 spotPage.view(),
-                stationPage.view()
+                stationPage.view(),
+                gaugePage.view()
         };
         pager = root.findViewById(R.id.pager);
         pageDots = root.findViewById(R.id.page_dots);
@@ -428,6 +437,13 @@ public final class AtmospherePane {
         gaugesOriginRow = find(R.id.gauges_origin_row);
         gaugesDistanceRow = find(R.id.gauges_distance_row);
         gaugesLegend = find(R.id.gauges_legend);
+        gaugesShowRow = find(R.id.gauges_show_row);
+        ((Button) find(R.id.gauges_open_list)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openPage(gaugePage == null ? null : gaugePage.view());
+            }
+        });
         spotLegend = find(R.id.spot_legend);
         spotSettings = find(R.id.spot_settings);
         warnSettings = find(R.id.warn_settings);
@@ -712,6 +728,13 @@ public final class AtmospherePane {
                 updatePageDots(position);
                 if (pages[position] == spotPage.view())
                     spotPage.onShown();
+                // A list page re-reads its layer when it comes into view: the tile
+                // counts are otherwise as old as the last redraw, and the operator
+                // saw "Red Flag (1)" over a list of two (2026-09-26).
+                if (stationPage != null && pages[position] == stationPage.view())
+                    stationPage.refresh();
+                if (gaugePage != null && pages[position] == gaugePage.view())
+                    gaugePage.refresh();
             }
         });
         for (int i = 0; i < pages.length; i++) {
@@ -1671,9 +1694,19 @@ public final class AtmospherePane {
                     gaugesStatus.setText(total == 0 ? "" : drawn + " gauges, "
                             + (flooding == 0 ? "none at action stage or above"
                                     : flooding + " at action stage or above"));
+                if (gaugePage != null)
+                    gaugePage.refresh();
                 updateLayerControls();
             }
+
+            @Override
+            public void onOriginMoved() {
+                if (gaugePage != null)
+                    gaugePage.refresh();
+            }
         });
+        if (gaugePage != null)
+            gaugePage.setLayer(gaugeLayer);
     }
 
     public void setSpotLayer(SpotOverlay overlay) {
@@ -1759,6 +1792,40 @@ public final class AtmospherePane {
                             updateLayerControls();
                         }
                     }));
+    }
+
+    /** Which gauges reach the map: the same three the list filters by. */
+    private void buildGaugesShowRow() {
+        gaugesShowRow.removeAllViews();
+        gaugeShowTile("All", GaugeOverlay.SHOW_ALL, 0);
+        gaugeShowTile("High water only", GaugeOverlay.SHOW_HIGH,
+                GaugeOverlay.legendColor(com.atakmap.android.atmosphere.data.Nwps.ACTION));
+        gaugeShowTile("\u2605 Starred only", GaugeOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
+    }
+
+    private void gaugeShowTile(String label, final int value, int color) {
+        final boolean chosen = gaugeLayer.show() == value;
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, gaugesShowRow, false);
+        b.setText(label);
+        b.setTextSize(12);
+        b.setTextColor(chosen
+                ? (color != 0 ? color : pluginContext.getResources().getColor(R.color.state_on))
+                : Color.WHITE);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                gaugeLayer.setShow(value);
+                if (gaugePage != null)
+                    gaugePage.refresh();
+                updateLayerControls();
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        b.setLayoutParams(lp);
+        gaugesShowRow.addView(b);
     }
 
     /** water.noaa.gov's legend, in its own colors and its own order. */
@@ -2573,6 +2640,7 @@ public final class AtmospherePane {
         if (gaugesOn) {
             buildGaugesOriginRow();
             buildGaugesDistanceRow();
+            buildGaugesShowRow();
             buildGaugesLegend();
         }
         final boolean spotOn = spotLayer != null && spotLayer.isOn();
