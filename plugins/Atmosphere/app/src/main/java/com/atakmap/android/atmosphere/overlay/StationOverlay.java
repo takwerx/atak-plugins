@@ -11,6 +11,7 @@ import com.atakmap.android.atmosphere.units.Quantity;
 import com.atakmap.android.atmosphere.units.UnitSystem;
 import com.atakmap.android.atmosphere.units.Units;
 import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.compat.ScaleBar;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoCalculations;
@@ -59,8 +60,16 @@ public final class StationOverlay {
     private static final String PREF_MILES = "weather.layer.stations.miles";
     private static final String PREF_FROM_ME = "weather.layer.stations.fromme";
     private static final String PREF_LABELS = "weather.layer.stations.labels";
-    private static final String PREF_GATE_STATIONS = "weather.layer.stations.gate";
-    private static final String PREF_GATE_LABELS = "weather.layer.stations.labelgate";
+    /**
+     * New keys on purpose.
+     *
+     * <p>The old ones hold whatever the broken builds of 2026-09-25 wrote: an int
+     * from one build, an infinity from the next. Nothing in them was a value the
+     * operator chose, so they are abandoned rather than migrated, and the defaults
+     * get their first honest chance.
+     */
+    private static final String PREF_GATE_STATIONS = "weather.layer.stations.gate2";
+    private static final String PREF_GATE_LABELS = "weather.layer.stations.labelgate2";
     private static final String PREF_UNITS = "weather.units";
 
     /** RAWS report hourly, so there is nothing to gain from asking more often. */
@@ -99,20 +108,23 @@ public final class StationOverlay {
      */
     /** No gate: drawn at every zoom. */
     public static final double ALWAYS_GATE = Double.MAX_VALUE;
+
     /**
-     * The readings start at a scale bar of about thirty miles.
+     * Whether a gate means "always", tested by size rather than by equality.
      *
-     * <p>Wide enough that they are there when the layer is first switched on, which
-     * is what a default is for -- an earlier guess of mine worked out to a bar near
-     * one mile and they simply never appeared (operator, 2026-09-25: "im at less than
-     * a mile, no labels even rendering"). Expressed through the same constant the
-     * presets and the readout use, so the control reads "30 mi or closer" rather than
-     * some number nobody chose.
-     *
-     * <p>The stations themselves start ungated: hiding them is the operator's call.
+     * <p>A preference holds a float. {@code (float) Double.MAX_VALUE} is infinity, and
+     * what comes back is not equal to what went in, so an equality test says the gate
+     * is a real distance and the control renders it: the operator's screen read
+     * "Stations drawn at 9,223,372,036,854,775,807 mi or closer" (2026-09-25). Any
+     * number this big is the same answer, so the test is a threshold, and NaN -- which
+     * is what a corrupted preference reads as -- falls on the same side by writing it
+     * as a negated less-than.
      */
-    private static final double DEFAULT_LABEL_GSD =
-            30d * 1609.344d / 200d;
+    public static boolean isAlways(double gate) {
+        return !(gate < 1e12);
+    }
+    /** The readings start at a scale bar of about thirty miles. */
+    private static final double DEFAULT_LABEL_BIG = 30d;
 
     /** How long the map must sit still before a band change is acted on. */
     private static final long SETTLE_MS = 400L;
@@ -165,10 +177,12 @@ public final class StationOverlay {
         miles = p == null ? DEFAULT_MILES : p.getInt(PREF_MILES, DEFAULT_MILES);
         fromMe = p == null || p.getBoolean(PREF_FROM_ME, true);
         labels = p == null || p.getBoolean(PREF_LABELS, true);
-        stationGate = p == null ? ALWAYS_GATE
-                : p.getFloat(PREF_GATE_STATIONS, (float) ALWAYS_GATE);
-        labelGate = p == null ? DEFAULT_LABEL_GSD
-                : p.getFloat(PREF_GATE_LABELS, (float) DEFAULT_LABEL_GSD);
+        stationGate = storedGate(p, PREF_GATE_STATIONS, ALWAYS_GATE);
+        // Worked out against this device's own scale bar, not a nominal width. A
+        // threshold derived from an assumed 200 pixel bar is wrong by whatever the
+        // real bar differs by -- here that is most of a factor of two, so a gate
+        // labelled "30 mi or closer" was still drawing at 53 (operator, 2026-09-25).
+        labelGate = storedGate(p, PREF_GATE_LABELS, gsdForBig(DEFAULT_LABEL_BIG));
     }
 
     /** How wide the map may be, in miles, and still draw the stations. 0 is always. */
@@ -216,7 +230,49 @@ public final class StationOverlay {
     private static void remember(String key, double metersPerPixel) {
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
-            p.edit().putFloat(key, (float) metersPerPixel).apply();
+            p.edit().putFloat(key,
+                    (float) Math.min(metersPerPixel, Float.MAX_VALUE)).apply();
+    }
+
+    /**
+     * A stored gate, or the default.
+     *
+     * <p>Guarded because earlier builds wrote this key as an int, and asking
+     * SharedPreferences for a float where an int is stored throws -- in this
+     * constructor, which would take the whole layer down on the next load for anyone
+     * who had ever pressed one of the old buttons.
+     */
+    private static double storedGate(SharedPreferences p, String key, double fallback) {
+        if (p == null)
+            return fallback;
+        try {
+            return p.getFloat(key, (float) Math.min(fallback, Float.MAX_VALUE));
+        } catch (ClassCastException oldFormat) {
+            p.edit().remove(key).apply();
+            return fallback;
+        }
+    }
+
+    /**
+     * A distance on the scale bar, as a map resolution, measured against the bar this
+     * device is actually drawing.
+     *
+     * <p>The bar's pixel width is the whole conversion, and it is not 200 everywhere.
+     * Using a nominal figure makes every preset and every default a promise the map
+     * does not keep: the number on the button and the zoom it takes effect at are
+     * different by whatever the real bar differs by.
+     */
+    public double gsdForBig(double big) {
+        return ScaleBar.bigToMeters(big) / barPixels();
+    }
+
+    /** How many pixels ATAK's scale bar spans right now. */
+    public double barPixels() {
+        final double res = mapView.getMapResolution();
+        if (res <= 0)
+            return ScaleBar.FALLBACK_BAR_PIXELS;
+        final double m = ScaleBar.meters(mapView);
+        return m > 0 ? m / res : ScaleBar.FALLBACK_BAR_PIXELS;
     }
 
     /** Whether something gated at this resolution is on screen at the moment. */
@@ -519,7 +575,7 @@ public final class StationOverlay {
         final boolean withLabels = labelsWanted;
         // A feature set's coarsest resolution has to be a real number: MAX_VALUE has
         // no level of detail to become, and the hit test then never reaches the layer.
-        final double gate = stationGate == ALWAYS_GATE ? 100_000d : stationGate;
+        final double gate = isAlways(stationGate) ? 100_000d : stationGate;
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         int critical = 0;
         for (Raws.Station s : held) {

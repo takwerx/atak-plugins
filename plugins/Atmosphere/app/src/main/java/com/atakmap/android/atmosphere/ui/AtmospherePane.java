@@ -1814,8 +1814,7 @@ public final class AtmospherePane {
                     @Override
                     public void onClick(DialogInterface d, int which) {
                         gate.set(which == GATE_BIG.length ? StationOverlay.ALWAYS_GATE
-                                : ScaleBar.bigToMeters(GATE_BIG[which])
-                                        / ScaleBar.FALLBACK_BAR_PIXELS);
+                                : stationLayer.gsdForBig(GATE_BIG[which]));
                         updateLayerControls();
                     }
                 })
@@ -1832,16 +1831,16 @@ public final class AtmospherePane {
 
     /** What the button itself carries: the current setting, short. */
     private String gateSetting(double gate) {
-        if (gate == StationOverlay.ALWAYS_GATE)
+        if (StationOverlay.isAlways(gate))
             return "Always";
-        return ScaleBar.describe(gate * ScaleBar.FALLBACK_BAR_PIXELS) + " or closer";
+        return ScaleBar.describe(gate * stationLayer.barPixels()) + " or closer";
     }
 
     private String gateText(double gate, String what) {
         final String bar = ScaleBar.text(mapView());
-        if (gate == StationOverlay.ALWAYS_GATE)
+        if (StationOverlay.isAlways(gate))
             return what + " always drawn  \u00b7  scale bar now " + bar;
-        return what + " drawn at " + ScaleBar.describe(gate * ScaleBar.FALLBACK_BAR_PIXELS)
+        return what + " drawn at " + ScaleBar.describe(gate * stationLayer.barPixels())
                 + " or closer  \u00b7  scale bar now " + bar
                 + (stationLayer.drawingNow(gate) ? "" : "  \u2014 hidden");
     }
