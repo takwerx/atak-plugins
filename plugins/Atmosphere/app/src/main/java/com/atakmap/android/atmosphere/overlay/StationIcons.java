@@ -170,29 +170,55 @@ final class StationIcons {
         if (dir != null && !dir.isDirectory())
             //noinspection ResultOfMethodCallIgnored
             dir.mkdirs();
-        clearOldFiles();
+        clearOldFiles(System.currentTimeMillis());
     }
 
     /**
-     * Empty the folder at start-up.
+     * Empty the folder of what a past session left, on a thread of its own.
      *
      * <p>Every reading is its own file -- a station's numbers and its wind direction
      * are both in the name -- so a folder kept across sessions accumulates one icon
      * per station per hour and never reads any of them again. They cost nothing to
      * compose and are written on a worker.
+     *
+     * <p><b>Never on the calling thread.</b> This constructor runs under
+     * {@code onStart}, which ATAK calls on the thread it loads plugins on -- the main
+     * one -- and the sweep is an unlink syscall per file over a folder holding a day
+     * of testing. Bumping {@link #VERSION} 11 -> 13 orphaned two versions of icons at
+     * once, and ATAK sat in File.delete long enough to be killed for not answering a
+     * tap (ANR, 2026-09-26, the fifth thing in this plugin to be slow on the load
+     * thread). A VERSION bump is exactly when this folder is at its largest, so the
+     * sweep is at its slowest on the build that most needs to start.
+     *
+     * @param before delete only what is older than this, so the sweep cannot race a
+     *               fresh icon: everything a past session wrote predates start-up,
+     *               and nothing this one composes does.
      */
-    private void clearOldFiles() {
-        if (dir == null)
+    private void clearOldFiles(final long before) {
+        // Captured into a local rather than read off the field: the thread starts
+        // while this constructor is still running, and handing it `this` would let it
+        // read fields that are not published yet.
+        final File folder = dir;
+        if (folder == null)
             return;
-        final File[] old = dir.listFiles();
-        if (old == null)
-            return;
-        int gone = 0;
-        for (File f : old)
-            if (f.isFile() && f.delete())
-                gone++;
-        if (gone > 0)
-            Log.d(TAG, "cleared " + gone + " station icon(s) from a past session");
+        final Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final File[] old = folder.listFiles();
+                if (old == null)
+                    return;
+                int gone = 0;
+                for (File f : old)
+                    if (f.isFile() && f.lastModified() < before && f.delete())
+                        gone++;
+                if (gone > 0)
+                    Log.d(TAG, "cleared " + gone
+                            + " station icon(s) from a past session");
+            }
+        }, "atmosphere-station-icons-sweep");
+        t.setDaemon(true);
+        t.setPriority(Thread.MIN_PRIORITY);
+        t.start();
     }
 
     /**
