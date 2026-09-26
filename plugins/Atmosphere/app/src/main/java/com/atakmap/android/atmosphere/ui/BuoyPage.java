@@ -12,6 +12,7 @@ import android.widget.TextView;
 
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.atmosphere.data.Coops;
+import com.atakmap.android.atmosphere.data.Cwf;
 import com.atakmap.android.atmosphere.data.Ndbc;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
@@ -49,14 +50,16 @@ public final class BuoyPage {
     private LinearLayout tideBlock;
     private String tideFor;
     /**
-     * CO-OPS answers by URL. Every buoy redraw rebuilds the open record, which was
-     * asking for the same tide twice a minute on 2026-09-26. Predictions do not
-     * change; the observed level is six-minute data, so ten minutes holds for all
-     * three, and a failure is held the same length so a station with no water
+     * CO-OPS and api.weather.gov answers by URL. Every buoy redraw rebuilds the open
+     * record, which was asking for the same tide twice a minute on 2026-09-26.
+     * Predictions do not change; the observed level is six-minute data and a
+     * coastal waters forecast is issued twice a day, so ten minutes holds for all
+     * of it, and a failure is held the same length so a station with no water
      * level is not asked again at every redraw either.
      */
-    private static final java.util.Map<String, Object[]> coopsCache = new java.util.HashMap<>();
-    private static final long COOPS_CACHE_MS = 10 * 60_000L;
+    private static final java.util.Map<String, Object[]> answers = new java.util.HashMap<>();
+    private static final long ANSWER_MS = 10 * 60_000L;
+    private LinearLayout marineBlock;
 
 
     private final Context pluginContext;
@@ -375,6 +378,11 @@ public final class BuoyPage {
         fillTides(g);
         for (String[] r : BuoyOverlay.describe(g, host.units(), System.currentTimeMillis()))
             detailBody.addView(field(r[0], r[1]));
+        // What the water will do next, under what it is doing now.
+        marineBlock = new LinearLayout(pluginContext);
+        marineBlock.setOrientation(LinearLayout.VERTICAL);
+        detailBody.addView(marineBlock);
+        fillMarine(g);
 
         detail.setVisibility(View.VISIBLE);
         list.setVisibility(View.GONE);
@@ -406,7 +414,7 @@ public final class BuoyPage {
                     + miles(Coops.milesBetween(g.latitude, g.longitude, tide.latitude, tide.longitude))
                     + ")", "Getting the tide\u2026")).getChildAt(1);
             tideBlock.addView((View) row.getParent());
-            coops(Coops.hiloUrl(tide.id, Coops.today()), egress.userAgent(), h, new Http.Callback() {
+            cached(Coops.hiloUrl(tide.id, Coops.today()), egress.userAgent(), h, new Http.Callback() {
                 @Override
                 public void onSuccess(String body) {
                     if (!g.id.equals(tideFor))
@@ -422,7 +430,7 @@ public final class BuoyPage {
                     }
                     row.setText(b.length() == 0 ? "No predictions" : b.toString());
                     // Asked of every station: the type does not say who measures.
-                    coops(Coops.waterLevelUrl(tide.id), egress.userAgent(), h,
+                    cached(Coops.waterLevelUrl(tide.id), egress.userAgent(), h,
                                 new Http.Callback() {
                                     @Override
                                     public void onSuccess(String wl) {
@@ -456,7 +464,7 @@ public final class BuoyPage {
                     + " (" + miles(Coops.milesBetween(g.latitude, g.longitude, cur.latitude, cur.longitude))
                     + ")", "Getting the current\u2026")).getChildAt(1);
             tideBlock.addView((View) row.getParent());
-            coops(Coops.currentsUrl(cur.id, cur.bin), egress.userAgent(), h, new Http.Callback() {
+            cached(Coops.currentsUrl(cur.id, cur.bin), egress.userAgent(), h, new Http.Callback() {
                 @Override
                 public void onSuccess(String body) {
                     if (!g.id.equals(tideFor))
@@ -491,12 +499,97 @@ public final class BuoyPage {
                 : Math.round(d) + " mi";
     }
 
-    /** {@link Http#get} through {@link #coopsCache}. */
-    private static void coops(final String url, String userAgent, java.util.Map<String, String> h,
+    /**
+     * The coastal waters forecast for the buoy's marine zone. {@code /points} names
+     * the zone and the office, the office's newest CWF is fetched and the zone's
+     * section cut out of it -- three requests, all through {@link #answers}, so
+     * the record rebuilt on the next redraw costs nothing. An offshore zone is
+     * forecast by an ocean center in a product this does not read yet, and the
+     * row says so instead of showing the wrong office's text.
+     */
+    private void fillMarine(final Ndbc.Buoy g) {
+        final EgressPolicy egress = host.egress();
+        final java.util.Map<String, String> h = new java.util.HashMap<>();
+        final TextView row = (TextView) ((LinearLayout) field("Coastal waters forecast",
+                "Getting the forecast\u2026")).getChildAt(1);
+        marineBlock.addView((View) row.getParent());
+        cached(Cwf.pointUrl(g.latitude, g.longitude), egress.userAgent(), h, new Http.Callback() {
+            @Override
+            public void onSuccess(String body) {
+                if (!g.id.equals(tideFor))
+                    return;
+                final Cwf.Zone z = Cwf.parsePoint(body);
+                if (z == null) {
+                    row.setText("Not in a coastal waters forecast zone");
+                    return;
+                }
+                if (!"CWF".equals(z.productType())) {
+                    row.setText("Offshore zone " + z.id + ": the offshore waters forecast is not read yet");
+                    return;
+                }
+                cached(Cwf.latestUrl("CWF", z.cwa), egress.userAgent(), h, new Http.Callback() {
+                    @Override
+                    public void onSuccess(String list) {
+                        if (!g.id.equals(tideFor))
+                            return;
+                        final String id = Cwf.parseLatestId(list);
+                        if (id == null) {
+                            row.setText("No coastal waters forecast from " + z.cwa);
+                            return;
+                        }
+                        cached(Cwf.productUrl(id), egress.userAgent(), h, new Http.Callback() {
+                            @Override
+                            public void onSuccess(String product) {
+                                if (!g.id.equals(tideFor))
+                                    return;
+                                final String s = Cwf.section(Cwf.parseText(product), z.id);
+                                row.setText(s == null ? "Zone " + z.id + " is not in " + z.cwa
+                                        + "'s forecast" : marineText(s));
+                            }
+
+                            @Override
+                            public void onFailure(String error) {
+                                forecastFailed(row, g, error);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onFailure(String error) {
+                        forecastFailed(row, g, error);
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(String error) {
+                forecastFailed(row, g, error);
+            }
+        });
+    }
+
+    private void forecastFailed(TextView row, Ndbc.Buoy g, String error) {
+        if (g.id.equals(tideFor))
+            row.setText("Could not get the forecast: " + error);
+    }
+
+    /** The zone, when it was issued, then each period on its own line. */
+    static String marineText(String section) {
+        final StringBuilder b = new StringBuilder(Cwf.name(section));
+        final String issued = Cwf.issued(section);
+        if (!issued.isEmpty())
+            b.append('\n').append("Issued ").append(issued);
+        for (Cwf.Period p : Cwf.periods(section))
+            b.append('\n').append(p.name).append(": ").append(p.text);
+        return b.toString();
+    }
+
+    /** {@link Http#get} through {@link #answers}. */
+    private static void cached(final String url, String userAgent, java.util.Map<String, String> h,
             final Http.Callback cb) {
-        synchronized (coopsCache) {
-            final Object[] hit = coopsCache.get(url);
-            if (hit != null && System.currentTimeMillis() - (Long) hit[1] < COOPS_CACHE_MS) {
+        synchronized (answers) {
+            final Object[] hit = answers.get(url);
+            if (hit != null && System.currentTimeMillis() - (Long) hit[1] < ANSWER_MS) {
                 if (hit[0] != null)
                     cb.onSuccess((String) hit[0]);
                 else
@@ -507,16 +600,16 @@ public final class BuoyPage {
         Http.get(url, userAgent, h, new Http.Callback() {
             @Override
             public void onSuccess(String body) {
-                synchronized (coopsCache) {
-                    coopsCache.put(url, new Object[] { body, System.currentTimeMillis(), null });
+                synchronized (answers) {
+                    answers.put(url, new Object[] { body, System.currentTimeMillis(), null });
                 }
                 cb.onSuccess(body);
             }
 
             @Override
             public void onFailure(String error) {
-                synchronized (coopsCache) {
-                    coopsCache.put(url, new Object[] { null, System.currentTimeMillis(), error });
+                synchronized (answers) {
+                    answers.put(url, new Object[] { null, System.currentTimeMillis(), error });
                 }
                 cb.onFailure(error);
             }
