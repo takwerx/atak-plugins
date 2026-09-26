@@ -431,10 +431,36 @@ final class AtmosphereFeatures {
                             if (a != null)
                                 try {
                                     final String glyph = a.getStringAttribute("chooserIcon");
-                                    if (glyph != null && !glyph.isEmpty())
+                                    if (glyph != null && !glyph.isEmpty()) {
+                                        // iconUri is read for a shape. A point comes
+                                        // back as a Marker, which draws from its Icon
+                                        // and ignores that meta entirely -- which is
+                                        // why setting it changed nothing and the
+                                        // chooser kept scaling the map icon down
+                                        // (operator, 2026-09-25, twice).
+                                        //
+                                        // This item is the hit test's own proxy, not
+                                        // what the renderer draws: the map draws the
+                                        // feature's IconPointStyle. So an icon here
+                                        // reaches the chooser and the radial and
+                                        // stops there.
                                         item.setMetaString("iconUri", glyph);
+                                        if (item instanceof com.atakmap.android.maps.Marker)
+                                            ((com.atakmap.android.maps.Marker) item).setIcon(
+                                                    new com.atakmap.coremap.maps.assets.Icon
+                                                            .Builder()
+                                                            .setImageUri(com.atakmap.coremap
+                                                                    .maps.assets.Icon
+                                                                    .STATE_DEFAULT, glyph)
+                                                            .setAnchor(48, 48)
+                                                            .setSize(48, 48)
+                                                            .setColor(com.atakmap.coremap.maps
+                                                                    .assets.Icon.STATE_DEFAULT,
+                                                                    0xFFFFFFFF)
+                                                            .build());
+                                    }
                                 } catch (Exception noGlyph) {
-                                    // most layers have none, and that is fine
+                                    Log.d(tag, "no chooser glyph for this item", noGlyph);
                                 }
                             if (a != null)
                                 item.setMetaString("remarks",
