@@ -43,7 +43,9 @@ public final class BuoyPage {
 
     /** CO-OPS station lists, fetched once a session; null until they land. */
     private static List<Coops.Station> tideStations, currentStations;
-    private static boolean listsRequested;
+    /** When the lists were last asked for; a request older than this is retried. */
+    private static long listsRequestedAt;
+    private static final long LIST_RETRY_MS = 90_000L;
     private LinearLayout tideBlock;
     private String tideFor;
 
@@ -472,9 +474,13 @@ public final class BuoyPage {
 
     /** Two megabytes each, once; the record is filled when they land. */
     private void fetchStationLists(final Ndbc.Buoy g) {
-        if (listsRequested)
+        // Not a latch. The first attempt on 2026-09-26 went out on a dead Wi-Fi
+        // link and never came back; a boolean here kept every reopen on "Finding
+        // the nearest stations..." until the plugin was reloaded.
+        final long now = System.currentTimeMillis();
+        if (now - listsRequestedAt < LIST_RETRY_MS)
             return;
-        listsRequested = true;
+        listsRequestedAt = now;
         final EgressPolicy egress = host.egress();
         final java.util.Map<String, String> h = new java.util.HashMap<>();
         Http.getLarge(Coops.TIDE_STATIONS_URL, egress.userAgent(), h, new Http.Callback() {
@@ -492,7 +498,7 @@ public final class BuoyPage {
                     @Override
                     public void onFailure(String error) {
                         currentStations = new ArrayList<>();
-                        listsRequested = false;
+                        listsRequestedAt = 0L;
                         if (showing != null && showing.id.equals(tideFor))
                             showDetail(showing);
                     }
@@ -501,7 +507,7 @@ public final class BuoyPage {
 
             @Override
             public void onFailure(String error) {
-                listsRequested = false;
+                listsRequestedAt = 0L;
                 if (tideBlock != null && showing != null && showing.id.equals(g.id)) {
                     tideBlock.removeAllViews();
                     tideBlock.addView(field("Tides and currents", "Could not reach CO-OPS: " + error));
