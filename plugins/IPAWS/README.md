@@ -1,5 +1,15 @@
 ATAK Plugin - IPAWS Alerts
 
+**Download IPAWS Alerts 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+
+- **ATAK-CIV 5.6:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.3/ATAK-Plugin-IPAWS-0.3--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.3/ATAK-Plugin-IPAWS-0.3--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.3/ATAK-Plugin-IPAWS-0.3--5.8.0-civ-release.apk
+
+All releases: https://github.com/takwerx/ipaws-alerts/releases
+
+**User guide with screenshots: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)**
+(https://github.com/takwerx/ipaws-alerts/blob/main/docs/USER_GUIDE.md)
 
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
@@ -48,7 +58,7 @@ originators and requires a signed agreement with FEMA.
 _________________________________________________________________
 STATUS
 
-0.2, in development. Not yet released.
+0.3, in development. Not yet released.
 
 _________________________________________________________________
 POINT OF CONTACTS
