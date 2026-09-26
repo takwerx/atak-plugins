@@ -48,7 +48,7 @@ originators and requires a signed agreement with FEMA.
 _________________________________________________________________
 STATUS
 
-0.1, in development. Not yet released.
+0.2, in development. Not yet released.
 
 _________________________________________________________________
 POINT OF CONTACTS
