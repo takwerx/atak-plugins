@@ -75,8 +75,32 @@ public final class ClickRepair {
         }
         wrapper = new Wrapper(original);
         w.setCallback(wrapper);
+        w.getDecorView().post(clearStrayFocus);
         Log.d(TAG, "click repair attached");
     }
+
+    /**
+     * A window that comes to the front after a keyboard or a programmatic switch is in
+     * keyboard mode, and Android then shows whichever button holds focus with a focus
+     * rectangle: ATAK's compass, top left, sat in a box after every start (2026-09-26).
+     * With a pointer there is no keyboard navigation to preserve, so a focused view that
+     * is not a text field is unfocused. Text fields keep it: that is the user typing.
+     */
+    private final Runnable clearStrayFocus = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                final View f = activity.getWindow().getDecorView().findFocus();
+                if (f != null && !(f instanceof android.widget.EditText)) {
+                    f.clearFocus();
+                    if (verbose)
+                        Log.d(TAG, "cleared stray focus from " + f.getClass().getSimpleName());
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "clearing focus failed", e);
+            }
+        }
+    };
 
     /** Symmetric with {@link #attach()}; a reload must leave no wrapper of a dead plugin active. */
     public void detach() {
@@ -233,6 +257,8 @@ public final class ClickRepair {
         @Override
         public void onWindowFocusChanged(boolean hasFocus) {
             original.onWindowFocusChanged(hasFocus);
+            if (hasFocus && !bypass)
+                activity.getWindow().getDecorView().post(clearStrayFocus);
         }
 
         @Override
