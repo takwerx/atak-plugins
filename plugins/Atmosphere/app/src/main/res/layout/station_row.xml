@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One station in the list: a swatch in the state's own color, what it is reading,
+     how far off it is, and a way to get to it. The shape is storm_row, which is
+     Comms' site_row and Cam Depot's camera_row carried forward. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:baselineAligned="false"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <!-- The same three colors the symbol uses, so a row and its station match. -->
+    <View
+        android:id="@+id/state"
+        android:layout_width="6dp"
+        android:layout_height="match_parent"
+        android:layout_marginRight="8dp" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/white"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:alpha="0.7" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/goto_btn"
+        style="@style/TakwerxButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:text="@string/go_to" />
+</LinearLayout>

@@ -222,6 +222,7 @@ public final class AtmospherePane {
     private final View spotSettings;
     private SpotOverlay spotLayer;
     private StationOverlay stationLayer;
+    private StationPage stationPage;
     private TextView stationsStatus, stationsBasis;
     private Button stationsToggle;
     private ImageButton stationsExpand;
@@ -301,10 +302,17 @@ public final class AtmospherePane {
                         return units;
                     }
                 });
+        stationPage = new StationPage(pluginContext, mapView(), new StationPage.Host() {
+            @Override
+            public UnitSystem units() {
+                return units;
+            }
+        });
         pages = new View[] {
                 inflater.inflate(R.layout.page_forecast, null),
                 inflater.inflate(R.layout.page_layers, null),
-                spotPage.view()
+                spotPage.view(),
+                stationPage.view()
         };
         pager = root.findViewById(R.id.pager);
         pageDots = root.findViewById(R.id.page_dots);
@@ -1572,8 +1580,22 @@ public final class AtmospherePane {
                 if (stationsStatus != null)
                     stationsStatus.setText(total == 0 ? ""
                             : drawn + " stations, " + critical + " at criteria");
+                if (stationPage != null)
+                    stationPage.refresh();
+                updateLayerControls();
+            }
+
+            @Override
+            public void onOriginMoved() {
+                // The map moved: the list is ordered by distance from it, so it is
+                // now in the wrong order even though nothing was refetched.
+                if (stationPage != null)
+                    stationPage.refresh();
+                updateLayerControls();      // the gate readouts quote the scale bar
             }
         });
+        if (stationPage != null)
+            stationPage.setLayer(stationLayer);
     }
 
     public void setSpotLayer(SpotOverlay overlay) {
@@ -1755,11 +1777,8 @@ public final class AtmospherePane {
         void set(double metersPerPixel);
     }
 
-    /** The scale-bar ladder the presets offer, in the operator's big unit. */
+    /** Feature Layer's ladder, as scale-bar readings in the operator's big unit. */
     private static final double[] GATE_BIG = { 0.25, 1, 5, 15, 50 };
-    private static final String[] GATE_NAMES = {
-            "city block", "neighborhood", "town", "county", "region"
-    };
 
     private void gateRow(LinearLayout row, final TextView readout, final String what,
             final double current, final Gate gate) {
@@ -1796,7 +1815,7 @@ public final class AtmospherePane {
                     public void onClick(DialogInterface d, int which) {
                         gate.set(which == GATE_BIG.length ? StationOverlay.ALWAYS_GATE
                                 : ScaleBar.bigToMeters(GATE_BIG[which])
-                                        / scaleBarPixels());
+                                        / ScaleBar.FALLBACK_BAR_PIXELS);
                         updateLayerControls();
                     }
                 })
@@ -1804,41 +1823,27 @@ public final class AtmospherePane {
                 .show();
     }
 
-    private String gateName(int i) {
+    private static String gateName(int i) {
         final double n = GATE_BIG[i];
         final String num = n == Math.floor(n) ? String.format(Locale.US, "%.0f", n)
                 : String.format(Locale.US, "%.2f", n);
-        return num + " " + bigUnit() + " or closer  \u2014  " + GATE_NAMES[i];
+        return num + " " + ScaleBar.bigLabel() + " or closer";
     }
 
     /** What the button itself carries: the current setting, short. */
     private String gateSetting(double gate) {
         if (gate == StationOverlay.ALWAYS_GATE)
             return "Always";
-        return ScaleBar.describe(gate * scaleBarPixels()) + " or closer";
+        return ScaleBar.describe(gate * ScaleBar.FALLBACK_BAR_PIXELS) + " or closer";
     }
 
     private String gateText(double gate, String what) {
         final String bar = ScaleBar.text(mapView());
         if (gate == StationOverlay.ALWAYS_GATE)
             return what + " always drawn  \u00b7  scale bar now " + bar;
-        return what + " drawn at " + ScaleBar.describe(gate * scaleBarPixels())
+        return what + " drawn at " + ScaleBar.describe(gate * ScaleBar.FALLBACK_BAR_PIXELS)
                 + " or closer  \u00b7  scale bar now " + bar
                 + (stationLayer.drawingNow(gate) ? "" : "  \u2014 hidden");
-    }
-
-    /** Miles or kilometers, whichever ATAK is set to show ranges in. */
-    private static String bigUnit() {
-        return ScaleBar.bigLabel();
-    }
-
-    /** Pixels the scale bar spans, so a quoted threshold matches the bar's own text. */
-    private double scaleBarPixels() {
-        final double res = stationLayer.resolution();
-        if (res <= 0)
-            return 200;
-        final double m = ScaleBar.meters(mapView());
-        return m > 0 ? m / res : 200;
     }
 
     private static MapView mapView() {

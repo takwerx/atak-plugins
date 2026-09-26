@@ -100,17 +100,19 @@ public final class StationOverlay {
     /** No gate: drawn at every zoom. */
     public static final double ALWAYS_GATE = Double.MAX_VALUE;
     /**
-     * Both gates start open.
+     * The readings start at a scale bar of about thirty miles.
      *
-     * <p>They were guesses of mine -- the readings' gate worked out to about 7 meters
-     * per pixel, which is a scale bar of roughly one mile, so at anything wider than
-     * that the readings vanished with no way to tell why (operator, 2026-09-25: "im
-     * at less than a mile, no labels even rendering"). A gate the operator did not
-     * set and cannot see is indistinguishable from the layer being broken. So nothing
-     * is hidden until they say where to hide it, and the control says what it is set
-     * to at all times.
+     * <p>Wide enough that they are there when the layer is first switched on, which
+     * is what a default is for -- an earlier guess of mine worked out to a bar near
+     * one mile and they simply never appeared (operator, 2026-09-25: "im at less than
+     * a mile, no labels even rendering"). Expressed through the same constant the
+     * presets and the readout use, so the control reads "30 mi or closer" rather than
+     * some number nobody chose.
+     *
+     * <p>The stations themselves start ungated: hiding them is the operator's call.
      */
-    private static final double DEFAULT_LABEL_GSD = ALWAYS_GATE;
+    private static final double DEFAULT_LABEL_GSD =
+            30d * 1609.344d / 200d;
 
     /** How long the map must sit still before a band change is acted on. */
     private static final long SETTLE_MS = 400L;
@@ -119,6 +121,9 @@ public final class StationOverlay {
         void onStationsStatus(String message);
 
         void onStationsDrawn(int drawn, int total, int critical);
+
+        /** The map moved: anything ordered by distance needs reordering. */
+        void onOriginMoved();
     }
 
     private final MapView mapView;
@@ -269,6 +274,11 @@ public final class StationOverlay {
                 return;
             applyLabelBand();
             followMapCenter();
+            // Even when nothing is refetched, anything ordered by distance from the
+            // map is now in the wrong order.
+            final Listener l = listener;
+            if (l != null)
+                l.onOriginMoved();
         }
     };
 
@@ -403,6 +413,26 @@ public final class StationOverlay {
         if (p != null)
             p.edit().putBoolean(PREF_FROM_ME, value).apply();
         refresh(true);
+    }
+
+    /**
+     * The stations currently held, whatever the map is showing.
+     *
+     * <p>Handed out rather than fetched again by whoever wants a list: a list and a
+     * map built from two different answers disagree, and the operator finds it.
+     */
+    public List<Raws.Station> stations() {
+        return new ArrayList<>(stations);
+    }
+
+    /** What a station's state is, by the same rule the map colors it with. */
+    public static int stateOf(Raws.Station s) {
+        return RedFlag.state(s.relativeHumidity, s.strongestMph());
+    }
+
+    /** Where distances are measured from right now: the operator, or the map. */
+    public GeoPoint originPoint() {
+        return origin();
     }
 
     /** Where the radius is measured from, or null when there is no such point yet. */

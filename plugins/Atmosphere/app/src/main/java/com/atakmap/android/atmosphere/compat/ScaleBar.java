@@ -31,8 +31,16 @@ public final class ScaleBar {
 
     private static final String TAG = "AtmosphereScaleBar";
 
-    /** Roughly the bar's own width; only used by the fallback. */
-    private static final double FALLBACK_BAR_PIXELS = 200;
+    /**
+     * Roughly the bar's own width.
+     *
+     * <p>Public, and used for <b>both</b> ends of a threshold: turning a preset like
+     * "5 mi" into a resolution, and turning a stored resolution back into text. It
+     * has to be the same constant both ways. Describing a fixed gate through the
+     * live bar width instead makes the button's own label change as the operator
+     * zooms, which reads as the setting drifting on its own.
+     */
+    public static final double FALLBACK_BAR_PIXELS = 200;
 
     private static ScaleWidget cached;
     private static boolean lookupFailed;
