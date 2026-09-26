@@ -87,11 +87,11 @@ public final class Http {
                     // does not hold is ordinary, and the caller decides what it means.
                     deliver(callback, null, e.status, "server returned HTTP " + e.status);
                 } catch (IOException e) {
-                    Log.w(TAG, "GET failed: " + url, e);
+                    Log.w(TAG, "GET failed: " + forLog(url), e);
                     deliver(callback, null, NO_RESPONSE, describe(e));
                 } catch (RuntimeException e) {
                     // Never let a plugin thread take ATAK down.
-                    Log.e(TAG, "GET failed hard: " + url, e);
+                    Log.e(TAG, "GET failed hard: " + forLog(url), e);
                     deliver(callback, null, NO_RESPONSE, "request failed");
                 }
             }
@@ -191,5 +191,22 @@ public final class Http {
         if (e instanceof javax.net.ssl.SSLException)
             return "TLS failed";
         return message == null ? "network error" : message;
+    }
+
+    /**
+     * A URL as it may appear in the log: host and path, with the /points lookup's
+     * coordinates cut off. That lookup carries the device's position, and a failure is
+     * logged -- once a minute while a fresh install retries offline -- so the log
+     * never gets more than "/points".
+     */
+    static String forLog(String url) {
+        if (url == null)
+            return "";
+        final int q = url.indexOf('?');
+        String u = q < 0 ? url : url.substring(0, q);
+        final int p = u.indexOf("/points/");
+        if (p >= 0)
+            u = u.substring(0, p + "/points".length());
+        return u;
     }
 }

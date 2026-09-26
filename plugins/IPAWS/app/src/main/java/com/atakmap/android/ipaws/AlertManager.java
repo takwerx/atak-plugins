@@ -136,6 +136,9 @@ public class AlertManager {
             if (!started)
                 return;
             final long due = Math.max(1, filter.pollMinutes) * 60_000L;
+            // A fresh install that could not find its state asks again each minute,
+            // until it does or the operator picks.
+            resolveHomeStateIfUnset();
             if (!polling && System.currentTimeMillis() - lastPollAttempt >= due)
                 poll();
             else
@@ -486,23 +489,61 @@ public class AlertManager {
      * nothing is selected, so it can never move a filter the operator set.
      */
     private void resolveHomeStateIfUnset() {
-        if (!filter.areas.isEmpty())
+        if (!filter.areas.isEmpty()) {
+            // The operator has picked, so the question is closed for this session: a
+            // later "Clear" is a choice too, and a retry must not undo it a minute on.
+            homeLookup = HOME_DONE;
             return;
+        }
+        if (homeLookup != HOME_NEEDED)
+            return;
+        homeLookup = HOME_ASKING;
+        changed();
         com.atakmap.android.ipaws.data.HomeState.resolve(
                 mapView.getSelfMarker() == null ? null : mapView.getSelfMarker().getPoint(),
                 new com.atakmap.android.ipaws.data.HomeState.Found() {
                     @Override
                     public void onState(String stateCode) {
-                        // Checked again: the operator may have picked while we asked.
-                        if (!filter.areas.isEmpty())
+                        // The operator may have picked, or picked and cleared, while
+                        // we asked: either closed the lookup, and their choice stands.
+                        final boolean stillAsking = homeLookup == HOME_ASKING;
+                        homeLookup = HOME_DONE;
+                        if (!stillAsking || !filter.areas.isEmpty()) {
+                            changed();
                             return;
+                        }
                         filter.areas.add(stateCode);
                         saveFilter();
                         Log.d(TAG, "fresh install homed to " + stateCode);
                         poll();
                     }
+
+                    @Override
+                    public void onOutside() {
+                        homeLookup = HOME_DONE;
+                        changed();
+                    }
+
+                    @Override
+                    public void onUnavailable() {
+                        if (homeLookup != HOME_ASKING)
+                            return;   // the operator chose meanwhile
+                        // Asked again on the next minute's tick. On the S21+ the one
+                        // lookup on a first start timed out on weak Wi-Fi and was never
+                        // repeated, so the pane said "Waiting for the first update" with
+                        // the network long back (2026-09-26).
+                        homeLookup = HOME_NEEDED;
+                        homeLookupFailed = true;
+                        changed();
+                    }
                 });
     }
+
+    /** Where the fresh-install state lookup is: still to ask, asking, or answered. */
+    private static final int HOME_NEEDED = 0, HOME_ASKING = 1, HOME_DONE = 2;
+    private volatile int homeLookup = HOME_NEEDED;
+    /** The last lookup could not be answered (no fix or no network); it will be retried. */
+    private volatile boolean homeLookupFailed;
 
     public void stop() {
         started = false;
@@ -1233,6 +1274,14 @@ public class AlertManager {
      * for twenty minutes looks exactly like one that has.
      */
     public String statusLine() {
+        // Nothing picked: there is nothing to wait for, so say what to do instead.
+        if (filter.selectsNothing()) {
+            if (homeLookup == HOME_ASKING)
+                return "Finding the state you are in...";
+            if (homeLookup == HOME_NEEDED && homeLookupFailed)
+                return "Could not find your state yet, trying again - or pick in Settings, Where";
+            return "No states picked - choose them in Settings, Where";
+        }
         if (lastGoodAt == 0)
             return lastError == null ? "Waiting for the first update"
                     : "No alerts yet - " + lastError;
@@ -1293,6 +1342,10 @@ public class AlertManager {
 
     /** Saves on change, not on dispose: a plugin reload must not be able to lose it. */
     public void saveFilter() {
+        // Any state picked closes the fresh-install lookup for this session, so a
+        // retry or an answer still in flight can never undo a later Clear.
+        if (!filter.areas.isEmpty())
+            homeLookup = HOME_DONE;
         try {
             prefs.edit().putString(PREF_FILTER, filter.toJson().toString()).apply();
         } catch (Exception e) {
