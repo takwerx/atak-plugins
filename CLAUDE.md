@@ -188,7 +188,28 @@ public repos. `/ship` covers the subtree push and the per-plugin release.
 ## Plugin UI standard — look like ATAK, not like a plugin
 
 Every takwerx plugin uses the same controls, so a user moving between them is not
-learning a new dialect each time. `CamDepot` is the reference implementation.
+learning a new dialect each time.
+
+**The pane itself has one shape, and it is written down in the `plugin-ui` skill
+(`.claude/skills/plugin-ui/SKILL.md`). It is the baseline a new plugin starts
+from: load it when writing a new plugin's PLAN and building its pane. Existing
+plugins keep what they have unless the operator asks to change them.** The short
+version: a main screen
+of three buttons (map switch | Settings | Notify) with the list straight under
+it; everything set once and left on a Settings page of drop-down rows reading
+`Name: value`; switches that say `<Thing> ON` / `OFF` in green or red text; a
+zoom gate stored and compared as the distance ATAK's scale bar reads; Area and
+Where as separate filters; one rule behind the list, the map and the map key;
+and a status line naming everything that is not shown. It was worked out across
+Feature Layer, Atmosphere, IPAWS, Evac Zone and Traffic, so a new plugin should
+not have to be taught it again. The rules below are the base it builds on.
+
+**When the operator likes something and says it should be the standard** ("make
+this the standard", "I want this in my other plugins"), add it to the skill the
+same day, from any session: a `tooling-<topic>` branch in `atak-plugins-tooling`,
+then `/ship tooling`. A memory alone is not enough; memory is recalled by chance,
+the skill is loaded for every new plugin. It changes new plugins only, never the
+existing ones unless the operator asks there.
 
 **Use ATAK's own button drawables.** `new-plugin.sh` already copies them out of the
 SDK template — `btn_gray` is a selector over `new_dark_button_bg` /
@@ -244,7 +265,11 @@ silently trimmed map reads as the whole picture.
 
 ## The SDK lives outside this repo
 
-- Path: `~/atak-sdk/ATAK-CIV-<version>/` (currently `ATAK-CIV-5.6.0.8`).
+- Path: `~/atak-sdk/ATAK-CIV-<version>/`, one per target, all from tak.gov:
+  `5.6.0.23`, `5.7.0.14`, `5.8.0.3` (`local-properties.sh` picks the newest per
+  target). `5.6.0.8` is older and only still supplies `takdev.plugin`. The open
+  source at `TAK-Product-Center/atak-civ` (checked out at `~/atak-sdk/atak-civ-source`)
+  stops at 5.5.1.10 and is not what any plugin builds against.
 - Contains `main.jar` (the ATAK API you compile against), `atak-gradle-takdev.jar`
   (the Gradle plugin), `android_keystore` (shared dev signing key), `atak.apk`
   (the matching ATAK build to sideload), `ATAK_Plugin_Development_Guide.pdf`, and
@@ -688,6 +713,24 @@ Policy the scrub enforces, in words:
   device serials, test locations, credentials custody, hashes of signed builds.
 - The notes repo is where a denylist entry is added the moment something
   sensitive shows up anywhere; the scrub then holds the line mechanically.
+
+## Our own skill — `takwerx/atak-plugin-pipeline`
+
+`skills/atak-plugin-pipeline/` is this pipeline packaged for developers outside
+takwerx, published as the public repo `takwerx/atak-plugin-pipeline` (MIT). It
+reaches that repo the way a plugin reaches its own, by subtree push from `main`:
+
+```bash
+git subtree split --prefix=skills/atak-plugin-pipeline -b pipeline-export
+git push https://github.com/takwerx/atak-plugin-pipeline.git pipeline-export:refs/heads/main
+```
+
+Its scripts are **deliberate forks** of `scripts/`, not links: they drop the
+worktrees, the notes repo, the depot catalog and `/ship`, and resolve a plugin
+through `plugin_dir()` instead of assuming `plugins/<Name>/`. So a fix to a gate
+here is a fix there too, in the same tooling branch, or the public copy drifts.
+It must never carry an SDK artifact, a takwerx server, catalog or fleet detail,
+or a notes-repo path; its own CI refuses binaries and SDK file names.
 
 ## The `atak-plugin` skill — useful, but this file wins
 
