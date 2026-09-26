@@ -2,9 +2,14 @@
 package com.atakmap.android.cursorwerx;
 
 import android.app.Activity;
+import android.os.Build;
+import android.view.InputDevice;
 import android.view.MotionEvent;
+import android.view.PointerIcon;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
@@ -28,9 +33,12 @@ import com.atakmap.coremap.log.Log;
  * the zoom -- and the scrolling the view hierarchy already did earlier in dispatch still
  * stands. No {@code Window.Callback} wrapper, no synthesised drags.
  *
- * <p>This deliberately only vetoes. It does not scroll anything itself: anything that
- * scrolls on the wheel has already scrolled by the time this runs, and scrolling again
- * here would double it.
+ * <p>Over UI it also scrolls, but only what nothing else did. MapActivity forwards the
+ * wheel here only when the view hierarchy did not consume it, so a list that scrolled
+ * itself never gets here. Under the Android Emulator's virtio tablet the panes did not
+ * scroll themselves at all (2026-09-26): the log showed every wheel over a pane arriving
+ * here, vetoed, and nothing moving. So the nearest ancestor that can move that way is
+ * scrolled from here instead.
  */
 public final class PointerRouter {
 
@@ -64,16 +72,71 @@ public final class PointerRouter {
                 final boolean overUi = isOverUi(event.getRawX(), event.getRawY());
                 if (!overUi && zoomAtCursor(event))
                     return true;
+                final String scrolled = overUi ? scrollUnder(event) : null;
                 if (verbose)
                     Log.d(TAG, "wheel at " + (int) event.getRawX() + ","
                             + (int) event.getRawY() + " -> "
-                            + (overUi ? "UI (map vetoed): " + describe(lastHit) : "map"));
+                            + (overUi ? "UI (map vetoed): " + describe(lastHit)
+                                    + (scrolled != null ? ", scrolled " + scrolled : ", nothing to scroll")
+                                    : "map"));
                 return overUi;
             }
         };
         mapView.addOnGenericMotionListener(listener);
+        hideGuestPointer(true);
         Log.d(TAG, "pointer router attached");
     }
+
+    /** The Android Emulator's pointer device, which the host draws its own cursor for. */
+    private static final String EMULATOR_TABLET = "QEMU Virtio Tablet";
+
+    /**
+     * In the Android Emulator the Mac draws its cursor and Android draws another one at
+     * the same spot: two arrows (2026-09-26). Setting the window's pointer icon to none
+     * removed the arrow but not the icons views choose for themselves, which Android
+     * resolves child-first: a hand over ATAK's toolbar buttons and its Plugins list, an
+     * I-beam over text fields ("still have that hand under the cursor"). So a transparent
+     * view that takes no touch, no hover and no focus is laid over the whole content, on
+     * top, with the none icon: it is the first view under the pointer everywhere, and its
+     * answer wins. Only under the emulator: on DeX or a Chromebook Android's cursor is the
+     * only cursor there is.
+     */
+    private void hideGuestPointer(boolean hide) {
+        if (Build.VERSION.SDK_INT < 24)
+            return;
+        boolean emulator = false;
+        for (int id : InputDevice.getDeviceIds()) {
+            final InputDevice d = InputDevice.getDevice(id);
+            if (d != null && EMULATOR_TABLET.equals(d.getName()))
+                emulator = true;
+        }
+        if (!emulator)
+            return;
+        final View decor = activity.getWindow().getDecorView();
+        final ViewGroup content = activity.findViewById(android.R.id.content);
+        if (hide) {
+            decor.setPointerIcon(PointerIcon.getSystemIcon(activity, PointerIcon.TYPE_NULL));
+            if (pointerShroud == null && content != null) {
+                pointerShroud = new View(activity);
+                pointerShroud.setClickable(false);
+                pointerShroud.setFocusable(false);
+                pointerShroud.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+                pointerShroud.setPointerIcon(PointerIcon.getSystemIcon(activity, PointerIcon.TYPE_NULL));
+                content.addView(pointerShroud, new ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            }
+        } else {
+            decor.setPointerIcon(null);
+            if (pointerShroud != null) {
+                if (content != null)
+                    content.removeView(pointerShroud);
+                pointerShroud = null;
+            }
+        }
+        Log.d(TAG, (hide ? "hid" : "restored") + " Android's pointer (emulator tablet present)");
+    }
+
+    private View pointerShroud;
 
     /** Symmetric with {@link #attach()}; a reload must leave no listener behind. */
     public void detach() {
@@ -81,6 +144,7 @@ public final class PointerRouter {
             return;
         mapView.removeOnGenericMotionListener(listener);
         listener = null;
+        hideGuestPointer(false);
         Log.d(TAG, "pointer router detached");
     }
 
@@ -131,10 +195,20 @@ public final class PointerRouter {
      * @return true when the wheel was handled here, so ATAK's coarser zoom never runs.
      */
     private boolean zoomAtCursor(MotionEvent event) {
-        final float notches = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
-        if (notches == 0f)
+        final float axis = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+        if (axis == 0f)
             return false;
+        // One wheel event is one step. The Android Emulator's virtio tablet reports a
+        // click as 8 and a fast flick as 32, which was a 3x or 87x jump per event
+        // (2026-09-26); scrcpy reports 1.
+        final float notches = Math.signum(axis);
         try {
+            // At either zoom limit the zoom does nothing but the cursor anchor still
+            // shifts the map, and repeated at the globe it spun the whole earth.
+            final double scale = mapView.getMapScale();
+            if ((notches > 0f && scale >= mapView.getMaxMapScale() * 0.999d)
+                    || (notches < 0f && scale <= mapView.getMinMapScale() * 1.001d))
+                return true;
             final int[] loc = new int[2];
             mapView.getLocationOnScreen(loc);
             // zoomBy wants upper-left view coordinates, so take the cursor back into
@@ -151,6 +225,39 @@ public final class PointerRouter {
             Log.w(TAG, "zoom at cursor failed; leaving it to ATAK", e);
             return false;
         }
+    }
+
+    /**
+     * Scrolls the nearest view at or above {@link #lastHit} that can move the way the wheel
+     * turned, by Android's own step for one notch.
+     *
+     * @return what was scrolled and by how much, for the log; null when nothing could.
+     */
+    private String scrollUnder(MotionEvent event) {
+        final float notches = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+        if (notches == 0f || lastHit == null)
+            return null;
+        // Wheel up (positive) brings the content above into view.
+        final int dir = notches > 0f ? -1 : 1;
+        for (View p = lastHit; p != null && !mapChain.contains(p); ) {
+            if (p.canScrollVertically(dir)) {
+                final int dy = Math.round(-notches * scrollStep(p));
+                if (p instanceof AbsListView)
+                    ((AbsListView) p).scrollListBy(dy); // scrollBy would move the list's frame
+                else
+                    p.scrollBy(0, dy);
+                return describe(p) + " by " + dy;
+            }
+            final Object parent = p.getParent();
+            p = (parent instanceof View) ? (View) parent : null;
+        }
+        return null;
+    }
+
+    private static float scrollStep(View v) {
+        if (Build.VERSION.SDK_INT >= 26)
+            return ViewConfiguration.get(v.getContext()).getScaledVerticalScrollFactor();
+        return 64f * v.getResources().getDisplayMetrics().density;
     }
 
     private View lastHit;

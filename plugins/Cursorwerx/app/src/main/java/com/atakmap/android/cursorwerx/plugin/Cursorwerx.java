@@ -5,6 +5,7 @@ import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atakmap.android.cursorwerx.BackControl;
+import com.atakmap.android.cursorwerx.ClickRepair;
 import com.atakmap.android.cursorwerx.PanControl;
 import com.atakmap.android.cursorwerx.PointerRouter;
 import com.atakmap.android.maps.MapView;
@@ -29,6 +30,7 @@ public class Cursorwerx implements IPlugin {
     BackControl backControl;
     PointerRouter pointerRouter;
     PanControl panControl;
+    ClickRepair clickRepair;
 
     public Cursorwerx(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -76,10 +78,17 @@ public class Cursorwerx implements IPlugin {
             pointerRouter.setVerbose(true); // bring-up: log where each tick landed
             pointerRouter.attach();
 
-            // Middle-button drag pans the map.
+            // Mouse drag pans the map; a click is handed back to ATAK.
             panControl = new PanControl(mapView);
             panControl.setVerbose(true);
             panControl.attach();
+
+            // A mouse click lands in text fields; see ClickRepair for the Android quirk.
+            if (mapView.getContext() instanceof android.app.Activity) {
+                clickRepair = new ClickRepair((android.app.Activity) mapView.getContext());
+                clickRepair.setVerbose(true);
+                clickRepair.attach();
+            }
         }
 
         // the plugin is starting, add the button to the toolbar
@@ -92,6 +101,10 @@ public class Cursorwerx implements IPlugin {
     @Override
     public void onStop() {
         // Symmetric with onStart: a reload must leave no view and no listener behind.
+        if (clickRepair != null) {
+            clickRepair.detach();
+            clickRepair = null;
+        }
         if (panControl != null) {
             panControl.detach();
             panControl = null;

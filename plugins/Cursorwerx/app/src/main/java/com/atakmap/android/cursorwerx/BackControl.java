@@ -2,6 +2,7 @@
 package com.atakmap.android.cursorwerx;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -13,6 +14,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
+import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 
@@ -42,6 +44,7 @@ public final class BackControl {
     private final MapView mapView;
     private final Activity activity;
     private View button;
+    private boolean verbose = true;
     private View.OnKeyListener keyListener;
 
     public BackControl(MapView mapView) {
@@ -83,14 +86,34 @@ public final class BackControl {
         });
     }
 
-    /** The one action. A real Back key reaches exactly here, via Activity.onKeyUp. */
+    /**
+     * ATAK's Back, the way ATAK does it.
+     *
+     * <p>Calling {@code Activity.onBackPressed()} looks right and does nothing.
+     * {@code ATAKActivity.onBackPressed} does not call super; it sends an internal
+     * broadcast on ATAK's own bus, and only when {@code isTaskRoot()}:
+     *
+     * <pre>AtakBroadcast.getInstance().sendBroadcast(
+     *         new Intent("com.android.arrowmaker.BACK_PRESS"));</pre>
+     *
+     * So the broadcast is the real action and the Activity method is only a wrapper
+     * around it with a condition attached. Sending it directly skips the condition and
+     * works whatever the task state is. {@code onBackPressed()} is kept as a fallback in
+     * case a future ATAK moves the behaviour back into the Activity.
+     */
     private void back() {
         try {
-            Log.d(TAG, "back: calling onBackPressed on " + activity.getClass().getName());
-            activity.onBackPressed();
-            Log.d(TAG, "back: onBackPressed returned");
+            AtakBroadcast.getInstance().sendBroadcast(
+                    new Intent("com.android.arrowmaker.BACK_PRESS"));
+            if (verbose)
+                Log.d(TAG, "back: BACK_PRESS broadcast sent");
         } catch (Exception e) {
-            Log.w(TAG, "back failed", e);
+            Log.w(TAG, "BACK_PRESS broadcast failed; falling back to onBackPressed", e);
+            try {
+                activity.onBackPressed();
+            } catch (Exception e2) {
+                Log.w(TAG, "back failed", e2);
+            }
         }
     }
 
@@ -124,7 +147,6 @@ public final class BackControl {
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Log.d(TAG, "back button clicked");
                 back();
             }
         });

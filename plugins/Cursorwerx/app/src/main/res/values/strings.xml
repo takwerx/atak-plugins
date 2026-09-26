@@ -3,5 +3,14 @@
     <!-- App -->
     <string name="app_name">Cursorwerx</string>
     <!-- description -->
-    <string name="app_desc">Cursorwerx</string>
+    <string name="app_desc">Makes ATAK work with a mouse: wheel zoom at the cursor, wheel scrolling in panes, click and drag to pan, a Back button.</string>
+
+    <!-- The pane -->
+    <string name="pane_title">Cursorwerx</string>
+    <string name="pane_intro">ATAK expects a finger. This plugin makes it behave for a mouse or trackpad, on a desktop, DeX or a Chromebook. It is working now; there is nothing to set up.</string>
+    <string name="pane_map_title">On the map</string>
+    <string name="pane_map">• Wheel zooms in and out at the cursor, one gentle step per click.\n• Click and drag pans the map 1:1.\n• A click selects, as a tap does. Long press opens the radial menu.\n• Things ATAK lets you drag, such as a range-and-bearing end or a shape vertex, still drag.</string>
+    <string name="pane_ui_title">In panes and menus</string>
+    <string name="pane_ui">• Wheel scrolls the pane or list under the cursor, and never zooms the map behind it.\n• The ‹ button on the left edge, and the Escape key, are Back.\n• Clicks land in text fields, so you can type.</string>
+    <string name="pane_note">On a phone or tablet used with a finger, Cursorwerx does nothing at all.</string>
 </resources>
