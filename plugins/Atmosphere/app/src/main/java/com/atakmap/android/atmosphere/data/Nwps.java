@@ -123,6 +123,138 @@ public final class Nwps {
         }
     }
 
+    /** {@code /gauges/{lid}/stageflow}: 30 days observed and the forecast. */
+    public static String stageflowUrl(String lid) {
+        return GAUGES + "/" + lid + "/stageflow";
+    }
+
+    /** {@code /gauges/{lid}}: the record with the flood stages. */
+    public static String gaugeUrl(String lid) {
+        return GAUGES + "/" + lid;
+    }
+
+    /** One point on the hydrograph. */
+    public static final class Point {
+        public final long at;
+        /** Feet, or NaN. */
+        public final double stage;
+        /** Thousands of cubic feet per second, or NaN. */
+        public final double flow;
+
+        Point(long at, double stage, double flow) {
+            this.at = at;
+            this.stage = stage;
+            this.flow = flow;
+        }
+    }
+
+    /** The flood stages a gauge defines, feet; NaN where it defines none. */
+    public static final class Stages {
+        public final double action, minor, moderate, major;
+
+        public Stages(double action, double minor, double moderate, double major) {
+            this.action = action;
+            this.minor = minor;
+            this.moderate = moderate;
+            this.major = major;
+        }
+
+        public boolean any() {
+            return !Double.isNaN(action) || !Double.isNaN(minor)
+                    || !Double.isNaN(moderate) || !Double.isNaN(major);
+        }
+
+        public static final Stages NONE = new Stages(Double.NaN, Double.NaN, Double.NaN,
+                Double.NaN);
+    }
+
+    /** The observed and forecast series, in time order. */
+    public static final class Hydrograph {
+        public final List<Point> observed, forecast;
+        /** When the forecast was issued, UTC millis, or 0. */
+        public final long forecastIssued;
+
+        Hydrograph(List<Point> observed, List<Point> forecast, long forecastIssued) {
+            this.observed = observed;
+            this.forecast = forecast;
+            this.forecastIssued = forecastIssued;
+        }
+    }
+
+    /**
+     * A stageflow answer. Primary and secondary are told apart by their units, as in
+     * the gauge list; a point with neither is skipped.
+     */
+    public static Hydrograph parseStageflow(String body) {
+        final List<Point> obs = new ArrayList<>(), fc = new ArrayList<>();
+        long issued = 0L;
+        if (body == null || body.isEmpty())
+            return new Hydrograph(obs, fc, 0L);
+        try {
+            final JSONObject root = new JSONObject(body);
+            series(root.optJSONObject("observed"), obs);
+            final JSONObject f = root.optJSONObject("forecast");
+            series(f, fc);
+            if (f != null)
+                issued = time(str(f, "issuedTime"));
+        } catch (Exception e) {
+            // whatever parsed stands
+        }
+        return new Hydrograph(obs, fc, issued);
+    }
+
+    private static void series(JSONObject s, List<Point> out) {
+        if (s == null)
+            return;
+        final String pu = str(s, "primaryUnits").toLowerCase(Locale.US);
+        final String su = str(s, "secondaryUnits").toLowerCase(Locale.US);
+        final JSONArray data = s.optJSONArray("data");
+        if (data == null)
+            return;
+        for (int i = 0; i < data.length(); i++) {
+            final JSONObject p = data.optJSONObject(i);
+            if (p == null)
+                continue;
+            final long at = time(str(p, "validTime"));
+            if (at <= 0)
+                continue;
+            final double primary = value(p, "primary"), secondary = value(p, "secondary");
+            double stage = Double.NaN, flow = Double.NaN;
+            if (pu.equals("ft"))
+                stage = primary;
+            else if (pu.equals("kcfs"))
+                flow = primary;
+            if (su.equals("ft"))
+                stage = secondary;
+            else if (su.equals("kcfs"))
+                flow = secondary;
+            if (Double.isNaN(stage) && Double.isNaN(flow))
+                continue;
+            out.add(new Point(at, stage, flow));
+        }
+    }
+
+    /** The flood stages out of a gauge record; {@code -9999} is none. */
+    public static Stages parseStages(String body) {
+        if (body == null || body.isEmpty())
+            return Stages.NONE;
+        try {
+            final JSONObject cats = new JSONObject(body).optJSONObject("flood")
+                    .optJSONObject("categories");
+            if (cats == null)
+                return Stages.NONE;
+            return new Stages(stageOf(cats, ACTION), stageOf(cats, MINOR),
+                    stageOf(cats, MODERATE), stageOf(cats, MAJOR));
+        } catch (Exception e) {
+            return Stages.NONE;
+        }
+    }
+
+    private static double stageOf(JSONObject cats, String name) {
+        final JSONObject c = cats.optJSONObject(name);
+        return c == null ? Double.NaN : value(c, "stage");
+    }
+
     /** Every gauge in a service answer. One without a position is skipped. */
     public static List<Gauge> parse(String body) {
         final List<Gauge> out = new ArrayList<>();

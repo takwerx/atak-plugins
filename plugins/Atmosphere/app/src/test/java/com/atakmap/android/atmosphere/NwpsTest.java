@@ -86,6 +86,32 @@ public class NwpsTest {
     }
 
     @Test
+    public void parsesTheHydrographAndTheStages() {
+        final String sf = "{\"observed\":{\"primaryUnits\":\"ft\",\"secondaryUnits\":\"kcfs\","
+                + "\"data\":[{\"validTime\":\"2026-09-25T00:00:00Z\",\"primary\":2.5,\"secondary\":-999},"
+                + "{\"validTime\":\"2026-09-25T01:00:00Z\",\"primary\":-999,\"secondary\":-999},"
+                + "{\"validTime\":\"2026-09-25T02:00:00Z\",\"primary\":2.6,\"secondary\":0.1}]},"
+                + "\"forecast\":{\"primaryUnits\":\"ft\",\"secondaryUnits\":\"kcfs\","
+                + "\"issuedTime\":\"2026-09-26T15:11:00Z\","
+                + "\"data\":[{\"validTime\":\"2026-09-26T16:00:00Z\",\"primary\":2.9,\"secondary\":0}]}}";
+        final Nwps.Hydrograph h = Nwps.parseStageflow(sf);
+        assertEquals(2, h.observed.size());               // the all-none point is skipped
+        assertEquals(2.6, h.observed.get(1).stage, 1e-9);
+        assertEquals(0.1, h.observed.get(1).flow, 1e-9);
+        assertEquals(1, h.forecast.size());
+        assertEquals(IsoTime.parse("2026-09-26T15:11:00Z"), h.forecastIssued);
+
+        final Nwps.Stages s = Nwps.parseStages("{\"flood\":{\"stageUnits\":\"ft\",\"categories\":{"
+                + "\"major\":{\"stage\":28,\"flow\":23400},\"moderate\":{\"stage\":26,\"flow\":18000},"
+                + "\"minor\":{\"stage\":25,\"flow\":15600},\"action\":{\"stage\":-9999,\"flow\":-9999}}}}");
+        assertEquals(25.0, s.minor, 1e-9);
+        assertEquals(28.0, s.major, 1e-9);
+        assertTrue(Double.isNaN(s.action));
+        assertTrue(s.any());
+        assertFalse(Nwps.parseStages("{}").any());
+    }
+
+    @Test
     public void nothingUsableIsAnEmptyList() {
         assertTrue(Nwps.parse("").isEmpty());
         assertTrue(Nwps.parse("not json").isEmpty());

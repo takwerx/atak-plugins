@@ -12,6 +12,8 @@ import android.widget.TextView;
 
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.atmosphere.data.Nwps;
+import com.atakmap.android.atmosphere.net.EgressPolicy;
+import com.atakmap.android.atmosphere.net.Http;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.atmosphere.units.Quantity;
@@ -34,7 +36,17 @@ public final class GaugePage {
 
     public interface Host {
         UnitSystem units();
+
+        EgressPolicy egress();
     }
+
+    /** What the last opened record fetched, so Back and reopen do not refetch. */
+    private String chartLid;
+    private Nwps.Hydrograph chart;
+    private Nwps.Stages chartStages = Nwps.Stages.NONE;
+    private int chartDays = 7;
+    private HydrographView chartView;
+    private TextView chartStatus;
 
     private final Context pluginContext;
     private final MapView mapView;
@@ -319,6 +331,38 @@ public final class GaugePage {
         title.setPadding(0, dp(8), 0, dp(2));
         title.setText(g.name);
         detailBody.addView(title);
+        // The hydrograph, under the name and above the fields: it is what the
+        // record is opened for. Two requests, both cached against the id, so Back
+        // and reopen cost nothing; a fresh gauge fetches.
+        final LinearLayout dayRow = new LinearLayout(pluginContext);
+        dayRow.setOrientation(LinearLayout.HORIZONTAL);
+        dayRow.setPadding(0, dp(6), 0, 0);
+        for (final int d : new int[] { 1, 3, 7, 14, 30 }) {
+            final Button b = chip(d + "d", d == chartDays, 0);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    chartDays = d;
+                    showDetail(g);
+                }
+            });
+            dayRow.addView(b);
+        }
+        detailBody.addView(dayRow);
+        chartView = new HydrographView(pluginContext);
+        detailBody.addView(chartView);
+        chartStatus = new TextView(pluginContext);
+        chartStatus.setTextSize(11);
+        chartStatus.setAlpha(0.7f);
+        chartStatus.setTextColor(0xFFFFFFFF);
+        detailBody.addView(chartStatus);
+        if (g.lid.equals(chartLid) && chart != null) {
+            chartView.set(chart, chartStages, host.units(), chartDays);
+            chartStatus.setText(chartCaption());
+        } else {
+            chartStatus.setText("Getting the hydrograph…");
+            fetchChart(g);
+        }
         for (String[] r : GaugeOverlay.describe(g, host.units(), System.currentTimeMillis()))
             detailBody.addView(field(r[0], r[1]));
 
@@ -328,6 +372,62 @@ public final class GaugePage {
         filterRow.setVisibility(View.GONE);
         scopeRow.setVisibility(View.GONE);
         status.setVisibility(View.GONE);
+    }
+
+    private String chartCaption() {
+        if (chart == null)
+            return "";
+        final StringBuilder b = new StringBuilder();
+        b.append("Solid: observed. Dashed: forecast");
+        if (chart.forecast.isEmpty())
+            b.append(" (none issued)");
+        else if (chart.forecastIssued > 0)
+            b.append(", issued ").append(new java.text.SimpleDateFormat("EEE h:mm a",
+                    java.util.Locale.US).format(new java.util.Date(chart.forecastIssued)));
+        b.append(". ");
+        b.append(chartStages.any() ? "Bands: action, minor, moderate, major flood stages."
+                : "This gauge has no flood stages defined.");
+        return b.toString();
+    }
+
+    private void fetchChart(final Nwps.Gauge g) {
+        final EgressPolicy egress = host.egress();
+        final java.util.Map<String, String> headers = new java.util.HashMap<>();
+        headers.put("Accept", "application/json");
+        Http.get(Nwps.stageflowUrl(g.lid), egress.userAgent(), headers, new Http.Callback() {
+            @Override
+            public void onSuccess(String body) {
+                final Nwps.Hydrograph h = Nwps.parseStageflow(body);
+                Http.get(Nwps.gaugeUrl(g.lid), egress.userAgent(), headers,
+                        new Http.Callback() {
+                            @Override
+                            public void onSuccess(String rec) {
+                                deliver(g, h, Nwps.parseStages(rec));
+                            }
+
+                            @Override
+                            public void onFailure(String error) {
+                                deliver(g, h, Nwps.Stages.NONE);
+                            }
+                        });
+            }
+
+            @Override
+            public void onFailure(String error) {
+                if (showing != null && showing.lid.equals(g.lid) && chartStatus != null)
+                    chartStatus.setText("Could not get the hydrograph: " + error);
+            }
+        });
+    }
+
+    private void deliver(Nwps.Gauge g, Nwps.Hydrograph h, Nwps.Stages s) {
+        chartLid = g.lid;
+        chart = h;
+        chartStages = s;
+        if (showing == null || !showing.lid.equals(g.lid) || chartView == null)
+            return;
+        chartView.set(h, s, host.units(), chartDays);
+        chartStatus.setText(chartCaption());
     }
 
     private void showList() {
