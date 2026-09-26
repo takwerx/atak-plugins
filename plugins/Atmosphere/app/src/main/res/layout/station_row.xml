@@ -39,6 +39,19 @@
             android:alpha="0.7" />
     </LinearLayout>
 
+    <!-- A TextView, not a Button: a focusable child in a row swallows the row's own
+         click. The star is Cam Depot's. -->
+    <TextView
+        android:id="@+id/star"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="center_vertical"
+        android:gravity="center"
+        android:textSize="22sp"
+        android:clickable="true"
+        android:focusable="false"
+        android:contentDescription="@string/favorite" />
+
     <Button
         android:id="@+id/goto_btn"
         style="@style/TakwerxButton"

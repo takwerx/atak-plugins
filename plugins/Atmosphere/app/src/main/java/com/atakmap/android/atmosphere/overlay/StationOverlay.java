@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 
 import com.atakmap.android.atmosphere.data.RedFlag;
 import com.atakmap.android.atmosphere.data.Raws;
+import com.atakmap.android.atmosphere.data.StationFavorites;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
 import com.atakmap.android.atmosphere.units.Quantity;
@@ -68,6 +69,8 @@ public final class StationOverlay {
     public static final int SHOW_WATCH = 1;
     /** Only the ones at Red Flag: both criteria at once. */
     public static final int SHOW_RED = 2;
+    /** Only the starred ones, wherever they are. */
+    public static final int SHOW_FAVORITES = 3;
     /**
      * New keys on purpose.
      *
@@ -165,6 +168,13 @@ public final class StationOverlay {
     /** Whether the pills are on the icons as drawn right now. */
     private boolean labelsWanted;
     private List<Raws.Station> stations = new ArrayList<>();
+    /**
+     * Starred stations the radius did not reach, fetched by id. Held apart from the
+     * radius answer so that unstarring one drops it on the next redraw, without a
+     * request.
+     */
+    private List<Raws.Station> beyond = new ArrayList<>();
+    private final StationFavorites favorites;
     /** Where the stations currently on the map were asked for. */
     private GeoPoint fetchedFrom;
 
@@ -182,6 +192,9 @@ public final class StationOverlay {
         this.egress = egress;
         this.features = new AtmosphereFeatures(mapView, pluginContext, TAG, NAME,
                 "stations.sqlite", "stations", false);
+        // ATAK's own context: preferences written through the plugin context are
+        // gone the next time the plugin loads.
+        this.favorites = new StationFavorites(mapView.getContext());
         final SharedPreferences p = MapCompat.prefs();
         miles = p == null ? DEFAULT_MILES : p.getInt(PREF_MILES, DEFAULT_MILES);
         fromMe = p == null || p.getBoolean(PREF_FROM_ME, true);
@@ -313,16 +326,132 @@ public final class StationOverlay {
     /**
      * Whether a station passes the map's own filter.
      *
-     * <p>Public and static so the list can ask the same question. A filter that lives
-     * on one surface is a filter the other one disagrees with.
+     * <p>Public so the list can ask the same question. A filter that lives on one
+     * surface is a filter the other one disagrees with.
      */
-    public static boolean passes(int show, Raws.Station s) {
+    public boolean passes(int show, Raws.Station s) {
+        if (show == SHOW_FAVORITES)
+            return favorites.contains(s.wxId);
         final int state = stateOf(s);
         if (show == SHOW_RED)
             return state == RedFlag.CRITICAL;
         if (show == SHOW_WATCH)
             return state != RedFlag.BELOW;
         return true;
+    }
+
+    public boolean isFavorite(Raws.Station s) {
+        return s != null && favorites.contains(s.wxId);
+    }
+
+    /**
+     * Star or unstar a station the map already holds.
+     *
+     * <p>Nothing to fetch: a station being starred is one the operator is looking
+     * at, so it is in the radius answer or already held from beyond it. The map
+     * redraws only when it is showing the starred ones, since a star changes
+     * nothing else it draws.
+     *
+     * @return true if the station is starred afterwards
+     */
+    public boolean toggleFavorite(Raws.Station s) {
+        final boolean now = favorites.toggle(s.wxId);
+        if (show == SHOW_FAVORITES)
+            redraw();
+        return now;
+    }
+
+    /** How many starred stations are held from beyond the radius. */
+    public int favoritesBeyond() {
+        int n = 0;
+        for (Raws.Station s : beyond)
+            if (favorites.contains(s.wxId))
+                n++;
+        return n;
+    }
+
+    /** Everything drawn: the radius answer, and the starred stations beyond it. */
+    private List<Raws.Station> held() {
+        final List<Raws.Station> near = stations;
+        final List<Raws.Station> far = beyond;
+        if (far.isEmpty())
+            return near;
+        final List<Raws.Station> out = new ArrayList<>(near.size() + far.size());
+        out.addAll(near);
+        for (Raws.Station s : far)
+            // Unstarred since it was fetched: it is outside the radius, so it goes.
+            if (favorites.contains(s.wxId))
+                out.add(s);
+        return out;
+    }
+
+    /** The starred ids the radius answer does not carry. */
+    private List<String> missingFavorites(List<Raws.Station> near) {
+        final List<String> missing = new ArrayList<>();
+        if (favorites.isEmpty())
+            return missing;
+        final java.util.Set<String> have = new java.util.HashSet<>();
+        for (Raws.Station s : near)
+            have.add(s.wxId);
+        for (String id : favorites.ids())
+            if (!have.contains(id))
+                missing.add(id);
+        return missing;
+    }
+
+    /**
+     * Ask for the starred stations the radius did not reach, a hundred ids at a time,
+     * then draw. The URL has a length the gateway will take, so a long list is several
+     * requests in a row rather than one that is refused.
+     */
+    private void fetchBeyond(final List<String> remaining, final List<Raws.Station> acc,
+            final int mine) {
+        final int n = Math.min(remaining.size(), Raws.MAX_IDS_PER_QUERY);
+        final List<String> chunk = new ArrayList<>(remaining.subList(0, n));
+        final List<String> rest = new ArrayList<>(remaining.subList(n, remaining.size()));
+        final Map<String, String> headers = new HashMap<>();
+        headers.put("Accept", "application/json");
+        Http.get(Raws.byIdUrl(chunk), egress.userAgent(), headers, new Http.Callback() {
+            @Override
+            public void onSuccess(final String body) {
+                if (mine != generation || !on) {
+                    inFlight = false;
+                    return;
+                }
+                worker.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        acc.addAll(Raws.parse(body));
+                        if (!rest.isEmpty()) {
+                            fetchBeyond(rest, acc, mine);
+                            return;
+                        }
+                        beyond = acc;
+                        Log.d(TAG, "holding " + acc.size()
+                                + " starred station(s) from beyond the radius");
+                        inFlight = false;
+                        rebuild(mine);
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(final String error) {
+                Log.w(TAG, "starred stations beyond the radius: " + error);
+                if (mine != generation || !on) {
+                    inFlight = false;
+                    return;
+                }
+                worker.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        // Whatever was held from last time stays; the map draws.
+                        inFlight = false;
+                        rebuild(mine);
+                    }
+                });
+            }
+        });
     }
 
     /** Whether the readings and name are drawn beside each station. */
@@ -481,6 +610,7 @@ public final class StationOverlay {
             mapView.postDelayed(autoPoll, POLL_MS);
         } else {
             stations = new ArrayList<>();
+            beyond = new ArrayList<>();
             clearOffMain();
             status("");
             drawn(0, 0, 0);
@@ -527,7 +657,7 @@ public final class StationOverlay {
      * map built from two different answers disagree, and the operator finds it.
      */
     public List<Raws.Station> stations() {
-        return new ArrayList<>(stations);
+        return new ArrayList<>(held());
     }
 
     /** What a station's state is, by the same rule the map colors it with. */
@@ -587,8 +717,17 @@ public final class StationOverlay {
                     public void run() {
                         final List<Raws.Station> all = Raws.parse(body);
                         stations = all;
-                        inFlight = false;
-                        rebuild(mine);
+                        // A starred station outside the radius is not in that answer
+                        // at all -- the server did the distance -- so those are asked
+                        // for by id, and only then is the map drawn.
+                        final List<String> missing = missingFavorites(all);
+                        if (missing.isEmpty()) {
+                            beyond = new ArrayList<>();
+                            inFlight = false;
+                            rebuild(mine);
+                        } else {
+                            fetchBeyond(missing, new ArrayList<Raws.Station>(), mine);
+                        }
                     }
                 });
             }
@@ -619,7 +758,7 @@ public final class StationOverlay {
         if (mine != generation || !on)
             return;
         final long began = android.os.SystemClock.elapsedRealtime();
-        final List<Raws.Station> held = stations;
+        final List<Raws.Station> held = held();
         final long now = System.currentTimeMillis();
         final UnitSystem system = units();
         final boolean withLabels = labelsWanted;

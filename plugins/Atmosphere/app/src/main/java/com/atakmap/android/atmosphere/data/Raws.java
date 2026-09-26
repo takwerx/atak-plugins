@@ -4,7 +4,10 @@ package com.atakmap.android.atmosphere.data;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 
@@ -57,6 +60,39 @@ public final class Raws {
                 + "&distance=" + trim(miles)
                 + "&geometry=" + trim(lon) + "," + trim(lat)
                 + "&where=1%3D1";
+    }
+
+    /**
+     * At most this many ids in one request. Past about 2,000 characters the REST
+     * gateway answers 404, not 414. Encoded, every id costs seventeen characters --
+     * the quotes and the comma are three each -- so a hundred was already over the
+     * line with the field list; the unit test said so before the gateway could.
+     */
+    public static final int MAX_IDS_PER_QUERY = 60;
+
+    /**
+     * The named stations, wherever they are, with their latest observation.
+     *
+     * <p>The radius query cannot return a starred station two hundred miles away, so
+     * those are asked for by id. WXID is a string field on the service; the ids are
+     * quoted, and a quote inside one is doubled the way SQL wants it.
+     */
+    public static String byIdUrl(Collection<String> wxIds) {
+        final StringBuilder in = new StringBuilder();
+        for (String id : wxIds) {
+            if (id == null || id.isEmpty())
+                continue;
+            if (in.length() > 0)
+                in.append(',');
+            in.append('\'').append(id.replace("'", "''")).append('\'');
+        }
+        final String where = "WXID IN (" + in + ")";
+        try {
+            return LAYER + "/query?f=json&returnGeometry=false&outFields=" + FIELDS
+                    + "&where=" + URLEncoder.encode(where, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static String trim(double d) {

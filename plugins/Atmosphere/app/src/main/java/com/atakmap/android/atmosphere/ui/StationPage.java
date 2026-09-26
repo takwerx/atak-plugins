@@ -50,6 +50,13 @@ public final class StationPage {
     }
 
     private static final int ALL = -1;
+    /** The starred ones, whatever their state. */
+    private static final int FAV = -2;
+
+    /** Marked. The one gold in the plugin, so a star is a star wherever it appears. */
+    public static final int STAR_ON = 0xFFFFC107;
+    /** Unmarked: present enough to be found, quiet enough not to be a row of stars. */
+    public static final int STAR_OFF = 0x66FFFFFF;
 
     private final Context pluginContext;
     private final MapView mapView;
@@ -101,6 +108,7 @@ public final class StationPage {
         final GeoPoint from = layer.originPoint();
 
         final int[] counts = new int[3];
+        int starred = 0;
         final List<Raws.Station> keep = new ArrayList<>();
         for (Raws.Station s : all) {
             // The same two exclusions the map makes: a station with nothing to say is
@@ -109,7 +117,10 @@ public final class StationPage {
                 continue;
             final int state = StationOverlay.stateOf(s);
             counts[state]++;
-            if (filter == ALL || filter == state)
+            final boolean fav = layer.isFavorite(s);
+            if (fav)
+                starred++;
+            if (filter == ALL || filter == state || (filter == FAV && fav))
                 keep.add(s);
         }
         if (from != null)
@@ -121,7 +132,7 @@ public final class StationPage {
             });
         shown = keep;
 
-        buildFilterRow(counts);
+        buildFilterRow(counts, starred);
         buildScopeRow();
         status.setText(summary(counts, from));
         adapter.notifyDataSetChanged();
@@ -139,12 +150,14 @@ public final class StationPage {
         final int total = counts[0] + counts[1] + counts[2];
         if (total == 0)
             return "No stations reporting within " + layer.miles() + " mi.";
+        final int far = layer.favoritesBeyond();
         return shown.size() + " of " + total + " stations, nearest first, within "
-                + layer.miles() + " mi of " + (layer.isFromMe() ? "you" : "the map");
+                + layer.miles() + " mi of " + (layer.isFromMe() ? "you" : "the map")
+                + (far == 0 ? "" : ", and " + far + " starred beyond that");
     }
 
-    /** All, then the two that matter, each with what it costs. */
-    private void buildFilterRow(int[] counts) {
+    /** All, the two that matter, and the starred, each with what it costs. */
+    private void buildFilterRow(int[] counts, int starred) {
         filterRow.removeAllViews();
         final int total = counts[0] + counts[1] + counts[2];
         filterRow.addView(tile("All (" + total + ")", filter == ALL, 0, ALL));
@@ -152,6 +165,29 @@ public final class StationPage {
                 filter == RedFlag.CRITICAL, StationOverlay.CRITICAL, RedFlag.CRITICAL));
         filterRow.addView(tile("Flirting (" + counts[RedFlag.NEAR] + ")",
                 filter == RedFlag.NEAR, StationOverlay.NEAR, RedFlag.NEAR));
+        // Narrower than the three it sits beside: a star and a count need less room
+        // than "Red Flag (12)", and four equal tiles left that one ellipsized.
+        final View fav = tile("\u2605 (" + starred + ")", filter == FAV, STAR_ON, FAV);
+        ((LinearLayout.LayoutParams) fav.getLayoutParams()).weight = 0.6f;
+        filterRow.addView(fav);
+    }
+
+    /** Paint one star, wherever it lives. */
+    private void styleStar(TextView star, Raws.Station s) {
+        final boolean on = layer != null && layer.isFavorite(s);
+        star.setText(on ? "\u2605" : "\u2606");
+        star.setTextColor(on ? STAR_ON : STAR_OFF);
+    }
+
+    /**
+     * Star or unstar, then make every view that shows it agree: the row, the count on
+     * the filter, the order when the filter is the stars, and the map.
+     */
+    private void toggleFavorite(Raws.Station s) {
+        if (layer == null)
+            return;
+        layer.toggleFavorite(s);
+        refresh();
     }
 
     /** Where "nearest" is measured from. The layer owns it; this only switches it. */
@@ -243,6 +279,14 @@ public final class StationPage {
             row.findViewById(R.id.state).setBackgroundColor(colorOf(state));
             ((TextView) row.findViewById(R.id.name)).setText(s.name);
             ((TextView) row.findViewById(R.id.detail)).setText(detail(s));
+            final TextView star = row.findViewById(R.id.star);
+            styleStar(star, s);
+            star.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    toggleFavorite(s);
+                }
+            });
             final Button go = row.findViewById(R.id.goto_btn);
             go.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -331,6 +375,18 @@ public final class StationPage {
                 goTo(s);
             }
         }));
+        // The star, where it is on the row: gold when it is on, and it says so.
+        final boolean starred = layer != null && layer.isFavorite(s);
+        final Button star = (Button) action(starred ? "\u2605 Starred" : "\u2606 Star",
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        toggleFavorite(s);
+                        showDetail(s);
+                    }
+                });
+        star.setTextColor(starred ? STAR_ON : 0xFFFFFFFF);
+        buttons.addView(star);
         detailBody.addView(buttons);
 
         final TextView title = new TextView(pluginContext);

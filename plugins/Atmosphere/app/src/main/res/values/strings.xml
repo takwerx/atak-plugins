@@ -22,6 +22,7 @@
     <string name="heading_height">Height</string>
     <string name="tropical_none">No storms right now</string>
     <string name="go_to">Go to</string>
+    <string name="favorite">Favorite</string>
     <string name="spot_layer_on">Spot forecasts ON</string>
     <string name="spot_layer_off">Spot forecasts OFF</string>
     <string name="stations_guide">Station legend</string>

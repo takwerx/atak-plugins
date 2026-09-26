@@ -1781,6 +1781,7 @@ public final class AtmospherePane {
         showTile("Flirting and Red Flag", StationOverlay.SHOW_WATCH,
                 StationOverlay.NEAR);
         showTile("Red Flag only", StationOverlay.SHOW_RED, StationOverlay.CRITICAL);
+        showTile("\u2605 Starred only", StationOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
     }
 
     private void showTile(String label, final int value, int color) {
