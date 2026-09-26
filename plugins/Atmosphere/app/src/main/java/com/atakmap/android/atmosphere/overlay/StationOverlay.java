@@ -191,7 +191,7 @@ public final class StationOverlay {
         // Worked out against this device's own scale bar, not a nominal width. A
         // threshold derived from an assumed 200 pixel bar is wrong by whatever the
         // real bar differs by -- here that is most of a factor of two, so a gate
-        // labelled "30 mi or closer" was still drawing at 53 (operator, 2026-09-25).
+        // labeled "30 mi or closer" was still drawing at 53 (operator, 2026-09-25).
         labelGate = storedGate(p, PREF_GATE_LABELS, gsdForBig(DEFAULT_LABEL_BIG));
     }
 
@@ -643,13 +643,13 @@ public final class StationOverlay {
             // so the gust is printed beside it or the color has nothing behind it.
             // A label is composed only for a station that is on screen.
             //
-            // Every labelled icon is a PNG encode and a file write, and crossing the
+            // Every labeled icon is a PNG encode and a file write, and crossing the
             // label zoom recomposed all of them: 325 stations took THIRTY SECONDS,
             // which is exactly the "labels come on very late" the operator kept
             // reporting (measured 2026-09-25). The radius is 250 miles and the view
             // is a few; almost all of that work was for symbols nobody could see.
             final boolean labelThis = withLabels && onScreen(s, view);
-            final AttributeSet a = attrs(s, color, now, system);
+            final AttributeSet a = attrs(s, color, now, system, labelThis);
             // The set is the state, so Overlay Manager can show the stations at
             // criteria on their own and ATAK's own switches work on one at a time.
             add(drawn, s, StationIcons.stateLabel(color), a, color, system, labelThis,
@@ -701,7 +701,7 @@ public final class StationOverlay {
      * The map's own extent, padded, as south, west, north, east -- or null when there
      * is none to be had.
      *
-     * <p>Padded by half a view so a station just off the edge is already labelled
+     * <p>Padded by half a view so a station just off the edge is already labeled
      * when it is panned to, rather than arriving a redraw later. Null on the globe,
      * where the bounds read as NaN.
      */
@@ -844,7 +844,8 @@ public final class StationOverlay {
             out.add(new String[] { label, value.trim() });
     }
 
-    private AttributeSet attrs(Raws.Station s, int color, long now, UnitSystem system) {
+    private AttributeSet attrs(Raws.Station s, int color, long now, UnitSystem system,
+            boolean withLabel) {
         final AttributeSet a = new AttributeSet();
         put(a, "Station", s.name);
         for (String[] r : describe(s, system, now))
@@ -857,10 +858,18 @@ public final class StationOverlay {
         // what a bare disc did (2026-09-25). Now that the bitmap is trimmed to its
         // ink it is also small enough to read in the Select Item chooser, which was
         // the reason for wanting a substitute in the first place.
+        //
+        // And it is the icon THIS station is drawn with -- the per-station label
+        // switch rebuild() worked out, not the layer's. Written against the layer's
+        // switch, this composed a labeled icon for every station in the radius, on
+        // screen or not, and quietly undid the on-screen gate three lines above the
+        // call: 389 labeled files for a dozen visible stations, and a 19 s wait for
+        // the labels after zooming in (measured 2026-09-26, the operator's "takes way
+        // too long"). Same key as add() composes, so it is one PNG per station, once.
         final StationIcons.Composed own = icons.compose(s.name,
                 speed(s.windMph, system), speed(s.gustMph, system), speedUnit(),
                 s.relativeHumidity, s.fuelMoisture, s.windFromDeg, knots(s.windMph),
-                color, labelsWanted);
+                color, withLabel);
         if (own != null) {
             put(a, "_chooserIcon", own.uri);
             a.setAttribute("_chooserW", own.width);
