@@ -228,8 +228,14 @@ public class AlertOverlay {
                             return out;
                         }
                     };
+            // The plugin's own glyph on its Overlay Manager row, PLSS's way: the icon
+            // lives in the plugin APK, so the authority is the plugin's package --
+            // ATAK's own package cannot resolve it. "file://asset/nothing" left the
+            // row blank beside every other overlay's icon.
             overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
-                    title, "file://asset/nothing", query, null, null);
+                    title, "android.resource://" + pluginContext.getPackageName() + "/"
+                            + com.atakmap.android.ipaws.plugin.R.drawable.ic_toolbar,
+                    query, null, null);
             // addOverlay, not addFilesOverlay. With addFilesOverlay (which is what
             // samples/hello3d uses) this overlay never appeared anywhere in the
             // Overlay Manager on the XCover -- the whole list was swept twice with
