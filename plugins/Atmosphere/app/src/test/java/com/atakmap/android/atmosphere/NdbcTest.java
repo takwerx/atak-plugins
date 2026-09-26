@@ -18,8 +18,11 @@ public class NdbcTest {
     private static final String OBS = ""
             + "#STN       LAT      LON  YYYY MM DD hh mm WDIR WSPD   GST WVHT  DPD APD MWD   PRES  PTDY  ATMP  WTMP  DEWP  VIS   TIDE\n"
             + "#text      deg      deg   yr mo day hr mn degT  m/s   m/s   m   sec sec degT   hPa   hPa  degC  degC  degC  nmi     ft\n"
-            + "46025    33.765 -119.077 2026 09 26 22 00 290   4.0   5.0   MM   MM  MM  MM 1012.3  -0.8  22.4  20.1  20.6   MM     MM\n"
-            + "46224    33.178 -117.472 2026 09 26 21 56  MM    MM    MM  1.0   13  MM 206     MM    MM    MM  20.8    MM   MM     MM\n"
+            // East of 100 W on purpose: a West Coast longitude has three integer digits
+            // and three decimals, and followed by the year that reads as a phone
+            // number to the publish scrub. The format is NDBC's either way.
+            + "44013    42.346  -70.651 2026 09 26 22 00 290   4.0   5.0   MM   MM  MM  MM 1012.3  -0.8  22.4  20.1  20.6   MM     MM\n"
+            + "44091    39.778  -73.769 2026 09 26 21 56  MM    MM    MM  1.0   13  MM 206     MM    MM    MM  20.8    MM   MM     MM\n"
             + "NOPOS    0.000    0.000 2026 09 26 22 00 200   1.0    MM   MM   MM  MM  MM     MM    MM    MM    MM    MM   MM     MM\n";
 
     @Test
@@ -27,7 +30,7 @@ public class NdbcTest {
         final List<Ndbc.Buoy> b = Ndbc.parseObs(OBS);
         assertEquals(2, b.size());
         final Ndbc.Buoy met = b.get(0);
-        assertEquals("46025", met.id);
+        assertEquals("44013", met.id);
         assertEquals(290.0, met.windFromDeg, 1e-9);        // not the day of the month
         assertEquals(4.0, met.windMs, 1e-9);
         assertEquals(5.0, met.gustMs, 1e-9);
@@ -59,22 +62,22 @@ public class NdbcTest {
     @Test
     public void namesComeFromTheStationTable() {
         final String table = "# STATION_ID | OWNER | TTYPE | HULL | NAME | PAYLOAD | LOCATION | TIMEZONE | FORECAST | NOTE\n"
-                + "46025|N|3-meter discus buoy w/ seal cage|3D15|Santa Monica Basin - 33NM WSW of Santa Monica, CA|SCOOP payload|33.765 N 119.077 W (33&#176;45'54\" N)|P|FZUS56.KLOX |\n"
-                + "46224|R|Waverider Buoy||Oceanside Offshore, CA (045)||33.178 N 117.472 W|P|FZUS56.KSGX |\n";
+                + "44013|N|3-meter discus buoy|3D15|BOSTON 16 NM East of Boston, MA|SCOOP payload|42.346 N 70.651 W (42&#176;20'46\" N)|E|FZUS51.KBOX |\n"
+                + "44091|R|Waverider Buoy||Barnegat, NJ (209)||39.778 N 73.769 W|E|FZUS51.KPHI |\n";
         final Map<String, Ndbc.Station> t = Ndbc.parseStations(table);
         assertEquals(2, t.size());
         final List<Ndbc.Buoy> b = Ndbc.parseObs(OBS);
-        assertEquals("46025", b.get(0).label());            // the id until named
+        assertEquals("44013", b.get(0).label());            // the id until named
         Ndbc.name(b, t);
-        assertEquals("Santa Monica Basin - 33NM WSW of Santa Monica, CA", b.get(0).label());
+        assertEquals("BOSTON 16 NM East of Boston, MA", b.get(0).label());
         assertEquals("Waverider Buoy", b.get(1).type);
     }
 
     @Test
     public void withinIsABoxAroundThePoint() {
         final List<Ndbc.Buoy> b = Ndbc.parseObs(OBS);
-        assertEquals(1, Ndbc.within(b, 33.2, -117.4, 25).size());
-        assertEquals(2, Ndbc.within(b, 33.5, -118.3, 100).size());
+        assertEquals(1, Ndbc.within(b, 42.3, -70.6, 25).size());
+        assertEquals(2, Ndbc.within(b, 41.0, -72.5, 150).size());
         assertEquals(0, Ndbc.within(b, 40.0, -124.0, 25).size());
     }
 }
