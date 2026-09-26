@@ -154,8 +154,27 @@ final class AtmosphereFeatures {
      * Item chooser reads that name, so it cannot simply be left off.
      */
     static Style icon(String iconUri, int width, int height) {
+        return icon(iconUri, width, height, 0f, 0f);
+    }
+
+    /**
+     * An icon placed by a pixel offset rather than by its own middle.
+     *
+     * <p>{@code alignX}/{@code alignY} are enums by sign -- left, center, right --
+     * and cannot place anything; the constructor that takes real {@code offsetX} and
+     * {@code offsetY} floats can (read from IconPointStyle, ATAK 5.8.0.3).
+     *
+     * <p>Which matters because a centered bitmap has to be big enough for everything
+     * it might contain in any direction -- a wind barb at any angle, a label on
+     * whichever side is free -- so it ends up mostly empty. That is invisible on the
+     * map and ruinous anywhere the icon is scaled into a small box, like ATAK's
+     * Select Item chooser, where the symbol became a few pixels across. With an
+     * offset the bitmap can be trimmed to its own ink and still land on its point.
+     */
+    static Style icon(String iconUri, int width, int height, float offsetX, float offsetY) {
         return new CompositeStyle(new Style[] {
-                new IconPointStyle(0xFFFFFFFF, iconUri, width, height, 0, 0, 0f, true),
+                new IconPointStyle(0xFFFFFFFF, iconUri, width, height,
+                        offsetX, offsetY, 0, 0, 0f, true),
                 new LabelPointStyle("", 0x00FFFFFF, 0x00000000,
                         LabelPointStyle.ScrollMode.DEFAULT) });
     }
@@ -428,24 +447,36 @@ final class AtmosphereFeatures {
                             // (operator, 2026-09-25). A layer that has something
                             // tighter says so in this attribute; Feature Layer does
                             // the same for its own chooser rows.
-                            // No icon is set on this item, and that is deliberate.
-                            //
-                            // Giving it one made the Select Item chooser legible and
-                            // wrecked the map: this proxy is DRAWN once a tap has
-                            // created it, so the tapped station lost its barb and its
-                            // readings and became a bare disc with ATAK's own text
-                            // label over it, while every station around it kept the
-                            // full symbol (operator, 2026-09-25: "when i click on it
-                            // it changes labels"). I had claimed an icon here reached
-                            // the chooser and stopped; it does not.
-                            //
-                            // The chooser's row icon is therefore the map icon scaled
-                            // down, and a station's map icon is mostly empty canvas,
-                            // so it is small. That is the lesser fault of the two.
-                            // Fixing it properly means shrinking the canvas itself --
-                            // an IconPointStyle offset instead of a centered bitmap
-                            // -- which is a change to how every icon is placed and
-                            // needs measuring before it is claimed.
+                            // The item a tap creates is DRAWN on the map, so an icon
+                            // here must be the one the feature already wears -- a
+                            // substitute changes the tapped symbol under the
+                            // operator's finger, which a bare disc did (2026-09-25).
+                            // Given that, it also makes ATAK's Select Item chooser
+                            // legible, since the chooser scales this icon into a
+                            // small row and the feature's own is now trimmed to its
+                            // ink rather than centered in a mostly empty square.
+                            if (a != null)
+                                try {
+                                    final String glyph = a.getStringAttribute("_chooserIcon");
+                                    if (glyph != null && !glyph.isEmpty()
+                                            && item instanceof com.atakmap.android.maps.Marker) {
+                                        ((com.atakmap.android.maps.Marker) item).setIcon(
+                                                new com.atakmap.coremap.maps.assets.Icon
+                                                        .Builder()
+                                                        .setImageUri(com.atakmap.coremap.maps
+                                                                .assets.Icon.STATE_DEFAULT, glyph)
+                                                        .setSize(a.getIntAttribute("_chooserW"),
+                                                                a.getIntAttribute("_chooserH"))
+                                                        .setAnchor(
+                                                                a.getIntAttribute("_chooserAnchorX"),
+                                                                a.getIntAttribute("_chooserAnchorY"))
+                                                        .setColor(com.atakmap.coremap.maps.assets
+                                                                .Icon.STATE_DEFAULT, 0xFFFFFFFF)
+                                                        .build());
+                                    }
+                                } catch (Exception noGlyph) {
+                                    Log.d(tag, "no icon for this item", noGlyph);
+                                }
                             if (a != null)
                                 item.setMetaString("remarks",
                                         com.atakmap.android.atmosphere.ui

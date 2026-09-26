@@ -692,7 +692,8 @@ public final class StationOverlay {
             return;
         drawn.add(new AtmosphereFeatures.Drawn(set, s.name,
                 AtmosphereFeatures.point(s.latitude, s.longitude),
-                AtmosphereFeatures.icon(icon.uri, icon.width, icon.height),
+                AtmosphereFeatures.icon(icon.uri, icon.width, icon.height,
+                        icon.offsetX, icon.offsetY),
                 a, minGsd, maxGsd));
     }
 
@@ -848,10 +849,25 @@ public final class StationOverlay {
         put(a, "Station", s.name);
         for (String[] r : describe(s, system, now))
             put(a, r[0], r[1]);
-        // Plumbing, not a field. Underscored so the details pane skips it: it was
-        // printing the icon's whole file path in among the readings (operator,
-        // 2026-09-25).
-        put(a, "_chooserIcon", icons.chooser(color));
+        // Plumbing, not a field. Underscored so the details pane skips it.
+        //
+        // The station's OWN icon, not a substitute: a tap materializes a map item
+        // that is drawn, so an icon here has to be the one the station already wears
+        // or the tapped station changes shape under the operator's finger -- which is
+        // what a bare disc did (2026-09-25). Now that the bitmap is trimmed to its
+        // ink it is also small enough to read in the Select Item chooser, which was
+        // the reason for wanting a substitute in the first place.
+        final StationIcons.Composed own = icons.compose(s.name,
+                speed(s.windMph, system), speed(s.gustMph, system), speedUnit(),
+                s.relativeHumidity, s.fuelMoisture, s.windFromDeg, knots(s.windMph),
+                color, labelsWanted);
+        if (own != null) {
+            put(a, "_chooserIcon", own.uri);
+            a.setAttribute("_chooserW", own.width);
+            a.setAttribute("_chooserH", own.height);
+            a.setAttribute("_chooserAnchorX", own.anchorX);
+            a.setAttribute("_chooserAnchorY", own.anchorY);
+        }
         // The details pane sorts what it is given, which turned a list that starts
         // with the wind into one that starts with the agency. Pre-rendered in the
         // order it was written, and the pane prefers this when it is there.

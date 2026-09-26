@@ -57,7 +57,7 @@ final class StationIcons {
     private static final String TAG = "AtmosphereStations";
 
     /** Bump when the drawing changes, or stale files are served under the same names. */
-    private static final int VERSION = 11;
+    private static final int VERSION = 13;
 
     /** Below criteria: the symbol as it normally reads. */
     static final int NORMAL = 0xFFFFFFFF;
@@ -145,11 +145,23 @@ final class StationIcons {
     static final class Composed {
         final String uri;
         final int width, height;
+        /**
+         * How far the bitmap must be shifted for the disc to land on the station,
+         * in the icon's own pixels. Zero when the disc is already its middle.
+         */
+        final float offsetX, offsetY;
+        /** Where the disc is inside the icon, for whatever anchors instead. */
+        final int anchorX, anchorY;
 
-        Composed(String uri, int width, int height) {
+        Composed(String uri, int width, int height, float offsetX, float offsetY,
+                int anchorX, int anchorY) {
             this.uri = uri;
             this.width = width;
             this.height = height;
+            this.offsetX = offsetX;
+            this.offsetY = offsetY;
+            this.anchorX = anchorX;
+            this.anchorY = anchorY;
         }
     }
 
@@ -225,7 +237,7 @@ final class StationIcons {
             }
         }
         final String uri = "file://" + out.getAbsolutePath();
-        cache.put(key, new Composed(uri, size, size));
+        cache.put(key, new Composed(uri, size, size, 0f, 0f, size / 2, size / 2));
         return uri;
     }
 
@@ -317,15 +329,50 @@ final class StationIcons {
                 + (Math.abs(ox) * pillW + Math.abs(oy) * pillH) / 2f;
         // The disc plus its staff, so nothing is clipped at any angle.
         final int reach = Math.round((DISC_R + STAFF + FEATHER) * scale) + 4;
-        // Symmetric about the disc, so the disc lands on the station rather than the
-        // middle of the drawing.
-        final int halfW = (int) Math.ceil(Math.max(reach,
-                Math.abs(ox) * away + pillW / 2f)) + 2;
-        final int halfH = (int) Math.ceil(Math.max(reach,
-                Math.abs(oy) * away + pillH / 2f)) + 2;
-        final int w = 2 * halfW, h = 2 * halfH;
-        final int cx = halfW, cy = halfH;
+        // The bitmap is the box around what is actually drawn, not a square big
+        // enough for anything that might be.
+        //
+        // Symmetric-about-the-disc was the easy way to make the disc land on the
+        // station, and it left most of the canvas empty: at some angles more than
+        // three quarters of it. Invisible on the map, ruinous in ATAK's Select Item
+        // chooser, which scales the whole bitmap into a small row and left the symbol
+        // a few pixels across (operator, 2026-09-25, four times). The style takes a
+        // pixel offset, so the box can be tight and the disc still land on its point.
+        final float barbLen = Double.isNaN(windFrom) || WindBarb.isCalm(knots)
+                ? 0f : (DISC_R + STAFF) * scale;
+        final float feather = barbLen > 0 ? FEATHER * scale : 0f;
+        final double rad = Math.toRadians(Double.isNaN(windFrom) ? 0 : windFrom);
+        final float bx = (float) Math.sin(rad) * barbLen;
+        final float by = (float) -Math.cos(rad) * barbLen;
+        final float r = DISC_R * scale + 2f;
+        float minX = -r, maxX = r, minY = -r, maxY = r;
+        // The barb, and the feathers hanging off its far end in any direction.
+        minX = Math.min(minX, bx - feather);
+        maxX = Math.max(maxX, bx + feather);
+        minY = Math.min(minY, by - feather);
+        maxY = Math.max(maxY, by + feather);
+        if (hasPill) {
+            minX = Math.min(minX, ox * away - pillW / 2f);
+            maxX = Math.max(maxX, ox * away + pillW / 2f);
+            minY = Math.min(minY, oy * away - pillH / 2f);
+            maxY = Math.max(maxY, oy * away + pillH / 2f);
+        }
+        final int pad = 2;
+        final int w = (int) Math.ceil(maxX - minX) + 2 * pad;
+        final int h = (int) Math.ceil(maxY - minY) + 2 * pad;
+        // Where the disc sits inside that box.
+        final int cx = Math.round(-minX) + pad, cy = Math.round(-minY) + pad;
         final float pillCx = cx + ox * away, pillCy = cy + oy * away;
+        // What the renderer must shift so the disc, not the box, is on the station.
+        //
+        // The bitmap is placed by its middle, so to bring a disc that sits LEFT of
+        // that middle onto the point the bitmap moves LEFT -- a negative offset.
+        // Written the other way round first, which moved every station off its
+        // coordinates by however far its barb reached (operator, 2026-09-25).
+        final float offX = cx - w / 2f, offY = cy - h / 2f;
+        // Where the disc is inside the icon, for anything that anchors rather than
+        // offsets -- the hit test's own marker does.
+        final float anchorX = cx, anchorY = cy;
 
         final File out = new File(dir, "wx_" + key + ".png");
         if (!out.isFile() && !draw(out, w, h, cx, cy, scale, windFrom, knots, state,
@@ -334,7 +381,9 @@ final class StationIcons {
         // Composed at device pixels and asked back at the same pixels, so nothing is
         // resampled: ATAK scales an icon by dp, and these are already scaled.
         final Composed made = new Composed("file://" + out.getAbsolutePath(),
-                Math.round(w / scale), Math.round(h / scale));
+                Math.round(w / scale), Math.round(h / scale),
+                offX / scale, offY / scale,
+                Math.round(anchorX / scale), Math.round(anchorY / scale));
         cache.put(key, made);
         return made;
     }
