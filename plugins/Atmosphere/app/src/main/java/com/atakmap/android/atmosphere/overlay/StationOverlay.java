@@ -135,7 +135,7 @@ public final class StationOverlay {
     private static final double DEFAULT_LABEL_BIG = 30d;
 
     /** How long the map must sit still before a band change is acted on. */
-    private static final long SETTLE_MS = 400L;
+    private static final long SETTLE_MS = 220L;
 
     public interface Listener {
         void onStationsStatus(String message);
@@ -370,6 +370,10 @@ public final class StationOverlay {
                 return;
             applyLabelBand();
             followMapCenter();
+            // Which stations are on screen has changed, and that is what decides
+            // which ones carry a label.
+            if (labelsWanted)
+                redraw();
             // Even when nothing is refetched, anything ordered by distance from the
             // map is now in the wrong order.
             final Listener l = listener;
@@ -609,10 +613,12 @@ public final class StationOverlay {
     private void rebuild(int mine) {
         if (mine != generation || !on)
             return;
+        final long began = android.os.SystemClock.elapsedRealtime();
         final List<Raws.Station> held = stations;
         final long now = System.currentTimeMillis();
         final UnitSystem system = units();
         final boolean withLabels = labelsWanted;
+        final double[] view = viewBounds();
         // A feature set's coarsest resolution has to be a real number: MAX_VALUE has
         // no level of detail to become, and the hit test then never reaches the layer.
         final double gate = isAlways(stationGate) ? 100_000d : stationGate;
@@ -635,10 +641,18 @@ public final class StationOverlay {
             // The feathers count the sustained wind, which is what a barb shows; the
             // color is decided by the strongest wind the station has, gust included,
             // so the gust is printed beside it or the color has nothing behind it.
+            // A label is composed only for a station that is on screen.
+            //
+            // Every labelled icon is a PNG encode and a file write, and crossing the
+            // label zoom recomposed all of them: 325 stations took THIRTY SECONDS,
+            // which is exactly the "labels come on very late" the operator kept
+            // reporting (measured 2026-09-25). The radius is 250 miles and the view
+            // is a few; almost all of that work was for symbols nobody could see.
+            final boolean labelThis = withLabels && onScreen(s, view);
             final AttributeSet a = attrs(s, color, now, system);
             // The set is the state, so Overlay Manager can show the stations at
             // criteria on their own and ATAK's own switches work on one at a time.
-            add(drawn, s, StationIcons.stateLabel(color), a, color, system, withLabels,
+            add(drawn, s, StationIcons.stateLabel(color), a, color, system, labelThis,
                     gate, FINEST);
         }
         if (mine != generation || !on)
@@ -657,8 +671,10 @@ public final class StationOverlay {
             }
         });
         Log.d(TAG, String.format(Locale.US,
-                "drew %d of %d stations within %d mi of %s, %d at criteria",
-                n, total, miles, fromMe ? "me" : "the map", red));
+                "drew %d of %d stations within %d mi of %s, %d at criteria, "
+                        + "labels=%b, took %d ms",
+                n, total, miles, fromMe ? "me" : "the map", red, withLabels,
+                android.os.SystemClock.elapsedRealtime() - began));
     }
 
     /** One station in one zoom band, with or without its pill. */
@@ -678,6 +694,39 @@ public final class StationOverlay {
                 AtmosphereFeatures.point(s.latitude, s.longitude),
                 AtmosphereFeatures.icon(icon.uri, icon.width, icon.height),
                 a, minGsd, maxGsd));
+    }
+
+    /**
+     * The map's own extent, padded, as south, west, north, east -- or null when there
+     * is none to be had.
+     *
+     * <p>Padded by half a view so a station just off the edge is already labelled
+     * when it is panned to, rather than arriving a redraw later. Null on the globe,
+     * where the bounds read as NaN.
+     */
+    private double[] viewBounds() {
+        try {
+            final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+            if (b == null)
+                return null;
+            final double s = b.getSouth(), w = b.getWest();
+            final double n = b.getNorth(), e = b.getEast();
+            if (Double.isNaN(s) || Double.isNaN(w) || Double.isNaN(n) || Double.isNaN(e))
+                return null;
+            final double padLat = Math.abs(n - s) / 2.0;
+            final double padLon = Math.abs(e - w) / 2.0;
+            return new double[] { s - padLat, w - padLon, n + padLat, e + padLon };
+        } catch (Exception noBounds) {
+            return null;
+        }
+    }
+
+    /** Whether a station falls inside that extent. No extent means everything does. */
+    private static boolean onScreen(Raws.Station s, double[] view) {
+        if (view == null)
+            return true;
+        return s.latitude >= view[0] && s.latitude <= view[2]
+                && s.longitude >= view[1] && s.longitude <= view[3];
     }
 
     private static int color(int level) {

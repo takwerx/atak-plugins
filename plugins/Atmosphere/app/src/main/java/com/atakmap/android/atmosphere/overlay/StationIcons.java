@@ -57,7 +57,7 @@ final class StationIcons {
     private static final String TAG = "AtmosphereStations";
 
     /** Bump when the drawing changes, or stale files are served under the same names. */
-    private static final int VERSION = 10;
+    private static final int VERSION = 11;
 
     /** Below criteria: the symbol as it normally reads. */
     static final int NORMAL = 0xFFFFFFFF;
@@ -97,11 +97,23 @@ final class StationIcons {
      * from the dimmer weight everything else carries -- and the other two keep their
      * meaning in lighter shades.
      */
+    /**
+     * Emphasis is carried by weight and hue, not by dimming.
+     *
+     * <p>Plain and notable are the same white, exactly as the Snooper prints them --
+     * ordinary text and bold text, one color. Dimming the ordinary values was my
+     * addition and it was wrong twice over: it made a plain reading hard to read at
+     * all ("why is 14 gray, its really hard to read"), and the two shades were so
+     * close that the emphasis it was meant to create did not register anyway.
+     *
+     * <p>Color starts where the Snooper's color starts, and weight carries the band
+     * below it.
+     */
     private static final int[] BAND = {
-            0xFF9FA8B2,     // plain: dimmer than the rest, so emphasis reads as such
-            0xFFFFFFFF,     // worth noticing
-            0xFFE87CFF,     // likely near critical
-            0xFFFF5252      // extreme
+            0xFFFFFFFF,     // plain: white, and carried by weight alone
+            0xFFFFFFFF,     // worth noticing: the same white, bold
+            0xFFB98CFF,     // likely near critical: violet, well clear of red
+            0xFFFF0000      // extreme: red, flat out
     };
     private static final int PAD_X = 6, PAD_Y = 3, GAP = 3, RADIUS = 4;
 
