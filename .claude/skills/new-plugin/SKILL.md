@@ -88,6 +88,11 @@ carries here, and fill what is already known from the operator's description:
   "Not applicable" is an answer; silence is not. Anything that must outlive a
   tap lives in a component, never inside a `Tool`.
 - ATAK targets to build for, and the UI surface (pane, toolbar item, radial)
+- **Pane** — load the `plugin-ui` skill and fill its shape in for this plugin:
+  the three main-row buttons, what the list lists and how it sorts, each
+  Settings row as `Name: value`, the zoom gate's default, Area and Where (or
+  "not applicable"), and the status-line reasons. The operator should not have
+  to describe the takwerx pane again; propose it and let them change it.
 - Open questions for the operator
 
 Add it by name (`git add <file>`, never `git add -A` in the notes repo).
