@@ -1,12 +1,12 @@
 # IPAWS Alerts for ATAK — User Guide
 
-**Version 0.3 · takwerx**
+**Version 0.4 · takwerx**
 
-**Download IPAWS Alerts 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download IPAWS Alerts 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.3/ATAK-Plugin-IPAWS-0.3--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.3/ATAK-Plugin-IPAWS-0.3--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.3/ATAK-Plugin-IPAWS-0.3--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.4/ATAK-Plugin-IPAWS-0.4--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.4/ATAK-Plugin-IPAWS-0.4--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.4/ATAK-Plugin-IPAWS-0.4--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/ipaws-alerts/releases
 
@@ -26,8 +26,9 @@ anyone else's map.
 - Published builds exist for **ATAK-CIV 5.6, 5.7 and 5.8**. Install the one that
   matches your ATAK exactly; a build for another version will not load.
 - The phone needs a network path to `api.weather.gov`. Nothing else is contacted.
-- A fresh install selects the state your phone is in, once, if it has a position
-  fix. Without one it selects nothing and asks you to choose.
+- A fresh install selects the state your phone is in as soon as it has a
+  position fix and a connection, and keeps trying until it does. You can always
+  pick states yourself in Settings, Where.
 
 ## 2. The main screen
 

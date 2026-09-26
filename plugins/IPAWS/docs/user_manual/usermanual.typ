@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "IPAWS Alerts",
-   plugin-version: "0.3",
+   plugin-version: "0.4",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -123,8 +123,9 @@ top line says "zoom in to see alerts on the map". Zoom in and they come back.
 ]
 
 #v(4pt)
-A brand new install picks the state the phone is in, once. It never moves a
-filter that has been set: drive across a state line and the filter stays put.
+A brand new install picks the state the phone is in, as soon as it has a fix and
+a connection. It never moves a filter that has been set: drive across a state
+line and the filter stays put.
 ]
 
 #tak-slide[
@@ -216,6 +217,8 @@ that has not been updated for twenty minutes looks exactly like one that has.
 - "1 alert shown at the state's center" - its area could not be found, so it is
   a dot in the middle of its state or stretch of water.
 - "map off", or "zoom in to see alerts on the map".
+- "No states picked" - choose them in Settings, Where. On a first start it says
+  "Finding the state you are in..." and keeps trying until it can.
 
 *Every N min* sets how often it checks, one to thirty minutes, five by default.
 It keeps checking with the pane closed. *Check now* asks immediately.
