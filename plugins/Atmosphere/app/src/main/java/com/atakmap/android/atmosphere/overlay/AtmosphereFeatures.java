@@ -257,10 +257,78 @@ final class AtmosphereFeatures {
         return ids;
     }
 
-    /** Open the store and put the layer on the map. Safe to call twice. */
+    /**
+     * Open the store off the main thread, then put the layer on the map. Safe to call
+     * twice.
+     *
+     * <p>Opening a {@code FeatureSetDatabase2} builds its tables and creates its
+     * indices. One is not much; <b>nine layers starting together is an ANR</b>, and
+     * that is exactly what plugin load does -- every overlay's start() in a row, on
+     * the thread ATAK is loading the plugin on. The operator hit it enabling the
+     * plugin from Package Management (2026-09-25); the trace is FeatureSetDatabase2's
+     * constructor under AtmosphereFeatures.attach under Atmosphere.onStart on "main".
+     * Emptying the file first, which this now does, means every one of those opens
+     * builds from nothing every time rather than sometimes.
+     *
+     * <p>So the database work goes to one shared background thread -- shared, so nine
+     * layers queue behind each other instead of nine threads fighting over the same
+     * disk -- and only the map registration comes back to main, which is cheap and
+     * has to be there. Anything that touches the store afterwards is worker-only by
+     * contract and waits on {@link #ready}, so the wait lands on a worker and never
+     * on the thread drawing the map.
+     */
     void attach() {
+        synchronized (lock) {
+            if (store != null || attaching)
+                return;
+            attaching = true;
+        }
+        ATTACH.execute(new Runnable() {
+            @Override
+            public void run() {
+                attachStore();
+            }
+        });
+    }
+
+    /** The one background thread every layer's store is opened on. */
+    private static final java.util.concurrent.ExecutorService ATTACH =
+            java.util.concurrent.Executors.newSingleThreadExecutor(
+                    new java.util.concurrent.ThreadFactory() {
+                        @Override
+                        public Thread newThread(Runnable r) {
+                            final Thread t = new Thread(r, "atmosphere-attach");
+                            t.setDaemon(true);
+                            return t;
+                        }
+                    });
+
+    /** Counts down once the store is usable, whether or not the layer is on the map. */
+    private final java.util.concurrent.CountDownLatch ready =
+            new java.util.concurrent.CountDownLatch(1);
+    private boolean attaching;
+    private FeatureDataStoreDeepMapItemQuery query;
+    private volatile boolean detached;
+
+    /**
+     * Wait for the store, on a worker.
+     *
+     * <p>Bounded: if the open failed there is nothing to wait for, and a layer that
+     * hangs its own worker forever is worse than one that misses a refresh.
+     */
+    private boolean awaitStore() {
         if (store != null)
-            return;
+            return true;
+        try {
+            ready.await(20, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        return store != null;
+    }
+
+    private void attachStore() {
         try {
             storeFile = FileSystemUtils.getItem("tools/atmosphere/" + storeName);
             final File dir = storeFile.getParentFile();
@@ -295,13 +363,17 @@ final class AtmosphereFeatures {
             // roughly 224.
             deleteStoreFile();
             store = new FeatureSetDatabase2(storeFile);
+            // Everything that only needs the database can go now; the rest of this
+            // is map registration and has to be on main.
+            ready.countDown();
             final FeatureDataStore2.FeatureQueryParameters visibleOnly =
                     new FeatureDataStore2.FeatureQueryParameters();
             visibleOnly.visibleOnly = true;
             layer = new FeatureLayer3(layerName, store, visibleOnly);
 
-            final FeatureDataStoreDeepMapItemQuery query =
-                    new FeatureDataStoreDeepMapItemQuery(layer) {
+            // A field, not a local: it is built here with the store and used when the
+            // map registration runs, which is now a separate hop onto main.
+            query = new FeatureDataStoreDeepMapItemQuery(layer) {
                         @Override
                         public java.util.SortedSet<MapItem> deepHitTest(MapView view,
                                 com.atakmap.map.hittest.HitTestQueryParameters params,
@@ -379,6 +451,25 @@ final class AtmosphereFeatures {
                         }
                     };
 
+            mapView.post(new Runnable() {
+                @Override
+                public void run() {
+                    registerOnMap();
+                }
+            });
+        } catch (Exception e) {
+            Log.w(tag, layerName + " store would not open", e);
+            ready.countDown();
+        }
+    }
+
+    /** The map half of attaching: cheap, and it has to run on the main thread. */
+    private void registerOnMap() {
+        if (detached) {
+            Log.d(tag, layerName + ": stopped before its store finished opening");
+            return;
+        }
+        try {
             overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
                     layerName, "file://asset/nothing", query, null, null);
             // addOverlay, not addFilesOverlay. With addFilesOverlay this overlay did
@@ -504,6 +595,10 @@ final class AtmosphereFeatures {
 
     void detach() {
         synchronized (lock) {
+            // Opening the store is asynchronous now, so a stop can overtake it. Say
+            // so here: the map registration is a posted hop and would otherwise put a
+            // layer on the map for a plugin that has already gone.
+            detached = true;
             detachLocked();
         }
     }
@@ -550,6 +645,12 @@ final class AtmosphereFeatures {
      * so a failed poll must not call this at all.
      */
     void rewrite(java.util.List<Drawn> drawn) {
+        // Waits for the store, which is opened on its own thread now. This is a
+        // worker-only API by contract, so the wait is never on the map's thread --
+        // and a layer whose first refresh beat the open would otherwise draw nothing
+        // and say nothing until its next poll, ten minutes later.
+        if (!awaitStore())
+            return;
         synchronized (lock) {
             if (store == null)
                 return;
@@ -612,7 +713,7 @@ final class AtmosphereFeatures {
 
     /** Empty the store without taking the layer off the map. */
     void clear() {
-        if (store == null)
+        if (!awaitStore())
             return;
         try {
             store.deleteFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
