@@ -521,7 +521,12 @@ final class AtmosphereFeatures {
                             // on it without knowing anything about spot forecasts.
                             if (a != null)
                                 try {
-                                    final String spotId = a.getStringAttribute("spotId");
+                                    // AttributeSet throws on a key it does not hold, so
+                                    // each is checked first: asking a gauge for spotId
+                                    // threw before the gauge line ran, and the details
+                                    // button opened the plain fields (2026-09-26).
+                                    final String spotId = a.containsAttribute("spotId")
+                                            ? a.getStringAttribute("spotId") : null;
                                     if (spotId != null && !spotId.isEmpty())
                                         item.setMetaString("spotId", spotId);
                                     if (a.containsAttribute("_gaugeId"))
