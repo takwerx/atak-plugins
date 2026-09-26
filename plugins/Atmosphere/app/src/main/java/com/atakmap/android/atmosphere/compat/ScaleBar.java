@@ -135,6 +135,34 @@ public final class ScaleBar {
         return Span.ENGLISH;
     }
 
+    /**
+     * The big distance unit ATAK is set to, as a label: "mi", "km" or "NM".
+     *
+     * <p>Note that {@code Span.ENGLISH} is 0 and {@code METRIC} is 1. Assuming the
+     * obvious ordering gets every distance in the plugin exactly backwards.
+     */
+    public static String bigLabel() {
+        final int units = rangeUnits();
+        if (units == Span.METRIC)
+            return "km";
+        return units == Span.NM ? "NM" : "mi";
+    }
+
+    /**
+     * A distance in that big unit, in meters.
+     *
+     * <p>Its own method because the obvious shortcut is wrong: the plugin's
+     * {@code Units.toCanonical} with no unit named hands the number straight back, so
+     * a five mile preset silently becomes five meters and every gate built from the
+     * ladder is off by a factor of sixteen hundred.
+     */
+    public static double bigToMeters(double big) {
+        final int units = rangeUnits();
+        if (units == Span.METRIC)
+            return big * 1000d;
+        return units == Span.NM ? big * 1852d : big * 1609.344d;
+    }
+
     private static String approximate(double metersPerPixel) {
         return describe(metersPerPixel * FALLBACK_BAR_PIXELS);
     }

@@ -1725,60 +1725,111 @@ public final class AtmospherePane {
      * When the stations draw, and when their readings do -- each as how wide the map
      * is on screen, which is the number already on the scale bar.
      */
+    /**
+     * The zoom gate and the label zoom, in Feature Layer's shape.
+     *
+     * <p>Two controls each: <b>Use this zoom</b>, which takes whatever is on screen
+     * right now, and a button carrying the current setting that opens the scale-bar
+     * ladder. Set it by example when you are already looking at the right view, pick
+     * a reading when you are not. Both quote ATAK's own scale bar, which is the
+     * reference already on screen.
+     */
     private void buildStationsGateRows() {
-        stationsGateRow.removeAllViews();
-        stationsGateRow.addView(choiceTile("Use this zoom",
-                stationLayer.stationGate() != StationOverlay.ALWAYS_GATE, new Runnable() {
+        gateRow(stationsGateRow, stationsGateText, "Stations",
+                stationLayer.stationGate(), new Gate() {
                     @Override
-                    public void run() {
-                        stationLayer.setStationGateToThisView();
-                        updateLayerControls();
+                    public void set(double gsd) {
+                        stationLayer.setStationGate(gsd);
                     }
-                }));
-        stationsGateRow.addView(choiceTile("Always",
-                stationLayer.stationGate() == StationOverlay.ALWAYS_GATE, new Runnable() {
+                });
+        gateRow(stationsLabelGateRow, stationsLabelGateText, "Readings",
+                stationLayer.labelGate(), new Gate() {
                     @Override
-                    public void run() {
-                        stationLayer.setStationGate(StationOverlay.ALWAYS_GATE);
-                        updateLayerControls();
+                    public void set(double gsd) {
+                        stationLayer.setLabelGate(gsd);
                     }
-                }));
-        stationsGateText.setText(gateText(stationLayer.stationGate(), "Stations"));
-
-        stationsLabelGateRow.removeAllViews();
-        stationsLabelGateRow.addView(choiceTile("Use this zoom",
-                stationLayer.labelGate() != StationOverlay.ALWAYS_GATE, new Runnable() {
-                    @Override
-                    public void run() {
-                        stationLayer.setLabelGateToThisView();
-                        updateLayerControls();
-                    }
-                }));
-        stationsLabelGateRow.addView(choiceTile("Always",
-                stationLayer.labelGate() == StationOverlay.ALWAYS_GATE, new Runnable() {
-                    @Override
-                    public void run() {
-                        stationLayer.setLabelGate(StationOverlay.ALWAYS_GATE);
-                        updateLayerControls();
-                    }
-                }));
-        stationsLabelGateText.setText(gateText(stationLayer.labelGate(), "Readings"));
+                });
     }
 
-    /**
-     * What a gate means, quoted against ATAK's own scale bar.
-     *
-     * <p>The bar is the reference already on the operator's screen. A threshold in
-     * meters per pixel, or in an invented band, is a second scale to learn and
-     * reconcile against it.
-     */
+    private interface Gate {
+        void set(double metersPerPixel);
+    }
+
+    /** The scale-bar ladder the presets offer, in the operator's big unit. */
+    private static final double[] GATE_BIG = { 0.25, 1, 5, 15, 50 };
+    private static final String[] GATE_NAMES = {
+            "city block", "neighborhood", "town", "county", "region"
+    };
+
+    private void gateRow(LinearLayout row, final TextView readout, final String what,
+            final double current, final Gate gate) {
+        row.removeAllViews();
+        row.addView(choiceTile("Use this zoom", false, new Runnable() {
+            @Override
+            public void run() {
+                gate.set(stationLayer.resolution());
+                updateLayerControls();
+            }
+        }));
+        row.addView(choiceTile(gateSetting(current), true, new Runnable() {
+            @Override
+            public void run() {
+                pickGate(what, gate);
+            }
+        }));
+        readout.setText(gateText(current, what));
+    }
+
+    /** The ladder, as scale-bar readings, plus Always. */
+    private void pickGate(final String what, final Gate gate) {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final String[] labels = new String[GATE_BIG.length + 1];
+        for (int i = 0; i < GATE_BIG.length; i++)
+            labels[i] = gateName(i);
+        labels[GATE_BIG.length] = "Always";
+        new AlertDialog.Builder(ctx)
+                .setTitle(what + " drawn when the scale bar reads")
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        gate.set(which == GATE_BIG.length ? StationOverlay.ALWAYS_GATE
+                                : ScaleBar.bigToMeters(GATE_BIG[which])
+                                        / scaleBarPixels());
+                        updateLayerControls();
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private String gateName(int i) {
+        final double n = GATE_BIG[i];
+        final String num = n == Math.floor(n) ? String.format(Locale.US, "%.0f", n)
+                : String.format(Locale.US, "%.2f", n);
+        return num + " " + bigUnit() + " or closer  \u2014  " + GATE_NAMES[i];
+    }
+
+    /** What the button itself carries: the current setting, short. */
+    private String gateSetting(double gate) {
+        if (gate == StationOverlay.ALWAYS_GATE)
+            return "Always";
+        return ScaleBar.describe(gate * scaleBarPixels()) + " or closer";
+    }
+
     private String gateText(double gate, String what) {
         final String bar = ScaleBar.text(mapView());
         if (gate == StationOverlay.ALWAYS_GATE)
             return what + " always drawn  \u00b7  scale bar now " + bar;
-        final String at = ScaleBar.describe(gate * scaleBarPixels());
-        return what + " drawn at " + at + " or closer  \u00b7  scale bar now " + bar
+        return what + " drawn at " + ScaleBar.describe(gate * scaleBarPixels())
+                + " or closer  \u00b7  scale bar now " + bar
                 + (stationLayer.drawingNow(gate) ? "" : "  \u2014 hidden");
+    }
+
+    /** Miles or kilometers, whichever ATAK is set to show ranges in. */
+    private static String bigUnit() {
+        return ScaleBar.bigLabel();
     }
 
     /** Pixels the scale bar spans, so a quoted threshold matches the bar's own text. */
