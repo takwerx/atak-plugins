@@ -428,40 +428,24 @@ final class AtmosphereFeatures {
                             // (operator, 2026-09-25). A layer that has something
                             // tighter says so in this attribute; Feature Layer does
                             // the same for its own chooser rows.
-                            if (a != null)
-                                try {
-                                    final String glyph = a.getStringAttribute("_chooserIcon");
-                                    if (glyph != null && !glyph.isEmpty()) {
-                                        // iconUri is read for a shape. A point comes
-                                        // back as a Marker, which draws from its Icon
-                                        // and ignores that meta entirely -- which is
-                                        // why setting it changed nothing and the
-                                        // chooser kept scaling the map icon down
-                                        // (operator, 2026-09-25, twice).
-                                        //
-                                        // This item is the hit test's own proxy, not
-                                        // what the renderer draws: the map draws the
-                                        // feature's IconPointStyle. So an icon here
-                                        // reaches the chooser and the radial and
-                                        // stops there.
-                                        item.setMetaString("iconUri", glyph);
-                                        if (item instanceof com.atakmap.android.maps.Marker)
-                                            ((com.atakmap.android.maps.Marker) item).setIcon(
-                                                    new com.atakmap.coremap.maps.assets.Icon
-                                                            .Builder()
-                                                            .setImageUri(com.atakmap.coremap
-                                                                    .maps.assets.Icon
-                                                                    .STATE_DEFAULT, glyph)
-                                                            .setAnchor(48, 48)
-                                                            .setSize(48, 48)
-                                                            .setColor(com.atakmap.coremap.maps
-                                                                    .assets.Icon.STATE_DEFAULT,
-                                                                    0xFFFFFFFF)
-                                                            .build());
-                                    }
-                                } catch (Exception noGlyph) {
-                                    Log.d(tag, "no chooser glyph for this item", noGlyph);
-                                }
+                            // No icon is set on this item, and that is deliberate.
+                            //
+                            // Giving it one made the Select Item chooser legible and
+                            // wrecked the map: this proxy is DRAWN once a tap has
+                            // created it, so the tapped station lost its barb and its
+                            // readings and became a bare disc with ATAK's own text
+                            // label over it, while every station around it kept the
+                            // full symbol (operator, 2026-09-25: "when i click on it
+                            // it changes labels"). I had claimed an icon here reached
+                            // the chooser and stopped; it does not.
+                            //
+                            // The chooser's row icon is therefore the map icon scaled
+                            // down, and a station's map icon is mostly empty canvas,
+                            // so it is small. That is the lesser fault of the two.
+                            // Fixing it properly means shrinking the canvas itself --
+                            // an IconPointStyle offset instead of a centered bitmap
+                            // -- which is a change to how every icon is placed and
+                            // needs measuring before it is claimed.
                             if (a != null)
                                 item.setMetaString("remarks",
                                         com.atakmap.android.atmosphere.ui
