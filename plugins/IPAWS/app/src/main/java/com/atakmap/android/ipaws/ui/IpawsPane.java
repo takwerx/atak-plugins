@@ -376,8 +376,9 @@ public class IpawsPane {
         whereFold.head.setText("Where: " + statesLabel(f)
                 + (f.counties.isEmpty() ? "" : ", " + countiesLabel(f)));
         typesFold.head.setText("Types: " + categoriesLabel(f));
-        notifyFold.head.setText("Notifications: " + severityList(f.notifySeverities)
-                + ", " + notifyWhereText(f));
+        // Severities only: with the where added the row ran out of room on the S22
+        // ("In my stat..."), and the where is the first thing the row opens to.
+        notifyFold.head.setText("Notifications: " + severityList(f.notifySeverities));
         rows.set(manager.snapshot());
         refreshKey();
     }
