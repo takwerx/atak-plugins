@@ -863,7 +863,10 @@ public final class StationOverlay {
                 continue;
             if (!passes(show, s))
                 continue;
-            final int level = RedFlag.state(s.relativeHumidity, s.strongestMph());
+            // The zone's own rule, the same one the record and the list read: the
+            // map colored SAC NWR "Below criteria" while its record said "Flirting"
+            // (2026-09-26), because this line still held the common pair.
+            final int level = stateOf(s);
             final int color = color(level);
             if (level == RedFlag.CRITICAL)
                 critical++;

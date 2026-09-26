@@ -476,7 +476,8 @@ final class AtmosphereFeatures {
                                             (com.atakmap.android.maps.Marker) item;
                                     m.setTextRenderFlag(
                                             com.atakmap.android.maps.Marker.TEXT_STATE_NEVER_SHOW);
-                                    final String glyph = a.getStringAttribute("_chooserIcon");
+                                    final String glyph = a.containsAttribute("_chooserIcon")
+                                            ? a.getStringAttribute("_chooserIcon") : null;
                                     if (glyph != null && !glyph.isEmpty()) {
                                         final int w = a.getIntAttribute("_chooserW");
                                         final int h = a.getIntAttribute("_chooserH");
