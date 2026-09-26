@@ -3307,7 +3307,25 @@ public final class AtmospherePane {
         v.setTextSize(13);
         v.setAlpha(0.7f);
         v.setTypeface(Typeface.DEFAULT);
+        // A tile is a third of the pane; the sentence needs two lines there, and a
+        // number's single line cut it to "Not issued by this of" (XCover, 2026-09-26).
+        v.setSingleLine(false);
+        v.setMaxLines(2);
         return t;
+    }
+
+    private static boolean isTwentyFoot(String key) {
+        return key != null && key.toLowerCase(Locale.US).contains("twentyfoot");
+    }
+
+    /** The first hour's 10 m wind direction, or null when there is none. */
+    private Reading tenMeterDirection() {
+        if (snapshot == null || snapshot.series.isEmpty())
+            return null;
+        for (Reading r : snapshot.series.get(0).readings)
+            if (kind(r) == Kind.DIR && !isTwentyFoot(r.key) && !Double.isNaN(r.value))
+                return r;
+        return null;
     }
 
     /** The first hour's 10 m wind, or null when the source has none or it is blank. */
@@ -3346,6 +3364,12 @@ public final class AtmospherePane {
                 // 2026-09-26). The 10 m wind for the hour, labeled as such, beats a
                 // dash -- and beats a number that does not say which wind it is.
                 row.addView(tile("Wind (10 m)", tenMeterWind().format(units)));
+            } else if (kind(r) == Kind.DIR && isTwentyFoot(r.key) && Double.isNaN(r.value)
+                    && tenMeterDirection() != null) {
+                // The 20-foot wind's direction goes with it: an office that does not
+                // issue the one does not issue the other (STO, 2026-09-26), and the
+                // 10 m direction is what the 10 m wind above was read against.
+                row.addView(tile("Wind from (10 m)", tenMeterDirection().format(units)));
             } else if (Double.isNaN(r.value) && neverIssued(r.key)) {
                 // The grid defines every element for every office and each office
                 // fills the ones it issues: WBGT is there at SGX, LOX, REV and PDT and
