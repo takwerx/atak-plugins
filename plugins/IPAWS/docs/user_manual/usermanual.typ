@@ -34,18 +34,17 @@ Emergency Message, Local Area Emergency and Child Abduction Emergency come from.
 
 Open the plugin from the ATAK toolbar, or from Tools if it is not on the bar.
 
-The pane is a column of rows. Each row names a setting and says what it is set
-to - "Zoom gate: 5 mi or closer", "Distance: Everything", "Where: 3 states" - so
-the whole setup reads at a glance without opening anything.
+The main screen is three buttons and the alerts. *Alerts ON / OFF* switches the
+alerts on the map, *Settings* opens everything else, and *Notify ON / OFF*
+switches notifications. Both switches show what is: green ON, red OFF. The alert
+list starts right underneath.
 
-Tap a row that has an arrow, or the arrow itself, to open its controls, and
-again to close them. Notify is the one exception: tapping it switches
-notifications on or off, and its arrow opens the settings. Everything starts
-closed, and each section stays open or closed the way you left it.
-
-From the top: *Alerts ON / OFF*, Zoom gate, Distance, Map key, Where, Types,
-Severity, how often to check, and Notify. The alerts themselves are listed
-underneath.
+*Settings* replaces the list with a page of rows - zoom gate, distance, map key,
+where, types, severity, how often to check, and notifications - and *Back*
+returns to the list. Each row names a setting and says what it is set to, "Zoom
+gate: 5 mi or closer" or "Where: 3 states", so the setup reads at a glance. Tap a
+row, or the arrow at its end, to open its controls; each stays open or closed the
+way you left it.
 ]
 
 #tak-slide[
@@ -233,8 +232,8 @@ immediately instead of waiting.
 #tak-slide[
 = Notifications
 
-*Notify* is off to begin with. Tap it to switch it on, and the arrow beside it
-opens its settings:
+*Notify* on the main screen is off to begin with; tap it to switch it on. Its
+settings are the last row of *Settings*:
 
 - *Severity* - which severities notify. Extreme and Severe to begin with.
 - *Where* - *In my states* (everything in the states and counties picked under

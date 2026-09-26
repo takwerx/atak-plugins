@@ -8,12 +8,10 @@ import com.atakmap.coremap.conversions.Span;
 import com.atakmap.coremap.conversions.SpanUtilities;
 
 /**
- * Distances in whatever units the operator has already told ATAK they want, and the
- * number ATAK's scale bar would show for a zoom level.
+ * Distances in whatever units the operator has already told ATAK they want.
  *
  * <p>Feature Layer's {@code Units} and {@code ScaleBar.describe}, carried forward
- * (there is no shared module) and cut to what the zoom gate needs, so the two plugins
- * word the same setting the same way.
+ * (there is no shared module) and cut to what the zoom gate and distance controls need.
  *
  * <p>ATAK keeps the choice in {@code rab_rng_units_pref}, and the stored value is the
  * {@link Span} constant itself: "0" is {@link Span#ENGLISH}, "1" {@link Span#METRIC},
@@ -25,14 +23,6 @@ public final class Units {
 
     private Units() {
     }
-
-    /**
-     * Roughly the scale bar's own width in pixels. A zoom level is quoted as what the
-     * bar would read at it, through this one nominal length: the live bar's length
-     * differs per phone and per zoom, and the same 40 m/px read "5 mi" on one phone
-     * and "9.38 mi" on another (Feature Layer, 2026-09-19).
-     */
-    public static final double BAR_PIXELS = 200;
 
     /** @return one of {@link Span#ENGLISH}, {@link Span#METRIC}, {@link Span#NM} */
     public static int type() {
@@ -79,16 +69,6 @@ public final class Units {
             return SpanUtilities.convert(n, bigSpan(), Span.METER);
         } catch (RuntimeException e) {
             return n * 1609.344;
-        }
-    }
-
-    /** What the scale bar would read at this resolution, e.g. "5 mi". */
-    public static String barReading(double metersPerPixel) {
-        final double meters = metersPerPixel * BAR_PIXELS;
-        try {
-            return SpanUtilities.formatType(type(), meters, Span.METER);
-        } catch (RuntimeException e) {
-            return Math.round(meters) + " m";
         }
     }
 }

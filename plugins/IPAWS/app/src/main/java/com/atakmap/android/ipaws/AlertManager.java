@@ -194,10 +194,10 @@ public class AlertManager {
     }
 
     /**
-     * Zoom gate, Feature Layer's: alerts draw only when zoomed in at least this far,
-     * in meters per pixel; {@code Double.MAX_VALUE} is Always.
+     * Zoom gate: alerts draw only while the scale bar reads this many meters or less;
+     * {@code Double.MAX_VALUE} is Always.
      *
-     * <p>Applied here, from {@code getMapResolution()} on every settled map move, and
+     * <p>Applied here, from the scale bar's reading on every settled map move, and
      * not as the feature sets' resolution range. That was the first version, and on
      * s10-dev-1 the map went empty at a zoom the status line called close enough:
      * ATAK's renderer tests the range against its own draw resolution, which is not
@@ -205,8 +205,8 @@ public class AlertManager {
      * whole tile level besides. One number now decides the map, the status line and
      * the button, so they cannot disagree.
      */
-    public void setGate(double metersPerPixel) {
-        filter.gateGsd = metersPerPixel;
+    public void setGate(double barMeters) {
+        filter.gateBarM = barMeters;
         saveFilter();
         gatedOut = pastGate();
         applyVisibility();
@@ -219,7 +219,11 @@ public class AlertManager {
     private Boolean shown;
 
     private boolean pastGate() {
-        return filter.gateGsd != Double.MAX_VALUE && mapView.getMapResolution() > filter.gateGsd;
+        // What the scale bar reads now against what the gate says, both in meters: the
+        // first version compared resolutions through a nominal 200 px bar, and on
+        // s10-dev-1 "30.06 mi or closer" still drew with the bar reading 64 mi.
+        return filter.gateBarM != Double.MAX_VALUE
+                && com.atakmap.android.ipaws.ui.ScaleBar.meters(mapView) > filter.gateBarM;
     }
 
     /** The one place the overlay is shown or hidden: All ON/OFF and the zoom gate together. */

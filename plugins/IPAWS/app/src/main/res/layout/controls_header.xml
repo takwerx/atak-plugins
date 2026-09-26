@@ -1,302 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The filter controls. This is the alert list's header view, not a panel above
-     it: a ListView inside a ScrollView collapses to one row, so the whole pane has
-     to be a single scroller.
-
-     Atmosphere's drop-downs, every section: a row that names the section and what
-     it is set to, and an arrow that opens its controls. All closed at first, and
-     each remembered, so the pane is a screen of settings at a glance rather than a
-     scroll (operator, 2026-09-25: "drop down for extended functions to clean this
-     up so your not scrolling for ever"). -->
+<!-- The alert list's header: the three things used in the field, in the operator's
+     order, alerts on the map, the settings page, notifications, and then the
+     list. Everything else is on the settings page. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <!-- The map switch, showing what is: green Alerts ON, red Alerts OFF. -->
-    <Button
-        android:id="@+id/btn_all"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp" />
-
-    <!-- Zoom gate and distance first, together: the operator reads them as one thing. -->
-    <LinearLayout
-        android:id="@+id/fold_gate_row"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="6dp">
-
-        <Button
-            android:id="@+id/fold_gate_head"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content" />
-
-        <ImageButton
-            android:id="@+id/fold_gate_chev"
-            style="@style/TakwerxIconButton"
-            android:layout_width="44dp"
-            android:layout_weight="0"
-            android:layout_marginRight="0dp"
-            android:contentDescription="@string/show_settings"
-            android:src="@drawable/ic_expand" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/fold_gate_body"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="4dp"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/btn_use_zoom"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/use_this_zoom" />
-
-            <Button
-                android:id="@+id/btn_gate"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="6dp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/fold_scope_row"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="6dp">
-
-        <Button
-            android:id="@+id/fold_scope_head"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content" />
-
-        <ImageButton
-            android:id="@+id/fold_scope_chev"
-            style="@style/TakwerxIconButton"
-            android:layout_width="44dp"
-            android:layout_weight="0"
-            android:layout_marginRight="0dp"
-            android:contentDescription="@string/show_settings"
-            android:src="@drawable/ic_expand" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/fold_scope_body"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="4dp"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/scope_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="@color/white" />
-
-        <SeekBar
-            android:id="@+id/scope_seek"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="44dp"
-            android:max="50" />
-
-        <Button
-            android:id="@+id/btn_scope_from"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="6dp">
-
-            <Button
-                android:id="@+id/btn_scope_extent"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/use_this_extent" />
-
-            <Button
-                android:id="@+id/btn_scope_presets"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="4dp"
-                android:text="@string/presets" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- The map key. The row hides when nothing is on the map; the lines are built in code from the same color call the map draws with. -->
-    <LinearLayout
-        android:id="@+id/fold_key_row"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="6dp">
-
-        <Button
-            android:id="@+id/btn_map_key"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content" />
-
-        <ImageButton
-            android:id="@+id/fold_key_chev"
-            style="@style/TakwerxIconButton"
-            android:layout_width="44dp"
-            android:layout_weight="0"
-            android:layout_marginRight="0dp"
-            android:contentDescription="@string/show_settings"
-            android:src="@drawable/ic_expand" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/map_key"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="4dp"
-        android:visibility="gone">
-
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/fold_where_row"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="6dp">
-
-        <Button
-            android:id="@+id/fold_where_head"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content" />
-
-        <ImageButton
-            android:id="@+id/fold_where_chev"
-            style="@style/TakwerxIconButton"
-            android:layout_width="44dp"
-            android:layout_weight="0"
-            android:layout_marginRight="0dp"
-            android:contentDescription="@string/show_settings"
-            android:src="@drawable/ic_expand" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/fold_where_body"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="4dp"
-        android:visibility="gone">
-
-        <Button
-            android:id="@+id/btn_regions"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp" />
-        <Button
-            android:id="@+id/btn_states"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp" />
-        <Button
-            android:id="@+id/btn_counties"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/fold_types_row"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="6dp">
-
-        <Button
-            android:id="@+id/fold_types_head"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content" />
-
-        <ImageButton
-            android:id="@+id/fold_types_chev"
-            style="@style/TakwerxIconButton"
-            android:layout_width="44dp"
-            android:layout_weight="0"
-            android:layout_marginRight="0dp"
-            android:contentDescription="@string/show_settings"
-            android:src="@drawable/ic_expand" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/fold_types_body"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="4dp"
-        android:visibility="gone">
-
-        <Button
-            android:id="@+id/btn_categories"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp" />
-        <Button
-            android:id="@+id/btn_events"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/btn_severity"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp" />
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -304,81 +14,28 @@
         android:layout_marginTop="6dp">
 
         <Button
-            android:id="@+id/btn_interval"
+            android:id="@+id/btn_all"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content" />
 
         <Button
-            android:id="@+id/btn_refresh"
+            android:id="@+id/btn_settings"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:layout_marginLeft="6dp"
-            android:text="@string/refresh_now" />
-    </LinearLayout>
-
-    <!-- Atmosphere's layer row exactly: the ON/OFF toggle, and an arrow to its settings that shows only while it is on. -->
-    <LinearLayout
-        android:id="@+id/fold_notify_row"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="6dp">
+            android:text="@string/settings" />
 
         <Button
             android:id="@+id/btn_notify"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="wrap_content" />
-
-        <ImageButton
-            android:id="@+id/fold_notify_chev"
-            style="@style/TakwerxIconButton"
-            android:layout_width="44dp"
-            android:layout_weight="0"
-            android:layout_marginRight="0dp"
-            android:contentDescription="@string/show_settings"
-            android:src="@drawable/ic_expand" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/fold_notify_body"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="4dp"
-        android:visibility="gone">
-
-        <Button
-            android:id="@+id/btn_notify_severity"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp" />
-        <Button
-            android:id="@+id/btn_notify_where"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp" />
-        <Button
-            android:id="@+id/btn_notify_updates"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp" />
-
-        <Button
-            android:id="@+id/btn_notify_test"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/notify_test" />
+            android:layout_marginLeft="6dp" />
     </LinearLayout>
 
     <TextView
@@ -386,7 +43,7 @@
         style="@style/TakwerxSectionHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingTop="14dp"
+        android:paddingTop="10dp"
         android:text="@string/heading_alerts" />
 
 </LinearLayout>

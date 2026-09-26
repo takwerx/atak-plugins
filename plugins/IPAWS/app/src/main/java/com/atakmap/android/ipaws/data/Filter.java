@@ -73,10 +73,11 @@ public class Filter {
      */
     public boolean mapOn = true;
     /**
-     * Zoom gate, Feature Layer's: alerts draw only when the map is zoomed in at least
-     * this far, in meters per pixel. {@code Double.MAX_VALUE} is Always, the default.
+     * Zoom gate: alerts draw only while ATAK's scale bar reads this distance or less,
+     * in meters. {@code Double.MAX_VALUE} is Always, the default. The bar itself, not
+     * a resolution: the label then means exactly what the operator sees on screen.
      */
-    public double gateGsd = Double.MAX_VALUE;
+    public double gateBarM = Double.MAX_VALUE;
     /**
      * Distance scope, Feature Layer's: {@code "all"} (Everything, the default),
      * {@code "view"} (What is in view -- the slider's far left), or {@code "radius"}
@@ -304,7 +305,7 @@ public class Filter {
         o.put("notifyRadiusM", notifyRadiusM);
         o.put("notifyUpdates", notifyUpdates);
         o.put("mapOn", mapOn);
-        o.put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd);
+        o.put("gateBarM", gateBarM == Double.MAX_VALUE ? -1 : gateBarM);
         o.put("scope", scope);
         o.put("scopeRadiusM", scopeRadiusM);
         o.put("scopeFrom", scopeFrom);
@@ -330,8 +331,13 @@ public class Filter {
         f.notifyRadiusM = nr > 0 ? nr : 25 * 1609.344;
         f.notifyUpdates = o.optBoolean("notifyUpdates", false);
         f.mapOn = o.optBoolean("mapOn", true);
-        final double gate = o.optDouble("gateGsd", -1);
-        f.gateGsd = gate > 0 ? gate : Double.MAX_VALUE;
+        double gate = o.optDouble("gateBarM", -1);
+        if (gate <= 0 && o.optDouble("gateGsd", -1) > 0)
+            // Saved before the gate followed the live scale bar: carried over as the
+            // reading it was labeled with (200 px of the old nominal bar), so the
+            // operator's "30.06 mi or closer" stays 30.06 mi and now means it.
+            gate = o.optDouble("gateGsd", -1) * 200d;
+        f.gateBarM = gate > 0 ? gate : Double.MAX_VALUE;
         f.scopeRadiusM = Math.max(0, o.optDouble("scopeRadiusM", 0));
         final String sc = o.optString("scope", f.scopeRadiusM > 0 ? "radius" : "all");
         f.scope = "view".equals(sc) || ("radius".equals(sc) && f.scopeRadiusM > 0) ? sc : "all";

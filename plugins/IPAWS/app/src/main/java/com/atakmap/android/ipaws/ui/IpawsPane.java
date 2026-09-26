@@ -71,6 +71,8 @@ public class IpawsPane {
     private final Button notifyWhereButton;
     private final Button notifyUpdatesButton;
     private final Button allButton;
+    /** The settings page, shown in place of the alert list. */
+    private final View settingsPage;
     private final Button gateButton;
     private final TextView scopeLabel;
     private final android.widget.SeekBar scopeSeek;
@@ -157,6 +159,24 @@ public class IpawsPane {
         final View header = PluginLayoutInflater.inflate(pluginContext,
                 R.layout.controls_header, null);
         list.addHeaderView(header, null, false);
+        // Everything set once and left lives on the settings page, which takes the
+        // list's place while it is open.
+        final View settings = PluginLayoutInflater.inflate(pluginContext,
+                R.layout.settings_controls, null);
+        ((android.view.ViewGroup) root.findViewById(R.id.settings_container)).addView(settings);
+        settingsPage = root.findViewById(R.id.settings_page);
+        header.findViewById(R.id.btn_settings).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showSettings(true);
+            }
+        });
+        root.findViewById(R.id.btn_settings_back).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showSettings(false);
+            }
+        });
         rows = new AlertRows(pluginContext);
         list.setAdapter(rows);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -180,49 +200,51 @@ public class IpawsPane {
                 refresh();
             }
         });
-        scopeLabel = header.findViewById(R.id.scope_label);
-        scopeSeek = header.findViewById(R.id.scope_seek);
-        scopeFromButton = header.findViewById(R.id.btn_scope_from);
-        bindScope(header);
-        gateButton = header.findViewById(R.id.btn_gate);
+        scopeLabel = settings.findViewById(R.id.scope_label);
+        scopeSeek = settings.findViewById(R.id.scope_seek);
+        scopeFromButton = settings.findViewById(R.id.btn_scope_from);
+        bindScope(settings);
+        gateButton = settings.findViewById(R.id.btn_gate);
         gateButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 chooseGate();
             }
         });
-        header.findViewById(R.id.btn_use_zoom).setOnClickListener(new View.OnClickListener() {
+        settings.findViewById(R.id.btn_use_zoom).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                manager.setGate(IpawsPane.this.mapView.getMapResolution());
+                // What the scale bar reads right now becomes the gate, so "Use this
+                // zoom" means exactly this zoom.
+                manager.setGate(ScaleBar.meters(IpawsPane.this.mapView));
                 refresh();
             }
         });
-        mapKey = header.findViewById(R.id.map_key);
-        gateFold = new Fold(header, R.id.fold_gate_row, R.id.fold_gate_head,
+        mapKey = settings.findViewById(R.id.map_key);
+        gateFold = new Fold(settings, R.id.fold_gate_row, R.id.fold_gate_head,
                 R.id.fold_gate_chev, R.id.fold_gate_body, "ipaws.fold.gate", true);
-        scopeFold = new Fold(header, R.id.fold_scope_row, R.id.fold_scope_head,
+        scopeFold = new Fold(settings, R.id.fold_scope_row, R.id.fold_scope_head,
                 R.id.fold_scope_chev, R.id.fold_scope_body, "ipaws.fold.scope", true);
-        keyFold = new Fold(header, R.id.fold_key_row, R.id.btn_map_key,
+        keyFold = new Fold(settings, R.id.fold_key_row, R.id.btn_map_key,
                 R.id.fold_key_chev, R.id.map_key, "ipaws.map_key_open", true);
-        whereFold = new Fold(header, R.id.fold_where_row, R.id.fold_where_head,
+        whereFold = new Fold(settings, R.id.fold_where_row, R.id.fold_where_head,
                 R.id.fold_where_chev, R.id.fold_where_body, "ipaws.fold.where", true);
-        typesFold = new Fold(header, R.id.fold_types_row, R.id.fold_types_head,
+        typesFold = new Fold(settings, R.id.fold_types_row, R.id.fold_types_head,
                 R.id.fold_types_chev, R.id.fold_types_body, "ipaws.fold.types", true);
-        notifyFold = new Fold(header, R.id.fold_notify_row, R.id.btn_notify,
-                R.id.fold_notify_chev, R.id.fold_notify_body, "ipaws.fold.notify", false);
+        notifyFold = new Fold(settings, R.id.fold_notify_row, R.id.fold_notify_head,
+                R.id.fold_notify_chev, R.id.fold_notify_body, "ipaws.fold.notify", true);
 
-        regionsButton = header.findViewById(R.id.btn_regions);
-        statesButton = header.findViewById(R.id.btn_states);
-        countiesButton = header.findViewById(R.id.btn_counties);
-        categoriesButton = header.findViewById(R.id.btn_categories);
-        eventsButton = header.findViewById(R.id.btn_events);
-        severityButton = header.findViewById(R.id.btn_severity);
-        intervalButton = header.findViewById(R.id.btn_interval);
+        regionsButton = settings.findViewById(R.id.btn_regions);
+        statesButton = settings.findViewById(R.id.btn_states);
+        countiesButton = settings.findViewById(R.id.btn_counties);
+        categoriesButton = settings.findViewById(R.id.btn_categories);
+        eventsButton = settings.findViewById(R.id.btn_events);
+        severityButton = settings.findViewById(R.id.btn_severity);
+        intervalButton = settings.findViewById(R.id.btn_interval);
         notifyButton = header.findViewById(R.id.btn_notify);
-        notifySeverityButton = header.findViewById(R.id.btn_notify_severity);
-        notifyWhereButton = header.findViewById(R.id.btn_notify_where);
-        notifyUpdatesButton = header.findViewById(R.id.btn_notify_updates);
+        notifySeverityButton = settings.findViewById(R.id.btn_notify_severity);
+        notifyWhereButton = settings.findViewById(R.id.btn_notify_where);
+        notifyUpdatesButton = settings.findViewById(R.id.btn_notify_updates);
         notifySeverityButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -243,7 +265,7 @@ public class IpawsPane {
         });
         // The real path, on demand: waiting for new weather is not a way to find out
         // what a notification looks and sounds like.
-        header.findViewById(R.id.btn_notify_test).setOnClickListener(new View.OnClickListener() {
+        settings.findViewById(R.id.btn_notify_test).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 manager.testNotification();
@@ -298,7 +320,7 @@ public class IpawsPane {
                 toggleNotify();
             }
         });
-        header.findViewById(R.id.btn_refresh).setOnClickListener(new View.OnClickListener() {
+        settings.findViewById(R.id.btn_refresh).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 manager.poll();
@@ -322,6 +344,12 @@ public class IpawsPane {
         manager.setListener(null);
     }
 
+    /** The settings page in place of the list, or the list back. */
+    private void showSettings(boolean open) {
+        settingsPage.setVisibility(open ? View.VISIBLE : View.GONE);
+        list.setVisibility(open ? View.GONE : View.VISIBLE);
+    }
+
     private void refreshStatus() {
         status.setText(manager.statusLine());
     }
@@ -339,16 +367,17 @@ public class IpawsPane {
         intervalButton.setText(intervalLabel(f));
         setNotifyLabels(f);
         setAllLabel(f);
-        gateButton.setText(gateLabel(f.gateGsd));
+        gateButton.setText(gateLabel(f.gateBarM));
         showScope(f);
         // Each drop-down's row says what it is set to, so a closed pane still reads
         // as the whole picture.
-        gateFold.head.setText("Zoom gate: " + gateLabel(f.gateGsd));
+        gateFold.head.setText("Zoom gate: " + gateLabel(f.gateBarM));
         scopeFold.head.setText("Distance: " + scopeText(f));
         whereFold.head.setText("Where: " + statesLabel(f)
                 + (f.counties.isEmpty() ? "" : ", " + countiesLabel(f)));
         typesFold.head.setText("Types: " + categoriesLabel(f));
-        notifyFold.show(f.notify);
+        notifyFold.head.setText("Notifications: " + severityList(f.notifySeverities)
+                + ", " + notifyWhereText(f));
         rows.set(manager.snapshot());
         refreshKey();
     }
@@ -406,7 +435,7 @@ public class IpawsPane {
      * no limit at all -- "all the way left is all on" -- where Feature Layer's is What
      * is in view. What is in view stays, as a preset.
      */
-    private void bindScope(View header) {
+    private void bindScope(View settings) {
         scopeSeek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(android.widget.SeekBar sb, int p, boolean fromUser) {
@@ -438,7 +467,7 @@ public class IpawsPane {
                 applyScope(p, "center".equals(f.scopeFrom) ? "me" : "center");
             }
         });
-        header.findViewById(R.id.btn_scope_extent).setOnClickListener(new View.OnClickListener() {
+        settings.findViewById(R.id.btn_scope_extent).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 // "What I am looking at", as a radius: center to corner, so the whole
@@ -461,7 +490,7 @@ public class IpawsPane {
                         "center");
             }
         });
-        header.findViewById(R.id.btn_scope_presets).setOnClickListener(new View.OnClickListener() {
+        settings.findViewById(R.id.btn_scope_presets).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 final Filter f = manager.getFilter();
@@ -506,8 +535,9 @@ public class IpawsPane {
     }
 
     /** What the gate button reads: the scale-bar reading and "or closer", or Always. */
-    private static String gateLabel(double gsd) {
-        return gsd == Double.MAX_VALUE ? "Always" : Units.barReading(gsd) + " or closer";
+    private static String gateLabel(double barMeters) {
+        return barMeters == Double.MAX_VALUE ? "Always"
+                : ScaleBar.describe(barMeters) + " or closer";
     }
 
     private static String gateName(double big) {
@@ -528,9 +558,8 @@ public class IpawsPane {
                 .setItems(labels, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {
-                        final double gsd = which == GATE_BIG.length ? Double.MAX_VALUE
-                                : Units.bigToMeters(GATE_BIG[which]) / Units.BAR_PIXELS;
-                        manager.setGate(gsd);
+                        manager.setGate(which == GATE_BIG.length ? Double.MAX_VALUE
+                                : Units.bigToMeters(GATE_BIG[which]));
                         refresh();
                     }
                 })
