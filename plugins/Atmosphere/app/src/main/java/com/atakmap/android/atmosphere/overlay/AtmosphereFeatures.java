@@ -532,6 +532,9 @@ final class AtmosphereFeatures {
                                     if (a.containsAttribute("_gaugeId"))
                                         item.setMetaString("gaugeId",
                                                 a.getStringAttribute("_gaugeId"));
+                                    if (a.containsAttribute("_buoyId"))
+                                        item.setMetaString("buoyId",
+                                                a.getStringAttribute("_buoyId"));
                                 } catch (Exception ignored) {
                                     // not a spot feature
                                 }

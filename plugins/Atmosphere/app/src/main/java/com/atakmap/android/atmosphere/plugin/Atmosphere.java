@@ -15,6 +15,7 @@ import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
+import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
@@ -85,6 +86,7 @@ public class Atmosphere implements IPlugin {
     private SpotOverlay spotLayer;
     private StationOverlay stations;
     private GaugeOverlay gauges;
+    private BuoyOverlay buoys;
 
     public Atmosphere(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -149,6 +151,8 @@ public class Atmosphere implements IPlugin {
         stations.start();
         gauges = new GaugeOverlay(mapView, pluginContext, egress);
         gauges.start();
+        buoys = new BuoyOverlay(mapView, pluginContext, egress);
+        buoys.start();
         tropical = new TropicalOverlay(mapView, pluginContext, egress);
         tropical.start();
         if (stormDetails == null) {
@@ -177,6 +181,14 @@ public class Atmosphere implements IPlugin {
                         if (atmospherePane != null)
                             atmospherePane.openGauge(lid);
                     }
+
+                    @Override
+                    public void openBuoy(String id) {
+                        if (atmospherePane == null)
+                            showPane();
+                        if (atmospherePane != null)
+                            atmospherePane.openBuoy(id);
+                    }
                 });
         if (atmospherePane != null) {
             atmospherePane.setRadar(radar);
@@ -187,6 +199,7 @@ public class Atmosphere implements IPlugin {
             atmospherePane.setSpotLayer(spotLayer);
             atmospherePane.setStations(stations);
             atmospherePane.setGauges(gauges);
+            atmospherePane.setBuoys(buoys);
             atmospherePane.setTropical(tropical);
         }
     }
@@ -208,6 +221,10 @@ public class Atmosphere implements IPlugin {
             }
             stormDetails.dispose();
             stormDetails = null;
+        }
+        if (buoys != null) {
+            buoys.stop();
+            buoys = null;
         }
         if (gauges != null) {
             gauges.stop();
@@ -285,6 +302,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setStations(stations);
             if (gauges != null)
                 atmospherePane.setGauges(gauges);
+            if (buoys != null)
+                atmospherePane.setBuoys(buoys);
             if (tropical != null)
                 atmospherePane.setTropical(tropical);
         }

@@ -47,6 +47,15 @@
     <string name="gauges_off">River gauges OFF</string>
     <string name="gauges_allow_title">Show river gauges?</string>
     <string name="gauges_allow_text">Atmosphere will ask the National Water Prediction Service for the river gauges around you, what they read and what they forecast.\n\nLike the weather stations, this one sends a position: a box around the point you measure from, rounded as far as your precision setting says. Switch it to Map center if you would rather it never send where you are.\n\nServer: api.water.noaa.gov</string>
+    <string name="buoys_on">Buoys ON</string>
+    <string name="buoys_off">Buoys OFF</string>
+    <string name="buoys_open_list">Open the buoy list</string>
+    <string name="buoys_page_heading">Buoys</string>
+    <string name="buoys_show_heading">Show on the map</string>
+    <string name="buoys_gate_heading">Draw buoys at this zoom or closer</string>
+    <string name="buoys_allow_title">Show buoys?</string>
+    <string name="buoys_allow_text">Atmosphere will ask the National Data Buoy Center for its latest observations: one file for the whole network, cut to the distance around you on the phone. Your position is not sent.\n\nServer: www.ndbc.noaa.gov</string>
+    <string name="buoys_credit">Buoys and coastal stations from the National Data Buoy Center (www.ndbc.noaa.gov)</string>
     <string name="gauges_credit">River gauges and forecasts from the National Water Prediction Service (api.water.noaa.gov)</string>
     <string name="stations_off">Weather stations OFF</string>
     <string name="stations_around_heading">Around</string>

@@ -61,6 +61,9 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
 
         /** A river gauge opens its record with the hydrograph, not its fields. */
         void openGauge(String lid);
+
+        /** A buoy opens its record on the buoy page. */
+        void openBuoy(String id);
     }
 
     private static SpotOpener spotOpener;
@@ -89,6 +92,11 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         final String gaugeId = item.getMetaString("gaugeId", "");
         if (!gaugeId.isEmpty() && spotOpener != null) {
             spotOpener.openGauge(gaugeId);
+            return;
+        }
+        final String buoyId = item.getMetaString("buoyId", "");
+        if (!buoyId.isEmpty() && spotOpener != null) {
+            spotOpener.openBuoy(buoyId);
             return;
         }
         final String title = item.getMetaString("title", item.getMetaString("callsign", ""));

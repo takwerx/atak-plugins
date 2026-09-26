@@ -39,6 +39,7 @@ import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
 import com.atakmap.android.atmosphere.compat.ScaleBar;
 import com.atakmap.android.atmosphere.data.RedFlag;
+import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
@@ -104,6 +105,7 @@ public final class AtmospherePane {
     private static final String PREF_WARN_OPEN = "weather.warn.open";
     private static final String PREF_STATIONS_OPEN = "weather.layers.stations.open";
     private static final String PREF_GAUGES_OPEN = "weather.layers.gauges.open";
+    private static final String PREF_BUOYS_OPEN = "weather.layers.buoys.open";
     private static final String PREF_STATIONS_GUIDE_OPEN = "weather.layers.stations.guide";
     private static final String PREF_SPOT_OPEN = "weather.spotlayer.open";
 
@@ -248,6 +250,17 @@ public final class AtmospherePane {
     private View gaugesSettings;
     private LinearLayout gaugesOriginRow, gaugesDistanceRow, gaugesLegend;
     private boolean gaugesOpen;
+    private BuoyOverlay buoyLayer;
+    private BuoyPage buoyPage;
+    private LinearLayout buoysShowRow, buoysGateRow, buoysLabelGateRow;
+    private TextView buoysGateText, buoysLabelGateText;
+    private Button buoysLabels;
+    private TextView buoysStatus;
+    private Button buoysToggle;
+    private ImageButton buoysExpand;
+    private View buoysSettings;
+    private LinearLayout buoysOriginRow, buoysDistanceRow, buoysLegend;
+    private boolean buoysOpen;
     private boolean spotOpen = true;
     private final LinearLayout warnSettings;
     private final TextView warnHere;
@@ -332,12 +345,19 @@ public final class AtmospherePane {
                 return egress;
             }
         });
+        buoyPage = new BuoyPage(pluginContext, mapView(), new BuoyPage.Host() {
+            @Override
+            public UnitSystem units() {
+                return units;
+            }
+        });
         pages = new View[] {
                 inflater.inflate(R.layout.page_forecast, null),
                 inflater.inflate(R.layout.page_layers, null),
                 spotPage.view(),
                 stationPage.view(),
-                gaugePage.view()
+                gaugePage.view(),
+                buoyPage.view()
         };
         pager = root.findViewById(R.id.pager);
         pageDots = root.findViewById(R.id.page_dots);
@@ -459,6 +479,34 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        buoysToggle = find(R.id.buoys_toggle);
+        buoysExpand = find(R.id.buoys_expand);
+        buoysSettings = find(R.id.buoys_settings);
+        buoysStatus = find(R.id.buoys_status);
+        buoysOriginRow = find(R.id.buoys_origin_row);
+        buoysDistanceRow = find(R.id.buoys_distance_row);
+        buoysLegend = find(R.id.buoys_legend);
+        buoysShowRow = find(R.id.buoys_show_row);
+        buoysGateRow = find(R.id.buoys_gate_row);
+        buoysLabelGateRow = find(R.id.buoys_label_gate_row);
+        buoysGateText = find(R.id.buoys_gate_text);
+        buoysLabelGateText = find(R.id.buoys_label_gate_text);
+        buoysLabels = find(R.id.buoys_labels);
+        buoysLabels.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (buoyLayer == null)
+                    return;
+                buoyLayer.setLabels(!buoyLayer.hasLabels());
+                updateLayerControls();
+            }
+        });
+        ((Button) find(R.id.buoys_open_list)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openPage(buoyPage == null ? null : buoyPage.view());
+            }
+        });
         ((Button) find(R.id.gauges_open_list)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -524,6 +572,31 @@ public final class AtmospherePane {
         spotOpen = prefs == null || prefs.getBoolean(PREF_SPOT_OPEN, true);
         stationsOpen = prefs == null || prefs.getBoolean(PREF_STATIONS_OPEN, true);
         gaugesOpen = prefs == null || prefs.getBoolean(PREF_GAUGES_OPEN, true);
+        buoysOpen = prefs == null || prefs.getBoolean(PREF_BUOYS_OPEN, true);
+        buoysExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                buoysOpen = !buoysOpen;
+                rememberFold(PREF_BUOYS_OPEN, buoysOpen);
+                updateLayerControls();
+            }
+        });
+        buoysToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (buoyLayer == null)
+                    return;
+                if (buoyLayer.isOn()) {
+                    buoyLayer.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(BuoyOverlay.LAYER_ID)) {
+                    buoyLayer.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowBuoys();
+                }
+            }
+        });
         gaugesExpand.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -756,6 +829,8 @@ public final class AtmospherePane {
                     stationPage.refresh();
                 if (gaugePage != null && pages[position] == gaugePage.view())
                     gaugePage.refresh();
+                if (buoyPage != null && pages[position] == buoyPage.view())
+                    buoyPage.refresh();
             }
         });
         for (int i = 0; i < pages.length; i++) {
@@ -1698,6 +1773,37 @@ public final class AtmospherePane {
             stationPage.setLayer(stationLayer);
     }
 
+    public void setBuoys(BuoyOverlay overlay) {
+        buoyLayer = overlay;
+        if (buoyLayer == null)
+            return;
+        buoyLayer.setListener(new BuoyOverlay.Listener() {
+            @Override
+            public void onBuoysStatus(String s) {
+                if (!s.isEmpty() && buoysStatus != null)
+                    buoysStatus.setText(s);
+            }
+
+            @Override
+            public void onBuoysDrawn(int drawn, int total, int windy) {
+                if (buoysStatus != null)
+                    buoysStatus.setText(total == 0 ? "" : drawn + " buoys, " + windy
+                            + " reporting wind");
+                if (buoyPage != null)
+                    buoyPage.refresh();
+                updateLayerControls();
+            }
+
+            @Override
+            public void onOriginMoved() {
+                if (buoyPage != null)
+                    buoyPage.refresh();
+            }
+        });
+        if (buoyPage != null)
+            buoyPage.setLayer(buoyLayer);
+    }
+
     public void setGauges(GaugeOverlay overlay) {
         gaugeLayer = overlay;
         if (gaugeLayer == null)
@@ -1755,6 +1861,131 @@ public final class AtmospherePane {
         if (spotLayer != null)
             spotLayer.setOn(true);
         updateLayerControls();
+    }
+
+    private void askToAllowBuoys() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.buoys_allow_title))
+                .setMessage(pluginContext.getString(R.string.buoys_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(BuoyOverlay.LAYER_ID, true);
+                                if (buoyLayer != null)
+                                    buoyLayer.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void buildBuoysOriginRow() {
+        buoysOriginRow.removeAllViews();
+        final boolean fromMe = buoyLayer.isFromMe();
+        buoysOriginRow.addView(choiceTile(pluginContext.getString(R.string.stations_from_me),
+                fromMe, new Runnable() {
+                    @Override
+                    public void run() {
+                        buoyLayer.setFromMe(true);
+                        updateLayerControls();
+                    }
+                }));
+        buoysOriginRow.addView(choiceTile(pluginContext.getString(R.string.stations_from_map),
+                !fromMe, new Runnable() {
+                    @Override
+                    public void run() {
+                        buoyLayer.setFromMe(false);
+                        updateLayerControls();
+                    }
+                }));
+    }
+
+    private void buildBuoysDistanceRow() {
+        buoysDistanceRow.removeAllViews();
+        final int current = buoyLayer.miles();
+        for (final int m : BuoyOverlay.RADII)
+            buoysDistanceRow.addView(choiceTile(m + " mi", m == current, new Runnable() {
+                @Override
+                public void run() {
+                    buoyLayer.setMiles(m);
+                    updateLayerControls();
+                }
+            }));
+    }
+
+    private void buildBuoysShowRow() {
+        buoysShowRow.removeAllViews();
+        buoyShowTile("All", BuoyOverlay.SHOW_ALL, 0);
+        buoyShowTile("Wind", BuoyOverlay.SHOW_WIND, 0xFF1E88E5);
+        buoyShowTile("Seas", BuoyOverlay.SHOW_WAVES, 0xFF00ACC1);
+        buoyShowTile("\u2605 Favorites", BuoyOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
+    }
+
+    private void buoyShowTile(String label, final int value, int color) {
+        final boolean chosen = buoyLayer.show() == value;
+        final Button b = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, buoysShowRow, false);
+        b.setText(label);
+        b.setTextSize(12);
+        b.setTextColor(chosen
+                ? (color != 0 ? color : pluginContext.getResources().getColor(R.color.state_on))
+                : Color.WHITE);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                buoyLayer.setShow(value);
+                if (buoyPage != null)
+                    buoyPage.refresh();
+                updateLayerControls();
+            }
+        });
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lp.rightMargin = dp(4);
+        b.setLayoutParams(lp);
+        buoysShowRow.addView(b);
+    }
+
+    private void buildBuoysGateRows() {
+        gateRow(buoysGateRow, buoysGateText, "Buoys", buoyLayer.gate(), new Gate() {
+            @Override
+            public void set(double gsd) {
+                buoyLayer.setGate(gsd);
+            }
+        });
+        gateRow(buoysLabelGateRow, buoysLabelGateText, "Readings", buoyLayer.labelGate(),
+                new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        buoyLayer.setLabelGate(gsd);
+                    }
+                });
+    }
+
+    private void buildBuoysLegend() {
+        if (buoysLegend.getChildCount() > 0)
+            return;
+        for (String[] row : BuoyOverlay.LEGEND)
+            buoysLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+    }
+
+    /** A buoy tapped on the map: its page, its record. */
+    public void openBuoy(final String id) {
+        if (id == null || id.isEmpty() || buoyPage == null)
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == buoyPage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.show();
+        buoyPage.showById(id);
     }
 
     private void askToAllowGauges() {
@@ -1967,6 +2198,10 @@ public final class AtmospherePane {
         if (gaugeLayer != null && on == allowed(GaugeOverlay.LAYER_ID))
             gaugeLayer.setOn(on);
         else if (gaugeLayer != null && on)
+            blocked++;
+        if (buoyLayer != null && on == allowed(BuoyOverlay.LAYER_ID))
+            buoyLayer.setOn(on);
+        else if (buoyLayer != null && on)
             blocked++;
         final Context ctx = MapCompat.atakContext();
         if (blocked > 0 && ctx != null)
@@ -2699,6 +2934,24 @@ public final class AtmospherePane {
             gaugesLabels.setTextColor(pluginContext.getResources().getColor(
                     gl ? R.color.state_on : R.color.state_off));
             buildGaugesLegend();
+        }
+        final boolean buoysOn = buoyLayer != null && buoyLayer.isOn();
+        buoysToggle.setText(buoysOn ? R.string.buoys_on : R.string.buoys_off);
+        buoysToggle.setTextColor(pluginContext.getResources().getColor(
+                buoysOn ? R.color.state_on : R.color.state_off));
+        buoysExpand.setVisibility(buoysOn ? View.VISIBLE : View.GONE);
+        buoysExpand.setRotation(buoysOpen ? 180f : 0f);
+        buoysSettings.setVisibility(buoysOn && buoysOpen ? View.VISIBLE : View.GONE);
+        if (buoysOn) {
+            buildBuoysOriginRow();
+            buildBuoysDistanceRow();
+            buildBuoysShowRow();
+            buildBuoysGateRows();
+            final boolean bl = buoyLayer.hasLabels();
+            buoysLabels.setText(bl ? "Readings and names  ON" : "Readings and names  OFF");
+            buoysLabels.setTextColor(pluginContext.getResources().getColor(
+                    bl ? R.color.state_on : R.color.state_off));
+            buildBuoysLegend();
         }
         final boolean spotOn = spotLayer != null && spotLayer.isOn();
         spotToggle.setText(spotOn ? R.string.spot_layer_on : R.string.spot_layer_off);
