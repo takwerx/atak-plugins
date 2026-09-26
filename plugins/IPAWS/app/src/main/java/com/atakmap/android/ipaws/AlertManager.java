@@ -1235,10 +1235,16 @@ public class AlertManager {
         final String age = ago(System.currentTimeMillis() - lastGoodAt);
         if (lastError != null)
             return "Last updated " + age + " - " + lastError;
-        // An empty map has to say it was asked to be, or it reads as no weather.
-        if (!filter.mapOn)
+        // An empty map has to say it was asked to be, or it reads as no weather -- and
+        // every reason, not the first: with the map off AND zoomed out past the gate,
+        // saying only "map off" leaves the second to be found by turning it on and
+        // still seeing nothing.
+        final boolean off = !filter.mapOn, gated = pastGate();
+        if (off && gated)
+            return "Updated " + age + " - map off, and zoomed out past the zoom gate";
+        if (off)
             return "Updated " + age + " - map off";
-        if (zoomedOutPastGate())
+        if (gated)
             return "Updated " + age + " - zoom in to see alerts on the map";
         // An alert we cannot draw has to be said out loud. Dropping it silently
         // leaves a confident-looking map that is missing an alert, which is the

@@ -50,7 +50,7 @@ public class AlertOverlay {
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
     private int count;
-    /** All ON / All OFF. Read by every set this writes, so a rewrite cannot undo it. */
+    /** Alerts ON / OFF. Read by every set this writes, so a rewrite cannot undo it. */
     private volatile boolean visible = true;
     /**
      * Its own thread, not the rebuild worker: a store-settings write waits for a
@@ -209,7 +209,7 @@ public class AlertOverlay {
                         }
 
                         private java.util.SortedSet<MapItem> dedupe(java.util.SortedSet<MapItem> hits) {
-                            // All OFF keeps the features, so a tap must not find them,
+                            // Alerts OFF keeps the features, so a tap must not find them,
                             // including in the moment before the store has caught up.
                             if (!visible && hits != null)
                                 return new java.util.TreeSet<>(hits.comparator());
@@ -274,7 +274,7 @@ public class AlertOverlay {
     }
 
     /**
-     * All ON / All OFF: shows or hides every alert at once, and keeps the features.
+     * Alerts ON / OFF: shows or hides every alert at once, and keeps the features.
      *
      * <p>The sets are what really switch: the store marks them hidden, and the
      * visibleOnly renderer (see {@link #attach}) re-reads and drops them, labels

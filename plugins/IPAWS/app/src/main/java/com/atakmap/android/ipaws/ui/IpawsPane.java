@@ -356,12 +356,15 @@ public class IpawsPane {
     // ---- map ------------------------------------------------------------------------
 
     /**
-     * Feature Layer's switch, word for word: the button says what it will do, red to
-     * take everything off the map and green to put it back.
+     * The switch shows what IS, the way Evac Zone's, Dozer Country's and Atmosphere's
+     * do: green "Alerts ON" while they are drawn, red "Alerts OFF" while they are not,
+     * in Evac Zone's colors. It was Feature Layer's "All ON" / "All OFF", which names
+     * what a tap will do; over Hawaii with the map off, the operator read the green
+     * "All ON" as the state and could not see why nothing drew.
      */
     private void setAllLabel(Filter f) {
-        allButton.setText(pluginContext.getString(f.mapOn ? R.string.all_off : R.string.all_on));
-        allButton.setTextColor(f.mapOn ? 0xFFF44336 : 0xFF4CAF50);
+        allButton.setText(pluginContext.getString(f.mapOn ? R.string.map_on : R.string.map_off));
+        allButton.setTextColor(f.mapOn ? 0xFF3DDC61 : 0xFFFF5B52);
     }
 
     // ---- distance scope -------------------------------------------------------------

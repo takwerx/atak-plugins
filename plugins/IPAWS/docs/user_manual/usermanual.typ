@@ -43,16 +43,18 @@ again to close them. Notify is the one exception: tapping it switches
 notifications on or off, and its arrow opens the settings. Everything starts
 closed, and each section stays open or closed the way you left it.
 
-From the top: *All ON / All OFF*, Zoom gate, Distance, Map key, Where, Types,
+From the top: *Alerts ON / OFF*, Zoom gate, Distance, Map key, Where, Types,
 Severity, how often to check, and Notify. The alerts themselves are listed
 underneath.
 ]
 
 #tak-slide[
-= All ON / All OFF, and the zoom gate
+= Alerts ON / OFF, and the zoom gate
 
-*All OFF* takes every alert off the map at once. The list, the checks and the
-notifications keep running, so *All ON* puts the current picture straight back.
+The top button shows whether alerts are on the map: green *Alerts ON*, red
+*Alerts OFF*. Tap it to switch. Off takes every alert off the map at once; the
+list, the checks and the notifications keep running, so switching back on puts
+the current picture straight back.
 The top line says "map off" while it is off, so an empty map never reads as no
 weather.
 
@@ -215,7 +217,7 @@ one that has.
   never blanked because a check failed.
 - "Updated 2 minutes ago - 1 alert shown at the state's center" - its area could
   not be found, so it is a dot in the middle of its state or stretch of water.
-- "map off" - All OFF is on. "zoom in to see alerts on the map" - zoomed out past
+- "map off" - the top button reads Alerts OFF. "zoom in to see alerts on the map" - zoomed out past
   the zoom gate.
 ]
 

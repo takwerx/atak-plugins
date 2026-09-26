@@ -24,8 +24,8 @@
     <string name="heading_updates">Updates</string>
     <string name="heading_notifications">Notifications</string>
     <string name="heading_map">Map</string>
-    <string name="all_on">All ON</string>
-    <string name="all_off">All OFF</string>
+    <string name="map_on">Alerts ON</string>
+    <string name="map_off">Alerts OFF</string>
     <string name="zoom_gate">Zoom gate</string>
     <string name="use_this_zoom">Use this zoom</string>
     <string name="heading_distance">Distance from a point</string>

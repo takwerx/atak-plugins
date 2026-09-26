@@ -26,7 +26,7 @@ there is a server in the path.
   - Each alert type drawn in the National Weather Service's own color for it,
     the table every public weather map uses, with a map key listing only the
     types on the map.
-  - Feature Layer's map controls: All ON / All OFF, a zoom gate ("draw when the
+  - Map controls: an Alerts ON / OFF switch that shows its state, a zoom gate ("draw when the
     scale bar reads 5 mi or closer"), and a distance limit - within N miles of
     My Location or of the map center, or what is in view.
   - A list grouped by alert type, worst first, with how long each alert has
@@ -108,7 +108,7 @@ color or a color has drifted from what NWS publishes.
 The zoom gate is applied by the plugin on settled map moves, not as the feature
 sets' resolution range: ATAK's renderer tests that range against its own draw
 resolution, rounded to a tile level, and hid alerts at zooms the status line
-called close enough. All ON / All OFF and the gate share one visibility path.
+called close enough. The ON / OFF switch and the gate share one visibility path.
 
 Most alerts carry no geometry of their own - measured at 312 of 337 - and name
 the forecast zones they cover instead. Those zones are fetched one at a time

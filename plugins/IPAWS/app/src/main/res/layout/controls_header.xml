@@ -13,7 +13,7 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <!-- Feature Layer's switch: red All OFF takes every alert off the map. -->
+    <!-- The map switch, showing what is: green Alerts ON, red Alerts OFF. -->
     <Button
         android:id="@+id/btn_all"
         style="@style/TakwerxButton"
