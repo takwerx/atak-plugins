@@ -418,6 +418,24 @@ final class AtmosphereFeatures {
                             item.setMetaBoolean("nevercot", true);
                             item.setMetaLong("featureid", feature.getId());
                             final AttributeSet a = attributesOf(feature.getId());
+                            // A glyph for ATAK's Select Item chooser.
+                            //
+                            // Without one the chooser scales the map icon into its
+                            // small box, and a station's icon is a large, mostly
+                            // transparent canvas -- room for a barb pointing any
+                            // direction -- so the symbol itself lands a few pixels
+                            // across and is unreadable beside ATAK's own entries
+                            // (operator, 2026-09-25). A layer that has something
+                            // tighter says so in this attribute; Feature Layer does
+                            // the same for its own chooser rows.
+                            if (a != null)
+                                try {
+                                    final String glyph = a.getStringAttribute("chooserIcon");
+                                    if (glyph != null && !glyph.isEmpty())
+                                        item.setMetaString("iconUri", glyph);
+                                } catch (Exception noGlyph) {
+                                    // most layers have none, and that is fine
+                                }
                             if (a != null)
                                 item.setMetaString("remarks",
                                         com.atakmap.android.atmosphere.ui

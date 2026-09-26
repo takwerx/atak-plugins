@@ -164,6 +164,52 @@ final class StationIcons {
     }
 
     /**
+     * A tight symbol for ATAK's Select Item chooser, with no barb and no pill.
+     *
+     * <p>The chooser scales whatever icon it is given into a small square. The map's
+     * own icon is mostly empty canvas -- it has to be, so a barb can point in any
+     * direction and the disc still land on the station -- so scaled down the symbol
+     * itself is a few pixels across and unreadable beside ATAK's own rows (operator,
+     * 2026-09-25). This is the disc alone, filling its frame.
+     */
+    String chooser(int state) {
+        final String key = "chooser_" + Integer.toHexString(state) + "_v" + VERSION;
+        final Composed hit = cache.get(key);
+        if (hit != null)
+            return hit.uri;
+        final int size = 96;
+        final File out = new File(dir, "wx_" + key + ".png");
+        if (!out.isFile()) {
+            Bitmap bmp = null;
+            try {
+                bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+                final Canvas c = new Canvas(bmp);
+                final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+                // Filling the frame: a chooser row is small enough already without
+                // the symbol leaving a margin inside it.
+                final float scale = (size / 2f - 2f) / DISC_R;
+                disc(c, p, size / 2, size / 2, scale);
+                anemometer(c, p, size / 2, size / 2, scale, state);
+                final FileOutputStream o = new FileOutputStream(out);
+                try {
+                    bmp.compress(Bitmap.CompressFormat.PNG, 100, o);
+                } finally {
+                    o.close();
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "could not compose a chooser glyph", e);
+                return null;
+            } finally {
+                if (bmp != null)
+                    bmp.recycle();
+            }
+        }
+        final String uri = "file://" + out.getAbsolutePath();
+        cache.put(key, new Composed(uri, size, size));
+        return uri;
+    }
+
+    /**
      * What a color means, in the Snooper's own words. These are also the feature set
      * names, so Overlay Manager reads the same way the Snooper's legend does.
      */

@@ -797,6 +797,9 @@ public final class StationOverlay {
         put(a, "Station", s.name);
         for (String[] r : describe(s, system, now))
             put(a, r[0], r[1]);
+        // Not a field anyone reads: the tight symbol ATAK's Select Item chooser
+        // should use instead of scaling the map icon down to a speck.
+        put(a, "chooserIcon", icons.chooser(color));
         return a;
     }
 
