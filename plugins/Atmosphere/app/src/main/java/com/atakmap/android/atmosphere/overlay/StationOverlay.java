@@ -97,10 +97,20 @@ public final class StationOverlay {
      * reads off a map. The resolution is worked out from the live map width, so the
      * label on the button is true on whatever screen it is running on.
      */
-    public static final int[] STATION_GATES = { 10, 50, 150, 0 };
-    public static final int[] LABEL_GATES = { 2, 10, 30, 0 };
-    private static final int DEFAULT_STATION_GATE = 150;
-    private static final int DEFAULT_LABEL_GATE = 10;
+    /** No gate: drawn at every zoom. */
+    public static final double ALWAYS_GATE = Double.MAX_VALUE;
+    /**
+     * Both gates start open.
+     *
+     * <p>They were guesses of mine -- the readings' gate worked out to about 7 meters
+     * per pixel, which is a scale bar of roughly one mile, so at anything wider than
+     * that the readings vanished with no way to tell why (operator, 2026-09-25: "im
+     * at less than a mile, no labels even rendering"). A gate the operator did not
+     * set and cannot see is indistinguishable from the layer being broken. So nothing
+     * is hidden until they say where to hide it, and the control says what it is set
+     * to at all times.
+     */
+    private static final double DEFAULT_LABEL_GSD = ALWAYS_GATE;
 
     /** How long the map must sit still before a band change is acted on. */
     private static final long SETTLE_MS = 400L;
@@ -124,7 +134,8 @@ public final class StationOverlay {
     private long lastPoll;
     private int miles;
     private boolean fromMe, labels;
-    private int stationGate, labelGate;
+    /** Coarsest meters per pixel at which each still draws. */
+    private double stationGate, labelGate;
     /** Whether the pills are on the icons as drawn right now. */
     private boolean labelsWanted;
     private List<Raws.Station> stations = new ArrayList<>();
@@ -149,53 +160,68 @@ public final class StationOverlay {
         miles = p == null ? DEFAULT_MILES : p.getInt(PREF_MILES, DEFAULT_MILES);
         fromMe = p == null || p.getBoolean(PREF_FROM_ME, true);
         labels = p == null || p.getBoolean(PREF_LABELS, true);
-        stationGate = p == null ? DEFAULT_STATION_GATE
-                : p.getInt(PREF_GATE_STATIONS, DEFAULT_STATION_GATE);
-        labelGate = p == null ? DEFAULT_LABEL_GATE
-                : p.getInt(PREF_GATE_LABELS, DEFAULT_LABEL_GATE);
+        stationGate = p == null ? ALWAYS_GATE
+                : p.getFloat(PREF_GATE_STATIONS, (float) ALWAYS_GATE);
+        labelGate = p == null ? DEFAULT_LABEL_GSD
+                : p.getFloat(PREF_GATE_LABELS, (float) DEFAULT_LABEL_GSD);
     }
 
     /** How wide the map may be, in miles, and still draw the stations. 0 is always. */
-    public int stationGate() {
+    /** Coarsest meters per pixel at which the stations still draw. */
+    public double stationGate() {
         return stationGate;
     }
 
     /** The same for the readings and names beside them. */
-    public int labelGate() {
+    public double labelGate() {
         return labelGate;
     }
 
-    public void setStationGate(int milesAcross) {
-        if (stationGate == milesAcross)
-            return;
-        stationGate = milesAcross;
-        final SharedPreferences p = MapCompat.prefs();
-        if (p != null)
-            p.edit().putInt(PREF_GATE_STATIONS, milesAcross).apply();
-        redraw();               // the gate lives on the feature set, so rewrite it
+    /**
+     * Set the gate to whatever the operator is looking at.
+     *
+     * <p>Set by example rather than by a number: there is no scale to interpret and
+     * nothing to convert. Zoom to where you want these to appear, press the button,
+     * and that view is the threshold. Cam Depot's control, and the reason for it.
+     */
+    public void setStationGateToThisView() {
+        setStationGate(mapView.getMapResolution());
     }
 
-    public void setLabelGate(int milesAcross) {
-        if (labelGate == milesAcross)
+    public void setLabelGateToThisView() {
+        setLabelGate(mapView.getMapResolution());
+    }
+
+    public void setStationGate(double metersPerPixel) {
+        if (stationGate == metersPerPixel)
             return;
-        labelGate = milesAcross;
-        final SharedPreferences p = MapCompat.prefs();
-        if (p != null)
-            p.edit().putInt(PREF_GATE_LABELS, milesAcross).apply();
+        stationGate = metersPerPixel;
+        remember(PREF_GATE_STATIONS, metersPerPixel);
+        redraw();                   // the gate lives on the feature set: rewrite it
+    }
+
+    public void setLabelGate(double metersPerPixel) {
+        if (labelGate == metersPerPixel)
+            return;
+        labelGate = metersPerPixel;
+        remember(PREF_GATE_LABELS, metersPerPixel);
         applyLabelBand();
     }
 
-    /**
-     * A gate expressed as the map's width in miles, in meters per pixel.
-     *
-     * <p>Worked out from the live map width so the button's label is true: "under 10
-     * miles" has to mean ten miles on this screen, not on the one it was tuned on.
-     */
-    private double gsdFor(int milesAcross) {
-        if (milesAcross <= 0)
-            return ALWAYS;
-        final int px = Math.max(320, mapView.getWidth());
-        return milesAcross * 1609.344 / px;
+    private static void remember(String key, double metersPerPixel) {
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putFloat(key, (float) metersPerPixel).apply();
+    }
+
+    /** Whether something gated at this resolution is on screen at the moment. */
+    public boolean drawingNow(double gate) {
+        return gate >= mapView.getMapResolution();
+    }
+
+    /** The map's current resolution, for describing a gate in the operator's terms. */
+    public double resolution() {
+        return mapView.getMapResolution();
     }
 
     /** Whether the readings and name are drawn beside each station. */
@@ -228,7 +254,7 @@ public final class StationOverlay {
      */
     private void applyLabelBand() {
         final boolean wanted = labels
-                && mapView.getMapResolution() <= gsdFor(labelGate);
+                && mapView.getMapResolution() <= labelGate;
         if (wanted == labelsWanted)
             return;
         labelsWanted = wanted;
@@ -303,7 +329,7 @@ public final class StationOverlay {
     public void start() {
         started = true;
         features.attach();
-        labelsWanted = labels && mapView.getMapResolution() <= gsdFor(labelGate);
+        labelsWanted = labels && mapView.getMapResolution() <= labelGate;
         mapView.addOnMapMovedListener(moved);
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
@@ -461,7 +487,9 @@ public final class StationOverlay {
         final long now = System.currentTimeMillis();
         final UnitSystem system = units();
         final boolean withLabels = labelsWanted;
-        final double gate = gsdFor(stationGate);
+        // A feature set's coarsest resolution has to be a real number: MAX_VALUE has
+        // no level of detail to become, and the hit test then never reaches the layer.
+        final double gate = stationGate == ALWAYS_GATE ? 100_000d : stationGate;
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         int critical = 0;
         for (Raws.Station s : held) {

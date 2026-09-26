@@ -675,6 +675,15 @@
                     android:orientation="horizontal" />
 
                 <TextView
+                    android:id="@+id/stations_gate_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textSize="12sp"
+                    android:alpha="0.75"
+                    android:text="" />
+
+                <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -688,6 +697,15 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/stations_label_gate_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textSize="12sp"
+                    android:alpha="0.75"
+                    android:text="" />
 
                 <Button
                     android:id="@+id/stations_labels"

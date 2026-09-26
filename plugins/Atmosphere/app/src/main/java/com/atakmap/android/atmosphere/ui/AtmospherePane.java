@@ -37,6 +37,7 @@ import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.data.AirNow;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
+import com.atakmap.android.atmosphere.compat.ScaleBar;
 import com.atakmap.android.atmosphere.data.RedFlag;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
@@ -227,6 +228,7 @@ public final class AtmospherePane {
     private View stationsSettings;
     private LinearLayout stationsOriginRow, stationsDistanceRow, stationsLegend;
     private LinearLayout stationsGateRow, stationsLabelGateRow;
+    private TextView stationsGateText, stationsLabelGateText;
     private Button stationsLabels, stationsGuideToggle;
     private ImageButton stationsGuideExpand;
     private LinearLayout stationsGuide;
@@ -395,6 +397,8 @@ public final class AtmospherePane {
         stationsLegend = find(R.id.stations_legend);
         stationsGateRow = find(R.id.stations_gate_row);
         stationsLabelGateRow = find(R.id.stations_label_gate_row);
+        stationsGateText = find(R.id.stations_gate_text);
+        stationsLabelGateText = find(R.id.stations_label_gate_text);
         stationsLabels = find(R.id.stations_labels);
         stationsGuide = find(R.id.stations_guide);
         stationsGuideToggle = find(R.id.stations_guide_toggle);
@@ -1723,30 +1727,71 @@ public final class AtmospherePane {
      */
     private void buildStationsGateRows() {
         stationsGateRow.removeAllViews();
-        for (final int miles : StationOverlay.STATION_GATES)
-            stationsGateRow.addView(choiceTile(gateLabel(miles),
-                    miles == stationLayer.stationGate(), new Runnable() {
-                        @Override
-                        public void run() {
-                            stationLayer.setStationGate(miles);
-                            updateLayerControls();
-                        }
-                    }));
+        stationsGateRow.addView(choiceTile("Use this zoom",
+                stationLayer.stationGate() != StationOverlay.ALWAYS_GATE, new Runnable() {
+                    @Override
+                    public void run() {
+                        stationLayer.setStationGateToThisView();
+                        updateLayerControls();
+                    }
+                }));
+        stationsGateRow.addView(choiceTile("Always",
+                stationLayer.stationGate() == StationOverlay.ALWAYS_GATE, new Runnable() {
+                    @Override
+                    public void run() {
+                        stationLayer.setStationGate(StationOverlay.ALWAYS_GATE);
+                        updateLayerControls();
+                    }
+                }));
+        stationsGateText.setText(gateText(stationLayer.stationGate(), "Stations"));
+
         stationsLabelGateRow.removeAllViews();
-        for (final int miles : StationOverlay.LABEL_GATES)
-            stationsLabelGateRow.addView(choiceTile(gateLabel(miles),
-                    miles == stationLayer.labelGate(), new Runnable() {
-                        @Override
-                        public void run() {
-                            stationLayer.setLabelGate(miles);
-                            updateLayerControls();
-                        }
-                    }));
+        stationsLabelGateRow.addView(choiceTile("Use this zoom",
+                stationLayer.labelGate() != StationOverlay.ALWAYS_GATE, new Runnable() {
+                    @Override
+                    public void run() {
+                        stationLayer.setLabelGateToThisView();
+                        updateLayerControls();
+                    }
+                }));
+        stationsLabelGateRow.addView(choiceTile("Always",
+                stationLayer.labelGate() == StationOverlay.ALWAYS_GATE, new Runnable() {
+                    @Override
+                    public void run() {
+                        stationLayer.setLabelGate(StationOverlay.ALWAYS_GATE);
+                        updateLayerControls();
+                    }
+                }));
+        stationsLabelGateText.setText(gateText(stationLayer.labelGate(), "Readings"));
     }
 
-    private String gateLabel(int miles) {
-        return miles <= 0 ? pluginContext.getString(R.string.stations_always)
-                : miles + " mi";
+    /**
+     * What a gate means, quoted against ATAK's own scale bar.
+     *
+     * <p>The bar is the reference already on the operator's screen. A threshold in
+     * meters per pixel, or in an invented band, is a second scale to learn and
+     * reconcile against it.
+     */
+    private String gateText(double gate, String what) {
+        final String bar = ScaleBar.text(mapView());
+        if (gate == StationOverlay.ALWAYS_GATE)
+            return what + " always drawn  \u00b7  scale bar now " + bar;
+        final String at = ScaleBar.describe(gate * scaleBarPixels());
+        return what + " drawn at " + at + " or closer  \u00b7  scale bar now " + bar
+                + (stationLayer.drawingNow(gate) ? "" : "  \u2014 hidden");
+    }
+
+    /** Pixels the scale bar spans, so a quoted threshold matches the bar's own text. */
+    private double scaleBarPixels() {
+        final double res = stationLayer.resolution();
+        if (res <= 0)
+            return 200;
+        final double m = ScaleBar.meters(mapView());
+        return m > 0 ? m / res : 200;
+    }
+
+    private static MapView mapView() {
+        return MapView.getMapView();
     }
 
     /** One tile of a row of choices: the chosen one green, the Traffic convention. */
