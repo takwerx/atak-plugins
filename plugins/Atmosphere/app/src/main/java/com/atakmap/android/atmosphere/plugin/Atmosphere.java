@@ -132,11 +132,37 @@ public class Atmosphere implements IPlugin {
                 .build();
     }
 
+    /** The Tool Preferences row, and the manual behind it. */
+    private static final String PREFS_KEY = "atmospherePreference";
+
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new AtmospherePreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
+    }
+
     @Override
     public void onStart() {
         if (uiService == null)
             return;
         uiService.addToolbarItem(toolbarItem);
+        registerPreferences();
         startOverlays();
         AtakBroadcast.getInstance().registerSystemReceiver(showReceiver,
                 new DocumentedIntentFilter(ACTION_SHOW, "Open the Atmosphere pane"));
@@ -299,6 +325,7 @@ public class Atmosphere implements IPlugin {
     public void onStop() {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+        unregisterPreferences();
         try {
             AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
         } catch (RuntimeException e) {

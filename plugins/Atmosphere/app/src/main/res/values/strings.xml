@@ -2,6 +2,9 @@
 <resources>
     <!-- App -->
     <string name="app_name">Atmosphere</string>
+    <string name="prefs_summary">Weather layers and readouts for the map, and the user manual</string>
+    <string name="manual_title">Atmosphere user manual</string>
+    <string name="manual_summary">Layers, forecasts, stations, buoys and gauges, page by page</string>
     <!-- description -->
     <string name="app_desc">Fire and hazmat weather for a point on the map, kept when the network drops</string>
 
