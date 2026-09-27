@@ -28,7 +28,10 @@ import java.util.regex.Pattern;
  * that covers most of the view, and switches when the map moves to another
  * (operator, 2026-09-27: radar "further out into the Caribbean and Mexico, Hawaii").
  * The lower-48 mosaic reaches 20 N, so northern Mexico is in it as far as the
- * border radars see.
+ * border radars see. Canada's radar comes from Environment Canada's GeoMet
+ * service under Canada's open-government terms (Fees None, Access Constraints
+ * None, read 2026-09-27): six-minute frames for the last three hours, given as
+ * a start/end/period that {@link #parseTimes} expands.
  *
  * <p>Lives for the plugin's life, never inside the pane: the pane comes and goes with
  * the toolbar button and the radar has to stay up. The pane only drives and reads it.
@@ -54,15 +57,29 @@ public final class RadarOverlay {
 
     public static final String LAYER_ID = "radar";
     public static final String HOST = "opengeo.ncep.noaa.gov";
-    /** One NWS mosaic: its GeoServer workspace and its coverage box from its capabilities. */
+    /** One radar mosaic: where its WMS is, the layer, and the box its radars cover. */
     static final class Mosaic {
-        final String id, base, wmsLayer;
+        final String id, base, wmsLayer, capabilities;
         final double west, east, south, north;
 
+        /** An NWS mosaic, by its GeoServer workspace. */
         Mosaic(String id, double west, double east, double south, double north) {
+            this(id, "https://" + HOST + "/geoserver/" + id + "/" + id + "_bref_qcd/ows",
+                    id + "_bref_qcd", null, west, east, south, north);
+        }
+
+        /**
+         * Any WMS. {@code capabilities} is the full capabilities URL when the server
+         * wants a layer named to keep the answer small (GeoMet's whole document is
+         * megabytes); null asks {@code base} the ordinary way.
+         */
+        Mosaic(String id, String base, String wmsLayer, String capabilities, double west,
+                double east, double south, double north) {
             this.id = id;
-            this.wmsLayer = id + "_bref_qcd";
-            this.base = "https://" + HOST + "/geoserver/" + id + "/" + wmsLayer + "/ows";
+            this.base = base;
+            this.wmsLayer = wmsLayer;
+            this.capabilities = capabilities != null ? capabilities
+                    : base + "?service=WMS&version=1.3.0&request=GetCapabilities";
             this.west = west;
             this.east = east;
             this.south = south;
@@ -81,12 +98,24 @@ public final class RadarOverlay {
      * The mosaics, boxes read from each one's capabilities on 2026-09-27. The lower
      * 48 first: it wins a tie, and it is what a whole-world view gets.
      */
+    public static final String CANADA_HOST = "geo.weather.gc.ca";
+    /**
+     * Canada's box is drawn from the 49th parallel, not from the service's nominal
+     * extent (which reaches 17 N and would out-vote the lower 48 everywhere): a
+     * view mostly north of the border picks it, one mostly south keeps NWS, which
+     * folds the border radars in anyway. Alaska is listed first so the Yukon
+     * corner they share goes to Alaska.
+     */
     static final Mosaic[] MOSAICS = {
             new Mosaic("conus", -130, -60, 20, 55),
             new Mosaic("carib", -90, -60, 10, 25),
             new Mosaic("hawaii", -164, -151, 15, 26),
             new Mosaic("alaska", -176, -126, 50, 72),
-            new Mosaic("guam", 140, 150, 9, 18) };
+            new Mosaic("guam", 140, 150, 9, 18),
+            new Mosaic("canada", "https://" + CANADA_HOST + "/geomet", "RADAR_1KM_RRAI",
+                    "https://" + CANADA_HOST + "/geomet?service=WMS&version=1.3.0"
+                            + "&request=GetCapabilities&layer=RADAR_1KM_RRAI",
+                    -141, -52, 49, 62) };
 
     /** The mosaic whose box covers most of the view; the lower 48 when none does. */
     static Mosaic mosaicFor(GeoBounds view) {
@@ -281,8 +310,7 @@ public final class RadarOverlay {
         final int mine = ++generation;
         status("Getting radar\u2026");
         final Mosaic asked = mosaic;
-        Http.get(asked.base + "?service=WMS&version=1.3.0&request=GetCapabilities",
-                egress.userAgent(), null, new Http.Callback() {
+        Http.get(asked.capabilities, egress.userAgent(), null, new Http.Callback() {
                     @Override
                     public void onSuccess(String body) {
                         capsInFlight = false;
@@ -330,16 +358,43 @@ public final class RadarOverlay {
             if (t.isEmpty())
                 continue;
             if (t.contains("/")) {
-                // start/end/period: keep the ends; the server accepts nearest values.
+                // start/end/period, the way GeoMet gives three hours of six-minute
+                // frames. Expanded into the frames when the period is minutes and
+                // the count is a scrubber's worth; otherwise the two ends.
                 final String[] parts = t.split("/");
-                if (parts.length >= 2) {
-                    out.add(parts[0].trim());
-                    out.add(parts[1].trim());
-                }
+                if (parts.length >= 2)
+                    out.addAll(expand(parts[0].trim(), parts[1].trim(),
+                            parts.length >= 3 ? parts[2].trim() : ""));
                 continue;
             }
             out.add(t);
         }
+        return out;
+    }
+
+    /** Every frame from start to end at an ISO period like PT6M; the ends alone otherwise. */
+    static List<String> expand(String start, String end, String period) {
+        final List<String> out = new ArrayList<>();
+        final java.util.regex.Matcher pm = Pattern.compile("PT(?:(\\d+)H)?(?:(\\d+)M)?").matcher(period);
+        final java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+        f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        try {
+            final long a = f.parse(start).getTime(), b = f.parse(end).getTime();
+            long step = 0;
+            if (pm.matches()) {
+                if (pm.group(1) != null) step += Long.parseLong(pm.group(1)) * 3_600_000L;
+                if (pm.group(2) != null) step += Long.parseLong(pm.group(2)) * 60_000L;
+            }
+            if (step > 0 && b > a && (b - a) / step <= 120) {
+                for (long t = a; t <= b; t += step)
+                    out.add(f.format(new java.util.Date(t)));
+                return out;
+            }
+        } catch (java.text.ParseException | NumberFormatException ignored) {
+            // not the shape expected; the ends below
+        }
+        out.add(start);
+        out.add(end);
         return out;
     }
 

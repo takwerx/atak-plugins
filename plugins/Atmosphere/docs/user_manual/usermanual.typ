@@ -101,9 +101,10 @@ where it can be hidden without opening the plugin.
 = Wind and fire
 
 *Radar* draws the National Weather Service's radar mosaics - the lower 48,
-Alaska, Hawaii, the Caribbean and Guam, whichever the map is over - and lets
-you scrub back through the last two hours of frames. The lower-48 picture
-reaches as far into Mexico as the border radars see.
+Alaska, Hawaii, the Caribbean and Guam - and Environment Canada's, whichever
+the map is over, and lets you scrub back through the last two to three hours
+of frames. The lower-48 picture reaches as far into Mexico as the border
+radars see.
 
 *Satellite* draws the newest GOES picture, about ten minutes old: *Infrared*
 shows the cloud tops day and night, brightest where they are highest and
