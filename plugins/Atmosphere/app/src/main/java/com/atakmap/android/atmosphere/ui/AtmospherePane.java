@@ -44,6 +44,7 @@ import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.BeachOverlay;
+import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
@@ -215,6 +216,14 @@ public final class AtmospherePane {
     private final LinearLayout sstLegend;
     private SstOverlay sst;
     private boolean sstOpen = true;
+    private static final String PREF_SNOTEL_OPEN = "weather.snotel.open";
+    private final LinearLayout snotelSettings;
+    private final ImageButton snotelExpand;
+    private final Button snotelToggle;
+    private final TextView snotelStatus;
+    private final LinearLayout snotelLegend;
+    private SnotelOverlay snotel;
+    private boolean snotelOpen = true;
     /** Which storms are showing their own list of maps. By storm id, not by slot. */
     private final Set<String> stormOpen = new HashSet<>();
     private final LinearLayout radarSettings;
@@ -503,6 +512,11 @@ public final class AtmospherePane {
         sstToggle = find(R.id.sst_toggle);
         sstStatus = find(R.id.sst_status);
         sstLegend = find(R.id.sst_legend);
+        snotelSettings = find(R.id.snotel_settings);
+        snotelExpand = find(R.id.snotel_expand);
+        snotelToggle = find(R.id.snotel_toggle);
+        snotelStatus = find(R.id.snotel_status);
+        snotelLegend = find(R.id.snotel_legend);
         buildStormScale();
         radarSettings = find(R.id.radar_settings);
         windSettings = find(R.id.wind_settings);
@@ -635,6 +649,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 tropicalOpen = !tropicalOpen;
                 rememberFold(PREF_TROPICAL_OPEN, tropicalOpen);
+                updateLayerControls();
+            }
+        });
+        snotelOpen = prefs == null || prefs.getBoolean(PREF_SNOTEL_OPEN, true);
+        snotelExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                snotelOpen = !snotelOpen;
+                rememberFold(PREF_SNOTEL_OPEN, snotelOpen);
                 updateLayerControls();
             }
         });
@@ -922,6 +945,8 @@ public final class AtmospherePane {
             beach.refresh(false);
         if (snow != null && snow.isOn())
             snow.refresh(false);
+        if (snotel != null && snotel.isOn())
+            snotel.refresh(false);
         if (sst != null && sst.isOn())
             sst.refresh(false);
         if (pages[pager.getCurrentItem()] == spotPage.view())
@@ -1167,6 +1192,24 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** SNOTEL stations, owned by the plugin. Not time-enabled. */
+    public void setSnotel(SnotelOverlay overlay) {
+        snotel = overlay;
+        if (snotel == null)
+            return;
+        snotel.setListener(new SnotelOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                snotelStatus.setText(status);
+                snotelStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        snotelLegend.removeAllViews();
+        for (String[] row : SnotelOverlay.LEGEND)
+            snotelLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
     /** NOHRSC's snow depth, owned by the plugin. Not time-enabled. */
     public void setSnow(SnowOverlay overlay) {
         snow = overlay;
@@ -1380,6 +1423,22 @@ public final class AtmospherePane {
                     turnTropicalOn();
                 } else {
                     askToAllowTropical();
+                }
+            }
+        });
+        snotelToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (snotel == null)
+                    return;
+                if (snotel.isOn()) {
+                    snotel.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SnotelOverlay.LAYER_ID)) {
+                    snotel.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowSnotel();
                 }
             }
         });
@@ -2595,6 +2654,10 @@ public final class AtmospherePane {
             tropical.setOn(on);
         else if (tropical != null && on)
             blocked++;
+        if (snotel != null && on == allowed(SnotelOverlay.LAYER_ID))
+            snotel.setOn(on);
+        else if (snotel != null && on)
+            blocked++;
         if (snow != null && on == allowed(SnowOverlay.LAYER_ID))
             snow.setOn(on);
         else if (snow != null && on)
@@ -3241,6 +3304,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowSnotel() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.snotel_allow_title))
+                .setMessage(pluginContext.getString(R.string.snotel_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SnotelOverlay.LAYER_ID, true);
+                                if (snotel != null)
+                                    snotel.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowSnow() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -3553,6 +3637,13 @@ public final class AtmospherePane {
         tropicalExpand.setVisibility(tropicalOn ? View.VISIBLE : View.GONE);
         tropicalExpand.setRotation(tropicalOpen ? 180f : 0f);
         tropicalSettings.setVisibility(tropicalOn && tropicalOpen ? View.VISIBLE : View.GONE);
+        final boolean snotelOn = snotel != null && snotel.isOn();
+        snotelToggle.setText(snotelOn ? R.string.snotel_on : R.string.snotel_off);
+        snotelToggle.setTextColor(pluginContext.getResources().getColor(
+                snotelOn ? R.color.state_on : R.color.state_off));
+        snotelExpand.setVisibility(snotelOn ? View.VISIBLE : View.GONE);
+        snotelExpand.setRotation(snotelOpen ? 180f : 0f);
+        snotelSettings.setVisibility(snotelOn && snotelOpen ? View.VISIBLE : View.GONE);
         final boolean snowOn = snow != null && snow.isOn();
         snowToggle.setText(snowOn ? R.string.snow_on : R.string.snow_off);
         snowToggle.setTextColor(pluginContext.getResources().getColor(
@@ -3701,6 +3792,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_snow, SnowOverlay.HOST));
+        }
+        if (snotel != null && snotel.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_snotel, SnotelOverlay.HOST));
         }
         if (sst != null && sst.isOn()) {
             if (out.length() > 0)
