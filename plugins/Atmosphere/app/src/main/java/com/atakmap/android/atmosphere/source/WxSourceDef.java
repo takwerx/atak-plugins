@@ -64,7 +64,7 @@ public final class WxSourceDef {
 
     /** Data request URL template. Placeholders: {lat} {lon} {group:NAME} {apiKey}. */
     public final String requestUrl;
-    /** Extra request headers, e.g. {@code Accept}. Never credentials. */
+    /** Extra request headers, e.g. {@code Accept}. Nothing that identifies the device or the operator. */
     public final Map<String, String> headers;
 
     public final boolean requiresApiKey;
