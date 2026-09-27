@@ -626,7 +626,8 @@ public final class BuoyOverlay {
     }
 
     /** "12G15 kt · 3.9 ft @ 13 s", whichever halves the station has. */
-    static String pillReading(Ndbc.Buoy g, UnitSystem system) {
+    /** The pill's reading; the list row shows the same text, so the two never disagree. */
+    public static String pillReading(Ndbc.Buoy g, UnitSystem system) {
         final StringBuilder b = new StringBuilder();
         if (!Double.isNaN(g.windMs)) {
             final long w = Math.round(Units.toDisplay(Quantity.SPEED, g.windMs, system));

@@ -280,21 +280,15 @@ public final class BuoyPage {
         }
     }
 
-    /** "12 kt NW  ·  3.9 ft @ 13 s  ·  4.1 mi  ·  38 min ago" */
+    /**
+     * "12G15 kt NW  ·  3.9 ft @ 13 s  ·  4.1 mi  ·  38 min ago". The reading is the
+     * map pill's own text: the row had its own copy, and Morro Bay read "No current
+     * reading" in the list under a pill that said "Water 61 °F" (2026-09-26).
+     */
     private String detail(Ndbc.Buoy g) {
         final UnitSystem system = host.units();
         final StringBuilder b = new StringBuilder();
-        if (!Double.isNaN(g.windMs))
-            append(b, Units.format(Quantity.SPEED, g.windMs, system)
-                    + (Double.isNaN(g.windFromDeg) ? "" : " " + Units.degreesToCompass(g.windFromDeg)));
-        if (!Double.isNaN(g.waveHeightM))
-            append(b, (system == UnitSystem.METRIC
-                    ? String.format(java.util.Locale.US, "%.1f m", g.waveHeightM)
-                    : String.format(java.util.Locale.US, "%.1f ft", g.waveHeightM / 0.3048))
-                    + (Double.isNaN(g.dominantPeriodS) ? "" : " @ " + Math.round(g.dominantPeriodS) + " s"));
-        if (b.length() == 0)
-            append(b, g.silent() ? "No current reading"
-                    : Units.format(Quantity.TEMPERATURE, g.airTempC, system));
+        append(b, BuoyOverlay.pillReading(g, system));
         final GeoPoint from = layer == null ? null : layer.originPoint();
         if (from != null)
             append(b, Units.format(Quantity.LENGTH, metersFrom(from, g), system));
