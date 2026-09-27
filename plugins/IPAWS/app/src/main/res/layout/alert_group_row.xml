@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A group header: one event type, however many alerts of it there are. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:minHeight="52dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:gravity="center_vertical">
+
+    <View
+        android:id="@+id/color_bar"
+        android:layout_width="5dp"
+        android:layout_height="match_parent"
+        android:minHeight="40dp"
+        android:layout_marginRight="8dp" />
+
+    <TextView
+        android:id="@+id/expander"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginRight="6dp"
+        android:textSize="13sp"
+        android:alpha="0.7"
+        android:textColor="@color/white" />
+
+    <TextView
+        android:id="@+id/event"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:textColor="@color/white" />
+
+    <TextView
+        android:id="@+id/count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="@color/white" />
+</LinearLayout>
