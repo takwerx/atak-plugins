@@ -171,6 +171,13 @@ the same bands the marine forecasts use: small craft, gale, storm, hurricane.
 Tap a buoy for its readings, the nearest tide and current predictions, and the
 coastal or offshore waters forecast for the water it sits in.
 
+*Waves* draws the wave forecast: the height of the seas as color in the states
+mariners use, smooth to phenomenal, and the swell as crests that move the way
+it is running, faster when the swell is longer. It shares the time strip with
+Wind, hour by hour for five days, and the pane reads the seas *Here*: height
+and state, where they come from and how often, and the swell under them. A
+model's forecast, not a buoy's reading.
+
 *Beach forecast* draws the surf zone forecast along the coast in view: each
 beach area colored by rip current risk, low, moderate or high, with surf,
 water temperature and the rest behind a tap.

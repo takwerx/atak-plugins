@@ -2,6 +2,7 @@ package com.atakmap.android.atmosphere.overlay;
 
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.view.ViewGroup;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
@@ -27,8 +28,9 @@ import java.util.concurrent.ThreadFactory;
 
 /**
  * The wave forecast on the map: significant wave height as a colored field in the
- * WMO sea states, with arrows the way the swell is going, one forecast hour at a time
- * on the shared time strip, drawn as a raster on the radar's {@link RasterLayer}.
+ * WMO sea states, drawn as a raster on the radar's {@link RasterLayer}, with the
+ * swell as moving crests over it ({@link SwellView}, the wind view's frame), one
+ * forecast hour at a time on the shared time strip.
  * NOAA's wave model, from the same NOMADS filter the wind and smoke come through
  * ({@link NomadsWaves}). Lives for the plugin's life; the pane drives and reads it.
  *
@@ -57,6 +59,9 @@ public final class WaveOverlay {
     /** A frame is a grid and a bitmap of up to 2.3 MB; a dozen is a shift's worth of scrubbing. */
     private static final int CACHE_FRAMES = 12;
     private static final int RUN_STEPS_BACK = 4;
+    /** Crests on the sea at once, and how often they move; a tenth of the wind's geometry. */
+    private static final int CRESTS = 450;
+    private static final long TICK_MS = 50L;
 
     public interface Listener {
         void onFrames(List<String> labels, int shown);
@@ -87,6 +92,8 @@ public final class WaveOverlay {
         }
     };
     private ExecutorService worker;
+    /** The moving crests, a transparent view inside the map view like the wind's. */
+    private SwellView crests;
 
     private boolean started, on;
     private Grid grid = Grid.FINE;
@@ -108,6 +115,17 @@ public final class WaveOverlay {
         public void run() {
             if (on)
                 ensureRegion();
+        }
+    };
+
+    private final Runnable ticker = new Runnable() {
+        @Override
+        public void run() {
+            if (!on || crests == null)
+                return;
+            crests.step();
+            crests.invalidate();
+            mapView.postDelayed(this, TICK_MS);
         }
     };
 
@@ -157,6 +175,12 @@ public final class WaveOverlay {
         GLRasterLayer.register();
         mapView.addLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
         layer.setVisible(false);
+        // Inside the map view, after its GL surface, the way the wind view is: a
+        // sibling in the map's parent is laid out at zero width off the right edge.
+        crests = new SwellView(mapView.getContext(), mapView, CRESTS);
+        crests.setVisibility(android.view.View.GONE);
+        mapView.addView(crests, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         mapView.addOnMapMovedListener(moved);
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
@@ -171,10 +195,17 @@ public final class WaveOverlay {
         mapView.removeOnMapMovedListener(moved);
         mapView.removeCallbacks(moveSettled);
         mapView.removeCallbacks(scrubSettled);
+        mapView.removeCallbacks(ticker);
         generation++;
         layer.clear();
         mapView.removeLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
         GLRasterLayer.unregister();
+        if (crests != null) {
+            final ViewGroup parent = (ViewGroup) crests.getParent();
+            if (parent != null)
+                parent.removeView(crests);
+            crests = null;
+        }
         if (worker != null) {
             worker.shutdownNow();
             worker = null;
@@ -199,11 +230,18 @@ public final class WaveOverlay {
             if (listener != null)
                 listener.onFrames(labels(), hourIndex());
             layer.setVisible(true);
+            if (crests != null)
+                crests.setVisibility(android.view.View.VISIBLE);
             ensureRegion();
         } else {
             generation++;
+            mapView.removeCallbacks(ticker);
             layer.setVisible(false);
             layer.clear();
+            if (crests != null) {
+                crests.setVisibility(android.view.View.GONE);
+                crests.setGrid(null);
+            }
             shown = null;
             status("");
         }
@@ -475,6 +513,10 @@ public final class WaveOverlay {
     private void show(Frame f) {
         shown = f;
         layer.setImage(f.bitmap, f.bounds);
+        if (crests != null)
+            crests.setGrid(f.grid);
+        mapView.removeCallbacks(ticker);
+        mapView.post(ticker);
         status("");
         if (listener != null)
             listener.onFrameShown(hourIndex(), f.grid.validTime);

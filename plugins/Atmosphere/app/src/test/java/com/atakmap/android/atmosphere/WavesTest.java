@@ -86,16 +86,15 @@ public class WavesTest {
     }
 
     @Test
-    public void rendersSeaColoredAndLandClearWithArrows() throws Exception {
+    public void rendersSeaColoredAndLandClear() throws Exception {
         final WaveGrid g = NomadsWaves.read(fixture());
         final int[] px = NomadsWaves.render(g, 43 * 8, 31 * 8);
         assertEquals(43 * 8 * 31 * 8, px.length);
         final double sea = NomadsWaves.seaPercent(px);
         assertTrue("sea " + sea, sea > 40 && sea < 95);
-        boolean white = false;
+        // The colors only: the crests are the view's, drawn at screen resolution.
         for (int p : px)
-            if (p == 0xFFFFFFFF) { white = true; break; }
-        assertTrue(white);
+            assertTrue(p == 0 || (p >>> 24) < 0xFF);
         // Land at the top right (the Mojave) is clear.
         assertEquals(0, px[4 * 43 * 8 + 43 * 8 - 4]);
         assertFalse(Float.isNaN(g.sample(g.height, 33.0, -120.0)));

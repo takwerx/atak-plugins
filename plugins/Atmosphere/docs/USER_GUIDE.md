@@ -109,6 +109,7 @@ gauges" and the rest — where it can be hidden without opening the plugin.
 | Rain and rivers | Flooded ground | Where the river model puts water over the banks, now or at the worst of the next 5 days (experimental) |
 | Rain and rivers | Streams running high | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
 | Ocean | Buoys | Buoys and coastal stations, readings colored by sea state; tides, currents and the marine forecast behind a tap |
+| Ocean | Waves | The wave forecast: seas colored by state, the swell as moving crests, five days on the time strip, with the seas "Here" |
 | Ocean | Beach forecast | Beach areas colored by rip current risk |
 | Ocean | Sea temperature | Sea surface temperature as a picture |
 | Ocean | Hurricanes | Active storms: track, cone, wind fields, advisory |

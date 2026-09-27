@@ -198,17 +198,11 @@ public final class NomadsWaves {
 
     // ---- the picture -----------------------------------------------------------------
 
-    /** Arrows this many pixels apart. */
-    private static final int ARROW_STEP = 44;
-    private static final int ARROW_LEN = 16;
-
     /**
      * The picture: wave height as a colored field, {@code width} by {@code height}
-     * ARGB pixels over the grid's extent, row 0 the north edge, land clear; then an
-     * arrow every {@link #ARROW_STEP} pixels pointing the way the primary swell is
-     * going (the model gives where it comes from; the arrow flies with it, the way a
-     * crew on the water reads it), drawn white over a dark outline so it reads on any
-     * band. When the model names no swell the peak wave direction is used.
+     * ARGB pixels over the grid's extent, row 0 the north edge, land clear. The
+     * swell's direction is not in it: that is drawn as moving crests by the
+     * overlay's view, at screen resolution, on top of this.
      */
     public static int[] render(WaveGrid g, int width, int height) {
         final int[] px = new int[width * height];
@@ -219,67 +213,7 @@ public final class NomadsWaves {
             for (int c = 0; c < width; c++)
                 px[row + c] = color(g.sample(g.height, lat, g.west + (c + 0.5) * dLon));
         }
-        final float[] dirs = g.swellDir != null ? g.swellDir : g.dir;
-        if (dirs == null)
-            return px;
-        for (int r = ARROW_STEP / 2; r < height; r += ARROW_STEP) {
-            final double lat = g.north - (r + 0.5) * dLat;
-            for (int c = ARROW_STEP / 2; c < width; c += ARROW_STEP) {
-                final double lon = g.west + (c + 0.5) * dLon;
-                final float from = g.nearestAt(dirs, lat, lon);
-                final float h = g.sample(g.height, lat, lon);
-                if (Float.isNaN(from) || Float.isNaN(h))
-                    continue;
-                // Toward: the direction it comes from, turned around. Screen y grows
-                // southward, so north is -y.
-                final double to = Math.toRadians(from + 180);
-                final double dx = Math.sin(to), dy = -Math.cos(to);
-                arrow(px, width, height, c, r, dx, dy);
-            }
-        }
         return px;
-    }
-
-    /** An arrow of {@link #ARROW_LEN} pixels from its middle, outline first, then white. */
-    private static void arrow(int[] px, int w, int h, int cx, int cy, double dx, double dy) {
-        final double half = ARROW_LEN / 2.0;
-        final int x0 = (int) Math.round(cx - dx * half), y0 = (int) Math.round(cy - dy * half);
-        final int x1 = (int) Math.round(cx + dx * half), y1 = (int) Math.round(cy + dy * half);
-        // Head: two strokes back from the tip at 30 degrees.
-        final double back = 6, ang = Math.toRadians(30);
-        final double ax = dx * Math.cos(ang) - dy * Math.sin(ang), ay = dx * Math.sin(ang) + dy * Math.cos(ang);
-        final double bx = dx * Math.cos(-ang) - dy * Math.sin(-ang), by = dx * Math.sin(-ang) + dy * Math.cos(-ang);
-        final int hx1 = (int) Math.round(x1 - ax * back), hy1 = (int) Math.round(y1 - ay * back);
-        final int hx2 = (int) Math.round(x1 - bx * back), hy2 = (int) Math.round(y1 - by * back);
-        for (int pass = 0; pass < 2; pass++) {
-            final int color = pass == 0 ? 0xC0202020 : 0xFFFFFFFF;
-            final int thick = pass == 0 ? 1 : 0;
-            line(px, w, h, x0, y0, x1, y1, color, thick);
-            line(px, w, h, x1, y1, hx1, hy1, color, thick);
-            line(px, w, h, x1, y1, hx2, hy2, color, thick);
-        }
-    }
-
-    /** Bresenham, with an optional one-pixel halo for the outline pass. */
-    private static void line(int[] px, int w, int h, int x0, int y0, int x1, int y1, int color,
-            int halo) {
-        int dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-        int dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-        int err = dx + dy;
-        int x = x0, y = y0;
-        while (true) {
-            for (int oy = -halo; oy <= halo; oy++)
-                for (int ox = -halo; ox <= halo; ox++) {
-                    final int X = x + ox, Y = y + oy;
-                    if (X >= 0 && X < w && Y >= 0 && Y < h)
-                        px[Y * w + X] = color;
-                }
-            if (x == x1 && y == y1)
-                break;
-            final int e2 = 2 * err;
-            if (e2 >= dy) { err += dy; x += sx; }
-            if (e2 <= dx) { err += dx; y += sy; }
-        }
     }
 
     /** Share of a picture's pixels that are sea, for the log line. */
