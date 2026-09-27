@@ -18,6 +18,7 @@ import com.atakmap.android.atmosphere.overlay.SpotOverlay;
 import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
+import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
@@ -78,6 +79,7 @@ public class Atmosphere implements IPlugin {
     /** Outlives the pane: the radar stays up while the pane is closed. */
     private RadarOverlay radar;
     private TropicalOverlay tropical;
+    private AvalancheOverlay avalanche;
     private StormDetailsReceiver stormDetails;
     private WindOverlay wind;
     private SmokeOverlay smoke;
@@ -155,6 +157,8 @@ public class Atmosphere implements IPlugin {
         buoys.start();
         tropical = new TropicalOverlay(mapView, pluginContext, egress);
         tropical.start();
+        avalanche = new AvalancheOverlay(mapView, pluginContext, egress);
+        avalanche.start();
         if (stormDetails == null) {
             stormDetails = new StormDetailsReceiver(mapView, pluginContext);
             final DocumentedIntentFilter f = new DocumentedIntentFilter();
@@ -196,6 +200,8 @@ public class Atmosphere implements IPlugin {
             atmospherePane.setSmoke(smoke);
             atmospherePane.setAirQuality(air);
             atmospherePane.setWarnings(warnings);
+            if (avalanche != null)
+                atmospherePane.setAvalanche(avalanche);
             atmospherePane.setSpotLayer(spotLayer);
             atmospherePane.setStations(stations);
             atmospherePane.setGauges(gauges);
@@ -239,6 +245,10 @@ public class Atmosphere implements IPlugin {
         if (stations != null)
             stations.stop();
             spotLayer = null;
+        }
+        if (avalanche != null) {
+            avalanche.stop();
+            avalanche = null;
         }
         if (warnings != null) {
             warnings.stop();
@@ -296,6 +306,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setAirQuality(air);
             if (warnings != null)
                 atmospherePane.setWarnings(warnings);
+            if (avalanche != null)
+                atmospherePane.setAvalanche(avalanche);
             if (spotLayer != null)
                 atmospherePane.setSpotLayer(spotLayer);
             if (stations != null)

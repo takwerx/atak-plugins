@@ -78,6 +78,11 @@
     <string name="tropical_on">Hurricanes ON</string>
     <string name="tropical_off">Hurricanes OFF</string>
     <string name="tropical_allow_title">Show hurricanes?</string>
+    <string name="avalanche_on">Avalanche ON</string>
+    <string name="avalanche_off">Avalanche OFF</string>
+    <string name="avalanche_allow_title">Show avalanche zones?</string>
+    <string name="avalanche_allow_text">Atmosphere will ask avalanche.org for every US avalanche center\'s forecast zones and today\'s danger ratings, and draw them on the map. Your position is not sent. Server: api.avalanche.org</string>
+    <string name="credit_avalanche">Avalanche zones and danger ratings from the US avalanche centers via avalanche.org (%1$s)</string>
     <string name="tropical_allow_text">Atmosphere will ask the National Hurricane Center which storms are running, and draw their forecast cones and tracks on the map. Your position is not sent. Server: mapservices.weather.noaa.gov</string>
     <string name="show_settings">Show or hide this layer\'s settings</string>
     <string name="credit_wind">Wind forecast from NOAA (%1$s)</string>

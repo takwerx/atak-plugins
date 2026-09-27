@@ -42,6 +42,7 @@ import com.atakmap.android.atmosphere.data.RedFlag;
 import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
+import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
 import com.atakmap.android.atmosphere.data.NwsAlerts;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -161,6 +162,14 @@ public final class AtmospherePane {
     private final LinearLayout tropicalScale;
     private TropicalOverlay tropical;
     private boolean tropicalOpen = true;
+    private static final String PREF_AVALANCHE_OPEN = "weather.avalanche.open";
+    private final LinearLayout avalancheSettings;
+    private final ImageButton avalancheExpand;
+    private final Button avalancheToggle;
+    private final TextView avalancheStatus;
+    private final LinearLayout avalancheLegend;
+    private AvalancheOverlay avalanche;
+    private boolean avalancheOpen = true;
     /** Which storms are showing their own list of maps. By storm id, not by slot. */
     private final Set<String> stormOpen = new HashSet<>();
     private final LinearLayout radarSettings;
@@ -419,6 +428,11 @@ public final class AtmospherePane {
         tropicalStatus = find(R.id.tropical_status);
         tropicalRows = find(R.id.tropical_rows);
         tropicalScale = find(R.id.tropical_scale);
+        avalancheSettings = find(R.id.avalanche_settings);
+        avalancheExpand = find(R.id.avalanche_expand);
+        avalancheToggle = find(R.id.avalanche_toggle);
+        avalancheStatus = find(R.id.avalanche_status);
+        avalancheLegend = find(R.id.avalanche_legend);
         buildStormScale();
         radarSettings = find(R.id.radar_settings);
         windSettings = find(R.id.wind_settings);
@@ -551,6 +565,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 tropicalOpen = !tropicalOpen;
                 rememberFold(PREF_TROPICAL_OPEN, tropicalOpen);
+                updateLayerControls();
+            }
+        });
+        avalancheOpen = prefs == null || prefs.getBoolean(PREF_AVALANCHE_OPEN, true);
+        avalancheExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                avalancheOpen = !avalancheOpen;
+                rememberFold(PREF_AVALANCHE_OPEN, avalancheOpen);
                 updateLayerControls();
             }
         });
@@ -774,6 +797,8 @@ public final class AtmospherePane {
             air.refresh(false);
         if (warnings != null && warnings.isOn())
             warnings.refresh(false);
+        if (avalanche != null && avalanche.isOn())
+            avalanche.refresh(false);
         if (pages[pager.getCurrentItem()] == spotPage.view())
             spotPage.onShown();
         updateLayerControls();
@@ -1017,6 +1042,24 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** Avalanche zones, owned by the plugin. Not time-enabled. */
+    public void setAvalanche(AvalancheOverlay overlay) {
+        avalanche = overlay;
+        if (avalanche == null)
+            return;
+        avalanche.setListener(new AvalancheOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                avalancheStatus.setText(status);
+                avalancheStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        avalancheLegend.removeAllViews();
+        for (String[] row : AvalancheOverlay.LEGEND)
+            avalancheLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
     /**
      * Air quality, owned by the plugin. The latest hour only, so no strip: its line
      * says which hour is on the map, and its reading follows the pane's point.
@@ -1092,6 +1135,22 @@ public final class AtmospherePane {
                     turnTropicalOn();
                 } else {
                     askToAllowTropical();
+                }
+            }
+        });
+        avalancheToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (avalanche == null)
+                    return;
+                if (avalanche.isOn()) {
+                    avalanche.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(AvalancheOverlay.LAYER_ID)) {
+                    avalanche.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowAvalanche();
                 }
             }
         });
@@ -2211,6 +2270,10 @@ public final class AtmospherePane {
             tropical.setOn(on);
         else if (tropical != null && on)
             blocked++;
+        if (avalanche != null && on == allowed(AvalancheOverlay.LAYER_ID))
+            avalanche.setOn(on);
+        else if (avalanche != null && on)
+            blocked++;
         if (stationLayer != null && on == allowed(StationOverlay.LAYER_ID))
             stationLayer.setOn(on);
         else if (stationLayer != null && on)
@@ -2833,6 +2896,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowAvalanche() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.avalanche_allow_title))
+                .setMessage(pluginContext.getString(R.string.avalanche_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(AvalancheOverlay.LAYER_ID, true);
+                                if (avalanche != null)
+                                    avalanche.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowAir() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -3019,6 +3103,13 @@ public final class AtmospherePane {
         tropicalExpand.setVisibility(tropicalOn ? View.VISIBLE : View.GONE);
         tropicalExpand.setRotation(tropicalOpen ? 180f : 0f);
         tropicalSettings.setVisibility(tropicalOn && tropicalOpen ? View.VISIBLE : View.GONE);
+        final boolean avalancheOn = avalanche != null && avalanche.isOn();
+        avalancheToggle.setText(avalancheOn ? R.string.avalanche_on : R.string.avalanche_off);
+        avalancheToggle.setTextColor(pluginContext.getResources().getColor(
+                avalancheOn ? R.color.state_on : R.color.state_off));
+        avalancheExpand.setVisibility(avalancheOn ? View.VISIBLE : View.GONE);
+        avalancheExpand.setRotation(avalancheOpen ? 180f : 0f);
+        avalancheSettings.setVisibility(avalancheOn && avalancheOpen ? View.VISIBLE : View.GONE);
         radarExpand.setVisibility(radarOn ? View.VISIBLE : View.GONE);
         windExpand.setVisibility(windOn ? View.VISIBLE : View.GONE);
         radarExpand.setRotation(radarOpen ? 180f : 0f);
@@ -3103,6 +3194,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_tropical, TropicalOverlay.HOST));
+        }
+        if (avalanche != null && avalanche.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_avalanche, AvalancheOverlay.HOST));
         }
         layersAttribution.setText(out.toString());
     }
