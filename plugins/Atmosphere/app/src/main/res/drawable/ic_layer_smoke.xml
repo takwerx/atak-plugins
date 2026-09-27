@@ -2,5 +2,11 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp"
     android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="#FFFFFFFF" android:pathData="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+    <!-- Three wisps rising off a burning line: smoke, not a cloud. -->
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M6.5 20 C5 17.5 8.5 16 8 13 C7.5 10.5 5 9.5 6.5 7"/>
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M12.5 20 C10.5 17 14.5 15 14 11.5 C13.5 8.5 10.5 7 12.5 3"/>
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M18.5 20 C17 17.5 20.5 16 20 13 C19.5 10.5 17 9.5 18.5 7"/>
 </vector>
