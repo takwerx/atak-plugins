@@ -369,6 +369,17 @@ final class AtmosphereFeatures {
     /** Counts down once the store is usable, whether or not the layer is on the map. */
     private final java.util.concurrent.CountDownLatch ready =
             new java.util.concurrent.CountDownLatch(1);
+    /**
+     * Counts down once the layer is on the map, or never will be. A write that lands
+     * between the store opening and the layer's registration is one the layer never
+     * shows: the fire weather outlook's first fetch (six small answers, one second)
+     * beat the registration by two seconds on 2026-09-26, "drew 1 areas" went into
+     * the store, nothing drew, and the next rewrite found "0 of 0 old sets" to
+     * clear -- the same unenumerable-set shape as the sixty-set file. The slow
+     * layers never hit it because their first answer takes longer than the hop.
+     */
+    private final java.util.concurrent.CountDownLatch registered =
+            new java.util.concurrent.CountDownLatch(1);
     private boolean attaching;
     private FeatureDataStoreDeepMapItemQuery query;
     private volatile boolean detached;
@@ -380,10 +391,12 @@ final class AtmosphereFeatures {
      * hangs its own worker forever is worse than one that misses a refresh.
      */
     private boolean awaitStore() {
-        if (store != null)
-            return true;
         try {
-            ready.await(20, java.util.concurrent.TimeUnit.SECONDS);
+            if (store == null)
+                ready.await(20, java.util.concurrent.TimeUnit.SECONDS);
+            // And the map half: a worker-only wait, so the main-thread hop it waits
+            // for is never the thread waiting.
+            registered.await(20, java.util.concurrent.TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
@@ -600,6 +613,7 @@ final class AtmosphereFeatures {
         } catch (Exception e) {
             Log.w(tag, layerName + " store would not open", e);
             ready.countDown();
+            registered.countDown();
         }
     }
 
@@ -663,6 +677,7 @@ final class AtmosphereFeatures {
             Log.w(tag, layerName + " store would not open", e);
             store = null;
         }
+        registered.countDown();
     }
 
     /**
@@ -772,6 +787,7 @@ final class AtmosphereFeatures {
         layer = null;
         store = null;
         sets.clear();
+        registered.countDown();
     }
 
     /**
