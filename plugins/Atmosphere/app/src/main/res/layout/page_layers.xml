@@ -80,6 +80,25 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
+                <ImageView
+
+                    android:id="@+id/radar_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_radar" />
+
+
                 <Button
                     android:id="@+id/radar_toggle"
                     style="@style/TakwerxButton"
@@ -110,6 +129,25 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
+
+                <ImageView
+
+                    android:id="@+id/wind_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_wind" />
+
 
                 <Button
                     android:id="@+id/wind_toggle"
@@ -237,6 +275,25 @@
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
+                <ImageView
+
+                    android:id="@+id/smoke_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_smoke" />
+
+
                 <Button
                     android:id="@+id/smoke_toggle"
                     style="@style/TakwerxButton"
@@ -308,6 +365,25 @@
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
+                <ImageView
+
+                    android:id="@+id/air_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_air" />
+
+
                 <Button
                     android:id="@+id/air_toggle"
                     style="@style/TakwerxButton"
@@ -371,6 +447,25 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
+
+                <ImageView
+
+                    android:id="@+id/warn_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_warnings" />
+
 
                 <Button
                     android:id="@+id/warn_toggle"
@@ -440,6 +535,25 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
+                <ImageView
+
+                    android:id="@+id/tropical_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_hurricane" />
+
+
                 <Button
                     android:id="@+id/tropical_toggle"
                     style="@style/TakwerxButton"
@@ -502,6 +616,25 @@
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
+                <ImageView
+
+                    android:id="@+id/firewx_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_firewx" />
+
+
                 <Button
                     android:id="@+id/firewx_toggle"
                     style="@style/TakwerxButton"
@@ -553,6 +686,25 @@
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
+                <ImageView
+
+                    android:id="@+id/flood_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_flood" />
+
+
                 <Button
                     android:id="@+id/flood_toggle"
                     style="@style/TakwerxButton"
@@ -603,6 +755,25 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
+
+                <ImageView
+
+                    android:id="@+id/beach_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_beach" />
+
 
                 <Button
                     android:id="@+id/beach_toggle"
@@ -656,6 +827,25 @@
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
+                <ImageView
+
+                    android:id="@+id/avalanche_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_avalanche" />
+
+
                 <Button
                     android:id="@+id/avalanche_toggle"
                     style="@style/TakwerxButton"
@@ -707,6 +897,25 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
+
+                <ImageView
+
+                    android:id="@+id/spot_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_spot" />
+
 
                 <Button
                     android:id="@+id/spot_toggle"
@@ -807,6 +1016,25 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
+
+                <ImageView
+
+                    android:id="@+id/stations_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_stations" />
+
 
                 <Button
                     android:id="@+id/stations_toggle"
@@ -1030,6 +1258,25 @@
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
 
+                <ImageView
+
+                    android:id="@+id/gauges_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_gauges" />
+
+
                 <Button
                     android:id="@+id/gauges_toggle"
                     style="@style/TakwerxButton"
@@ -1217,6 +1464,25 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:orientation="horizontal">
+
+                <ImageView
+
+                    android:id="@+id/buoys_icon"
+
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_buoys" />
+
 
                 <Button
                     android:id="@+id/buoys_toggle"
