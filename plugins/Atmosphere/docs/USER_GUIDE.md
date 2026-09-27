@@ -89,8 +89,9 @@ now".
 
 The first time a layer is switched on it asks once, naming the server it will
 talk to and what is sent: the area of the map, never your position, unless the
-layer says so. **Allow** remembers the answer. Every layer is also in ATAK's
-Overlay Manager under Atmosphere.
+layer says so. **Allow** remembers the answer. Every layer that draws features is also a row
+of its own in ATAK's Overlay Manager — "Buoys", "Streams running high", "River
+gauges" and the rest — where it can be hidden without opening the plugin.
 
 | Group | Layer | What it draws |
 |---|---|---|
