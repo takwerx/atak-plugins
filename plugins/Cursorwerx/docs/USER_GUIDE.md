@@ -78,7 +78,26 @@ Two places set the same value, and a change applies at the next click:
 - **ATAK's settings**: Settings, **Tool Preferences**, **Cursorwerx**, **Wheel
   zoom**.
 
-## 5. Nothing to undo
+## 5. Updating Cursorwerx
+
+Each Cursorwerx release is built once for every ATAK version it supports (5.6,
+5.7, 5.8). The build must match your ATAK.
+
+- **With the TAKWERX Market** (the TAKwerx ATAK Terminal installs it for you):
+  open the Market from ATAK's toolbar overflow. A newer Cursorwerx shows as an
+  update; tap it. The Market chooses the build for your ATAK.
+- **Without the Market:** download the APK for your ATAK from the links at the top
+  of this guide, install it over the old one, and load it in ATAK's Plugins
+  manager if ATAK asks. In the TAKwerx ATAK Terminal, `takwerx plugin FILE.apk`
+  installs it, switches it on and restarts ATAK.
+- **After updating ATAK itself** (say 5.7 to 5.8), the build for the old ATAK no
+  longer loads. Open the Market and install Cursorwerx again; it offers the build
+  for your new ATAK.
+
+Your Wheel zoom choice lives in ATAK's own settings, so it survives every one of
+these.
+
+## 6. Nothing to undo
 
 Unload the plugin in ATAK's Plugins manager and ATAK is exactly as it was.
 Cursorwerx writes nothing to disk; its one setting is kept in ATAK's own
