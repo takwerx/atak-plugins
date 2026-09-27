@@ -21,6 +21,8 @@ import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.HighFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
+import com.atakmap.android.atmosphere.overlay.SatelliteOverlay;
+import com.atakmap.android.atmosphere.overlay.WaveOverlay;
 import com.atakmap.android.atmosphere.overlay.BeachOverlay;
 import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
@@ -93,11 +95,13 @@ public class Atmosphere implements IPlugin {
     private HighFlowOverlay highflow;
     private FloodedGroundOverlay floodground;
     private SnowOverlay snow;
+    private SatelliteOverlay satellite;
     private SstOverlay sst;
     private SnotelOverlay snotel;
     private StormDetailsReceiver stormDetails;
     private WindOverlay wind;
     private SmokeOverlay smoke;
+    private WaveOverlay waves;
     private AirQualityOverlay air;
     private SpotOverlay spotLayer;
     private StationOverlay stations;
@@ -225,6 +229,8 @@ public class Atmosphere implements IPlugin {
         wind.start();
         smoke = new SmokeOverlay(mapView, egress);
         smoke.start();
+        waves = new WaveOverlay(mapView, egress);
+        waves.start();
         air = new AirQualityOverlay(mapView, pluginContext, egress);
         air.start();
         spotLayer = new SpotOverlay(mapView, pluginContext, egress);
@@ -251,6 +257,8 @@ public class Atmosphere implements IPlugin {
         highflow.start();
         snow = new SnowOverlay(mapView, egress);
         snow.start();
+        satellite = new SatelliteOverlay(mapView, egress);
+        satellite.start();
         sst = new SstOverlay(mapView, egress);
         sst.start();
         snotel = new SnotelOverlay(mapView, pluginContext, egress);
@@ -294,6 +302,8 @@ public class Atmosphere implements IPlugin {
             atmospherePane.setRadar(radar);
             atmospherePane.setWind(wind);
             atmospherePane.setSmoke(smoke);
+            if (waves != null)
+                atmospherePane.setWaves(waves);
             atmospherePane.setAirQuality(air);
             if (avalanche != null)
                 atmospherePane.setAvalanche(avalanche);
@@ -309,6 +319,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setHighFlow(highflow);
             if (snow != null)
                 atmospherePane.setSnow(snow);
+            if (satellite != null)
+                atmospherePane.setSatellite(satellite);
             if (sst != null)
                 atmospherePane.setSst(sst);
             if (snotel != null)
@@ -374,6 +386,10 @@ public class Atmosphere implements IPlugin {
             floodground.stop();
             floodground = null;
         }
+        if (satellite != null) {
+            satellite.stop();
+            satellite = null;
+        }
         if (snow != null) {
             snow.stop();
             snow = null;
@@ -397,6 +413,10 @@ public class Atmosphere implements IPlugin {
         if (air != null) {
             air.stop();
             air = null;
+        }
+        if (waves != null) {
+            waves.stop();
+            waves = null;
         }
         if (smoke != null) {
             smoke.stop();
@@ -446,6 +466,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setWind(wind);
             if (smoke != null)
                 atmospherePane.setSmoke(smoke);
+            if (waves != null)
+                atmospherePane.setWaves(waves);
             if (air != null)
                 atmospherePane.setAirQuality(air);
             if (avalanche != null)
@@ -462,6 +484,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setHighFlow(highflow);
             if (snow != null)
                 atmospherePane.setSnow(snow);
+            if (satellite != null)
+                atmospherePane.setSatellite(satellite);
             if (sst != null)
                 atmospherePane.setSst(sst);
             if (snotel != null)

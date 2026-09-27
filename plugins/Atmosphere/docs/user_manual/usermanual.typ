@@ -105,6 +105,12 @@ Alaska, Hawaii, the Caribbean and Guam, whichever the map is over - and lets
 you scrub back through the last two hours of frames. The lower-48 picture
 reaches as far into Mexico as the border radars see.
 
+*Satellite* draws the newest GOES picture, about ten minutes old: *Infrared*
+shows the cloud tops day and night, brightest where they are highest and
+coldest; *Visible* is the daylight picture and goes dark at night. It reaches
+where no radar does - the whole of Mexico, the open Pacific and Atlantic -
+which is where a hurricane is read from.
+
 *Wind* draws the modeled wind field as barbs with a time scrubber, and its
 status line says the wind *Here*, at the pane's point: speed, direction and
 gusts. Outside the drawn area it says so.

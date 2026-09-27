@@ -47,11 +47,14 @@ import com.atakmap.android.atmosphere.overlay.BeachOverlay;
 import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
 import com.atakmap.android.atmosphere.overlay.HighFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
+import com.atakmap.android.atmosphere.overlay.SatelliteOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
+import com.atakmap.android.atmosphere.overlay.WaveOverlay;
+import com.atakmap.android.atmosphere.waves.NomadsWaves;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
 import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
 import com.atakmap.android.atmosphere.overlay.WindScaleView;
@@ -107,6 +110,15 @@ public final class AtmospherePane {
     private static final String PREF_RADAR_OPEN = "weather.radar.open";
     private static final String PREF_TROPICAL_OPEN = "weather.tropical.open";
     private static final String PREF_WIND_OPEN = "weather.wind.open";
+    private static final String PREF_WAVES_OPEN = "weather.waves.open";
+    private final Button wavesToggle;
+    private final ImageButton wavesExpand;
+    private final LinearLayout wavesSettings;
+    private final WindScaleView wavesScale;
+    private final TextView wavesReading;
+    private boolean wavesOpen = true;
+    private WaveOverlay waves;
+    private int wavesHours;
     private static final String PREF_SMOKE_OPEN = "weather.smoke.open";
     private static final String PREF_AIR_OPEN = "weather.air.open";
     private static final String PREF_STATIONS_OPEN = "weather.layers.stations.open";
@@ -219,6 +231,14 @@ public final class AtmospherePane {
     private final LinearLayout floodgroundWhenRow;
     private FloodedGroundOverlay floodground;
     private boolean floodgroundOpen = true;
+    private static final String PREF_SATELLITE_OPEN = "weather.satellite.open";
+    private final LinearLayout satelliteSettings;
+    private final ImageButton satelliteExpand;
+    private final Button satelliteToggle;
+    private final TextView satelliteStatus;
+    private final LinearLayout satelliteBandRow;
+    private SatelliteOverlay satellite;
+    private boolean satelliteOpen = true;
     private static final String PREF_SNOW_OPEN = "weather.snow.open";
     private final LinearLayout snowSettings;
     private final ImageButton snowExpand;
@@ -527,6 +547,11 @@ public final class AtmospherePane {
         floodgroundStatus = find(R.id.floodground_status);
         floodgroundLegend = find(R.id.floodground_legend);
         floodgroundWhenRow = find(R.id.floodground_when_row);
+        satelliteSettings = find(R.id.satellite_settings);
+        satelliteExpand = find(R.id.satellite_expand);
+        satelliteToggle = find(R.id.satellite_toggle);
+        satelliteStatus = find(R.id.satellite_status);
+        satelliteBandRow = find(R.id.satellite_band_row);
         snowSettings = find(R.id.snow_settings);
         snowExpand = find(R.id.snow_expand);
         snowToggle = find(R.id.snow_toggle);
@@ -547,6 +572,12 @@ public final class AtmospherePane {
         windSettings = find(R.id.wind_settings);
         radarExpand = find(R.id.radar_expand);
         windExpand = find(R.id.wind_expand);
+        wavesToggle = find(R.id.waves_toggle);
+        wavesExpand = find(R.id.waves_expand);
+        wavesSettings = find(R.id.waves_settings);
+        wavesScale = new WindScaleView(pluginContext);
+        ((LinearLayout) find(R.id.waves_scale_host)).addView(wavesScale);
+        wavesReading = find(R.id.waves_reading);
         smokeToggle = find(R.id.smoke_toggle);
         smokeExpand = find(R.id.smoke_expand);
         smokeSettings = find(R.id.smoke_settings);
@@ -697,6 +728,15 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        satelliteOpen = prefs == null || prefs.getBoolean(PREF_SATELLITE_OPEN, true);
+        satelliteExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                satelliteOpen = !satelliteOpen;
+                rememberFold(PREF_SATELLITE_OPEN, satelliteOpen);
+                updateLayerControls();
+            }
+        });
         snowOpen = prefs == null || prefs.getBoolean(PREF_SNOW_OPEN, true);
         snowExpand.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -768,6 +808,7 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        wavesOpen = prefs == null || prefs.getBoolean(PREF_WAVES_OPEN, true);
         smokeOpen = prefs == null || prefs.getBoolean(PREF_SMOKE_OPEN, true);
         airOpen = prefs == null || prefs.getBoolean(PREF_AIR_OPEN, true);
         spotOpen = prefs == null || prefs.getBoolean(PREF_SPOT_OPEN, true);
@@ -920,6 +961,14 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        wavesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                wavesOpen = !wavesOpen;
+                rememberFold(PREF_WAVES_OPEN, wavesOpen);
+                updateLayerControls();
+            }
+        });
         smokeExpand.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -972,6 +1021,8 @@ public final class AtmospherePane {
             highflow.refresh(false);
         if (floodground != null && floodground.isOn())
             floodground.refresh(false);
+        if (satellite != null && satellite.isOn())
+            satellite.refresh(false);
         if (snow != null && snow.isOn())
             snow.refresh(false);
         if (snotel != null && snotel.isOn())
@@ -1313,6 +1364,54 @@ public final class AtmospherePane {
         }
     }
 
+    /** The GOES satellite picture, owned by the plugin. Not time-enabled: the newest frame. */
+    public void setSatellite(SatelliteOverlay overlay) {
+        satellite = overlay;
+        if (satellite == null)
+            return;
+        satellite.setListener(new SatelliteOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                satelliteStatus.setText(status);
+                satelliteStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        buildSatelliteBandRow();
+        updateLayerControls();
+    }
+
+    /** Infrared / Visible, the chosen one in green. */
+    private void buildSatelliteBandRow() {
+        final LinearLayout row = satelliteBandRow;
+        row.removeAllViews();
+        final String[] labels = { pluginContext.getString(R.string.satellite_infrared),
+                pluginContext.getString(R.string.satellite_visible) };
+        final int[] values = { SatelliteOverlay.INFRARED, SatelliteOverlay.VISIBLE };
+        final int current = satellite == null ? SatelliteOverlay.INFRARED : satellite.band();
+        for (int i = 0; i < labels.length; i++) {
+            final int value = values[i];
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(labels[i]);
+            b.setTextSize(12);
+            b.setTextColor(current == value
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (satellite != null)
+                        satellite.setBand(value);
+                    buildSatelliteBandRow();
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
     /** NOHRSC's snow depth, owned by the plugin. Not time-enabled. */
     public void setSnow(SnowOverlay overlay) {
         snow = overlay;
@@ -1613,6 +1712,22 @@ public final class AtmospherePane {
                 }
             }
         });
+        satelliteToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (satellite == null)
+                    return;
+                if (satellite.isOn()) {
+                    satellite.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SatelliteOverlay.LAYER_ID)) {
+                    satellite.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowSatellite();
+                }
+            }
+        });
         snowToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1755,6 +1870,21 @@ public final class AtmospherePane {
                 }
             }
         });
+        wavesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (waves == null)
+                    return;
+                if (waves.isOn()) {
+                    waves.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(WaveOverlay.LAYER_ID)) {
+                    turnWavesOn();
+                } else {
+                    askToAllowWaves();
+                }
+            }
+        });
         smokeToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1788,6 +1918,56 @@ public final class AtmospherePane {
     }
 
     // ---- when: live, then a day, then an hour ----------------------------------------
+
+    /**
+     * The wave overlay, owned by the plugin. A forecast on the same kind of hourly
+     * run as the wind, so it shares the strip and the wind's way of naming an hour.
+     */
+    public void setWaves(WaveOverlay overlay) {
+        waves = overlay;
+        if (waves == null)
+            return;
+        waves.setListener(new WaveOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+                wavesHours = Math.max(0, labels.size() - 1);
+                if (waves.isOn())
+                    setWhenTimes(wavesTimes(), shown, 0);
+                updateLayerControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                if (!waves.isOn())
+                    return;
+                showWhen(index);
+                scrubberLabel.setText(windLabel(index, validTime));
+                updateWavesReading();
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!waves.isOn())
+                    return;
+                if (!status.isEmpty())
+                    scrubberLabel.setText(status);
+                else
+                    scrubberLabel.setText(
+                            windLabel(waves.hourIndex(), waves.validTime(waves.hourIndex())));
+                updateWavesReading();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /** The waves' forecast hours as wall-clock times, index for index. */
+    private List<Long> wavesTimes() {
+        final List<Long> out = new ArrayList<>();
+        if (waves != null)
+            for (int i = 0; i <= wavesHours; i++)
+                out.add(waves.validTime(i));
+        return out;
+    }
 
     /** The wind's forecast hours as wall-clock times, index for index. */
     private List<Long> windTimes() {
@@ -2000,6 +2180,9 @@ public final class AtmospherePane {
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
         } else if (smoke != null && smoke.isOn()) {
             smoke.setHourIndex(index);
+            scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
+        } else if (waves != null && waves.isOn()) {
+            waves.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
         } else if (radar != null && radar.isOn()) {
             radar.setFrameIndex(index);
@@ -2712,6 +2895,10 @@ public final class AtmospherePane {
             wind.setOn(on);
         else if (wind != null && on)
             blocked++;
+        if (waves != null && on == allowed(WaveOverlay.LAYER_ID))
+            waves.setOn(on);
+        else if (waves != null && on)
+            blocked++;
         if (smoke != null && on == allowed(SmokeOverlay.LAYER_ID))
             smoke.setOn(on);
         else if (smoke != null && on)
@@ -2739,6 +2926,10 @@ public final class AtmospherePane {
         if (floodground != null && on == allowed(FloodedGroundOverlay.LAYER_ID))
             floodground.setOn(on);
         else if (floodground != null && on)
+            blocked++;
+        if (satellite != null && on == allowed(SatelliteOverlay.LAYER_ID))
+            satellite.setOn(on);
+        else if (satellite != null && on)
             blocked++;
         if (snow != null && on == allowed(SnowOverlay.LAYER_ID))
             snow.setOn(on);
@@ -3332,6 +3523,8 @@ public final class AtmospherePane {
             wind.setOn(false);
         if (smoke != null && smoke.isOn())
             smoke.setOn(false);
+        if (waves != null && waves.isOn())
+            waves.setOn(false);
         if (radar != null) {
             radar.setOn(true);
             setWhenTimes(radarTimes(), radar.frameIndex(),
@@ -3345,6 +3538,8 @@ public final class AtmospherePane {
             radar.setOn(false);
         if (smoke != null && smoke.isOn())
             smoke.setOn(false);
+        if (waves != null && waves.isOn())
+            waves.setOn(false);
         if (wind != null) {
             wind.setOn(true);
             setWhenTimes(windTimes(), wind.hourIndex(), 0);
@@ -3358,9 +3553,26 @@ public final class AtmospherePane {
             radar.setOn(false);
         if (wind != null && wind.isOn())
             wind.setOn(false);
+        if (waves != null && waves.isOn())
+            waves.setOn(false);
         if (smoke != null) {
             smoke.setOn(true);
             setWhenTimes(smokeTimes(), smoke.hourIndex(), 0);
+        }
+        updateLayerControls();
+    }
+
+    /** One time-enabled layer at a time, because they share the one strip. */
+    private void turnWavesOn() {
+        if (radar != null && radar.isOn())
+            radar.setOn(false);
+        if (wind != null && wind.isOn())
+            wind.setOn(false);
+        if (smoke != null && smoke.isOn())
+            smoke.setOn(false);
+        if (waves != null) {
+            waves.setOn(true);
+            setWhenTimes(wavesTimes(), waves.hourIndex(), 0);
         }
         updateLayerControls();
     }
@@ -3421,6 +3633,27 @@ public final class AtmospherePane {
                                 egress.setLayerEnabled(FloodedGroundOverlay.LAYER_ID, true);
                                 if (floodground != null)
                                     floodground.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowSatellite() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.satellite_allow_title))
+                .setMessage(pluginContext.getString(R.string.satellite_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SatelliteOverlay.LAYER_ID, true);
+                                if (satellite != null)
+                                    satellite.setOn(true);
                                 updateLayerControls();
                             }
                         })
@@ -3575,6 +3808,25 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowWaves() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.waves_allow_title))
+                .setMessage(pluginContext.getString(R.string.waves_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(WaveOverlay.LAYER_ID, true);
+                                turnWavesOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowSmoke() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -3633,6 +3885,17 @@ public final class AtmospherePane {
             updateSmokeScale();
             updateSmokeHeightRow();
             updateSmokeReading();
+        }
+        final boolean wavesOn = waves != null && waves.isOn();
+        wavesToggle.setText(wavesOn ? R.string.waves_on : R.string.waves_off);
+        wavesToggle.setTextColor(pluginContext.getResources().getColor(
+                wavesOn ? R.color.state_on : R.color.state_off));
+        wavesExpand.setVisibility(wavesOn ? View.VISIBLE : View.GONE);
+        wavesExpand.setRotation(wavesOpen ? 180f : 0f);
+        wavesSettings.setVisibility(wavesOn && wavesOpen ? View.VISIBLE : View.GONE);
+        if (wavesOn) {
+            updateWavesScale();
+            updateWavesReading();
         }
         final boolean stationsOn = stationLayer != null && stationLayer.isOn();
         stationsToggle.setText(stationsOn ? R.string.stations_on : R.string.stations_off);
@@ -3750,6 +4013,13 @@ public final class AtmospherePane {
         floodgroundExpand.setVisibility(floodgroundOn ? View.VISIBLE : View.GONE);
         floodgroundExpand.setRotation(floodgroundOpen ? 180f : 0f);
         floodgroundSettings.setVisibility(floodgroundOn && floodgroundOpen ? View.VISIBLE : View.GONE);
+        final boolean satelliteOn = satellite != null && satellite.isOn();
+        satelliteToggle.setText(satelliteOn ? R.string.satellite_on : R.string.satellite_off);
+        satelliteToggle.setTextColor(pluginContext.getResources().getColor(
+                satelliteOn ? R.color.state_on : R.color.state_off));
+        satelliteExpand.setVisibility(satelliteOn ? View.VISIBLE : View.GONE);
+        satelliteExpand.setRotation(satelliteOpen ? 180f : 0f);
+        satelliteSettings.setVisibility(satelliteOn && satelliteOpen ? View.VISIBLE : View.GONE);
         final boolean snowOn = snow != null && snow.isOn();
         snowToggle.setText(snowOn ? R.string.snow_on : R.string.snow_off);
         snowToggle.setTextColor(pluginContext.getResources().getColor(
@@ -3815,9 +4085,11 @@ public final class AtmospherePane {
             hostScrubberIn(windSettings);
         else if (smokeOn)
             hostScrubberIn(smokeSettings);
+        else if (wavesOn)
+            hostScrubberIn(wavesSettings);
         else if (radarOn)
             hostScrubberIn(radarSettings);
-        scrubber.setVisibility(radarOn || windOn || smokeOn ? View.VISIBLE : View.GONE);
+        scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
     }
 
@@ -3859,6 +4131,11 @@ public final class AtmospherePane {
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_smoke, SmokeOverlay.HOST));
         }
+        if (waves != null && waves.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_waves, WaveOverlay.HOST));
+        }
         if (radarOn) {
             if (out.length() > 0)
                 out.append('\n');
@@ -3898,6 +4175,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_floodground, FloodedGroundOverlay.HOST));
+        }
+        if (satellite != null && satellite.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_satellite, SatelliteOverlay.HOST));
         }
         if (snow != null && snow.isOn()) {
             if (out.length() > 0)
@@ -4103,7 +4385,63 @@ public final class AtmospherePane {
         }
     }
 
+    /** The legend for the seas on the map: the sea states, feet or meters under the joins. */
+    private void updateWavesScale() {
+        final boolean metric = units == UnitSystem.METRIC;
+        wavesScale.setBands(NomadsWaves.legendColors(), NomadsWaves.legendBreaks(metric),
+                metric ? "m" : "ft");
+        // Numbers only: the bar has seven joins and the last one sits where an end
+        // word would go ("46 ft" over "Phenomenal", XCover 2026-09-27). The words
+        // are in the reading line, where there is room for them.
+        wavesScale.setEnds(null, null);
+    }
+
     /**
+     * The seas at the pane's own point, read out of the picture already on the map:
+     * the height and what a mariner calls it, where the swell comes from and how
+     * often, in words a deckhand uses.
+     */
+    private void updateWavesReading() {
+        if (waves == null || !waves.isOn()) {
+            wavesReading.setText(R.string.empty);
+            return;
+        }
+        final GeoPoint p = point();
+        final WaveOverlay.Reading r = p == null ? null
+                : waves.readingAt(p.getLatitude(), p.getLongitude());
+        String line;
+        if (p == null)
+            line = "";
+        else if (r == null)
+            line = pluginContext.getString(R.string.wind_here_unknown);
+        else if (Float.isNaN(r.heightM))
+            line = pluginContext.getString(R.string.waves_land);
+        else {
+            final boolean metric = units == UnitSystem.METRIC;
+            final StringBuilder b = new StringBuilder();
+            b.append(NomadsWaves.heightText(r.heightM, metric)).append(' ')
+                    .append(NomadsWaves.words(r.heightM));
+            if (!Float.isNaN(r.fromDeg))
+                b.append(", from the ").append(NomadsWaves.compass(r.fromDeg));
+            if (!Float.isNaN(r.periodS))
+                b.append(" every ").append(Math.round(r.periodS)).append(" s");
+            if (!Float.isNaN(r.swellHeightM) && r.swellHeightM > 0.1f) {
+                b.append("; swell ").append(NomadsWaves.heightText(r.swellHeightM, metric));
+                if (!Float.isNaN(r.swellFromDeg))
+                    b.append(" from the ").append(NomadsWaves.compass(r.swellFromDeg));
+                if (!Float.isNaN(r.swellPeriodS))
+                    b.append(" every ").append(Math.round(r.swellPeriodS)).append(" s");
+            }
+            line = pluginContext.getString(R.string.waves_here, b.toString());
+        }
+        if (waves.isCropped())
+            line = line.isEmpty() ? pluginContext.getString(R.string.waves_cropped)
+                    : line + "\n" + pluginContext.getString(R.string.waves_cropped);
+        wavesReading.setText(line);
+    }
+
+    /**
+     * The two heights the model carries smoke at, as two presets side by side: the    /**
      * The two heights the model carries smoke at, as two presets side by side: the
      * ground, which is what a crew breathes, and the whole sky, which is what they see
      * and what the sun and the aircraft come through.

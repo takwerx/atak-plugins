@@ -96,7 +96,7 @@ public final class Grib2 {
         boolean jNorthUp = true;
         float ref = 0;
         int binScale = 0, decScale = 0, bits = 0;
-        int npts = 0;
+        int npts = 0, packed = -1;
         boolean[] bitmap = null;
         float[] values = null;
         int p = start + 16;
@@ -187,7 +187,12 @@ public final class Grib2 {
                     final int template = u16(b, p + 9);
                     if (template != 0)
                         throw new IOException("data template 5." + template + ", only 5.0 (simple packing) is read");
-                    npts = (int) u32(b, p + 5);
+                    // Octets 6-9 count the points actually packed, which under a
+                    // bitmap is the sea cells only (845 of a 1,333-cell wave grid,
+                    // 2026-09-27). The grid's own count from section 3 is what the
+                    // bitmap and the unpacked field are sized by; this one is only
+                    // checked against it when there is no bitmap.
+                    packed = (int) u32(b, p + 5);
                     ref = Float.intBitsToFloat((int) u32(b, p + 11));
                     binScale = s16(b, p + 15);
                     decScale = s16(b, p + 17);
@@ -206,6 +211,8 @@ public final class Grib2 {
                     break;
                 }
                 case 7: {
+                    if (bitmap == null && packed >= 0 && packed != npts)
+                        throw new IOException("section 5 packs " + packed + " points for a grid of " + npts);
                     values = unpack(b, p + 5, len - 5, npts, bitmap, ref, binScale, decScale, bits);
                     break;
                 }

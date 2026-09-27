@@ -127,6 +127,28 @@ public abstract class ImageOverlay {
     }
 
     /**
+     * Where the server has a picture at all, degrees. The request box is cut to it
+     * and the picture placed over the cut box, so the two agree: cutting the box
+     * inside the URL alone stretched a satellite frame rendered from 10.9 N over a
+     * region that began at 4.6 N (XCover, 2026-09-27).
+     */
+    protected double coverWest() {
+        return -180;
+    }
+
+    protected double coverEast() {
+        return 180;
+    }
+
+    protected double coverSouth() {
+        return -85;
+    }
+
+    protected double coverNorth() {
+        return 85;
+    }
+
+    /**
      * A view wider than this, in degrees, is told to zoom in rather than shown a
      * picture of its middle. The default is the whole world. A layer whose server
      * draws nothing past a scale, the way the flood extent draws nothing coarser
@@ -269,8 +291,14 @@ public abstract class ImageOverlay {
         }
         final double padX = Math.min((e - w) * 0.5, Math.max(0, (maxLon - (e - w)) / 2));
         final double padY = Math.min((n - s) * 0.5, Math.max(0, (maxLat - (n - s)) / 2));
-        final double rw = Math.max(-180, w - padX), re = Math.min(180, e + padX);
-        final double rs = Math.max(-85, s - padY), rn = Math.min(85, n + padY);
+        final double rw = Math.max(coverWest(), w - padX), re = Math.min(coverEast(), e + padX);
+        final double rs = Math.max(coverSouth(), s - padY), rn = Math.min(coverNorth(), n + padY);
+        if (re <= rw || rn <= rs) {
+            region = null;
+            layer.clear();
+            status("No " + noun() + " for this area");
+            return;
+        }
         final GeoBounds r = new GeoBounds(rn, rw, rs, re);
         // Pixels follow the degrees: the picture is a plain lon/lat quad.
         int px = MAX_PX, py = (int) Math.round(MAX_PX * (rn - rs) / (re - rw));
