@@ -119,6 +119,45 @@ public class WxSourceParserTest {
         assertTrue(r.errors.get(0).startsWith("mine.json:"));
     }
 
+    /**
+     * The host is what the operator is shown before enabling a source and what the
+     * consent is bound to; a URL the strict parser cannot name a host for is refused
+     * rather than shown as "its provider" and sent anyway (security review, 2026-09-27).
+     */
+    @Test
+    public void unreadableHostIsRefused() {
+        assertFalse(parseWith("\"requestUrl\": \"https://collector.example/fore cast?lat={lat}&lon={lon}\"").ok());
+        assertFalse(parseWith("\"requestUrl\": \"https://wx_api.example/f?lat={lat}&lon={lon}\"").ok());
+        assertFalse(parseWith("\"requestUrl\": \"https:///f?lat={lat}&lon={lon}\"").ok());
+        final WxSourceParser.Result r = parseWith("\"requestUrl\": \"https://a b.example/{lat}/{lon}\"");
+        assertTrue(r.errors.toString(), r.errors.toString().contains("no readable host"));
+        final WxSourceParser.Result ok = parseWith("\"requestUrl\": \"https://Api.Example.com/f?lat={lat}&lon={lon}\"");
+        assertTrue(ok.errors.toString(), ok.ok());
+        assertEquals("api.example.com", ok.def.hostsKey());
+    }
+
+    /** A URL a provider hands back is fetched only on a host the operator consented to. */
+    @Test
+    public void resolvedUrlMustBeOnAConsentedHost() {
+        final WxSourceParser.Result r = parseWith(
+                "\"resolveUrl\": \"https://api.example.gov/points/{lat},{lon}\", \"resolvePath\": \"properties.forecast\","
+                + "\"requestUrl\": \"https://cdn.example.gov/f?lat={lat}&lon={lon}\"");
+        assertTrue(r.errors.toString(), r.ok());
+        assertEquals("api.example.gov,cdn.example.gov", r.def.hostsKey());
+        assertTrue(r.def.trusts("https://api.example.gov/gridpoints/SGX/1,2/forecast"));
+        assertTrue(r.def.trusts("https://CDN.example.gov/anything"));
+        assertFalse(r.def.trusts("https://collector.attacker.example/x?lat=33.5"));
+        assertFalse(r.def.trusts("http://api.example.gov/plain"));
+        assertFalse(r.def.trusts("https://api.example.gov.attacker.example/"));
+        // userinfo before the real host; written in pieces so the publish scrub
+        // does not read the literal as an email address
+        assertFalse(r.def.trusts("https://api.example.gov" + '@' + "attacker.example/"));
+        assertFalse(r.def.trusts(""));
+        assertFalse(r.def.trusts(null));
+        assertEquals(null, WxSourceDef.hostOf("https://wx_api.example/"));
+        assertEquals("api.example.gov", WxSourceDef.hostOf("https://api.example.gov/points/{lat},{lon}"));
+    }
+
     private static WxSourceParser.Result parseWith(String urlField) {
         final String json = "{\"schemaVersion\": 1, \"sourceId\": \"x\","
                 + "\"displayName\": \"X\"," + urlField + ","

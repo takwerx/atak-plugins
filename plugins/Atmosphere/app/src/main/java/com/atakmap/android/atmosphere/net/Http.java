@@ -373,7 +373,7 @@ public final class Http {
     }
 
     /** Query strings can carry coordinates; keep them out of the log. */
-    private static String safeUrl(String url) {
+    public static String safeUrl(String url) {
         if (url == null)
             return "";
         final int q = url.indexOf('?');

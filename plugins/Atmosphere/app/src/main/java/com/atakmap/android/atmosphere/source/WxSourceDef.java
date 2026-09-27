@@ -139,16 +139,52 @@ public final class WxSourceDef {
     }
 
     private static void addHost(List<String> out, String url) {
+        final String host = hostOf(url);
+        if (host != null && !out.contains(host))
+            out.add(host);
+    }
+
+    /**
+     * The host of a URL as the strict parser reads it, or null when there is none.
+     * Strict on purpose: the request path uses the lenient {@code java.net.URL}, so a
+     * URL whose host this cannot read is refused by {@link WxSourceParser} rather than
+     * shown to the operator as "its provider" and sent anyway (security review,
+     * 2026-09-27).
+     */
+    public static String hostOf(String url) {
         if (url == null)
-            return;
+            return null;
         try {
             final String host = new java.net.URI(url.replace("{", "%7B").replace("}", "%7D"))
                     .getHost();
-            if (host != null && !out.contains(host))
-                out.add(host);
-        } catch (java.net.URISyntaxException ignored) {
-            // A malformed URL never reaches here: the parser rejects it.
+            return host == null || host.isEmpty() ? null : host.toLowerCase(java.util.Locale.US);
+        } catch (java.net.URISyntaxException e) {
+            return null;
         }
+    }
+
+    /**
+     * Whether a URL a provider handed back may be fetched on this source's consent:
+     * https, and a host the operator was shown when enabling the source. The NWS
+     * resolve step answers with the forecast URL for a grid cell; that answer decides
+     * where the next request goes, so it is held to the hosts consented to.
+     */
+    public boolean trusts(String url) {
+        if (url == null || !url.startsWith("https://"))
+            return false;
+        final String host = hostOf(url);
+        return host != null && hosts().contains(host);
+    }
+
+    /** The hosts as one string, for binding the operator's consent to them. */
+    public String hostsKey() {
+        final StringBuilder sb = new StringBuilder();
+        for (String h : hosts()) {
+            if (sb.length() > 0)
+                sb.append(',');
+            sb.append(h);
+        }
+        return sb.toString();
     }
 
     @Override

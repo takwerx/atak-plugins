@@ -117,8 +117,10 @@ public final class WeatherClient {
         // so the place appears without waiting a week for the entry to age out.
         final boolean placeKnown = def.placePaths.isEmpty()
                 || store.read(placeKey(def, lat, lon)) != null;
+        // A cached answer is held to the same rule as a fresh one: the definition's
+        // hosts may have changed since it was written.
         if (resolved != null && resolved.ageMillis(now) < RESOLVE_FRESH_MS
-                && !resolved.body.isEmpty() && placeKnown) {
+                && def.trusts(resolved.body) && placeKnown) {
             request(def, resolved.body, lat, lon, cacheKey, cached, listener);
             return;
         }
@@ -136,7 +138,13 @@ public final class WeatherClient {
                         } catch (JSONException e) {
                             Log.w(TAG, def.id + ": resolve response was not JSON", e);
                         }
-                        if (dataUrl == null || !dataUrl.startsWith("https://")) {
+                        // The provider's answer decides where the next request goes.
+                        // It is fetched on the operator's consent to THIS source's
+                        // hosts, so it must be one of them (security review, 2026-09-27).
+                        if (dataUrl == null || !def.trusts(dataUrl)) {
+                            if (dataUrl != null)
+                                Log.w(TAG, def.id + ": resolve answered with a URL off the "
+                                        + "source's hosts: " + Http.safeUrl(dataUrl));
                             listener.onError(def.displayName
                                     + ": provider did not return a usable forecast URL",
                                     cached == null ? null : parse(def, cached, lat, lon, null));

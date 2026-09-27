@@ -334,7 +334,14 @@ public final class WxSourceParser {
             // free weather API worth that, so this is a hard rejection, not a warning.
             errors.add(file + ": " + field + " must be https (got \""
                     + url.split("://")[0] + "\")");
+            return;
         }
+        // The host is what the operator is shown before enabling the source, read by
+        // the strict URI parser; the connection uses the lenient one. A URL the strict
+        // parser cannot name a host for (a space, a quote, an underscore label) would
+        // show as "its provider" and still be sent, so it is refused here.
+        if (WxSourceDef.hostOf(url) == null)
+            errors.add(file + ": " + field + " has no readable host");
     }
 
     private static String str(JSONObject o, String key) {

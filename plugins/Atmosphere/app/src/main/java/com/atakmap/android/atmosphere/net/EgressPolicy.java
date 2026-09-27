@@ -26,6 +26,14 @@ import java.util.Locale;
 public final class EgressPolicy {
 
     private static final String PREF_ENABLED_PREFIX = "weather.source.enabled.";
+    /**
+     * The hosts the operator saw when enabling a source. A definition file on the
+     * sdcard may replace a bundled source under the same id (that is how a provider's
+     * URL change is fixed in the field), and consent keyed by id alone would carry
+     * over to whatever hosts the new file names. Consent is to the hosts, so a
+     * changed host asks again (security review, 2026-09-27).
+     */
+    private static final String PREF_HOSTS_PREFIX = "weather.source.hosts.";
     private static final String PREF_LAYER_PREFIX = "weather.layer.enabled.";
     private static final String PREF_PRECISION = "weather.position.decimals";
 
@@ -51,14 +59,26 @@ public final class EgressPolicy {
         final SharedPreferences prefs = MapCompat.prefs();
         if (prefs == null)
             return false;
-        return prefs.getBoolean(PREF_ENABLED_PREFIX + def.id, false);
+        return prefs.getBoolean(PREF_ENABLED_PREFIX + def.id, false)
+                && def.hostsKey().equals(prefs.getString(PREF_HOSTS_PREFIX + def.id, null));
+    }
+
+    /** Enabled once, but the definition's hosts have changed since. */
+    public boolean hostsChanged(WxSourceDef def) {
+        final SharedPreferences prefs = MapCompat.prefs();
+        if (prefs == null || def == null)
+            return false;
+        final String seen = prefs.getString(PREF_HOSTS_PREFIX + def.id, null);
+        return prefs.getBoolean(PREF_ENABLED_PREFIX + def.id, false)
+                && seen != null && !seen.equals(def.hostsKey());
     }
 
     public void setEnabled(WxSourceDef def, boolean enabled) {
         final SharedPreferences prefs = MapCompat.prefs();
         if (prefs == null || def == null)
             return;
-        prefs.edit().putBoolean(PREF_ENABLED_PREFIX + def.id, enabled).apply();
+        prefs.edit().putBoolean(PREF_ENABLED_PREFIX + def.id, enabled)
+                .putString(PREF_HOSTS_PREFIX + def.id, enabled ? def.hostsKey() : null).apply();
     }
 
     /**
@@ -137,8 +157,11 @@ public final class EgressPolicy {
         if (def == null)
             return "no source selected";
         if (!isEnabled(def))
-            return def.displayName + " is not enabled. Enable it in Sources to allow "
-                    + "requests to " + hostList(def) + ".";
+            return def.displayName + (hostsChanged(def)
+                    ? " now sends its requests to " + hostList(def) + ", not where it did "
+                            + "when it was enabled. Enable it again in Sources if that is right."
+                    : " is not enabled. Enable it in Sources to allow requests to "
+                            + hostList(def) + ".");
         if (def.requiresApiKey)
             return def.displayName + " needs an API key, and this build does not store "
                     + "keys yet.";
