@@ -25,7 +25,6 @@ import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
-import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
 import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
@@ -96,7 +95,6 @@ public class Atmosphere implements IPlugin {
     private WindOverlay wind;
     private SmokeOverlay smoke;
     private AirQualityOverlay air;
-    private WarningsOverlay warnings;
     private SpotOverlay spotLayer;
     private StationOverlay stations;
     private GaugeOverlay gauges;
@@ -140,6 +138,47 @@ public class Atmosphere implements IPlugin {
                 new DocumentedIntentFilter(ACTION_SHOW, "Open the Atmosphere pane"));
     }
 
+    /**
+     * The warnings layer was removed on 2026-09-26: alerts are IPAWS's, the
+     * companion plugin, which draws the same feed and sends notifications. A phone
+     * that ran it holds 600 zone shapes (28 MB) and a store it no longer reads.
+     * Swept once, on a daemon thread, never on the load thread.
+     */
+    private static void sweepRemovedLayerFiles() {
+        final Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final java.io.File root = com.atakmap.coremap.filesystem.FileSystemUtils
+                            .getItem("tools/atmosphere");
+                    if (root == null)
+                        return;
+                    deleteTree(new java.io.File(root, "zones"));
+                    for (String f : new String[] { "warnings.sqlite", "warnings.sqlite-journal",
+                            "warnings.sqlite-wal", "warnings.sqlite-shm" })
+                        //noinspection ResultOfMethodCallIgnored
+                        new java.io.File(root, f).delete();
+                } catch (Exception e) {
+                    Log.w(TAG, "could not sweep the removed warnings layer's files", e);
+                }
+            }
+        }, "atmosphere-sweep");
+        t.setDaemon(true);
+        t.setPriority(Thread.MIN_PRIORITY);
+        t.start();
+    }
+
+    private static void deleteTree(java.io.File f) {
+        if (f == null || !f.exists())
+            return;
+        final java.io.File[] kids = f.listFiles();
+        if (kids != null)
+            for (java.io.File k : kids)
+                deleteTree(k);
+        //noinspection ResultOfMethodCallIgnored
+        f.delete();
+    }
+
     /** The overlays need the map; it exists by onStart, and showPane retries if not. */
     private void startOverlays() {
         if (radar != null)
@@ -149,6 +188,7 @@ public class Atmosphere implements IPlugin {
             return;
         if (egress == null)
             egress = new EgressPolicy(pluginVersion());
+        sweepRemovedLayerFiles();
         radar = new RadarOverlay(mapView, egress);
         radar.start();
         wind = new WindOverlay(mapView, egress);
@@ -157,8 +197,6 @@ public class Atmosphere implements IPlugin {
         smoke.start();
         air = new AirQualityOverlay(mapView, pluginContext, egress);
         air.start();
-        warnings = new WarningsOverlay(mapView, pluginContext, egress);
-        warnings.start();
         spotLayer = new SpotOverlay(mapView, pluginContext, egress);
         spotLayer.start();
         stations = new StationOverlay(mapView, pluginContext, egress);
@@ -223,7 +261,6 @@ public class Atmosphere implements IPlugin {
             atmospherePane.setWind(wind);
             atmospherePane.setSmoke(smoke);
             atmospherePane.setAirQuality(air);
-            atmospherePane.setWarnings(warnings);
             if (avalanche != null)
                 atmospherePane.setAvalanche(avalanche);
             if (firewx != null)
@@ -310,10 +347,6 @@ public class Atmosphere implements IPlugin {
             avalanche.stop();
             avalanche = null;
         }
-        if (warnings != null) {
-            warnings.stop();
-            warnings = null;
-        }
         if (air != null) {
             air.stop();
             air = null;
@@ -368,8 +401,6 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setSmoke(smoke);
             if (air != null)
                 atmospherePane.setAirQuality(air);
-            if (warnings != null)
-                atmospherePane.setWarnings(warnings);
             if (avalanche != null)
                 atmospherePane.setAvalanche(avalanche);
             if (firewx != null)
