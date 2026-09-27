@@ -348,13 +348,23 @@ final class AtmosphereFeatures {
         if (e == null || ring == null || ring.getNumPoints() < 3)
             return com.atakmap.android.atmosphere.data.GeoJson.center(g);
         final double midLat = (e.minY + e.maxY) / 2;
-        // Every crossing of the middle latitude, sorted: inside runs are between pairs.
+        // Every crossing of the middle latitude, sorted: inside runs are between
+        // pairs. The holes count too -- WPC cuts a Moderate area out of the Slight
+        // polygon around it as an interior ring, and walking the outer ring alone put
+        // "Slight" in the hole, on top of "Moderate" (operator, 2026-09-26).
         final java.util.List<Double> xs = new java.util.ArrayList<>();
-        final int n = ring.getNumPoints();
-        for (int i = 0, j = n - 1; i < n; j = i++) {
-            final double xi = ring.getX(i), yi = ring.getY(i), xj = ring.getX(j), yj = ring.getY(j);
-            if ((yi > midLat) != (yj > midLat))
-                xs.add(xj + (midLat - yj) * (xi - xj) / (yi - yj));
+        final java.util.List<LineString> rings = new java.util.ArrayList<>();
+        rings.add(ring);
+        final java.util.Collection<LineString> holes = biggest.getInteriorRings();
+        if (holes != null)
+            rings.addAll(holes);
+        for (LineString r : rings) {
+            final int n = r.getNumPoints();
+            for (int i = 0, j = n - 1; i < n; j = i++) {
+                final double xi = r.getX(i), yi = r.getY(i), xj = r.getX(j), yj = r.getY(j);
+                if ((yi > midLat) != (yj > midLat))
+                    xs.add(xj + (midLat - yj) * (xi - xj) / (yi - yj));
+            }
         }
         java.util.Collections.sort(xs);
         double bestW = -1, bestMid = (e.minX + e.maxX) / 2;
@@ -1044,11 +1054,15 @@ final class AtmosphereFeatures {
                     // label and a label-only point is stored at its center, horizontal,
                     // in the same set; the hit-test drops the point again.
                     final String centered = centerLabelOf(d.geometry, d.style);
-                    store.insertFeature(new Feature(fsid, d.name, d.geometry,
-                            centered == null ? d.style : withoutLabel(d.style),
-                            d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                    // The label point goes in BEFORE its polygon: the newest point in a
+                    // rewrite was missing its label on the first draw and picked it up
+                    // on the next pan (2026-09-26, the Moderate outlook area), so the
+                    // newest row of every rewrite is a polygon now, and the renderer
+                    // is asked to lay out again once the lock is released.
                     if (centered != null) {
                         final double[] c = labelPoint(d.geometry);
+                        Log.d(tag, "label '" + centered + "' at " + (c == null ? "nowhere"
+                                : String.format(java.util.Locale.US, "%.3f,%.3f", c[0], c[1])));
                         if (c != null) {
                             final AttributeSet la = new AttributeSet();
                             la.setAttribute("_labelOnly", 1);
@@ -1064,6 +1078,9 @@ final class AtmosphereFeatures {
                                     la, Feature.AltitudeMode.ClampToGround, 0d));
                         }
                     }
+                    store.insertFeature(new Feature(fsid, d.name, d.geometry,
+                            centered == null ? d.style : withoutLabel(d.style),
+                            d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
                 }
                 // One at a time. deleteFeatureSets(params) is a silent no-op on this
                 // store -- the file held sixty sets before and sixty after, every
@@ -1089,6 +1106,21 @@ final class AtmosphereFeatures {
             } finally {
                 if (bulk)
                     store.releaseModifyLock();
+                // Ask the renderer to lay out again: the newest label of a rewrite was
+                // sometimes missing until the next pan (2026-09-26). GLMapView is a
+                // MapRenderer, and that is where requestRefresh lives.
+                mapView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            final Object r = mapView.getRenderer3();
+                            if (r instanceof com.atakmap.map.MapRenderer)
+                                ((com.atakmap.map.MapRenderer) r).requestRefresh();
+                        } catch (Exception ignored) {
+                            // the next map move lays the labels out anyway
+                        }
+                    }
+                });
             }
         }
     }
