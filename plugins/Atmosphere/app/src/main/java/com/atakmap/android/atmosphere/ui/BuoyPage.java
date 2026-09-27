@@ -518,8 +518,8 @@ public final class BuoyPage {
      * the zone and the office, the office's newest CWF is fetched and the zone's
      * section cut out of it -- three requests, all through {@link #answers}, so
      * the record rebuilt on the next redraw costs nothing. An offshore zone is
-     * forecast by an ocean center in a product this does not read yet, and the
-     * row says so instead of showing the wrong office's text.
+     * forecast by an ocean center in its OFF product, which is filed by region,
+     * so the likely regions are read until one has the zone's section.
      */
     private void fillMarine(final Ndbc.Buoy g) {
         final EgressPolicy egress = host.egress();
@@ -538,7 +538,13 @@ public final class BuoyPage {
                     return;
                 }
                 if (!"CWF".equals(z.productType())) {
-                    row.setText("Offshore zone " + z.id + ": the offshore waters forecast is not read yet");
+                    // Beyond the coastal zones the text is the ocean center's OFF
+                    // product, filed by region (PZ6 for California waters), not by
+                    // the center id /points returns; the zone's own section proves
+                    // which region, so the likely ones are read in turn.
+                    ((TextView) ((LinearLayout) row.getParent()).getChildAt(0))
+                            .setText("Offshore waters forecast");
+                    fillOffshore(row, g, z, Cwf.offshoreLocations(z.id), 0, h);
                     return;
                 }
                 cached(Cwf.latestUrl("CWF", z.cwa), egress.userAgent(), h, new Http.Callback() {
@@ -566,6 +572,53 @@ public final class BuoyPage {
                                 forecastFailed(row, g, error);
                             }
                         });
+                    }
+
+                    @Override
+                    public void onFailure(String error) {
+                        forecastFailed(row, g, error);
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(String error) {
+                forecastFailed(row, g, error);
+            }
+        });
+    }
+
+    /** The offshore product for the zone, from the candidate regions in order. */
+    private void fillOffshore(final TextView row, final Ndbc.Buoy g, final Cwf.Zone z,
+            final java.util.List<String> regions, final int index, final java.util.Map<String, String> h) {
+        if (!g.id.equals(tideFor))
+            return;
+        if (index >= regions.size()) {
+            row.setText(regions.isEmpty()
+                    ? "Offshore zone " + z.id + ": no offshore forecast is filed for this ocean"
+                    : "Zone " + z.id + " is not in the offshore forecast for this region");
+            return;
+        }
+        final String region = regions.get(index);
+        final String userAgent = host.egress().userAgent();
+        cached(Cwf.latestUrl("OFF", region), userAgent, h, new Http.Callback() {
+            @Override
+            public void onSuccess(String list) {
+                final String id = Cwf.parseLatestId(list);
+                if (id == null) {
+                    fillOffshore(row, g, z, regions, index + 1, h);
+                    return;
+                }
+                cached(Cwf.productUrl(id), userAgent, h, new Http.Callback() {
+                    @Override
+                    public void onSuccess(String product) {
+                        if (!g.id.equals(tideFor))
+                            return;
+                        final String s = Cwf.section(Cwf.parseText(product), z.id);
+                        if (s == null)
+                            fillOffshore(row, g, z, regions, index + 1, h);
+                        else
+                            row.setText(marineText(s));
                     }
 
                     @Override

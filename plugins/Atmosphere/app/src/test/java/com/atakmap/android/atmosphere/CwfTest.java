@@ -86,4 +86,43 @@ public class CwfTest {
         assertEquals("abc", Cwf.parseLatestId("{\"@graph\":[{\"id\":\"abc\"},{\"id\":\"old\"}]}"));
         assertNull(Cwf.parseLatestId("{\"@graph\":[]}"));
     }
+
+    /** Where the OFF product for an offshore zone is filed, best guess first. */
+    @Test
+    public void offshoreZonesMapToTheirProductLocation() {
+        assertEquals(java.util.Arrays.asList("PZ6", "PZ5"), Cwf.offshoreLocations("PZZ840"));   // Tanner Bank
+        assertEquals(java.util.Arrays.asList("PZ5", "PZ6"), Cwf.offshoreLocations("PZZ905"));
+        assertEquals(java.util.Arrays.asList("PZ7", "PZ8"), Cwf.offshoreLocations("PMZ011"));
+        assertEquals(java.util.Arrays.asList("PZ8", "PZ7"), Cwf.offshoreLocations("PMZ113"));
+        assertEquals(java.util.Arrays.asList("NT1", "NT2"), Cwf.offshoreLocations("ANZ805"));
+        assertEquals(java.util.Arrays.asList("NT2", "NT1"), Cwf.offshoreLocations("ANZ935"));
+        assertEquals(java.util.Arrays.asList("NT3", "NT5"), Cwf.offshoreLocations("AMZ041"));
+        assertEquals(java.util.Arrays.asList("NT5", "NT3"), Cwf.offshoreLocations("AMZ088"));
+        assertEquals(java.util.Arrays.asList("NT4"), Cwf.offshoreLocations("GMZ049"));
+        assertEquals(java.util.Arrays.asList("HFO"), Cwf.offshoreLocations("PHZ180"));
+        assertEquals(4, Cwf.offshoreLocations("PKZ150").size());
+        assertTrue(Cwf.offshoreLocations("CAZ043").isEmpty());
+        assertTrue(Cwf.offshoreLocations(null).isEmpty());
+    }
+
+    /** An OFF section has the same shape as a CWF one, with the zone name over the issued line. */
+    @Test
+    public void offshoreSectionReads() {
+        final String off = "PZZ840-271615-\n"
+                + "Santa Cruz Island, CA to San Clemente Island, CA between 60 NM\n"
+                + "and 150 NM offshore-\n"
+                + "907 PM PDT Sat Sep 26 2026\n\n"
+                + ".TONIGHT...N to NW winds 10 to 20 kt. Seas 4 to 8 ft. \n"
+                + ".SUN...N to NW winds 10 to 20 kt, becoming NW 5 to 15 kt. Seas\n"
+                + "4 to 8 ft. \n\n$$\n\nPZZ940-271615-\nSanta Cruz Island, CA to 120W-\n907 PM PDT Sat Sep 26 2026\n\n.TONIGHT...N winds.\n\n$$\n";
+        final String s = Cwf.section(off, "PZZ840");
+        assertEquals("Santa Cruz Island, CA to San Clemente Island, CA between 60 NM and 150 NM offshore",
+                Cwf.name(s));
+        assertEquals("9:07 PM PDT Sat Sep 26", Cwf.issued(s));
+        final List<Cwf.Period> p = Cwf.periods(s);
+        assertEquals(2, p.size());
+        assertEquals("Sun", p.get(1).name);
+        assertEquals("N to NW winds 10 to 20 kt, becoming NW 5 to 15 kt. Seas 4 to 8 ft.", p.get(1).text);
+        assertNull(Cwf.section(off, "PZZ845"));
+    }
 }

@@ -96,6 +96,83 @@ public final class Cwf {
         }
     }
 
+    /**
+     * Where an offshore zone's OFF product is filed, most likely first. The API
+     * files OFF not under the ocean center's id that {@code /points} returns (ONP,
+     * NH2, HPA) but under region codes, each one product covering a run of zones
+     * (read from the newest issuances, 2026-09-27): PZ5 Washington and Oregon
+     * (PZZ800-815, 900-915), PZ6 California (PZZ820-945), PZ7 and PZ8 the central
+     * Pacific (PMZ), NT1 New England (ANZ800-815), NT2 the mid-Atlantic
+     * (ANZ820-935), NT3 the Caribbean (AMZ001-061), NT5 the SW North Atlantic
+     * (AMZ063-101), NT4 the Gulf (GMZ); Hawaii's is under HFO, Alaska's under its
+     * offices. The zone's own section is what proves the guess, so callers scan
+     * the list in order until {@link #section} finds it.
+     */
+    public static List<String> offshoreLocations(String zoneId) {
+        final List<String> out = new ArrayList<>();
+        if (zoneId == null || zoneId.length() != 6)
+            return out;
+        final String prefix = zoneId.substring(0, 3);
+        int n = -1;
+        try {
+            n = Integer.parseInt(zoneId.substring(3));
+        } catch (NumberFormatException ignored) {
+        }
+        switch (prefix) {
+            case "PZZ":
+                if (n % 100 <= 15) {
+                    out.add("PZ5");
+                    out.add("PZ6");
+                } else {
+                    out.add("PZ6");
+                    out.add("PZ5");
+                }
+                break;
+            case "PMZ":
+                if (n >= 100) {
+                    out.add("PZ8");
+                    out.add("PZ7");
+                } else {
+                    out.add("PZ7");
+                    out.add("PZ8");
+                }
+                break;
+            case "ANZ":
+                if (n % 100 <= 15) {
+                    out.add("NT1");
+                    out.add("NT2");
+                } else {
+                    out.add("NT2");
+                    out.add("NT1");
+                }
+                break;
+            case "AMZ":
+                if (n <= 61) {
+                    out.add("NT3");
+                    out.add("NT5");
+                } else {
+                    out.add("NT5");
+                    out.add("NT3");
+                }
+                break;
+            case "GMZ":
+                out.add("NT4");
+                break;
+            case "PHZ":
+                out.add("HFO");
+                break;
+            case "PKZ":
+                out.add("AER");
+                out.add("ALU");
+                out.add("AJK");
+                out.add("AFG");
+                break;
+            default:
+                break;
+        }
+        return out;
+    }
+
     /** The newest issuance's id from a product-type listing, or null. */
     public static String parseLatestId(String body) {
         if (body == null || body.isEmpty())
