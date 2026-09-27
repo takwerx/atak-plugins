@@ -42,7 +42,8 @@ Open Atmosphere from the ATAK toolbar, or from Tools if it is not on the bar.
 The pane opens at half width; **Wide** makes it full width and back, and at full width each button in the top row has its name written under it. Back closes
 it, or narrows a wide one first.
 
-It is six pages, side by side. Swipe, tap a dot, or press the arrow button:
+It is six pages, side by side. Swipe, or tap a page's name in the row of page
+buttons under the top row; the page showing has its name in green:
 
 1. **Forecast** — the readout for a point.
 2. **Layers** — every map layer, its switch and its settings.
@@ -54,7 +55,7 @@ It is six pages, side by side. Swipe, tap a dot, or press the arrow button:
 The row of buttons at the top is the same on every page: **My position**,
 **Map center** and **Pick a point** choose where the forecast is read; the star
 is **Favorites**; the unit button switches wind between knots and miles per
-hour; then **Wide**, **Next page**, **Refresh** and **Settings**.
+hour; then **Wide**.
 
 ## 3. The forecast
 
@@ -70,7 +71,8 @@ old the reading is.
 - **Next days**: the days ahead.
 - **Sun and moon** for the point.
 
-**Settings** on this page picks the weather service the forecast comes from,
+**Refresh** at the top of this page reads the forecast again. **Forecast
+settings** beside it picks the weather service the forecast comes from,
 what to show, and how coarsely your position is rounded before it leaves the
 device. **Favorites** keeps places by name.
 

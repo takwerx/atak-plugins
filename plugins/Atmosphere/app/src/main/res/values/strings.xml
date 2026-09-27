@@ -258,10 +258,13 @@
     <string name="caption_units">Units</string>
     <string name="caption_full">Full size</string>
     <string name="caption_half">Half size</string>
-    <string name="caption_next_page">Next page</string>
-    <string name="caption_first_page">First page</string>
-    <string name="caption_refresh">Refresh</string>
-    <string name="caption_settings">Settings</string>
+    <string name="forecast_settings">Forecast settings</string>
+    <string name="tab_forecast">Forecast</string>
+    <string name="tab_layers">Layers</string>
+    <string name="tab_spots">Spots</string>
+    <string name="tab_stations">Stations</string>
+    <string name="tab_gauges">Gauges</string>
+    <string name="tab_buoys">Buoys</string>
     <string name="page_forecast">Forecast</string>
     <string name="page_layers">Layers</string>
     <string name="settings">Settings</string>

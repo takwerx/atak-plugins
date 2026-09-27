@@ -157,20 +157,24 @@ public final class AtmospherePane {
     private final ImageButton favoritesButton;
     private final Button unitsButton;
     private final ImageButton wideButton;
-    private final ImageButton pageButton;
     /** The captions under the icon row, and the two whose words follow the state. */
     private LinearLayout iconCaptions;
-    private TextView wideCaption, pageCaption;
+    private TextView wideCaption;
     private View iconRow;
-    /** A button at least this wide carries its caption; narrower, the icon stands alone. */
-    private static final float CAPTION_MIN_DP = 64f;
     private final ViewPager pager;
-    private final LinearLayout pageDots;
+    /** The page buttons, one per page, in two rows of three or one row of six. */
+    private final LinearLayout pageTabs;
+    private Button[] tabButtons;
+    private int tabsPerRow;
+    /** Six page buttons go in one row when each would get at least this much. */
+    private static final float TAB_ROW_MIN_DP = 90f;
+    private static final int[] TAB_NAMES = { R.string.tab_forecast, R.string.tab_layers,
+            R.string.tab_spots, R.string.tab_stations, R.string.tab_gauges, R.string.tab_buoys };
     private final View[] pages;
     /** Page 3, its own class; the pane only hosts it. */
     private final SpotPage spotPage;
-    private final ImageButton refreshButton;
-    private final ImageButton settingsButton;
+    private final Button refreshButton;
+    private final Button settingsButton;
     private final TextView positionText;
     private final TextView statusText;
     private final TextView currentHeading;
@@ -483,11 +487,9 @@ public final class AtmospherePane {
                 buoyPage.view()
         };
         pager = root.findViewById(R.id.pager);
-        pageDots = root.findViewById(R.id.page_dots);
-        pageButton = root.findViewById(R.id.page_button);
+        pageTabs = root.findViewById(R.id.page_tabs);
         iconCaptions = root.findViewById(R.id.icon_captions);
         wideCaption = root.findViewById(R.id.cap_wide);
-        pageCaption = root.findViewById(R.id.cap_page);
         iconRow = root.findViewById(R.id.icon_row);
         wireCaptions(iconRow);
         wirePager();
@@ -1137,43 +1139,75 @@ public final class AtmospherePane {
                     buoyPage.refresh();
             }
         });
+        tabButtons = new Button[pages.length];
         for (int i = 0; i < pages.length; i++) {
-            final View dot = new View(pluginContext);
-            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(9), dp(9));
-            lp.setMargins(dp(4), 0, dp(4), 0);
-            dot.setLayoutParams(lp);
-            final android.graphics.drawable.GradientDrawable bg =
-                    new android.graphics.drawable.GradientDrawable();
-            bg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            bg.setColor(Color.WHITE);
-            dot.setBackground(bg);
             final int page = i;
-            dot.setOnClickListener(new View.OnClickListener() {
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, pageTabs, false);
+            b.setText(i < TAB_NAMES.length ? TAB_NAMES[i] : R.string.empty);
+            b.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     pager.setCurrentItem(page, true);
                 }
             });
-            pageDots.addView(dot);
+            tabButtons[i] = b;
         }
-        updatePageDots(0);
-        pageButton.setOnClickListener(new View.OnClickListener() {
+        arrangeTabs(3);
+        pageTabs.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
             @Override
-            public void onClick(View v) {
-                pager.setCurrentItem((pager.getCurrentItem() + 1) % pages.length, true);
+            public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                    int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                if (right - left == oldRight - oldLeft)
+                    return;
+                final int width = right - left;
+                v.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        final float dp = width / pluginContext.getResources().getDisplayMetrics().density;
+                        arrangeTabs(dp / pages.length >= TAB_ROW_MIN_DP ? pages.length : 3);
+                    }
+                });
             }
         });
+        updatePageDots(0);
     }
 
+    /** Lay the page buttons out {@code perRow} to a row; a no-op when they already are. */
+    private void arrangeTabs(int perRow) {
+        if (perRow == tabsPerRow || tabButtons == null)
+            return;
+        tabsPerRow = perRow;
+        for (Button b : tabButtons) {
+            final ViewParent parent = b.getParent();
+            if (parent instanceof ViewGroup)
+                ((ViewGroup) parent).removeView(b);
+        }
+        pageTabs.removeAllViews();
+        LinearLayout row = null;
+        for (int i = 0; i < tabButtons.length; i++) {
+            if (i % perRow == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                pageTabs.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.leftMargin = dp(2);
+            lp.rightMargin = dp(2);
+            lp.topMargin = dp(2);
+            row.addView(tabButtons[i], lp);
+        }
+    }
+
+    /** The page showing has its name in green (the Traffic toggle convention). */
     private void updatePageDots(int current) {
-        for (int i = 0; i < pageDots.getChildCount(); i++)
-            pageDots.getChildAt(i).setAlpha(i == current ? 1f : 0.35f);
-        // The arrow points at the page it will go to: right until the last page,
-        // then mirrored, since from there it goes back to the first.
-        pageButton.setScaleX(current == pages.length - 1 ? -1f : 1f);
-        if (pageCaption != null)
-            pageCaption.setText(current == pages.length - 1 ? R.string.caption_first_page
-                    : R.string.caption_next_page);
+        if (tabButtons == null)
+            return;
+        final int on = pluginContext.getResources().getColor(R.color.state_on);
+        for (int i = 0; i < tabButtons.length; i++)
+            tabButtons[i].setTextColor(i == current ? on : Color.WHITE);
     }
 
     /**
@@ -1217,16 +1251,31 @@ public final class AtmospherePane {
             });
     }
 
+    /**
+     * Captions show only when every one of them fits whole under its button: a
+     * row of "My posit..." and "Map cen..." explains nothing (half width with six
+     * buttons, XCover 2026-09-27, where a plain width rule let them through).
+     * Measured with each caption's own paint, so the text size and the words
+     * decide, not a guess.
+     */
     private void updateCaptions(View iconRow) {
         final int buttons = ((ViewGroup) iconRow).getChildCount();
-        if (buttons == 0)
+        if (buttons == 0 || iconRow.getWidth() == 0)
             return;
-        final float density = iconRow.getResources().getDisplayMetrics().density;
-        final boolean room = iconRow.getWidth() / (float) buttons / density >= CAPTION_MIN_DP;
-        iconCaptions.setVisibility(room ? View.VISIBLE : View.GONE);
         if (wideCaption != null)
             wideCaption.setText(host != null && host.isWide() ? R.string.caption_half
                     : R.string.caption_full);
+        // Each caption gets the button's share of the row less the two margins.
+        final float room = iconRow.getWidth() / (float) buttons - dp(4);
+        boolean fits = true;
+        for (int i = 0; i < iconCaptions.getChildCount() && fits; i++) {
+            final View c = iconCaptions.getChildAt(i);
+            if (c instanceof TextView) {
+                final TextView t = (TextView) c;
+                fits = t.getPaint().measureText(t.getText().toString()) <= room;
+            }
+        }
+        iconCaptions.setVisibility(fits ? View.VISIBLE : View.GONE);
     }
 
     /** The drop-down hosting this pane; the wide toggle needs it. */

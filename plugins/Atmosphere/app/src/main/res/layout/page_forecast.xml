@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Page 1: the forecast for the point. Opens first; the LAYERS page is a swipe
-     or the arrow away. -->
+<!-- Page 1: the forecast for the point. Opens first; the other pages are a swipe
+     or a tap on their names away. -->
 <!-- focusableInTouchMode + beforeDescendants: the scroller takes focus itself,
      so a rebuilt button (the chip row, the layer toggles) cannot pull the page down
      to itself on the next layout. Without it the forecast opened scrolled past the
@@ -17,6 +17,32 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingBottom="8dp">
+
+        <!-- The two controls that act on the forecast alone, moved here from the
+             top row when the pages got their own buttons (2026-09-27). -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/refresh_button"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="4dp"
+                android:text="@string/refresh" />
+
+            <Button
+                android:id="@+id/settings_button"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/forecast_settings" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/position_text"
