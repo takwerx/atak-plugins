@@ -2071,7 +2071,32 @@ public final class AtmospherePane {
             b.setLayoutParams(lp);
             warnGroups.addView(b);
         }
+        // The lower tier, off by default: advisories and statements are most of
+        // the feed and IPAWS already shows them. Tagged with a string, not a
+        // group, so the group loop above leaves it alone.
+        final Button adv = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, warnGroups, false);
+        adv.setText("Advisories");
+        adv.setTextSize(13);
+        adv.setTag(ADVISORIES_TAG);
+        adv.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (warnings == null)
+                    return;
+                warnings.setAdvisories(!warnings.showsAdvisories());
+                updateWarnGroups();
+            }
+        });
+        final LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        alp.rightMargin = dp(4);
+        alp.topMargin = dp(4);
+        adv.setLayoutParams(alp);
+        warnGroups.addView(adv);
     }
+
+    private static final String ADVISORIES_TAG = "advisories";
 
     private void updateWarnGroups() {
         for (int i = 0; i < warnGroups.getChildCount(); i++) {
@@ -2079,6 +2104,10 @@ public final class AtmospherePane {
             if (v instanceof Button && v.getTag() instanceof NwsAlerts.Group)
                 ((Button) v).setTextColor(warnings != null
                         && warnings.isShowing((NwsAlerts.Group) v.getTag())
+                        ? pluginContext.getResources().getColor(R.color.state_on)
+                        : Color.WHITE);
+            else if (v instanceof Button && ADVISORIES_TAG.equals(v.getTag()))
+                ((Button) v).setTextColor(warnings != null && warnings.showsAdvisories()
                         ? pluginContext.getResources().getColor(R.color.state_on)
                         : Color.WHITE);
         }

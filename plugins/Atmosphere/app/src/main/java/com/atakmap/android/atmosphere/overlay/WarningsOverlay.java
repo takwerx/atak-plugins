@@ -86,6 +86,8 @@ public final class WarningsOverlay {
     /** What each drawn alert covers, for "in effect here". Replaced whole, never edited. */
     private volatile List<Covered> covered = new ArrayList<>();
     private final Map<NwsAlerts.Group, Boolean> groups = new HashMap<>();
+    private static final String PREF_ADVISORIES = "weather.layer.warnings.advisories";
+    private boolean advisories;
 
     /** An alert and the area it is drawn over. */
     public static final class Covered {
@@ -119,6 +121,7 @@ public final class WarningsOverlay {
         for (NwsAlerts.Group g : NwsAlerts.Group.values())
             groups.put(g, p == null ? g != NwsAlerts.Group.MARINE
                     : p.getBoolean(PREF_GROUP + g.name(), g != NwsAlerts.Group.MARINE));
+        advisories = p != null && p.getBoolean(PREF_ADVISORIES, false);
     }
 
     public void setListener(Listener l) {
@@ -181,6 +184,22 @@ public final class WarningsOverlay {
 
     public boolean isShowing(NwsAlerts.Group g) {
         return Boolean.TRUE.equals(groups.get(g));
+    }
+
+    public boolean showsAdvisories() {
+        return advisories;
+    }
+
+    /** Advisories and statements on or off; redrawn from what is held, no new poll. */
+    public void setAdvisories(boolean show) {
+        if (advisories == show)
+            return;
+        advisories = show;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putBoolean(PREF_ADVISORIES, show).apply();
+        if (on)
+            rebuild(0, generation);
     }
 
     /** Switch a group; redrawn from what is already held, no new poll. */
@@ -323,6 +342,7 @@ public final class WarningsOverlay {
     private void rebuild(final int round, final int mine) {
         final List<NwsAlerts.Alert> snapshot = new ArrayList<>(alerts);
         final Map<NwsAlerts.Group, Boolean> show = new HashMap<>(groups);
+        final boolean withAdvisories = advisories;
         worker.execute(new Runnable() {
             @Override
             public void run() {
@@ -334,6 +354,8 @@ public final class WarningsOverlay {
                 int shown = 0, waiting = 0;
                 for (NwsAlerts.Alert a : snapshot) {
                     if (!Boolean.TRUE.equals(show.get(a.group)))
+                        continue;
+                    if (a.advisory && !withAdvisories)
                         continue;
                     shown++;
                     final List<JSONObject> parts = new ArrayList<>();

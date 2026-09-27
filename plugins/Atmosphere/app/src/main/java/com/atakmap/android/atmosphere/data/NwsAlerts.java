@@ -88,7 +88,11 @@ public final class NwsAlerts {
             }
             zones = Collections.unmodifiableList(z);
             this.group = group;
+            this.advisory = advisory(event);
         }
+
+        /** True for the lower tier (advisory, statement, alert), drawn only when asked. */
+        public final boolean advisory;
 
         /** When it stops being in effect: ends if stated, else when the message expires. */
         public long until() {
@@ -119,6 +123,17 @@ public final class NwsAlerts {
     }
 
     /**
+     * The lower tier: advisories, statements and alerts that are neither a warning
+     * nor a watch. Kept out of the map unless asked for, because they are most of
+     * the feed (319 of 406 on 2026-09-26) and IPAWS already shows them; the operator
+     * asked for them by name after "nothing within 50 mi" sat beside IPAWS's Beach
+     * Hazards Statement.
+     */
+    public static boolean advisory(String event) {
+        return event != null && !drawn(event) && !event.isEmpty();
+    }
+
+    /**
      * Every alert Atmosphere draws, the most urgent LAST, so inserting in list order
      * puts it on top. Tests and anything not "Actual" are dropped whatever the URL asked.
      */
@@ -131,7 +146,7 @@ public final class NwsAlerts {
             if (p == null || !"Actual".equals(p.optString("status", "")))
                 continue;
             final String event = p.optString("event", "");
-            if (!drawn(event))
+            if (!drawn(event) && !advisory(event))
                 continue;
             final JSONObject g = f.optJSONObject("geometry");
             out.add(new Alert(p, g, groupOf(event, ugc(p))));

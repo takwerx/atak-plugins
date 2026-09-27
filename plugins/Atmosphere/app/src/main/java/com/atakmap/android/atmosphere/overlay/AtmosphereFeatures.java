@@ -314,6 +314,60 @@ final class AtmosphereFeatures {
                 : String.format(java.util.Locale.US, "%.5f,%.5f", at.getLatitude(), at.getLongitude()));
     }
 
+    /**
+     * Where a polygon's label goes: a point INSIDE it. The envelope's center is
+     * not one for a multi-zone warning (a 19-zone Flood Watch's center fell in a
+     * gap between zones, and "Flood Watch" sat over ground the watch did not
+     * cover; operator, 2026-09-26) or for a concave shape. So: the polygon with
+     * the largest envelope, and on it the midpoint of the widest run of inside at
+     * its middle latitude, which is inside by construction. {lat, lon}, or the
+     * envelope center when the shape is degenerate.
+     */
+    static double[] labelPoint(com.atakmap.map.layer.feature.geometry.Geometry g) {
+        Polygon biggest = null;
+        double biggestArea = -1;
+        final java.util.List<com.atakmap.map.layer.feature.geometry.Geometry> stack = new java.util.ArrayList<>();
+        stack.add(g);
+        while (!stack.isEmpty()) {
+            final com.atakmap.map.layer.feature.geometry.Geometry x = stack.remove(stack.size() - 1);
+            if (x instanceof com.atakmap.map.layer.feature.geometry.GeometryCollection) {
+                stack.addAll(((com.atakmap.map.layer.feature.geometry.GeometryCollection) x).getGeometries());
+            } else if (x instanceof Polygon) {
+                final com.atakmap.map.layer.feature.geometry.Envelope e = x.getEnvelope();
+                final double area = e == null ? 0 : (e.maxX - e.minX) * (e.maxY - e.minY);
+                if (area > biggestArea) {
+                    biggestArea = area;
+                    biggest = (Polygon) x;
+                }
+            }
+        }
+        if (biggest == null)
+            return com.atakmap.android.atmosphere.data.GeoJson.center(g);
+        final com.atakmap.map.layer.feature.geometry.Envelope e = biggest.getEnvelope();
+        final LineString ring = biggest.getExteriorRing();
+        if (e == null || ring == null || ring.getNumPoints() < 3)
+            return com.atakmap.android.atmosphere.data.GeoJson.center(g);
+        final double midLat = (e.minY + e.maxY) / 2;
+        // Every crossing of the middle latitude, sorted: inside runs are between pairs.
+        final java.util.List<Double> xs = new java.util.ArrayList<>();
+        final int n = ring.getNumPoints();
+        for (int i = 0, j = n - 1; i < n; j = i++) {
+            final double xi = ring.getX(i), yi = ring.getY(i), xj = ring.getX(j), yj = ring.getY(j);
+            if ((yi > midLat) != (yj > midLat))
+                xs.add(xj + (midLat - yj) * (xi - xj) / (yi - yj));
+        }
+        java.util.Collections.sort(xs);
+        double bestW = -1, bestMid = (e.minX + e.maxX) / 2;
+        for (int i = 0; i + 1 < xs.size(); i += 2) {
+            final double w = xs.get(i + 1) - xs.get(i);
+            if (w > bestW) {
+                bestW = w;
+                bestMid = (xs.get(i) + xs.get(i + 1)) / 2;
+            }
+        }
+        return new double[] { midLat, bestMid };
+    }
+
     /** The label text of a polygon's style, or null when it is a point, a line or unlabeled. */
     private static String centerLabelOf(com.atakmap.map.layer.feature.geometry.Geometry g, Style s) {
         if (!(g instanceof Polygon) && !(g instanceof com.atakmap.map.layer.feature.geometry.GeometryCollection))
@@ -994,7 +1048,7 @@ final class AtmosphereFeatures {
                             centered == null ? d.style : withoutLabel(d.style),
                             d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
                     if (centered != null) {
-                        final double[] c = com.atakmap.android.atmosphere.data.GeoJson.center(d.geometry);
+                        final double[] c = labelPoint(d.geometry);
                         if (c != null) {
                             final AttributeSet la = new AttributeSet();
                             la.setAttribute("_labelOnly", 1);
