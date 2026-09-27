@@ -590,6 +590,8 @@ public final class BuoyOverlay {
         row(out, "Visibility", Double.isNaN(g.visibilityNmi) ? "" : String.format(Locale.US, "%.1f nmi", g.visibilityNmi));
         row(out, "Tide", Double.isNaN(g.tideFt) ? "" : String.format(Locale.US, "%.1f ft above MLLW", g.tideFt));
         row(out, "Observed", when(g.observedAt, now));
+        // The full NDBC name, with its bearing and state, when the label shortened it.
+        row(out, "Station name", g.name == null || g.name.trim().equals(g.label()) ? "" : g.name.trim());
         row(out, "Station type", g.type);
         row(out, "Owner", g.owner);
         row(out, "Station id", g.id);

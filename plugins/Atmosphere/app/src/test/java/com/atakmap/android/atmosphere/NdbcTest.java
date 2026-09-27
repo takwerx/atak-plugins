@@ -69,7 +69,8 @@ public class NdbcTest {
         final List<Ndbc.Buoy> b = Ndbc.parseObs(OBS);
         assertEquals("44013", b.get(0).label());            // the id until named
         Ndbc.name(b, t);
-        assertEquals("BOSTON 16 NM East of Boston, MA", b.get(0).label());
+        assertEquals("Boston", b.get(0).label());                       // the place, not the bearing
+        assertEquals("BOSTON 16 NM East of Boston, MA", b.get(0).name);  // the record keeps the whole name
         assertEquals("Waverider Buoy", b.get(1).type);
     }
 
@@ -79,5 +80,26 @@ public class NdbcTest {
         assertEquals(1, Ndbc.within(b, 42.3, -70.6, 25).size());
         assertEquals(2, Ndbc.within(b, 41.0, -72.5, 150).size());
         assertEquals(0, Ndbc.within(b, 40.0, -124.0, 25).size());
+    }
+
+    @Test
+    public void shortNamesArePlaces() {
+        assertEquals("Cape San Martin", Ndbc.shortName("CAPE SAN MARTIN - 55NM West NW of Morro Bay, CA"));
+        assertEquals("East Santa Barbara", Ndbc.shortName("EAST SANTA BARBARA  - 12NM Southwest of Santa Barbara, CA"));
+        assertEquals("West Santa Barbara", Ndbc.shortName("WEST SANTA BARBARA  38 NM West of Santa Barbara, CA"));
+        assertEquals("Santa Monica Basin", Ndbc.shortName("Santa Monica Basin - 33NM WSW of Santa Monica, CA"));
+        assertEquals("Pt. San Luis", Ndbc.shortName("Pt. San Luis, CA - 18 NM South Southwest of Morro Bay, CA"));
+        assertEquals("San Diego", Ndbc.shortName("9410170 - San Diego, CA"));
+        assertEquals("Santa Monica Bay", Ndbc.shortName("Santa Monica Bay, CA (028)"));
+        assertEquals("Ventura Nearshore", Ndbc.shortName("Ventura Nearshore, CA - 169"));
+        assertEquals("Aptos Creek Nearshore", Ndbc.shortName("Aptos Creek Nearshore, CA 275"));
+        assertEquals("Cabrillo Point, Monterey Bay", Ndbc.shortName("Cabrillo Point, Monterey Bay, CA  (158)"));
+        assertEquals("SCRIPPS Nearshore", Ndbc.shortName("SCRIPPS Nearshore, CA (201)"));
+        assertEquals("Sturgeon Bay CG Station", Ndbc.shortName("Sturgeon Bay CG Station, WI"));
+        assertEquals("SD 1063", Ndbc.shortName("SD 1063 - 24 NM SSW of San Francisco, CA (Site of 46012)"));
+        assertEquals("Pt Arena", Ndbc.shortName("PT ARENA - 19NM North of Point Arena, CA"));
+        assertEquals("Reggae", Ndbc.shortName("Reggae"));
+        assertEquals("", Ndbc.shortName(null));
+        assertEquals("", Ndbc.shortName("  "));
     }
 }

@@ -116,10 +116,58 @@ public final class Ndbc {
             return humidity(airTempC, dewpointC);
         }
 
-        /** The station's label: its name, or its id when the table has not loaded. */
+        /** The station's label: the short form of its name, or its id when the table has not loaded. */
         public String label() {
-            return name == null || name.isEmpty() ? id : name;
+            final String s = shortName(name);
+            return s.isEmpty() ? id : s;
         }
+    }
+
+    /**
+     * The name a person calls the station: "Cape San Martin" from NDBC's "CAPE SAN
+     * MARTIN - 55NM West NW of Morro Bay, CA" (operator, 2026-09-26: "can it just be
+     * cape san martin?").
+     *
+     * <p>The table names a station four ways, measured over its 1,940 rows: a CO-OPS
+     * id then the place ("9410170 - San Diego, CA"); a headline then a bearing
+     * ("CAPE SAN MARTIN - 55NM ...", once with no dash at all, "WEST SANTA BARBARA
+     * 38 NM West of ..."); a place with its state and CDIP number ("Santa Monica
+     * Bay, CA (028)", "Ventura Nearshore, CA - 169", "Aptos Creek Nearshore, CA
+     * 275"); or a bare place. The bearing, the state and the number stay in the
+     * record; the pill, the list and the title get the place. A drifter's "SD 1063"
+     * is left alone: a name with a number in it is not title-cased.
+     */
+    public static String shortName(String full) {
+        if (full == null)
+            return "";
+        String s = full.trim().replaceAll("\\s+", " ");
+        if (s.isEmpty())
+            return "";
+        final java.util.regex.Matcher coops = java.util.regex.Pattern
+                .compile("^\\d{7} - (.+)$").matcher(s);
+        if (coops.matches()) {
+            s = coops.group(1);
+        } else if (s.contains(" - ")) {
+            s = s.substring(0, s.indexOf(" - "));
+        } else {
+            s = s.replaceFirst("\\s+\\d+\\s*NM\\b.*$", "");
+        }
+        s = s.replaceFirst("[\\s-]+\\(?\\d{3}\\)?\\s*$", "");    // the CDIP number
+        s = s.replaceFirst(",\\s*[A-Z]{2}\\s*$", "");              // the state
+        s = s.trim();
+        if (s.equals(s.toUpperCase(Locale.US)) && !s.matches(".*\\d.*")) {
+            final StringBuilder b = new StringBuilder();
+            for (String w : s.split(" ")) {
+                if (w.isEmpty())
+                    continue;
+                if (b.length() > 0)
+                    b.append(' ');
+                b.append(Character.toUpperCase(w.charAt(0)))
+                        .append(w.substring(1).toLowerCase(Locale.US));
+            }
+            s = b.toString();
+        }
+        return s;
     }
 
     /** Magnus, over water: RH = 100 * e(Td) / e(T). Within half a percent of the tables. */
