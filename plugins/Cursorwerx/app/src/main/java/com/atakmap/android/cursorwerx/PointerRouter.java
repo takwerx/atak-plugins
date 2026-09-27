@@ -74,7 +74,7 @@ public final class PointerRouter {
                     return true;
                 final String scrolled = overUi ? scrollUnder(event) : null;
                 if (verbose)
-                    Log.d(TAG, "wheel at " + (int) event.getRawX() + ","
+                    Log.d(TAG, "wheel " + event.getAxisValue(MotionEvent.AXIS_VSCROLL) + " at " + (int) event.getRawX() + ","
                             + (int) event.getRawY() + " -> "
                             + (overUi ? "UI (map vetoed): " + describe(lastHit)
                                     + (scrolled != null ? ", scrolled " + scrolled : ", nothing to scroll")

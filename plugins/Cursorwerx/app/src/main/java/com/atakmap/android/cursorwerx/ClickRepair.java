@@ -55,6 +55,8 @@ public final class ClickRepair {
     private final Activity activity;
     private Wrapper wrapper;
     private boolean verbose;
+    /** The press in progress lands on a WebView and goes through as a finger. */
+    private boolean pressOnWeb;
 
     public ClickRepair(Activity activity) {
         this.activity = activity;
@@ -125,13 +127,17 @@ public final class ClickRepair {
      * is up. Coordinates, timing, pointer ids and flags are kept.
      */
     private static MotionEvent reshaped(MotionEvent e, int source) {
+        return reshaped(e, source, MotionEvent.TOOL_TYPE_MOUSE);
+    }
+
+    private static MotionEvent reshaped(MotionEvent e, int source, int toolType) {
         final int n = e.getPointerCount();
         final MotionEvent.PointerProperties[] props = new MotionEvent.PointerProperties[n];
         final MotionEvent.PointerCoords[] coords = new MotionEvent.PointerCoords[n];
         for (int i = 0; i < n; i++) {
             props[i] = new MotionEvent.PointerProperties();
             e.getPointerProperties(i, props[i]);
-            props[i].toolType = MotionEvent.TOOL_TYPE_MOUSE;
+            props[i].toolType = toolType;
             coords[i] = new MotionEvent.PointerCoords();
             e.getPointerCoords(i, coords[i]);
         }
@@ -141,6 +147,29 @@ public final class ClickRepair {
         return MotionEvent.obtain(e.getDownTime(), e.getEventTime(), e.getAction(), n, props, coords,
                 e.getMetaState(), buttons, e.getXPrecision(), e.getYPrecision(), e.getDeviceId(),
                 e.getEdgeFlags(), source, e.getFlags());
+    }
+
+    /** Whether a WebView lies under a window point, looking through views that do not
+     *  take touches (the pointer shroud, plain overlays), the way ViewGroup dispatch does. */
+    private boolean webViewUnder(float x, float y) {
+        return webViewUnder(activity.getWindow().getDecorView(), x, y, new int[2]);
+    }
+
+    private static boolean webViewUnder(View v, float x, float y, int[] loc) {
+        if (v.getVisibility() != View.VISIBLE)
+            return false;
+        v.getLocationInWindow(loc);
+        if (x < loc[0] || x >= loc[0] + v.getWidth() || y < loc[1] || y >= loc[1] + v.getHeight())
+            return false;
+        if (v instanceof android.webkit.WebView)
+            return true;
+        if (!(v instanceof android.view.ViewGroup))
+            return false;
+        final android.view.ViewGroup g = (android.view.ViewGroup) v;
+        for (int i = g.getChildCount() - 1; i >= 0; i--)
+            if (webViewUnder(g.getChildAt(i), x, y, loc))
+                return true;
+        return false;
     }
 
     private String focusNow() {
@@ -172,13 +201,23 @@ public final class ClickRepair {
         public boolean dispatchTouchEvent(MotionEvent event) {
             if (bypass || !fromTablet(event))
                 return original.dispatchTouchEvent(event);
-            final MotionEvent fixed = reshaped(event, InputDevice.SOURCE_TOUCHSCREEN);
+            final int action = event.getActionMasked();
+            // A WebView (Esri's sign-in form in Feature Layer, 2026-09-26) drops a press
+            // that is touchscreen-sourced with the mouse tool type: "Show" and "Sign In"
+            // did nothing. It takes a finger. Decided on DOWN, kept for the press.
+            if (action == MotionEvent.ACTION_DOWN)
+                pressOnWeb = webViewUnder(event.getX(), event.getY());
+            final MotionEvent fixed = reshaped(event, InputDevice.SOURCE_TOUCHSCREEN,
+                    pressOnWeb ? MotionEvent.TOOL_TYPE_FINGER : MotionEvent.TOOL_TYPE_MOUSE);
             try {
                 final boolean handled = original.dispatchTouchEvent(fixed);
-                if (verbose && event.getActionMasked() == MotionEvent.ACTION_UP)
+                if (verbose && action == MotionEvent.ACTION_UP)
                     Log.d(TAG, "tablet click at " + (int) event.getX() + "," + (int) event.getY()
                             + " buttons=0x" + Integer.toHexString(event.getButtonState())
+                            + (pressOnWeb ? " as finger (WebView)" : "")
                             + " -> handled=" + handled + ", focus: " + focusNow());
+                if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
+                    pressOnWeb = false;
                 return handled;
             } finally {
                 fixed.recycle();
