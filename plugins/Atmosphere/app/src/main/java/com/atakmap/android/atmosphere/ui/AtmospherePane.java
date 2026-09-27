@@ -2096,12 +2096,16 @@ public final class AtmospherePane {
             warnHere.setText(R.string.empty);
             return;
         }
+        // Named for the point it is read at: "Here" meant nothing to the operator
+        // (2026-09-26: "when it says Here no warning in effect what does that mean").
+        final String label = modeLabel();
+        final String at = "At " + (mode == PointMode.FAVORITE ? label : label.toLowerCase(Locale.US));
         final List<NwsAlerts.Alert> here = warnings.inEffectAt(p.getLatitude(), p.getLongitude());
         if (here.isEmpty()) {
-            warnHere.setText(R.string.warn_here_none);
+            warnHere.setText(at + ": no warnings in effect");
             return;
         }
-        final StringBuilder b = new StringBuilder("Here: ");
+        final StringBuilder b = new StringBuilder(at).append(": ");
         for (int i = 0; i < here.size() && i < 3; i++) {
             if (i > 0)
                 b.append('\n').append("      ");

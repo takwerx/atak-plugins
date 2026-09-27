@@ -154,7 +154,6 @@
     <string name="warn_fire">Fire weather</string>
     <string name="warn_land">Land</string>
     <string name="warn_marine">Marine</string>
-    <string name="warn_here_none">Here: no warnings in effect</string>
     <string name="credit_warnings">Warnings from the US National Weather Service (%1$s)</string>
     <string name="warn_allow_title">Allow warnings</string>
     <string name="warn_allow_text">Warnings come from the US National Weather Service: Red Flag Warnings, Fire Weather Watches and every other warning and watch in effect, drawn in the Weather Service\'s own colors.\n\nTurning it on lets Atmosphere download the country\'s active warnings and the shapes of the areas they cover. Your position is not sent.\n\nServer: api.weather.gov</string>
