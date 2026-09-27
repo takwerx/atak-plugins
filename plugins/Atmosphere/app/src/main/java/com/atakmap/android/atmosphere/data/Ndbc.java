@@ -116,6 +116,11 @@ public final class Ndbc {
             return humidity(airTempC, dewpointC);
         }
 
+        /** Where the reading sits on the NWS marine ladder: sustained wind in knots, seas in feet. */
+        public MarineBand band() {
+            return MarineBand.of(windMs * 1.943844, waveHeightM / 0.3048);
+        }
+
         /** The station's label: the short form of its name, or its id when the table has not loaded. */
         public String label() {
             final String s = shortName(name);

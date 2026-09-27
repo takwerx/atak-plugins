@@ -33,7 +33,7 @@ final class BuoyIcons {
     private static final String TAG = "AtmosphereBuoys";
 
     /** Bump when the drawing changes, or a stale file is served under the same name. */
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
 
     /** NDBC's yellow diamond: a station with recent data. */
     static final int RECENT = 0xFFFFD700;
@@ -87,10 +87,14 @@ final class BuoyIcons {
      * ink and placed by offset, the way the station icon is, with the same signs
      * (x = middle relative to the disc, y = disc relative to the middle).
      */
-    Composed labeled(int color, String reading, String name) {
+    /**
+     * @param readingColor the reading line's text color: the NWS marine band's, white
+     *                     below small craft criteria. Part of the cache key.
+     */
+    Composed labeled(int color, int readingColor, String reading, String name) {
         final String r = reading == null ? "" : reading.trim();
         final String n = name == null ? "" : name.trim();
-        final String key = String.format(Locale.US, "L%08x_%s_v%d_s%d", color,
+        final String key = String.format(Locale.US, "L%08x_%08x_%s_v%d_s%d", color, readingColor,
                 Integer.toHexString((r + "|" + n).hashCode()), VERSION,
                 Math.round(density * 100));
         final Composed hit = labeled.get(key);
@@ -105,6 +109,7 @@ final class BuoyIcons {
         if (textPx <= 0f)
             textPx = 14f * density;
         final Paint big = text(tf, textPx, true);
+        big.setColor(readingColor);
         final Paint small = text(tf, textPx * 0.85f, false);
         final Paint.FontMetricsInt bm = big.getFontMetricsInt();
         final Paint.FontMetricsInt sm = small.getFontMetricsInt();

@@ -13,6 +13,7 @@ import android.widget.TextView;
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.atmosphere.data.Coops;
 import com.atakmap.android.atmosphere.data.Cwf;
+import com.atakmap.android.atmosphere.data.MarineBand;
 import com.atakmap.android.atmosphere.data.Ndbc;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
@@ -108,7 +109,7 @@ public final class BuoyPage {
             return;
         final List<Ndbc.Buoy> all = layer.buoys();
         final GeoPoint from = layer.originPoint();
-        int wind = 0, waves = 0, starred = 0;
+        int wind = 0, waves = 0, starred = 0, rough = 0;
         final List<Ndbc.Buoy> keep = new ArrayList<>();
         for (Ndbc.Buoy g : all) {
             if (g.hasWind())
@@ -117,6 +118,8 @@ public final class BuoyPage {
                 waves++;
             if (layer.isFavorite(g))
                 starred++;
+            if (g.band() != MarineBand.NONE)
+                rough++;
             if (layer.passes(filter, g))
                 keep.add(g);
         }
@@ -128,7 +131,7 @@ public final class BuoyPage {
                 }
             });
         shown = keep;
-        buildFilterRow(all.size(), wind, waves, starred);
+        buildFilterRow(all.size(), wind, waves, rough, starred);
         buildScopeRow();
         status.setText(summary(all.size(), from));
         adapter.notifyDataSetChanged();
@@ -148,18 +151,35 @@ public final class BuoyPage {
                 + layer.miles() + " mi of " + (layer.isFromMe() ? "you" : "the map");
     }
 
-    private void buildFilterRow(int total, int wind, int waves, int starred) {
+    private void buildFilterRow(int total, int wind, int waves, int rough, int starred) {
         filterRow.removeAllViews();
-        filterRow.addView(tile("All (" + total + ")", filter == BuoyOverlay.SHOW_ALL, 0,
+        // Two rows: five tiles at the standard text size do not fit one row of the
+        // half-width pane ("Rough..." and the star, XCover, 2026-09-26). The first row
+        // is what a buoy reports; the second is what its reading means.
+        filterRow.setOrientation(LinearLayout.VERTICAL);
+        final LinearLayout reports = new LinearLayout(pluginContext);
+        reports.setOrientation(LinearLayout.HORIZONTAL);
+        reports.addView(tile("All (" + total + ")", filter == BuoyOverlay.SHOW_ALL, 0,
                 BuoyOverlay.SHOW_ALL));
-        filterRow.addView(tile("Wind (" + wind + ")", filter == BuoyOverlay.SHOW_WIND,
+        reports.addView(tile("Wind (" + wind + ")", filter == BuoyOverlay.SHOW_WIND,
                 0, BuoyOverlay.SHOW_WIND));
-        filterRow.addView(tile("Seas (" + waves + ")", filter == BuoyOverlay.SHOW_WAVES,
+        reports.addView(tile("Seas (" + waves + ")", filter == BuoyOverlay.SHOW_WAVES,
                 0, BuoyOverlay.SHOW_WAVES));
-        final View fav = tile("\u2605 (" + starred + ")", filter == BuoyOverlay.SHOW_FAVORITES,
-                StationPage.STAR_ON, BuoyOverlay.SHOW_FAVORITES);
-        ((LinearLayout.LayoutParams) fav.getLayoutParams()).weight = 0.6f;
-        filterRow.addView(fav);
+        final LinearLayout means = new LinearLayout(pluginContext);
+        means.setOrientation(LinearLayout.HORIZONTAL);
+        // Small craft criteria or worse by the buoy's own reading, the station list's
+        // "Red Flag (n)" for the water (operator, 2026-09-26).
+        means.addView(tile("Rough (" + rough + ")", filter == BuoyOverlay.SHOW_ROUGH,
+                MarineBand.GALE.color, BuoyOverlay.SHOW_ROUGH));
+        means.addView(tile("\u2605 Favorites (" + starred + ")", filter == BuoyOverlay.SHOW_FAVORITES,
+                StationPage.STAR_ON, BuoyOverlay.SHOW_FAVORITES));
+        final LinearLayout.LayoutParams full = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        filterRow.addView(reports, full);
+        final LinearLayout.LayoutParams under = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        under.topMargin = dp(4);
+        filterRow.addView(means, under);
     }
 
     private void buildScopeRow() {

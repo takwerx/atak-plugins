@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.compat.ScaleBar;
 import com.atakmap.android.atmosphere.data.BuoyFavorites;
+import com.atakmap.android.atmosphere.data.MarineBand;
 import com.atakmap.android.atmosphere.data.Ndbc;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
@@ -57,10 +58,18 @@ public final class BuoyOverlay {
     public static final int[] RADII = { 25, 50, 100, 250 };
     private static final int DEFAULT_MILES = 100;
 
-    /** NDBC's legend, in its words. */
+    /**
+     * NDBC's legend for the diamond, in its words, then the NWS marine bands the
+     * reading is colored by (weather.gov's colors for the matching products).
+     */
     public static final String[][] LEGEND = {
             { "Recent data", String.valueOf(BuoyIcons.RECENT) },
-            { "No data in the last 8 hours", String.valueOf(BuoyIcons.SILENT) } };
+            { "No data in the last 8 hours", String.valueOf(BuoyIcons.SILENT) },
+            { "Small craft criteria: " + MarineBand.SMALL_CRAFT.fromKt + " kt or seas "
+                    + Math.round(MarineBand.SEAS_FT) + " ft", String.valueOf(MarineBand.SMALL_CRAFT.color) },
+            { "Gale force: " + MarineBand.GALE.fromKt + " kt", String.valueOf(MarineBand.GALE.color) },
+            { "Storm force: " + MarineBand.STORM.fromKt + " kt", String.valueOf(MarineBand.STORM.color) },
+            { "Hurricane force: " + MarineBand.HURRICANE.fromKt + " kt", String.valueOf(MarineBand.HURRICANE.color) } };
     /** The station table, fetched once and kept for the session. */
     private java.util.Map<String, Ndbc.Station> stations;
     /** The whole file's stations, so a scope change needs no request. */
@@ -74,6 +83,8 @@ public final class BuoyOverlay {
     public static final int SHOW_WAVES = 2;
     /** Only the starred ones. */
     public static final int SHOW_FAVORITES = 3;
+    /** The ones at small craft criteria or worse, by their own reading. */
+    public static final int SHOW_ROUGH = 4;
     private static final String PREF_SHOW = "weather.layer.buoys.show";
     private static final String PREF_GATE = "weather.layer.buoys.gate";
     private static final String PREF_LABEL_GATE = "weather.layer.buoys.labelgate";
@@ -256,6 +267,8 @@ public final class BuoyOverlay {
             return g.hasWind();
         if (show == SHOW_WAVES)
             return g.hasWaves();
+        if (show == SHOW_ROUGH)
+            return g.band() != MarineBand.NONE;
         return true;
     }
 
@@ -529,7 +542,8 @@ public final class BuoyOverlay {
             final String set = !recent ? "No data in 8 hours" : g.hasWind() ? "Wind reported" : "Seas only";
             final AtmosphereFeatures.Drawn d;
             if (withLabels && onScreen(g, view)) {
-                final BuoyIcons.Composed c = icons.labeled(color, pillReading(g, system), g.label());
+                final BuoyIcons.Composed c = icons.labeled(color, g.band().color,
+                        pillReading(g, system), g.label());
                 if (c == null)
                     continue;
                 d = new AtmosphereFeatures.Drawn(set, g.label(),
@@ -581,12 +595,16 @@ public final class BuoyOverlay {
                 + (Double.isNaN(g.dominantPeriodS) ? "" : " every " + Math.round(g.dominantPeriodS) + " s")
                 + direction(g.waveFromDeg));
         row(out, "Average period", Double.isNaN(g.averagePeriodS) ? "" : Math.round(g.averagePeriodS) + " s");
+        if (g.hasWind() || g.hasWaves()) {
+            row(out, "Conditions", g.band().describe(g.windMs * 1.943844, g.waveHeightM / 0.3048));
+            row(out, "Criteria", MarineBand.basis());
+        }
         row(out, "Air temperature", temp(g.airTempC, system));
         row(out, "Water temperature", temp(g.waterTempC, system));
         row(out, "Humidity", Double.isNaN(g.relativeHumidity()) ? ""
                 : Math.round(g.relativeHumidity()) + "% (from dewpoint " + temp(g.dewpointC, system) + ")");
         row(out, "Pressure", Double.isNaN(g.pressureHpa) ? "" : Units.format(Quantity.PRESSURE, g.pressureHpa, system)
-                + (Double.isNaN(g.pressureTendencyHpa) ? "" : String.format(Locale.US, ", %+.1f hPa in 3 h", g.pressureTendencyHpa)));
+                + (Double.isNaN(g.pressureTendencyHpa) ? "" : tendency(g.pressureTendencyHpa, system)));
         row(out, "Visibility", Double.isNaN(g.visibilityNmi) ? "" : String.format(Locale.US, "%.1f nmi", g.visibilityNmi));
         row(out, "Tide", Double.isNaN(g.tideFt) ? "" : String.format(Locale.US, "%.1f ft above MLLW", g.tideFt));
         row(out, "Observed", when(g.observedAt, now));
@@ -661,6 +679,17 @@ public final class BuoyOverlay {
                 append(b, "No current reading");
         }
         return b.toString();
+    }
+
+    /**
+     * ", -0.03 inHg in 3 h" in the pressure's own unit. The row read "29.80 inHg,
+     * -1.0 hPa in 3 h" on the aviation setting (2026-09-26); a change converts
+     * like a value because the scale has no offset.
+     */
+    private static String tendency(double hPa, UnitSystem system) {
+        final double d = Units.toDisplay(Quantity.PRESSURE, hPa, system);
+        final String unit = Units.displayUnit(Quantity.PRESSURE, system);
+        return String.format(Locale.US, unit.equals("inHg") ? ", %+.2f %s in 3 h" : ", %+.1f %s in 3 h", d, unit);
     }
 
     private static void row(List<String[]> out, String label, String value) {

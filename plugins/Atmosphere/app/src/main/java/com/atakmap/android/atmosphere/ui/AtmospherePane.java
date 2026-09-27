@@ -1925,13 +1925,28 @@ public final class AtmospherePane {
 
     private void buildBuoysShowRow() {
         buoysShowRow.removeAllViews();
-        buoyShowTile("All", BuoyOverlay.SHOW_ALL, 0);
-        buoyShowTile("Wind", BuoyOverlay.SHOW_WIND, 0);
-        buoyShowTile("Seas", BuoyOverlay.SHOW_WAVES, 0);
-        buoyShowTile("\u2605 Favorites", BuoyOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
+        // Two rows, as on the buoy list: what a buoy reports, then what its reading
+        // means. Five tiles overflow one row of the half-width pane.
+        buoysShowRow.setOrientation(LinearLayout.VERTICAL);
+        final LinearLayout reports = new LinearLayout(pluginContext);
+        reports.setOrientation(LinearLayout.HORIZONTAL);
+        buoyShowTile(reports, "All", BuoyOverlay.SHOW_ALL, 0);
+        buoyShowTile(reports, "Wind", BuoyOverlay.SHOW_WIND, 0);
+        buoyShowTile(reports, "Seas", BuoyOverlay.SHOW_WAVES, 0);
+        final LinearLayout means = new LinearLayout(pluginContext);
+        means.setOrientation(LinearLayout.HORIZONTAL);
+        buoyShowTile(means, "Rough", BuoyOverlay.SHOW_ROUGH,
+                com.atakmap.android.atmosphere.data.MarineBand.GALE.color);
+        buoyShowTile(means, "\u2605 Favorites", BuoyOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
+        buoysShowRow.addView(reports, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        final LinearLayout.LayoutParams under = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        under.topMargin = dp(4);
+        buoysShowRow.addView(means, under);
     }
 
-    private void buoyShowTile(String label, final int value, int color) {
+    private void buoyShowTile(LinearLayout row, String label, final int value, int color) {
         final boolean chosen = buoyLayer.show() == value;
         final Button b = (Button) LayoutInflater.from(pluginContext)
                 .inflate(R.layout.trend_chip, buoysShowRow, false);
@@ -1953,7 +1968,7 @@ public final class AtmospherePane {
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         lp.rightMargin = dp(4);
         b.setLayoutParams(lp);
-        buoysShowRow.addView(b);
+        row.addView(b);
     }
 
     private void buildBuoysGateRows() {
