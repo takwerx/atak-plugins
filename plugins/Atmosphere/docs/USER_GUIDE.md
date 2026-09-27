@@ -42,8 +42,8 @@ Open Atmosphere from the ATAK toolbar, or from Tools if it is not on the bar.
 The pane opens at half width; **Wide** makes it full width and back, and at full width each button in the top row has its name written under it. Back closes
 it, or narrows a wide one first.
 
-It is six pages, side by side. Swipe, or tap a page's name in the row of page
-buttons under the top row; the page showing has its name in green:
+It is six pages, side by side. Swipe, use the arrows at the right end of the
+top row, or tap the page's name between them for a list of all six:
 
 1. **Forecast** — the readout for a point.
 2. **Layers** — every map layer, its switch and its settings.
@@ -55,7 +55,7 @@ buttons under the top row; the page showing has its name in green:
 The row of buttons at the top is the same on every page: **My position**,
 **Map center** and **Pick a point** choose where the forecast is read; the star
 is **Favorites**; the unit button switches wind between knots and miles per
-hour; then **Wide**.
+hour; then **Wide**, and the page controls.
 
 ## 3. The forecast
 

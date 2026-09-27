@@ -9,9 +9,9 @@
     android:layout_marginLeft="3dp"
     android:layout_marginRight="3dp">
 
-        <!-- The icon row: what applies to every page: point modes, favorites,
-             units, wide. Refresh and Settings act on the forecast only and live
-             on the Forecast page.
+        <!-- The icon row: what applies to every page (point modes, favorites,
+             units, wide), then the page controls. Refresh and Settings act on the
+             forecast only and live on the Forecast page.
              44 dp targets on ATAK's own button background, white masks tinted green
              for the mode in use (the Traffic toggle convention). Replaces the Source
              and Where button rows, so the readout starts one row down. -->
@@ -63,6 +63,37 @@
                 style="@style/TakwerxIconButton"
                 android:contentDescription="@string/wide"
                 android:src="@drawable/ic_wide" />
+
+            <!-- The pages: back, the page showing (a tap lists all six), forward.
+                 At the right end, under the thumb that holds a phone in landscape.
+                 In this row rather than a row of their own so the pane keeps its
+                 height for the page (operator, 2026-09-27: "a drop down for the
+                 pages so i could have some more vertical space back"). -->
+            <ImageButton
+                android:id="@+id/page_prev"
+                style="@style/TakwerxIconButton"
+                android:scaleX="-1"
+                android:contentDescription="@string/caption_prev"
+                android:src="@drawable/ic_page_next" />
+
+            <Button
+                android:id="@+id/page_pick"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="2.4"
+                android:layout_height="44dp"
+                android:layout_marginLeft="2dp"
+                android:layout_marginRight="2dp"
+                android:paddingLeft="4dp"
+                android:paddingRight="4dp"
+                android:textSize="13sp"
+                android:text="@string/tab_forecast" />
+
+            <ImageButton
+                android:id="@+id/page_next"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/caption_next"
+                android:src="@drawable/ic_page_next" />
         </LinearLayout>
 
         <!-- What each button above does, in words, one caption under each. Shown
@@ -106,20 +137,24 @@
                 android:id="@+id/cap_wide"
                 style="@style/TakwerxIconCaption"
                 android:text="@string/caption_full" />
+
+            <TextView
+                android:id="@+id/cap_prev"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_prev" />
+
+            <TextView
+                android:id="@+id/cap_page"
+                style="@style/TakwerxIconCaption"
+                android:layout_weight="2.4"
+                android:text="@string/caption_page" />
+
+            <TextView
+                android:id="@+id/cap_next"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_next" />
         </LinearLayout>
 
-        <!-- The pages by name, one tap to any of them, the one showing in green
-             (operator, 2026-09-27: "another set of rows for each page to quickly
-             get there"). One row of six when the pane is wide, two rows of three
-             at half width where six names do not fit; built in code. Replaces the
-             page dots and the next-page arrow. -->
-        <LinearLayout
-            android:id="@+id/page_tabs"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingTop="2dp"
-            android:paddingBottom="4dp" />
 
         <androidx.viewpager.widget.ViewPager
             android:id="@+id/pager"

@@ -259,6 +259,10 @@
     <string name="caption_full">Full size</string>
     <string name="caption_half">Half size</string>
     <string name="forecast_settings">Forecast settings</string>
+    <string name="caption_prev">Previous</string>
+    <string name="caption_page">Page</string>
+    <string name="caption_next">Next</string>
+    <string name="page_pick_title">Go to page</string>
     <string name="tab_forecast">Forecast</string>
     <string name="tab_layers">Layers</string>
     <string name="tab_spots">Spots</string>

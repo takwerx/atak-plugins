@@ -162,12 +162,9 @@ public final class AtmospherePane {
     private TextView wideCaption;
     private View iconRow;
     private final ViewPager pager;
-    /** The page buttons, one per page, in two rows of three or one row of six. */
-    private final LinearLayout pageTabs;
-    private Button[] tabButtons;
-    private int tabsPerRow;
-    /** Six page buttons go in one row when each would get at least this much. */
-    private static final float TAB_ROW_MIN_DP = 90f;
+    /** Back, the page showing (a tap lists them all), forward; in the top row. */
+    private final ImageButton pagePrev, pageNext;
+    private final Button pagePick;
     private static final int[] TAB_NAMES = { R.string.tab_forecast, R.string.tab_layers,
             R.string.tab_spots, R.string.tab_stations, R.string.tab_gauges, R.string.tab_buoys };
     private final View[] pages;
@@ -487,7 +484,9 @@ public final class AtmospherePane {
                 buoyPage.view()
         };
         pager = root.findViewById(R.id.pager);
-        pageTabs = root.findViewById(R.id.page_tabs);
+        pagePrev = root.findViewById(R.id.page_prev);
+        pageNext = root.findViewById(R.id.page_next);
+        pagePick = root.findViewById(R.id.page_pick);
         iconCaptions = root.findViewById(R.id.icon_captions);
         wideCaption = root.findViewById(R.id.cap_wide);
         iconRow = root.findViewById(R.id.icon_row);
@@ -1139,75 +1138,63 @@ public final class AtmospherePane {
                     buoyPage.refresh();
             }
         });
-        tabButtons = new Button[pages.length];
-        for (int i = 0; i < pages.length; i++) {
-            final int page = i;
-            final Button b = (Button) LayoutInflater.from(pluginContext)
-                    .inflate(R.layout.trend_chip, pageTabs, false);
-            b.setText(i < TAB_NAMES.length ? TAB_NAMES[i] : R.string.empty);
-            b.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    pager.setCurrentItem(page, true);
-                }
-            });
-            tabButtons[i] = b;
-        }
-        arrangeTabs(3);
-        pageTabs.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+        pagePrev.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onLayoutChange(View v, int left, int top, int right, int bottom,
-                    int oldLeft, int oldTop, int oldRight, int oldBottom) {
-                if (right - left == oldRight - oldLeft)
-                    return;
-                final int width = right - left;
-                v.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        final float dp = width / pluginContext.getResources().getDisplayMetrics().density;
-                        arrangeTabs(dp / pages.length >= TAB_ROW_MIN_DP ? pages.length : 3);
-                    }
-                });
+            public void onClick(View v) {
+                if (pager.getCurrentItem() > 0)
+                    pager.setCurrentItem(pager.getCurrentItem() - 1, true);
+            }
+        });
+        pageNext.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (pager.getCurrentItem() < pages.length - 1)
+                    pager.setCurrentItem(pager.getCurrentItem() + 1, true);
+            }
+        });
+        pagePick.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showPagePicker();
             }
         });
         updatePageDots(0);
     }
 
-    /** Lay the page buttons out {@code perRow} to a row; a no-op when they already are. */
-    private void arrangeTabs(int perRow) {
-        if (perRow == tabsPerRow || tabButtons == null)
+    /** Every page by name, the one showing checked; a tap goes there. MapView context, never the plugin's. */
+    private void showPagePicker() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
             return;
-        tabsPerRow = perRow;
-        for (Button b : tabButtons) {
-            final ViewParent parent = b.getParent();
-            if (parent instanceof ViewGroup)
-                ((ViewGroup) parent).removeView(b);
-        }
-        pageTabs.removeAllViews();
-        LinearLayout row = null;
-        for (int i = 0; i < tabButtons.length; i++) {
-            if (i % perRow == 0) {
-                row = new LinearLayout(pluginContext);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                pageTabs.addView(row, new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            }
-            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            lp.leftMargin = dp(2);
-            lp.rightMargin = dp(2);
-            lp.topMargin = dp(2);
-            row.addView(tabButtons[i], lp);
-        }
+        final String[] names = new String[pages.length];
+        for (int i = 0; i < names.length; i++)
+            names[i] = pluginContext.getString(i < TAB_NAMES.length ? TAB_NAMES[i] : R.string.empty);
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.page_pick_title))
+                .setSingleChoiceItems(names, pager.getCurrentItem(), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        pager.setCurrentItem(which, true);
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
     }
 
-    /** The page showing has its name in green (the Traffic toggle convention). */
+    /**
+     * The picker names the page showing, with a mark that says it opens a list; an
+     * arrow with nowhere to go is grayed out, so the ends of the pages read as ends.
+     */
     private void updatePageDots(int current) {
-        if (tabButtons == null)
+        if (pagePick == null)
             return;
-        final int on = pluginContext.getResources().getColor(R.color.state_on);
-        for (int i = 0; i < tabButtons.length; i++)
-            tabButtons[i].setTextColor(i == current ? on : Color.WHITE);
+        pagePick.setText(pluginContext.getString(current < TAB_NAMES.length ? TAB_NAMES[current]
+                : R.string.empty) + " \u25BE");
+        pagePrev.setEnabled(current > 0);
+        pagePrev.setAlpha(current > 0 ? 1f : 0.35f);
+        pageNext.setEnabled(current < pages.length - 1);
+        pageNext.setAlpha(current < pages.length - 1 ? 1f : 0.35f);
     }
 
     /**
@@ -1258,6 +1245,12 @@ public final class AtmospherePane {
      * Measured with each caption's own paint, so the text size and the words
      * decide, not a guess.
      */
+    private static float weightOf(View v) {
+        final ViewGroup.LayoutParams lp = v.getLayoutParams();
+        return lp instanceof LinearLayout.LayoutParams && ((LinearLayout.LayoutParams) lp).weight > 0
+                ? ((LinearLayout.LayoutParams) lp).weight : 1f;
+    }
+
     private void updateCaptions(View iconRow) {
         final int buttons = ((ViewGroup) iconRow).getChildCount();
         if (buttons == 0 || iconRow.getWidth() == 0)
@@ -1265,14 +1258,28 @@ public final class AtmospherePane {
         if (wideCaption != null)
             wideCaption.setText(host != null && host.isWide() ? R.string.caption_half
                     : R.string.caption_full);
-        // Each caption gets the button's share of the row less the two margins.
-        final float room = iconRow.getWidth() / (float) buttons - dp(4);
-        boolean fits = true;
-        for (int i = 0; i < iconCaptions.getChildCount() && fits; i++) {
-            final View c = iconCaptions.getChildAt(i);
-            if (c instanceof TextView) {
+        // Each caption gets its button's share of the row (the page picker is two
+        // shares wide) less the two margins.
+        float shares = 0;
+        for (int i = 0; i < iconCaptions.getChildCount(); i++)
+            shares += weightOf(iconCaptions.getChildAt(i));
+        final float perShare = iconRow.getWidth() / Math.max(1f, shares);
+        // One size for the whole row, the largest at which every caption fits:
+        // with the page controls in the row, "Pick a point" no longer fits at 12
+        // sp even with the pane wide (XCover, 2026-09-27), and mixed sizes read
+        // as a mistake. Below 10 sp they are too small to read in a truck; hidden.
+        boolean fits = false;
+        for (float sp = 12f; sp >= 10f && !fits; sp -= 0.5f) {
+            fits = true;
+            for (int i = 0; i < iconCaptions.getChildCount(); i++) {
+                final View c = iconCaptions.getChildAt(i);
+                if (!(c instanceof TextView))
+                    continue;
                 final TextView t = (TextView) c;
-                fits = t.getPaint().measureText(t.getText().toString()) <= room;
+                t.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, sp);
+                if (t.getPaint().measureText(t.getText().toString())
+                        > perShare * weightOf(c) - dp(4))
+                    fits = false;
             }
         }
         iconCaptions.setVisibility(fits ? View.VISIBLE : View.GONE);

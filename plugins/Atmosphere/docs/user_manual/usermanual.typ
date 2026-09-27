@@ -32,8 +32,8 @@ Alerts plugin's job, and the two are meant to run side by side.
 
 The pane opens at half width; *Wide* (the arrows button) makes it full width and
 back. At full width each button in the top row has its name written under it.
-It is six pages, side by side. Swipe, or tap a page's name in the row of
-page buttons under the top row; the page showing has its name in green:
+It is six pages, side by side. Swipe, use the arrows at the right end of the
+top row, or tap the page's name between them for a list of all six:
 
 + *Forecast* - the readout for a point.
 + *Layers* - every map layer, its switch and its settings.
@@ -45,7 +45,7 @@ page buttons under the top row; the page showing has its name in green:
 The row of buttons at the top is the same on every page: *My position*, *Map
 center* and *Pick a point* choose where the forecast is read; the star is
 *Favorites*; the unit button switches wind between knots and miles per hour;
-then *Wide*.
+then *Wide*, and the page controls.
 
 Back closes the pane, or narrows a wide one first.
 ]
