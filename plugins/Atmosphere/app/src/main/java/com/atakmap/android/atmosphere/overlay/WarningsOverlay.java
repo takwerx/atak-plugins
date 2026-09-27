@@ -193,6 +193,41 @@ public final class WarningsOverlay {
             rebuild(0, generation);
     }
 
+    /** One alert near a point: how far to its edge and which way. */
+    public static final class Nearby {
+        public final NwsAlerts.Alert alert;
+        public final double miles, bearing;
+
+        Nearby(NwsAlerts.Alert alert, double miles, double bearing) {
+            this.alert = alert;
+            this.miles = miles;
+            this.bearing = bearing;
+        }
+    }
+
+    /**
+     * The drawn alerts whose area comes within {@code miles} of a point but does
+     * not cover it, nearest first. "Around me", not only "here" (operator,
+     * 2026-09-26: "no way for like around me not just map center?").
+     */
+    public List<Nearby> nearby(double lat, double lon, double miles) {
+        final List<Nearby> out = new ArrayList<>();
+        for (Covered c : covered) {
+            if (c.area == null || c.area.contains(lat, lon))
+                continue;
+            final double d = c.area.distanceMiles(lat, lon);
+            if (d <= miles)
+                out.add(new Nearby(c.alert, d, c.area.bearingTo(lat, lon)));
+        }
+        Collections.sort(out, new java.util.Comparator<Nearby>() {
+            @Override
+            public int compare(Nearby a, Nearby b) {
+                return Double.compare(a.miles, b.miles);
+            }
+        });
+        return out;
+    }
+
     /** The drawn alerts covering a point, most urgent first. */
     public List<NwsAlerts.Alert> inEffectAt(double lat, double lon) {
         final List<NwsAlerts.Alert> out = new ArrayList<>();
@@ -247,6 +282,17 @@ public final class WarningsOverlay {
                                     // What is drawn stays drawn: a failed read is not
                                     // "no warnings".
                                     status("Warnings could not be read");
+                                    return;
+                                }
+                                // The feed answered 200 with nothing in it at 22:10 on
+                                // 2026-09-26 (44 warnings the poll before, "drew 0 of 0"
+                                // after) and the map went blank. An empty answer on the
+                                // heels of a full one is a hiccup, not a quiet country:
+                                // keep what is drawn and ask again at the next poll.
+                                Log.d(TAG, "alerts: " + got.size() + " from "
+                                        + (body == null ? 0 : body.length()) + " chars");
+                                if (got.isEmpty() && !alerts.isEmpty()) {
+                                    status("Warnings feed answered empty; keeping the last ones");
                                     return;
                                 }
                                 alerts = got;

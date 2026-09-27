@@ -43,6 +43,58 @@ public final class GeoRings {
             maxLat = n;
         }
 
+        /**
+         * Statute miles from a point to the nearest edge of the area, 0 inside it.
+         * Point-to-segment on a local flat projection: a mile at these distances is
+         * a mile whichever way it is measured, and the edges are short.
+         */
+        public double distanceMiles(double lat, double lon) {
+            if (contains(lat, lon))
+                return 0;
+            final double kx = 69.172 * Math.cos(Math.toRadians(lat)), ky = 69.172;
+            double best = Double.MAX_VALUE;
+            for (double[][] poly : polygons) {
+                if (poly.length == 0)
+                    continue;
+                final double[] ring = poly[0];
+                final int n = ring.length / 2;
+                for (int i = 0, j = n - 1; i < n; j = i++) {
+                    final double ax = (ring[2 * j] - lon) * kx, ay = (ring[2 * j + 1] - lat) * ky;
+                    final double bx = (ring[2 * i] - lon) * kx, by = (ring[2 * i + 1] - lat) * ky;
+                    final double dx = bx - ax, dy = by - ay;
+                    final double len2 = dx * dx + dy * dy;
+                    double t = len2 == 0 ? 0 : -(ax * dx + ay * dy) / len2;
+                    t = Math.max(0, Math.min(1, t));
+                    final double px = ax + t * dx, py = ay + t * dy;
+                    final double d = Math.sqrt(px * px + py * py);
+                    if (d < best)
+                        best = d;
+                }
+            }
+            return best;
+        }
+
+        /** Where the area's nearest edge lies from a point, degrees true, for "32 mi NE". */
+        public double bearingTo(double lat, double lon) {
+            final double kx = 69.172 * Math.cos(Math.toRadians(lat)), ky = 69.172;
+            double best = Double.MAX_VALUE, bx0 = 0, by0 = 0;
+            for (double[][] poly : polygons) {
+                if (poly.length == 0)
+                    continue;
+                final double[] ring = poly[0];
+                for (int i = 0; i + 1 < ring.length; i += 2) {
+                    final double x = (ring[i] - lon) * kx, y = (ring[i + 1] - lat) * ky;
+                    final double d = x * x + y * y;
+                    if (d < best) {
+                        best = d;
+                        bx0 = x;
+                        by0 = y;
+                    }
+                }
+            }
+            return (Math.toDegrees(Math.atan2(bx0, by0)) + 360) % 360;
+        }
+
         /** Inside an outer ring and outside all of that polygon's holes. */
         public boolean contains(double lat, double lon) {
             if (lon < minLon || lon > maxLon || lat < minLat || lat > maxLat)

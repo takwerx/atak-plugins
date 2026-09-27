@@ -329,6 +329,7 @@ public final class AtmospherePane {
     private boolean spotOpen = true;
     private final LinearLayout warnSettings;
     private final TextView warnHere;
+    private final TextView warnNearby;
     private final TextView warnStatus;
     private final LinearLayout warnGroups;
     private boolean warnOpen = true;
@@ -624,6 +625,7 @@ public final class AtmospherePane {
         spotSettings = find(R.id.spot_settings);
         warnSettings = find(R.id.warn_settings);
         warnHere = find(R.id.warn_here);
+        warnNearby = find(R.id.warn_nearby);
         warnStatus = find(R.id.warn_status);
         warnGroups = find(R.id.warn_groups);
         buildWarnGroups();
@@ -2086,16 +2088,22 @@ public final class AtmospherePane {
      * What is in effect at the pane's point, most urgent first: "Here: Red Flag Warning
      * until Thu 8 pm". One line per warning, three at most; the map has the rest.
      */
+    /** How far "around me" reaches for the warnings list. */
+    private static final double WARN_NEARBY_MILES = 50;
+
     private void updateWarnHere() {
         if (warnings == null || !warnings.isOn()) {
             warnHere.setText(R.string.empty);
+            warnNearby.setVisibility(View.GONE);
             return;
         }
         final GeoPoint p = point();
         if (p == null) {
             warnHere.setText(R.string.empty);
+            warnNearby.setVisibility(View.GONE);
             return;
         }
+        updateWarnNearby(p);
         // Named for the point it is read at: "Here" meant nothing to the operator
         // (2026-09-26: "when it says Here no warning in effect what does that mean").
         final String label = modeLabel();
@@ -2117,6 +2125,30 @@ public final class AtmospherePane {
         if (here.size() > 3)
             b.append("\n      and ").append(here.size() - 3).append(" more");
         warnHere.setText(b.toString());
+    }
+
+    /** "Within 50 mi: Flood Watch 32 mi NE, Red Flag Warning 41 mi S". */
+    private void updateWarnNearby(GeoPoint p) {
+        final List<WarningsOverlay.Nearby> near = warnings.nearby(p.getLatitude(), p.getLongitude(),
+                WARN_NEARBY_MILES);
+        if (near.isEmpty()) {
+            warnNearby.setText("Nothing else within " + (int) WARN_NEARBY_MILES + " mi");
+            warnNearby.setVisibility(View.VISIBLE);
+            return;
+        }
+        final StringBuilder b = new StringBuilder("Within " + (int) WARN_NEARBY_MILES + " mi:");
+        int shown = 0;
+        for (WarningsOverlay.Nearby n : near) {
+            if (shown++ == 4) {
+                b.append("\n      and ").append(near.size() - 4).append(" more");
+                break;
+            }
+            b.append("\n      ").append(n.alert.event).append(", ")
+                    .append(Math.max(1, Math.round(n.miles))).append(" mi ")
+                    .append(Units.degreesToCompass(n.bearing));
+        }
+        warnNearby.setText(b.toString());
+        warnNearby.setVisibility(View.VISIBLE);
     }
 
     /** The category at the pane's point, from the contours already on the map. */
@@ -4348,6 +4380,9 @@ public final class AtmospherePane {
         updateModeIcons();
         snapshot = null;
         refresh(false);
+        // The warnings lines are read at the point too; they said "map center" a
+        // moment after the picker moved to my position (2026-09-26).
+        updateWarnHere();
     }
 
     private void setFavorite(Favorites.Place place) {

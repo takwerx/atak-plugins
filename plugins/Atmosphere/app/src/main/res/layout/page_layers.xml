@@ -496,6 +496,19 @@
                     android:textSize="15sp"
                     android:text="" />
 
+                <!-- What is close but not overhead: the same warnings within a radius,
+                     nearest first, with distance and direction to their edge. -->
+                <TextView
+                    android:id="@+id/warn_nearby"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:alpha="0.85"
+                    android:visibility="gone"
+                    android:text="" />
+
                 <TextView
                     android:id="@+id/warn_status"
                     android:layout_width="match_parent"
