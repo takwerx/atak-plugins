@@ -39,7 +39,7 @@ two are meant to run side by side.
 ## 2. The pane
 
 Open Atmosphere from the ATAK toolbar, or from Tools if it is not on the bar.
-The pane opens at half width; **Wide** makes it full width and back. Back closes
+The pane opens at half width; **Wide** makes it full width and back, and at full width each button in the top row has its name written under it. Back closes
 it, or narrows a wide one first.
 
 It is six pages, side by side. Swipe, tap a dot, or press the arrow button:

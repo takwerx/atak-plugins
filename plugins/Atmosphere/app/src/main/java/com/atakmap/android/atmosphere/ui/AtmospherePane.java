@@ -158,6 +158,12 @@ public final class AtmospherePane {
     private final Button unitsButton;
     private final ImageButton wideButton;
     private final ImageButton pageButton;
+    /** The captions under the icon row, and the two whose words follow the state. */
+    private LinearLayout iconCaptions;
+    private TextView wideCaption, pageCaption;
+    private View iconRow;
+    /** A button at least this wide carries its caption; narrower, the icon stands alone. */
+    private static final float CAPTION_MIN_DP = 64f;
     private final ViewPager pager;
     private final LinearLayout pageDots;
     private final View[] pages;
@@ -479,6 +485,11 @@ public final class AtmospherePane {
         pager = root.findViewById(R.id.pager);
         pageDots = root.findViewById(R.id.page_dots);
         pageButton = root.findViewById(R.id.page_button);
+        iconCaptions = root.findViewById(R.id.icon_captions);
+        wideCaption = root.findViewById(R.id.cap_wide);
+        pageCaption = root.findViewById(R.id.cap_page);
+        iconRow = root.findViewById(R.id.icon_row);
+        wireCaptions(iconRow);
         wirePager();
 
         modeSelf = find(R.id.mode_self);
@@ -1160,6 +1171,62 @@ public final class AtmospherePane {
         // The arrow points at the page it will go to: right until the last page,
         // then mirrored, since from there it goes back to the first.
         pageButton.setScaleX(current == pages.length - 1 ? -1f : 1f);
+        if (pageCaption != null)
+            pageCaption.setText(current == pages.length - 1 ? R.string.caption_first_page
+                    : R.string.caption_next_page);
+    }
+
+    /**
+     * The captions show whenever the buttons are wide enough to carry them,
+     * measured, not guessed from the pane's state: the pane opened wide in
+     * landscape and a phone held upright both qualify. Decided after each layout
+     * of the row, and posted, since changing visibility inside a layout pass asks
+     * for another one.
+     */
+    private void wireCaptions(final View iconRow) {
+        if (iconRow == null || iconCaptions == null)
+            return;
+        iconRow.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                    int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                if (right - left == oldRight - oldLeft)
+                    return;
+                v.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        updateCaptions(iconRow);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * The drop-down changed size. The row's own layout listener catches the width;
+     * this catches the full/half words, whose state the drop-down learns only now.
+     */
+    public void onPaneResized() {
+        final View row = iconRow;
+        if (row != null)
+            row.post(new Runnable() {
+                @Override
+                public void run() {
+                    updateCaptions(row);
+                }
+            });
+    }
+
+    private void updateCaptions(View iconRow) {
+        final int buttons = ((ViewGroup) iconRow).getChildCount();
+        if (buttons == 0)
+            return;
+        final float density = iconRow.getResources().getDisplayMetrics().density;
+        final boolean room = iconRow.getWidth() / (float) buttons / density >= CAPTION_MIN_DP;
+        iconCaptions.setVisibility(room ? View.VISIBLE : View.GONE);
+        if (wideCaption != null)
+            wideCaption.setText(host != null && host.isWide() ? R.string.caption_half
+                    : R.string.caption_full);
     }
 
     /** The drop-down hosting this pane; the wide toggle needs it. */

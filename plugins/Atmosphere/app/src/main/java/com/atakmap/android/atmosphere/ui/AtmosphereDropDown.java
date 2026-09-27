@@ -112,6 +112,7 @@ public class AtmosphereDropDown extends DropDownReceiver implements OnStateListe
         currentWidth = width;
         currentHeight = height;
         Log.d(TAG, "size " + width + " x " + height);
+        pane.onPaneResized();
     }
 
     @Override

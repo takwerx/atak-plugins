@@ -81,6 +81,64 @@
                 android:src="@drawable/ic_settings" />
         </LinearLayout>
 
+        <!-- What each button above does, in words, one caption under each. Shown
+             only when the buttons are wide enough to carry it (the pane opened
+             wide, or a phone held upright); at half width the icons stand alone
+             (operator, 2026-09-27: "when its wide like this can we put what each
+             tool means underneath it"). -->
+        <LinearLayout
+            android:id="@+id/icon_captions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/cap_self"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_self" />
+
+            <TextView
+                android:id="@+id/cap_center"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_center" />
+
+            <TextView
+                android:id="@+id/cap_pick"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_pick" />
+
+            <TextView
+                android:id="@+id/cap_favorites"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_favorites" />
+
+            <TextView
+                android:id="@+id/cap_units"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_units" />
+
+            <TextView
+                android:id="@+id/cap_wide"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_full" />
+
+            <TextView
+                android:id="@+id/cap_page"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_next_page" />
+
+            <TextView
+                android:id="@+id/cap_refresh"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_refresh" />
+
+            <TextView
+                android:id="@+id/cap_settings"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/caption_settings" />
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/page_dots"
             android:layout_width="match_parent"

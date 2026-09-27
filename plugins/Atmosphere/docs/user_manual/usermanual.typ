@@ -31,7 +31,8 @@ Alerts plugin's job, and the two are meant to run side by side.
 = The pane
 
 The pane opens at half width; *Wide* (the arrows button) makes it full width and
-back. It is six pages, side by side. Swipe, tap a dot, or press the arrow
+back. At full width each button in the top row has its name written under it.
+It is six pages, side by side. Swipe, tap a dot, or press the arrow
 button to move between them:
 
 + *Forecast* - the readout for a point.

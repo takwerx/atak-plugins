@@ -143,6 +143,23 @@
 
     <!-- An icon in the pane's row: the same background and 44 dp target as
          TakwerxButton, the glyph a white mask centered with room around it. -->
+    <!-- A caption under a TakwerxIconButton: the same width and margins, so it
+         sits under its own button. -->
+    <style name="TakwerxIconCaption">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginLeft">2dp</item>
+        <item name="android:layout_marginRight">2dp</item>
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:gravity">center_horizontal</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">#FFFFFFFF</item>
+        <item name="android:alpha">0.8</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+    </style>
+
     <style name="TakwerxIconButton">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_weight">1</item>
