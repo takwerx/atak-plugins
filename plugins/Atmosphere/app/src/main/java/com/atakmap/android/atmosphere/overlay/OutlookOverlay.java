@@ -71,7 +71,9 @@ public abstract class OutlookOverlay {
     protected final EgressPolicy egress;
     private final AtmosphereFeatures features;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private final String tag, layerId, prefOn;
+    private final String tag, layerId, prefOn, prefDay;
+    /** 0 draws every day; 1-3 one day. Three days stacked hid each other (2026-09-26). */
+    private int day = 1;
     private Listener listener;
     private boolean started, on, inFlight;
     private long lastPoll;
@@ -95,6 +97,9 @@ public abstract class OutlookOverlay {
         this.tag = tag;
         this.layerId = layerId;
         this.prefOn = "weather.layer." + layerId + ".on";
+        this.prefDay = "weather.layer." + layerId + ".day";
+        final SharedPreferences p0 = MapCompat.prefs();
+        day = p0 == null ? 1 : Math.max(0, Math.min(3, p0.getInt(prefDay, 1)));
         this.features = new AtmosphereFeatures(mapView, pluginContext, tag, name,
                 layerId + ".sqlite", layerId, false);
     }
@@ -161,6 +166,23 @@ public abstract class OutlookOverlay {
         return areas;
     }
 
+    public int day() {
+        return day;
+    }
+
+    /** Which day to draw, 0 for all; redrawn from what is held, no new request. */
+    public void setDay(int value) {
+        final int v = Math.max(0, Math.min(3, value));
+        if (v == day)
+            return;
+        day = v;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putInt(prefDay, v).apply();
+        if (on)
+            rebuild(generation);
+    }
+
     /** Ask for every layer, one after another, unless that was done very recently. */
     public void refresh(boolean force) {
         if (!on || !started || inFlight)
@@ -211,7 +233,10 @@ public abstract class OutlookOverlay {
                 if (mine != generation)
                     return;
                 final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
+                final int showDay = day;
                 for (Area a : snapshot) {
+                    if (showDay != 0 && a.day != showDay)
+                        continue;
                     final Geometry g;
                     try {
                         g = GeoJson.parse(a.geometry);

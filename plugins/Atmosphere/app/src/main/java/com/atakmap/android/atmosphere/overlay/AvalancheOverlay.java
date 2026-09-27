@@ -47,7 +47,7 @@ public final class AvalancheOverlay {
         for (int i = 1; i <= 5; i++)
             LEGEND[i - 1] = new String[] { Avalanche.LEVEL_LABELS[i] + " (" + i + ")",
                     String.valueOf(Avalanche.LEVEL_COLORS[i]) };
-        LEGEND[5] = new String[] { "No rating or off season", String.valueOf(Avalanche.LEVEL_COLORS[0]) };
+        LEGEND[5] = new String[] { "In season, no rating yet (outline)", String.valueOf(Avalanche.LEVEL_COLORS[0]) };
     }
 
     public interface Listener {
@@ -189,28 +189,38 @@ public final class AvalancheOverlay {
                     }
                     if (g == null)
                         continue;
-                    if (!z.offSeason)
-                        inSeason++;
-                    if (z.dangerLevel >= 1)
+                    // A zone whose center is off season is not drawn: a gray fill over
+                    // New Mexico in September read as an avalanche (operator,
+                    // 2026-09-26: "is there snow in NM right now its got an avalanche?").
+                    // An in-season zone with no rating yet is an outline, so the map
+                    // says where a rating will appear without coloring anything.
+                    if (z.offSeason)
+                        continue;
+                    inSeason++;
+                    final boolean isRated = z.dangerLevel >= 1;
+                    if (isRated)
                         rated++;
                     final int c = z.color & 0x00FFFFFF;
                     // Named for what it is: the chooser row and the details heading are
                     // the feature's name, and "Northern New Mexico" alone told the
                     // operator nothing.
-                    final String label = "Avalanche: " + z.name;
+                    final String label = (isRated ? "Avalanche " + Avalanche.levelLabel(z.dangerLevel).toLowerCase(java.util.Locale.US)
+                            : "Avalanche zone, no rating yet") + ": " + z.name;
                     drawn.add(new AtmosphereFeatures.Drawn(z.center, label, g,
-                            AtmosphereFeatures.area(0xFF000000 | c, WEIGHT, (FILL_ALPHA << 24) | c, label),
+                            AtmosphereFeatures.area(0xFF000000 | c, WEIGHT,
+                                    isRated ? (FILL_ALPHA << 24) | c : 0x00000000, label),
                             attributes(z)));
                 }
                 features.rewrite(drawn);
                 final int nDrawn = drawn.size(), nSeason = inSeason, nRated = rated;
+                final int nOff = snapshot.size() - inSeason;
                 mapView.post(new Runnable() {
                     @Override
                     public void run() {
                         if (mine != generation || !on)
                             return;
-                        Log.d(TAG, "drew " + nDrawn + " avalanche zones, " + nSeason
-                                + " in season, " + nRated + " rated");
+                        Log.d(TAG, "drew " + nDrawn + " avalanche zones in season, " + nRated
+                                + " rated, " + nOff + " off season not drawn");
                         status(line(nDrawn, nSeason, nRated));
                     }
                 });
@@ -243,11 +253,9 @@ public final class AvalancheOverlay {
 
     private static String line(int drawn, int inSeason, int rated) {
         if (drawn == 0)
-            return "No avalanche zones";
-        if (inSeason == 0)
-            return drawn + " zones on the map, all off season";
-        return drawn + " zones on the map, " + inSeason + " in season, "
-                + (rated == 0 ? "none rated yet" : rated + " rated");
+            return "No avalanche centers in season; nothing on the map";
+        return drawn + (drawn == 1 ? " zone" : " zones") + " in season on the map, "
+                + (rated == 0 ? "none rated yet" : rated + " rated") + ". Off-season zones are not drawn.";
     }
 
     private void drawNothing() {

@@ -273,7 +273,15 @@ final class AtmosphereFeatures {
      * the set in place.
      */
     private static void onePerPlace(java.util.SortedSet<MapItem> hits) {
-        if (hits == null || hits.size() < 2)
+        if (hits == null || hits.isEmpty())
+            return;
+        // A polygon's center label is a point of its own in the store; the polygon
+        // is the thing to pick, so its label never makes a row.
+        final java.util.Iterator<MapItem> it = hits.iterator();
+        while (it.hasNext())
+            if (it.next().getMetaBoolean("_labelOnly", false))
+                it.remove();
+        if (hits.size() < 2)
             return;
         final Map<String, MapItem> newest = new HashMap<>();
         final java.util.List<MapItem> older = new java.util.ArrayList<>();
@@ -304,6 +312,107 @@ final class AtmosphereFeatures {
         }
         return m.getMetaString("title", m.getUID()) + "@" + (at == null ? ""
                 : String.format(java.util.Locale.US, "%.5f,%.5f", at.getLatitude(), at.getLongitude()));
+    }
+
+    /** The label text of a polygon's style, or null when it is a point, a line or unlabeled. */
+    private static String centerLabelOf(com.atakmap.map.layer.feature.geometry.Geometry g, Style s) {
+        if (!(g instanceof Polygon) && !(g instanceof com.atakmap.map.layer.feature.geometry.GeometryCollection))
+            return null;
+        if (g instanceof com.atakmap.map.layer.feature.geometry.GeometryCollection) {
+            // A collection of polygons (a multi-polygon) is labeled; one of lines is not.
+            final com.atakmap.map.layer.feature.geometry.GeometryCollection gc =
+                    (com.atakmap.map.layer.feature.geometry.GeometryCollection) g;
+            boolean anyPolygon = false;
+            for (com.atakmap.map.layer.feature.geometry.Geometry child : gc.getGeometries())
+                if (child instanceof Polygon)
+                    anyPolygon = true;
+            if (!anyPolygon)
+                return null;
+        }
+        if (s instanceof LabelPointStyle)
+            return ((LabelPointStyle) s).getText();
+        if (s instanceof CompositeStyle) {
+            final CompositeStyle c = (CompositeStyle) s;
+            for (int i = 0; i < c.getNumStyles(); i++)
+                if (c.getStyle(i) instanceof LabelPointStyle) {
+                    final String t = ((LabelPointStyle) c.getStyle(i)).getText();
+                    return t == null || t.isEmpty() ? null : t;
+                }
+        }
+        return null;
+    }
+
+    /** Perceived brightness 0-255 of an ARGB color. */
+    private static int luminance(int argb) {
+        final int r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
+        return (r * 299 + g * 587 + b * 114) / 1000;
+    }
+
+    private static Style withoutLabel(Style s) {
+        if (!(s instanceof CompositeStyle))
+            return s;
+        final CompositeStyle c = (CompositeStyle) s;
+        final java.util.List<Style> kept = new java.util.ArrayList<>();
+        for (int i = 0; i < c.getNumStyles(); i++)
+            if (!(c.getStyle(i) instanceof LabelPointStyle))
+                kept.add(c.getStyle(i));
+        return kept.size() == 1 ? kept.get(0) : new CompositeStyle(kept.toArray(new Style[0]));
+    }
+
+    /** A white rounded square, composed once, for the chooser to tint. */
+    private static volatile String swatchUri;
+
+    private static void ensureSwatch() {
+        if (swatchUri != null)
+            return;
+        synchronized (AtmosphereFeatures.class) {
+            if (swatchUri != null)
+                return;
+            try {
+                final File dir = FileSystemUtils.getItem("tools/atmosphere");
+                if (dir != null && !dir.isDirectory())
+                    //noinspection ResultOfMethodCallIgnored
+                    dir.mkdirs();
+                final File out = new File(dir, "swatch_v1.png");
+                if (!out.isFile()) {
+                    final android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(
+                            64, 64, android.graphics.Bitmap.Config.ARGB_8888);
+                    final android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+                    final android.graphics.Paint p = new android.graphics.Paint(
+                            android.graphics.Paint.ANTI_ALIAS_FLAG);
+                    p.setColor(0xFFFFFFFF);
+                    c.drawRoundRect(new android.graphics.RectF(4, 4, 60, 60), 8, 8, p);
+                    final java.io.FileOutputStream o = new java.io.FileOutputStream(out);
+                    try {
+                        bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, o);
+                    } finally {
+                        o.close();
+                    }
+                    bmp.recycle();
+                }
+                swatchUri = "file://" + out.getAbsolutePath();
+            } catch (Exception e) {
+                Log.w("AtmosphereFeatures", "no chooser swatch", e);
+            }
+        }
+    }
+
+    /** The stroke color of a style, the fill's if it has no stroke, white otherwise. */
+    private static int strokeColorOf(Style s) {
+        if (s instanceof BasicStrokeStyle)
+            return ((BasicStrokeStyle) s).getColor();
+        if (s instanceof CompositeStyle) {
+            final CompositeStyle c = (CompositeStyle) s;
+            for (int i = 0; i < c.getNumStyles(); i++)
+                if (c.getStyle(i) instanceof BasicStrokeStyle)
+                    return ((BasicStrokeStyle) c.getStyle(i)).getColor();
+            for (int i = 0; i < c.getNumStyles(); i++)
+                if (c.getStyle(i) instanceof BasicFillStyle)
+                    return ((BasicFillStyle) c.getStyle(i)).getColor() | 0xFF000000;
+        }
+        if (s instanceof BasicFillStyle)
+            return ((BasicFillStyle) s).getColor() | 0xFF000000;
+        return 0xFFFFFFFF;
     }
 
     /** Every feature set id in the store, as the store reports it. */
@@ -459,6 +568,7 @@ final class AtmosphereFeatures {
             // garbage forever -- this one reached 7.7 MB and 1,887 features to draw
             // roughly 224.
             deleteStoreFile();
+            ensureSwatch();
             store = new FeatureSetDatabase2(storeFile);
             // Everything that only needs the database can go now; the rest of this
             // is map registration and has to be on main.
@@ -581,6 +691,22 @@ final class AtmosphereFeatures {
                                 } catch (Exception noGlyph) {
                                     Log.d(tag, "no icon for this item", noGlyph);
                                 }
+                            // A shape's row in Select Item has no picture of its own: it
+                            // showed a black square beside "Day 3 excessive rainfall"
+                            // (operator, 2026-09-26). The chooser reads iconUri and tints
+                            // it by the color meta, so a white square in the shape's own
+                            // stroke color is its swatch.
+                            if (a != null && a.containsAttribute("_labelOnly"))
+                                item.setMetaBoolean("_labelOnly", true);
+                            if (!(item instanceof com.atakmap.android.maps.Marker)) {
+                                final String sw = swatchUri;
+                                if (sw != null) {
+                                    final int c = strokeColorOf(feature.getStyle());
+                                    item.setMetaString("iconUri", sw);
+                                    item.setMetaInteger("iconColor", c);
+                                    item.setMetaInteger("color", c);
+                                }
+                            }
                             if (a != null)
                                 item.setMetaString("remarks",
                                         com.atakmap.android.atmosphere.ui
@@ -857,8 +983,33 @@ final class AtmosphereFeatures {
                         store.setFeatureSetVisible(fsid, true);
                         fresh.put(d.setName, fsid);
                     }
-                    store.insertFeature(new Feature(fsid, d.name, d.geometry, d.style,
+                    // A polygon's label rides its edge when it is part of the polygon's
+                    // own style, and turned with it ("Flood Watch" up the side of a
+                    // county; operator, 2026-09-26: "can the label be horizontal not
+                    // follow the polygon edge?"). So a polygon is stored without its
+                    // label and a label-only point is stored at its center, horizontal,
+                    // in the same set; the hit-test drops the point again.
+                    final String centered = centerLabelOf(d.geometry, d.style);
+                    store.insertFeature(new Feature(fsid, d.name, d.geometry,
+                            centered == null ? d.style : withoutLabel(d.style),
                             d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                    if (centered != null) {
+                        final double[] c = com.atakmap.android.atmosphere.data.GeoJson.center(d.geometry);
+                        if (c != null) {
+                            final AttributeSet la = new AttributeSet();
+                            la.setAttribute("_labelOnly", 1);
+                            // In the shape's own color, so a label met in the middle of a
+                            // polygon wider than the screen still reads as that polygon's
+                            // (operator, 2026-09-26: "some random flood watch label").
+                            final int edge = strokeColorOf(d.style);
+                            final int bg = (edge & 0x00FFFFFF) | 0xD9000000;
+                            final int text = luminance(edge) > 150 ? 0xFF000000 : 0xFFFFFFFF;
+                            store.insertFeature(new Feature(fsid, d.name, new Point(c[1], c[0]),
+                                    new LabelPointStyle(centered, text, bg,
+                                            LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f, true),
+                                    la, Feature.AltitudeMode.ClampToGround, 0d));
+                        }
+                    }
                 }
                 // One at a time. deleteFeatureSets(params) is a silent no-op on this
                 // store -- the file held sixty sets before and sixty after, every

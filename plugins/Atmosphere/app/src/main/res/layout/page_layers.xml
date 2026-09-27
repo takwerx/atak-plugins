@@ -727,6 +727,13 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
+                <LinearLayout
+                    android:id="@+id/firewx_day_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
                 <TextView
                     android:id="@+id/firewx_status"
                     android:layout_width="match_parent"
@@ -1032,6 +1039,13 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/flood_day_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
 
                 <TextView
                     android:id="@+id/flood_status"

@@ -182,6 +182,7 @@ public final class AtmospherePane {
     private final Button firewxToggle;
     private final TextView firewxStatus;
     private final LinearLayout firewxLegend;
+    private final LinearLayout firewxDayRow;
     private FireWxOutlookOverlay firewx;
     private boolean firewxOpen = true;
     private static final String PREF_FLOOD_OPEN = "weather.flood.open";
@@ -190,6 +191,7 @@ public final class AtmospherePane {
     private final Button floodToggle;
     private final TextView floodStatus;
     private final LinearLayout floodLegend;
+    private final LinearLayout floodDayRow;
     private FloodOutlookOverlay flood;
     private boolean floodOpen = true;
     private static final String PREF_BEACH_OPEN = "weather.beach.open";
@@ -492,11 +494,13 @@ public final class AtmospherePane {
         firewxToggle = find(R.id.firewx_toggle);
         firewxStatus = find(R.id.firewx_status);
         firewxLegend = find(R.id.firewx_legend);
+        firewxDayRow = find(R.id.firewx_day_row);
         floodSettings = find(R.id.flood_settings);
         floodExpand = find(R.id.flood_expand);
         floodToggle = find(R.id.flood_toggle);
         floodStatus = find(R.id.flood_status);
         floodLegend = find(R.id.flood_legend);
+        floodDayRow = find(R.id.flood_day_row);
         beachSettings = find(R.id.beach_settings);
         beachExpand = find(R.id.beach_expand);
         beachToggle = find(R.id.beach_toggle);
@@ -1309,6 +1313,7 @@ public final class AtmospherePane {
         floodLegend.removeAllViews();
         for (String[] row : FloodOutlookOverlay.LEGEND)
             floodLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(floodDayRow, flood);
         updateLayerControls();
     }
 
@@ -1327,7 +1332,42 @@ public final class AtmospherePane {
         firewxLegend.removeAllViews();
         for (String[] row : FireWxOutlookOverlay.LEGEND)
             firewxLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(firewxDayRow, firewx);
         updateLayerControls();
+    }
+
+    /**
+     * Which day of an outlook is on the map: one at a time by default, because
+     * three days of bands stacked on one map hide each other and a tap on the
+     * overlap lists all three (operator, 2026-09-26).
+     */
+    private void buildDayRow(final LinearLayout row, final com.atakmap.android.atmosphere.overlay.OutlookOverlay layer) {
+        row.removeAllViews();
+        if (layer == null)
+            return;
+        final String[] labels = { "Day 1", "Day 2", "Day 3", "All days" };
+        final int[] values = { 1, 2, 3, 0 };
+        for (int i = 0; i < labels.length; i++) {
+            final int value = values[i];
+            final boolean chosen = layer.day() == value;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(labels[i]);
+            b.setTextSize(12);
+            b.setTextColor(chosen ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    layer.setDay(value);
+                    buildDayRow(row, layer);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
     }
 
     /** Avalanche zones, owned by the plugin. Not time-enabled. */
