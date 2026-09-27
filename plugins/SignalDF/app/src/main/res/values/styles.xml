@@ -123,4 +123,32 @@
     </style>
 
 
+    <!-- ==== takwerx house button ====
+         Verbatim from CLAUDE.md and identical in every takwerx plugin. ATAK's
+         own darkButton sets vertical padding only, which lets a short label
+         render wider than its own background; 44dp is a touch target for a
+         gloved hand on a vehicle mount, not a cosmetic choice. -->
+    <style name="TakwerxButton" parent="@style/darkButton">
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+    </style>
+
+    <!-- Small caps heading over each group of controls. -->
+    <style name="SectionHeading">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">2dp</item>
+        <item name="android:alpha">0.6</item>
+    </style>
+
 </resources>

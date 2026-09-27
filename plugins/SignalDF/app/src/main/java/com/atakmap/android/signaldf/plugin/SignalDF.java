@@ -1,27 +1,46 @@
-
 package com.atakmap.android.signaldf.plugin;
 
 import android.content.Context;
 
 import com.atak.plugins.impl.PluginContextProvider;
-import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.android.signaldf.net.KrakenLink;
+import com.atakmap.android.signaldf.ui.SignalDfDropDown;
+import com.atakmap.coremap.log.Log;
 
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
 import gov.tak.api.ui.IHostUIService;
-import gov.tak.api.ui.Pane;
-import gov.tak.api.ui.PaneBuilder;
 import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
+/**
+ * Signal DF -- RF direction finding from a KrakenSDR, on the ATAK map.
+ *
+ * <p>The plugin owns the radio link. {@link KrakenLink} is created here and
+ * lives exactly as long as the plugin does, never inside the pane and never
+ * inside a {@code Tool}: ATAK ends the active tool whenever another starts, a
+ * dropdown opens or Back is pressed, and a search does not stop being a search
+ * because the operator switched base maps. FOBS 0.4 shipped a GPS recording
+ * inside its tool and lost a walk to exactly that.
+ *
+ * <p>0.1 is deliberately small -- connect to the radio and put one correct
+ * bearing on the map. No fix, no power lobe, no sharing, no WebSocket. The
+ * bearing has to be right before anything built on top of it means anything,
+ * and as of 0.1 it has not been checked against a radio at all.
+ */
 public class SignalDF implements IPlugin {
+
+    private static final String TAG = "SignalDF";
 
     IServiceController serviceController;
     Context pluginContext;
     IHostUIService uiService;
     ToolbarItem toolbarItem;
-    Pane templatePane;
+
+    private KrakenLink link;
+    private SignalDfDropDown dropDown;
 
     public SignalDF(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -34,8 +53,6 @@ public class SignalDF implements IPlugin {
 
         // obtain the UI service
         uiService = serviceController.getService(IHostUIService.class);
-
-        // initialize the toolbar button for the plugin
 
         // create the button and set the identifier to be well known
         // if you fail to do this, the toolbar configuration will never
@@ -57,44 +74,44 @@ public class SignalDF implements IPlugin {
 
     @Override
     public void onStart() {
-        // the plugin is starting, add the button to the toolbar
         if (uiService == null)
             return;
+
+        // Built before any pane exists, so nothing about the connection depends
+        // on the operator having opened one.
+        if (link == null)
+            link = new KrakenLink();
 
         uiService.addToolbarItem(toolbarItem);
     }
 
     @Override
     public void onStop() {
-        // the plugin is stopping, remove the button from the toolbar
-        if (uiService == null)
-            return;
+        if (uiService != null)
+            uiService.removeToolbarItem(toolbarItem);
 
-        uiService.removeToolbarItem(toolbarItem);
+        if (dropDown != null) {
+            dropDown.dispose();
+            dropDown = null;
+        }
+        // The link is stopped rather than left running: a stopped plugin that
+        // is still polling a radio is a battery drain nobody can see.
+        if (link != null) {
+            link.dispose();
+            link = null;
+        }
     }
 
     private void showPane() {
-        // instantiate the plugin view if necessary
-        if(templatePane == null) {
-            // Remember to use the PluginLayoutInflator if you are actually inflating a custom view
-            // In this case, using it is not necessary - but I am putting it here to remind
-            // developers to look at this Inflator
-
-            templatePane = new PaneBuilder(PluginLayoutInflater.inflate(pluginContext,
-                    R.layout.main_layout, null))
-                    // relative location is set to default; pane will switch location dependent on
-                    // current orientation of device screen
-                    .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
-                    // pane will take up 50% of screen width in landscape mode
-                    .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
-                    // pane will take up 50% of screen height in portrait mode
-                    .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
-                    .build();
+        final MapView mapView = MapView.getMapView();
+        if (mapView == null) {
+            Log.w(TAG, "no map view yet, cannot open the pane");
+            return;
         }
-
-        // if the plugin pane is not visible, show it!
-        if(!uiService.isPaneVisible(templatePane)) {
-            uiService.showPane(templatePane, null);
-        }
+        if (link == null)
+            link = new KrakenLink();
+        if (dropDown == null)
+            dropDown = new SignalDfDropDown(mapView, pluginContext);
+        dropDown.show();
     }
 }

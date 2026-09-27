@@ -5,4 +5,10 @@
     <color name="darker_gray">#121212</color>
     <color name="heading_yellow">#dfb228</color>
 
+    <!-- Toggle text colors, matching Traffic: the word carries the state, not
+         the button face. -->
+    <color name="on_green">#4CD964</color>
+    <color name="off_red">#FF5B5B</color>
+    <color name="live_cyan">#00E5FF</color>
+    <color name="warn_amber">#FFB300</color>
 </resources>

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The Signal DF pane.
+
+    The wide/narrow button is pinned in the root LinearLayout below the
+    ScrollView rather than placed inside it, so it stays reachable however long
+    the bearing list gets. There is no ListView anywhere here: a ListView inside
+    a ScrollView collapses to one row, and the per-VFO rows are added to a plain
+    LinearLayout so the whole pane is one scroller.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingLeft="6dp"
+    android:paddingRight="6dp">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fadeScrollbars="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/SectionHeading"
+                android:text="Radio" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:text="Not connected" />
+
+            <TextView
+                android:id="@+id/feed_line"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:alpha="0.75"
+                android:paddingTop="2dp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingTop="4dp">
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/host"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="krakensdr.local" />
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/connect"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="Connect" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/SectionHeading"
+                android:text="Array heading" />
+
+            <TextView
+                android:id="@+id/heading_provenance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:text="Array heading: unknown" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingTop="4dp">
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/set_heading"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Set heading" />
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/clear_heading"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="Use radio" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/SectionHeading"
+                android:id="@+id/bearings_heading"
+                android:text="Bearings" />
+
+            <TextView
+                android:id="@+id/bearings_note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:alpha="0.75"
+                android:text="Nothing yet." />
+
+            <LinearLayout
+                android:id="@+id/vfo_rows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="2dp" />
+
+            <TextView
+                android:id="@+id/unverified"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:paddingTop="10dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <Button
+        style="@style/TakwerxButton"
+        android:id="@+id/wide_narrow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:text="Open wide" />
+
+</LinearLayout>
