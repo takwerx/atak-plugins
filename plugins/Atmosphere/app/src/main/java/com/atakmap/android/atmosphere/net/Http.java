@@ -74,6 +74,18 @@ public final class Http {
             });
     private static final int LARGE_READ_TIMEOUT_MS = 60_000;
 
+    /**
+     * Called when the plugin stops. These pools are static, so a plugin generation
+     * that is unloaded leaves them running, and their threads pin that generation's
+     * classloader and everything static in it -- icon caches, station lists, the
+     * lot. ATAK ran out of heap on 2026-09-26 after a day of reinstalls ("six
+     * wx-http threads" was two generations). A new generation has its own pools.
+     */
+    public static void shutdown() {
+        EXECUTOR.shutdownNow();
+        LARGE.shutdownNow();
+    }
+
     public static void getLarge(final String url, final String userAgent,
             final Map<String, String> headers, final Callback callback) {
         LARGE.execute(new Runnable() {

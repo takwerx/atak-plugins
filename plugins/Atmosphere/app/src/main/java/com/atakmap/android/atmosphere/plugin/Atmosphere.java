@@ -20,6 +20,7 @@ import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.BeachOverlay;
+import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
@@ -90,6 +91,7 @@ public class Atmosphere implements IPlugin {
     private BeachOverlay beach;
     private SnowOverlay snow;
     private SstOverlay sst;
+    private SnotelOverlay snotel;
     private StormDetailsReceiver stormDetails;
     private WindOverlay wind;
     private SmokeOverlay smoke;
@@ -179,6 +181,8 @@ public class Atmosphere implements IPlugin {
         snow.start();
         sst = new SstOverlay(mapView, egress);
         sst.start();
+        snotel = new SnotelOverlay(mapView, pluginContext, egress);
+        snotel.start();
         if (stormDetails == null) {
             stormDetails = new StormDetailsReceiver(mapView, pluginContext);
             final DocumentedIntentFilter f = new DocumentedIntentFilter();
@@ -232,6 +236,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setSnow(snow);
             if (sst != null)
                 atmospherePane.setSst(sst);
+            if (snotel != null)
+                atmospherePane.setSnotel(snotel);
             atmospherePane.setSpotLayer(spotLayer);
             atmospherePane.setStations(stations);
             atmospherePane.setGauges(gauges);
@@ -275,6 +281,10 @@ public class Atmosphere implements IPlugin {
         if (stations != null)
             stations.stop();
             spotLayer = null;
+        }
+        if (snotel != null) {
+            snotel.stop();
+            snotel = null;
         }
         if (sst != null) {
             sst.stop();
@@ -320,6 +330,10 @@ public class Atmosphere implements IPlugin {
             radar.stop();
             radar = null;
         }
+        // Static pools are per generation; a generation that is unloaded shuts its
+        // own down, or its threads keep the whole generation in memory.
+        com.atakmap.android.atmosphere.overlay.OverlayPools.shutdown();
+        com.atakmap.android.atmosphere.net.Http.shutdown();
         if (dropDown != null) {
             dropDown.dispose();
             dropDown = null;
@@ -368,6 +382,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setSnow(snow);
             if (sst != null)
                 atmospherePane.setSst(sst);
+            if (snotel != null)
+                atmospherePane.setSnotel(snotel);
             if (spotLayer != null)
                 atmospherePane.setSpotLayer(spotLayer);
             if (stations != null)

@@ -366,6 +366,11 @@ final class AtmosphereFeatures {
                         }
                     });
 
+    /** Called when the plugin stops: the static attach thread would otherwise pin this generation. */
+    static void shutdownAttach() {
+        ATTACH.shutdownNow();
+    }
+
     /** Counts down once the store is usable, whether or not the layer is on the map. */
     private final java.util.concurrent.CountDownLatch ready =
             new java.util.concurrent.CountDownLatch(1);
