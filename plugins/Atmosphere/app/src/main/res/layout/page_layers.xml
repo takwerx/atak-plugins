@@ -101,6 +101,8 @@
 
                 <Button
                     android:id="@+id/radar_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -151,6 +153,8 @@
 
                 <Button
                     android:id="@+id/wind_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -296,6 +300,8 @@
 
                 <Button
                     android:id="@+id/smoke_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -386,6 +392,8 @@
 
                 <Button
                     android:id="@+id/air_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -469,6 +477,8 @@
 
                 <Button
                     android:id="@+id/warn_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -556,6 +566,8 @@
 
                 <Button
                     android:id="@+id/tropical_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -637,6 +649,8 @@
 
                 <Button
                     android:id="@+id/firewx_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -707,6 +721,8 @@
 
                 <Button
                     android:id="@+id/flood_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -777,6 +793,8 @@
 
                 <Button
                     android:id="@+id/beach_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -837,6 +855,8 @@
 
                 <Button
                     android:id="@+id/sst_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -908,6 +928,8 @@
 
                 <Button
                     android:id="@+id/avalanche_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -969,6 +991,8 @@
 
                 <Button
                     android:id="@+id/snow_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -1029,6 +1053,8 @@
 
                 <Button
                     android:id="@+id/snotel_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -1099,6 +1125,8 @@
 
                 <Button
                     android:id="@+id/spot_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -1218,6 +1246,8 @@
 
                 <Button
                     android:id="@+id/stations_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -1372,6 +1402,7 @@
 
                     <Button
                         android:id="@+id/stations_guide_toggle"
+
                         style="@style/TakwerxButton"
                         android:layout_width="0dp"
                         android:layout_weight="1"
@@ -1459,6 +1490,8 @@
 
                 <Button
                     android:id="@+id/gauges_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
@@ -1666,6 +1699,8 @@
 
                 <Button
                     android:id="@+id/buoys_toggle"
+
+                    android:gravity="left|center_vertical"
                     style="@style/TakwerxButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
