@@ -61,8 +61,6 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
 
     private static final String TAG = "SignalDF.Pane";
 
-    public static final String SHOW = "com.atakmap.android.signaldf.SHOW";
-
     /** Where the radio's address is remembered between sessions. */
     private static final String PREF_HOST = "signaldf.host";
 
@@ -197,8 +195,8 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (SHOW.equals(intent.getAction()))
-            show();
+        // Opened directly by the toolbar item, or by the plugin's own SHOW
+        // receiver; this drop down is not registered for any broadcast itself.
     }
 
     /**

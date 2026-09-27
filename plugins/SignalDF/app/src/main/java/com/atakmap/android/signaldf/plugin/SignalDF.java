@@ -1,8 +1,12 @@
 package com.atakmap.android.signaldf.plugin;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
 
 import com.atak.plugins.impl.PluginContextProvider;
+import com.atakmap.android.ipc.AtakBroadcast;
+import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.signaldf.net.KrakenLink;
 import com.atakmap.android.signaldf.ui.SignalDfDropDown;
@@ -33,6 +37,21 @@ import gov.tak.platform.marshal.MarshalManager;
 public class SignalDF implements IPlugin {
 
     private static final String TAG = "SignalDF";
+
+    /**
+     * Opens the pane from outside: a test over adb, a hotkey, or another plugin.
+     * A system broadcast, because ATAK's own {@code registerReceiver} wraps
+     * {@code LocalBroadcastManager} and is process-local, so {@code am broadcast}
+     * cannot reach it. It opens a pane and nothing else.
+     */
+    public static final String ACTION_SHOW = "com.atakmap.android.signaldf.SHOW";
+
+    private final BroadcastReceiver showReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            showPane();
+        }
+    };
 
     IServiceController serviceController;
     Context pluginContext;
@@ -83,12 +102,20 @@ public class SignalDF implements IPlugin {
             link = new KrakenLink();
 
         uiService.addToolbarItem(toolbarItem);
+        AtakBroadcast.getInstance().registerSystemReceiver(showReceiver,
+                new DocumentedIntentFilter(ACTION_SHOW, "Open the Signal DF pane"));
     }
 
     @Override
     public void onStop() {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+
+        try {
+            AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "show receiver was not registered", e);
+        }
 
         if (dropDown != null) {
             dropDown.dispose();
