@@ -50,6 +50,11 @@ On a phone or tablet used with a finger, Cursorwerx does nothing at all.
 _________________________________________________________________
 STATUS
 
+Version 0.2: the wheel zoom step is a setting (Fine to Very fast), in the
+plugin's pane and under Tool Preferences. Verified on ATAK-CIV 5.8.0.3 in the
+TAKwerx ATAK Terminal on a Mac (debug and release builds) and on official
+ATAK-CIV 5.7 in the TAKwerx ATAK Terminal on Windows (the tak.gov-signed build).
+
 Version 0.1. Verified on ATAK-CIV 5.8.0.3 and 5.8.0.5 in the TAKwerx ATAK
 Terminal (Google's Android Emulator, Android 14, on Apple Silicon Macs): mouse
 and trackpad, wheel zoom and pane scrolling, click and drag, text entry in
