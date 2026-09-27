@@ -19,6 +19,11 @@
     <string name="hide_hours_table">Hide hourly table</string>
     <string name="heading_sun_moon">Sun and moon</string>
     <string name="heading_layers">Layers</string>
+    <string name="group_general">Warnings and wind</string>
+    <string name="group_fire">Fire</string>
+    <string name="group_rain">Rain and rivers</string>
+    <string name="group_ocean">Ocean</string>
+    <string name="group_snow">Snow</string>
     <string name="heading_height">Height</string>
     <string name="tropical_none">No storms right now</string>
     <string name="go_to">Go to</string>
