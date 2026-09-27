@@ -194,14 +194,44 @@ public final class PointerRouter {
      *
      * @return true when the wheel was handled here, so ATAK's coarser zoom never runs.
      */
+    /**
+     * Wheel travel since the last zoom step, in the device's own units. A mouse click is
+     * one event of one notch and zooms at once; a trackpad's two-finger scroll is a
+     * stream of small events, and on the laptop every one of them zoomed a step, so a
+     * short swipe flew through many levels (2026-09-26). Steps are taken per notch of
+     * travel, and no faster than one per {@link #MIN_STEP_MS}.
+     */
+    private float travel;
+    private long lastStepAt;
+    private static final long MIN_STEP_MS = 90;
+
+    /**
+     * One notch in the device's units. The Android Emulator's virtio tablet reports a
+     * mouse click as 8; scrcpy and most Android mice report 1.
+     */
+    private static float notch(MotionEvent event) {
+        final android.view.InputDevice d = event.getDevice();
+        return d != null && "QEMU Virtio Tablet".equals(d.getName()) ? 8f : 1f;
+    }
+
     private boolean zoomAtCursor(MotionEvent event) {
         final float axis = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
         if (axis == 0f)
             return false;
-        // One wheel event is one step. The Android Emulator's virtio tablet reports a
-        // click as 8 and a fast flick as 32, which was a 3x or 87x jump per event
-        // (2026-09-26); scrcpy reports 1.
-        final float notches = Math.signum(axis);
+        // Direction change resets the travel, so a reversal answers at once.
+        if (Math.signum(axis) != Math.signum(travel))
+            travel = 0f;
+        travel += axis;
+        final float n = notch(event);
+        final long now = android.os.SystemClock.uptimeMillis();
+        if (verbose)
+            Log.d(TAG, "wheel axis " + axis + " travel " + travel + " notch " + n
+                    + " device " + (event.getDevice() != null ? event.getDevice().getName() : "?"));
+        if (Math.abs(travel) < n || now - lastStepAt < MIN_STEP_MS)
+            return true; // taken, no step yet
+        final float notches = Math.signum(travel);
+        travel = 0f;
+        lastStepAt = now;
         try {
             // At either zoom limit the zoom does nothing but the cursor anchor still
             // shifts the map, and repeated at the globe it spun the whole earth.
