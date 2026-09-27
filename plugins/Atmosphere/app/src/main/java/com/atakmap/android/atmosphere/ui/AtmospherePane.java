@@ -43,6 +43,7 @@ import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
+import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
 import com.atakmap.android.atmosphere.data.NwsAlerts;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -170,6 +171,14 @@ public final class AtmospherePane {
     private final LinearLayout avalancheLegend;
     private AvalancheOverlay avalanche;
     private boolean avalancheOpen = true;
+    private static final String PREF_FIREWX_OPEN = "weather.firewx.open";
+    private final LinearLayout firewxSettings;
+    private final ImageButton firewxExpand;
+    private final Button firewxToggle;
+    private final TextView firewxStatus;
+    private final LinearLayout firewxLegend;
+    private FireWxOutlookOverlay firewx;
+    private boolean firewxOpen = true;
     /** Which storms are showing their own list of maps. By storm id, not by slot. */
     private final Set<String> stormOpen = new HashSet<>();
     private final LinearLayout radarSettings;
@@ -433,6 +442,11 @@ public final class AtmospherePane {
         avalancheToggle = find(R.id.avalanche_toggle);
         avalancheStatus = find(R.id.avalanche_status);
         avalancheLegend = find(R.id.avalanche_legend);
+        firewxSettings = find(R.id.firewx_settings);
+        firewxExpand = find(R.id.firewx_expand);
+        firewxToggle = find(R.id.firewx_toggle);
+        firewxStatus = find(R.id.firewx_status);
+        firewxLegend = find(R.id.firewx_legend);
         buildStormScale();
         radarSettings = find(R.id.radar_settings);
         windSettings = find(R.id.wind_settings);
@@ -565,6 +579,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 tropicalOpen = !tropicalOpen;
                 rememberFold(PREF_TROPICAL_OPEN, tropicalOpen);
+                updateLayerControls();
+            }
+        });
+        firewxOpen = prefs == null || prefs.getBoolean(PREF_FIREWX_OPEN, true);
+        firewxExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                firewxOpen = !firewxOpen;
+                rememberFold(PREF_FIREWX_OPEN, firewxOpen);
                 updateLayerControls();
             }
         });
@@ -799,6 +822,8 @@ public final class AtmospherePane {
             warnings.refresh(false);
         if (avalanche != null && avalanche.isOn())
             avalanche.refresh(false);
+        if (firewx != null && firewx.isOn())
+            firewx.refresh(false);
         if (pages[pager.getCurrentItem()] == spotPage.view())
             spotPage.onShown();
         updateLayerControls();
@@ -1042,6 +1067,24 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** SPC's fire weather outlook, owned by the plugin. Not time-enabled. */
+    public void setFireWx(FireWxOutlookOverlay overlay) {
+        firewx = overlay;
+        if (firewx == null)
+            return;
+        firewx.setListener(new FireWxOutlookOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                firewxStatus.setText(status);
+                firewxStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        firewxLegend.removeAllViews();
+        for (String[] row : FireWxOutlookOverlay.LEGEND)
+            firewxLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
     /** Avalanche zones, owned by the plugin. Not time-enabled. */
     public void setAvalanche(AvalancheOverlay overlay) {
         avalanche = overlay;
@@ -1135,6 +1178,22 @@ public final class AtmospherePane {
                     turnTropicalOn();
                 } else {
                     askToAllowTropical();
+                }
+            }
+        });
+        firewxToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (firewx == null)
+                    return;
+                if (firewx.isOn()) {
+                    firewx.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FireWxOutlookOverlay.LAYER_ID)) {
+                    firewx.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFireWx();
                 }
             }
         });
@@ -2270,6 +2329,10 @@ public final class AtmospherePane {
             tropical.setOn(on);
         else if (tropical != null && on)
             blocked++;
+        if (firewx != null && on == allowed(FireWxOutlookOverlay.LAYER_ID))
+            firewx.setOn(on);
+        else if (firewx != null && on)
+            blocked++;
         if (avalanche != null && on == allowed(AvalancheOverlay.LAYER_ID))
             avalanche.setOn(on);
         else if (avalanche != null && on)
@@ -2896,6 +2959,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowFireWx() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.firewx_allow_title))
+                .setMessage(pluginContext.getString(R.string.firewx_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FireWxOutlookOverlay.LAYER_ID, true);
+                                if (firewx != null)
+                                    firewx.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowAvalanche() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -3103,6 +3187,13 @@ public final class AtmospherePane {
         tropicalExpand.setVisibility(tropicalOn ? View.VISIBLE : View.GONE);
         tropicalExpand.setRotation(tropicalOpen ? 180f : 0f);
         tropicalSettings.setVisibility(tropicalOn && tropicalOpen ? View.VISIBLE : View.GONE);
+        final boolean firewxOn = firewx != null && firewx.isOn();
+        firewxToggle.setText(firewxOn ? R.string.firewx_on : R.string.firewx_off);
+        firewxToggle.setTextColor(pluginContext.getResources().getColor(
+                firewxOn ? R.color.state_on : R.color.state_off));
+        firewxExpand.setVisibility(firewxOn ? View.VISIBLE : View.GONE);
+        firewxExpand.setRotation(firewxOpen ? 180f : 0f);
+        firewxSettings.setVisibility(firewxOn && firewxOpen ? View.VISIBLE : View.GONE);
         final boolean avalancheOn = avalanche != null && avalanche.isOn();
         avalancheToggle.setText(avalancheOn ? R.string.avalanche_on : R.string.avalanche_off);
         avalancheToggle.setTextColor(pluginContext.getResources().getColor(
@@ -3194,6 +3285,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_tropical, TropicalOverlay.HOST));
+        }
+        if (firewx != null && firewx.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_firewx, FireWxOutlookOverlay.HOST));
         }
         if (avalanche != null && avalanche.isOn()) {
             if (out.length() > 0)

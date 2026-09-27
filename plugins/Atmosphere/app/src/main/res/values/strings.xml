@@ -78,6 +78,11 @@
     <string name="tropical_on">Hurricanes ON</string>
     <string name="tropical_off">Hurricanes OFF</string>
     <string name="tropical_allow_title">Show hurricanes?</string>
+    <string name="firewx_on">Fire weather outlook ON</string>
+    <string name="firewx_off">Fire weather outlook OFF</string>
+    <string name="firewx_allow_title">Show the fire weather outlook?</string>
+    <string name="firewx_allow_text">Atmosphere will ask the National Weather Service for the Storm Prediction Center\'s fire weather outlook areas for the next three days and draw them on the map. Your position is not sent. Server: mapservices.weather.noaa.gov</string>
+    <string name="credit_firewx">Fire weather outlook from the NOAA Storm Prediction Center (%1$s)</string>
     <string name="avalanche_on">Avalanche ON</string>
     <string name="avalanche_off">Avalanche OFF</string>
     <string name="avalanche_allow_title">Show avalanche zones?</string>
