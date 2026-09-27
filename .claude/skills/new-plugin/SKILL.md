@@ -120,4 +120,7 @@ Not this session's job, but say it once so it is not discovered at ship time:
 - `refresh_depot.py` in the notes repo must list the repo, or the Market never
   shows the plugin at all (HARD RULE 2)
 - The icons are two files, not one: `ic_launcher.png` on a dark tile,
-  `ic_toolbar.png` a bare white glyph, edge to edge at 256
+  `ic_toolbar.png` a bare white glyph, edge to edge at 256. Invoke the
+  `plugin-icon` skill rather than doing it by hand -- it carries the tool, the
+  arguments and the traps (the launcher mask clips a glyph wider than 180, and
+  the 40 px render is the only size that tells you the truth)
