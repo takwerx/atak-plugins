@@ -40,9 +40,14 @@ public class AtmosphereDropDown extends DropDownReceiver implements OnStateListe
         if (isVisible())
             return;
         setRetain(true);
-        // ignoreBackButton = true: Back steps a wide pane back to half before it closes,
-        // which is what the handle gesture does and what a person expects from Back.
-        showDropDown(root, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, true, this);
+        // ignoreBackButton is FALSE. The manager calls onBackButtonPressed() either way,
+        // so Back still narrows a wide pane first; what the flag does is gate the close
+        // that follows a false answer -- closeRightDropDown(false, true) returns without
+        // closing a dropdown that ignores Back. With it true, from 2026-09-21 to
+        // 2026-09-26, Back could never close this pane at all: the operator pressed it
+        // six times and reported ATAK locked up. Retention under a chooser or another
+        // dropdown comes from setRetain(true) above, not from this flag.
+        showDropDown(root, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, false, this);
         pane.onShown();
     }
 
