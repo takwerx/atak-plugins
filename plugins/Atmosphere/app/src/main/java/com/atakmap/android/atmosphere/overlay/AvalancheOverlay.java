@@ -194,8 +194,12 @@ public final class AvalancheOverlay {
                     if (z.dangerLevel >= 1)
                         rated++;
                     final int c = z.color & 0x00FFFFFF;
-                    drawn.add(new AtmosphereFeatures.Drawn(z.center, z.name, g,
-                            AtmosphereFeatures.area(0xFF000000 | c, WEIGHT, (FILL_ALPHA << 24) | c),
+                    // Named for what it is: the chooser row and the details heading are
+                    // the feature's name, and "Northern New Mexico" alone told the
+                    // operator nothing.
+                    final String label = "Avalanche: " + z.name;
+                    drawn.add(new AtmosphereFeatures.Drawn(z.center, label, g,
+                            AtmosphereFeatures.area(0xFF000000 | c, WEIGHT, (FILL_ALPHA << 24) | c, label),
                             attributes(z)));
                 }
                 features.rewrite(drawn);

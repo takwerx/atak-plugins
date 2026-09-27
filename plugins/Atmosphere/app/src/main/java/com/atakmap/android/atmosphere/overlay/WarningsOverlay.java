@@ -314,7 +314,7 @@ public final class WarningsOverlay {
                     final int c = a.color() & 0x00FFFFFF;
                     drawn.add(new AtmosphereFeatures.Drawn(a.event, a.event, g,
                             AtmosphereFeatures.area(0xFF000000 | c, WEIGHT,
-                                    (FILL_ALPHA << 24) | c),
+                                    (FILL_ALPHA << 24) | c, a.event),
                             attributes(a)));
                     cover.add(new Covered(a, GeoRings.of(parts)));
                 }

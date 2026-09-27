@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -266,8 +267,10 @@ public final class BeachOverlay {
                     final AttributeSet s = new AttributeSet();
                     s.setAttribute("_details", b.details());
                     s.setAttribute("Beach", b.name);
-                    drawn.add(new AtmosphereFeatures.Drawn(b.office, b.title(), g,
-                            AtmosphereFeatures.area(0xFF000000 | c, WEIGHT, (FILL_ALPHA << 24) | c), s));
+                    final String label = (b.rip.isEmpty() ? "Beach" : "Rip current " + b.rip.toLowerCase(Locale.US))
+                            + ": " + b.name;
+                    drawn.add(new AtmosphereFeatures.Drawn(b.office, label, g,
+                            AtmosphereFeatures.area(0xFF000000 | c, WEIGHT, (FILL_ALPHA << 24) | c, label), s));
                 }
                 features.rewrite(drawn);
                 final String line = line(drawn.size(), low, moderate, high);

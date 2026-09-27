@@ -226,7 +226,8 @@ public abstract class OutlookOverlay {
                     s.setAttribute("_details", a.details);
                     s.setAttribute("Outlook", a.title);
                     drawn.add(new AtmosphereFeatures.Drawn("Day " + a.day, a.title, g,
-                            AtmosphereFeatures.area(0xFF000000 | c, WEIGHT, (FILL_ALPHA << 24) | c), s));
+                            AtmosphereFeatures.area(0xFF000000 | c, WEIGHT, (FILL_ALPHA << 24) | c,
+                                    a.title), s));
                 }
                 features.rewrite(drawn);
                 final String line = summary(snapshot);

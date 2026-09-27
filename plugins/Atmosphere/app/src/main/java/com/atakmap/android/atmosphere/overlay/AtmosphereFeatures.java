@@ -215,6 +215,22 @@ final class AtmosphereFeatures {
                 new BasicFillStyle(fill), new BasicStrokeStyle(stroke, weight) });
     }
 
+    /**
+     * An area's style with its name drawn in it. ATAK does not label a polygon from
+     * its name any more than a line, so a LabelPointStyle in the composite is what
+     * says what a colored area is; without it three days of outlook bands and a
+     * gray avalanche zone were unlabeled shapes the operator could only name by
+     * tapping (2026-09-26: "i have no idea what is what").
+     */
+    static Style area(int stroke, float weight, int fill, String label) {
+        if (label == null || label.isEmpty())
+            return area(stroke, weight, fill);
+        return new CompositeStyle(new Style[] {
+                new BasicFillStyle(fill), new BasicStrokeStyle(stroke, weight),
+                new LabelPointStyle(label, 0xFFFFFFFF, 0x99000000,
+                        LabelPointStyle.ScrollMode.DEFAULT) });
+    }
+
     AtmosphereFeatures(MapView mapView, Context pluginContext, String logTag, String layerName,
             String storeName, String type, boolean sweepOldStormDrawings) {
         this.mapView = mapView;
