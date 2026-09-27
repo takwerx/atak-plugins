@@ -44,6 +44,8 @@ import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.BeachOverlay;
+import com.atakmap.android.atmosphere.overlay.SnowOverlay;
+import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
@@ -197,6 +199,22 @@ public final class AtmospherePane {
     private final LinearLayout beachLegend;
     private BeachOverlay beach;
     private boolean beachOpen = true;
+    private static final String PREF_SNOW_OPEN = "weather.snow.open";
+    private final LinearLayout snowSettings;
+    private final ImageButton snowExpand;
+    private final Button snowToggle;
+    private final TextView snowStatus;
+    private final LinearLayout snowLegend;
+    private SnowOverlay snow;
+    private boolean snowOpen = true;
+    private static final String PREF_SST_OPEN = "weather.sst.open";
+    private final LinearLayout sstSettings;
+    private final ImageButton sstExpand;
+    private final Button sstToggle;
+    private final TextView sstStatus;
+    private final LinearLayout sstLegend;
+    private SstOverlay sst;
+    private boolean sstOpen = true;
     /** Which storms are showing their own list of maps. By storm id, not by slot. */
     private final Set<String> stormOpen = new HashSet<>();
     private final LinearLayout radarSettings;
@@ -475,6 +493,16 @@ public final class AtmospherePane {
         beachToggle = find(R.id.beach_toggle);
         beachStatus = find(R.id.beach_status);
         beachLegend = find(R.id.beach_legend);
+        snowSettings = find(R.id.snow_settings);
+        snowExpand = find(R.id.snow_expand);
+        snowToggle = find(R.id.snow_toggle);
+        snowStatus = find(R.id.snow_status);
+        snowLegend = find(R.id.snow_legend);
+        sstSettings = find(R.id.sst_settings);
+        sstExpand = find(R.id.sst_expand);
+        sstToggle = find(R.id.sst_toggle);
+        sstStatus = find(R.id.sst_status);
+        sstLegend = find(R.id.sst_legend);
         buildStormScale();
         radarSettings = find(R.id.radar_settings);
         windSettings = find(R.id.wind_settings);
@@ -607,6 +635,24 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 tropicalOpen = !tropicalOpen;
                 rememberFold(PREF_TROPICAL_OPEN, tropicalOpen);
+                updateLayerControls();
+            }
+        });
+        snowOpen = prefs == null || prefs.getBoolean(PREF_SNOW_OPEN, true);
+        snowExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                snowOpen = !snowOpen;
+                rememberFold(PREF_SNOW_OPEN, snowOpen);
+                updateLayerControls();
+            }
+        });
+        sstOpen = prefs == null || prefs.getBoolean(PREF_SST_OPEN, true);
+        sstExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sstOpen = !sstOpen;
+                rememberFold(PREF_SST_OPEN, sstOpen);
                 updateLayerControls();
             }
         });
@@ -874,6 +920,10 @@ public final class AtmospherePane {
             flood.refresh(false);
         if (beach != null && beach.isOn())
             beach.refresh(false);
+        if (snow != null && snow.isOn())
+            snow.refresh(false);
+        if (sst != null && sst.isOn())
+            sst.refresh(false);
         if (pages[pager.getCurrentItem()] == spotPage.view())
             spotPage.onShown();
         updateLayerControls();
@@ -1117,6 +1167,72 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** NOHRSC's snow depth, owned by the plugin. Not time-enabled. */
+    public void setSnow(SnowOverlay overlay) {
+        snow = overlay;
+        if (snow == null)
+            return;
+        snow.setListener(new SnowOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                snowStatus.setText(status);
+                snowStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        snowLegend.removeAllViews();
+        for (String[] row : SnowOverlay.LEGEND)
+            snowLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
+        updateLayerControls();
+    }
+
+    /**
+     * Sea surface temperature, owned by the plugin. Not time-enabled. The legend
+     * is nowCOAST's own graphic, fetched once when the block is bound.
+     */
+    public void setSst(SstOverlay overlay) {
+        sst = overlay;
+        if (sst == null)
+            return;
+        sst.setListener(new SstOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                sstStatus.setText(status);
+                sstStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        updateLayerControls();
+    }
+
+    private boolean sstLegendAsked;
+
+    /** The legend graphic is asked for once the layer is allowed, never before. */
+    private void ensureSstLegend() {
+        if (sstLegendAsked || sst == null || !egress.isLayerEnabled(SstOverlay.LAYER_ID))
+            return;
+        sstLegendAsked = true;
+        com.atakmap.android.atmosphere.net.Http.getBitmap(SstOverlay.LEGEND_URL, egress.userAgent(),
+                new com.atakmap.android.atmosphere.net.Http.BitmapCallback() {
+                    @Override
+                    public void onSuccess(android.graphics.Bitmap bitmap) {
+                        if (bitmap == null)
+                            return;
+                        final android.widget.ImageView iv = new android.widget.ImageView(pluginContext);
+                        iv.setImageBitmap(bitmap);
+                        iv.setAdjustViewBounds(true);
+                        iv.setScaleType(android.widget.ImageView.ScaleType.FIT_START);
+                        iv.setContentDescription("Sea surface temperature scale, Fahrenheit above, Celsius below");
+                        sstLegend.removeAllViews();
+                        sstLegend.addView(iv, new LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                    }
+
+                    @Override
+                    public void onFailure(String error) {
+                        sstLegendAsked = false;
+                    }
+                });
+    }
+
     /** The NWS beach forecast, owned by the plugin. Not time-enabled. */
     public void setBeach(BeachOverlay overlay) {
         beach = overlay;
@@ -1264,6 +1380,38 @@ public final class AtmospherePane {
                     turnTropicalOn();
                 } else {
                     askToAllowTropical();
+                }
+            }
+        });
+        snowToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (snow == null)
+                    return;
+                if (snow.isOn()) {
+                    snow.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SnowOverlay.LAYER_ID)) {
+                    snow.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowSnow();
+                }
+            }
+        });
+        sstToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (sst == null)
+                    return;
+                if (sst.isOn()) {
+                    sst.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SstOverlay.LAYER_ID)) {
+                    sst.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowSst();
                 }
             }
         });
@@ -2447,6 +2595,14 @@ public final class AtmospherePane {
             tropical.setOn(on);
         else if (tropical != null && on)
             blocked++;
+        if (snow != null && on == allowed(SnowOverlay.LAYER_ID))
+            snow.setOn(on);
+        else if (snow != null && on)
+            blocked++;
+        if (sst != null && on == allowed(SstOverlay.LAYER_ID))
+            sst.setOn(on);
+        else if (sst != null && on)
+            blocked++;
         if (beach != null && on == allowed(BeachOverlay.LAYER_ID))
             beach.setOn(on);
         else if (beach != null && on)
@@ -3085,6 +3241,48 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowSnow() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.snow_allow_title))
+                .setMessage(pluginContext.getString(R.string.snow_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SnowOverlay.LAYER_ID, true);
+                                if (snow != null)
+                                    snow.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowSst() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.sst_allow_title))
+                .setMessage(pluginContext.getString(R.string.sst_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SstOverlay.LAYER_ID, true);
+                                if (sst != null)
+                                    sst.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowBeach() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -3355,6 +3553,22 @@ public final class AtmospherePane {
         tropicalExpand.setVisibility(tropicalOn ? View.VISIBLE : View.GONE);
         tropicalExpand.setRotation(tropicalOpen ? 180f : 0f);
         tropicalSettings.setVisibility(tropicalOn && tropicalOpen ? View.VISIBLE : View.GONE);
+        final boolean snowOn = snow != null && snow.isOn();
+        snowToggle.setText(snowOn ? R.string.snow_on : R.string.snow_off);
+        snowToggle.setTextColor(pluginContext.getResources().getColor(
+                snowOn ? R.color.state_on : R.color.state_off));
+        snowExpand.setVisibility(snowOn ? View.VISIBLE : View.GONE);
+        snowExpand.setRotation(snowOpen ? 180f : 0f);
+        snowSettings.setVisibility(snowOn && snowOpen ? View.VISIBLE : View.GONE);
+        final boolean sstOn = sst != null && sst.isOn();
+        sstToggle.setText(sstOn ? R.string.sst_on : R.string.sst_off);
+        sstToggle.setTextColor(pluginContext.getResources().getColor(
+                sstOn ? R.color.state_on : R.color.state_off));
+        sstExpand.setVisibility(sstOn ? View.VISIBLE : View.GONE);
+        sstExpand.setRotation(sstOpen ? 180f : 0f);
+        sstSettings.setVisibility(sstOn && sstOpen ? View.VISIBLE : View.GONE);
+        if (sstOn)
+            ensureSstLegend();
         final boolean beachOn = beach != null && beach.isOn();
         beachToggle.setText(beachOn ? R.string.beach_on : R.string.beach_off);
         beachToggle.setTextColor(pluginContext.getResources().getColor(
@@ -3482,6 +3696,16 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_beach, BeachOverlay.HOST));
+        }
+        if (snow != null && snow.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_snow, SnowOverlay.HOST));
+        }
+        if (sst != null && sst.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_sst, SstOverlay.HOST));
         }
         if (avalanche != null && avalanche.isOn()) {
             if (out.length() > 0)

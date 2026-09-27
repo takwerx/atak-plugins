@@ -20,6 +20,8 @@ import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.BeachOverlay;
+import com.atakmap.android.atmosphere.overlay.SnowOverlay;
+import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
@@ -86,6 +88,8 @@ public class Atmosphere implements IPlugin {
     private FireWxOutlookOverlay firewx;
     private FloodOutlookOverlay flood;
     private BeachOverlay beach;
+    private SnowOverlay snow;
+    private SstOverlay sst;
     private StormDetailsReceiver stormDetails;
     private WindOverlay wind;
     private SmokeOverlay smoke;
@@ -171,6 +175,10 @@ public class Atmosphere implements IPlugin {
         flood.start();
         beach = new BeachOverlay(mapView, pluginContext, egress);
         beach.start();
+        snow = new SnowOverlay(mapView, egress);
+        snow.start();
+        sst = new SstOverlay(mapView, egress);
+        sst.start();
         if (stormDetails == null) {
             stormDetails = new StormDetailsReceiver(mapView, pluginContext);
             final DocumentedIntentFilter f = new DocumentedIntentFilter();
@@ -220,6 +228,10 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFlood(flood);
             if (beach != null)
                 atmospherePane.setBeach(beach);
+            if (snow != null)
+                atmospherePane.setSnow(snow);
+            if (sst != null)
+                atmospherePane.setSst(sst);
             atmospherePane.setSpotLayer(spotLayer);
             atmospherePane.setStations(stations);
             atmospherePane.setGauges(gauges);
@@ -263,6 +275,14 @@ public class Atmosphere implements IPlugin {
         if (stations != null)
             stations.stop();
             spotLayer = null;
+        }
+        if (sst != null) {
+            sst.stop();
+            sst = null;
+        }
+        if (snow != null) {
+            snow.stop();
+            snow = null;
         }
         if (beach != null) {
             beach.stop();
@@ -344,6 +364,10 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFlood(flood);
             if (beach != null)
                 atmospherePane.setBeach(beach);
+            if (snow != null)
+                atmospherePane.setSnow(snow);
+            if (sst != null)
+                atmospherePane.setSst(sst);
             if (spotLayer != null)
                 atmospherePane.setSpotLayer(spotLayer);
             if (stations != null)

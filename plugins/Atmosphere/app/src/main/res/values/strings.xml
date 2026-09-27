@@ -93,6 +93,16 @@
     <string name="beach_allow_title">Show the beach forecast?</string>
     <string name="beach_allow_text">Atmosphere will ask the National Weather Service for the beach and surf zone forecast along the coast the map is showing and draw it on the map: rip current risk, surf and water temperature per beach. The map\'s area is sent; your position is not. Server: mapservices.weather.noaa.gov</string>
     <string name="credit_beach">Beach and surf zone forecast from the US National Weather Service (%1$s)</string>
+    <string name="snow_on">Snow depth ON</string>
+    <string name="snow_off">Snow depth OFF</string>
+    <string name="snow_allow_title">Show snow depth?</string>
+    <string name="snow_allow_text">Atmosphere will ask the National Weather Service for its daily snow depth analysis as a picture of the area the map is showing. The map\'s area is sent; your position is not. Server: mapservices.weather.noaa.gov</string>
+    <string name="credit_snow">Snow analysis from the NOAA National Operational Hydrologic Remote Sensing Center (%1$s)</string>
+    <string name="sst_on">Sea temperature ON</string>
+    <string name="sst_off">Sea temperature OFF</string>
+    <string name="sst_allow_title">Show sea surface temperature?</string>
+    <string name="sst_allow_text">Atmosphere will ask NOAA\'s nowCOAST for the sea surface temperature analysis as a picture of the area the map is showing. The map\'s area is sent; your position is not. Server: nowcoast.noaa.gov</string>
+    <string name="credit_sst">Sea surface temperature from NOAA nowCOAST (%1$s)</string>
     <string name="avalanche_on">Avalanche ON</string>
     <string name="avalanche_off">Avalanche OFF</string>
     <string name="avalanche_allow_title">Show avalanche zones?</string>
