@@ -20,6 +20,7 @@ import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
+import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
@@ -82,6 +83,7 @@ public class Atmosphere implements IPlugin {
     private TropicalOverlay tropical;
     private AvalancheOverlay avalanche;
     private FireWxOutlookOverlay firewx;
+    private FloodOutlookOverlay flood;
     private StormDetailsReceiver stormDetails;
     private WindOverlay wind;
     private SmokeOverlay smoke;
@@ -163,6 +165,8 @@ public class Atmosphere implements IPlugin {
         avalanche.start();
         firewx = new FireWxOutlookOverlay(mapView, pluginContext, egress);
         firewx.start();
+        flood = new FloodOutlookOverlay(mapView, pluginContext, egress);
+        flood.start();
         if (stormDetails == null) {
             stormDetails = new StormDetailsReceiver(mapView, pluginContext);
             final DocumentedIntentFilter f = new DocumentedIntentFilter();
@@ -208,6 +212,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setAvalanche(avalanche);
             if (firewx != null)
                 atmospherePane.setFireWx(firewx);
+            if (flood != null)
+                atmospherePane.setFlood(flood);
             atmospherePane.setSpotLayer(spotLayer);
             atmospherePane.setStations(stations);
             atmospherePane.setGauges(gauges);
@@ -251,6 +257,10 @@ public class Atmosphere implements IPlugin {
         if (stations != null)
             stations.stop();
             spotLayer = null;
+        }
+        if (flood != null) {
+            flood.stop();
+            flood = null;
         }
         if (firewx != null) {
             firewx.stop();
@@ -320,6 +330,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setAvalanche(avalanche);
             if (firewx != null)
                 atmospherePane.setFireWx(firewx);
+            if (flood != null)
+                atmospherePane.setFlood(flood);
             if (spotLayer != null)
                 atmospherePane.setSpotLayer(spotLayer);
             if (stations != null)
