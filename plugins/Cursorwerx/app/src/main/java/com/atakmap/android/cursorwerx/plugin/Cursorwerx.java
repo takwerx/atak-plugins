@@ -1,7 +1,13 @@
 
 package com.atakmap.android.cursorwerx.plugin;
 
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
+import android.view.View;
+import android.widget.Button;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atakmap.android.cursorwerx.BackControl;
@@ -9,6 +15,7 @@ import com.atakmap.android.cursorwerx.ClickRepair;
 import com.atakmap.android.cursorwerx.PanControl;
 import com.atakmap.android.cursorwerx.PointerRouter;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.log.Log;
 import com.atak.plugins.impl.PluginLayoutInflater;
 
 import gov.tak.api.plugin.IPlugin;
@@ -22,6 +29,11 @@ import gov.tak.platform.marshal.MarshalManager;
 
 public class Cursorwerx implements IPlugin {
 
+    private static final String TAG = "Cursorwerx";
+
+    /** Our entry in ATAK's Tool Preferences. */
+    private static final String PREFS_KEY = "cursorwerxPreferences";
+
     IServiceController serviceController;
     Context pluginContext;
     IHostUIService uiService;
@@ -31,6 +43,8 @@ public class Cursorwerx implements IPlugin {
     PointerRouter pointerRouter;
     PanControl panControl;
     ClickRepair clickRepair;
+    /** The pane's "Wheel zoom: value" row; relabelled every time the pane is shown. */
+    Button wheelZoomButton;
 
     public Cursorwerx(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -91,11 +105,39 @@ public class Cursorwerx implements IPlugin {
             }
         }
 
+        registerPreferences();
+
         // the plugin is starting, add the button to the toolbar
         if (uiService == null)
             return;
 
         uiService.addToolbarItem(toolbarItem);
+    }
+
+    /**
+     * Cursorwerx's entry in ATAK's Tool Preferences, holding the wheel zoom setting. A
+     * failure is logged and the plugin runs on: the pane's row sets the same value.
+     */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment.ToolPreference(
+                            pluginContext.getString(R.string.app_name),
+                            pluginContext.getString(R.string.prefs_summary),
+                            PREFS_KEY,
+                            pluginContext.getResources().getDrawable(R.drawable.ic_toolbar),
+                            new CursorwerxPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
     }
 
     @Override
@@ -117,6 +159,7 @@ public class Cursorwerx implements IPlugin {
             backControl.detach();
             backControl = null;
         }
+        unregisterPreferences();
 
         // the plugin is stopping, remove the button from the toolbar
         if (uiService == null)
@@ -132,8 +175,17 @@ public class Cursorwerx implements IPlugin {
             // In this case, using it is not necessary - but I am putting it here to remind
             // developers to look at this Inflator
 
-            templatePane = new PaneBuilder(PluginLayoutInflater.inflate(pluginContext,
-                    R.layout.main_layout, null))
+            final View view = PluginLayoutInflater.inflate(pluginContext,
+                    R.layout.main_layout, null);
+            wheelZoomButton = view.findViewById(R.id.wheel_zoom);
+            if (wheelZoomButton != null)
+                wheelZoomButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        chooseWheelZoom();
+                    }
+                });
+            templatePane = new PaneBuilder(view)
                     // relative location is set to default; pane will switch location dependent on
                     // current orientation of device screen
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
@@ -144,9 +196,76 @@ public class Cursorwerx implements IPlugin {
                     .build();
         }
 
+        // Tool Preferences may have changed the value since the pane was last open.
+        relabelWheelZoom();
+
         // if the plugin pane is not visible, show it!
         if(!uiService.isPaneVisible(templatePane)) {
             uiService.showPane(templatePane, null);
         }
+    }
+
+    /** ATAK's own preferences, where Tool Preferences keeps the same setting. */
+    private static SharedPreferences atakPrefs() {
+        final MapView mv = MapView.getMapView();
+        return mv == null ? null
+                : PreferenceManager.getDefaultSharedPreferences(mv.getContext());
+    }
+
+    /** Index of the stored step in the choice list; the default's when unset or unknown. */
+    private int wheelZoomIndex() {
+        final String[] values = pluginContext.getResources()
+                .getStringArray(R.array.wheel_zoom_values);
+        final SharedPreferences prefs = atakPrefs();
+        final String stored = prefs == null ? PointerRouter.DEFAULT_WHEEL_ZOOM
+                : prefs.getString(PointerRouter.PREF_WHEEL_ZOOM, PointerRouter.DEFAULT_WHEEL_ZOOM);
+        int fallback = 0;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equals(stored))
+                return i;
+            if (values[i].equals(PointerRouter.DEFAULT_WHEEL_ZOOM))
+                fallback = i;
+        }
+        return fallback;
+    }
+
+    private void relabelWheelZoom() {
+        if (wheelZoomButton == null)
+            return;
+        final String[] names = pluginContext.getResources()
+                .getStringArray(R.array.wheel_zoom_names);
+        wheelZoomButton.setText(pluginContext.getString(R.string.wheel_zoom_row,
+                names[wheelZoomIndex()]));
+    }
+
+    /**
+     * The choice as a single-choice dialog on the MapView context, never a Spinner and
+     * never the plugin context (CLAUDE.md, plugin UI standard: either ends in a
+     * BadTokenException that takes ATAK down).
+     */
+    private void chooseWheelZoom() {
+        final MapView mv = MapView.getMapView();
+        if (mv == null)
+            return;
+        final String[] entries = pluginContext.getResources()
+                .getStringArray(R.array.wheel_zoom_entries);
+        final String[] values = pluginContext.getResources()
+                .getStringArray(R.array.wheel_zoom_values);
+        new AlertDialog.Builder(mv.getContext())
+                .setTitle(pluginContext.getString(R.string.wheel_zoom_dialog))
+                .setSingleChoiceItems(entries, wheelZoomIndex(),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                final SharedPreferences prefs = atakPrefs();
+                                if (prefs != null && which >= 0 && which < values.length)
+                                    prefs.edit().putString(PointerRouter.PREF_WHEEL_ZOOM,
+                                            values[which]).apply();
+                                relabelWheelZoom();
+                                dialog.dismiss();
+                            }
+                        })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 }
