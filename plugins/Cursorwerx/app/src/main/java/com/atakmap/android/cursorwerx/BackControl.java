@@ -44,7 +44,7 @@ public final class BackControl {
     private final MapView mapView;
     private final Activity activity;
     private View button;
-    private boolean verbose = true;
+    private boolean verbose = false;
     private View.OnKeyListener keyListener;
 
     public BackControl(MapView mapView) {

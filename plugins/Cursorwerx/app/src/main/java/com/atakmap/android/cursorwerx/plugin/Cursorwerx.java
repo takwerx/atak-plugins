@@ -75,18 +75,18 @@ public class Cursorwerx implements IPlugin {
 
             // Stop the map zooming when the wheel is used over ATAK's own UI.
             pointerRouter = new PointerRouter(mapView);
-            pointerRouter.setVerbose(true); // bring-up: log where each tick landed
+            pointerRouter.setVerbose(BuildConfig.DEBUG); // debug builds log where each tick landed
             pointerRouter.attach();
 
             // Mouse drag pans the map; a click is handed back to ATAK.
             panControl = new PanControl(mapView);
-            panControl.setVerbose(true);
+            panControl.setVerbose(BuildConfig.DEBUG);
             panControl.attach();
 
             // A mouse click lands in text fields; see ClickRepair for the Android quirk.
             if (mapView.getContext() instanceof android.app.Activity) {
                 clickRepair = new ClickRepair((android.app.Activity) mapView.getContext());
-                clickRepair.setVerbose(true);
+                clickRepair.setVerbose(BuildConfig.DEBUG);
                 clickRepair.attach();
             }
         }
