@@ -43,6 +43,7 @@ import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
+import com.atakmap.android.atmosphere.overlay.BeachOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.WarningsOverlay;
@@ -188,6 +189,14 @@ public final class AtmospherePane {
     private final LinearLayout floodLegend;
     private FloodOutlookOverlay flood;
     private boolean floodOpen = true;
+    private static final String PREF_BEACH_OPEN = "weather.beach.open";
+    private final LinearLayout beachSettings;
+    private final ImageButton beachExpand;
+    private final Button beachToggle;
+    private final TextView beachStatus;
+    private final LinearLayout beachLegend;
+    private BeachOverlay beach;
+    private boolean beachOpen = true;
     /** Which storms are showing their own list of maps. By storm id, not by slot. */
     private final Set<String> stormOpen = new HashSet<>();
     private final LinearLayout radarSettings;
@@ -461,6 +470,11 @@ public final class AtmospherePane {
         floodToggle = find(R.id.flood_toggle);
         floodStatus = find(R.id.flood_status);
         floodLegend = find(R.id.flood_legend);
+        beachSettings = find(R.id.beach_settings);
+        beachExpand = find(R.id.beach_expand);
+        beachToggle = find(R.id.beach_toggle);
+        beachStatus = find(R.id.beach_status);
+        beachLegend = find(R.id.beach_legend);
         buildStormScale();
         radarSettings = find(R.id.radar_settings);
         windSettings = find(R.id.wind_settings);
@@ -593,6 +607,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 tropicalOpen = !tropicalOpen;
                 rememberFold(PREF_TROPICAL_OPEN, tropicalOpen);
+                updateLayerControls();
+            }
+        });
+        beachOpen = prefs == null || prefs.getBoolean(PREF_BEACH_OPEN, true);
+        beachExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                beachOpen = !beachOpen;
+                rememberFold(PREF_BEACH_OPEN, beachOpen);
                 updateLayerControls();
             }
         });
@@ -849,6 +872,8 @@ public final class AtmospherePane {
             firewx.refresh(false);
         if (flood != null && flood.isOn())
             flood.refresh(false);
+        if (beach != null && beach.isOn())
+            beach.refresh(false);
         if (pages[pager.getCurrentItem()] == spotPage.view())
             spotPage.onShown();
         updateLayerControls();
@@ -1092,6 +1117,24 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** The NWS beach forecast, owned by the plugin. Not time-enabled. */
+    public void setBeach(BeachOverlay overlay) {
+        beach = overlay;
+        if (beach == null)
+            return;
+        beach.setListener(new BeachOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                beachStatus.setText(status);
+                beachStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        beachLegend.removeAllViews();
+        for (String[] row : BeachOverlay.LEGEND)
+            beachLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
     /** WPC's excessive rainfall outlook, owned by the plugin. Not time-enabled. */
     public void setFlood(FloodOutlookOverlay overlay) {
         flood = overlay;
@@ -1221,6 +1264,22 @@ public final class AtmospherePane {
                     turnTropicalOn();
                 } else {
                     askToAllowTropical();
+                }
+            }
+        });
+        beachToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (beach == null)
+                    return;
+                if (beach.isOn()) {
+                    beach.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(BeachOverlay.LAYER_ID)) {
+                    beach.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowBeach();
                 }
             }
         });
@@ -2388,6 +2447,10 @@ public final class AtmospherePane {
             tropical.setOn(on);
         else if (tropical != null && on)
             blocked++;
+        if (beach != null && on == allowed(BeachOverlay.LAYER_ID))
+            beach.setOn(on);
+        else if (beach != null && on)
+            blocked++;
         if (flood != null && on == allowed(FloodOutlookOverlay.LAYER_ID))
             flood.setOn(on);
         else if (flood != null && on)
@@ -3022,6 +3085,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowBeach() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.beach_allow_title))
+                .setMessage(pluginContext.getString(R.string.beach_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(BeachOverlay.LAYER_ID, true);
+                                if (beach != null)
+                                    beach.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowFlood() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -3271,6 +3355,13 @@ public final class AtmospherePane {
         tropicalExpand.setVisibility(tropicalOn ? View.VISIBLE : View.GONE);
         tropicalExpand.setRotation(tropicalOpen ? 180f : 0f);
         tropicalSettings.setVisibility(tropicalOn && tropicalOpen ? View.VISIBLE : View.GONE);
+        final boolean beachOn = beach != null && beach.isOn();
+        beachToggle.setText(beachOn ? R.string.beach_on : R.string.beach_off);
+        beachToggle.setTextColor(pluginContext.getResources().getColor(
+                beachOn ? R.color.state_on : R.color.state_off));
+        beachExpand.setVisibility(beachOn ? View.VISIBLE : View.GONE);
+        beachExpand.setRotation(beachOpen ? 180f : 0f);
+        beachSettings.setVisibility(beachOn && beachOpen ? View.VISIBLE : View.GONE);
         final boolean floodOn = flood != null && flood.isOn();
         floodToggle.setText(floodOn ? R.string.flood_on : R.string.flood_off);
         floodToggle.setTextColor(pluginContext.getResources().getColor(
@@ -3386,6 +3477,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_flood, FloodOutlookOverlay.HOST));
+        }
+        if (beach != null && beach.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_beach, BeachOverlay.HOST));
         }
         if (avalanche != null && avalanche.isOn()) {
             if (out.length() > 0)
