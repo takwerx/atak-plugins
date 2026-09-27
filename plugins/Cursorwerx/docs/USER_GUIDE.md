@@ -1,12 +1,12 @@
 # Cursorwerx for ATAK — User Guide
 
-**Version 0.1 · takwerx**
+**Version 0.2 · takwerx**
 
-**Download Cursorwerx 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cursorwerx 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cursorwerx/releases/download/v0.1/ATAK-Plugin-Cursorwerx-0.1--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cursorwerx/releases/download/v0.1/ATAK-Plugin-Cursorwerx-0.1--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cursorwerx/releases/download/v0.1/ATAK-Plugin-Cursorwerx-0.1--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cursorwerx/releases
 
@@ -22,16 +22,17 @@ used with a finger.
 
 - Published builds exist for ATAK-CIV 5.6, 5.7 and 5.8. Install the one that
   matches your ATAK.
-- There is nothing to configure. Once the plugin is loaded it is working. The
-  plugin's own pane, opened from its toolbar icon, only explains what it does.
+- There is nothing you have to configure. Once the plugin is loaded it is
+  working. The plugin's own pane, opened from its toolbar icon, explains what it
+  does and holds its one setting, Wheel zoom (section 4).
 - If you run ATAK on the TAKwerx ATAK Terminal, the Market inside ATAK installs
   and updates Cursorwerx for you.
 
 ## 1. On the map
 
-- **Wheel zooms at the cursor**, one gentle step per click. A trackpad's
-  two-finger scroll is paced by how far your fingers travel, so it does not fly
-  through the zoom range.
+- **Wheel zooms at the cursor**, one step per click; how big a step is up to
+  you (section 4). A trackpad's two-finger scroll is paced by how far your
+  fingers travel, so it does not fly through the zoom range.
 - **Click and drag pans the map** 1:1, the way dragging a finger does.
 - **A click selects**, as a tap does. Hold the button for the radial menu.
 - Anything ATAK lets you drag with a finger, such as the end of a
@@ -56,10 +57,32 @@ pointer of its own. Cursorwerx delivers those presses the way a finger would,
 and hides the guest's pointer, so there is one cursor on screen and every
 control responds.
 
-## 4. Nothing to undo
+## 4. Wheel zoom: how far one click zooms
+
+One click of the wheel zooms the map by a fixed step. On a trackpad or a
+free-spinning wheel the default, Gentle, feels right; on a notched mouse wheel it
+can take five clicks to double the scale. Pick the step that suits your mouse:
+
+| Setting | One click zooms | Clicks to double the scale |
+|---|---|---|
+| Fine | 10% | about 7 |
+| Gentle (default) | 15% | about 5 |
+| Medium | 25% | about 3 |
+| Fast | 40% | about 2 |
+| Very fast | 60% | about 1.5 |
+
+Two places set the same value, and a change applies at the next click:
+
+- **The plugin's pane**: tap the Cursorwerx icon in the toolbar, then the
+  **Wheel zoom** button under Settings.
+- **ATAK's settings**: Settings, **Tool Preferences**, **Cursorwerx**, **Wheel
+  zoom**.
+
+## 5. Nothing to undo
 
 Unload the plugin in ATAK's Plugins manager and ATAK is exactly as it was.
-Cursorwerx keeps no settings and writes nothing to disk.
+Cursorwerx writes nothing to disk; its one setting is kept in ATAK's own
+preferences, where it waits for the plugin to come back.
 
 ## Getting help
 

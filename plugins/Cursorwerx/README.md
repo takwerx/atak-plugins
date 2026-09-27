@@ -1,10 +1,10 @@
 ATAK Plugin — Cursorwerx
 
-**Download Cursorwerx 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cursorwerx 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cursorwerx/releases/download/v0.1/ATAK-Plugin-Cursorwerx-0.1--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cursorwerx/releases/download/v0.1/ATAK-Plugin-Cursorwerx-0.1--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cursorwerx/releases/download/v0.1/ATAK-Plugin-Cursorwerx-0.1--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cursorwerx/releases
 
@@ -17,12 +17,16 @@ PURPOSE AND CAPABILITIES
 ATAK expects a finger. Cursorwerx makes it behave for a mouse or a trackpad:
 on a desktop (the TAKwerx ATAK Terminal, Android Studio's emulator, any
 Android-in-a-window), on Samsung DeX, or on a Chromebook. It is working the
-moment it loads; there is nothing to set up.
+moment it loads; there is nothing to set up, and one thing to adjust if you
+want: how far each click of the wheel zooms.
 
 On the map:
 
-  - The scroll wheel zooms in and out at the cursor, one gentle step per click,
-    paced so a trackpad does not fly through the zoom range.
+  - The scroll wheel zooms in and out at the cursor, one step per click, paced
+    so a trackpad does not fly through the zoom range. The step is a setting,
+    Wheel zoom, from Fine (10% a click) to Very fast (60% a click), in the
+    plugin's pane and under Settings > Tool Preferences > Cursorwerx; the
+    default is Gentle, 15% a click, as in 0.1.
   - Click and drag pans the map 1:1. A click selects, as a tap does; a long
     press opens the radial menu.
   - Things ATAK lets you drag, such as a range-and-bearing end or a shape
