@@ -19,6 +19,7 @@ import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
+import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
 import com.atakmap.android.atmosphere.overlay.BeachOverlay;
 import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
@@ -88,6 +89,7 @@ public class Atmosphere implements IPlugin {
     private FireWxOutlookOverlay firewx;
     private FloodOutlookOverlay flood;
     private BeachOverlay beach;
+    private FloodedGroundOverlay floodground;
     private SnowOverlay snow;
     private SstOverlay sst;
     private SnotelOverlay snotel;
@@ -215,6 +217,8 @@ public class Atmosphere implements IPlugin {
         flood.start();
         beach = new BeachOverlay(mapView, pluginContext, egress);
         beach.start();
+        floodground = new FloodedGroundOverlay(mapView, egress);
+        floodground.start();
         snow = new SnowOverlay(mapView, egress);
         snow.start();
         sst = new SstOverlay(mapView, egress);
@@ -269,6 +273,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFlood(flood);
             if (beach != null)
                 atmospherePane.setBeach(beach);
+            if (floodground != null)
+                atmospherePane.setFloodedGround(floodground);
             if (snow != null)
                 atmospherePane.setSnow(snow);
             if (sst != null)
@@ -326,6 +332,10 @@ public class Atmosphere implements IPlugin {
         if (sst != null) {
             sst.stop();
             sst = null;
+        }
+        if (floodground != null) {
+            floodground.stop();
+            floodground = null;
         }
         if (snow != null) {
             snow.stop();
@@ -409,6 +419,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFlood(flood);
             if (beach != null)
                 atmospherePane.setBeach(beach);
+            if (floodground != null)
+                atmospherePane.setFloodedGround(floodground);
             if (snow != null)
                 atmospherePane.setSnow(snow);
             if (sst != null)

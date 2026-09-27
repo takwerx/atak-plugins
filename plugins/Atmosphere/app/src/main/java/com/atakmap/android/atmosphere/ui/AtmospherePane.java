@@ -45,6 +45,7 @@ import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.BeachOverlay;
 import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
+import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
@@ -199,6 +200,15 @@ public final class AtmospherePane {
     private final LinearLayout beachLegend;
     private BeachOverlay beach;
     private boolean beachOpen = true;
+    private static final String PREF_FLOODGROUND_OPEN = "weather.floodground.open";
+    private final LinearLayout floodgroundSettings;
+    private final ImageButton floodgroundExpand;
+    private final Button floodgroundToggle;
+    private final TextView floodgroundStatus;
+    private final LinearLayout floodgroundLegend;
+    private final LinearLayout floodgroundWhenRow;
+    private FloodedGroundOverlay floodground;
+    private boolean floodgroundOpen = true;
     private static final String PREF_SNOW_OPEN = "weather.snow.open";
     private final LinearLayout snowSettings;
     private final ImageButton snowExpand;
@@ -495,6 +505,12 @@ public final class AtmospherePane {
         beachToggle = find(R.id.beach_toggle);
         beachStatus = find(R.id.beach_status);
         beachLegend = find(R.id.beach_legend);
+        floodgroundSettings = find(R.id.floodground_settings);
+        floodgroundExpand = find(R.id.floodground_expand);
+        floodgroundToggle = find(R.id.floodground_toggle);
+        floodgroundStatus = find(R.id.floodground_status);
+        floodgroundLegend = find(R.id.floodground_legend);
+        floodgroundWhenRow = find(R.id.floodground_when_row);
         snowSettings = find(R.id.snow_settings);
         snowExpand = find(R.id.snow_expand);
         snowToggle = find(R.id.snow_toggle);
@@ -644,6 +660,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 snotelOpen = !snotelOpen;
                 rememberFold(PREF_SNOTEL_OPEN, snotelOpen);
+                updateLayerControls();
+            }
+        });
+        floodgroundOpen = prefs == null || prefs.getBoolean(PREF_FLOODGROUND_OPEN, true);
+        floodgroundExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                floodgroundOpen = !floodgroundOpen;
+                rememberFold(PREF_FLOODGROUND_OPEN, floodgroundOpen);
                 updateLayerControls();
             }
         });
@@ -918,6 +943,8 @@ public final class AtmospherePane {
             flood.refresh(false);
         if (beach != null && beach.isOn())
             beach.refresh(false);
+        if (floodground != null && floodground.isOn())
+            floodground.refresh(false);
         if (snow != null && snow.isOn())
             snow.refresh(false);
         if (snotel != null && snotel.isOn())
@@ -1163,6 +1190,70 @@ public final class AtmospherePane {
         for (String[] row : SnotelOverlay.LEGEND)
             snotelLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
         updateLayerControls();
+    }
+
+    /**
+     * Modeled flooded ground, owned by the plugin. Not time-enabled; its horizon
+     * (now or the next five days) is the flood layers' shared one.
+     */
+    public void setFloodedGround(FloodedGroundOverlay overlay) {
+        floodground = overlay;
+        if (floodground == null)
+            return;
+        floodground.setListener(new FloodedGroundOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                floodgroundStatus.setText(status);
+                floodgroundStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        floodgroundLegend.removeAllViews();
+        for (String[] row : FloodedGroundOverlay.LEGEND)
+            floodgroundLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
+        buildFloodWhenRow();
+        updateLayerControls();
+    }
+
+    /** The flood layers' horizon as the map is drawing it. */
+    private int floodHorizon() {
+        return floodground != null ? floodground.horizon() : FloodedGroundOverlay.horizonPref();
+    }
+
+    /** One choice for every flood layer: the picture and the streams follow together. */
+    private void setFloodHorizon(int value) {
+        if (floodground != null)
+            floodground.setHorizon(value);
+        buildFloodWhenRow();
+    }
+
+    /** Now / Next 5 days, the chosen one in green, the outlook day chips' shape. */
+    private void buildFloodWhenRow() {
+        final LinearLayout row = floodgroundWhenRow;
+        row.removeAllViews();
+        final String[] labels = { pluginContext.getString(R.string.flood_when_now),
+                pluginContext.getString(R.string.flood_when_5day) };
+        final int[] values = { FloodedGroundOverlay.HORIZON_NOW, FloodedGroundOverlay.HORIZON_5DAY };
+        final int current = floodHorizon();
+        for (int i = 0; i < labels.length; i++) {
+            final int value = values[i];
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(labels[i]);
+            b.setTextSize(12);
+            b.setTextColor(current == value
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    setFloodHorizon(value);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
     }
 
     /** NOHRSC's snow depth, owned by the plugin. Not time-enabled. */
@@ -1430,6 +1521,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowSnotel();
+                }
+            }
+        });
+        floodgroundToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (floodground == null)
+                    return;
+                if (floodground.isOn()) {
+                    floodground.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FloodedGroundOverlay.LAYER_ID)) {
+                    floodground.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFloodedGround();
                 }
             }
         });
@@ -2552,6 +2659,10 @@ public final class AtmospherePane {
             snotel.setOn(on);
         else if (snotel != null && on)
             blocked++;
+        if (floodground != null && on == allowed(FloodedGroundOverlay.LAYER_ID))
+            floodground.setOn(on);
+        else if (floodground != null && on)
+            blocked++;
         if (snow != null && on == allowed(SnowOverlay.LAYER_ID))
             snow.setOn(on);
         else if (snow != null && on)
@@ -3198,6 +3309,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowFloodedGround() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.floodground_allow_title))
+                .setMessage(pluginContext.getString(R.string.floodground_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FloodedGroundOverlay.LAYER_ID, true);
+                                if (floodground != null)
+                                    floodground.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowSnow() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -3506,6 +3638,13 @@ public final class AtmospherePane {
         snotelExpand.setVisibility(snotelOn ? View.VISIBLE : View.GONE);
         snotelExpand.setRotation(snotelOpen ? 180f : 0f);
         snotelSettings.setVisibility(snotelOn && snotelOpen ? View.VISIBLE : View.GONE);
+        final boolean floodgroundOn = floodground != null && floodground.isOn();
+        floodgroundToggle.setText(floodgroundOn ? R.string.floodground_on : R.string.floodground_off);
+        floodgroundToggle.setTextColor(pluginContext.getResources().getColor(
+                floodgroundOn ? R.color.state_on : R.color.state_off));
+        floodgroundExpand.setVisibility(floodgroundOn ? View.VISIBLE : View.GONE);
+        floodgroundExpand.setRotation(floodgroundOpen ? 180f : 0f);
+        floodgroundSettings.setVisibility(floodgroundOn && floodgroundOpen ? View.VISIBLE : View.GONE);
         final boolean snowOn = snow != null && snow.isOn();
         snowToggle.setText(snowOn ? R.string.snow_on : R.string.snow_off);
         snowToggle.setTextColor(pluginContext.getResources().getColor(
@@ -3644,6 +3783,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_beach, BeachOverlay.HOST));
+        }
+        if (floodground != null && floodground.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_floodground, FloodedGroundOverlay.HOST));
         }
         if (snow != null && snow.isOn()) {
             if (out.length() > 0)

@@ -103,6 +103,15 @@
     <string name="snow_allow_title">Show snow depth?</string>
     <string name="snow_allow_text">Atmosphere will ask the National Weather Service for its daily snow depth analysis as a picture of the area the map is showing. The map\'s area is sent; your position is not. Server: mapservices.weather.noaa.gov</string>
     <string name="credit_snow">Snow analysis from the NOAA National Operational Hydrologic Remote Sensing Center (%1$s)</string>
+    <string name="floodground_on">Flooded ground ON</string>
+    <string name="floodground_off">Flooded ground OFF</string>
+    <string name="floodground_allow_title">Show flooded ground?</string>
+    <string name="floodground_allow_text">Atmosphere will ask the National Weather Service\'s water prediction service for its picture of where its river model puts water over the banks, for the area the map is showing, now or at the worst of the next five days. The map\'s area is sent; your position is not. Server: maps.water.noaa.gov</string>
+    <string name="credit_floodground">Flood inundation from the NOAA National Water Prediction Service, experimental (%1$s)</string>
+    <string name="flood_when_heading">When</string>
+    <string name="flood_when_now">Now</string>
+    <string name="flood_when_5day">Next 5 days</string>
+    <string name="floodground_note">The National Weather Service calls this experimental: a river model\'s estimate of where water goes over the banks, not a survey, and it covers only part of the country. What you can see wins.</string>
     <string name="sst_on">Sea temperature ON</string>
     <string name="sst_off">Sea temperature OFF</string>
     <string name="sst_allow_title">Show sea surface temperature?</string>

@@ -27,6 +27,8 @@ public abstract class ImageOverlay {
     private static final long POLL_MS = 30 * 60 * 1000L;
     private static final long MOVE_SETTLE_MS = 700L;
     private static final int MAX_PX = 1024;
+    private static final int MAX_RETRIES = 2;
+    private static final long RETRY_MS = 3000L;
 
     public interface Listener {
         void onStatus(String status);
@@ -42,6 +44,8 @@ public abstract class ImageOverlay {
     private GeoBounds region;
     private long fetchedAt;
     private String pendingKey;
+    /** Failed answers in a row for the picture being asked for; reset by a success. */
+    private int failures;
 
     private final Runnable moveSettled = new Runnable() {
         @Override
@@ -68,6 +72,20 @@ public abstract class ImageOverlay {
                 return;
             ensureRegion(true);
             mapView.postDelayed(this, POLL_MS);
+        }
+    };
+
+    /**
+     * One more try after a failed answer. The flood map server answers roughly one
+     * request in six with HTTP 500 and the retry works (measured 2026-09-26, from
+     * the Studio and from the phone), so a failure is not left on the status line
+     * until the next map move or the half-hour poll.
+     */
+    private final Runnable retry = new Runnable() {
+        @Override
+        public void run() {
+            if (on && started)
+                ensureRegion(true);
         }
     };
 
@@ -108,8 +126,47 @@ public abstract class ImageOverlay {
         return 30;
     }
 
+    /**
+     * A view wider than this, in degrees, is told to zoom in rather than shown a
+     * picture of its middle. The default is the whole world. A layer whose server
+     * draws nothing past a scale, the way the flood extent draws nothing coarser
+     * than 1:400,000, sets this to its widest request, so the picture always
+     * covers the view it is drawn under.
+     */
+    protected double zoomInSpanLon() {
+        return 355;
+    }
+
+    /**
+     * The subclass changed what it asks for -- another horizon, another product --
+     * so the picture up is the wrong one: drop it and ask for the view again.
+     */
+    protected void reask() {
+        if (!on)
+            return;
+        mapView.removeCallbacks(moveSettled);
+        mapView.removeCallbacks(retry);
+        generation++;
+        pendingKey = null;
+        failures = 0;
+        region = null;
+        layer.clear();
+        ensureRegion(true);
+    }
+
+    /** The last line said, so a pane built after the layer spoke still hears it. */
+    private String lastStatus = "";
+
+    /**
+     * The pane's ear. The overlays start with the plugin and the pane is built when
+     * it is first shown, so the line a layer said at start -- "Zoom in to see the
+     * flooded ground" -- was said to nobody and the block opened blank (XCover,
+     * 2026-09-27). A new listener is told the last line at once.
+     */
     public void setListener(Listener l) {
         listener = l;
+        if (l != null && on && !lastStatus.isEmpty())
+            l.onStatus(lastStatus);
     }
 
     public void start() {
@@ -132,6 +189,7 @@ public abstract class ImageOverlay {
         mapView.removeOnMapMovedListener(moved);
         mapView.removeCallbacks(moveSettled);
         mapView.removeCallbacks(autoPoll);
+        mapView.removeCallbacks(retry);
         generation++;
         layer.clear();
         mapView.removeLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
@@ -151,8 +209,10 @@ public abstract class ImageOverlay {
             p.edit().putBoolean(prefOn, value).apply();
         mapView.removeCallbacks(autoPoll);
         mapView.removeCallbacks(moveSettled);
+        mapView.removeCallbacks(retry);
         generation++;
         pendingKey = null;
+        failures = 0;
         if (value) {
             layer.setVisible(true);
             mapView.addOnMapMovedListener(moved);
@@ -180,7 +240,7 @@ public abstract class ImageOverlay {
         final boolean wholeWorld = Double.isNaN(bounds.getNorth()) || Double.isNaN(bounds.getSouth())
                 || Double.isNaN(bounds.getEast()) || Double.isNaN(bounds.getWest())
                 || bounds.getEast() <= bounds.getWest()
-                || bounds.getEast() - bounds.getWest() >= 355;
+                || bounds.getEast() - bounds.getWest() >= zoomInSpanLon();
         if (wholeWorld) {
             region = null;
             layer.clear();
@@ -233,6 +293,7 @@ public abstract class ImageOverlay {
                     return;
                 region = r;
                 fetchedAt = System.currentTimeMillis();
+                failures = 0;
                 layer.setImage(translucent(bitmap, alpha()), r);
                 Log.d(tag, "picture " + bitmap.getWidth() + "x" + bitmap.getHeight() + " for " + key);
                 status(shown());
@@ -242,8 +303,18 @@ public abstract class ImageOverlay {
             public void onFailure(String error) {
                 if (key.equals(pendingKey))
                     pendingKey = null;
-                if (mine == generation && on)
+                if (mine != generation || !on)
+                    return;
+                failures++;
+                if (failures <= MAX_RETRIES) {
+                    Log.w(tag, "picture failed (" + error + "), retry " + failures + " in "
+                            + RETRY_MS * failures + " ms");
+                    status("Getting the " + noun() + "… (trying again)");
+                    mapView.removeCallbacks(retry);
+                    mapView.postDelayed(retry, RETRY_MS * failures);
+                } else {
                     status(capitalize(noun()) + ": " + error);
+                }
             }
         });
     }
@@ -271,7 +342,8 @@ public abstract class ImageOverlay {
     }
 
     private void status(String s) {
+        lastStatus = s == null ? "" : s;
         if (listener != null)
-            listener.onStatus(s);
+            listener.onStatus(lastStatus);
     }
 }
