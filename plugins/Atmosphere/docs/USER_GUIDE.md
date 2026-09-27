@@ -72,9 +72,10 @@ old the reading is.
 - **Sun and moon** for the point.
 
 **Refresh** at the top of this page reads the forecast again. **Forecast
-settings** beside it picks the weather service the forecast comes from,
-what to show, and how coarsely your position is rounded before it leaves the
-device. **Favorites** keeps places by name.
+settings** beside it picks the weather service the forecast comes from (the
+first time, choosing one asks to allow its server, by name), lists the allowed
+services, what to show, and how coarsely your position is rounded before it
+leaves the device. **Favorites** keeps places by name.
 
 ## 4. The layers
 

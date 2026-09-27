@@ -4971,14 +4971,53 @@ public final class AtmospherePane {
                         d.dismiss();
                         if (which < 0 || which >= sources.size())
                             return;
-                        selected = sources.get(which);
-                        final SharedPreferences p = MapCompat.prefs();
-                        if (p != null)
-                            p.edit().putString(PREF_SOURCE, selected.id).apply();
-                        snapshot = null;
-                        refresh(false);
+                        final WxSourceDef def = sources.get(which);
+                        if (egress.isEnabled(def))
+                            chooseSource(def);
+                        else
+                            askToAllowSource(def);
                     }
                 })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void chooseSource(WxSourceDef def) {
+        selected = def;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putString(PREF_SOURCE, selected.id).apply();
+        snapshot = null;
+        refresh(true);
+    }
+
+    /**
+     * Choosing a service that is not allowed yet asks for it right there, naming
+     * its servers, the way a layer does. The operator's first run on the S22
+     * (2026-09-27) picked NWS in the service list, got nothing, and had to find a
+     * second, look-alike row to turn it on: "thats confusing AF". Allow turns it
+     * on and chooses it in one step; Close leaves both as they were.
+     */
+    private void askToAllowSource(final WxSourceDef def) {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        if (def.requiresApiKey) {
+            Toast.makeText(ctx, egress.refuse(def), Toast.LENGTH_LONG).show();
+            return;
+        }
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.source_allow_title, def.displayName))
+                .setMessage(pluginContext.getString(R.string.source_allow_text, def.displayName,
+                        hosts(def)))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setEnabled(def, true);
+                                chooseSource(def);
+                            }
+                        })
                 .setNegativeButton(pluginContext.getString(R.string.close), null)
                 .show();
     }
@@ -6001,9 +6040,13 @@ public final class AtmospherePane {
                                 egress.setEnabled(sources.get(which), isChecked);
                             }
                         })
-                .setPositiveButton(pluginContext.getString(R.string.close), new DialogInterface.OnClickListener() {
+                .setPositiveButton(pluginContext.getString(R.string.close), null)
+                // However it is closed -- the button, Back, a tap outside -- the
+                // pane reads again: a tick saved with Back used to leave "not
+                // turned on" on screen until something else refreshed.
+                .setOnDismissListener(new DialogInterface.OnDismissListener() {
                     @Override
-                    public void onClick(DialogInterface dialog, int which) {
+                    public void onDismiss(DialogInterface dialog) {
                         refresh(false);
                     }
                 })

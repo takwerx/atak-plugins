@@ -157,11 +157,14 @@ public final class EgressPolicy {
         if (def == null)
             return "no source selected";
         if (!isEnabled(def))
+            // The path is named the way the pane names it: nothing on screen is
+            // called "Sources" (the operator's first run on the S22, 2026-09-27).
             return def.displayName + (hostsChanged(def)
                     ? " now sends its requests to " + hostList(def) + ", not where it did "
-                            + "when it was enabled. Enable it again in Sources if that is right."
-                    : " is not enabled. Enable it in Sources to allow requests to "
-                            + hostList(def) + ".");
+                            + "when it was allowed. Choose it again in Forecast settings, "
+                            + "Weather service, to allow that."
+                    : " is not allowed yet. Choose it in Forecast settings, Weather service, "
+                            + "to allow requests to " + hostList(def) + ".");
         if (def.requiresApiKey)
             return def.displayName + " needs an API key, and this build does not store "
                     + "keys yet.";

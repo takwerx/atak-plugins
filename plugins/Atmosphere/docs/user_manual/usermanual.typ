@@ -67,9 +67,10 @@ old the reading is.
 - *Sun and moon*: sunrise, sunset and the moon for the point.
 
 *Refresh* at the top of this page reads the forecast again. *Forecast
-settings* beside it picks the *Weather service* the forecast comes from,
-*What to show*, and *Position sent* - how coarsely your position is rounded
-before it leaves the device.
+settings* beside it picks the *Weather service* the forecast comes from - the
+first time, choosing one asks to allow its server, by name - and lists the
+*Allowed services*, *What to show*, and *Position sent*: how coarsely your
+position is rounded before it leaves the device.
 
 *Favorites* keeps places by name. *Add this place* saves the point being read;
 pick one later from the star.
