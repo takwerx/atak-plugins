@@ -190,10 +190,18 @@ public final class WorldRadar {
 
     /**
      * The plan for a region: the highest zoom, up to {@link #MAX_ZOOM}, at which the
-     * region is no wider or taller than {@code maxPx} in tile pixels -- so a city
-     * view gets the finest tiles there are and a continent a handful of coarse ones,
-     * and the count never passes a three-by-three of 512s. The picture is the
-     * region's size at that zoom, so nothing is invented and nothing is thrown away.
+     * region is no more than twice {@code maxPx} in tile pixels, and a picture of at
+     * most {@code maxPx} on its long side, the region's own shape. A zoom step
+     * doubles the pixels, so the tiles land between one and two times the picture:
+     * it is always drawn from at least as fine a source as it shows.
+     *
+     * <p>The first rule was "the region fits in {@code maxPx}", which left the
+     * picture between half and all of it and usually near half: over Central
+     * America on 2026-09-27 a 12-degree region came from zoom 5 at 571 px, and the
+     * operator asked whether that was the best there was. Zoom 6 is 1,140 px of
+     * source for a 1,024 px picture. The cost is tiles, at most a five-by-five of
+     * 512s for a square region and usually a four-by-three, which the overlay
+     * fetches four at a time.
      */
     public static Plan plan(double west, double south, double east, double north, int maxPx) {
         south = Math.max(-MAX_LAT, south);
@@ -202,11 +210,12 @@ public final class WorldRadar {
         east = Math.min(180, east);
         if (east <= west || north <= south)
             return null;
+        final int limit = 2 * maxPx;
         int zoom = MIN_ZOOM;
         for (int z = MAX_ZOOM; z >= MIN_ZOOM; z--) {
             final double w = xPx(east, z) - xPx(west, z);
             final double h = yPx(south, z) - yPx(north, z);
-            if (w <= maxPx && h <= maxPx) {
+            if (w <= limit && h <= limit) {
                 zoom = z;
                 break;
             }
@@ -218,48 +227,93 @@ public final class WorldRadar {
         final int tx1 = clamp(lastPx(xPx(east, zoom)) / TILE_PX, 0, n - 1);
         final int ty0 = clamp(firstPx(yPx(north, zoom)) / TILE_PX, 0, n - 1);
         final int ty1 = clamp(lastPx(yPx(south, zoom)) / TILE_PX, 0, n - 1);
-        final int outW = clamp((int) Math.round(xPx(east, zoom) - xPx(west, zoom)), 64, maxPx);
-        final int outH = clamp((int) Math.round(yPx(south, zoom) - yPx(north, zoom)), 64, maxPx);
+        final double w = xPx(east, zoom) - xPx(west, zoom);
+        final double h = yPx(south, zoom) - yPx(north, zoom);
+        final double scale = Math.min(1.0, maxPx / Math.max(w, h));
+        final int outW = clamp((int) Math.round(w * scale), 64, maxPx);
+        final int outH = clamp((int) Math.round(h * scale), 64, maxPx);
         return new Plan(zoom, tx0, ty0, tx1, ty1, west, south, east, north, outW, outH);
     }
 
     /**
-     * The picture: the region resampled from the Mercator tiles onto the lon/lat
-     * quad the map draws, rows evenly spaced in latitude, nearest pixel. A missing
-     * tile (null) leaves its part clear. {@code tiles} is indexed by
-     * {@link Plan#slot}, each {@link #TILE_PX} squared ARGB.
+     * For each column of the picture, the Mercator pixel it is drawn from; the same
+     * on every row. Worked out once per frame and handed to {@link #paintTile}.
      */
-    public static int[] assemble(Plan p, int[][] tiles) {
-        final int[] out = new int[p.outW * p.outH];
-        final int n = 1 << p.zoom;
-        final int worldPx = n * TILE_PX;
-        // Columns are the same on every row: which tile, which pixel in it.
-        final int[] colTile = new int[p.outW], colPx = new int[p.outW];
+    public static int[] columns(Plan p) {
+        final int worldPx = (1 << p.zoom) * TILE_PX;
+        final int[] gx = new int[p.outW];
         final double lonSpan = p.east - p.west;
         for (int i = 0; i < p.outW; i++) {
             final double lon = p.west + (i + 0.5) * lonSpan / p.outW;
-            final int gx = clamp((int) Math.floor(xPx(lon, p.zoom)), 0, worldPx - 1);
-            colTile[i] = gx / TILE_PX;
-            colPx[i] = gx % TILE_PX;
+            gx[i] = clamp((int) Math.floor(xPx(lon, p.zoom)), 0, worldPx - 1);
         }
+        return gx;
+    }
+
+    /**
+     * For each row of the picture, the Mercator pixel row it is drawn from. The
+     * picture's rows are even steps of latitude, which is what the lon/lat quad the
+     * map draws expects; Mercator stretches the north, so they are not even steps
+     * of the tiles.
+     */
+    public static int[] rows(Plan p) {
+        final int worldPx = (1 << p.zoom) * TILE_PX;
+        final int[] gy = new int[p.outH];
         final double latSpan = p.north - p.south;
         for (int j = 0; j < p.outH; j++) {
             final double lat = p.north - (j + 0.5) * latSpan / p.outH;
-            final int gy = clamp((int) Math.floor(yPx(lat, p.zoom)), 0, worldPx - 1);
-            final int ty = gy / TILE_PX, py = gy % TILE_PX;
-            if (ty < p.ty0 || ty > p.ty1)
-                continue;
-            final int rowBase = j * p.outW;
-            for (int i = 0; i < p.outW; i++) {
-                final int tx = colTile[i];
-                if (tx < p.tx0 || tx > p.tx1)
-                    continue;
-                final int[] tile = tiles[p.slot(tx, ty)];
-                if (tile == null)
-                    continue;
-                out[rowBase + i] = tile[py * TILE_PX + colPx[i]];
+            gy[j] = clamp((int) Math.floor(yPx(lat, p.zoom)), 0, worldPx - 1);
+        }
+        return gy;
+    }
+
+    /**
+     * Copy one tile's share of the picture into {@code out}, nearest pixel. Tiles
+     * are painted as they arrive, so a frame holds one tile's pixels at a time
+     * rather than all of them: a four-by-four of 512s held at once is 16 MB of the
+     * Java heap per frame, which is the churn that stalls a small phone.
+     */
+    public static void paintTile(Plan p, int[] gx, int[] gy, int tx, int ty, int[] tile, int[] out) {
+        if (tile == null)
+            return;
+        // Rows and columns are monotonic, so this tile's share is one run of each.
+        int j0 = -1, j1 = -1;
+        for (int j = 0; j < gy.length; j++) {
+            if (gy[j] / TILE_PX == ty) {
+                if (j0 < 0)
+                    j0 = j;
+                j1 = j;
             }
         }
+        int i0 = -1, i1 = -1;
+        for (int i = 0; i < gx.length; i++) {
+            if (gx[i] / TILE_PX == tx) {
+                if (i0 < 0)
+                    i0 = i;
+                i1 = i;
+            }
+        }
+        if (j0 < 0 || i0 < 0)
+            return;
+        for (int j = j0; j <= j1; j++) {
+            final int src = (gy[j] % TILE_PX) * TILE_PX;
+            final int dst = j * p.outW;
+            for (int i = i0; i <= i1; i++)
+                out[dst + i] = tile[src + gx[i] % TILE_PX];
+        }
+    }
+
+    /**
+     * The whole picture from tiles already in hand, indexed by {@link Plan#slot};
+     * a missing tile (null) leaves its part clear. The overlay paints tile by tile
+     * with {@link #paintTile}; this is the same done at once, for the tests.
+     */
+    public static int[] assemble(Plan p, int[][] tiles) {
+        final int[] out = new int[p.outW * p.outH];
+        final int[] gx = columns(p), gy = rows(p);
+        for (int ty = p.ty0; ty <= p.ty1; ty++)
+            for (int tx = p.tx0; tx <= p.tx1; tx++)
+                paintTile(p, gx, gy, tx, ty, tiles[p.slot(tx, ty)], out);
         return out;
     }
 

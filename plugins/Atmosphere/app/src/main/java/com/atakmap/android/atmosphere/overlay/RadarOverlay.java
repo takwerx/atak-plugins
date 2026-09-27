@@ -20,8 +20,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -227,6 +230,15 @@ public final class RadarOverlay {
      * thread pinning the old generation.
      */
     private ExecutorService worker;
+    /**
+     * Fetches a world frame's tiles four at a time for the worker, which paints
+     * them in order as they land. One after another, a server that stalled on two
+     * tiles held Europe's first frame for 50 s (XCover, 2026-09-27); in parallel a
+     * stall costs one wait, not the sum. Four is modest for a service that asks
+     * not to be hammered, and a frame is at most 25 tiles.
+     */
+    private ExecutorService tileFetch;
+    private static final int TILE_FETCHERS = 4;
     private int index = -1;
     /** True while the operator has not scrubbed away from the newest frame. */
     private boolean followLatest = true;
@@ -295,6 +307,14 @@ public final class RadarOverlay {
                 return t;
             }
         });
+        tileFetch = Executors.newFixedThreadPool(TILE_FETCHERS, new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                final Thread t = new Thread(r, "wx-radar-fetch");
+                t.setDaemon(true);
+                return t;
+            }
+        });
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
             setOn(true);
@@ -316,6 +336,10 @@ public final class RadarOverlay {
         if (worker != null) {
             worker.shutdownNow();
             worker = null;
+        }
+        if (tileFetch != null) {
+            tileFetch.shutdownNow();
+            tileFetch = null;
         }
     }
 
@@ -638,8 +662,8 @@ public final class RadarOverlay {
         final String path = worldFrames == null ? null : worldFrames.pathOf(time);
         final WorldRadar.Plan plan = path == null ? null
                 : WorldRadar.plan(r.getWest(), r.getSouth(), r.getEast(), r.getNorth(), MAX_PX);
-        final ExecutorService w = worker;
-        if (plan == null || w == null) {
+        final ExecutorService w = worker, fetch = tileFetch;
+        if (plan == null || w == null || fetch == null) {
             pendingKey = null;
             status("No radar frames available");
             return;
@@ -651,43 +675,65 @@ public final class RadarOverlay {
             public void run() {
                 Bitmap bitmap = null;
                 String error = null;
+                final List<Future<byte[]>> fetches = new ArrayList<>();
                 try {
-                    final int[][] tiles = new int[plan.tileCount()][];
-                    int missing = 0;
+                    // Every tile asked for at once, four in flight; painted in order
+                    // as each lands, one tile's pixels in hand at a time.
                     for (int ty = plan.ty0; ty <= plan.ty1; ty++) {
                         for (int tx = plan.tx0; tx <= plan.tx1; tx++) {
-                            if (mine != generation)
-                                return;
-                            try {
-                                final byte[] bytes = Http.fetchBytes(plan.tileUrl(path, tx, ty), ua);
-                                final Bitmap t = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                                if (t == null || t.getWidth() != WorldRadar.TILE_PX
-                                        || t.getHeight() != WorldRadar.TILE_PX) {
-                                    missing++;
-                                    if (t != null)
-                                        t.recycle();
-                                    continue;
+                            final String url = plan.tileUrl(path, tx, ty);
+                            fetches.add(fetch.submit(new Callable<byte[]>() {
+                                @Override
+                                public byte[] call() throws IOException {
+                                    return mine != generation ? null : Http.fetchBytes(url, ua);
                                 }
-                                final int[] px = new int[WorldRadar.TILE_PX * WorldRadar.TILE_PX];
-                                t.getPixels(px, 0, WorldRadar.TILE_PX, 0, 0, WorldRadar.TILE_PX,
-                                        WorldRadar.TILE_PX);
-                                t.recycle();
-                                tiles[plan.slot(tx, ty)] = px;
-                            } catch (IOException e) {
-                                missing++;
-                                Log.w(TAG, "tile " + plan.zoom + "/" + tx + "/" + ty + ": " + e.getMessage());
-                            }
+                            }));
                         }
                     }
-                    if (missing == plan.tileCount()) {
-                        error = "the provider did not return an image";
-                    } else {
-                        final int[] out = WorldRadar.assemble(plan, tiles);
-                        bitmap = Bitmap.createBitmap(out, plan.outW, plan.outH, Bitmap.Config.ARGB_8888);
+                    final int[] out = new int[plan.outW * plan.outH];
+                    final int[] gx = WorldRadar.columns(plan), gy = WorldRadar.rows(plan);
+                    final int[] px = new int[WorldRadar.TILE_PX * WorldRadar.TILE_PX];
+                    int missing = 0, k = 0;
+                    for (int ty = plan.ty0; ty <= plan.ty1; ty++) {
+                        for (int tx = plan.tx0; tx <= plan.tx1; tx++) {
+                            final Future<byte[]> f = fetches.get(k++);
+                            if (mine != generation)
+                                return;
+                            byte[] bytes = null;
+                            try {
+                                bytes = f.get();
+                            } catch (ExecutionException e) {
+                                Log.w(TAG, "tile " + plan.zoom + "/" + tx + "/" + ty + ": "
+                                        + (e.getCause() == null ? e : e.getCause().getMessage()));
+                            }
+                            final Bitmap t = bytes == null ? null
+                                    : BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                            if (t == null || t.getWidth() != WorldRadar.TILE_PX
+                                    || t.getHeight() != WorldRadar.TILE_PX) {
+                                missing++;
+                                if (t != null)
+                                    t.recycle();
+                                continue;
+                            }
+                            t.getPixels(px, 0, WorldRadar.TILE_PX, 0, 0, WorldRadar.TILE_PX,
+                                    WorldRadar.TILE_PX);
+                            t.recycle();
+                            WorldRadar.paintTile(plan, gx, gy, tx, ty, px, out);
+                        }
                     }
+                    if (missing == plan.tileCount())
+                        error = "the provider did not return an image";
+                    else
+                        bitmap = Bitmap.createBitmap(out, plan.outW, plan.outH, Bitmap.Config.ARGB_8888);
+                } catch (InterruptedException e) {
+                    // The plugin is stopping; nothing to deliver.
+                    return;
                 } catch (RuntimeException e) {
                     Log.e(TAG, "world frame failed hard", e);
                     error = "request failed";
+                } finally {
+                    for (Future<byte[]> f : fetches)
+                        f.cancel(true);
                 }
                 final Bitmap b = bitmap;
                 final String err = error;
