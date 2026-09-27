@@ -97,7 +97,7 @@ gauges" and the rest — where it can be hidden without opening the plugin.
 |---|---|---|
 | | Spot forecasts | Every open spot forecast request, with the office's forecast behind a tap |
 | | Weather stations | The stations around you, wind barb and readings, colored against the Red Flag criteria for their zone |
-| Wind | Radar | The national radar mosaic, with a time scrubber |
+| Wind | Radar | The NWS radar mosaics for the lower 48, Alaska, Hawaii, the Caribbean and Guam, whichever the map is over, with a time scrubber |
 | Wind | Wind | The modeled wind field, with a time scrubber and the wind "Here" |
 | Fire | Fire weather outlook | Elevated, critical and extreme areas and dry lightning, Day 1, 2, 3 or all |
 | Fire | Smoke | Forecast smoke, ground or whole sky, light or dense |

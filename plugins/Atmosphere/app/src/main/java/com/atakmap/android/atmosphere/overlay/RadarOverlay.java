@@ -21,8 +21,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * NWS radar on the map: the CONUS base reflectivity composite from the NWS GeoServer,
- * the same tiles radar.weather.gov draws, one frame at a time picked by timestamp.
+ * NWS radar on the map: the base reflectivity composites from the NWS GeoServer, the
+ * same tiles radar.weather.gov draws, one frame at a time picked by timestamp. NWS
+ * publishes five mosaics -- the lower 48, the Caribbean, Hawaii, Alaska and Guam --
+ * each with its own coverage box and its own frame list; the layer draws the one
+ * that covers most of the view, and switches when the map moves to another
+ * (operator, 2026-09-27: radar "further out into the Caribbean and Mexico, Hawaii").
+ * The lower-48 mosaic reaches 20 N, so northern Mexico is in it as far as the
+ * border radars see.
  *
  * <p>Lives for the plugin's life, never inside the pane: the pane comes and goes with
  * the toolbar button and the radar has to stay up. The pane only drives and reads it.
@@ -48,10 +54,53 @@ public final class RadarOverlay {
 
     public static final String LAYER_ID = "radar";
     public static final String HOST = "opengeo.ncep.noaa.gov";
-    private static final String BASE = "https://" + HOST + "/geoserver/conus/conus_bref_qcd/ows";
-    private static final String WMS_LAYER = "conus_bref_qcd";
-    /** The layer's own extent, from its capabilities. */
-    private static final double WEST = -130, EAST = -60, SOUTH = 20, NORTH = 55;
+    /** One NWS mosaic: its GeoServer workspace and its coverage box from its capabilities. */
+    static final class Mosaic {
+        final String id, base, wmsLayer;
+        final double west, east, south, north;
+
+        Mosaic(String id, double west, double east, double south, double north) {
+            this.id = id;
+            this.wmsLayer = id + "_bref_qcd";
+            this.base = "https://" + HOST + "/geoserver/" + id + "/" + wmsLayer + "/ows";
+            this.west = west;
+            this.east = east;
+            this.south = south;
+            this.north = north;
+        }
+
+        /** How much of a view this mosaic covers, in square degrees; 0 when none. */
+        double overlap(GeoBounds v) {
+            final double w = Math.max(west, v.getWest()), e = Math.min(east, v.getEast());
+            final double s = Math.max(south, v.getSouth()), n = Math.min(north, v.getNorth());
+            return e > w && n > s ? (e - w) * (n - s) : 0;
+        }
+    }
+
+    /**
+     * The mosaics, boxes read from each one's capabilities on 2026-09-27. The lower
+     * 48 first: it wins a tie, and it is what a whole-world view gets.
+     */
+    static final Mosaic[] MOSAICS = {
+            new Mosaic("conus", -130, -60, 20, 55),
+            new Mosaic("carib", -90, -60, 10, 25),
+            new Mosaic("hawaii", -164, -151, 15, 26),
+            new Mosaic("alaska", -176, -126, 50, 72),
+            new Mosaic("guam", 140, 150, 9, 18) };
+
+    /** The mosaic whose box covers most of the view; the lower 48 when none does. */
+    static Mosaic mosaicFor(GeoBounds view) {
+        Mosaic best = MOSAICS[0];
+        double bestOverlap = 0;
+        for (Mosaic m : MOSAICS) {
+            final double o = m.overlap(view);
+            if (o > bestOverlap) {
+                best = m;
+                bestOverlap = o;
+            }
+        }
+        return best;
+    }
 
     private static final String PREF_ON = "weather.layer.radar.on";
     private static final int MAX_PX = 1024;
@@ -82,6 +131,8 @@ public final class RadarOverlay {
 
     private boolean started;
     private boolean on;
+    /** The mosaic being drawn; frames, region and cache all belong to it. */
+    private Mosaic mosaic = MOSAICS[0];
     private List<String> frames = new ArrayList<>();
     private int index = -1;
     /** True while the operator has not scrubbed away from the newest frame. */
@@ -229,12 +280,13 @@ public final class RadarOverlay {
         capsInFlight = true;
         final int mine = ++generation;
         status("Getting radar\u2026");
-        Http.get(BASE + "?service=WMS&version=1.3.0&request=GetCapabilities",
+        final Mosaic asked = mosaic;
+        Http.get(asked.base + "?service=WMS&version=1.3.0&request=GetCapabilities",
                 egress.userAgent(), null, new Http.Callback() {
                     @Override
                     public void onSuccess(String body) {
                         capsInFlight = false;
-                        if (mine != generation)
+                        if (mine != generation || asked != mosaic)
                             return;
                         final List<String> times = parseTimes(body);
                         if (times.isEmpty()) {
@@ -293,14 +345,14 @@ public final class RadarOverlay {
 
     // ---- region and images -------------------------------------------------------
 
-    /** The region the images cover: the view padded by half its span, clamped. */
-    private static GeoBounds regionFor(GeoBounds view) {
+    /** The region the images cover: the view padded by half its span, clamped to the mosaic. */
+    private static GeoBounds regionFor(Mosaic m, GeoBounds view) {
         double w = view.getWest(), e = view.getEast(), s = view.getSouth(), n = view.getNorth();
         final double padX = (e - w) * 0.5, padY = (n - s) * 0.5;
-        w = Math.max(WEST, w - padX);
-        e = Math.min(EAST, e + padX);
-        s = Math.max(SOUTH, s - padY);
-        n = Math.min(NORTH, n + padY);
+        w = Math.max(m.west, w - padX);
+        e = Math.min(m.east, e + padX);
+        s = Math.max(m.south, s - padY);
+        n = Math.min(m.north, n + padY);
         if (e - w <= 0 || n - s <= 0)
             return null;
         return new GeoBounds(n, w, s, e);
@@ -313,23 +365,47 @@ public final class RadarOverlay {
 
     /** Fetch again when the view left the region or its scale changed a lot. */
     private void ensureRegion() {
-        if (!on || frames.isEmpty())
+        if (!on)
             return;
         final GeoBounds view = mapView.getBounds();
         if (view == null)
             return;
         // On the globe the bounds come back NaN, or span the world, or cross the
-        // antimeridian; any of those means "everything", which is the layer's extent.
+        // antimeridian; any of those means "everything", which is the lower 48.
         final boolean wholeWorld = Double.isNaN(view.getNorth()) || Double.isNaN(view.getSouth())
                 || Double.isNaN(view.getEast()) || Double.isNaN(view.getWest())
                 || view.getEast() <= view.getWest()
-                || view.getEast() - view.getWest() >= EAST - WEST;
+                || view.getEast() - view.getWest() >= 180;
+        // The mosaic follows the map. A change drops the frames, the region and the
+        // cache, which are all that mosaic's, and reads the new one's frame list; the
+        // capabilities answer calls back here.
+        final Mosaic wanted = wholeWorld ? MOSAICS[0] : mosaicFor(view);
+        if (wanted != mosaic) {
+            Log.d(TAG, "mosaic " + mosaic.id + " -> " + wanted.id);
+            mosaic = wanted;
+            frames = new ArrayList<>();
+            index = -1;
+            followLatest = true;
+            region = null;
+            cache.clear();
+            layer.clear();
+            capsFetchedAt = 0;
+            capsInFlight = false;
+            pendingKey = null;
+            if (listener != null)
+                listener.onFrames(frames(), index);
+            refreshFrames(true);
+            return;
+        }
+        if (frames.isEmpty())
+            return;
+        final Mosaic m = mosaic;
         // Clamp the view itself first, so a coast view does not pad out to sea.
         final GeoBounds clampedView = wholeWorld
-                ? new GeoBounds(NORTH, WEST, SOUTH, EAST)
+                ? new GeoBounds(m.north, m.west, m.south, m.east)
                 : new GeoBounds(
-                        Math.min(NORTH, view.getNorth()), Math.max(WEST, view.getWest()),
-                        Math.max(SOUTH, view.getSouth()), Math.min(EAST, view.getEast()));
+                        Math.min(m.north, view.getNorth()), Math.max(m.west, view.getWest()),
+                        Math.max(m.south, view.getSouth()), Math.min(m.east, view.getEast()));
         if (clampedView.getEast() <= clampedView.getWest()
                 || clampedView.getNorth() <= clampedView.getSouth()) {
             layer.clear();
@@ -343,14 +419,14 @@ public final class RadarOverlay {
             refetch = viewSpan < regionSpan / 3.5 || viewSpan > regionSpan;
         }
         if (refetch) {
-            region = regionFor(clampedView);
+            region = regionFor(m, clampedView);
             cache.clear();
         }
         showFrame();
     }
 
     private String cacheKey(String time) {
-        return String.format(Locale.US, "%s|%.3f,%.3f,%.3f,%.3f", time,
+        return String.format(Locale.US, "%s|%s|%.3f,%.3f,%.3f,%.3f", mosaic.id, time,
                 region.getWest(), region.getSouth(), region.getEast(), region.getNorth());
     }
 
@@ -373,7 +449,7 @@ public final class RadarOverlay {
         pendingKey = key;
         final int mine = ++generation;
         status("Getting radar\u2026");
-        Http.getBitmap(imageUrl(r, time), egress.userAgent(), new Http.BitmapCallback() {
+        Http.getBitmap(imageUrl(mosaic, r, time), egress.userAgent(), new Http.BitmapCallback() {
             @Override
             public void onSuccess(Bitmap bitmap) {
                 if (key.equals(pendingKey))
@@ -403,7 +479,7 @@ public final class RadarOverlay {
     }
 
     /** The GetMap request: CRS:84 so lon/lat corners are the image's corners. */
-    static String imageUrl(GeoBounds r, String time) {
+    static String imageUrl(Mosaic m, GeoBounds r, String time) {
         final double lonSpan = r.getEast() - r.getWest();
         final double latSpan = r.getNorth() - r.getSouth();
         int width, height;
@@ -414,7 +490,7 @@ public final class RadarOverlay {
             height = MAX_PX;
             width = Math.max(64, (int) Math.round(MAX_PX * lonSpan / latSpan));
         }
-        return BASE + "?service=WMS&version=1.3.0&request=GetMap&layers=" + WMS_LAYER
+        return m.base + "?service=WMS&version=1.3.0&request=GetMap&layers=" + m.wmsLayer
                 + "&styles=&crs=CRS:84&bbox=" + String.format(Locale.US, "%.4f,%.4f,%.4f,%.4f",
                         r.getWest(), r.getSouth(), r.getEast(), r.getNorth())
                 + "&width=" + width + "&height=" + height
