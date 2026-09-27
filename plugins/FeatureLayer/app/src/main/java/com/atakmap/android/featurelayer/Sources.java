@@ -108,6 +108,150 @@ public final class Sources {
         return s;
     }
 
+    // ---- DART: NIFC personnel and vehicle last known locations ----------------------
+
+    /**
+     * The two DART feeds, both shared to the whole NIFC org. `Dart_AVLs` (no `_view`) is
+     * the Parent service, whose own item says it must not be shared beyond the DART
+     * Group; these are the internal views NIFC shares to the org and to EGP's WildFireSA
+     * Advanced. Read-only, and never republished as CoT: they are internal-to-NIFC
+     * positions of people, and a CoT reaches every EUD on the server.
+     */
+    static final String DART_PERSONNEL = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/DART_Personnel_EGP/FeatureServer";
+    static final String DART_VEHICLES = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/Dart_AVLs_view/FeatureServer";
+
+    /** Default scope: what is within this of the operator, until they pick an area. */
+    static final double DART_DEFAULT_RADIUS_M = 40000;
+
+    private static LayerSpec dart(String id, String title, String layerTitle, String base, String labelField,
+            String setField, String timeField) {
+        final LayerSpec s = new LayerSpec();
+        s.id = id;
+        s.title = title;
+        s.subtitle = "DART";
+        s.portal = NIFC_PORTAL; // the same portal as NIFS live, so one sign-in covers both
+        s.orgName = "NIFC";
+        s.base = base;
+        s.layerIds = new int[] { 0 };
+        s.where = "1=1";
+        s.geojson = false;
+        s.profile = LayerSpec.Profile.GENERIC;
+        s.labelField = labelField;
+        s.layerTitle = layerTitle;
+        s.setField = setField;
+        s.timeField = timeField;
+        s.live = true;
+        // A last known location moves about every 60 s, so a slower refresh draws the
+        // past. The change check is a few hundred bytes and the fetch only follows a
+        // change, so this is cheap even on a thin link.
+        s.refreshMinutes = 1;
+        s.sinceHours = 24; // both services are 24-hour views; asking for more returns nothing
+        s.iconSet = "dart"; // EGP's glyphs; see DartStyles
+        s.labelGsd = LayerSpec.DEFAULT_LABEL_GSD_WIDE; // callsigns from five miles in; fires get one
+        // What is in view, not what is around the operator. A phone with no fix has no
+        // position -- the XCover sat over a fire with DART on and fetched nothing, because
+        // the self marker had nothing to give -- and the thing being asked about is the
+        // part of the map being looked at. "me" stays available for locking to your own
+        // surroundings while scanning elsewhere.
+        s.scopeKind = "view";          // the operator's default: what is in view (2026-09-18)
+        s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
+        // Nationally 387 people and 3,981 vehicles, measured 2026-09-17. A scope keeps a
+        // fetch in the tens, and the cap is what stops a wide area drawing the country.
+        s.maxFeatures = 300;
+        return s;
+    }
+
+    /**
+     * People sharing a last known location: Field Maps "My Tracks", WFTAK and Garmin
+     * inReach, deduplicated by NIFC into one 24-hour view. Labeled by callsign, which
+     * only about a quarter of them have submitted; typed by resource_type, which is the
+     * field that carries IHC / ENG / OPS. Not `category`, which holds a cohort code.
+     */
+    public static LayerSpec dartPersonnel() {
+        return dart("dart-personnel", "Personnel", "Personnel", DART_PERSONNEL, "call_sign",
+                "resource_type", "location_timestamp");
+    }
+
+    static final String FIREGUARD = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/FireGuard_Project_Data/FeatureServer";
+
+    /**
+     * National FireGuard detections: the polygons the FireGuard analysts draw around a
+     * satellite heat detection, with type, acreage, urgency and jurisdiction. About 33 a
+     * day nationally, 750 in EGP's fourteen-day window, so no scope and no cap. Colored by
+     * age the way EGP colors them (FireGuardStyles); typed by IncidentType.
+     */
+    public static LayerSpec fireGuard() {
+        final LayerSpec s = new LayerSpec();
+        s.id = "nifc-fireguard";
+        s.title = "FireGuard";
+        s.subtitle = "NIFC";
+        s.layerTitle = "Detection";
+        s.portal = NIFC_PORTAL;
+        s.orgName = "NIFC";
+        s.base = FIREGUARD;
+        s.layerIds = new int[] { 0 };
+        s.where = "delete_feature <> 'Yes'"; // EGP's own filter; a deleted detection stays in the table
+        s.geojson = false;
+        s.profile = LayerSpec.Profile.GENERIC;
+        s.labelField = "SerialNumber";
+        s.setField = "IncidentType";
+        s.timeField = "CreationDate";
+        s.sinceHours = 24;
+        s.live = true;
+        s.refreshMinutes = 5;
+        s.iconSet = "fireguard";
+        s.labelGsd = LayerSpec.DEFAULT_LABEL_GSD_WIDE;
+        s.fillAlpha = 0x99; // the age ramp has to read; a quarter-alpha pale yellow does not
+        return s;
+    }
+
+    /** USFS and DOI fire vehicles, every row inside 24 hours and most inside the hour. */
+    public static LayerSpec dartVehicles() {
+        return dart("dart-vehicles", "Vehicles", "Vehicle", DART_VEHICLES, "ResourceName", "ResourceType",
+                "DateTime");
+    }
+
+    /**
+     * Re-applies what the plugin owns to a restored layer. A saved layer carries the
+     * definition it was added with, so a built-in source that gains a field in a new
+     * build keeps drawing the old way: DART's EGP symbology never appeared because
+     * {@code iconSet} was null in JSON saved before that field existed, so the styling
+     * code was never even asked (2026-09-17).
+     *
+     * <p>Only fields the plugin decides are touched. The operator's own choices -- the
+     * scope, which types are switched on, whether labels show -- are left alone.
+     */
+    public static void migrate(LayerSpec s) {
+        if (s == null || s.id == null)
+            return;
+        final LayerSpec now = "dart-personnel".equals(s.id) ? dartPersonnel()
+                : "dart-vehicles".equals(s.id) ? dartVehicles()
+                : "nifc-fireguard".equals(s.id) ? fireGuard() : null;
+        if (now == null)
+            return;
+        s.base = now.base;
+        s.layerIds = now.layerIds;
+        s.title = now.title;
+        s.subtitle = now.subtitle;
+        s.layerTitle = now.layerTitle;
+        s.portal = now.portal;
+        s.orgName = now.orgName;
+        s.profile = now.profile;
+        s.iconSet = now.iconSet;
+        s.labelField = now.labelField;
+        s.setField = now.setField;
+        s.timeField = now.timeField;
+        s.sinceHours = now.sinceHours;
+        s.maxFeatures = now.maxFeatures;
+        // The scope is the operator's choice and the pane has a control for it now; a
+        // saved layer keeps whatever they set. Only a layer with no scope at all gets the
+        // default.
+        if (s.scopeKind == null) {
+            s.scopeKind = now.scopeKind;
+            s.scopeRadiusM = now.scopeRadiusM;
+        }
+    }
+
     /** A whole feature service from a user's own org: every layer, generic symbology, capped. */
     /** CA Air Intel: statewide fire perimeters from FIRIS, CAL FIRE intel flights, USFS, NIFC and WFIGS, public. */
     static final String CA_AIR_INTEL = "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/CA_Perimeters_NIFC_FIRIS_public_view/FeatureServer";

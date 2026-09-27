@@ -18,6 +18,7 @@ import com.atakmap.android.featurelayer.ArcGisAuth;
 import com.atakmap.android.featurelayer.LayerManager;
 import com.atakmap.android.featurelayer.LayerSpec;
 import com.atakmap.android.featurelayer.LoadedLayer;
+import com.atakmap.android.featurelayer.Units;
 import com.atakmap.android.featurelayer.Sources;
 import com.atakmap.coremap.log.Log;
 
@@ -432,6 +433,24 @@ public class FeatureLayer implements IPlugin {
                     @Override
                     public void onChanged() {
                         renderRows();
+                        // The Features panel of a live layer follows its fetches too, in
+                        // place: new vehicle types appear and counts move as the map pans.
+                        // Only while it is the panel on screen: with Find open on top of it
+                        // this re-showed the type list under the results every minute, and
+                        // the results "reverted" (2026-09-18). Find refreshes its own rows.
+                        final LoadedLayer showing = featuresFor;
+                        final View search = paneView == null ? null : paneView.findViewById(R.id.search_panel);
+                        final boolean finding = search != null && search.getVisibility() == View.VISIBLE;
+                        final View details = paneView == null ? null : paneView.findViewById(R.id.details_panel);
+                        final boolean reading = details != null && details.getVisibility() == View.VISIBLE;
+                        // Details up: leave them alone. The in-place Features redraw put its
+                        // panel back over the details on every refresh tick (S22, 2026-09-19).
+                        if (showing != null && !showing.refreshing && !showing.busy && !reading) {
+                            if (finding)
+                                refreshResultsInPlace();
+                            else
+                                pickSets(showing, true);
+                        }
                     }
                 });
             refreshOrgUi();
@@ -645,10 +664,19 @@ public class FeatureLayer implements IPlugin {
         return m > 0 ? m / res : 200;
     }
 
+    // A level is printed and picked through one nominal bar length, not the live scale
+    // bar: the same 40 m/px read "5 mi" on the XCover and "9.38 mi" on the S22
+    // (2026-09-19), because the bar's pixel length differs per phone and zoom.
+    private String labelLevel(LoadedLayer l) {
+        if (l.spec.labelGsd == Double.MAX_VALUE)
+            return "Always";
+        return com.atakmap.android.featurelayer.ScaleBar.describe(l.spec.labelGsd * com.atakmap.android.featurelayer.ScaleBar.FALLBACK_BAR_PIXELS) + " or closer";
+    }
+
     private String gateLabel(LoadedLayer l) {
         if (l.spec.gateGsd == Double.MAX_VALUE)
             return "Always";
-        return com.atakmap.android.featurelayer.ScaleBar.describe(l.spec.gateGsd * scaleBarPixels()) + " or closer";
+        return com.atakmap.android.featurelayer.ScaleBar.describe(l.spec.gateGsd * com.atakmap.android.featurelayer.ScaleBar.FALLBACK_BAR_PIXELS) + " or closer";
     }
 
     /** Opens the search pane with the text inside one layer: a fire, an incident, a source. */
@@ -727,6 +755,8 @@ public class FeatureLayer implements IPlugin {
             @Override
             public void onClick(View v) {
                 searchPanel.setVisibility(View.GONE);
+                paneView.findViewById(R.id.details_panel).setVisibility(View.GONE);
+                paneView.findViewById(R.id.features_header).setVisibility(View.VISIBLE);
                 header.setVisibility(View.GONE);
                 if (scope != null) {
                     pickSets(scope); // back to the layer's Features, where this came from
@@ -764,8 +794,22 @@ public class FeatureLayer implements IPlugin {
         for (LoadedLayer l : manager.snapshot()) {
             if (scope != null && l != scope)
                 continue;
-            for (LoadedLayer.Hit h : l.find(text, 5000))
+            // "What is in view" means the view now, not the box the last fetch covered:
+            // zooming in stays inside that box, so nothing refetches, and the list kept
+            // every vehicle from the wider view (2026-09-18, "the list is not updating").
+            com.atakmap.coremap.maps.coords.GeoBounds view = null;
+            if ("view".equals(l.spec.scopeKind)) {
+                try {
+                    view = mapView.getBounds();
+                } catch (RuntimeException ignored) {
+                }
+            }
+            for (LoadedLayer.Hit h : l.find(text, 5000)) {
+                if (view != null && (h.lat < view.getSouth() || h.lat > view.getNorth()
+                        || h.lon < view.getWest() || h.lon > view.getEast()))
+                    continue;
                 hits.add(new Object[] { l, h });
+            }
         }
         return hits;
     }
@@ -828,15 +872,27 @@ public class FeatureLayer implements IPlugin {
                 final String t = ((LoadedLayer.Hit) o[1]).type;
                 counts.put(t, counts.containsKey(t) ? counts.get(t) + 1 : 1);
             }
-            status.setText(counts.size() + " types, " + all.size() + " features \u00b7 tap a type, or type a name");
+            // The picker is the catalog of what the layer carries, not what happens to be
+            // in view: a DART layer's types are its sets, every kind ever seen, so
+            // "Command" can be picked with none in view and the list fills as the map
+            // pans (operator, 2026-09-18: "your current view should not limit that").
+            // The count beside each is what is in view now.
+            if (scope != null && com.atakmap.android.featurelayer.DartStyles.handles(scope.spec))
+                for (LoadedLayer.SetInfo si : scope.types())
+                    if (!counts.containsKey(si.name))
+                        counts.put(si.name, 0);
+            status.setText(withLegend(counts.isEmpty() ? emptyOrScanning(null, scope) + scopeNote(scope)
+                    : counts.size() + " types, " + all.size() + " in view" + scopeNote(scope)
+                            + (scanning(scope) ? " \u00b7 updating\u2026" : "") + " \u00b7 tap a type, or type a name", scope));
             shownHits = null;   // the type list carries counts, not distances
             container.removeAllViews();
             for (final java.util.Map.Entry<String, Integer> e : counts.entrySet()) {
                 final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.result_row, null);
+                row.findViewById(R.id.result_go).setVisibility(View.GONE); // a type row lists, it does not go
                 ((TextView) row.findViewById(R.id.result_title)).setText(e.getKey());
                 ((TextView) row.findViewById(R.id.result_sub)).setText("");
                 ((TextView) row.findViewById(R.id.result_goto)).setText("tap to list");
-                ((TextView) row.findViewById(R.id.result_dist)).setText(String.valueOf(e.getValue()));
+                ((TextView) row.findViewById(R.id.result_dist)).setText(e.getValue() + " in view");
                 row.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -849,9 +905,18 @@ public class FeatureLayer implements IPlugin {
             return;
         }
         final List<Object[]> hits = new java.util.ArrayList<>();
-        for (Object[] o : all)
-            if (filterType == null || filterType.equalsIgnoreCase(((LoadedLayer.Hit) o[1]).type))
-                hits.add(o);
+        // A typed name in a scoped layer: the feed's own answer, anywhere, once it is in;
+        // the cached view's matches until then.
+        final List<LoadedLayer.Hit> fromFeed = text.isEmpty() ? null : feedHitsFor(text, scope);
+        if (fromFeed != null) {
+            for (LoadedLayer.Hit h : fromFeed)
+                if (filterType == null || filterType.equalsIgnoreCase(h.type))
+                    hits.add(new Object[] { scope, h });
+        } else {
+            for (Object[] o : all)
+                if (filterType == null || filterType.equalsIgnoreCase(((LoadedLayer.Hit) o[1]).type))
+                    hits.add(o);
+        }
         // From the device, or from the map's center; without a fix, the map center stands in.
         final com.atakmap.coremap.maps.coords.GeoPoint me = fromMapCenter ? null : selfPoint();
         final boolean noFix = !fromMapCenter && me == null;
@@ -882,14 +947,27 @@ public class FeatureLayer implements IPlugin {
             }
         });
         final StringBuilder st = new StringBuilder();
-        st.append(hits.size()).append(hits.size() == 1 ? " feature" : " features");
+        if (fromFeed != null) {
+            st.append(hits.isEmpty() ? "Nothing on the feed matches \"" + text + "\""
+                    : hits.size() + (hits.size() == 1 ? " match" : " matches") + " on the feed, anywhere");
+            if (feedError != null)
+                st.append(" \u00b7 ").append(feedError);
+        } else if (!text.isEmpty() && scope != null && scope.hasScopeControl() && feedAsking) {
+            st.append(hits.isEmpty() ? "" : hits.size() + " in view \u00b7 ").append("asking the feed for \"").append(text).append("\"\u2026");
+        } else if (hits.isEmpty())
+            st.append(emptyOrScanning(text, scope));
+        else
+            st.append(hits.size()).append(hits.size() == 1 ? " feature" : " features")
+                    .append(scanning(scope) ? " \u00b7 updating\u2026" : "");
         if (hits.size() > RESULT_CAP)
             st.append(", showing ").append(SORT_LABELS[mode].toLowerCase(java.util.Locale.US)).append(" ").append(RESULT_CAP);
         if (noFix && from != null)
             st.append(" \u00b7 no GPS fix, measured from the map center");
         else if (from == null)
             st.append(" \u00b7 nowhere to measure from, sorted by name");
-        status.setText(st.toString());
+        if (fromFeed == null)
+            st.append(scopeNote(scope));
+        status.setText(withLegend(st.toString(), scope));
         container.removeAllViews();
         shownHits = new java.util.ArrayList<>();
         final java.text.SimpleDateFormat when = new java.text.SimpleDateFormat("MMM d HH:mm", java.util.Locale.US);
@@ -901,18 +979,54 @@ public class FeatureLayer implements IPlugin {
             final LoadedLayer l = (LoadedLayer) o[0];
             final LoadedLayer.Hit h = (LoadedLayer.Hit) o[1];
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.result_row, null);
-            ((TextView) row.findViewById(R.id.result_title)).setText(h.title);
+            // An inReach S.O.S. (EGP's rule: the callsign ends "-Alert") says so in the list too.
+            ((TextView) row.findViewById(R.id.result_title)).setText(
+                    com.atakmap.android.featurelayer.DartStyles.sosCallsign(h.title) ? "S.O.S. " + h.title : h.title);
             final StringBuilder sub = new StringBuilder();
             if (h.type != null && !h.type.equalsIgnoreCase(h.title))
                 sub.append(h.type);
             if (scope == null)
                 sub.append(sub.length() > 0 ? " \u00b7 " : "").append(h.layer);
-            if (h.time > 0)
+            // A DART row says how old its report is, in the bucket's color -- the same
+            // green / yellow / red as the ring on its marker. Other layers keep the date.
+            final boolean dart = com.atakmap.android.featurelayer.DartStyles.handles(l.spec);
+            String agoText = null;
+            int agoColor = 0;
+            if (h.time > 0 && dart) {
+                final int bucket = com.atakmap.android.featurelayer.DartStyles.ageBucket(h.time,
+                        // A hit does not carry its data source, so a person gets the Field
+                        // Maps cut-offs here; the marker's ring, built from the row, knows
+                        // an inReach when it sees one. Same numbers today.
+                        System.currentTimeMillis(), com.atakmap.android.featurelayer.DartStyles.ageCutoffs(
+                                l.spec.id.contains("personnel"), false));
+                agoColor = com.atakmap.android.featurelayer.DartStyles.ageColor(bucket);
+                final long min = Math.max(0, (System.currentTimeMillis() - h.time) / 60000L);
+                agoText = min < 1 ? "just now" : min < 60 ? min + " min ago"
+                        : min < 1440 ? (min / 60) + " h " + (min % 60) + " min ago" : (min / 1440) + " d ago";
+            }
+            if (h.time > 0 && !dart)
                 sub.append(sub.length() > 0 ? " \u00b7 " : "").append(when.format(new java.util.Date(h.time)));
-            ((TextView) row.findViewById(R.id.result_sub)).setText(sub.toString());
+            final TextView subView = row.findViewById(R.id.result_sub);
+            if (agoText != null) {
+                final String head = sub.length() > 0 ? sub + " \u00b7 " : "";
+                final android.text.SpannableString sp = new android.text.SpannableString(head + agoText);
+                if (agoColor != 0)
+                    sp.setSpan(new android.text.style.ForegroundColorSpan(agoColor), head.length(), sp.length(),
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                subView.setText(sp);
+            } else {
+                subView.setText(sub.toString());
+            }
             ((TextView) row.findViewById(R.id.result_dist)).setText(dist.containsKey(o)
                     ? com.atakmap.android.featurelayer.Units.format(dist.get(o)) : "");
+            // Cam Depot's shape: the row opens the details, the button goes there.
             row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showDetails(l, h);
+                }
+            });
+            row.findViewById(R.id.result_go).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     l.zoomTo(h);
@@ -920,6 +1034,38 @@ public class FeatureLayer implements IPlugin {
             });
             container.addView(row);
         }
+    }
+
+    /** A hit's attributes in the pane, as the radial's Details shows them; Back returns to the list. */
+    private void showDetails(final LoadedLayer l, final LoadedLayer.Hit h) {
+        if (paneView == null)
+            return;
+        final View searchPanel = paneView.findViewById(R.id.search_panel);
+        final View panel = paneView.findViewById(R.id.details_panel);
+        final String[] title = { h.title };
+        final String body = com.atakmap.android.featurelayer.FeatureDetailsReceiver.render(h.attrs, title);
+        ((TextView) paneView.findViewById(R.id.pane_details_title)).setText(
+                com.atakmap.android.featurelayer.DartStyles.sosCallsign(title[0]) ? "S.O.S. " + title[0] : title[0]);
+        ((TextView) paneView.findViewById(R.id.pane_details_subtitle)).setText(l.displayName());
+        ((TextView) paneView.findViewById(R.id.pane_details_attributes)).setText(body);
+        paneView.findViewById(R.id.btn_details_back).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                panel.setVisibility(View.GONE);
+                paneView.findViewById(R.id.features_header).setVisibility(View.VISIBLE);
+                searchPanel.setVisibility(View.VISIBLE);
+            }
+        });
+        paneView.findViewById(R.id.btn_details_goto).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                l.zoomTo(h);
+            }
+        });
+        searchPanel.setVisibility(View.GONE);
+        paneView.findViewById(R.id.features_header).setVisibility(View.GONE); // one Back, the details' own
+        panel.setVisibility(View.VISIBLE);
+        scrollPaneToTop();
     }
 
     private void refreshOrgUi() {
@@ -938,12 +1084,34 @@ public class FeatureLayer implements IPlugin {
         final Button find = paneView.findViewById(R.id.btn_find);
         final EditText search = paneView.findViewById(R.id.search_text);
         final View searchRow = paneView.findViewById(R.id.search_row);
+        // DART is not a source of its own: NIFC is the source, and DART is a choice
+        // inside it that appears once the operator is signed in. It shares NIFC's
+        // portal, so there is never a second sign-in.
+        final View dartRow = paneView.findViewById(R.id.dart_row);
+        final Button dart = paneView.findViewById(R.id.btn_dart);
+        dartRow.setVisibility(View.GONE);
+        dart.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickDart();
+            }
+        });
+        // FireGuard rides the same NIFC sign-in and the same row: one tap adds it.
+        paneView.findViewById(R.id.btn_fireguard).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (manager != null)
+                    manager.add(Sources.fireGuard());
+            }
+        });
         if (org == null) {
             orgButton.setText("Pick a source");
             signin.setVisibility(View.GONE);
             searchRow.setVisibility(View.GONE);
             return;
         }
+        if ("nifc".equals(org.id) && manager != null && manager.auth(Sources.NIFC_PORTAL).isSignedIn())
+            dartRow.setVisibility(View.VISIBLE);
         orgButton.setText(org.title);
         searchRow.setVisibility(View.VISIBLE);
         find.setText(org.findLabel);
@@ -1144,16 +1312,201 @@ public class FeatureLayer implements IPlugin {
                     manager.remove(l);
                 }
             });
+            final View scopeBlock = row.findViewById(R.id.row_scope);
+            if (l.hasScopeControl()) {
+                scopeBlock.setVisibility(View.VISIBLE);
+                bindScope(row, l);
+            } else {
+                scopeBlock.setVisibility(View.GONE);
+            }
             container.addView(row);
         }
+    }
+
+    /** After a panel swap; posted so it runs once the new panel has been laid out. */
+    private void scrollPaneToTop() {
+        if (paneView == null)
+            return;
+        final android.widget.ScrollView sv = paneView.findViewById(R.id.pane_scroll);
+        if (sv == null)
+            return;
+        sv.post(new Runnable() {
+            @Override
+            public void run() {
+                sv.scrollTo(0, 0);
+            }
+        });
+    }
+
+    /**
+     * Re-run the current find after its layer fetched, keeping the scroll where it was:
+     * a vehicle's last-reported time moves, a vehicle arrives or leaves, the list does
+     * not jump and does not revert to the type list.
+     */
+    private void refreshResultsInPlace() {
+        if (paneView == null || scope == null)
+            return;
+        final android.widget.ScrollView sv = paneView.findViewById(R.id.pane_scroll);
+        final int keepY = sv == null ? 0 : sv.getScrollY();
+        renderResults();
+        if (sv != null)
+            sv.post(new Runnable() {
+                @Override
+                public void run() {
+                    sv.scrollTo(0, keepY);
+                }
+            });
+    }
+
+    /** The radius a layer gets when the operator asks for a point without naming one. */
+    private static final int DEFAULT_SCOPE_BIG = 25;
+    /** Radius choices, in the operator's own big unit. 0 is "what is in view". */
+    private static final int[] SCOPE_PRESETS = { 0, 2, 5, 10, 25, 50 };
+
+    private static String scopePresetLabel(int r) {
+        return r == 0 ? "What is in view" : r + " " + Units.bigLabel();
+    }
+
+    /**
+     * Cam Depot's radius control, on a layer that has a scope: the label says the state,
+     * the slider is the radius (0 = what is in view), the From button names the point it
+     * measures from and rotates it, Use this extent takes the radius from the map, and
+     * Presets is the list. Every change fetches.
+     */
+    private void bindScope(final View row, final LoadedLayer l) {
+        final TextView label = row.findViewById(R.id.row_scope_label);
+        final android.widget.SeekBar seek = row.findViewById(R.id.row_scope_seek);
+        final Button from = row.findViewById(R.id.row_scope_from);
+        final boolean center = "center".equals(l.spec.scopeKind);
+        final boolean inView = "view".equals(l.spec.scopeKind);
+        final String fromName = center ? "Map Center" : "My Location";
+        final int big = inView ? 0
+                : (int) Math.max(0, Math.min(seek.getMax(), Math.round(l.spec.scopeRadiusM / Units.bigToMeters(1))));
+        label.setText(l.scopeLabel());
+        seek.setProgress(big);
+        from.setText("Measuring from: " + fromName);
+        seek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar sb, int p, boolean fromUser) {
+                if (fromUser)
+                    label.setText(p == 0 ? "What is in view"
+                            : "Within " + p + " " + Units.bigLabel() + " of " + fromName);
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar sb) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar sb) {
+                applyScope(l, sb.getProgress(), center ? "center" : "me");
+            }
+        });
+        from.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Rotates between the two points. From "what is in view" it also needs a
+                // radius, or the button would change nothing anyone could see.
+                final int p = seek.getProgress() == 0 ? DEFAULT_SCOPE_BIG : seek.getProgress();
+                applyScope(l, p, center ? "me" : "center");
+            }
+        });
+        row.findViewById(R.id.row_scope_extent).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // "What I am looking at", as a radius: center to corner, so the whole
+                // visible rectangle is inside the circle.
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+                if (b == null || c == null) {
+                    toast("The map has no extent yet");
+                    return;
+                }
+                final double m = c.distanceTo(new com.atakmap.coremap.maps.coords.GeoPoint(b.getNorth(), b.getEast()));
+                final double bigD = m / Units.bigToMeters(1);
+                if (bigD > seek.getMax())
+                    toast(String.format(java.util.Locale.US, "That view is wider than %d %s, radius set to the maximum",
+                            seek.getMax(), Units.bigLabel()));
+                applyScope(l, (int) Math.max(1, Math.min(seek.getMax(), Math.round(bigD))), "center");
+            }
+        });
+        row.findViewById(R.id.row_scope_preset).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final String[] items = new String[SCOPE_PRESETS.length];
+                int checked = -1;
+                for (int i = 0; i < SCOPE_PRESETS.length; i++) {
+                    items[i] = scopePresetLabel(SCOPE_PRESETS[i]);
+                    if (SCOPE_PRESETS[i] == (inView ? 0 : big))
+                        checked = i;
+                }
+                // MapView context, never the plugin context: a dialog on the plugin
+                // context is a BadTokenException and ATAK dies.
+                new android.app.AlertDialog.Builder(mapView.getContext())
+                        .setTitle("Show " + l.spec.title.toLowerCase(java.util.Locale.US) + " within")
+                        .setSingleChoiceItems(items, checked, new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface d, int w) {
+                                d.dismiss();
+                                applyScope(l, SCOPE_PRESETS[w], center ? "center" : "me");
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+    }
+
+    private void applyScope(LoadedLayer l, int big, String kind) {
+        if (big <= 0)
+            manager.setScope(l, "view", 0);
+        else
+            manager.setScope(l, kind, Units.bigToMeters(big));
     }
 
     /**
      * Feature types of one layer, shown in the pane in place of the layer list so the map
      * stays visible: an ON/OFF button per type, a fill button for area types, Back on top.
      */
+    /** The layer whose Features panel is showing, or null; re-rendered in place on change. */
+    private LoadedLayer featuresFor;
+
     private void pickSets(final LoadedLayer l) {
+        if (paneView == null || manager == null)
+            return; // the pane is gone: a late notification after stop
+        pickSets(l, false);
+    }
+
+    /**
+     * @param inPlace true when the panel is already showing this layer and a fetch just
+     *        changed it: the rows are rebuilt where they are, without clearing the find
+     *        box or jumping to the top. A DART list that did not change as the map panned
+     *        read as "panning does nothing" (2026-09-18).
+     */
+    /** What the Features panel last drew, so a fetch that changed nothing does not redraw it. */
+    private String featuresSig;
+
+    private static String featuresSignature(LoadedLayer l, List<LoadedLayer.SetInfo> sets) {
+        final StringBuilder sb = new StringBuilder(l.spec.id).append('|').append(l.count);
+        for (LoadedLayer.SetInfo si : sets)
+            sb.append('|').append(si.id).append(':').append(si.name).append(':').append(si.visible);
+        return sb.toString();
+    }
+
+    private void pickSets(final LoadedLayer l, final boolean inPlace) {
+        if (paneView == null || manager == null)
+            return; // the pane is gone: a late notification after stop
         final List<LoadedLayer.SetInfo> sets = l.types();
+        // In place: redraw only when the types or counts moved, and keep the scroll
+        // where it was. Rebuilding the rows empties the list for a frame and the
+        // ScrollView snapped to the top on every pan (2026-09-18).
+        final String sig = featuresSignature(l, sets);
+        final android.widget.ScrollView sv = paneView == null ? null
+                : (android.widget.ScrollView) paneView.findViewById(R.id.pane_scroll);
+        final int keepY = inPlace && sv != null ? sv.getScrollY() : 0;
+        if (inPlace && sig.equals(featuresSig))
+            return;
+        featuresSig = sig;
         if (sets.isEmpty()) {
             toast("Nothing loaded in this layer yet");
             return;
@@ -1164,7 +1517,8 @@ public class FeatureLayer implements IPlugin {
         final LinearLayout container = paneView.findViewById(R.id.features_container);
         ((TextView) paneView.findViewById(R.id.features_title)).setText(l.spec.title);
         final EditText layerSearch = paneView.findViewById(R.id.layer_search_text);
-        layerSearch.setText("");
+        if (!inPlace)
+            layerSearch.setText("");
         final View.OnClickListener doFind = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1241,7 +1595,7 @@ public class FeatureLayer implements IPlugin {
                                 @Override
                                 public void onClick(DialogInterface d, int which) {
                                     final double gsd = which == GATE_BIG.length ? Double.MAX_VALUE
-                                            : com.atakmap.android.featurelayer.Units.bigToMeters(GATE_BIG[which]) / scaleBarPixels();
+                                            : com.atakmap.android.featurelayer.Units.bigToMeters(GATE_BIG[which]) / com.atakmap.android.featurelayer.ScaleBar.FALLBACK_BAR_PIXELS;
                                     manager.setGate(l, gsd);
                                     preset.setText(gateLabel(l));
                                 }
@@ -1265,6 +1619,55 @@ public class FeatureLayer implements IPlugin {
                 }
             });
             row.findViewById(R.id.feature_fill).setVisibility(View.INVISIBLE);
+            container.addView(row);
+        }
+        {
+            // Label zoom, the same shape as the zoom gate: set it by example ("Use this
+            // zoom") or pick a scale-bar reading. Names from there in, symbols alone
+            // further out; 5 mi unless changed. "Always" is a choice, not the default.
+            final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.feature_row, null);
+            ((TextView) row.findViewById(R.id.feature_name)).setText("Label zoom");
+            final Button useThis = row.findViewById(R.id.feature_toggle);
+            useThis.setText("Use this zoom");
+            useThis.setTextColor(Color.WHITE);
+            final Button level = row.findViewById(R.id.feature_fill);
+            level.setText(labelLevel(l));
+            useThis.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    manager.setLabelLevel(l, mapView.getMapResolution());
+                    level.setText(labelLevel(l));
+                }
+            });
+            level.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final String[] labels = new String[GATE_BIG.length + 1];
+                    for (int i = 0; i < GATE_BIG.length; i++)
+                        labels[i] = gateName(GATE_BIG[i]);
+                    labels[GATE_BIG.length] = "Always";
+                    new AlertDialog.Builder(mapView.getContext()).setTitle("Label when the scale bar reads")
+                            .setItems(labels, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface d, int which) {
+                                    final double gsd = which == GATE_BIG.length ? Double.MAX_VALUE
+                                            : com.atakmap.android.featurelayer.Units.bigToMeters(GATE_BIG[which]) / com.atakmap.android.featurelayer.ScaleBar.FALLBACK_BAR_PIXELS;
+                                    manager.setLabelLevel(l, gsd);
+                                    level.setText(labelLevel(l));
+                                }
+                            }).setNegativeButton("Cancel", null).show();
+                }
+            });
+            container.addView(row);
+        }
+        if (com.atakmap.android.featurelayer.DartStyles.handles(l.spec)) {
+            // What the ring colors mean, where the layer is set up; the list says it too.
+            final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.feature_row, null);
+            final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder("Reported ");
+            b.append(ageLegend(l.spec.id.contains("personnel")));
+            ((TextView) row.findViewById(R.id.feature_name)).setText(b);
+            row.findViewById(R.id.feature_toggle).setVisibility(View.GONE);
+            row.findViewById(R.id.feature_fill).setVisibility(View.GONE);
             container.addView(row);
         }
         if (l.spec.profile == LayerSpec.Profile.NWCG) {
@@ -1329,15 +1732,33 @@ public class FeatureLayer implements IPlugin {
         paneView.findViewById(R.id.btn_features_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                featuresFor = null;
+                featuresSig = null;
                 featuresPanel.setVisibility(View.GONE);
                 featuresHeader.setVisibility(View.GONE);
                 mainPanel.setVisibility(View.VISIBLE);
                 renderRows();
+                scrollPaneToTop();
             }
         });
+        featuresFor = l;
         mainPanel.setVisibility(View.GONE);
         featuresHeader.setVisibility(View.VISIBLE);
         featuresPanel.setVisibility(View.VISIBLE);
+        // The panels swap inside one ScrollView, which keeps its offset: from a layer row
+        // halfway down the list, Features opened halfway down the feature list, with the
+        // find box scrolled off the top (2026-09-18). Start every panel at its top --
+        // unless this is a redraw in place, which goes back to where the operator was.
+        if (!inPlace) {
+            scrollPaneToTop();
+        } else if (sv != null) {
+            sv.post(new Runnable() {
+                @Override
+                public void run() {
+                    sv.scrollTo(0, keepY);
+                }
+            });
+        }
     }
 
     private static String autoLabel(int minutes) {
@@ -1351,6 +1772,124 @@ public class FeatureLayer implements IPlugin {
 
     private static String fillLabel(int alpha) {
         return alpha == 0 ? "Outline" : alpha >= 0x80 ? "Fill 50%" : "Fill 25%";
+    }
+
+    /**
+     * The report-age colors spelled out: the ring on a DART marker and the age in its
+     * row. Asked for on 2026-09-18 ("could we display what the schema is somewhere"):
+     * under the layer's controls, and over its list.
+     */
+    private static CharSequence ageLegend(boolean personnel) {
+        final int[] cut = com.atakmap.android.featurelayer.DartStyles.ageCutoffs(personnel, false);
+        final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder();
+        legendDot(b, com.atakmap.android.featurelayer.DartStyles.ageColor(0), "under " + cut[0] + " min");
+        legendDot(b, com.atakmap.android.featurelayer.DartStyles.ageColor(1), "under " + cut[1] + " min");
+        legendDot(b, com.atakmap.android.featurelayer.DartStyles.ageColor(2), "older");
+        legendDot(b, 0xFFBBBBBB, "no time");
+        return b;
+    }
+
+    private static void legendDot(android.text.SpannableStringBuilder b, int color, String what) {
+        if (b.length() > 0)
+            b.append("   ");
+        final int at = b.length();
+        b.append("\u25cf ");
+        b.setSpan(new android.text.style.ForegroundColorSpan(color), at, at + 1,
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        b.append(what);
+    }
+
+    /**
+     * How wide the search is, on the line the results sit under: there is no search of
+     * everything, a scoped layer searches its own area, and people have to be told
+     * (operator, 2026-09-18: "people need to know there is no overall search, it's by
+     * extent set on the map").
+     */
+    private String scopeNote(LoadedLayer only) {
+        if (only != null) {
+            if (!only.hasScopeControl())
+                return "";
+            final String label = only.scopeLabel();
+            return " \u00b7 " + Character.toLowerCase(label.charAt(0)) + label.substring(1);
+        }
+        if (manager != null)
+            for (LoadedLayer l : manager.snapshot())
+                if (l.hasScopeControl())
+                    return " \u00b7 scoped layers search only their own area";
+        return "";
+    }
+
+    // ---- a typed name asks the feed, not only the cached view ----------------------
+    private String feedText;                       // the text the feed was last asked for
+    private List<LoadedLayer.Hit> feedHits;        // its answer, or null while it is being asked
+    private long feedAt;                           // when it answered, so a stale answer is asked again
+    private String feedError;
+    private boolean feedAsking;
+
+    /**
+     * The feed's answer for the typed text in a scoped layer, asking for it if it has not
+     * been asked (or the answer is older than two minutes). Null while the answer is on
+     * its way, so the cached matches show meanwhile.
+     */
+    private List<LoadedLayer.Hit> feedHitsFor(final String text, final LoadedLayer only) {
+        if (only == null || !only.hasScopeControl() || text == null || text.isEmpty())
+            return null;
+        final boolean fresh = text.equals(feedText) && feedHits != null && System.currentTimeMillis() - feedAt < 120_000;
+        if (fresh)
+            return feedHits;
+        if (feedAsking && text.equals(feedText))
+            return null;
+        feedText = text;
+        feedHits = null;
+        feedError = null;
+        feedAsking = true;
+        manager.searchFeed(only, text, new LayerManager.SearchCallback<List<LoadedLayer.Hit>>() {
+            @Override
+            public void onResult(List<LoadedLayer.Hit> result, String error) {
+                feedAsking = false;
+                if (!text.equals(feedText))
+                    return; // the box moved on
+                feedHits = result == null ? new java.util.ArrayList<LoadedLayer.Hit>() : result;
+                feedError = error;
+                feedAt = System.currentTimeMillis();
+                if (paneView != null && paneView.findViewById(R.id.search_panel).getVisibility() == View.VISIBLE)
+                    refreshResultsInPlace();
+            }
+        });
+        return null;
+    }
+
+    /** Whether the layers behind the list are fetching right now: a pan just asked for a new area. */
+    private boolean scanning(LoadedLayer only) {
+        if (only != null)
+            return only.refreshing || only.busy || only.pendingMove;
+        if (manager != null)
+            for (LoadedLayer l : manager.snapshot())
+                if (l.refreshing || l.busy || l.pendingMove)
+                    return true;
+        return false;
+    }
+
+    /**
+     * What an empty or in-progress list says, so a pan to a new area reads as "looking"
+     * and then "nothing here", never as a list that quietly stayed empty (operator,
+     * 2026-09-18: "loading features or scanning area or something so you know").
+     */
+    private String emptyOrScanning(String text, LoadedLayer only) {
+        if (scanning(only))
+            return "Scanning this area\u2026";
+        if (text != null && !text.isEmpty())
+            return "Nothing matches \"" + text + "\" in this view";
+        return filterType != null ? "No " + filterType + " in this view" : "No features in this view";
+    }
+
+    /** A status line with the legend under it when the list is one DART layer's. */
+    private static CharSequence withLegend(CharSequence line, LoadedLayer only) {
+        if (only == null || !com.atakmap.android.featurelayer.DartStyles.handles(only.spec))
+            return line;
+        final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(line);
+        b.append("\nReported ").append(ageLegend(only.spec.id.contains("personnel")));
+        return b;
     }
 
     private static String statusLine(LoadedLayer l) {
@@ -1370,6 +1909,8 @@ public class FeatureLayer implements IPlugin {
             sb.append(" · STALE: ").append(l.status);
         else if (!l.refreshing && l.status.startsWith("partial"))
             sb.append(" · ").append(l.status);
+        if (l.capped)
+            sb.append(" \u00b7 ").append(l.spec.maxFeatures).append(" shown, more exist: zoom in or shrink the radius");
         return sb.toString();
     }
 
@@ -1382,6 +1923,32 @@ public class FeatureLayer implements IPlugin {
         if (s < 86400)
             return (s / 3600) + " h";
         return (s / 86400) + " d";
+    }
+
+    /**
+     * What to draw from DART. Two services, so two layers: each is turned off or removed
+     * on its own, which is the toggle. Vehicles is the denser half by a factor of ten
+     * (3,981 nationally against 387 people), so it is added first and personnel draws
+     * over the top of it.
+     */
+    private void pickDart() {
+        if (manager == null)
+            return;
+        final String[] labels = { "Personnel and vehicles", "Personnel only", "Vehicles only" };
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Add DART")
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (which != 1)
+                            manager.add(Sources.dartVehicles());
+                        if (which != 2)
+                            manager.add(Sources.dartPersonnel());
+                        d.dismiss();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void pickFire(final List<Sources.Fire> fires) {
