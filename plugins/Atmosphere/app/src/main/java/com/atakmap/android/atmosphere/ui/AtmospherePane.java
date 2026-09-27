@@ -61,7 +61,9 @@ import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.WorldRadar;
 import com.atakmap.android.atmosphere.overlay.WaveOverlay;
+import com.atakmap.android.atmosphere.overlay.RainOverlay;
 import com.atakmap.android.atmosphere.waves.NomadsWaves;
+import com.atakmap.android.atmosphere.rain.NomadsRain;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
 import com.atakmap.android.atmosphere.overlay.TropicalOverlay;
 import com.atakmap.android.atmosphere.overlay.WindScaleView;
@@ -126,6 +128,15 @@ public final class AtmospherePane {
     private boolean wavesOpen = true;
     private WaveOverlay waves;
     private int wavesHours;
+    private static final String PREF_RAIN_OPEN = "weather.rain.open";
+    private final Button rainToggle;
+    private final ImageButton rainExpand;
+    private final LinearLayout rainSettings;
+    private final WindScaleView rainScale;
+    private final TextView rainReading;
+    private boolean rainOpen = true;
+    private RainOverlay rain;
+    private int rainHours;
     private static final String PREF_SMOKE_OPEN = "weather.smoke.open";
     private static final String PREF_AIR_OPEN = "weather.air.open";
     private static final String PREF_STATIONS_OPEN = "weather.layers.stations.open";
@@ -585,6 +596,12 @@ public final class AtmospherePane {
         wavesScale = new WindScaleView(pluginContext);
         ((LinearLayout) find(R.id.waves_scale_host)).addView(wavesScale);
         wavesReading = find(R.id.waves_reading);
+        rainToggle = find(R.id.rain_toggle);
+        rainExpand = find(R.id.rain_expand);
+        rainSettings = find(R.id.rain_settings);
+        rainScale = new WindScaleView(pluginContext);
+        ((LinearLayout) find(R.id.rain_scale_host)).addView(rainScale);
+        rainReading = find(R.id.rain_reading);
         smokeToggle = find(R.id.smoke_toggle);
         smokeExpand = find(R.id.smoke_expand);
         smokeSettings = find(R.id.smoke_settings);
@@ -816,6 +833,7 @@ public final class AtmospherePane {
             }
         });
         wavesOpen = prefs == null || prefs.getBoolean(PREF_WAVES_OPEN, true);
+        rainOpen = prefs == null || prefs.getBoolean(PREF_RAIN_OPEN, true);
         smokeOpen = prefs == null || prefs.getBoolean(PREF_SMOKE_OPEN, true);
         airOpen = prefs == null || prefs.getBoolean(PREF_AIR_OPEN, true);
         spotOpen = prefs == null || prefs.getBoolean(PREF_SPOT_OPEN, true);
@@ -973,6 +991,14 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 wavesOpen = !wavesOpen;
                 rememberFold(PREF_WAVES_OPEN, wavesOpen);
+                updateLayerControls();
+            }
+        });
+        rainExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                rainOpen = !rainOpen;
+                rememberFold(PREF_RAIN_OPEN, rainOpen);
                 updateLayerControls();
             }
         });
@@ -1892,6 +1918,21 @@ public final class AtmospherePane {
                 }
             }
         });
+        rainToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (rain == null)
+                    return;
+                if (rain.isOn()) {
+                    rain.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(RainOverlay.LAYER_ID)) {
+                    turnRainOn();
+                } else {
+                    askToAllowRain();
+                }
+            }
+        });
         smokeToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1973,6 +2014,56 @@ public final class AtmospherePane {
         if (waves != null)
             for (int i = 0; i <= wavesHours; i++)
                 out.add(waves.validTime(i));
+        return out;
+    }
+
+    /**
+     * The rain overlay, owned by the plugin. A forecast on the same kind of hourly
+     * run as the wind, so it shares the strip and the wind's way of naming an hour.
+     */
+    public void setRain(RainOverlay overlay) {
+        rain = overlay;
+        if (rain == null)
+            return;
+        rain.setListener(new RainOverlay.Listener() {
+            @Override
+            public void onFrames(List<String> labels, int shown) {
+                rainHours = Math.max(0, labels.size() - 1);
+                if (rain.isOn())
+                    setWhenTimes(rainTimes(), shown, 0);
+                updateLayerControls();
+            }
+
+            @Override
+            public void onFrameShown(int index, long validTime) {
+                if (!rain.isOn())
+                    return;
+                showWhen(index);
+                scrubberLabel.setText(windLabel(index, validTime));
+                updateRainReading();
+            }
+
+            @Override
+            public void onStatus(String status) {
+                if (!rain.isOn())
+                    return;
+                if (!status.isEmpty())
+                    scrubberLabel.setText(status);
+                else
+                    scrubberLabel.setText(
+                            windLabel(rain.hourIndex(), rain.validTime(rain.hourIndex())));
+                updateRainReading();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /** The rain's forecast hours as wall-clock times, index for index. */
+    private List<Long> rainTimes() {
+        final List<Long> out = new ArrayList<>();
+        if (rain != null)
+            for (int i = 0; i <= rainHours; i++)
+                out.add(rain.validTime(i));
         return out;
     }
 
@@ -2190,6 +2281,9 @@ public final class AtmospherePane {
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
         } else if (waves != null && waves.isOn()) {
             waves.setHourIndex(index);
+            scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
+        } else if (rain != null && rain.isOn()) {
+            rain.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
         } else if (radar != null && radar.isOn()) {
             radar.setFrameIndex(index);
@@ -2906,6 +3000,10 @@ public final class AtmospherePane {
             waves.setOn(on);
         else if (waves != null && on)
             blocked++;
+        if (rain != null && on == allowed(RainOverlay.LAYER_ID))
+            rain.setOn(on);
+        else if (rain != null && on)
+            blocked++;
         if (smoke != null && on == allowed(SmokeOverlay.LAYER_ID))
             smoke.setOn(on);
         else if (smoke != null && on)
@@ -3532,6 +3630,8 @@ public final class AtmospherePane {
             smoke.setOn(false);
         if (waves != null && waves.isOn())
             waves.setOn(false);
+        if (rain != null && rain.isOn())
+            rain.setOn(false);
         if (radar != null) {
             radar.setOn(true);
             setWhenTimes(radarTimes(), radar.frameIndex(),
@@ -3547,6 +3647,8 @@ public final class AtmospherePane {
             smoke.setOn(false);
         if (waves != null && waves.isOn())
             waves.setOn(false);
+        if (rain != null && rain.isOn())
+            rain.setOn(false);
         if (wind != null) {
             wind.setOn(true);
             setWhenTimes(windTimes(), wind.hourIndex(), 0);
@@ -3562,6 +3664,8 @@ public final class AtmospherePane {
             wind.setOn(false);
         if (waves != null && waves.isOn())
             waves.setOn(false);
+        if (rain != null && rain.isOn())
+            rain.setOn(false);
         if (smoke != null) {
             smoke.setOn(true);
             setWhenTimes(smokeTimes(), smoke.hourIndex(), 0);
@@ -3577,9 +3681,28 @@ public final class AtmospherePane {
             wind.setOn(false);
         if (smoke != null && smoke.isOn())
             smoke.setOn(false);
+        if (rain != null && rain.isOn())
+            rain.setOn(false);
         if (waves != null) {
             waves.setOn(true);
             setWhenTimes(wavesTimes(), waves.hourIndex(), 0);
+        }
+        updateLayerControls();
+    }
+
+    /** One time-enabled layer at a time, because they share the one strip. */
+    private void turnRainOn() {
+        if (radar != null && radar.isOn())
+            radar.setOn(false);
+        if (wind != null && wind.isOn())
+            wind.setOn(false);
+        if (smoke != null && smoke.isOn())
+            smoke.setOn(false);
+        if (waves != null && waves.isOn())
+            waves.setOn(false);
+        if (rain != null) {
+            rain.setOn(true);
+            setWhenTimes(rainTimes(), rain.hourIndex(), 0);
         }
         updateLayerControls();
     }
@@ -3834,6 +3957,25 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowRain() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.rain_allow_title))
+                .setMessage(pluginContext.getString(R.string.rain_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(RainOverlay.LAYER_ID, true);
+                                turnRainOn();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowSmoke() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -3903,6 +4045,17 @@ public final class AtmospherePane {
         if (wavesOn) {
             updateWavesScale();
             updateWavesReading();
+        }
+        final boolean rainOn = rain != null && rain.isOn();
+        rainToggle.setText(rainOn ? R.string.rain_on : R.string.rain_off);
+        rainToggle.setTextColor(pluginContext.getResources().getColor(
+                rainOn ? R.color.state_on : R.color.state_off));
+        rainExpand.setVisibility(rainOn ? View.VISIBLE : View.GONE);
+        rainExpand.setRotation(rainOpen ? 180f : 0f);
+        rainSettings.setVisibility(rainOn && rainOpen ? View.VISIBLE : View.GONE);
+        if (rainOn) {
+            updateRainScale();
+            updateRainReading();
         }
         final boolean stationsOn = stationLayer != null && stationLayer.isOn();
         stationsToggle.setText(stationsOn ? R.string.stations_on : R.string.stations_off);
@@ -4094,9 +4247,11 @@ public final class AtmospherePane {
             hostScrubberIn(smokeSettings);
         else if (wavesOn)
             hostScrubberIn(wavesSettings);
+        else if (rainOn)
+            hostScrubberIn(rainSettings);
         else if (radarOn)
             hostScrubberIn(radarSettings);
-        scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn ? View.VISIBLE : View.GONE);
+        scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn || rainOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
     }
 
@@ -4142,6 +4297,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_waves, WaveOverlay.HOST));
+        }
+        if (rain != null && rain.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_rain, RainOverlay.HOST));
         }
         if (radarOn) {
             if (out.length() > 0)
@@ -4476,6 +4636,41 @@ public final class AtmospherePane {
             line = line.isEmpty() ? pluginContext.getString(R.string.waves_cropped)
                     : line + "\n" + pluginContext.getString(R.string.waves_cropped);
         wavesReading.setText(line);
+    }
+
+    /** The legend for the rain on the map: light to violent, inches or millimeters an hour under the joins. */
+    private void updateRainScale() {
+        final boolean metric = units == UnitSystem.METRIC;
+        rainScale.setBands(NomadsRain.legendColors(), NomadsRain.legendBreaks(metric),
+                metric ? "mm/hr" : "in/hr");
+        rainScale.setEnds(null, null);
+    }
+
+    /** The rain at the pane's own point, read out of the picture already on the map. */
+    private void updateRainReading() {
+        if (rain == null || !rain.isOn()) {
+            rainReading.setText(R.string.empty);
+            return;
+        }
+        final GeoPoint p = point();
+        final RainOverlay.Reading r = p == null ? null
+                : rain.readingAt(p.getLatitude(), p.getLongitude());
+        String line;
+        if (p == null)
+            line = "";
+        else if (r == null || Float.isNaN(r.mmPerHr))
+            line = pluginContext.getString(R.string.wind_here_unknown);
+        else if (NomadsRain.band(r.mmPerHr) < 0)
+            line = pluginContext.getString(R.string.rain_none);
+        else {
+            final boolean metric = units == UnitSystem.METRIC;
+            line = pluginContext.getString(R.string.rain_here,
+                    NomadsRain.rateText(r.mmPerHr, metric) + ", " + NomadsRain.words(r.mmPerHr));
+        }
+        if (rain.isCropped())
+            line = line.isEmpty() ? pluginContext.getString(R.string.rain_cropped)
+                    : line + "\n" + pluginContext.getString(R.string.rain_cropped);
+        rainReading.setText(line);
     }
 
     /**

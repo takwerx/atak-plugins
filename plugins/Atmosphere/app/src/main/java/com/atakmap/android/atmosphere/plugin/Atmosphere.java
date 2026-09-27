@@ -23,6 +23,7 @@ import com.atakmap.android.atmosphere.overlay.HighFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
 import com.atakmap.android.atmosphere.overlay.SatelliteOverlay;
 import com.atakmap.android.atmosphere.overlay.WaveOverlay;
+import com.atakmap.android.atmosphere.overlay.RainOverlay;
 import com.atakmap.android.atmosphere.overlay.BeachOverlay;
 import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
@@ -102,6 +103,7 @@ public class Atmosphere implements IPlugin {
     private WindOverlay wind;
     private SmokeOverlay smoke;
     private WaveOverlay waves;
+    private RainOverlay rain;
     private AirQualityOverlay air;
     private SpotOverlay spotLayer;
     private StationOverlay stations;
@@ -231,6 +233,8 @@ public class Atmosphere implements IPlugin {
         smoke.start();
         waves = new WaveOverlay(mapView, egress);
         waves.start();
+        rain = new RainOverlay(mapView, egress);
+        rain.start();
         air = new AirQualityOverlay(mapView, pluginContext, egress);
         air.start();
         spotLayer = new SpotOverlay(mapView, pluginContext, egress);
@@ -304,6 +308,8 @@ public class Atmosphere implements IPlugin {
             atmospherePane.setSmoke(smoke);
             if (waves != null)
                 atmospherePane.setWaves(waves);
+            if (rain != null)
+                atmospherePane.setRain(rain);
             atmospherePane.setAirQuality(air);
             if (avalanche != null)
                 atmospherePane.setAvalanche(avalanche);
@@ -418,6 +424,10 @@ public class Atmosphere implements IPlugin {
             waves.stop();
             waves = null;
         }
+        if (rain != null) {
+            rain.stop();
+            rain = null;
+        }
         if (smoke != null) {
             smoke.stop();
             smoke = null;
@@ -468,6 +478,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setSmoke(smoke);
             if (waves != null)
                 atmospherePane.setWaves(waves);
+            if (rain != null)
+                atmospherePane.setRain(rain);
             if (air != null)
                 atmospherePane.setAirQuality(air);
             if (avalanche != null)

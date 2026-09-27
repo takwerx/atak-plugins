@@ -99,6 +99,7 @@ gauges" and the rest — where it can be hidden without opening the plugin.
 | | Weather stations | The stations around you, wind barb and readings, colored against the Red Flag criteria for their zone |
 | Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber |
 | Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches the open ocean where no radar does |
+| Wind | Rain | The model's rain rate, light to violent, hour by hour for five days with the rate "Here"; a forecast, not radar |
 | Wind | Wind | The modeled wind field, with a time scrubber and the wind "Here" |
 | Fire | Fire weather outlook | Elevated, critical and extreme areas and dry lightning, Day 1, 2, 3 or all |
 | Fire | Smoke | Forecast smoke, ground or whole sky, light or dense |

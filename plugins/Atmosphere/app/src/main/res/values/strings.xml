@@ -140,6 +140,15 @@
     <string name="waves_cropped">Drawn for the middle of the map. Zoom in to see all of it.</string>
     <string name="waves_calm">Calm</string>
     <string name="waves_phenomenal">Phenomenal</string>
+    <string name="rain_on">Rain ON</string>
+    <string name="rain_off">Rain OFF</string>
+    <string name="rain_allow_title">Show the rain forecast?</string>
+    <string name="rain_allow_text">Rain comes from NOAA\'s global forecast model: how hard it expects rain to be falling, hour by hour for five days, everywhere on the map, including far out to sea. A forecast, not radar: the radar layer shows what is falling now where a radar can see it.\n\nTurning it on lets Atmosphere ask them for rain over the part of the map you are looking at. Nothing else about you is sent.\n\nServer: nomads.ncep.noaa.gov</string>
+    <string name="credit_rain">Rain forecast from NOAA (%1$s)</string>
+    <string name="rain_here">Here: %1$s</string>
+    <string name="rain_none">Here: no rain</string>
+    <string name="rain_cropped">Drawn for the middle of the map. Zoom in to see all of it.</string>
+    <string name="rain_note">Color is how hard the model expects rain to fall, light to violent. A forecast, not radar: for what is falling now, turn on Radar.</string>
     <string name="waves_note">Color is the height of the seas in the states mariners use, calm to phenomenal. The arrows point the way the swell is running. A model\'s forecast, not a buoy\'s reading; the buoys are the layer above.</string>
     <string name="sst_on">Sea temperature ON</string>
     <string name="sst_off">Sea temperature OFF</string>

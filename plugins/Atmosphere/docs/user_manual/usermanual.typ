@@ -116,6 +116,12 @@ coldest; *Visible* is the daylight picture and goes dark at night. It reaches
 where no radar does - the open Pacific and Atlantic - which is where a
 hurricane at sea is read from.
 
+*Rain* draws how hard the forecast model expects rain to be falling, light to
+violent, hour by hour for five days, everywhere on the map including far out
+to sea, with the rate *Here* at the pane's point. It is a forecast, not
+radar: Radar is what is falling now where a radar can see it, Rain is what
+the model expects where nothing can.
+
 *Wind* draws the modeled wind field as barbs with a time scrubber, and its
 status line says the wind *Here*, at the pane's point: speed, direction and
 gusts. Outside the drawn area it says so.

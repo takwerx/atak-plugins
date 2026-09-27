@@ -27,6 +27,12 @@ public final class Grib2 {
         public final long referenceTime;
         /** Hours after the run this field is valid for. */
         public final int forecastHours;
+        /**
+         * Section 4's template: 0 is a value at an instant, 8 a value over an
+         * interval (an average or an accumulation, its forecast time the
+         * interval's start). A file can carry both for one field; the rain does.
+         */
+        public final int productTemplate;
         /** The Lambert grid, when the message is on one; null for a lat/lon grid. */
         public final Lcc grid;
         /** The lat/lon lattice, when the message is on one; null for a Lambert grid. */
@@ -38,12 +44,14 @@ public final class Grib2 {
         public final boolean jNorthUp;
 
         Message(int discipline, int category, int number, long referenceTime, int forecastHours,
-                Lcc grid, LatLonGrid latLon, int nx, int ny, float[] values, boolean jNorthUp) {
+                int productTemplate, Lcc grid, LatLonGrid latLon, int nx, int ny, float[] values,
+                boolean jNorthUp) {
             this.discipline = discipline;
             this.category = category;
             this.number = number;
             this.referenceTime = referenceTime;
             this.forecastHours = forecastHours;
+            this.productTemplate = productTemplate;
             this.grid = grid;
             this.latLon = latLon;
             this.nx = nx;
@@ -89,7 +97,7 @@ public final class Grib2 {
     private static Message readMessage(byte[] b, int start, int total) throws IOException {
         final int discipline = u8(b, start + 6);
         long referenceTime = 0;
-        int category = -1, number = -1, forecastHours = 0;
+        int category = -1, number = -1, forecastHours = 0, productTemplate = -1;
         Lcc grid = null;
         LatLonGrid latLon = null;
         int nx = 0, ny = 0;
@@ -168,6 +176,7 @@ public final class Grib2 {
                     final int template = u16(b, p + 7);
                     if (template != 0 && template != 8)
                         throw new IOException("product template 4." + template + " is not read");
+                    productTemplate = template;
                     category = u8(b, p + 9);
                     number = u8(b, p + 10);
                     final int unit = u8(b, p + 17);
@@ -224,8 +233,8 @@ public final class Grib2 {
         if ((grid == null && latLon == null) || values == null || nx * ny != values.length)
             throw new IOException("incomplete GRIB message (grid " + (grid != null || latLon != null)
                     + ", values " + (values == null ? "none" : values.length) + ", nx*ny " + (nx * ny) + ")");
-        return new Message(discipline, category, number, referenceTime, forecastHours, grid,
-                latLon, nx, ny, values, jNorthUp);
+        return new Message(discipline, category, number, referenceTime, forecastHours,
+                productTemplate, grid, latLon, nx, ny, values, jNorthUp);
     }
 
     /** Simple packing: value = (R + X * 2^E) / 10^D, X read as {@code bits}-bit unsigned. */

@@ -96,7 +96,7 @@ PORTS REQUIRED
     geo.weather.gc.ca               radar over Canada (Environment Canada)
     api.rainviewer.com              radar everywhere else, the frame list
     tilecache.rainviewer.com        and its tiles (RainViewer's composite)
-    nomads.ncep.noaa.gov            model wind and smoke files
+    nomads.ncep.noaa.gov            model wind, smoke, wave and rain files
     nowcoast.noaa.gov               sea surface temperature
     maps.water.noaa.gov             flooded ground, streams running high
     api.water.noaa.gov              river gauges and their forecasts
