@@ -92,7 +92,10 @@ PORTS REQUIRED
                                     excessive rainfall outlooks, beach forecast,
                                     spot forecast requests, fire weather zones,
                                     hurricane maps, snow depth
-    opengeo.ncep.noaa.gov           radar mosaic
+    opengeo.ncep.noaa.gov           radar mosaics (NWS)
+    geo.weather.gc.ca               radar over Canada (Environment Canada)
+    api.rainviewer.com              radar everywhere else, the frame list
+    tilecache.rainviewer.com        and its tiles (RainViewer's composite)
     nomads.ncep.noaa.gov            model wind and smoke files
     nowcoast.noaa.gov               sea surface temperature
     maps.water.noaa.gov             flooded ground, streams running high

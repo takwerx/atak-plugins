@@ -101,16 +101,20 @@ where it can be hidden without opening the plugin.
 = Wind and fire
 
 *Radar* draws the National Weather Service's radar mosaics - the lower 48,
-Alaska, Hawaii, the Caribbean and Guam - and Environment Canada's, whichever
-the map is over, and lets you scrub back through the last two to three hours
-of frames. The lower-48 picture reaches as far into Mexico as the border
-radars see.
+Alaska, Hawaii, the Caribbean and Guam - over the United States, Environment
+Canada's over Canada, and everywhere else RainViewer's composite of the
+world's public weather radars: Mexico past the border radars, the Caribbean
+beyond Puerto Rico, Europe, wherever a country publishes its radar. The
+picture switches by itself as the map moves, and the time strip scrubs back
+through the last two to three hours of frames. Outside the US and Canada the
+frames are ten minutes apart, and the credit under the layers names
+RainViewer.
 
 *Satellite* draws the newest GOES picture, about ten minutes old: *Infrared*
 shows the cloud tops day and night, brightest where they are highest and
 coldest; *Visible* is the daylight picture and goes dark at night. It reaches
-where no radar does - the whole of Mexico, the open Pacific and Atlantic -
-which is where a hurricane is read from.
+where no radar does - the open Pacific and Atlantic - which is where a
+hurricane at sea is read from.
 
 *Wind* draws the modeled wind field as barbs with a time scrubber, and its
 status line says the wind *Here*, at the pane's point: speed, direction and

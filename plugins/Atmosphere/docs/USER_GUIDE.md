@@ -97,8 +97,8 @@ gauges" and the rest — where it can be hidden without opening the plugin.
 |---|---|---|
 | | Spot forecasts | Every open spot forecast request, with the office's forecast behind a tap |
 | | Weather stations | The stations around you, wind barb and readings, colored against the Red Flag criteria for their zone |
-| Wind | Radar | The NWS radar mosaics for the lower 48, Alaska, Hawaii, the Caribbean and Guam, and Environment Canada's, whichever the map is over, with a time scrubber |
-| Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches all of Mexico and the open ocean |
+| Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber |
+| Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches the open ocean where no radar does |
 | Wind | Wind | The modeled wind field, with a time scrubber and the wind "Here" |
 | Fire | Fire weather outlook | Elevated, critical and extreme areas and dry lightning, Day 1, 2, 3 or all |
 | Fire | Smoke | Forecast smoke, ground or whole sky, light or dense |

@@ -160,6 +160,7 @@
     <string name="show_settings">Show or hide this layer\'s settings</string>
     <string name="credit_wind">Wind forecast from NOAA (%1$s)</string>
     <string name="credit_radar">Radar from the US National Weather Service (%1$s)</string>
+    <string name="credit_radar_world">Radar here: weather data by RainViewer, rainviewer.com</string>
     <string name="radar_on">Radar ON</string>
     <string name="radar_off">Radar OFF</string>
     <string name="allow">Allow</string>
@@ -232,7 +233,7 @@
     <string name="spot_allow_title">Allow spot forecasts</string>
     <string name="spot_allow_text">Spot forecasts come from the US National Weather Service: the open requests from their spot forecast map service, and each forecast from their weather API.\n\nTurning it on lets Atmosphere download the whole country\'s list and filter it on this phone. Your position is not sent.\n\nServers: mapservices.weather.noaa.gov, api.weather.gov</string>
     <string name="radar_allow_title">Allow radar</string>
-    <string name="radar_allow_text">Radar comes from the US National Weather Service, the same picture their own radar site draws.\n\nOver Canada the picture is Environment Canada\'s.\n\nTurning it on lets Atmosphere ask them for radar over the part of the map you are looking at. Nothing else about you is sent.\n\nServers: opengeo.ncep.noaa.gov, geo.weather.gc.ca</string>
+    <string name="radar_allow_text">Radar comes from the US National Weather Service, the same picture their own radar site draws.\n\nOver Canada the picture is Environment Canada\'s. Everywhere else, from Mexico south of the border radars to the rest of the world, it is RainViewer\'s composite of the public radars of some 150 countries.\n\nTurning it on lets Atmosphere ask them for radar over the part of the map you are looking at. Nothing else about you is sent.\n\nServers: opengeo.ncep.noaa.gov, geo.weather.gc.ca, api.rainviewer.com, tilecache.rainviewer.com</string>
     <string name="variables">What to show</string>
     <string name="sources">Weather services</string>
     <string name="privacy">Position sent</string>

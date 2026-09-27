@@ -206,6 +206,17 @@ public final class Http {
         });
     }
 
+    /**
+     * A binary GET on the caller's own thread, for a worker that assembles several
+     * answers into one thing (the world radar's tiles) and would otherwise juggle a
+     * callback per piece on main. Never call it on the main thread.
+     */
+    public static byte[] fetchBytes(String url, String userAgent) throws IOException {
+        if (Looper.myLooper() == Looper.getMainLooper())
+            throw new IOException("fetchBytes on the main thread");
+        return requestBytes(url, userAgent, null);
+    }
+
     public interface BitmapCallback {
         void onSuccess(Bitmap bitmap);
         void onFailure(String error);

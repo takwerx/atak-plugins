@@ -4,6 +4,12 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
+import android.text.style.ClickableSpan;
+import android.text.method.LinkMovementMethod;
+import android.text.Spanned;
+import android.text.SpannableString;
+import android.net.Uri;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PointF;
 import android.graphics.Typeface;
@@ -53,6 +59,7 @@ import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
+import com.atakmap.android.atmosphere.overlay.WorldRadar;
 import com.atakmap.android.atmosphere.overlay.WaveOverlay;
 import com.atakmap.android.atmosphere.waves.NomadsWaves;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
@@ -4139,7 +4146,9 @@ public final class AtmospherePane {
         if (radarOn) {
             if (out.length() > 0)
                 out.append('\n');
-            out.append(pluginContext.getString(R.string.credit_radar, RadarOverlay.HOST));
+            out.append(radar != null && radar.worldSource()
+                    ? pluginContext.getString(R.string.credit_radar_world)
+                    : pluginContext.getString(R.string.credit_radar, RadarOverlay.HOST));
         }
         if (air != null && air.isOn()) {
             if (out.length() > 0)
@@ -4201,7 +4210,36 @@ public final class AtmospherePane {
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_avalanche, AvalancheOverlay.HOST));
         }
-        layersAttribution.setText(out.toString());
+        setCredits(out.toString());
+    }
+
+    /**
+     * The credits, with RainViewer's words a link: its terms ask for a link back,
+     * and a stock URLSpan would start the browser from the plugin context, which
+     * throws without NEW_TASK. So the span is ours and starts it from ATAK's.
+     */
+    private void setCredits(String text) {
+        final int at = text.indexOf(WorldRadar.CREDIT_HOST);
+        if (at < 0) {
+            layersAttribution.setText(text);
+            layersAttribution.setMovementMethod(null);
+            return;
+        }
+        final SpannableString span = new SpannableString(text);
+        span.setSpan(new ClickableSpan() {
+            @Override
+            public void onClick(View widget) {
+                try {
+                    final Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(WorldRadar.CREDIT_URL));
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    MapCompat.atakContext().startActivity(i);
+                } catch (RuntimeException e) {
+                    com.atakmap.coremap.log.Log.w("AtmospherePane", "could not open the credit link", e);
+                }
+            }
+        }, at, at + WorldRadar.CREDIT_HOST.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        layersAttribution.setText(span);
+        layersAttribution.setMovementMethod(LinkMovementMethod.getInstance());
     }
 
     /**

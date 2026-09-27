@@ -11,12 +11,18 @@ import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoBounds;
 import com.atakmap.map.AtakMapView;
 
+import android.graphics.BitmapFactory;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,7 +37,12 @@ import java.util.regex.Pattern;
  * border radars see. Canada's radar comes from Environment Canada's GeoMet
  * service under Canada's open-government terms (Fees None, Access Constraints
  * None, read 2026-09-27): six-minute frames for the last three hours, given as
- * a start/end/period that {@link #parseTimes} expands.
+ * a start/end/period that {@link #parseTimes} expands. Wherever none of those
+ * radars see -- Mexico past the border radars, the Caribbean beyond Puerto Rico,
+ * the oceans, the rest of the world -- the picture is RainViewer's composite of
+ * the world's public radars, through {@link WorldRadar} ("like around the
+ * world", same day). Which source draws is decided by the view's center, and the
+ * credit on the layers page follows it.
  *
  * <p>Lives for the plugin's life, never inside the pane: the pane comes and goes with
  * the toolbar button and the radar has to stay up. The pane only drives and reads it.
@@ -57,10 +68,20 @@ public final class RadarOverlay {
 
     public static final String LAYER_ID = "radar";
     public static final String HOST = "opengeo.ncep.noaa.gov";
-    /** One radar mosaic: where its WMS is, the layer, and the box its radars cover. */
+    /**
+     * One radar mosaic: where its WMS is, the layer, and the box its radars cover.
+     * The world composite is a Mosaic too, with no WMS; {@link #WORLD} is the one.
+     */
     static final class Mosaic {
         final String id, base, wmsLayer, capabilities;
         final double west, east, south, north;
+        /**
+         * The box within which this mosaic's radars actually see, for choosing it:
+         * the extent unless {@link #sees} narrows it. The lower-48 WMS extent runs
+         * to 20 N, but the southernmost radars reach about 24 N; a view centered
+         * below that is Mexico, and the world composite has Mexico's radars.
+         */
+        double seesWest, seesEast, seesSouth, seesNorth;
 
         /** An NWS mosaic, by its GeoServer workspace. */
         Mosaic(String id, double west, double east, double south, double north) {
@@ -84,6 +105,22 @@ public final class RadarOverlay {
             this.east = east;
             this.south = south;
             this.north = north;
+            sees(west, east, south, north);
+        }
+
+        Mosaic sees(double w, double e, double s, double n) {
+            seesWest = w;
+            seesEast = e;
+            seesSouth = s;
+            seesNorth = n;
+            return this;
+        }
+
+        /** Whether this mosaic's radars see the middle of a view. */
+        boolean seesCenter(GeoBounds v) {
+            final double lat = (v.getNorth() + v.getSouth()) / 2;
+            final double lon = (v.getEast() + v.getWest()) / 2;
+            return lat >= seesSouth && lat <= seesNorth && lon >= seesWest && lon <= seesEast;
         }
 
         /** How much of a view this mosaic covers, in square degrees; 0 when none. */
@@ -96,7 +133,12 @@ public final class RadarOverlay {
 
     /**
      * The mosaics, boxes read from each one's capabilities on 2026-09-27. The lower
-     * 48 first: it wins a tie, and it is what a whole-world view gets.
+     * 48 first: it wins a tie, and it is what a whole-world view gets. Each one's
+     * {@code sees} box is where its radars reach, not its WMS extent: the Caribbean
+     * mosaic's extent runs from Central America to the Windward Islands and its one
+     * radar is Puerto Rico's, so a view centered on Cuba, Jamaica or Honduras goes
+     * to the world composite, which has their radars; likewise Bermuda east of the
+     * lower 48 and Mexico south of the border radars.
      */
     public static final String CANADA_HOST = "geo.weather.gc.ca";
     /**
@@ -107,28 +149,42 @@ public final class RadarOverlay {
      * corner they share goes to Alaska.
      */
     static final Mosaic[] MOSAICS = {
-            new Mosaic("conus", -130, -60, 20, 55),
-            new Mosaic("carib", -90, -60, 10, 25),
-            new Mosaic("hawaii", -164, -151, 15, 26),
+            new Mosaic("conus", -130, -60, 20, 55).sees(-130, -65, 24, 55),
+            new Mosaic("carib", -90, -60, 10, 25).sees(-68.5, -63.5, 15.5, 20.5),
+            new Mosaic("hawaii", -164, -151, 15, 26).sees(-161.5, -153, 17, 24),
             new Mosaic("alaska", -176, -126, 50, 72),
-            new Mosaic("guam", 140, 150, 9, 18),
+            new Mosaic("guam", 140, 150, 9, 18).sees(142, 147.5, 11, 16),
             new Mosaic("canada", "https://" + CANADA_HOST + "/geomet", "RADAR_1KM_RRAI",
                     "https://" + CANADA_HOST + "/geomet?service=WMS&version=1.3.0"
                             + "&request=GetCapabilities&layer=RADAR_1KM_RRAI",
                     -141, -52, 49, 62) };
 
-    /** The mosaic whose box covers most of the view; the lower 48 when none does. */
+    /**
+     * Everywhere the agency mosaics do not see: RainViewer's composite, tiles to
+     * Mercator's reach. Its "capabilities" is the JSON frame list.
+     */
+    static final Mosaic WORLD = new Mosaic("world", null, null, WorldRadar.FRAMES_URL,
+            -180, 180, -WorldRadar.MAX_LAT, WorldRadar.MAX_LAT);
+
+    /**
+     * The mosaic whose radars see the view's center -- the one covering most of the
+     * view when several do -- and the world composite when none does. The center
+     * decides, not the overlap alone: a view of Mexico City overlaps the lower-48
+     * extent a little and its radars not at all.
+     */
     static Mosaic mosaicFor(GeoBounds view) {
-        Mosaic best = MOSAICS[0];
+        Mosaic best = null;
         double bestOverlap = 0;
         for (Mosaic m : MOSAICS) {
+            if (!m.seesCenter(view))
+                continue;
             final double o = m.overlap(view);
-            if (o > bestOverlap) {
+            if (best == null || o > bestOverlap) {
                 best = m;
                 bestOverlap = o;
             }
         }
-        return best;
+        return best != null ? best : WORLD;
     }
 
     private static final String PREF_ON = "weather.layer.radar.on";
@@ -163,6 +219,14 @@ public final class RadarOverlay {
     /** The mosaic being drawn; frames, region and cache all belong to it. */
     private Mosaic mosaic = MOSAICS[0];
     private List<String> frames = new ArrayList<>();
+    /** The world composite's frame list, with each frame's tile path; null elsewhere. */
+    private WorldRadar.Frames worldFrames;
+    /**
+     * Fetches and assembles a world frame's tiles, one frame at a time, off main.
+     * Made at start and shut down at stop, so a reloaded plugin does not leave a
+     * thread pinning the old generation.
+     */
+    private ExecutorService worker;
     private int index = -1;
     /** True while the operator has not scrubbed away from the newest frame. */
     private boolean followLatest = true;
@@ -172,7 +236,8 @@ public final class RadarOverlay {
     private boolean capsInFlight;
     /** The image being fetched; asking for the same one again is a no-op. */
     private String pendingKey;
-    private int generation;
+    /** Bumped on main whenever what is in flight no longer matters; read by the worker as a hint to stop. */
+    private volatile int generation;
     private Listener listener;
 
     private final Runnable moveSettled = new Runnable() {
@@ -222,6 +287,14 @@ public final class RadarOverlay {
         mapView.addLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
         layer.setVisible(false);
         mapView.addOnMapMovedListener(moved);
+        worker = Executors.newSingleThreadExecutor(new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                final Thread t = new Thread(r, "wx-radar-tiles");
+                t.setDaemon(true);
+                return t;
+            }
+        });
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
             setOn(true);
@@ -240,10 +313,19 @@ public final class RadarOverlay {
         mapView.removeLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
         GLRasterLayer.unregister();
         cache.clear();
+        if (worker != null) {
+            worker.shutdownNow();
+            worker = null;
+        }
     }
 
     public boolean isOn() {
         return on;
+    }
+
+    /** True while the picture is the world composite's, so the credit can say so. */
+    public boolean worldSource() {
+        return mosaic == WORLD;
     }
 
     /** Turn the radar on or off. The caller has cleared the egress gate first. */
@@ -316,7 +398,15 @@ public final class RadarOverlay {
                         capsInFlight = false;
                         if (mine != generation || asked != mosaic)
                             return;
-                        final List<String> times = parseTimes(body);
+                        final List<String> times;
+                        if (asked == WORLD) {
+                            worldFrames = WorldRadar.parseFrames(body);
+                            if (worldFrames.note != null)
+                                Log.w(TAG, worldFrames.note);
+                            times = new ArrayList<>(worldFrames.times);
+                        } else {
+                            times = parseTimes(body);
+                        }
                         if (times.isEmpty()) {
                             status("No radar frames available");
                             return;
@@ -439,6 +529,7 @@ public final class RadarOverlay {
             Log.d(TAG, "mosaic " + mosaic.id + " -> " + wanted.id);
             mosaic = wanted;
             frames = new ArrayList<>();
+            worldFrames = null;
             index = -1;
             followLatest = true;
             region = null;
@@ -504,6 +595,10 @@ public final class RadarOverlay {
         pendingKey = key;
         final int mine = ++generation;
         status("Getting radar\u2026");
+        if (mosaic == WORLD) {
+            fetchWorldFrame(key, r, time, mine);
+            return;
+        }
         Http.getBitmap(imageUrl(mosaic, r, time), egress.userAgent(), new Http.BitmapCallback() {
             @Override
             public void onSuccess(Bitmap bitmap) {
@@ -529,6 +624,98 @@ public final class RadarOverlay {
                 if (mine != generation)
                     return;
                 status(error);
+            }
+        });
+    }
+
+    /**
+     * A world frame: the tiles under the region, fetched and resampled onto the
+     * lon/lat quad on the worker, delivered on main like a WMS frame. A tile that
+     * fails leaves its part clear; a frame with no tile at all is a failure.
+     */
+    private void fetchWorldFrame(final String key, final GeoBounds r, final String time,
+            final int mine) {
+        final String path = worldFrames == null ? null : worldFrames.pathOf(time);
+        final WorldRadar.Plan plan = path == null ? null
+                : WorldRadar.plan(r.getWest(), r.getSouth(), r.getEast(), r.getNorth(), MAX_PX);
+        final ExecutorService w = worker;
+        if (plan == null || w == null) {
+            pendingKey = null;
+            status("No radar frames available");
+            return;
+        }
+        final String ua = egress.userAgent();
+        Log.d(TAG, "world frame " + time + " " + plan);
+        w.execute(new Runnable() {
+            @Override
+            public void run() {
+                Bitmap bitmap = null;
+                String error = null;
+                try {
+                    final int[][] tiles = new int[plan.tileCount()][];
+                    int missing = 0;
+                    for (int ty = plan.ty0; ty <= plan.ty1; ty++) {
+                        for (int tx = plan.tx0; tx <= plan.tx1; tx++) {
+                            if (mine != generation)
+                                return;
+                            try {
+                                final byte[] bytes = Http.fetchBytes(plan.tileUrl(path, tx, ty), ua);
+                                final Bitmap t = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                                if (t == null || t.getWidth() != WorldRadar.TILE_PX
+                                        || t.getHeight() != WorldRadar.TILE_PX) {
+                                    missing++;
+                                    if (t != null)
+                                        t.recycle();
+                                    continue;
+                                }
+                                final int[] px = new int[WorldRadar.TILE_PX * WorldRadar.TILE_PX];
+                                t.getPixels(px, 0, WorldRadar.TILE_PX, 0, 0, WorldRadar.TILE_PX,
+                                        WorldRadar.TILE_PX);
+                                t.recycle();
+                                tiles[plan.slot(tx, ty)] = px;
+                            } catch (IOException e) {
+                                missing++;
+                                Log.w(TAG, "tile " + plan.zoom + "/" + tx + "/" + ty + ": " + e.getMessage());
+                            }
+                        }
+                    }
+                    if (missing == plan.tileCount()) {
+                        error = "the provider did not return an image";
+                    } else {
+                        final int[] out = WorldRadar.assemble(plan, tiles);
+                        bitmap = Bitmap.createBitmap(out, plan.outW, plan.outH, Bitmap.Config.ARGB_8888);
+                    }
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "world frame failed hard", e);
+                    error = "request failed";
+                }
+                final Bitmap b = bitmap;
+                final String err = error;
+                mapView.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (key.equals(pendingKey))
+                            pendingKey = null;
+                        if (mine != generation || !on) {
+                            if (b != null)
+                                b.recycle();
+                            return;
+                        }
+                        if (err != null) {
+                            status(err);
+                            return;
+                        }
+                        cache.put(key, b);
+                        Log.d(TAG, String.format(Locale.US,
+                                "world frame %s drawn %dx%d over %.2f,%.2f..%.2f,%.2f, echo %.1f%%",
+                                time, b.getWidth(), b.getHeight(), r.getWest(), r.getSouth(),
+                                r.getEast(), r.getNorth(), echoPercent(b)));
+                        layer.setImage(b, r);
+                        if (listener != null)
+                            listener.onFrameShown(index, time);
+                        status("");
+                    }
+                });
             }
         });
     }
