@@ -246,6 +246,50 @@ final class AtmosphereFeatures {
             Log.d(tag, layerName + ": removed " + gone + " old store file(s)");
     }
 
+    /**
+     * One row per feature in ATAK's "Select Item" list. A rewrite inserts the fresh
+     * sets before it deletes the old ones, so the map is never momentarily empty --
+     * and for the length of one pass the store holds every point twice. A tap that
+     * lands inside that pass returns both copies, and the chooser listed one buoy
+     * twice with the same name and position (operator, 2026-09-26, 40 ms before the
+     * pass logged). Copies are told apart by name and place, since a rewrite gives
+     * the fresh copy a new feature id; the newer one is kept, the older removed from
+     * the set in place.
+     */
+    private static void onePerPlace(java.util.SortedSet<MapItem> hits) {
+        if (hits == null || hits.size() < 2)
+            return;
+        final Map<String, MapItem> newest = new HashMap<>();
+        final java.util.List<MapItem> older = new java.util.ArrayList<>();
+        for (MapItem m : hits) {
+            final String key = placeKey(m);
+            final MapItem have = newest.get(key);
+            if (have == null) {
+                newest.put(key, m);
+            } else if (m.getMetaLong("featureid", 0) > have.getMetaLong("featureid", 0)) {
+                older.add(have);
+                newest.put(key, m);
+            } else {
+                older.add(m);
+            }
+        }
+        hits.removeAll(older);
+    }
+
+    /** The feature's name and, for a point or a shape, where it is to five decimals. */
+    private static String placeKey(MapItem m) {
+        com.atakmap.coremap.maps.coords.GeoPoint at = null;
+        if (m instanceof com.atakmap.android.maps.PointMapItem) {
+            at = ((com.atakmap.android.maps.PointMapItem) m).getPoint();
+        } else if (m instanceof com.atakmap.android.maps.Shape) {
+            final com.atakmap.coremap.maps.coords.GeoPointMetaData c =
+                    ((com.atakmap.android.maps.Shape) m).getCenter();
+            at = c == null ? null : c.get();
+        }
+        return m.getMetaString("title", m.getUID()) + "@" + (at == null ? ""
+                : String.format(java.util.Locale.US, "%.5f,%.5f", at.getLatitude(), at.getLongitude()));
+    }
+
     /** Every feature set id in the store, as the store reports it. */
     private java.util.List<Long> existingSetIds() {
         final java.util.List<Long> ids = new java.util.ArrayList<>();
@@ -400,8 +444,11 @@ final class AtmosphereFeatures {
                                         java.util.Collection<com.atakmap.map.hittest.HitTestControl>> controls) {
                             final java.util.SortedSet<MapItem> hits =
                                     super.deepHitTest(view, params, controls);
+                            final int raw = hits == null ? -1 : hits.size();
+                            onePerPlace(hits);
                             Log.d(tag, "deepHitTest: " + (controls == null ? -1 : controls.size())
-                                    + " controls, " + (hits == null ? -1 : hits.size()) + " hits");
+                                    + " controls, " + raw + " hits"
+                                    + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
                             return hits;
                         }
 
@@ -410,8 +457,10 @@ final class AtmosphereFeatures {
                                 com.atakmap.coremap.maps.coords.GeoPoint point, MapView view) {
                             final java.util.SortedSet<MapItem> hits =
                                     super.deepHitTestItems(x, y, point, view);
-                            Log.d(tag, "deepHitTestItems: "
-                                    + (hits == null ? -1 : hits.size()) + " hits");
+                            final int raw = hits == null ? -1 : hits.size();
+                            onePerPlace(hits);
+                            Log.d(tag, "deepHitTestItems: " + raw + " hits"
+                                    + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
                             return hits;
                         }
 
