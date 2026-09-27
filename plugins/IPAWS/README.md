@@ -14,13 +14,9 @@ All releases: https://github.com/takwerx/ipaws-alerts/releases
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
 
-Public emergency alerts on the ATAK map, with the filter chosen on the device
-rather than once for a whole server.
-
-A TAK server can already publish one alert picture to everyone on it. This is
-the other half of that: an engine, a division or a strike team sets its own
-states, counties and alert types on the phone, in the field, whether or not
-there is a server in the path.
+Public emergency alerts on the ATAK map, with the filter chosen on the device.
+An engine, a division or a strike team sets its own states, counties and alert
+types on the phone, in the field, whether or not there is a server in the path.
 
   - States, territories and offshore waters, any number of them, picked one by
     one or a region at a time.
