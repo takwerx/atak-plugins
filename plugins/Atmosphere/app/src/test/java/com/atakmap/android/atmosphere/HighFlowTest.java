@@ -77,11 +77,19 @@ public class HighFlowTest {
     public void urlAndNumbers() {
         final String now = HighFlow.url(HighFlow.HORIZON_NOW, -78.2, 33.9, -77.6, 34.4, 0.0012);
         assertTrue(now, now.startsWith("https://maps.water.noaa.gov/server/rest/services/nwm/ana_high_flow_magnitude/MapServer/0/query?geometry=-78.200,33.900,-77.600,34.400&"));
-        assertTrue(now, now.contains("&outFields=*&orderByFields=strm_order%20DESC&resultRecordCount=2000&outSR=4326"));
+        assertTrue(now, now.contains("&outFields=feature_id,name,strm_order,state,reference_time,valid_time,max_flow,recur_cat,"));
+        assertTrue(now, now.contains("&orderByFields=strm_order%20DESC&resultRecordCount=2000&outSR=4326"));
         assertTrue(now, now.contains("&maxAllowableOffset=0.00120&f=geojson"));
         final String day5 = HighFlow.url(HighFlow.HORIZON_5DAY, -1, 2, 3, 4, 0);
         assertTrue(day5, day5.contains("/mrf_nbm_5day_max_high_flow_magnitude/MapServer/0/query?"));
         assertTrue(day5, day5.contains("&maxAllowableOffset=0.00001&"));
+        // The 5-day service names its fields differently and has no valid_time; a
+        // four-degree box is wide, so it asks for the biggest 800.
+        assertTrue(day5, day5.contains("maxflow_5day_cfs,recur_cat_5day,"));
+        assertFalse(day5, day5.contains("valid_time"));
+        assertTrue(day5, day5.contains("&resultRecordCount=800&"));
+        assertEquals(2000, HighFlow.recordsFor(2.0));
+        assertEquals(800, HighFlow.recordsFor(2.01));
         assertEquals("12,300 cfs", HighFlow.cfs(12300.4));
         assertEquals("350 cfs", HighFlow.cfs(350));
         assertEquals("0.4 cfs", HighFlow.cfs(0.353));

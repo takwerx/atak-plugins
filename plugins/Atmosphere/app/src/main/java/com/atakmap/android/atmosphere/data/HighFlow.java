@@ -35,6 +35,32 @@ public final class HighFlow {
     public static final int HORIZON_NOW = 0, HORIZON_5DAY = 1;
     /** The service's own page size; a fuller answer says so and the biggest streams come first. */
     public static final int MAX_RECORDS = 2000;
+    /**
+     * The cap for a wide view, and the width in degrees of longitude past which it
+     * applies. Over the Mississippi on 2026-09-27 a 5-degree box answered 1.2 MB
+     * and 2,000 reaches down to headwater creeks too short to see at that scale,
+     * on every pan, and the XCover's map stalled under it. The 800 biggest are
+     * every river of stream order 4 and up there, 0.4 MB; the status line says
+     * the smaller ones are left out, and zooming in brings them back.
+     */
+    public static final int WIDE_RECORDS = 800;
+    public static final double WIDE_SPAN = 2.0;
+    /**
+     * The fields the record reads, per service: they are named differently, and an
+     * outFields entry a service does not have is an error. Leaving out the four
+     * nobody reads (huc6, nwm_vers, update_time, oid) is 15 percent of the answer.
+     */
+    private static final String NOW_FIELDS = "feature_id,name,strm_order,state,reference_time,"
+            + "valid_time,max_flow,recur_cat,high_water_threshold,flow_2yr,flow_5yr,flow_10yr,"
+            + "flow_25yr,flow_50yr";
+    private static final String DAY5_FIELDS = "feature_id,name,strm_order,state,reference_time,"
+            + "maxflow_5day_cfs,recur_cat_5day,high_water_threshold,flow_2yr,flow_5yr,flow_10yr,"
+            + "flow_25yr,flow_50yr";
+
+    /** How many reaches to ask for over a box this wide, biggest streams first. */
+    public static int recordsFor(double spanLon) {
+        return spanLon > WIDE_SPAN ? WIDE_RECORDS : MAX_RECORDS;
+    }
 
     /**
      * The service's grades, worst first, in its own colors (read from the layer's
@@ -73,16 +99,19 @@ public final class HighFlow {
     }
 
     /**
-     * Every reach crossing the box, biggest streams first, generalized to about
-     * {@code offsetDeg} so a wide view is not a megabyte of bends. All fields, so
-     * one request shape serves both layers.
+     * The reaches crossing the box, biggest streams first, as many as the box's
+     * width warrants ({@link #recordsFor}), generalized to about {@code offsetDeg}
+     * so a wide view is not a megabyte of bends, with only the fields the record
+     * reads.
      */
     public static String url(int horizon, double west, double south, double east, double north,
             double offsetDeg) {
-        return SERVICES + (horizon == HORIZON_5DAY ? DAY5 : NOW) + "/MapServer/0/query?geometry="
+        final boolean day5 = horizon == HORIZON_5DAY;
+        return SERVICES + (day5 ? DAY5 : NOW) + "/MapServer/0/query?geometry="
                 + String.format(Locale.US, "%.3f,%.3f,%.3f,%.3f", west, south, east, north)
                 + "&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects"
-                + "&outFields=*&orderByFields=strm_order%20DESC&resultRecordCount=" + MAX_RECORDS
+                + "&outFields=" + (day5 ? DAY5_FIELDS : NOW_FIELDS)
+                + "&orderByFields=strm_order%20DESC&resultRecordCount=" + recordsFor(east - west)
                 + "&outSR=4326&geometryPrecision=5"
                 + String.format(Locale.US, "&maxAllowableOffset=%.5f", Math.max(0.00001, offsetDeg))
                 + "&f=geojson";
