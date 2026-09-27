@@ -272,7 +272,8 @@ final class AtmosphereFeatures {
      * the fresh copy a new feature id; the newer one is kept, the older removed from
      * the set in place.
      */
-    private static void onePerPlace(java.util.SortedSet<MapItem> hits) {
+    private static void onePerPlace(java.util.SortedSet<MapItem> hits,
+            com.atakmap.coremap.maps.coords.GeoPoint tap) {
         if (hits == null || hits.isEmpty())
             return;
         // A polygon's center label is a point of its own in the store; the polygon
@@ -283,25 +284,58 @@ final class AtmosphereFeatures {
                 it.remove();
         if (hits.size() < 2)
             return;
-        final Map<String, MapItem> newest = new HashMap<>();
-        final java.util.List<MapItem> older = new java.util.ArrayList<>();
+        final Map<String, MapItem> keep = new HashMap<>();
+        final java.util.List<MapItem> dropped = new java.util.ArrayList<>();
         for (MapItem m : hits) {
             final String key = placeKey(m);
-            final MapItem have = newest.get(key);
+            final MapItem have = keep.get(key);
             if (have == null) {
-                newest.put(key, m);
-            } else if (m.getMetaLong("featureid", 0) > have.getMetaLong("featureid", 0)) {
-                older.add(have);
-                newest.put(key, m);
+                keep.put(key, m);
+                continue;
+            }
+            // Same name, same place: the fresher copy from a rewrite in progress.
+            // Same name only (a layer that asked for one row per name): the one
+            // under the finger. The river model cuts a creek into reaches a few
+            // hundred meters long, and a tap on Galisteo Creek listed four rows
+            // that read the same (XCover, 2026-09-27).
+            final boolean byName = m.getMetaBoolean("_oneRowPerName", false);
+            final boolean better = byName && tap != null
+                    ? distance(m, tap) < distance(have, tap)
+                    : m.getMetaLong("featureid", 0) > have.getMetaLong("featureid", 0);
+            if (better) {
+                dropped.add(have);
+                keep.put(key, m);
             } else {
-                older.add(m);
+                dropped.add(m);
             }
         }
-        hits.removeAll(older);
+        hits.removeAll(dropped);
     }
 
-    /** The feature's name and, for a point or a shape, where it is to five decimals. */
+    /** Meters from the tap to where the item says it is; far when it does not say. */
+    private static double distance(MapItem m, com.atakmap.coremap.maps.coords.GeoPoint tap) {
+        final com.atakmap.coremap.maps.coords.GeoPoint at = placeOf(m);
+        return at == null ? Double.MAX_VALUE : at.distanceTo(tap);
+    }
+
+    private static com.atakmap.coremap.maps.coords.GeoPoint placeOf(MapItem m) {
+        if (m instanceof com.atakmap.android.maps.PointMapItem)
+            return ((com.atakmap.android.maps.PointMapItem) m).getPoint();
+        if (m instanceof com.atakmap.android.maps.Shape) {
+            final com.atakmap.coremap.maps.coords.GeoPointMetaData c =
+                    ((com.atakmap.android.maps.Shape) m).getCenter();
+            return c == null ? null : c.get();
+        }
+        return null;
+    }
+
+    /**
+     * The feature's name and, for a point or a shape, where it is to five decimals;
+     * the name alone for a feature that asked for one row per name.
+     */
     private static String placeKey(MapItem m) {
+        if (m.getMetaBoolean("_oneRowPerName", false))
+            return m.getMetaString("title", m.getUID());
         com.atakmap.coremap.maps.coords.GeoPoint at = null;
         if (m instanceof com.atakmap.android.maps.PointMapItem) {
             at = ((com.atakmap.android.maps.PointMapItem) m).getPoint();
@@ -653,7 +687,7 @@ final class AtmosphereFeatures {
                             final java.util.SortedSet<MapItem> hits =
                                     super.deepHitTest(view, params, controls);
                             final int raw = hits == null ? -1 : hits.size();
-                            onePerPlace(hits);
+                            onePerPlace(hits, params == null ? null : params.geo);
                             Log.d(tag, "deepHitTest: " + (controls == null ? -1 : controls.size())
                                     + " controls, " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
@@ -666,7 +700,7 @@ final class AtmosphereFeatures {
                             final java.util.SortedSet<MapItem> hits =
                                     super.deepHitTestItems(x, y, point, view);
                             final int raw = hits == null ? -1 : hits.size();
-                            onePerPlace(hits);
+                            onePerPlace(hits, point);
                             Log.d(tag, "deepHitTestItems: " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
                             return hits;
@@ -762,6 +796,8 @@ final class AtmosphereFeatures {
                             // stroke color is its swatch.
                             if (a != null && a.containsAttribute("_labelOnly"))
                                 item.setMetaBoolean("_labelOnly", true);
+                            if (a != null && a.containsAttribute("_oneRowPerName"))
+                                item.setMetaBoolean("_oneRowPerName", true);
                             if (!(item instanceof com.atakmap.android.maps.Marker)) {
                                 final String sw = swatchUri;
                                 if (sw != null) {

@@ -112,6 +112,12 @@
     <string name="flood_when_now">Now</string>
     <string name="flood_when_5day">Next 5 days</string>
     <string name="floodground_note">The National Weather Service calls this experimental: a river model\'s estimate of where water goes over the banks, not a survey, and it covers only part of the country. What you can see wins.</string>
+    <string name="highflow_on">Streams running high ON</string>
+    <string name="highflow_off">Streams running high OFF</string>
+    <string name="highflow_allow_title">Show streams running high?</string>
+    <string name="highflow_allow_text">Atmosphere will ask the National Weather Service\'s water prediction service which stretches of stream its river model has over their high-water mark in the area the map is showing, now or at the worst of the next five days, and draw them as colored lines. The map\'s area is sent; your position is not. Server: maps.water.noaa.gov</string>
+    <string name="credit_highflow">High-flow streams from the NOAA National Water Prediction Service, experimental (%1$s)</string>
+    <string name="highflow_note">A line means the river model has that stretch over its high-water mark; the color is how rare a flow that big is. Experimental, and a computed flow, not a gauge reading. Tap a line for the numbers.</string>
     <string name="sst_on">Sea temperature ON</string>
     <string name="sst_off">Sea temperature OFF</string>
     <string name="sst_allow_title">Show sea surface temperature?</string>

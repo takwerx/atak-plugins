@@ -19,6 +19,7 @@ import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
+import com.atakmap.android.atmosphere.overlay.HighFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
 import com.atakmap.android.atmosphere.overlay.BeachOverlay;
 import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
@@ -89,6 +90,7 @@ public class Atmosphere implements IPlugin {
     private FireWxOutlookOverlay firewx;
     private FloodOutlookOverlay flood;
     private BeachOverlay beach;
+    private HighFlowOverlay highflow;
     private FloodedGroundOverlay floodground;
     private SnowOverlay snow;
     private SstOverlay sst;
@@ -219,6 +221,8 @@ public class Atmosphere implements IPlugin {
         beach.start();
         floodground = new FloodedGroundOverlay(mapView, egress);
         floodground.start();
+        highflow = new HighFlowOverlay(mapView, pluginContext, egress);
+        highflow.start();
         snow = new SnowOverlay(mapView, egress);
         snow.start();
         sst = new SstOverlay(mapView, egress);
@@ -275,6 +279,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setBeach(beach);
             if (floodground != null)
                 atmospherePane.setFloodedGround(floodground);
+            if (highflow != null)
+                atmospherePane.setHighFlow(highflow);
             if (snow != null)
                 atmospherePane.setSnow(snow);
             if (sst != null)
@@ -332,6 +338,10 @@ public class Atmosphere implements IPlugin {
         if (sst != null) {
             sst.stop();
             sst = null;
+        }
+        if (highflow != null) {
+            highflow.stop();
+            highflow = null;
         }
         if (floodground != null) {
             floodground.stop();
@@ -421,6 +431,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setBeach(beach);
             if (floodground != null)
                 atmospherePane.setFloodedGround(floodground);
+            if (highflow != null)
+                atmospherePane.setHighFlow(highflow);
             if (snow != null)
                 atmospherePane.setSnow(snow);
             if (sst != null)

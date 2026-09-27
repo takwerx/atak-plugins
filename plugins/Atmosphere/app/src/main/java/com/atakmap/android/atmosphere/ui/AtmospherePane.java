@@ -45,6 +45,7 @@ import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
 import com.atakmap.android.atmosphere.overlay.BeachOverlay;
 import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
+import com.atakmap.android.atmosphere.overlay.HighFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodedGroundOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
@@ -200,6 +201,15 @@ public final class AtmospherePane {
     private final LinearLayout beachLegend;
     private BeachOverlay beach;
     private boolean beachOpen = true;
+    private static final String PREF_HIGHFLOW_OPEN = "weather.highflow.open";
+    private final LinearLayout highflowSettings;
+    private final ImageButton highflowExpand;
+    private final Button highflowToggle;
+    private final TextView highflowStatus;
+    private final LinearLayout highflowLegend;
+    private final LinearLayout highflowWhenRow;
+    private HighFlowOverlay highflow;
+    private boolean highflowOpen = true;
     private static final String PREF_FLOODGROUND_OPEN = "weather.floodground.open";
     private final LinearLayout floodgroundSettings;
     private final ImageButton floodgroundExpand;
@@ -505,6 +515,12 @@ public final class AtmospherePane {
         beachToggle = find(R.id.beach_toggle);
         beachStatus = find(R.id.beach_status);
         beachLegend = find(R.id.beach_legend);
+        highflowSettings = find(R.id.highflow_settings);
+        highflowExpand = find(R.id.highflow_expand);
+        highflowToggle = find(R.id.highflow_toggle);
+        highflowStatus = find(R.id.highflow_status);
+        highflowLegend = find(R.id.highflow_legend);
+        highflowWhenRow = find(R.id.highflow_when_row);
         floodgroundSettings = find(R.id.floodground_settings);
         floodgroundExpand = find(R.id.floodground_expand);
         floodgroundToggle = find(R.id.floodground_toggle);
@@ -660,6 +676,15 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 snotelOpen = !snotelOpen;
                 rememberFold(PREF_SNOTEL_OPEN, snotelOpen);
+                updateLayerControls();
+            }
+        });
+        highflowOpen = prefs == null || prefs.getBoolean(PREF_HIGHFLOW_OPEN, true);
+        highflowExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                highflowOpen = !highflowOpen;
+                rememberFold(PREF_HIGHFLOW_OPEN, highflowOpen);
                 updateLayerControls();
             }
         });
@@ -943,6 +968,8 @@ public final class AtmospherePane {
             flood.refresh(false);
         if (beach != null && beach.isOn())
             beach.refresh(false);
+        if (highflow != null && highflow.isOn())
+            highflow.refresh(false);
         if (floodground != null && floodground.isOn())
             floodground.refresh(false);
         if (snow != null && snow.isOn())
@@ -1214,21 +1241,51 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** Streams running high, owned by the plugin. Not time-enabled; the flood layers' horizon. */
+    public void setHighFlow(HighFlowOverlay overlay) {
+        highflow = overlay;
+        if (highflow == null)
+            return;
+        highflow.setListener(new HighFlowOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                highflowStatus.setText(status);
+                highflowStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        highflowLegend.removeAllViews();
+        for (com.atakmap.android.atmosphere.data.HighFlow.Category k
+                : com.atakmap.android.atmosphere.data.HighFlow.Category.values())
+            highflowLegend.addView(legendLine(k.words, k.color));
+        buildFloodWhenRow();
+        updateLayerControls();
+    }
+
     /** The flood layers' horizon as the map is drawing it. */
     private int floodHorizon() {
-        return floodground != null ? floodground.horizon() : FloodedGroundOverlay.horizonPref();
+        if (floodground != null)
+            return floodground.horizon();
+        if (highflow != null)
+            return highflow.horizon();
+        return FloodedGroundOverlay.horizonPref();
     }
 
     /** One choice for every flood layer: the picture and the streams follow together. */
     private void setFloodHorizon(int value) {
         if (floodground != null)
             floodground.setHorizon(value);
+        if (highflow != null)
+            highflow.setHorizon(value);
         buildFloodWhenRow();
     }
 
-    /** Now / Next 5 days, the chosen one in green, the outlook day chips' shape. */
+    /** Now / Next 5 days on both flood blocks, the chosen one in green. */
     private void buildFloodWhenRow() {
-        final LinearLayout row = floodgroundWhenRow;
+        buildFloodWhenRow(floodgroundWhenRow);
+        buildFloodWhenRow(highflowWhenRow);
+    }
+
+    private void buildFloodWhenRow(final LinearLayout row) {
         row.removeAllViews();
         final String[] labels = { pluginContext.getString(R.string.flood_when_now),
                 pluginContext.getString(R.string.flood_when_5day) };
@@ -1521,6 +1578,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowSnotel();
+                }
+            }
+        });
+        highflowToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (highflow == null)
+                    return;
+                if (highflow.isOn()) {
+                    highflow.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(HighFlowOverlay.LAYER_ID)) {
+                    highflow.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowHighFlow();
                 }
             }
         });
@@ -2659,6 +2732,10 @@ public final class AtmospherePane {
             snotel.setOn(on);
         else if (snotel != null && on)
             blocked++;
+        if (highflow != null && on == allowed(HighFlowOverlay.LAYER_ID))
+            highflow.setOn(on);
+        else if (highflow != null && on)
+            blocked++;
         if (floodground != null && on == allowed(FloodedGroundOverlay.LAYER_ID))
             floodground.setOn(on);
         else if (floodground != null && on)
@@ -3309,6 +3386,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowHighFlow() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.highflow_allow_title))
+                .setMessage(pluginContext.getString(R.string.highflow_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(HighFlowOverlay.LAYER_ID, true);
+                                if (highflow != null)
+                                    highflow.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowFloodedGround() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -3638,6 +3736,13 @@ public final class AtmospherePane {
         snotelExpand.setVisibility(snotelOn ? View.VISIBLE : View.GONE);
         snotelExpand.setRotation(snotelOpen ? 180f : 0f);
         snotelSettings.setVisibility(snotelOn && snotelOpen ? View.VISIBLE : View.GONE);
+        final boolean highflowOn = highflow != null && highflow.isOn();
+        highflowToggle.setText(highflowOn ? R.string.highflow_on : R.string.highflow_off);
+        highflowToggle.setTextColor(pluginContext.getResources().getColor(
+                highflowOn ? R.color.state_on : R.color.state_off));
+        highflowExpand.setVisibility(highflowOn ? View.VISIBLE : View.GONE);
+        highflowExpand.setRotation(highflowOpen ? 180f : 0f);
+        highflowSettings.setVisibility(highflowOn && highflowOpen ? View.VISIBLE : View.GONE);
         final boolean floodgroundOn = floodground != null && floodground.isOn();
         floodgroundToggle.setText(floodgroundOn ? R.string.floodground_on : R.string.floodground_off);
         floodgroundToggle.setTextColor(pluginContext.getResources().getColor(
@@ -3783,6 +3888,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_beach, BeachOverlay.HOST));
+        }
+        if (highflow != null && highflow.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_highflow, HighFlowOverlay.HOST));
         }
         if (floodground != null && floodground.isOn()) {
             if (out.length() > 0)
