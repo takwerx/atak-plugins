@@ -39,16 +39,19 @@ public class DoaCsvFeedTest {
     }
 
     /**
-     * The trap. This feed writes 360 - theta_0 where the XML writes theta_0,
-     * and a bearing read with the wrong convention is a confident line pointing
-     * the wrong way rather than an obviously broken one.
+     * The trap, and it bites in the direction nobody expects. This feed writes
+     * {@code 360 - theta_0} where the XML writes {@code theta_0}, so it looks
+     * like the odd one out -- but {@code 360 - theta_0} is already the compass
+     * bearing, so this is the feed that needs nothing applied. Signal DF
+     * shipped it the wrong way round until the radio's own
+     * {@code calculate_end_lat_lng} settled it.
      */
     @Test
-    public void mirrorsTheBearing() {
+    public void carriesTheCompassBearingAlready() {
         Bearing b = only(new DoaCsvFeed().parse(Fixtures.load("DOA_value_single.html"), RX));
-        assertEquals(BearingConvention.MIRRORED, b.convention);
+        assertEquals(BearingConvention.DIRECT, b.convention);
         assertEquals(Fixtures.CSV_REPORTED, b.reportedDeg, EPS);
-        assertEquals(Fixtures.THETA, b.arrayRelativeDeg, EPS);
+        assertEquals(Fixtures.COMPASS, b.arrayRelativeDeg, EPS);
     }
 
     /** This feed applies none of the XML's scaling: Hz, 0..1, dB as-is. */
@@ -88,12 +91,12 @@ public class DoaCsvFeedTest {
 
         assertEquals(0, f.bearings.get(0).vfo);
         assertEquals(155_160_000.0, f.bearings.get(0).frequencyHz, 1.0);
-        assertEquals(142.0, f.bearings.get(0).arrayRelativeDeg, EPS);
+        assertEquals(Fixtures.COMPASS, f.bearings.get(0).arrayRelativeDeg, EPS);
 
         assertEquals(1, f.bearings.get(1).vfo);
         assertEquals(162_550_000.0, f.bearings.get(1).frequencyHz, 1.0);
         assertEquals(43.0, f.bearings.get(1).reportedDeg, EPS);
-        assertEquals(317.0, f.bearings.get(1).arrayRelativeDeg, EPS);
+        assertEquals(43.0, f.bearings.get(1).arrayRelativeDeg, EPS);
     }
 
     /**
@@ -107,7 +110,7 @@ public class DoaCsvFeedTest {
         assertEquals(1, f.bearings.size());
         assertEquals(1, f.discarded);
         assertFalse("a discard has to reach the pane in words", f.note.isEmpty());
-        assertEquals(142.0, f.bearings.get(0).arrayRelativeDeg, EPS);
+        assertEquals(Fixtures.COMPASS, f.bearings.get(0).arrayRelativeDeg, EPS);
     }
 
     /**
@@ -121,7 +124,7 @@ public class DoaCsvFeedTest {
                 Fixtures.load("DOA_value_short_spectrum.html"), RX);
         assertEquals(0, f.discarded);
         Bearing b = only(f);
-        assertEquals(142.0, b.arrayRelativeDeg, EPS);
+        assertEquals(Fixtures.COMPASS, b.arrayRelativeDeg, EPS);
         assertEquals(12, b.spectrumSampleCount);
     }
 
@@ -192,9 +195,9 @@ public class DoaCsvFeedTest {
     /** The bench seam, should the operator's build have stopped mirroring. */
     @Test
     public void conventionCanBeFlippedForTheBench() {
-        Bearing b = only(new DoaCsvFeed(BearingConvention.DIRECT)
+        Bearing b = only(new DoaCsvFeed(BearingConvention.MIRRORED)
                 .parse(Fixtures.load("DOA_value_single.html"), RX));
         assertEquals(218.0, b.reportedDeg, EPS);
-        assertEquals(218.0, b.arrayRelativeDeg, EPS);
+        assertEquals(142.0, b.arrayRelativeDeg, EPS);
     }
 }

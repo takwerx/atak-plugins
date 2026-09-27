@@ -32,8 +32,8 @@ public class FeedAgreementTest {
 
         assertNotEquals("the fixtures must exercise the mirror",
                 xml.reportedDeg, csv.reportedDeg, 1.0e-9);
-        assertEquals(Fixtures.THETA, xml.arrayRelativeDeg, 1.0e-9);
-        assertEquals(Fixtures.THETA, csv.arrayRelativeDeg, 1.0e-9);
+        assertEquals(Fixtures.COMPASS, xml.arrayRelativeDeg, 1.0e-9);
+        assertEquals(Fixtures.COMPASS, csv.arrayRelativeDeg, 1.0e-9);
     }
 
     /** And the scalars agree once each feed's own scaling is undone. */
@@ -57,8 +57,9 @@ public class FeedAgreementTest {
     public void trueBearingIsTheConsumersSum() {
         Bearing xml = new DoaXmlFeed()
                 .parse(Fixtures.load("doa.xml"), RX).bearings.get(0);
-        assertEquals(232.0, xml.trueBearing(90.0), 1.0e-9);
-        assertEquals(82.0, xml.trueBearing(300.0), 1.0e-9);
-        assertEquals(142.0, xml.trueBearing(0.0), 1.0e-9);
+        // The radio's own formula: my_bearing + (360 - theta_0).
+        assertEquals(308.0, xml.trueBearing(90.0), 1.0e-9);
+        assertEquals(158.0, xml.trueBearing(300.0), 1.0e-9);
+        assertEquals(Fixtures.COMPASS, xml.trueBearing(0.0), 1.0e-9);
     }
 }

@@ -41,12 +41,18 @@ public class DoaXmlFeedTest {
         assertFalse(b.adcOverdrive);
     }
 
+    /**
+     * The XML is handed {@code theta_0_list[0]} unmodified, and raw theta_0 is
+     * counter-clockwise, so this is the feed that has to be mirrored to become
+     * a compass bearing. The CSV is the one that needs nothing -- which is the
+     * opposite of what the field order suggests and is why this is asserted.
+     */
     @Test
-    public void exportsThetaWithoutMirroring() {
+    public void exportsRawThetaAndIsMirroredToCompass() {
         Bearing b = only(new DoaXmlFeed().parse(Fixtures.load("doa.xml"), RX));
-        assertEquals(BearingConvention.DIRECT, b.convention);
+        assertEquals(BearingConvention.MIRRORED, b.convention);
         assertEquals(Fixtures.THETA, b.reportedDeg, EPS);
-        assertEquals(Fixtures.THETA, b.arrayRelativeDeg, EPS);
+        assertEquals(Fixtures.COMPASS, b.arrayRelativeDeg, EPS);
     }
 
     /** FREQUENCY is megahertz here and hertz on the other two feeds. */
@@ -193,10 +199,10 @@ public class DoaXmlFeedTest {
      */
     @Test
     public void conventionCanBeFlippedForTheBench() {
-        Bearing b = only(new DoaXmlFeed(BearingConvention.MIRRORED)
+        Bearing b = only(new DoaXmlFeed(BearingConvention.DIRECT)
                 .parse(Fixtures.load("doa.xml"), RX));
         assertEquals(142.0, b.reportedDeg, EPS);
-        assertEquals(218.0, b.arrayRelativeDeg, EPS);
+        assertEquals(142.0, b.arrayRelativeDeg, EPS);
     }
 
     /** The sample document with one element's text replaced or appended. */

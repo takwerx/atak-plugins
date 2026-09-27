@@ -60,11 +60,12 @@ public final class DoaXmlFeed implements Feed {
     public static final int PORT = 8081;
 
     /**
-     * Read from {@code krakensdr_doa} source: the XML export writes theta_0
-     * unmirrored. Change this one constant if the bench proves otherwise on the
-     * operator's build; nothing downstream needs to know.
+     * Read from {@code krakensdr_doa} source: the XML export writes raw
+     * theta_0, which is counter-clockwise and must be mirrored. Change this one
+     * constant if the bench proves otherwise on the operator's build; nothing
+     * downstream needs to know.
      */
-    public static final BearingConvention CONVENTION = BearingConvention.DIRECT;
+    public static final BearingConvention CONVENTION = BearingConvention.MIRRORED;
 
     /**
      * A sane ceiling on a document that is normally under a kilobyte. The HTTP

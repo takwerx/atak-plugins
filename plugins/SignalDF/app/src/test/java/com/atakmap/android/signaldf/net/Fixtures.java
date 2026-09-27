@@ -24,11 +24,24 @@ import java.io.InputStream;
  */
 final class Fixtures {
 
-    /** theta_0 in both fixtures, degrees clockwise from the array's zero. */
+    /**
+     * Raw {@code theta_0} in both fixtures. This is what the XML and the
+     * WebSocket put on the wire, and it runs counter-clockwise in the array's
+     * own scan frame, so it is NOT a compass bearing.
+     */
     static final double THETA = 142.0;
 
-    /** What the CSV writes for that theta: 360 - 142. */
-    static final double CSV_REPORTED = 218.0;
+    /**
+     * The compass-convention bearing for that theta: {@code 360 - 142}. This is
+     * what the CSV puts on the wire and what every adapter has to resolve to.
+     * {@code calculate_end_lat_lng} in the radio's own DSP computes a
+     * geolocated endpoint as {@code my_bearing + (360 - theta_0)}, which is the
+     * authority for this being the right way round.
+     */
+    static final double COMPASS = 218.0;
+
+    /** What the CSV writes: the compass bearing, needing nothing applied. */
+    static final double CSV_REPORTED = COMPASS;
 
     private Fixtures() {
     }

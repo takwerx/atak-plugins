@@ -41,11 +41,12 @@ public final class DoaCsvFeed implements Feed {
     public static final int PORT = 8081;
 
     /**
-     * Read from {@code krakensdr_doa} source: the CSV export mirrors theta_0.
-     * Change this one constant if the bench proves otherwise on the operator's
-     * build; nothing downstream needs to know.
+     * Read from {@code krakensdr_doa} source: the CSV export already carries
+     * the compass-convention bearing, so nothing is applied here. Change this
+     * one constant if the bench proves otherwise on the operator's build;
+     * nothing downstream needs to know.
      */
-    public static final BearingConvention CONVENTION = BearingConvention.MIRRORED;
+    public static final BearingConvention CONVENTION = BearingConvention.DIRECT;
 
     /**
      * Field layout, verified against the CSV writer in
