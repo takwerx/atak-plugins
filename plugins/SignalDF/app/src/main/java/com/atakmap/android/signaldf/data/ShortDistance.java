@@ -56,4 +56,26 @@ public final class ShortDistance {
     public static double toCm(double entered) {
         return imperial() ? entered * CM_PER_INCH : entered;
     }
+
+    /**
+     * A distance that is a NAME rather than a measurement, printed the way the
+     * thing it names is printed.
+     *
+     * <p>KrakenRF's arms are drilled at 100, 150, 200 and 250 mm and the paper
+     * is printed "10 cm", "15 cm", "20 cm", "25 cm". Those are labels on a
+     * part. Running them through the operator's distance preference turned
+     * "use the 20 cm hole" into "use the 7.9 in hole", which names a hole that
+     * does not exist on anything they are holding -- and the operator caught it
+     * by asking whether the holes were not called 10, 15, 20 and 25.
+     *
+     * <p>The unit preference governs distances somebody measures. It does not
+     * govern what is written on a part, so this one stays metric whatever the
+     * preference says.
+     */
+    public static String labelCm(double cm) {
+        if (Math.abs(cm - Math.rint(cm)) < 0.05)
+            return String.format(java.util.Locale.US, "%.0f cm", cm);
+        return String.format(java.util.Locale.US, "%.1f cm", cm);
+    }
+
 }
