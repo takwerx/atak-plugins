@@ -4,6 +4,12 @@ package com.atakmap.android.atmosphere.overlay;
 import android.content.Context;
 
 import com.atakmap.android.features.FeatureDataStoreMapOverlay;
+import com.atakmap.android.overlay.MapOverlay;
+import com.atakmap.android.overlay.MapOverlayParent;
+import com.atakmap.android.hierarchy.HierarchyListFilter;
+import com.atakmap.android.hierarchy.HierarchyListItem;
+import com.atakmap.android.hierarchy.action.Actions;
+import android.widget.BaseAdapter;
 import com.atakmap.android.menu.PluginMenuParser;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
@@ -100,6 +106,10 @@ final class AtmosphereFeatures {
     private FeatureSetDatabase2 store;
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
+    /** The one "Atmosphere" row in ATAK's Overlay Manager every layer sits under. */
+    static final String PARENT_ID = "atmosphere";
+    private static final String PARENT_NAME = "Atmosphere";
+    private MapOverlayParent parent;
     private final Map<String, Long> sets = new java.util.concurrent.ConcurrentHashMap<>();
     /**
      * Feature sets already in the store when this instance opened it, retired by the
@@ -864,6 +874,25 @@ final class AtmosphereFeatures {
         }
     }
 
+    /** Each layer's own pane icon on its Overlay Manager row, by store type. */
+    private static int listIcon(String type) {
+        switch (type) {
+            case "stations": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_stations;
+            case "snotel": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_snotel;
+            case "spot": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_spot;
+            case "highflow": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_highflow;
+            case "gauges": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_gauges;
+            case "firewx": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_firewx;
+            case "flood": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_flood;
+            case "beach": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_beach;
+            case "buoys": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_buoys;
+            case "avalanche": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_avalanche;
+            case "airquality": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_air;
+            case "tropical": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_hurricane;
+            default: return com.atakmap.android.atmosphere.plugin.R.drawable.ic_toolbar;
+        }
+    }
+
     /** The map half of attaching: cheap, and it has to run on the main thread. */
     private void registerOnMap() {
         if (detached) {
@@ -871,19 +900,69 @@ final class AtmosphereFeatures {
             return;
         }
         try {
+            // Every layer is a row inside one "Atmosphere" row in ATAK's Overlay
+            // Manager, with the plugin's glyph, the way IPAWS Alerts is one row, and
+            // each layer carries its own pane icon. Until 2026-09-27 each layer was
+            // its own top-level row with a blank icon ("file://asset/nothing");
+            // shooting the manual on the S22 the operator found "Streams running
+            // high" alone at the bottom of the list with nothing beside it. The icon
+            // lives in the plugin APK, so the authority is the plugin's package;
+            // ATAK's own package cannot resolve it (IPAWS).
+            final String res = "android.resource://" + pluginContext.getPackageName() + "/";
             overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
-                    layerName, "file://asset/nothing", query, null, null);
+                    layerName, res + listIcon(type), query, null, null) {
+                /**
+                 * The row never asks to be hidden when empty. MapOverlayParent's
+                 * refresh runs the empty-list filter on a child's row the moment it
+                 * makes it, before the row's own asynchronous refresh has counted
+                 * anything, and never refreshes a row it rejected: every layer read
+                 * as empty, so did the group, and the XCover showed no Atmosphere
+                 * row at all with Hurricanes drawing (2026-09-27). Kept listed, an
+                 * off layer shows as an empty row inside the group, which is also
+                 * where someone looking for it would look.
+                 */
+                @Override
+                public HierarchyListItem getListModel(BaseAdapter adapter, long capabilities,
+                        HierarchyListFilter filter) {
+                    if ((capabilities & (Actions.ACTION_GOTO | Actions.ACTION_VISIBILITY
+                            | Actions.ACTION_DELETE | Actions.ACTION_EXPORT)) == 0)
+                        return null;
+                    return new ListItem(adapter, filter) {
+                        @Override
+                        public boolean hideIfEmpty() {
+                            return false;
+                        }
+                    };
+                }
+            };
+            final com.atakmap.android.maps.MapOverlayManager mgr = mapView.getMapOverlayManager();
+            parent = MapOverlayParent.getOrAddParent(mapView, PARENT_ID, PARENT_NAME,
+                    res + com.atakmap.android.atmosphere.plugin.R.drawable.ic_toolbar, 50, false);
+            final String id = overlay.getIdentifier();
+            // A reinstall does not reliably run the old instance's detach (see the
+            // layer sweep below), and the parent is ATAK's, so it outlives us: take
+            // out any child of that name an earlier instance left, and any top-level
+            // row of that name from a build before the parent, before adding ours.
+            if (parent != null) {
+                final MapOverlay stale = parent.get(id);
+                if (stale != null)
+                    mgr.removeOverlay(parent, stale);
+            }
+            final MapOverlay oldTop = mgr.getOverlay(id);
+            if (oldTop != null && !(oldTop instanceof MapOverlayParent))
+                mgr.removeOverlay(oldTop);
             // addOverlay, not addFilesOverlay. With addFilesOverlay this overlay did
             // not appear anywhere in Overlay Manager on the XCover, while its polygons
             // drew on the map perfectly well -- the same thing IPAWS found on the same
-            // phone. The add reports whether it took, so ask rather than assume: the
-            // symptom of getting it wrong is an absence from a list, which looks like
-            // nothing at all.
-            final boolean added = mapView.getMapOverlayManager().addOverlay(overlay);
-            final String id = overlay.getIdentifier();
+            // phone. Adding under a parent through the manager registers the map
+            // group and its tap query exactly as a top-level add does, so a tap on a
+            // buoy still finds the buoy. The add reports whether it took, so ask
+            // rather than assume.
+            final boolean added = parent != null ? mgr.addOverlay(parent, overlay)
+                    : mgr.addOverlay(overlay);
             Log.d(tag, "overlay registration: added=" + added + " identifier='" + id
-                    + "' findable="
-                    + (mapView.getMapOverlayManager().getOverlay(id) != null));
+                    + "' under=" + (parent != null ? PARENT_NAME : "root") + " findable="
+                    + (parent != null ? parent.get(id) != null : mgr.getOverlay(id) != null));
             // Sweep any layer a previous instance of this plugin left on the map.
             //
             // A reinstall does not reliably run the old instance's detach: disposal
@@ -1007,8 +1086,18 @@ final class AtmosphereFeatures {
 
     private void detachLocked() {
         try {
-            if (overlay != null)
-                mapView.getMapOverlayManager().removeOverlay(overlay);
+            if (overlay != null) {
+                final com.atakmap.android.maps.MapOverlayManager mgr = mapView.getMapOverlayManager();
+                if (parent != null) {
+                    mgr.removeOverlay(parent, overlay);
+                    // The last layer out takes the Atmosphere row with it, so an
+                    // unloaded plugin leaves no empty group behind.
+                    if (parent.getOverlays().isEmpty())
+                        mgr.removeOverlay(parent);
+                } else {
+                    mgr.removeOverlay(overlay);
+                }
+            }
             if (layer != null)
                 mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             // The store is deliberately NOT disposed.
