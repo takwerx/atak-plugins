@@ -102,11 +102,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="How you know it: not set" />
+                android:text="Heading source: radio" />
 
             <TextView
                 style="@style/SectionHeading"
-                android:text="Share" />
+                android:text="Transmit" />
 
             <Button
                 style="@style/TakwerxButton"
@@ -127,7 +127,7 @@
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:text="Ages out: 30 seconds" />
+                    android:text="Stale time: 30 seconds" />
 
                 <Button
                     style="@style/TakwerxButton"
@@ -136,7 +136,7 @@
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:layout_marginLeft="4dp"
-                    android:text="SHARING OFF" />
+                    android:text="TRANSMIT OFF" />
             </LinearLayout>
 
             <TextView
@@ -146,7 +146,7 @@
                 android:textSize="13sp"
                 android:alpha="0.75"
                 android:paddingTop="2dp"
-                android:text="Not sharing." />
+                android:text="Not transmitting." />
 
             <TextView
                 style="@style/SectionHeading"

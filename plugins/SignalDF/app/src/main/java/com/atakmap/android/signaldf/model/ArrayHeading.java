@@ -160,12 +160,20 @@ public final class ArrayHeading {
                 return String.format(Locale.US,
                         "Array heading: %.0f deg, from the radio", degrees);
             case RADIO_ZERO:
-                return "Array heading: the radio says 0 deg, which is also what "
-                        + "it says when it has none -- set one to be sure";
+                return "Array heading: the radio reports 0 deg, which is also "
+                        + "what it reports when it has none. Set a heading "
+                        + "source to be certain.";
             case NONE:
             default:
+                // Actionable, not just honest. The default heading source is
+                // the radio, and a KrakenSDR has no GPS of its own -- the
+                // vendor's own note is that "a seperate GPS unit is not
+                // required if you're using the Kraken App, as Kraken App can
+                // make use of the smartphone GPS instead". So on most rigs
+                // this line is the first thing the operator sees and it has
+                // to name the fix.
                 return "Array heading: unknown -- bearings are relative to the "
-                        + "antenna, not to north";
+                        + "antenna, not to north. Set a heading source.";
         }
     }
 

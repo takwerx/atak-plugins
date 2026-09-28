@@ -523,9 +523,9 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
                     return;
                 if (p.feed() != null) {
                     new android.app.AlertDialog.Builder(getMapView().getContext())
-                            .setTitle("Sharing to " + p.feed())
-                            .setItems(new String[] { "Pick a different feed",
-                                    "Stop sharing to this feed" },
+                            .setTitle("Feed: " + p.feed())
+                            .setItems(new String[] { "Select a different feed",
+                                    "Clear feed selection" },
                                     new DialogInterface.OnClickListener() {
                                         @Override
                                         public void onClick(DialogInterface d, int which) {
@@ -562,7 +562,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
                         current = i;
                 }
                 new android.app.AlertDialog.Builder(getMapView().getContext())
-                        .setTitle("Ages off other maps after")
+                        .setTitle("Stale time")
                         .setSingleChoiceItems(names, current,
                                 new DialogInterface.OnClickListener() {
                                     @Override
@@ -627,15 +627,15 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
      */
     private void pickHeadingMode() {
         final String[] names = {
-                "On the vehicle, antenna 0 forward -- follows your driving",
-                "Fixed, pointing a direction I will type",
-                "The radio knows -- its own GPS or compass"
+                "GPS track -- vehicle mounted, antenna 0 forward",
+                "Manual -- fixed installation, entered once",
+                "Radio -- only with a USB GPS on the Pi, or a fixed\noffset set in the KrakenSDR web interface"
         };
         int current = prefs.get(PREF_HEADING, "").trim().isEmpty()
                 ? (prefs.get(ArrayHeading.PREF_FORWARD, false) ? 0 : 2)
                 : 1;
         new android.app.AlertDialog.Builder(getMapView().getContext())
-                .setTitle("Which way is the array pointing?")
+                .setTitle("Heading source")
                 .setSingleChoiceItems(names, current,
                         new DialogInterface.OnClickListener() {
                             @Override
@@ -670,18 +670,18 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
             return;
         String fixed = prefs.get(PREF_HEADING, "");
         if (fixed != null && !fixed.trim().isEmpty()) {
-            headingModeButton.setText("How you know it: fixed, you typed it");
+            headingModeButton.setText("Heading source: fixed, set manually");
             return;
         }
         if (!prefs.get(ArrayHeading.PREF_FORWARD, false)) {
-            headingModeButton.setText("How you know it: from the radio");
+            headingModeButton.setText("Heading source: radio");
             return;
         }
         VehicleHeading v = VehicleHeading.get();
         Double deg = v == null ? null : v.degrees();
         if (deg == null)
             headingModeButton.setText(
-                    "How you know it: from your driving, waiting to move");
+                    "Heading source: GPS track, no track until moving");
         else if (v.isHeld()) {
             // ATAK puts a "driving" widget on screen while it is holding a GPS
             // bearing through a stop. This is the same statement, in words,
@@ -689,12 +689,12 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
             // has been turned round since.
             long s = v.heldSeconds();
             headingModeButton.setText(String.format(Locale.US,
-                    "How you know it: from your driving, %.0f deg held %s",
+                    "Heading source: GPS track, %.0f deg, held %s",
                     deg, s < 90 ? s + " s" : (s / 60) + " min"));
         }
         else
             headingModeButton.setText(String.format(Locale.US,
-                    "How you know it: from your driving, %.0f deg", deg));
+                    "Heading source: GPS track, %.0f deg", deg));
     }
 
     private void refreshSharing() {
@@ -705,23 +705,23 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         shareFeedButton.setText(feed == null ? "Feed: not set" : "Feed: " + feed);
 
         int s = p.staleSeconds();
-        shareStaleButton.setText("Ages out: " + (s < 60 ? s + " seconds"
+        shareStaleButton.setText("Stale time: " + (s < 60 ? s + " seconds"
                 : (s / 60) + (s == 60 ? " minute" : " minutes")));
 
         boolean on = p.isOn();
-        shareToggleButton.setText(on ? "SHARING ON" : "SHARING OFF");
+        shareToggleButton.setText(on ? "TRANSMIT ON" : "TRANSMIT OFF");
         shareToggleButton.setTextColor(pluginContext.getResources().getColor(
                 on ? R.color.on_green : R.color.off_red));
 
         if (feed == null)
-            shareNote.setText("Not sharing. Pick a Data Sync feed and everyone "
-                    + "subscribed to it sees the bearings.");
+            shareNote.setText("Not transmitting. Select a Data Sync feed; every "
+                    + "subscriber to that feed receives the bearings.");
         else if (!on)
-            shareNote.setText("Ready to share to " + feed + ". Nothing is going out.");
+            shareNote.setText("Ready. Feed selected, transmitter off.");
         else
-            shareNote.setText("Sharing to " + feed + ". " + p.sentCount()
-                    + " sent. Lines age off other maps by themselves; nothing "
-                    + "is stored in the feed.");
+            shareNote.setText("Transmitting to " + feed + ". " + p.sentCount()
+                    + " sent. Bearings expire on receiving maps at the stale "
+                    + "time; nothing is stored in the feed.");
     }
 
     private void refresh() {

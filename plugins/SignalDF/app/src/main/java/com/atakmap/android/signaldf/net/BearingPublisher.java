@@ -226,7 +226,7 @@ public final class BearingPublisher implements KrakenLink.Listener {
     public void choose(final OnChosen then) {
         final TAKServer[] list = connectedServers();
         if (list.length == 0) {
-            toast("no TAK server connected -- connect one first");
+            toast("no TAK server connected");
             return;
         }
         if (list.length == 1) {
@@ -246,7 +246,7 @@ public final class BearingPublisher implements KrakenLink.Listener {
     /** GET api/missions, the same list Data Sync shows. */
     private void listFeeds(final TAKServer server, final OnChosen then) {
         final android.app.ProgressDialog busy = new android.app.ProgressDialog(host);
-        busy.setMessage("Looking for feeds...");
+        busy.setMessage("Reading feeds...");
         busy.setIndeterminate(true);
         busy.setCancelable(false);
         busy.show();
@@ -287,7 +287,7 @@ public final class BearingPublisher implements KrakenLink.Listener {
                             return;
                         }
                         if (names.isEmpty()) {
-                            toast("that server has no feeds yet -- make one in Data Sync");
+                            toast("that server has no feeds; create one in Data Sync");
                             return;
                         }
                         showFeeds(server, names, locked, then);
@@ -308,7 +308,7 @@ public final class BearingPublisher implements KrakenLink.Listener {
                     @Override
                     public void onClick(DialogInterface d, int which) {
                         if (locked.get(which)) {
-                            toast("password-protected feeds are not supported yet");
+                            toast("password-protected feeds are not supported");
                             return;
                         }
                         String name = names.get(which);
