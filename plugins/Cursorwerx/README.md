@@ -1,10 +1,10 @@
 ATAK Plugin — Cursorwerx
 
-**Download Cursorwerx 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cursorwerx 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cursorwerx/releases/download/v0.1/ATAK-Plugin-Cursorwerx-0.1--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cursorwerx/releases/download/v0.1/ATAK-Plugin-Cursorwerx-0.1--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cursorwerx/releases/download/v0.1/ATAK-Plugin-Cursorwerx-0.1--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cursorwerx/releases
 
@@ -17,12 +17,16 @@ PURPOSE AND CAPABILITIES
 ATAK expects a finger. Cursorwerx makes it behave for a mouse or a trackpad:
 on a desktop (the TAKwerx ATAK Terminal, Android Studio's emulator, any
 Android-in-a-window), on Samsung DeX, or on a Chromebook. It is working the
-moment it loads; there is nothing to set up.
+moment it loads; there is nothing to set up, and one thing to adjust if you
+want: how far each click of the wheel zooms.
 
 On the map:
 
-  - The scroll wheel zooms in and out at the cursor, one gentle step per click,
-    paced so a trackpad does not fly through the zoom range.
+  - The scroll wheel zooms in and out at the cursor, one step per click, paced
+    so a trackpad does not fly through the zoom range. The step is a setting,
+    Wheel zoom, from Fine (10% a click) to Very fast (60% a click), in the
+    plugin's pane and under Settings > Tool Preferences > Cursorwerx; the
+    default is Gentle, 15% a click, as in 0.1.
   - Click and drag pans the map 1:1. A click selects, as a tap does; a long
     press opens the radial menu.
   - Things ATAK lets you drag, such as a range-and-bearing end or a shape
@@ -43,8 +47,44 @@ In panes and menus:
 
 On a phone or tablet used with a finger, Cursorwerx does nothing at all.
 
+Settings. Cursorwerx has one, Wheel zoom: how far the map zooms for one click
+of the wheel.
+
+  - Fine: 10% a click, about 7 clicks to double the scale.
+  - Gentle: 15% a click, about 5 clicks. The default, and 0.1's only speed;
+    right for a trackpad or a free-spinning wheel.
+  - Medium: 25% a click, about 3 clicks.
+  - Fast: 40% a click, about 2 clicks. Good for a notched mouse wheel.
+  - Very fast: 60% a click, about 1.5 clicks.
+
+  Two places set the same value, and a change applies at the next click, no
+  restart: the Wheel zoom button in the plugin's pane (tap the Cursorwerx icon
+  in the toolbar), or ATAK's Settings > Tool Preferences > Specific Tool
+  Preferences > Cursorwerx > Wheel zoom. The choice is kept in ATAK's own
+  settings, so it survives restarts, plugin updates and ATAK updates.
+
+Updates. Each release is built for each ATAK version (5.6, 5.7, 5.8); install
+the one that matches your ATAK.
+
+  - With the TAKWERX Market plugin, which the TAKwerx ATAK Terminal installs:
+    open the Market from ATAK's toolbar overflow; when a newer Cursorwerx is out
+    it shows as an update, one tap. The Market picks the build for your ATAK.
+  - Without the Market: download the APK for your ATAK from the Releases page
+    (the links at the top of this page), install it over the old one, and load
+    it in ATAK's Plugins manager if ATAK asks. In the TAKwerx ATAK Terminal,
+    `takwerx plugin FILE.apk` does all of that and restarts ATAK.
+  - After ATAK itself moves to a new version (for example 5.7 to 5.8), the
+    build for the old ATAK no longer loads. Open the Market and install
+    Cursorwerx again: it offers the build for the new ATAK. Your Wheel zoom
+    choice is kept.
+
 _________________________________________________________________
 STATUS
+
+Version 0.2: the wheel zoom step is a setting (Fine to Very fast), in the
+plugin's pane and under Tool Preferences. Verified on ATAK-CIV 5.8.0.3 in the
+TAKwerx ATAK Terminal on a Mac (debug and release builds) and on official
+ATAK-CIV 5.7 in the TAKwerx ATAK Terminal on Windows (the tak.gov-signed build).
 
 Version 0.1. Verified on ATAK-CIV 5.8.0.3 and 5.8.0.5 in the TAKwerx ATAK
 Terminal (Google's Android Emulator, Android 14, on Apple Silicon Macs): mouse

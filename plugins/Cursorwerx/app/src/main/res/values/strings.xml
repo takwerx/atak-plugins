@@ -9,8 +9,16 @@
     <string name="pane_title">Cursorwerx</string>
     <string name="pane_intro">ATAK expects a finger. This plugin makes it behave for a mouse or trackpad, on a desktop, DeX or a Chromebook. It is working now; there is nothing to set up.</string>
     <string name="pane_map_title">On the map</string>
-    <string name="pane_map">• Wheel zooms in and out at the cursor, one gentle step per click.\n• Click and drag pans the map 1:1.\n• A click selects, as a tap does. Long press opens the radial menu.\n• Things ATAK lets you drag, such as a range-and-bearing end or a shape vertex, still drag.</string>
+    <string name="pane_map">• Wheel zooms in and out at the cursor, one step per click. How big a step is the Wheel zoom setting below.\n• Click and drag pans the map 1:1.\n• A click selects, as a tap does. Long press opens the radial menu.\n• Things ATAK lets you drag, such as a range-and-bearing end or a shape vertex, still drag.</string>
     <string name="pane_ui_title">In panes and menus</string>
     <string name="pane_ui">• Wheel scrolls the pane or list under the cursor, and never zooms the map behind it.\n• The ‹ button on the left edge, and the Escape key, are Back.\n• Clicks land in text fields, so you can type.</string>
     <string name="pane_note">On a phone or tablet used with a finger, Cursorwerx does nothing at all.</string>
+
+    <!-- Settings: the pane's row and Tool Preferences write the same value -->
+    <string name="pane_settings_title">Settings</string>
+    <string name="wheel_zoom_name">Wheel zoom</string>
+    <string name="wheel_zoom_row">Wheel zoom: %1$s</string>
+    <string name="wheel_zoom_dialog">How far one click of the wheel zooms</string>
+    <string name="wheel_zoom_summary">How far one click of the wheel zooms: %s</string>
+    <string name="prefs_summary">Mouse and trackpad settings</string>
 </resources>

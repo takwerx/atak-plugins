@@ -2,7 +2,9 @@
 package com.atakmap.android.cursorwerx;
 
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.Build;
+import android.preference.PreferenceManager;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.PointerIcon;
@@ -179,12 +181,46 @@ public final class PointerRouter {
      * How far one wheel notch zooms. ATAK's own step is a jump -- the operator's words
      * were "one click and boom" -- so the wheel is taken over here and applied gently.
      * A notch multiplies the map scale by this, so 1.15 is about 15% per click.
+     *
+     * <p>Since 0.2 the operator chooses it: on a notched mouse wheel 15% is about five
+     * clicks to double the scale, which read as slow on a Windows laptop while the same
+     * step suited the Mac (2026-09-27; the emulator sends a click as 8 units on both, so
+     * the difference is the wheel, not the platform). The choice is stored in ATAK's own
+     * preferences under {@link #PREF_WHEEL_ZOOM}, written by the pane's Wheel zoom row
+     * and by Tool Preferences, and read on every step, so a change applies at the next
+     * click with no reload. This field is the fallback when nothing valid is stored.
      */
     private double zoomStep = 1.15d;
+
+    /** ATAK preference key for the wheel zoom step, a decimal string such as "1.25". */
+    public static final String PREF_WHEEL_ZOOM = "cursorwerx.wheelZoom";
+
+    /** The step when the operator has chosen none: 0.1's gentle 15%, unchanged. */
+    public static final String DEFAULT_WHEEL_ZOOM = "1.15";
 
     public void setZoomStep(double step) {
         if (step > 1.0d)
             this.zoomStep = step;
+    }
+
+    /**
+     * The step to use now: the stored choice when it is a sane factor, else
+     * {@link #zoomStep}. Read per step rather than cached, so Tool Preferences and the
+     * pane never need to tell this class anything; a SharedPreferences read is an
+     * in-memory map lookup.
+     */
+    private double currentZoomStep() {
+        try {
+            final SharedPreferences prefs = PreferenceManager
+                    .getDefaultSharedPreferences(mapView.getContext());
+            final double d = Double.parseDouble(
+                    prefs.getString(PREF_WHEEL_ZOOM, DEFAULT_WHEEL_ZOOM));
+            if (d > 1.0d && d <= 3.0d)
+                return d;
+        } catch (Exception notANumber) {
+            // A hand-edited or corrupt value: fall through to the built-in step.
+        }
+        return zoomStep;
     }
 
     /**
@@ -245,7 +281,7 @@ public final class PointerRouter {
             // the map's own space rather than the screen's.
             final float x = event.getRawX() - loc[0];
             final float y = event.getRawY() - loc[1];
-            final double factor = Math.pow(zoomStep, notches);
+            final double factor = Math.pow(currentZoomStep(), notches);
             mapView.getMapController().zoomBy(factor, x, y, false);
             if (verbose)
                 Log.d(TAG, "zoom x" + String.format(java.util.Locale.US, "%.3f", factor)
