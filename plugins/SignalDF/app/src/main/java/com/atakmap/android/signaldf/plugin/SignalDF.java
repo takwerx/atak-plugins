@@ -98,8 +98,12 @@ public class SignalDF implements IPlugin {
 
         // Built before any pane exists, so nothing about the connection depends
         // on the operator having opened one.
-        if (link == null)
-            link = new KrakenLink();
+        if (link == null) {
+            // The host's context: a plugin context has no system services, and
+            // WifiPin needs the connectivity service.
+            MapView mv = MapView.getMapView();
+            link = new KrakenLink(mv == null ? null : mv.getContext());
+        }
 
         uiService.addToolbarItem(toolbarItem);
         AtakBroadcast.getInstance().registerSystemReceiver(showReceiver,
@@ -136,7 +140,7 @@ public class SignalDF implements IPlugin {
             return;
         }
         if (link == null)
-            link = new KrakenLink();
+            link = new KrakenLink(mapView.getContext());
         if (dropDown == null)
             dropDown = new SignalDfDropDown(mapView, pluginContext);
         dropDown.show();

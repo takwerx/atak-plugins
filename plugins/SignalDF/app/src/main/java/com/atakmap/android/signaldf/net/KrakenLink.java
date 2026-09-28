@@ -1,5 +1,6 @@
 package com.atakmap.android.signaldf.net;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -134,6 +135,13 @@ public final class KrakenLink implements ToolListener {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final List<Listener> listeners = new ArrayList<>(2);
 
+    /**
+     * Keeps radio traffic on the WiFi while the phone's default network stays
+     * cellular, so the operator does not have to choose between the radio and
+     * the TAK server. Null when the plugin was built without a context.
+     */
+    private final WifiPin wifiPin;
+
     private KrakenHost host;
     private State state = State.IDLE;
     private Feed active;
@@ -167,13 +175,33 @@ public final class KrakenLink implements ToolListener {
     private int generation;
 
     public KrakenLink() {
+        this(null);
+    }
+
+    /**
+     * @param context the HOST's context (MapView.getContext()), never the
+     *                plugin's -- a plugin context has no system services. Null
+     *                falls back to the phone's default network for every
+     *                request, which is the behavior before {@link WifiPin}.
+     */
+    public KrakenLink(Context context) {
         instance = this;
+        wifiPin = context == null ? null : new WifiPin(context);
+        if (wifiPin != null)
+            wifiPin.start();
         ToolManagerBroadcastReceiver.getInstance().registerListener(this);
+    }
+
+    /** Whether radio traffic is being kept off the phone's default route. */
+    public boolean isPinnedToWifi() {
+        return wifiPin != null && wifiPin.isPinned();
     }
 
     /** Plugin stop. Stops polling; keeps nothing running behind it. */
     public void dispose() {
         ToolManagerBroadcastReceiver.getInstance().unregisterListener(this);
+        if (wifiPin != null)
+            wifiPin.stop();
         stop();
         listeners.clear();
         if (instance == this)
@@ -378,7 +406,7 @@ public final class KrakenLink implements ToolListener {
         final int mine = ++generation;
         final String url = host.url(feed);
 
-        Http.get(url, new Http.Callback() {
+        Http.get(url, wifiPin == null ? null : wifiPin.network(), new Http.Callback() {
             @Override
             public void onSuccess(String body) {
                 if (mine != generation || !running)

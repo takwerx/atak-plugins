@@ -1,5 +1,6 @@
 package com.atakmap.android.signaldf.net;
 
+import android.net.Network;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -86,13 +87,27 @@ public final class Http {
     private Http() {
     }
 
-    /** GET {@code url}, delivering the body as text on the main thread. */
+    /** GET {@code url} over the phone's default network. */
     public static void get(final String url, final Callback callback) {
+        get(url, null, callback);
+    }
+
+    /**
+     * GET {@code url}, delivering the body as text on the main thread.
+     *
+     * @param network the network to send this request over, or null for the
+     *                phone's default. See {@link WifiPin}: on a vehicle the
+     *                radio is on a WiFi access point with no internet while the
+     *                TAK server is on cellular, and pinning only these requests
+     *                to the WiFi is what lets both work at once.
+     */
+    public static void get(final String url, final Network network,
+            final Callback callback) {
         EXECUTOR.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    deliver(callback, request(url), null);
+                    deliver(callback, request(url, network), null);
                 } catch (IOException e) {
                     Log.w(TAG, "GET failed: " + url + " (" + describe(e) + ")");
                     deliver(callback, null, describe(e));
@@ -105,7 +120,7 @@ public final class Http {
         });
     }
 
-    private static String request(String url) throws IOException {
+    private static String request(String url, Network network) throws IOException {
         final URL parsed = new URL(url);
         if (!"http".equalsIgnoreCase(parsed.getProtocol()))
             throw new IOException("refusing a non-http request");
@@ -113,7 +128,11 @@ public final class Http {
         HttpURLConnection conn = null;
         InputStream in = null;
         try {
-            conn = (HttpURLConnection) parsed.openConnection();
+            // openConnection ON the network, not the default one, when we have
+            // been given a network to use.
+            conn = (HttpURLConnection) (network == null
+                    ? parsed.openConnection()
+                    : network.openConnection(parsed));
             conn.setRequestMethod("GET");
             conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
             conn.setReadTimeout(READ_TIMEOUT_MS);
