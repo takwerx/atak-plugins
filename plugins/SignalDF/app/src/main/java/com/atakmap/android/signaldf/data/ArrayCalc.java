@@ -1,0 +1,277 @@
+package com.atakmap.android.signaldf.data;
+
+import java.util.Locale;
+
+/**
+ * Antenna array sizing: what to build for a frequency, and whether what you
+ * have built will work at one.
+ *
+ * <p>This is KrakenRF's own <i>Antenna Array Size Calculator</i> spreadsheet,
+ * reimplemented. Every formula below was read out of that workbook and every
+ * one is pinned by a test that reproduces the workbook's own printed values, so
+ * a change that drifts from it fails rather than quietly disagreeing with what
+ * the operator was told to build.
+ *
+ * <p><b>Why it is in the plugin rather than left as a spreadsheet.</b> The
+ * spreadsheet asks for the frequency and the array size; the plugin already
+ * knows both -- the radio reports what it is tuned to and how its array is
+ * configured. So this can do the thing the spreadsheet cannot: look at the
+ * array somebody actually built, look at what the radio is actually listening
+ * to, and say whether those two agree. A DF bearing from an array that is the
+ * wrong size for the frequency is not obviously wrong; it is confidently wrong.
+ *
+ * <p><b>The two rules, in KrakenRF's words.</b> "Array sizing must use a
+ * spacing multiplier less than 0.5 in order to avoid ambiguities", and "We
+ * consider a resolution of 0 - 25 degrees acceptable for direction finding."
+ * Both are theirs, not ours, and {@link #ambiguityFree} and
+ * {@link #resolutionUsable} are the only places they are expressed.
+ *
+ * <p><b>The resolution figure is not the textbook Rayleigh limit.</b> The
+ * workbook divides it by ten, which is its allowance for the super-resolution
+ * the DSP gets from MUSIC. That factor is reproduced exactly rather than
+ * "corrected": the number an operator sees here has to be the number the
+ * vendor's own tool gives them, or the two disagree about what array to build.
+ */
+public final class ArrayCalc {
+
+    /** Which shape the elements are in. The radio calls these UCA and ULA. */
+    public enum Geometry {
+        /** Uniform circular array. Its size is a RADIUS. */
+        CIRCULAR("UCA", "circular"),
+        /** Uniform linear array. Its size is a TOTAL LENGTH end to end. */
+        LINEAR("ULA", "linear");
+
+        private final String radioName;
+        private final String plain;
+
+        Geometry(String radioName, String plain) {
+            this.radioName = radioName;
+            this.plain = plain;
+        }
+
+        /** What the radio's own settings call it: {@code UCA} or {@code ULA}. */
+        public String radioName() {
+            return radioName;
+        }
+
+        public String plain() {
+            return plain;
+        }
+
+        /** Maps the radio's {@code ant_arrangement} onto this, or null. */
+        public static Geometry fromRadio(String antArrangement) {
+            if (antArrangement == null)
+                return null;
+            String s = antArrangement.trim().toUpperCase(Locale.US);
+            if (s.startsWith("UCA"))
+                return CIRCULAR;
+            if (s.startsWith("ULA"))
+                return LINEAR;
+            return null;
+        }
+    }
+
+    /** Spacing at or above this wavelength fraction aliases. KrakenRF's rule. */
+    public static final double AMBIGUITY_LIMIT = 0.5;
+
+    /** Resolution worse than this is not useful for DF. KrakenRF's rule. */
+    public static final double RESOLUTION_LIMIT_DEG = 25.0;
+
+    private ArrayCalc() {
+    }
+
+    /**
+     * Wavelength in meters. The workbook uses {@code 300 / f(MHz)} -- the
+     * engineering approximation, not {@code c / f} -- and it is kept because
+     * every number the operator compares against came from it.
+     */
+    public static double wavelengthM(double freqMHz) {
+        return 300.0 / freqMHz;
+    }
+
+    /**
+     * The chord factor for a circle of N elements:
+     * {@code sqrt(2(1 - cos(360/N)))}, which is the straight-line distance
+     * between neighbouring elements on a unit-radius circle. Radius and
+     * element spacing differ by this, and conflating them is how an array ends
+     * up built to the wrong size.
+     */
+    static double chordFactor(int elements) {
+        return Math.sqrt(2.0 * (1.0 - Math.cos(Math.toRadians(360.0 / elements))));
+    }
+
+    /** One sizing answer: what to build, and how well it will work. */
+    public static final class Result {
+        /** Wavelength at the frequency asked about, meters. */
+        public final double wavelengthM;
+        /** Distance between neighbouring elements, centimeters. */
+        public final double spacingCm;
+        /** Radius for a circular array, total end-to-end length for a linear one. */
+        public final double sizeCm;
+        /** That same size expressed in wavelengths. */
+        public final double sizeWavelengths;
+        /** Element spacing as a fraction of a wavelength. Under 0.5 or it aliases. */
+        public final double multiplier;
+        /** Estimated resolution, degrees, on KrakenRF's super-resolution scale. */
+        public final double resolutionDeg;
+        public final Geometry geometry;
+        public final int elements;
+        public final double freqMHz;
+
+        Result(Geometry g, int elements, double freqMHz, double wavelengthM,
+                double spacingCm, double sizeCm, double sizeWavelengths,
+                double multiplier, double resolutionDeg) {
+            this.geometry = g;
+            this.elements = elements;
+            this.freqMHz = freqMHz;
+            this.wavelengthM = wavelengthM;
+            this.spacingCm = spacingCm;
+            this.sizeCm = sizeCm;
+            this.sizeWavelengths = sizeWavelengths;
+            this.multiplier = multiplier;
+            this.resolutionDeg = resolutionDeg;
+        }
+
+        /** Both of KrakenRF's rules met. */
+        public boolean usable() {
+            return ambiguityFree(multiplier) && resolutionUsable(resolutionDeg);
+        }
+
+        /**
+         * What is wrong with this array at this frequency, in words an operator
+         * can act on, or empty when nothing is. Deliberately says which way to
+         * move the array rather than only naming the number.
+         */
+        public String problem() {
+            if (!ambiguityFree(multiplier))
+                return String.format(Locale.US,
+                        "Elements are %.2f wavelengths apart. Over %.1f the array cannot tell "
+                                + "some directions apart -- make it smaller, or tune lower.",
+                        multiplier, AMBIGUITY_LIMIT);
+            if (!resolutionUsable(resolutionDeg))
+                return String.format(Locale.US,
+                        "Resolution about %.0f degrees, past the %.0f that is useful for "
+                                + "direction finding -- make the array bigger, or tune higher.",
+                        resolutionDeg, RESOLUTION_LIMIT_DEG);
+            return "";
+        }
+    }
+
+    /**
+     * What to build: given a frequency, an element count and a spacing
+     * multiplier, the array size that results.
+     *
+     * @param multiplier element spacing as a fraction of a wavelength. Keep it
+     *                   just under {@link #AMBIGUITY_LIMIT} for the best
+     *                   resolution that is still unambiguous.
+     */
+    public static Result sizeFor(Geometry g, double freqMHz, int elements, double multiplier) {
+        double lambda = wavelengthM(freqMHz);
+        double spacingCm = multiplier * lambda * 100.0;
+        if (g == Geometry.CIRCULAR) {
+            double radiusWl = multiplier / chordFactor(elements);
+            double radiusCm = lambda * radiusWl * 100.0;
+            // Aperture of a circle is its DIAMETER, hence the 2.
+            double res = Math.toDegrees(1.22 / (radiusWl * 2.0)) / 10.0;
+            return new Result(g, elements, freqMHz, lambda, spacingCm, radiusCm,
+                    radiusWl, multiplier, res);
+        }
+        // Linear: N elements make N-1 gaps, so the aperture is (N-1) spacings.
+        double lengthWl = (elements - 1) * multiplier;
+        double lengthCm = lengthWl * lambda * 100.0;
+        double res = Math.toDegrees(1.22 / lengthWl) / 10.0;
+        return new Result(g, elements, freqMHz, lambda, spacingCm, lengthCm,
+                lengthWl, multiplier, res);
+    }
+
+    /**
+     * What you have: given an array that is already built, at a frequency, what
+     * spacing multiplier and resolution it gives. This is the direction the
+     * spreadsheet makes hard and the plugin makes easy, because the radio
+     * already reports both numbers.
+     *
+     * @param sizeCm radius for a circular array, total end-to-end length for a
+     *               linear one -- the same thing {@link Result#sizeCm} returns
+     */
+    public static Result atSize(Geometry g, double freqMHz, int elements, double sizeCm) {
+        double lambda = wavelengthM(freqMHz);
+        if (g == Geometry.CIRCULAR) {
+            double radiusWl = (sizeCm / 100.0) / lambda;
+            double multiplier = radiusWl * chordFactor(elements);
+            double res = Math.toDegrees(1.22 / (radiusWl * 2.0)) / 10.0;
+            return new Result(g, elements, freqMHz, lambda, multiplier * lambda * 100.0,
+                    sizeCm, radiusWl, multiplier, res);
+        }
+        double lengthWl = (sizeCm / 100.0) / lambda;
+        double multiplier = lengthWl / (elements - 1);
+        double res = Math.toDegrees(1.22 / lengthWl) / 10.0;
+        return new Result(g, elements, freqMHz, lambda, multiplier * lambda * 100.0,
+                sizeCm, lengthWl, multiplier, res);
+    }
+
+    /**
+     * The highest frequency a built array stays unambiguous at -- the one where
+     * the spacing reaches {@link #AMBIGUITY_LIMIT}. Above this the array
+     * aliases and its bearings cannot be trusted.
+     *
+     * @param sizeCm radius (circular) or total length (linear)
+     */
+    public static double highestUsableMHz(Geometry g, int elements, double sizeCm) {
+        double spacingM = g == Geometry.CIRCULAR
+                ? (sizeCm / 100.0) * chordFactor(elements)
+                : (sizeCm / 100.0) / (elements - 1);
+        return 300.0 / (spacingM / AMBIGUITY_LIMIT);
+    }
+
+    /**
+     * The lowest frequency a built array still resolves usefully at -- where
+     * the resolution reaches {@link #RESOLUTION_LIMIT_DEG}. Below this the
+     * bearing is real but too coarse to act on.
+     */
+    public static double lowestUsableMHz(Geometry g, int elements, double sizeCm) {
+        // Invert the resolution formula for the aperture in wavelengths, then
+        // turn that back into a frequency for the aperture we physically have.
+        double apertureWl = Math.toRadians(RESOLUTION_LIMIT_DEG * 10.0) == 0
+                ? 0 : 1.22 / Math.toRadians(RESOLUTION_LIMIT_DEG * 10.0);
+        double apertureM = g == Geometry.CIRCULAR
+                ? (sizeCm / 100.0) * 2.0
+                : (sizeCm / 100.0);
+        return 300.0 / (apertureM / apertureWl);
+    }
+
+    public static boolean ambiguityFree(double multiplier) {
+        return multiplier < AMBIGUITY_LIMIT;
+    }
+
+    public static boolean resolutionUsable(double resolutionDeg) {
+        return resolutionDeg <= RESOLUTION_LIMIT_DEG;
+    }
+
+    /**
+     * Where each element goes, in centimeters, for drawing a top-down plan.
+     *
+     * <p>Element 0 is the array's forward direction and sits on the +X axis;
+     * the rest run clockwise, which is the workbook's own layout ("ANT 0 points
+     * to the forward direction of the array") and matches a compass rather than
+     * the mathematical convention.
+     *
+     * @return {@code [n][2]} of x, y in centimeters
+     */
+    public static double[][] positions(Geometry g, int elements, double sizeCm) {
+        double[][] p = new double[elements][2];
+        if (g == Geometry.CIRCULAR) {
+            for (int i = 0; i < elements; i++) {
+                double a = 2.0 * Math.PI / elements * i;
+                p[i][0] = sizeCm * Math.cos(a);
+                p[i][1] = sizeCm * Math.sin(-a);
+            }
+            return p;
+        }
+        double step = sizeCm / (elements - 1);
+        for (int i = 0; i < elements; i++) {
+            p[i][0] = step * i;
+            p[i][1] = 0.0;
+        }
+        return p;
+    }
+}
