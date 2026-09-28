@@ -88,25 +88,33 @@ not care about three radios competing in a metal box.
 
 ### Scenario B — No Starlink, but you have cell service
 
-Join the radio's own network and let the phone's mobile data carry the server.
+Join the radio's own network and let mobile data carry the server. **Signal DF
+handles the awkward part for you.**
 
 1. **Settings → Connections → Wi-Fi**
 2. Tap **krakensdr**, password **krakensdr**
-3. Android says *"Internet may not be available"* → choose **Stay connected**.
-   Not "Allow switch" — that drops you off the radio.
-4. Leave **mobile data ON**. The WiFi has no internet, so Android should route
-   the TAK server over cellular while the radio stays on WiFi.
+3. Android will say *"Internet may not be available."* Either answer is fine now
+   — see below.
+4. Leave **mobile data ON**.
 5. In Signal DF, set the address to **192.168.50.5** and Connect.
 
-> **Verify this one before you trust it.** The behavior above is how Android is
-> meant to handle a WiFi network with no internet alongside mobile data, but it
-> has not been confirmed on a phone with a SIM in it. Check that your TAK server
-> stays connected while you are on the radio's network, somewhere it does not
-> matter, before you need it somewhere it does.
+**Why you do not have to care about that prompt any more.** Android routes
+everything over one default network. Answering "Stay connected" makes the
+radio's WiFi that default, and then the TAK server, the map sources and the rest
+of ATAK are all being sent at a radio with no internet behind it. That is a
+genuinely nasty failure: the plugin works perfectly and everything else quietly
+stops.
 
-Also turn **off** the phone's "switch to mobile data" helper, or it will keep
-trying to move you off a network it thinks is broken:
-**Settings → Connections → Wi-Fi → ⋮ → Advanced → Switch to mobile data → off.**
+So Signal DF does not rely on the default route. It asks Android for a handle on
+the WiFi network and sends **its own** requests down it explicitly, leaving your
+phone's default network alone. Your mobile data keeps carrying ATAK; the radio
+traffic goes out the WiFi; nobody has to choose.
+
+> **One piece still unproven.** The pinning itself is confirmed working on
+> hardware. What has *not* been tested is the whole picture on a phone with a
+> SIM in it — the dev phone here has none, so nothing could verify that the TAK
+> server really stays up over cellular while the radio runs on WiFi. It should.
+> Check it somewhere it does not matter before you need it somewhere it does.
 
 ### Scenario C — Nothing but the radio
 
