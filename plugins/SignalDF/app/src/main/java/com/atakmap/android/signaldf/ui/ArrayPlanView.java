@@ -8,6 +8,7 @@ import android.util.AttributeSet;
 import android.view.View;
 
 import com.atakmap.android.signaldf.data.ArrayCalc;
+import com.atakmap.android.signaldf.data.ShortDistance;
 import com.atakmap.android.signaldf.data.ArrayCalc.Geometry;
 
 import java.util.Locale;
@@ -132,7 +133,12 @@ public class ArrayPlanView extends View {
         float[] sy = new float[p.length];
         for (int i = 0; i < p.length; i++) {
             sx[i] = originX + (float) p[i][0] * scale;
-            sy[i] = originY + (float) p[i][1] * scale;
+            // MINUS, not plus. The workbook's coordinates are in a y-up frame
+            // and a canvas is y-down, so adding them mirrors the array: element
+            // 1 rendered above the center, anticlockwise, when the workbook
+            // puts it below and clockwise. The operator spotted it by looking
+            // at the picture, which is the whole argument for drawing one.
+            sy[i] = originY - (float) p[i][1] * scale;
         }
 
         // The spacing first, so the elements sit on top of its line.
@@ -140,7 +146,7 @@ public class ArrayPlanView extends View {
             stroke.setColor(usable ? COLOR_ELEMENT : COLOR_BAD);
             c.drawLine(sx[0], sy[0], sx[1], sy[1], stroke);
             text.setColor(usable ? COLOR_ELEMENT : COLOR_BAD);
-            c.drawText(String.format(Locale.US, "%.1f cm", spacingCm),
+            c.drawText(ShortDistance.fromCm(spacingCm),
                     (sx[0] + sx[1]) / 2f, (sy[0] + sy[1]) / 2f - dp(7), text);
         }
 

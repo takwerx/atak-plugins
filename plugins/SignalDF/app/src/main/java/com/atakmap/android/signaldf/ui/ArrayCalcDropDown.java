@@ -18,6 +18,7 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.signaldf.data.ArrayCalc;
 import com.atakmap.android.signaldf.data.ArrayCalc.Geometry;
 import com.atakmap.android.signaldf.data.ArrayCalc.Result;
+import com.atakmap.android.signaldf.data.ShortDistance;
 import com.atakmap.android.signaldf.net.KrakenLink;
 import com.atakmap.android.signaldf.plugin.R;
 
@@ -142,17 +143,19 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
             @Override
             public void onClick(View v) {
                 askNumber(geometry == Geometry.CIRCULAR ? "Array radius" : "Array length",
-                        geometry == Geometry.CIRCULAR
-                                ? "Centimeters, center of the array to any element."
-                                : "Centimeters, first element to last.",
-                        sizeCm, new OnNumber() {
+                        (geometry == Geometry.CIRCULAR
+                                ? "Center of the array to any element, in "
+                                : "First element to last, in ")
+                                + (ShortDistance.imperial() ? "inches." : "centimeters."),
+                        ShortDistance.valueFromCm(sizeCm), new OnNumber() {
                             @Override
                             public void got(double value) {
                                 if (value <= 0) {
                                     toast("a size has to be above zero");
                                     return;
                                 }
-                                sizeCm = value;
+                                // Typed in the operator's unit, kept in cm.
+                                sizeCm = ShortDistance.toCm(value);
                                 refresh();
                             }
                         });
@@ -307,8 +310,8 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         freqButton.setText(String.format(Locale.US, "%.4f MHz", freqMHz));
         geometryButton.setText(geometry == Geometry.CIRCULAR ? "Circular" : "Linear");
         elementsButton.setText(elements + " elements");
-        sizeButton.setText(String.format(Locale.US, "%s %.1f cm",
-                geometry == Geometry.CIRCULAR ? "Radius" : "Length", sizeCm));
+        sizeButton.setText((geometry == Geometry.CIRCULAR ? "Radius " : "Length ")
+                + ShortDistance.fromCm(sizeCm));
 
         plan.set(geometry, elements, sizeCm, r.spacingCm, r.usable());
 
@@ -328,15 +331,16 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         StringBuilder n = new StringBuilder();
         if (geometry == Geometry.CIRCULAR) {
             n.append(String.format(Locale.US,
-                    "Measure %.1f cm out from the center, along each arm\n"
+                    "Measure %s out from the center, along each arm\n"
                             + "Arms %.0f degrees apart\n"
-                            + "Check: neighboring antennas %.1f cm apart\n",
-                    sizeCm, 360.0 / elements, r.spacingCm));
+                            + "Check: neighboring antennas %s apart\n",
+                    ShortDistance.fromCm(sizeCm), 360.0 / elements,
+                    ShortDistance.fromCm(r.spacingCm)));
         } else {
             n.append(String.format(Locale.US,
-                    "%.1f cm from the first antenna to the last\n"
-                            + "%.1f cm between neighbors, in a straight line\n",
-                    sizeCm, r.spacingCm));
+                    "%s from the first antenna to the last\n"
+                            + "%s between neighbors, in a straight line\n",
+                    ShortDistance.fromCm(sizeCm), ShortDistance.fromCm(r.spacingCm)));
         }
         n.append(String.format(Locale.US,
                 "Spacing is %.2f wavelengths (wavelength %.2f m)\n"
@@ -351,8 +355,8 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         if (geometry == Geometry.CIRCULAR) {
             double hole = ArrayCalc.templateRadiusCm(elements, freqMHz);
             if (hole > 0)
-                b.append(String.format(Locale.US,
-                        "\n\nOn KrakenRF's printed arms, use the %.0f cm hole.", hole));
+                b.append("\n\nOn KrakenRF's printed arms, use the "
+                        + ShortDistance.fromCm(hole) + " hole.");
             else
                 b.append("\n\nNo hole on KrakenRF's printed arms covers this "
                         + "frequency; the array has to be built to size.");
