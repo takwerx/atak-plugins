@@ -245,14 +245,14 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
     /**
      * Which jig the operator is laying the array out with. It changes nothing
      * about the arithmetic and everything about the answer: the same radius is
-     * "use the 15 cm hole" on one template, "use the position labelled with
+     * "use the 15 cm hole" on one template, "use the position labeled with
      * the next frequency above yours" on another, and a tape measurement on
      * neither.
      */
     private void pickTemplate() {
         final String[] names = {
                 "KrakenRF printed arms -- holes at fixed radii",
-                "3D-printed template -- positions labelled by frequency",
+                "3D-printed template -- positions labeled by frequency",
                 "None -- measuring it myself"
         };
         new AlertDialog.Builder(getMapView().getContext())
@@ -443,7 +443,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
                 b.append("\n\nNo hole on KrakenRF's printed arms covers this "
                         + "frequency; the array has to be built to size.");
         } else if (geometry == Geometry.CIRCULAR && template == TEMPLATE_3D) {
-            // Its seven positions are labelled with the highest frequency each
+            // Its seven positions are labeled with the highest frequency each
             // one is good for, so the rule is the author's own and needs no
             // table: take the next label above the frequency being hunted.
             // Deliberately not naming a label -- the seven numbers are in the
@@ -451,7 +451,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
             // found out on a car roof.
             b.append(String.format(Locale.US,
                     "\n\nOn the 3D-printed template, use the position "
-                            + "labelled with the next frequency above %.1f MHz. "
+                            + "labeled with the next frequency above %.1f MHz. "
                             + "Its arm points antenna 0 forward.", freqMHz));
             if (freqMHz < 150)
                 b.append(" Below 150 MHz this template runs out; "
@@ -466,7 +466,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
                 : template == TEMPLATE_3D
                         ? "The 3D-printed template is a magnetic hub and one "
                                 + "arm you move round five positions; its "
-                                + "seven layout positions are each labelled "
+                                + "seven layout positions are each labeled "
                                 + "with the highest frequency that position is "
                                 + "good for, and the arm doubles as a scale "
                                 + "for setting the whips. "

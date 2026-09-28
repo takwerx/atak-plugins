@@ -17,7 +17,7 @@ import com.atakmap.android.signaldf.data.ArrayCalc.Geometry;
  *
  * <p><b>It deliberately carries no measurements.</b> Every element sits the
  * same distance out and the arms are always 360/N apart, so a radius drawn on
- * the picture and a neighbour-to-neighbour distance drawn between two dots add
+ * the picture and a neighbor-to-neighbor distance drawn between two dots add
  * nothing the table underneath does not already say -- and they cost a great
  * deal, because the only places those labels fit are on top of each other and
  * on top of the drawing. Three rounds of this screen went on finding somewhere
@@ -25,7 +25,7 @@ import com.atakmap.android.signaldf.data.ArrayCalc.Geometry;
  * numbers are in the table; the picture answers the one question a table
  * cannot, which is which way round the thing goes.
  *
- * <p>Element 0 is filled green at the top and labelled as the forward
+ * <p>Element 0 is filled green at the top and labeled as the forward
  * direction, because the workbook's own note reads "ANT 0 points to the
  * forward direction of the array", and every bearing the radio reports is
  * measured from it. The rest run clockwise, so element n sits at n * (360/N)
@@ -116,8 +116,8 @@ public class ArrayPlanView extends View {
         setMeasuredDimension(w, Math.max(h, (int) dp(115)));
     }
 
-    /** Draw {@code s} centred on a point rather than sitting on a baseline. */
-    private void centred(Canvas c, String s, float x, float y) {
+    /** Draw {@code s} centered on a point rather than sitting on a baseline. */
+    private void centered(Canvas c, String s, float x, float y) {
         c.drawText(s, x, y - (text.ascent() + text.descent()) / 2f, text);
     }
 
@@ -141,7 +141,7 @@ public class ArrayPlanView extends View {
 
         if (geometry == Geometry.CIRCULAR) {
             // Draw in the array's OWN frame: the origin is the center of the
-            // circle, which is what the radius is measured from. Centring on
+            // circle, which is what the radius is measured from. Centering on
             // the elements' bounding box instead put the circle and the
             // elements in two different frames and pushed element 0 off screen.
             float half = Math.min(getWidth(), getHeight()) / 2f - pad;
@@ -150,7 +150,7 @@ public class ArrayPlanView extends View {
             originY = cy;
 
             for (int i = 0; i < p.length; i++) {
-                // A quarter turn anticlockwise, then y flipped for the canvas.
+                // A quarter turn counterclockwise, then y flipped for the canvas.
                 // The workbook's frame is y-up with element 0 on +x; a canvas
                 // is y-down; and a plan wants forward at the top. Both steps
                 // collapse into this: screen x from -y, screen y from -x.
@@ -202,7 +202,7 @@ public class ArrayPlanView extends View {
                 ly = sy[i] - r - dp(11);
             }
             text.setColor(forward ? COLOR_FORWARD : Color.WHITE);
-            centred(c, forward ? "0 = forward" : String.valueOf(i), lx, ly);
+            centered(c, forward ? "0 = forward" : String.valueOf(i), lx, ly);
         }
     }
 

@@ -328,7 +328,7 @@ public final class ArrayCalc {
     }
 
     /**
-     * The length one antenna element should be, in centimetres: a quarter of
+     * The length one antenna element should be, in centimeters: a quarter of
      * the wavelength.
      *
      * <p>This is not in the vendor's workbook, which sizes the array and stops.
@@ -340,7 +340,7 @@ public final class ArrayCalc {
      *
      * <p>Plain lambda/4, with no end-effect shortening factor applied. A
      * telescopic whip is set by eye against a tape to the nearest few
-     * millimetres, the guide itself says <i>"using shorter than optimal antenna
+     * millimeters, the guide itself says <i>"using shorter than optimal antenna
      * lengths will be acceptable in most cases"</i>, and quoting 17.1 cm where
      * the vendor's own rule gives 18.0 would be false precision about a number
      * nobody can hit anyway.

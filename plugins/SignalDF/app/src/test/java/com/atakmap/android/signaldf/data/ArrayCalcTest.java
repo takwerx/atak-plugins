@@ -73,7 +73,7 @@ public class ArrayCalcTest {
         }
     }
 
-    /** Element 0 is forward, and the rest run clockwise, not anticlockwise. */
+    /** Element 0 is forward, and the rest run clockwise, not counterclockwise. */
     @Test
     public void elementZeroIsForwardAndTheRestGoClockwise() {
         double[][] p = ArrayCalc.positions(Geometry.CIRCULAR, 5, 10.0);
