@@ -60,6 +60,16 @@
             android:textColor="@color/heading_yellow"
             android:text="@string/status_idle" />
 
+        <!-- Shown only while the chosen weather service is not allowed: the way to
+             allow it, under the line that says it is not. -->
+        <Button
+            android:id="@+id/allow_source_button"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/current_heading"
             android:layout_width="match_parent"
