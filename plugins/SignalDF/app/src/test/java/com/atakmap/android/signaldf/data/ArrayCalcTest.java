@@ -103,7 +103,7 @@ public class ArrayCalcTest {
     @Test
     public void linearSpacingIsLengthOverTheGaps() {
         Result r = ArrayCalc.atSize(Geometry.LINEAR, 300.0, 5, 132.0);
-        // 4 gaps, so 33 cm between neighbours whatever the frequency.
+        // 4 gaps, so 33 cm between neighbors whatever the frequency.
         assertEquals(33.0, r.sizeCm / 4, 1e-9);
     }
 
@@ -145,7 +145,7 @@ public class ArrayCalcTest {
 
     /** And one too small is not ambiguous, just too coarse to act on. */
     @Test
-    public void tooSmallForTheFrequencyReportsResolution() {
+    public void tooSmallForTheFrequencyIsNotAmbiguousJustUseless() {
         // 3 cm radius at 50 MHz: unambiguous, and hopeless.
         Result r = ArrayCalc.atSize(Geometry.CIRCULAR, 50.0, 5, 3.0);
         assertTrue(ArrayCalc.ambiguityFree(r.multiplier));
@@ -158,6 +158,89 @@ public class ArrayCalcTest {
         Result r = ArrayCalc.sizeFor(Geometry.CIRCULAR, 416.0, 5, 0.45);
         assertTrue(r.usable());
         assertEquals("", r.problem());
+    }
+
+    // ---- KrakenRF's published template table --------------------------------
+
+    /**
+     * The strongest oracle available: the wiki states the band each template
+     * hole covers, and those numbers must fall out of the formulas.
+     *
+     * <p>"Each hole is spaced at 50mm radius intervals. So you have radius
+     * spacings of 100mm, 150mm, 200mm, and 250mm. These spacings cover the
+     * following frequency range: 100mm : 510 - 1275 MHz, 150mm : 340 - 850 MHz,
+     * 200mm : 255 - 637 MHz, 250mm : 204 - 510 MHz."
+     *
+     * <p>Reproducing both ends is what proved the band is bounded by the
+     * multiplier at 0.2 and 0.5, not by the 25 degree resolution figure. The
+     * first version of this class derived the bottom from resolution and put
+     * the 250 mm hole at 152 MHz against their published 204.
+     */
+    @Test
+    public void everyTemplateHoleMatchesTheWikisPublishedBand() {
+        double[][] table = {
+                // radius cm, low MHz, high MHz
+                { 10.0, 510, 1275 },
+                { 15.0, 340, 850 },
+                { 20.0, 255, 637 },
+                { 25.0, 204, 510 },
+        };
+        for (double[] row : table) {
+            double radius = row[0];
+            double lo = ArrayCalc.lowestUsableMHz(Geometry.CIRCULAR, 5, radius);
+            double hi = ArrayCalc.highestUsableMHz(Geometry.CIRCULAR, 5, radius);
+            // The wiki rounds to whole megahertz.
+            assertEquals(radius + " cm low", row[1], lo, 1.0);
+            assertEquals(radius + " cm high", row[2], hi, 1.0);
+        }
+    }
+
+    /** The template's holes are 50 mm apart, four of them, starting at 100 mm. */
+    @Test
+    public void theTemplateOffersFourRadii() {
+        assertEquals(4, ArrayCalc.TEMPLATE_RADII_CM.length);
+        assertEquals(10.0, ArrayCalc.TEMPLATE_RADII_CM[0], 1e-9);
+        for (int i = 1; i < ArrayCalc.TEMPLATE_RADII_CM.length; i++)
+            assertEquals(5.0, ArrayCalc.TEMPLATE_RADII_CM[i]
+                    - ArrayCalc.TEMPLATE_RADII_CM[i - 1], 1e-9);
+    }
+
+    /**
+     * Which hole to use is answered from the published bands. 416 MHz sits in
+     * the 150 mm and 200 mm bands; the one nearer KrakenRF's typical s=0.33 is
+     * chosen rather than simply the biggest that fits.
+     */
+    @Test
+    public void picksTheTemplateHoleNearestTheirTypicalSpacing() {
+        double radius = ArrayCalc.templateRadiusCm(5, 416.588);
+        assertTrue("a hole must fit at 416 MHz", radius > 0);
+        Result r = ArrayCalc.atSize(Geometry.CIRCULAR, 416.588, 5, radius);
+        assertTrue(r.usable());
+        // Nothing else in the table is closer to 0.33 than the one chosen.
+        for (double other : ArrayCalc.TEMPLATE_RADII_CM) {
+            Result o = ArrayCalc.atSize(Geometry.CIRCULAR, 416.588, 5, other);
+            if (!o.usable())
+                continue;
+            assertTrue(Math.abs(r.multiplier - ArrayCalc.TYPICAL_MULTIPLIER)
+                    <= Math.abs(o.multiplier - ArrayCalc.TYPICAL_MULTIPLIER) + 1e-9);
+        }
+    }
+
+    /** And outside every published band, it says so rather than guessing. */
+    @Test
+    public void noTemplateHoleWorksWayOutOfBand() {
+        assertEquals(-1.0, ArrayCalc.templateRadiusCm(5, 50.0), 1e-9);
+        assertEquals(-1.0, ArrayCalc.templateRadiusCm(5, 3000.0), 1e-9);
+    }
+
+    /** Spacing under 0.2 is KrakenRF's "too poor", and is not usable. */
+    @Test
+    public void tooLittleSpacingIsUnusableEvenThoughItCannotAlias() {
+        Result r = ArrayCalc.atSize(Geometry.CIRCULAR, 250.0, 5, 10.0);
+        assertTrue("it cannot alias", ArrayCalc.ambiguityFree(r.multiplier));
+        assertTrue("but it is under the floor", r.multiplier < ArrayCalc.MIN_MULTIPLIER);
+        assertFalse(r.usable());
+        assertTrue(r.problem().contains("too rough to trust"));
     }
 
     // ---- the band a built array covers -------------------------------------
@@ -179,12 +262,12 @@ public class ArrayCalcTest {
         assertEquals(440.0, ArrayCalc.highestUsableMHz(Geometry.LINEAR, 5, r.sizeCm), 1e-6);
     }
 
-    /** At the bottom of the band the resolution is exactly the 25 degree limit. */
+    /** At the bottom of the band the spacing is exactly KrakenRF's 0.2 floor. */
     @Test
-    public void lowestUsableIsWhereResolutionReachesTheLimit() {
+    public void lowestUsableIsWhereSpacingReachesTheFloor() {
         double lo = ArrayCalc.lowestUsableMHz(Geometry.CIRCULAR, 5, 30.0);
         Result r = ArrayCalc.atSize(Geometry.CIRCULAR, lo, 5, 30.0);
-        assertEquals(ArrayCalc.RESOLUTION_LIMIT_DEG, r.resolutionDeg, 1e-6);
+        assertEquals(ArrayCalc.MIN_MULTIPLIER, r.multiplier, 1e-9);
     }
 
     /** And the band is a band: the ceiling is above the floor. */

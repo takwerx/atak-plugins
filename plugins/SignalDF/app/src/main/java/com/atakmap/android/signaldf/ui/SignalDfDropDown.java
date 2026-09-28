@@ -78,6 +78,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final AtakPreferences prefs;
     private final BearingLayer layer;
     private RadioSetupDropDown radioSetup;
+    private ArrayCalcDropDown arrayCalc;
     private final View root;
 
     private final TextView status;
@@ -90,6 +91,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final Button setHeadingButton;
     private final Button clearHeadingButton;
     private final Button radioSetupButton;
+    private final Button arrayCalcButton;
     private final Button wideNarrowButton;
     private final LinearLayout vfoRows;
 
@@ -131,6 +133,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         setHeadingButton = root.findViewById(R.id.set_heading);
         clearHeadingButton = root.findViewById(R.id.clear_heading);
         radioSetupButton = root.findViewById(R.id.radio_setup);
+        arrayCalcButton = root.findViewById(R.id.array_calc);
         wideNarrowButton = root.findViewById(R.id.wide_narrow);
         vfoRows = root.findViewById(R.id.vfo_rows);
 
@@ -163,6 +166,14 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
             @Override
             public void onClick(View v) {
                 openRadioSetup();
+            }
+        });
+        arrayCalcButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (arrayCalc == null)
+                    arrayCalc = new ArrayCalcDropDown(getMapView(), pluginContext);
+                arrayCalc.show();
             }
         });
         wideNarrowButton.setOnClickListener(new View.OnClickListener() {
@@ -294,6 +305,10 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         if (radioSetup != null) {
             radioSetup.dispose();
             radioSetup = null;
+        }
+        if (arrayCalc != null) {
+            arrayCalc.dispose();
+            arrayCalc = null;
         }
     }
 

@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    The Signal DF pane.
+    Antenna array sizing. Two questions, one screen: what should I build for
+    the frequency I am hunting, and will the array I already have work at it.
 
-    The wide/narrow button is pinned in the root LinearLayout below the
-    ScrollView rather than placed inside it, so it stays reachable however long
-    the bearing list gets. There is no ListView anywhere here: a ListView inside
-    a ScrollView collapses to one row, and the per-VFO rows are added to a plain
-    LinearLayout so the whole pane is one scroller.
+    The plan drawing sits between the inputs and the numbers on purpose , the
+    picture is what stops somebody building to the radius when they meant the
+    spacing.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -28,136 +27,134 @@
 
             <TextView
                 style="@style/SectionHeading"
-                android:text="Radio" />
+                android:text="Frequency you are hunting" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/freq"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="416.588 MHz" />
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/from_radio"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="From radio" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/status"
+                style="@style/SectionHeading"
+                android:text="Your array" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/geometry"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Circular" />
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/elements"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="5 elements" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingTop="4dp">
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/size"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Radius 30.7 cm" />
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/size_it"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="Size it for me" />
+            </LinearLayout>
+
+            <com.atakmap.android.signaldf.ui.ArrayPlanView
+                android:id="@+id/plan"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" />
+
+            <TextView
+                android:id="@+id/verdict"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="15sp"
-                android:text="Not connected" />
-
-            <TextView
-                android:id="@+id/feed_line"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="12sp"
-                android:alpha="0.75"
-                android:paddingTop="2dp"
-                android:visibility="gone" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingTop="4dp">
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/host"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="krakensdr.local" />
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/connect"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="4dp"
-                    android:text="Connect" />
-            </LinearLayout>
-
-            <Button
-                style="@style/TakwerxButton"
-                android:id="@+id/radio_setup"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Radio setup" />
-
-            <Button
-                style="@style/TakwerxButton"
-                android:id="@+id/array_calc"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Antenna array sizing" />
+                android:paddingTop="6dp"
+                android:paddingBottom="2dp" />
 
             <TextView
                 style="@style/SectionHeading"
-                android:text="Array heading" />
+                android:text="What you get" />
 
             <TextView
-                android:id="@+id/heading_provenance"
+                android:id="@+id/numbers"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="13sp"
-                android:text="Array heading: unknown" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingTop="4dp">
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/set_heading"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="Set heading" />
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/clear_heading"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="4dp"
-                    android:text="Use radio" />
-            </LinearLayout>
+                android:lineSpacingMultiplier="1.15" />
 
             <TextView
                 style="@style/SectionHeading"
-                android:id="@+id/bearings_heading"
-                android:text="Bearings" />
+                android:text="This array covers" />
 
             <TextView
-                android:id="@+id/bearings_note"
+                android:id="@+id/band"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="13sp"
-                android:alpha="0.75"
-                android:text="Nothing yet." />
-
-            <LinearLayout
-                android:id="@+id/vfo_rows"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingTop="2dp" />
+                android:paddingBottom="8dp" />
 
             <TextView
-                android:id="@+id/unverified"
+                android:id="@+id/note"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
-                android:paddingTop="10dp"
-                android:paddingBottom="6dp"
-                android:visibility="gone" />
+                android:alpha="0.7"
+                android:paddingBottom="8dp" />
 
         </LinearLayout>
     </ScrollView>
 
     <Button
         style="@style/TakwerxButton"
-        android:id="@+id/wide_narrow"
+        android:id="@+id/close"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:layout_marginBottom="4dp"
-        android:text="Open wide" />
+        android:text="Done" />
 
 </LinearLayout>

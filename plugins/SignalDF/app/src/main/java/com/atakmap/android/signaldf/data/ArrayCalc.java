@@ -74,6 +74,27 @@ public final class ArrayCalc {
     /** Spacing at or above this wavelength fraction aliases. KrakenRF's rule. */
     public static final double AMBIGUITY_LIMIT = 0.5;
 
+    /**
+     * Below this the array still works but resolves too poorly to trust.
+     * KrakenRF: "keep the spacing multiplier above around 0.2 ... Below 0.2,
+     * the resolution becomes too poor", and "for 5-elements the accuracy starts
+     * to become unacceptable below around s=0.2". This is the LOWER end of the
+     * usable band, and it is a multiplier rule rather than a resolution one --
+     * their published per-hole frequency table is exactly s from 0.2 to 0.5.
+     */
+    public static final double MIN_MULTIPLIER = 0.2;
+
+    /** What KrakenRF say they actually build to: "we typically set our arrays to s=0.33". */
+    public static final double TYPICAL_MULTIPLIER = 0.33;
+
+    /**
+     * The radii KrakenRF's printed template can actually give you, in
+     * centimeters. Their arms have holes at 50 mm intervals, so an array built
+     * with the template is one of these four and nothing in between -- which is
+     * why this class can answer "which hole" rather than only "what radius".
+     */
+    public static final double[] TEMPLATE_RADII_CM = { 10.0, 15.0, 20.0, 25.0 };
+
     /** Resolution worse than this is not useful for DF. KrakenRF's rule. */
     public static final double RESOLUTION_LIMIT_DEG = 25.0;
 
@@ -92,7 +113,7 @@ public final class ArrayCalc {
     /**
      * The chord factor for a circle of N elements:
      * {@code sqrt(2(1 - cos(360/N)))}, which is the straight-line distance
-     * between neighbouring elements on a unit-radius circle. Radius and
+     * between neighboring elements on a unit-radius circle. Radius and
      * element spacing differ by this, and conflating them is how an array ends
      * up built to the wrong size.
      */
@@ -104,7 +125,7 @@ public final class ArrayCalc {
     public static final class Result {
         /** Wavelength at the frequency asked about, meters. */
         public final double wavelengthM;
-        /** Distance between neighbouring elements, centimeters. */
+        /** Distance between neighboring elements, centimeters. */
         public final double spacingCm;
         /** Radius for a circular array, total end-to-end length for a linear one. */
         public final double sizeCm;
@@ -134,7 +155,7 @@ public final class ArrayCalc {
 
         /** Both of KrakenRF's rules met. */
         public boolean usable() {
-            return ambiguityFree(multiplier) && resolutionUsable(resolutionDeg);
+            return ambiguityFree(multiplier) && multiplier >= MIN_MULTIPLIER;
         }
 
         /**
@@ -148,11 +169,11 @@ public final class ArrayCalc {
                         "Elements are %.2f wavelengths apart. Over %.1f the array cannot tell "
                                 + "some directions apart -- make it smaller, or tune lower.",
                         multiplier, AMBIGUITY_LIMIT);
-            if (!resolutionUsable(resolutionDeg))
+            if (multiplier < MIN_MULTIPLIER)
                 return String.format(Locale.US,
-                        "Resolution about %.0f degrees, past the %.0f that is useful for "
-                                + "direction finding -- make the array bigger, or tune higher.",
-                        resolutionDeg, RESOLUTION_LIMIT_DEG);
+                        "Elements are only %.2f wavelengths apart. Under %.1f the bearings "
+                                + "get too rough to trust -- make the array bigger, or tune higher.",
+                        multiplier, MIN_MULTIPLIER);
             return "";
         }
     }
@@ -224,19 +245,50 @@ public final class ArrayCalc {
     }
 
     /**
-     * The lowest frequency a built array still resolves usefully at -- where
-     * the resolution reaches {@link #RESOLUTION_LIMIT_DEG}. Below this the
-     * bearing is real but too coarse to act on.
+     * The lowest frequency a built array is still trusted at -- where the
+     * spacing falls to {@link #MIN_MULTIPLIER}.
+     *
+     * <p>This is a multiplier rule, not a resolution one, and getting that
+     * wrong was the first version of this class. KrakenRF publish the band each
+     * template hole covers -- 250 mm is 204 to 510 MHz -- and those numbers are
+     * exactly s = 0.2 and s = 0.5. Deriving the bottom from the 25 degree
+     * resolution figure instead gave 152 MHz for an array they say bottoms out
+     * at 204.
      */
     public static double lowestUsableMHz(Geometry g, int elements, double sizeCm) {
-        // Invert the resolution formula for the aperture in wavelengths, then
-        // turn that back into a frequency for the aperture we physically have.
-        double apertureWl = Math.toRadians(RESOLUTION_LIMIT_DEG * 10.0) == 0
-                ? 0 : 1.22 / Math.toRadians(RESOLUTION_LIMIT_DEG * 10.0);
-        double apertureM = g == Geometry.CIRCULAR
-                ? (sizeCm / 100.0) * 2.0
-                : (sizeCm / 100.0);
-        return 300.0 / (apertureM / apertureWl);
+        return frequencyAt(g, elements, sizeCm, MIN_MULTIPLIER);
+    }
+
+    /** The frequency at which a built array has exactly this spacing multiplier. */
+    public static double frequencyAt(Geometry g, int elements, double sizeCm,
+            double multiplier) {
+        double spacingM = g == Geometry.CIRCULAR
+                ? (sizeCm / 100.0) * chordFactor(elements)
+                : (sizeCm / 100.0) / (elements - 1);
+        return 300.0 / (spacingM / multiplier);
+    }
+
+    /**
+     * The template hole to use at this frequency, or -1 when none of them
+     * works. Prefers the hole closest to {@link #TYPICAL_MULTIPLIER}, which is
+     * what KrakenRF say they build to, rather than the largest that merely
+     * fits.
+     *
+     * @return a radius from {@link #TEMPLATE_RADII_CM}, or -1
+     */
+    public static double templateRadiusCm(int elements, double freqMHz) {
+        double best = -1, bestDistance = Double.MAX_VALUE;
+        for (double radius : TEMPLATE_RADII_CM) {
+            Result r = atSize(Geometry.CIRCULAR, freqMHz, elements, radius);
+            if (!ambiguityFree(r.multiplier) || r.multiplier < MIN_MULTIPLIER)
+                continue;
+            double d = Math.abs(r.multiplier - TYPICAL_MULTIPLIER);
+            if (d < bestDistance) {
+                bestDistance = d;
+                best = radius;
+            }
+        }
+        return best;
     }
 
     public static boolean ambiguityFree(double multiplier) {
