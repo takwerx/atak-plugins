@@ -146,7 +146,7 @@ public final class BearingFix {
          * long and thin, and the two statements could not both be acted on.
          *
          * <p>The long axis is the honest single number, and the ellipse is
-         * still drawn so the shape is visible rather than summarised.
+         * still drawn so the shape is visible rather than summarized.
          */
         public double accuracyM() {
             return ellipse()[0];
