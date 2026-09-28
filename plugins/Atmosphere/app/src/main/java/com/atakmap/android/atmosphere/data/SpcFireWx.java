@@ -58,7 +58,15 @@ public final class SpcFireWx {
             new Layer(4, 2, Kind.OUTLOOK), new Layer(5, 2, Kind.DRY_THUNDER),
             new Layer(8, 3, Kind.OUTLOOK), new Layer(7, 3, Kind.DRY_THUNDER) };
 
-    /** The renderer's categories: code, label, color, per kind. */
+    /**
+     * The renderer's categories: code, label, color, per kind. Days 1 and 2 are
+     * named categories; from Day 3 SPC gives the chance instead -- 40 or 70 percent
+     * that wind and low humidity reach critical, 10 or 40 percent of dry
+     * thunderstorms -- and the code is the percent. Its own map calls them
+     * "Marginal (40%)" and "Critical (70%)"; the percent is the part that says what
+     * it means. Before 2026-09-27 these came out as "Category 40" (operator,
+     * shooting the manual: "what does category 40 mean?").
+     */
     public static String label(Kind kind, int dn) {
         if (kind == Kind.OUTLOOK) {
             if (dn == 5)
@@ -67,11 +75,15 @@ public final class SpcFireWx {
                 return "Critical";
             if (dn == 10)
                 return "Extreme";
+            if (dn == 40 || dn == 70)
+                return dn + "% chance of critical";
         } else {
             if (dn == 5)
                 return "Isolated dry thunderstorms";
             if (dn == 8)
                 return "Scattered dry thunderstorms";
+            if (dn == 10 || dn == 40)
+                return dn + "% chance of dry thunderstorms";
         }
         return "Category " + dn;
     }
@@ -84,17 +96,30 @@ public final class SpcFireWx {
                 return 0xFFFF0000;
             if (dn == 10)
                 return 0xFFE600A9;
+            // Day 3, SPC's outline colors off the service's renderer (2026-09-27).
+            if (dn == 40)
+                return 0xFFFFAA00;
+            if (dn == 70)
+                return 0xFFE60000;
         } else {
             if (dn == 5)
                 return 0xFF732600;
             if (dn == 8)
                 return 0xFFFF0000;
+            if (dn == 10)
+                return 0xFF734C00;
+            if (dn == 40)
+                return 0xFF0070FF;
         }
         return 0xFFB0B0B0;
     }
 
-    /** The legend, in the order SPC prints it: outlook categories, then dry thunderstorms. */
-    public static final int[][] LEGEND_CODES = { { 0, 5 }, { 0, 8 }, { 0, 10 }, { 1, 5 }, { 1, 8 } };
+    /**
+     * The legend, in the order SPC prints it: outlook categories, then dry
+     * thunderstorms, then Day 3's chances.
+     */
+    public static final int[][] LEGEND_CODES = { { 0, 5 }, { 0, 8 }, { 0, 10 }, { 1, 5 }, { 1, 8 },
+            { 0, 40 }, { 0, 70 }, { 1, 10 }, { 1, 40 } };
 
     public static final class Area {
         public final int day, dn;

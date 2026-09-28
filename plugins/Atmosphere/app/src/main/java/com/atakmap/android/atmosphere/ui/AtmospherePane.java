@@ -2275,7 +2275,8 @@ public final class AtmospherePane {
 
         // Live, then one button per day the times cover. A single day is not worth
         // a button of its own: the hours below it are already that day.
-        scrubberDays.addView(whenButton("Live", null, new View.OnClickListener() {
+        final List<Button> dayButtons = new ArrayList<>();
+        dayButtons.add(whenButton("Live", null, new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 liveMode = true;
@@ -2295,7 +2296,7 @@ public final class AtmospherePane {
         // all (operator, 2026-09-23: "all i see is live"). Last night's window
         // straddled midnight and showed two, which is why this held until morning.
         for (final Long day : days)
-            scrubberDays.addView(whenButton(dayLabel(day), day, new View.OnClickListener() {
+            dayButtons.add(whenButton(dayLabel(day), day, new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     // A day is picked by going to its first hour, so green always
@@ -2308,6 +2309,7 @@ public final class AtmospherePane {
                         }
                 }
             }, !liveMode && day == whenDay));
+        layOutDayRows(dayButtons);
 
         // Live is not a day, so it has no hours to choose from.
         scrubberHours.setVisibility(liveMode ? View.GONE : View.VISIBLE);
@@ -2358,11 +2360,44 @@ public final class AtmospherePane {
         }
     }
 
+    /**
+     * The day buttons, at most four to a row. Seven across -- Live and six days of
+     * a model run -- cut "Today" and "Tomorrow" to "To..." at half width (the rain
+     * and wave strips on the S22, 2026-09-27); four leave room for "Tomorrow" whole.
+     * A short last row is padded so its buttons line up with the ones above.
+     */
+    private void layOutDayRows(List<Button> buttons) {
+        scrubberDays.setOrientation(LinearLayout.VERTICAL);
+        final int perRow = 4;
+        LinearLayout row = null;
+        for (int i = 0; i < buttons.size(); i++) {
+            if (i % perRow == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                scrubberDays.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            row.addView(buttons.get(i));
+        }
+        if (row != null && buttons.size() > perRow)
+            for (int k = buttons.size() % perRow; k != 0 && k < perRow; k++) {
+                final View pad = new View(pluginContext);
+                final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, 1, 1f);
+                lp.rightMargin = dp(4);
+                row.addView(pad, lp);
+            }
+    }
+
     private void paintGreen(LinearLayout host) {
         final long day = whenIndex >= 0 && whenIndex < whenTimes.size()
                 ? startOfDay(whenTimes.get(whenIndex)) : Long.MIN_VALUE;
         for (int i = 0; i < host.getChildCount(); i++) {
             final View v = host.getChildAt(i);
+            // The day buttons sit in rows now; paint inside them too.
+            if (v instanceof LinearLayout && !(v instanceof Button)) {
+                paintGreen((LinearLayout) v);
+                continue;
+            }
             if (!(v instanceof Button))
                 continue;
             final Object tag = v.getTag(R.id.scrubber);
@@ -3242,6 +3277,37 @@ public final class AtmospherePane {
                 StationOverlay.NEAR);
         showTile("Red Flag only", StationOverlay.SHOW_RED, StationOverlay.CRITICAL);
         showTile("\u2605 Favorites only", StationOverlay.SHOW_FAVORITES, StationPage.STAR_ON);
+        inRowsOf(stationsShowRow, 2);
+    }
+
+    /**
+     * Move a row's buttons into rows of {@code perRow}. Four across cut "Flirting and
+     * Red Flag" and "Red Flag only" to "Flirting an..." and "Red Flag o..." at half
+     * width (S22, 2026-09-27); two across leaves every label whole.
+     */
+    private void inRowsOf(LinearLayout host, int perRow) {
+        final List<View> buttons = new ArrayList<>();
+        for (int i = 0; i < host.getChildCount(); i++)
+            buttons.add(host.getChildAt(i));
+        host.removeAllViews();
+        host.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout row = null;
+        for (int i = 0; i < buttons.size(); i++) {
+            if (i % perRow == 0) {
+                row = new LinearLayout(pluginContext);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                host.addView(row, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+            final View b = buttons.get(i);
+            final ViewGroup.LayoutParams old = b.getLayoutParams();
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            lp.topMargin = old instanceof ViewGroup.MarginLayoutParams
+                    ? ((ViewGroup.MarginLayoutParams) old).topMargin : dp(4);
+            row.addView(b, lp);
+        }
     }
 
     private void showTile(String label, final int value, int color) {

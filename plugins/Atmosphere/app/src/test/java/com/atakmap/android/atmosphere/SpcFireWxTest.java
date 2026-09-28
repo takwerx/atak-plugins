@@ -36,4 +36,18 @@ public class SpcFireWxTest {
         assertEquals(3, SpcFireWx.LAYERS[5].day);
         assertEquals(SpcFireWx.Kind.DRY_THUNDER, SpcFireWx.LAYERS[5].kind);
     }
+
+    @Test
+    public void dayThreeSaysTheChanceNotACode() {
+        assertEquals("40% chance of critical", SpcFireWx.label(SpcFireWx.Kind.OUTLOOK, 40));
+        assertEquals("70% chance of critical", SpcFireWx.label(SpcFireWx.Kind.OUTLOOK, 70));
+        assertEquals("10% chance of dry thunderstorms", SpcFireWx.label(SpcFireWx.Kind.DRY_THUNDER, 10));
+        assertEquals("40% chance of dry thunderstorms", SpcFireWx.label(SpcFireWx.Kind.DRY_THUNDER, 40));
+        assertEquals("Elevated", SpcFireWx.label(SpcFireWx.Kind.OUTLOOK, 5));
+        assertEquals(0xFFFFAA00, SpcFireWx.color(SpcFireWx.Kind.OUTLOOK, 40));
+        for (int[] code : SpcFireWx.LEGEND_CODES) {
+            final SpcFireWx.Kind k = code[0] == 0 ? SpcFireWx.Kind.OUTLOOK : SpcFireWx.Kind.DRY_THUNDER;
+            org.junit.Assert.assertFalse(SpcFireWx.label(k, code[1]).startsWith("Category"));
+        }
+    }
 }
