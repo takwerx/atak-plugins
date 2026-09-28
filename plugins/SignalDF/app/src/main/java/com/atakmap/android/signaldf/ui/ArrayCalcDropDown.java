@@ -430,15 +430,18 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
                 "%.0f to %.0f MHz", lo, hi));
         if (geometry == Geometry.CIRCULAR && template == TEMPLATE_KRAKENRF) {
             double hole = ArrayCalc.templateRadiusCm(elements, freqMHz);
-            if (hole > 0)
-                // The hole's NAME as printed on the part, then the
-                // measurement in the operator's own unit. Naming it in
-                // inches alone names a hole that is not on the paper.
+            int holeNo = ArrayCalc.templateHoleNumber(elements, freqMHz);
+            if (hole > 0 && holeNo > 0)
+                // Counted out from the center first, because that is what
+                // somebody holding the arm does; the measurements follow for
+                // checking. The hole's printed name stays metric -- it is a
+                // name, not a distance.
                 b.append("\n\nOn KrakenRF's printed arms, use the "
-                        + ShortDistance.labelCm(hole) + " hole"
+                        + ArrayCalc.ordinal(holeNo) + " hole out from the center ("
+                        + ShortDistance.labelCm(hole)
                         + (ShortDistance.imperial()
-                                ? " (" + ShortDistance.fromCm(hole) + " out)"
-                                : "") + ".");
+                                ? ", " + ShortDistance.fromCm(hole) + " out"
+                                : "") + ").");
             else
                 b.append("\n\nNo hole on KrakenRF's printed arms covers this "
                         + "frequency; the array has to be built to size.");

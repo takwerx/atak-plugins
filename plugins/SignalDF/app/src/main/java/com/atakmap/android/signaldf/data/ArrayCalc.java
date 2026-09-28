@@ -419,4 +419,42 @@ public final class ArrayCalc {
         return freqMHz > RETRACTED_QUARTER_WAVE_MHZ ? q * 3.0 : q;
     }
 
+
+    /**
+     * Which hole out from the center, counting from 1, or -1 when no hole on
+     * KrakenRF's printed arms suits {@code freqMHz}.
+     *
+     * <p>The number is what somebody laying the array out actually uses. They
+     * are holding an arm with four holes in it and counting outward; "the 3rd
+     * hole" is a thing they can do without reading a ruler, and "20 cm" is a
+     * thing they have to check. Both get said, in that order.
+     *
+     * <p>KrakenRF: "Each hole is spaced at 50mm radius intervals. So you have
+     * radius spacings of 100mm, 150mm, 200mm, and 250mm." So hole 1 is the
+     * innermost at 100 mm, not a hole at the hub.
+     */
+    public static int templateHoleNumber(int elements, double freqMHz) {
+        double r = templateRadiusCm(elements, freqMHz);
+        if (r <= 0)
+            return -1;
+        for (int i = 0; i < TEMPLATE_RADII_CM.length; i++)
+            if (Math.abs(TEMPLATE_RADII_CM[i] - r) < 0.001)
+                return i + 1;
+        return -1;
+    }
+
+    /** "1st", "2nd", "3rd", "4th" -- for counting holes, nothing more. */
+    public static String ordinal(int n) {
+        switch (n) {
+            case 1:
+                return "1st";
+            case 2:
+                return "2nd";
+            case 3:
+                return "3rd";
+            default:
+                return n + "th";
+        }
+    }
+
 }
