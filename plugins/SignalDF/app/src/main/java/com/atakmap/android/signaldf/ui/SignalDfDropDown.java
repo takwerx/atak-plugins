@@ -20,6 +20,7 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.preference.AtakPreferences;
 import com.atakmap.android.signaldf.data.Age;
 import com.atakmap.android.signaldf.map.BearingLayer;
+import com.atakmap.android.signaldf.find.Collector;
 import com.atakmap.android.signaldf.net.BearingPublisher;
 import com.atakmap.android.signaldf.model.ArrayHeading;
 import com.atakmap.android.signaldf.model.VehicleHeading;
@@ -79,6 +80,9 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final Context pluginContext;
     private final AtakPreferences prefs;
     private final BearingLayer layer;
+    private Button collectToggleButton;
+    private Button collectClearButton;
+    private TextView collectNote;
     private Button shareFeedButton;
     private Button shareStaleButton;
     private Button shareToggleButton;
@@ -130,6 +134,10 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.signaldf_pane, null);
         status = root.findViewById(R.id.status);
         feedLine = root.findViewById(R.id.feed_line);
+        collectToggleButton = root.findViewById(R.id.collect_toggle);
+        collectClearButton = root.findViewById(R.id.collect_clear);
+        collectNote = root.findViewById(R.id.collect_note);
+        wireCollecting();
         shareFeedButton = root.findViewById(R.id.share_feed);
         shareStaleButton = root.findViewById(R.id.share_stale);
         shareToggleButton = root.findViewById(R.id.share_toggle);
@@ -509,7 +517,10 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         KrakenLink link = KrakenLink.get();
         if (link == null)
             return;
-        layer.draw(link.latest(), heading(), BearingLayer.selfPoint(getMapView()));
+        Collector c = Collector.get();
+        layer.draw(link.latest(), heading(), BearingLayer.selfPoint(getMapView()),
+                c == null ? Double.NaN : c.minConfidence(),
+                c == null ? Double.NaN : c.minPowerDb());
     }
 
     // ---- sharing -----------------------------------------------------------
@@ -697,6 +708,68 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
                     "Heading source: GPS track, %.0f deg", deg));
     }
 
+    // ---- finding -----------------------------------------------------------
+
+    private void wireCollecting() {
+        collectToggleButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Collector c = Collector.get();
+                if (c == null)
+                    return;
+                boolean on = !c.isOn();
+                c.setOn(on);
+                if (on && !heading().isKnown())
+                    toast("set a heading source first -- without one a bearing "
+                            + "cannot be crossed with another");
+                refresh();
+            }
+        });
+
+        collectClearButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final Collector c = Collector.get();
+                if (c == null || c.collected() == 0) {
+                    if (c != null)
+                        c.clear();
+                    refresh();
+                    return;
+                }
+                // An afternoon's driving is behind this number, so it is not
+                // thrown away on one tap.
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("Clear " + c.collected() + " bearings?")
+                        .setMessage("This throws away everything collected and "
+                                + "takes the fix off the map. Start a new "
+                                + "search this way; turning collecting off "
+                                + "keeps what you have.")
+                        .setPositiveButton("Clear",
+                                new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface d, int w) {
+                                        c.clear();
+                                        refresh();
+                                    }
+                                })
+                        .setNegativeButton("Keep", null)
+                        .show();
+            }
+        });
+    }
+
+    private void refreshCollecting() {
+        Collector c = Collector.get();
+        if (c == null || collectToggleButton == null)
+            return;
+        boolean on = c.isOn();
+        collectToggleButton.setText(on ? "COLLECTING ON" : "COLLECTING OFF");
+        collectToggleButton.setTextColor(pluginContext.getResources().getColor(
+                on ? R.color.on_green : R.color.off_red));
+        collectClearButton.setEnabled(c.collected() > 0);
+        collectNote.setText(c.status());
+    }
+
     private void refreshSharing() {
         BearingPublisher p = BearingPublisher.get();
         if (p == null || shareFeedButton == null)
@@ -726,6 +799,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
 
     private void refresh() {
         refreshForward();
+        refreshCollecting();
         refreshSharing();
         KrakenLink link = KrakenLink.get();
         if (link == null)

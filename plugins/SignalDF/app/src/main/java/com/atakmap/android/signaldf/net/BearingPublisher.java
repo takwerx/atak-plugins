@@ -10,6 +10,8 @@ import android.os.Looper;
 import android.preference.PreferenceManager;
 
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.signaldf.data.Quality;
+import com.atakmap.android.signaldf.find.Collector;
 import com.atakmap.android.signaldf.map.BearingLayer;
 import com.atakmap.android.signaldf.model.ArrayHeading;
 import com.atakmap.android.signaldf.model.Bearing;
@@ -358,7 +360,18 @@ public final class BearingPublisher implements KrakenLink.Listener {
 
         GeoPoint fallback = BearingLayer.selfPoint(mapView);
         int staleS = staleSeconds();
+        Collector c = Collector.get();
+        double minConf = c == null ? Quality.DEFAULT_MIN_CONFIDENCE
+                : c.minConfidence();
+        double minPower = c == null ? Quality.DEFAULT_MIN_POWER_DB
+                : c.minPowerDb();
+
         for (Bearing b : frame.bearings) {
+            // A bearing not good enough to build our own fix from is not good
+            // enough to put on somebody else's map either. Same thresholds,
+            // read from the same place.
+            if (!Quality.usable(b, minConf, minPower))
+                continue;
             GeoPoint from = BearingLayer.receiverPoint(b, fallback);
             if (from == null)
                 continue;

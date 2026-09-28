@@ -131,10 +131,25 @@ public final class BearingFix {
             return new double[] { semiMajor, semiMinor, deg };
         }
 
-        /** Radius of a circle with the same area as the ellipse, meters. */
+        /**
+         * One number for "how far off could this be", in meters: the ellipse's
+         * LONG semi-axis.
+         *
+         * <p>Not the geometric mean of the two axes, which is what this
+         * returned first and which is quietly wrong in the case that matters
+         * most. A fix from a short stretch of road is a cigar -- a hundred
+         * meters across and two kilometers long -- and the geometric mean of
+         * those is four hundred and fifty meters. "Fix within 450 m" is a
+         * number an operator would act on, and the transmitter can be more
+         * than a kilometer away along the cigar. Seen on the first virtual
+         * drive: the pane read "within 338 ft" while also saying the fix was
+         * long and thin, and the two statements could not both be acted on.
+         *
+         * <p>The long axis is the honest single number, and the ellipse is
+         * still drawn so the shape is visible rather than summarised.
+         */
         public double accuracyM() {
-            double[] e = ellipse();
-            return Math.sqrt(Math.max(0.0, e[0] * e[1]));
+            return ellipse()[0];
         }
 
         /**

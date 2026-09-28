@@ -120,6 +120,15 @@ public final class Http {
         });
     }
 
+    /** True for the addresses a bound network can never carry. */
+    private static boolean isLoopback(String host) {
+        if (host == null)
+            return false;
+        String h = host.trim();
+        return "localhost".equalsIgnoreCase(h) || "::1".equals(h)
+                || h.startsWith("127.");
+    }
+
     private static String request(String url, Network network) throws IOException {
         final URL parsed = new URL(url);
         if (!"http".equalsIgnoreCase(parsed.getProtocol()))
@@ -128,9 +137,14 @@ public final class Http {
         HttpURLConnection conn = null;
         InputStream in = null;
         try {
-            // openConnection ON the network, not the default one, when we have
-            // been given a network to use.
-            conn = (HttpURLConnection) (network == null
+            // openConnection ON the network, not the default one, when we
+            // have been given a network to use -- except for loopback, which
+            // cannot be reached through a bound network and is never on one.
+            // A radio at 127.0.0.1 is a developer's forwarded port rather than
+            // a real install, and pinning it to WiFi turns every poll into a
+            // silent timeout with the pane stuck on "Not connected".
+            boolean loopback = isLoopback(parsed.getHost());
+            conn = (HttpURLConnection) (network == null || loopback
                     ? parsed.openConnection()
                     : network.openConnection(parsed));
             conn.setRequestMethod("GET");

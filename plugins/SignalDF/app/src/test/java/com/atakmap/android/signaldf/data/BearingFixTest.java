@@ -245,4 +245,29 @@ public class BearingFixTest {
         assertTrue("long axis should run along the line of sight, got " + e[2],
                 off < 20);
     }
+
+    @Test
+    public void accuracyIsTheWorstCaseNotAnAverage() {
+        // A cigar from a short stretch of road. The number an operator reads
+        // has to be the long axis: the geometric mean of a 2 km by 100 m
+        // ellipse is 450 m, and the transmitter can be a kilometer away along
+        // it. "Within 450 m" would be acted on and would be wrong.
+        double tx = 0, ty = 20000;
+        double[] x = { -300, -150, 0, 150, 300 };
+        double[] y = { 0, 0, 0, 0, 0 };
+        Random rnd = new Random(11L);
+        double[] b = new double[5];
+        for (int i = 0; i < 5; i++)
+            b[i] = Angles.norm360(az(x[i], y[i], tx, ty)
+                    + rnd.nextGaussian() * 1.0);
+
+        Fix f = BearingFix.solve(x, y, b, null, 5);
+        assertNotNull(f);
+        double[] e = f.ellipse();
+        assertTrue("this geometry must be long and thin", e[0] > e[1] * 5);
+        assertEquals("accuracy is the long semi-axis", e[0], f.accuracyM(), 1e-9);
+        assertTrue("and so is bigger than the geometric mean",
+                f.accuracyM() > Math.sqrt(e[0] * e[1]));
+    }
+
 }

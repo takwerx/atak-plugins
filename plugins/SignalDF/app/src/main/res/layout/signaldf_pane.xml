@@ -106,6 +106,43 @@
 
             <TextView
                 style="@style/SectionHeading"
+                android:text="Find" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/collect_toggle"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="COLLECTING OFF" />
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/collect_clear"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="Clear" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/collect_note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:alpha="0.85"
+                android:lineSpacingMultiplier="1.15"
+                android:paddingTop="2dp"
+                android:paddingBottom="6dp"
+                android:text="Not collecting." />
+
+            <TextView
+                style="@style/SectionHeading"
                 android:text="Transmit" />
 
             <Button
