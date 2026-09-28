@@ -109,6 +109,20 @@
 
 
 
+    <!-- The takwerx button (CLAUDE.md, plugin UI standard): ATAK's darkButton with the
+         horizontal padding it lacks and a 44dp touch target. -->
+    <style name="TakwerxButton" parent="@style/darkButton">
+        <item name="android:paddingLeft">12dp</item>
+        <item name="android:paddingRight">12dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+    </style>
+
     <!-- ==== Style for ISRV Dark Buttons ==== -->
     <style name="darkButton" parent="@android:style/Widget.Button">
         <item name="android:background">@drawable/btn_gray</item>

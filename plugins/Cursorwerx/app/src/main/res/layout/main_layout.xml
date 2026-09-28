@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The pane behind the toolbar button. Cursorwerx has nothing to configure; it works from
-     the moment it loads, so the pane only says what it is doing. -->
+<!-- The pane behind the toolbar button. Cursorwerx works from the moment it loads; the pane
+     says what it is doing, and holds its one setting, the wheel zoom step (also in Tool
+     Preferences). -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -63,6 +64,24 @@
             android:text="@string/pane_ui"
             android:textColor="#DDDDDD"
             android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/pane_settings_title"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/wheel_zoom"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="start|center_vertical"
+            android:text="@string/wheel_zoom_name" />
 
         <TextView
             android:layout_width="match_parent"

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Cursorwerx under Settings > Tool Preferences. One setting, the wheel zoom step,
+    which the pane's Wheel zoom row writes too: both store the same key in ATAK's own
+    preferences, and PointerRouter reads it on every step. No manual here on purpose
+    (operator, 2026-09-26: a GitHub page is enough).
+-->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <com.atakmap.android.gui.PanListPreference
+        android:key="cursorwerx.wheelZoom"
+        android:title="@string/wheel_zoom_name"
+        android:summary="@string/wheel_zoom_summary"
+        android:dialogTitle="@string/wheel_zoom_dialog"
+        android:defaultValue="1.15"
+        android:entries="@array/wheel_zoom_entries"
+        android:entryValues="@array/wheel_zoom_values" />
+
+</PreferenceScreen>
