@@ -144,6 +144,26 @@ public final class BearingLayer {
             return;
         }
 
+        // No heading, no line. Operator's call, 2026-09-28, and the right one.
+        //
+        // This used to draw the bearing anyway, treating the array's zero as
+        // north and labeling the line "47 deg rel" so nobody was lied to in
+        // writing. But a line on a map is a claim about a direction on the
+        // earth, and that one is wrong by however far the array is turned --
+        // pointing at the exact opposite of the transmitter when the vehicle
+        // happens to be heading south. Four small words beside it are no
+        // defense against a glance at a screen while driving, and the whole
+        // reason ArrayHeading is a type rather than a double is that a wrong
+        // heading never looks wrong.
+        //
+        // The relative bearing is still real information and the pane still
+        // lists it. It is only the map that stays empty, and the heading line
+        // above the list says why and what to do about it.
+        if (!heading.isKnown()) {
+            clear();
+            return;
+        }
+
         final double lengthM = lineLength();
         final List<Integer> drawn = new ArrayList<>(bearings.size());
 

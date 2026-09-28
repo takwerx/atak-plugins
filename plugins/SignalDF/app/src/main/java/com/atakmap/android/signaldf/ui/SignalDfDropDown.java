@@ -629,7 +629,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         final String[] names = {
                 "GPS track -- vehicle mounted, antenna 0 forward",
                 "Manual -- fixed installation, entered once",
-                "Radio -- only with a USB GPS on the Pi, or a fixed\noffset set in the KrakenSDR web interface"
+                "Radio -- requires a USB GPS on the Pi"
         };
         int current = prefs.get(PREF_HEADING, "").trim().isEmpty()
                 ? (prefs.get(ArrayHeading.PREF_FORWARD, false) ? 0 : 2)
@@ -802,6 +802,19 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         }
 
         boolean live = link.isLive();
+        // The house rule is that a panel says what it is not showing, and
+        // nothing is more worth saying than an empty map that has bearings
+        // behind it: with no array heading the map stays clear on purpose,
+        // and without this line that reads as a broken plugin.
+        if (!h.isKnown()) {
+            bearingsNote.setVisibility(View.VISIBLE);
+            bearingsNote.setText("Not on the map: these are measured from "
+                    + "antenna 0, and nothing knows which way that points. "
+                    + "Set a heading source above.");
+            for (Bearing b : latest)
+                vfoRows.addView(row(b, h, live));
+            return;
+        }
         bearingsNote.setVisibility(live ? View.GONE : View.VISIBLE);
         if (!live) {
             long age = link.ageMs();
