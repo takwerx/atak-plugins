@@ -1,0 +1,25 @@
+{
+ "@graph": [
+  {
+   "@id": "https://api.weather.gov/products/9c4e3958-b2e0-4a5e-9363-4d21cd48d151",
+   "id": "9c4e3958-b2e0-4a5e-9363-4d21cd48d151",
+   "issuanceTime": "2026-09-24T03:12:00+00:00",
+   "productCode": "FWS",
+   "issuingOffice": "KEKA"
+  },
+  {
+   "@id": "https://api.weather.gov/products/c258bf85-b160-4881-9ffb-e0e751954612",
+   "id": "c258bf85-b160-4881-9ffb-e0e751954612",
+   "issuanceTime": "2026-09-24T01:46:00+00:00",
+   "productCode": "FWS",
+   "issuingOffice": "KEKA"
+  },
+  {
+   "@id": "https://api.weather.gov/products/86327528-7303-46e6-a4aa-334fb977a193",
+   "id": "86327528-7303-46e6-a4aa-334fb977a193",
+   "issuanceTime": "2026-09-23T23:01:00+00:00",
+   "productCode": "FWS",
+   "issuingOffice": "KEKA"
+  }
+ ]
+}

@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "nws",
+  "displayName": "NWS (United States)",
+  "description": "National Weather Service forecast grid (NDFD), hourly for seven days. US coverage only, public domain, no API key. Two-step: the point lookup returns the gridpoint URL. The grid carries the fire weather elements the hourly product does not: the 20-foot wind, gusts, transport wind, mixing height.",
+  "attribution": "Forecast from the US National Weather Service (api.weather.gov)",
+  "termsUrl": "https://www.weather.gov/documentation/services-web-api",
+  "resolveUrl": "https://api.weather.gov/points/{lat},{lon}",
+  "resolvePath": "properties.forecastGridData",
+  "placePaths": [
+    "properties.relativeLocation.properties.city",
+    "properties.relativeLocation.properties.state"
+  ],
+  "headers": {
+    "Accept": "application/geo+json"
+  },
+  "layout": "grid",
+  "recordsPath": "properties",
+  "parameters": [
+    {
+      "key": "temperature",
+      "label": "Temperature",
+      "quantity": "temperature",
+      "unitPath": "uom",
+      "seriesPath": "temperature",
+      "defaultOn": true
+    },
+    {
+      "key": "relativeHumidity",
+      "label": "Relative humidity",
+      "quantity": "percent",
+      "unitPath": "uom",
+      "seriesPath": "relativeHumidity",
+      "defaultOn": true
+    },
+    {
+      "key": "twentyFootWindSpeed",
+      "label": "20-ft wind",
+      "quantity": "speed",
+      "unitPath": "uom",
+      "seriesPath": "twentyFootWindSpeed",
+      "defaultOn": true
+    },
+    {
+      "key": "twentyFootWindDirection",
+      "label": "20-ft wind direction",
+      "quantity": "angle",
+      "unitPath": "uom",
+      "seriesPath": "twentyFootWindDirection",
+      "defaultOn": true
+    },
+    {
+      "key": "windGust",
+      "label": "Gusts",
+      "quantity": "speed",
+      "unitPath": "uom",
+      "seriesPath": "windGust",
+      "defaultOn": true
+    },
+    {
+      "key": "windSpeed",
+      "label": "Wind (10 m)",
+      "quantity": "speed",
+      "unitPath": "uom",
+      "seriesPath": "windSpeed",
+      "defaultOn": false
+    },
+    {
+      "key": "windDirection",
+      "label": "Wind direction (10 m)",
+      "quantity": "angle",
+      "unitPath": "uom",
+      "seriesPath": "windDirection",
+      "defaultOn": false
+    },
+    {
+      "key": "mixingHeight",
+      "label": "Mixing height",
+      "quantity": "height",
+      "unitPath": "uom",
+      "seriesPath": "mixingHeight",
+      "defaultOn": true
+    },
+    {
+      "key": "transportWindSpeed",
+      "label": "Transport wind",
+      "quantity": "speed",
+      "unitPath": "uom",
+      "seriesPath": "transportWindSpeed",
+      "defaultOn": true
+    },
+    {
+      "key": "transportWindDirection",
+      "label": "Transport wind direction",
+      "quantity": "angle",
+      "unitPath": "uom",
+      "seriesPath": "transportWindDirection",
+      "defaultOn": false
+    },
+    {
+      "key": "wetBulbGlobeTemperature",
+      "label": "Wet bulb globe temperature",
+      "quantity": "temperature",
+      "unitPath": "uom",
+      "seriesPath": "wetBulbGlobeTemperature",
+      "defaultOn": true
+    },
+    {
+      "key": "probabilityOfPrecipitation",
+      "label": "Chance of precipitation",
+      "quantity": "percent",
+      "unitPath": "uom",
+      "seriesPath": "probabilityOfPrecipitation",
+      "defaultOn": true
+    },
+    {
+      "key": "skyCover",
+      "label": "Sky cover",
+      "quantity": "percent",
+      "unitPath": "uom",
+      "seriesPath": "skyCover",
+      "defaultOn": true
+    },
+    {
+      "key": "dewpoint",
+      "label": "Dew point",
+      "quantity": "temperature",
+      "unitPath": "uom",
+      "seriesPath": "dewpoint",
+      "defaultOn": false
+    }
+  ]
+}

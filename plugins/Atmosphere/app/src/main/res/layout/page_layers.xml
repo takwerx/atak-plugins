@@ -1,0 +1,2233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Page 2: the overlays on the map, their shared scrubber and, as they land,
+     each layer's own controls. -->
+<!-- focusableInTouchMode + beforeDescendants: the scroller takes focus itself,
+     so a rebuilt button (the chip row, the layer toggles) cannot pull the page down
+     to itself on the next layout. Without it the forecast opened scrolled past the
+     place, status and now-values (XCover, 2026-09-22). -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fadeScrollbars="false"
+    android:focusableInTouchMode="true"
+    android:descendantFocusability="beforeDescendants">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="8dp">
+
+        <!-- ====== LAYERS: overlays on the map, one toggle each, ON green / OFF red
+             on a plain TakwerxButton the way Traffic does it. Time-enabled layers
+             share the scrubber under the grid. ====== -->
+        <TextView
+            android:id="@+id/layers_heading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/heading_layers"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:paddingTop="8dp"
+            android:alpha="0.6" />
+
+        <!-- Everything at once. "All off" is the one a crew actually reaches for:
+             the map has filled up and they want it back. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/layers_all_on"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="4dp"
+                android:textSize="13sp"
+                android:text="@string/layers_all_on" />
+
+            <Button
+                android:id="@+id/layers_all_off"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:text="@string/layers_all_off" />
+        </LinearLayout>
+
+        <!-- One layer per row, full width, so the list grows downward as layers
+             land rather than squeezing more buttons across. Each layer's own
+             controls sit under its toggle: wind's speed legend here, radar's
+             transparency and dBZ scale when they come. -->
+        <LinearLayout
+            android:id="@+id/layer_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+
+            <!-- Spot forecasts on the map, drawn the way NWS's own Spot Forecast
+                 Monitor draws them. Not time-enabled; on beside anything. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/spot_icon"
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_spot" />
+
+
+                <Button
+                    android:id="@+id/spot_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/spot_layer_off" />
+
+                <ImageButton
+                    android:id="@+id/spot_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/spot_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/spot_layer_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <!-- The filters live on the spot page, not here. Say so: without it
+                     the layer looks like the only place to narrow what is drawn, and
+                     its one toggle looks like the only filter there is (operator,
+                     2026-09-25: "i have no way to filter on map or close to me, its
+                     like that went away"). -->
+                <Button
+                    android:id="@+id/spot_open_list"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="13sp"
+                    android:text="@string/spot_open_list" />
+
+                <TextView
+                    android:id="@+id/spot_where_filters"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="2dp"
+                    android:textSize="12sp"
+                    android:alpha="0.7"
+                    android:text="@string/spot_filters_elsewhere" />
+
+                <Button
+                    android:id="@+id/spot_open_only"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center_vertical|left"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/heading_legend"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <!-- NWS's legend, built in code so the discs are the same art the
+                     map is drawing. -->
+                <LinearLayout
+                    android:id="@+id/spot_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <!-- Fire weather stations, the way NWS's Fire Weather Snooper shows them:
+                 every station in an area with where the wind is from and the two numbers
+                 that decide a burn. Scoped by distance rather than held nationally. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/stations_icon"
+                        android:layout_width="30dp"
+
+                        android:layout_height="30dp"
+
+                        android:layout_gravity="center_vertical"
+
+                        android:layout_marginLeft="2dp"
+
+                        android:layout_marginRight="8dp"
+
+                        android:contentDescription="@null"
+
+                        android:src="@drawable/ic_layer_stations" />
+
+
+                    <Button
+                        android:id="@+id/stations_toggle"
+
+                        android:gravity="left|center_vertical"
+                        style="@style/TakwerxButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/stations_off" />
+
+                    <ImageButton
+                        android:id="@+id/stations_expand"
+                        style="@style/TakwerxIconButton"
+                        android:layout_width="44dp"
+                        android:layout_weight="0"
+                        android:contentDescription="@string/show_settings"
+                        android:src="@drawable/ic_expand"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/stations_settings"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <Button
+                        android:id="@+id/stations_open_list"
+                        style="@style/TakwerxButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="13sp"
+                        android:text="@string/stations_open_list" />
+
+                    <TextView
+                        android:id="@+id/stations_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textColor="@color/white"
+                        android:textSize="13sp"
+                        android:text="" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_around_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <!-- Measured from the operator or from the middle of the map, which is
+                         how a crew looks at a fire they are not standing on. -->
+                    <LinearLayout
+                        android:id="@+id/stations_origin_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_distance_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/stations_distance_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_show_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/stations_show_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_gate_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/stations_gate_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:id="@+id/stations_gate_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textSize="12sp"
+                        android:alpha="0.75"
+                        android:text="" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_label_gate_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/stations_label_gate_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:id="@+id/stations_label_gate_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textSize="12sp"
+                        android:alpha="0.75"
+                        android:text="" />
+
+                    <Button
+                        android:id="@+id/stations_labels"
+                        style="@style/TakwerxButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical|left"
+                        android:textSize="13sp" />
+
+                    <!-- The guide, folded away: it is read once and then never again. -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/stations_guide_toggle"
+
+                            style="@style/TakwerxButton"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical|left"
+                            android:textSize="13sp"
+                            android:text="@string/stations_guide" />
+
+                        <ImageButton
+                            android:id="@+id/stations_guide_expand"
+                            style="@style/TakwerxIconButton"
+                            android:layout_width="44dp"
+                            android:layout_weight="0"
+                            android:contentDescription="@string/show_settings"
+                            android:src="@drawable/ic_expand" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/stations_guide"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/heading_legend"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/stations_legend"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <!-- Says whose criteria these are, because they are not the local
+                         office's own numbers yet. -->
+                    <TextView
+                        android:id="@+id/stations_basis"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textSize="12sp"
+                        android:alpha="0.7"
+                        android:text="" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/group_wind"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/wind_icon"
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_wind" />
+
+
+                <Button
+                    android:id="@+id/wind_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/wind_off" />
+
+                <ImageButton
+                    android:id="@+id/wind_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/wind_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+            <!-- When: one strip, owned by whichever time-enabled layer is on. Only
+                 one of them can be on at a time, so the strip is re-parented into
+                 that layer's settings rather than duplicated; this is its home when
+                 the wind has it. Live first, then the day, then the hour, all as
+                 buttons: a slider on a pager page fights the pager sideways and
+                 steals the page's scroll, and the operator could not work it
+                 (XCover, 2026-09-22: "the slider very hard to work ... so like
+                 live, then pick day and hour"). -->
+            <LinearLayout
+                android:id="@+id/scrubber"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/scrubber_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/scrubber_days"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <LinearLayout
+                    android:id="@+id/scrubber_hours"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <!-- The speed legend, added in code so the custom view is built with the
+                 plugin's own class loader. -->
+            <LinearLayout
+                android:id="@+id/wind_scale_host"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingLeft="4dp"
+                android:paddingRight="4dp"
+                android:paddingTop="4dp"
+                android:visibility="gone" />
+
+            <!-- Wind height: one preset button per level the models carry, lowest first. -->
+            <LinearLayout
+                android:id="@+id/wind_level_block"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- The wind where the pane is pointed. It answers "what is it doing
+                     here", which the moving field alone cannot: the particles show a
+                     shape, not a number (operator, 2026-09-23: "is there no extra
+                     details if i click on the wind?"). The point is the pane's own
+                     (self, map center, a picked point or a favorite), so Pick a point
+                     is the click-to-read this asks for, and it already exists. -->
+                <TextView
+                    android:id="@+id/wind_reading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:text="" />
+
+                <!-- A heading, not a readout: the lit button below says the height,
+                     and the sentence that used to sit here also carried the model's
+                     grid spacing, which is not a thing a crew can act on. -->
+                <TextView
+                    android:id="@+id/wind_level_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/heading_height"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/wind_level_rows"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/group_fire"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <!-- SPC's fire weather outlook, days 1-3, in SPC's colors. Not
+                 time-enabled; on beside anything. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/firewx_icon"
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_firewx" />
+
+
+                <Button
+                    android:id="@+id/firewx_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/firewx_off" />
+
+                <ImageButton
+                    android:id="@+id/firewx_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/firewx_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/firewx_day_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/firewx_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/firewx_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <!-- Smoke: the model's smoke forecast, a time-enabled layer like the
+                 wind, so the time strip moves in here when it is on. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/smoke_icon"
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_smoke" />
+
+
+                <Button
+                    android:id="@+id/smoke_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/smoke_off" />
+
+                <ImageButton
+                    android:id="@+id/smoke_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/smoke_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- The legend, added in code like the wind's. -->
+                <LinearLayout
+                    android:id="@+id/smoke_scale_host"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingLeft="4dp"
+                    android:paddingRight="4dp"
+                    android:paddingTop="4dp" />
+
+                <!-- The smoke at the pane's own point, in words as well as a number. -->
+                <TextView
+                    android:id="@+id/smoke_reading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:text="" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/heading_height"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <!-- Two presets, the two the model carries: at the ground and the
+                     whole sky. -->
+                <LinearLayout
+                    android:id="@+id/smoke_height_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </LinearLayout>
+
+            <!-- Air quality: EPA AirNow's latest hour, not time-enabled, so it never
+                 takes the strip and can be on beside any of the layers above. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/air_icon"
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_air" />
+
+
+                <Button
+                    android:id="@+id/air_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/air_off" />
+
+                <ImageButton
+                    android:id="@+id/air_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/air_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- Which hour is on the map, or what went wrong. -->
+                <TextView
+                    android:id="@+id/air_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <!-- EPA's six categories in EPA's colors, built in code from the same
+                     table the map is drawn with. -->
+                <LinearLayout
+                    android:id="@+id/air_scale"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <!-- The category at the pane's own point. -->
+                <TextView
+                    android:id="@+id/air_reading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:text="" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/group_rain"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <!-- A layer is a row: the toggle, and a chevron when it has settings to
+                 show. The chevron folds the settings away while the layer stays on,
+                 so a page of layers stays a page of layers (operator, 2026-09-22:
+                 "the wind settings need to collapse even while on, so then i can get
+                 to the other sections"). Every layer that lands follows this shape. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/radar_icon"
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_radar" />
+
+
+                <Button
+                    android:id="@+id/radar_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/radar_off" />
+
+                <ImageButton
+                    android:id="@+id/radar_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/radar_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone" />
+
+            <!-- The GOES satellite picture, infrared or visible, the newest frame, as a
+                 picture on the map surface. Not time-enabled. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/satellite_icon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="2dp"
+                    android:layout_marginRight="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_layer_satellite" />
+
+                <Button
+                    android:id="@+id/satellite_toggle"
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/satellite_off" />
+
+                <ImageButton
+                    android:id="@+id/satellite_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/satellite_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/satellite_band_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/satellite_band_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/satellite_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="6dp"
+                    android:textSize="12sp"
+                    android:alpha="0.7"
+                    android:text="@string/satellite_note" />
+            </LinearLayout>
+
+            <!-- Rain: the global model's rain rate, a time-enabled layer like the
+                 wind, so the time strip moves in here when it is on. A forecast,
+                 beside the radar that is the observation. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/rain_icon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="2dp"
+                    android:layout_marginRight="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_layer_rain" />
+
+                <Button
+                    android:id="@+id/rain_toggle"
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/rain_off" />
+
+                <ImageButton
+                    android:id="@+id/rain_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rain_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- The legend, added in code like the wind's. -->
+                <LinearLayout
+                    android:id="@+id/rain_scale_host"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingLeft="4dp"
+                    android:paddingRight="4dp"
+                    android:paddingTop="4dp" />
+
+                <!-- The rain at the pane's own point, in words as well as numbers. -->
+                <TextView
+                    android:id="@+id/rain_reading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:text="" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="6dp"
+                    android:textSize="12sp"
+                    android:alpha="0.7"
+                    android:text="@string/rain_note" />
+            </LinearLayout>
+
+            <!-- WPC's excessive rainfall outlook, days 1-3: the flash flood risk
+                 before the warning, in WPC's colors. Not time-enabled. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/flood_icon"
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_flood" />
+
+
+                <Button
+                    android:id="@+id/flood_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/flood_off" />
+
+                <ImageButton
+                    android:id="@+id/flood_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/flood_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/flood_day_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/flood_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/flood_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <!-- River gauges from the National Water Prediction Service, colored by
+                 flood category the way water.noaa.gov colors them. Scoped by distance
+                 like the stations, and asked for the same way. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/gauges_icon"
+                        android:layout_width="30dp"
+
+                        android:layout_height="30dp"
+
+                        android:layout_gravity="center_vertical"
+
+                        android:layout_marginLeft="2dp"
+
+                        android:layout_marginRight="8dp"
+
+                        android:contentDescription="@null"
+
+                        android:src="@drawable/ic_layer_gauges" />
+
+
+                    <Button
+                        android:id="@+id/gauges_toggle"
+
+                        android:gravity="left|center_vertical"
+                        style="@style/TakwerxButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/gauges_off" />
+
+                    <ImageButton
+                        android:id="@+id/gauges_expand"
+                        style="@style/TakwerxIconButton"
+                        android:layout_width="44dp"
+                        android:layout_weight="0"
+                        android:contentDescription="@string/show_settings"
+                        android:src="@drawable/ic_expand"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/gauges_settings"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <Button
+                        android:id="@+id/gauges_open_list"
+                        style="@style/TakwerxButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="13sp"
+                        android:text="@string/gauges_open_list" />
+
+                    <TextView
+                        android:id="@+id/gauges_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textColor="@color/white"
+                        android:textSize="13sp"
+                        android:text="" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_around_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/gauges_origin_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_distance_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/gauges_distance_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/gauges_show_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/gauges_show_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/gauges_gate_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/gauges_gate_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:id="@+id/gauges_gate_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textSize="12sp"
+                        android:alpha="0.75"
+                        android:text="" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_label_gate_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/gauges_label_gate_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:id="@+id/gauges_label_gate_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textSize="12sp"
+                        android:alpha="0.75"
+                        android:text="" />
+
+                    <Button
+                        android:id="@+id/gauges_labels"
+                        style="@style/TakwerxButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:gravity="center_vertical|left"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/heading_legend"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <!-- water.noaa.gov's legend, built in code so the swatches are the
+                         same colors the map is drawing. -->
+                    <LinearLayout
+                        android:id="@+id/gauges_legend"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textSize="12sp"
+                        android:alpha="0.7"
+                        android:text="@string/gauges_credit" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Where the river model puts water over the banks: the National Water
+                 Prediction Service's modeled flood inundation extent, now or at the
+                 worst of the next five days, as a picture on the map surface. The
+                 service calls itself experimental. Not time-enabled. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/floodground_icon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="2dp"
+                    android:layout_marginRight="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_layer_floodground" />
+
+                <Button
+                    android:id="@+id/floodground_toggle"
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/floodground_off" />
+
+                <ImageButton
+                    android:id="@+id/floodground_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/floodground_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/flood_when_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/floodground_when_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/floodground_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/floodground_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="6dp"
+                    android:textSize="12sp"
+                    android:alpha="0.7"
+                    android:text="@string/floodground_note" />
+            </LinearLayout>
+
+            <!-- Streams the river model has over their high-water mark, as lines in the
+                 service's colors for how rare the flow is, with the numbers behind a tap.
+                 Same horizon as the flooded ground picture. Not time-enabled. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/highflow_icon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="2dp"
+                    android:layout_marginRight="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_layer_highflow" />
+
+                <Button
+                    android:id="@+id/highflow_toggle"
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/highflow_off" />
+
+                <ImageButton
+                    android:id="@+id/highflow_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/highflow_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/flood_when_heading"
+                    android:textSize="10sp"
+                    android:textAllCaps="true"
+                    android:alpha="0.6" />
+
+                <LinearLayout
+                    android:id="@+id/highflow_when_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/highflow_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/highflow_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="6dp"
+                    android:textSize="12sp"
+                    android:alpha="0.7"
+                    android:text="@string/highflow_note" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/group_ocean"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <!-- Buoys and coastal stations from NDBC. The file is national and fetched whole,
+                 so this layer sends nothing about where the operator is. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/buoys_icon"
+                        android:layout_width="30dp"
+
+                        android:layout_height="30dp"
+
+                        android:layout_gravity="center_vertical"
+
+                        android:layout_marginLeft="2dp"
+
+                        android:layout_marginRight="8dp"
+
+                        android:contentDescription="@null"
+
+                        android:src="@drawable/ic_layer_buoys" />
+
+
+                    <Button
+                        android:id="@+id/buoys_toggle"
+
+                        android:gravity="left|center_vertical"
+                        style="@style/TakwerxButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/buoys_off" />
+
+                    <ImageButton
+                        android:id="@+id/buoys_expand"
+                        style="@style/TakwerxIconButton"
+                        android:layout_width="44dp"
+                        android:layout_weight="0"
+                        android:contentDescription="@string/show_settings"
+                        android:src="@drawable/ic_expand"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/buoys_settings"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <Button
+                        android:id="@+id/buoys_open_list"
+                        style="@style/TakwerxButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="13sp"
+                        android:text="@string/buoys_open_list" />
+
+                    <TextView
+                        android:id="@+id/buoys_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textColor="@color/white"
+                        android:textSize="13sp"
+                        android:text="" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_around_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/buoys_origin_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_distance_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/buoys_distance_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/buoys_show_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/buoys_show_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/buoys_gate_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/buoys_gate_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:id="@+id/buoys_gate_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textSize="12sp"
+                        android:alpha="0.75"
+                        android:text="" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/stations_label_gate_heading"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <LinearLayout
+                        android:id="@+id/buoys_label_gate_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                    <TextView
+                        android:id="@+id/buoys_label_gate_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textSize="12sp"
+                        android:alpha="0.75"
+                        android:text="" />
+
+                    <Button
+                        android:id="@+id/buoys_labels"
+                        style="@style/TakwerxButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:gravity="center_vertical|left"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/heading_legend"
+                        android:textSize="10sp"
+                        android:textAllCaps="true"
+                        android:alpha="0.6" />
+
+                    <!-- What the three colors mean, built in code. -->
+                    <LinearLayout
+                        android:id="@+id/buoys_legend"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textSize="12sp"
+                        android:alpha="0.7"
+                        android:text="@string/buoys_credit" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Waves: the wave model's height and swell, a time-enabled layer like the
+                 wind, so the time strip moves in here when it is on. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/waves_icon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="2dp"
+                    android:layout_marginRight="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_layer_waves" />
+
+                <Button
+                    android:id="@+id/waves_toggle"
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/waves_off" />
+
+                <ImageButton
+                    android:id="@+id/waves_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/waves_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- The legend, added in code like the wind's. -->
+                <LinearLayout
+                    android:id="@+id/waves_scale_host"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingLeft="4dp"
+                    android:paddingRight="4dp"
+                    android:paddingTop="4dp" />
+
+                <!-- The seas at the pane's own point, in words as well as numbers. -->
+                <TextView
+                    android:id="@+id/waves_reading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="15sp"
+                    android:text="" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="6dp"
+                    android:textSize="12sp"
+                    android:alpha="0.7"
+                    android:text="@string/waves_note" />
+            </LinearLayout>
+
+            <!-- The NWS beach forecast for the coast in view: each beach area filled
+                 by its rip current risk. Not time-enabled. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/beach_icon"
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_beach" />
+
+
+                <Button
+                    android:id="@+id/beach_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/beach_off" />
+
+                <ImageButton
+                    android:id="@+id/beach_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/beach_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/beach_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/beach_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <!-- Sea surface temperature from nowCOAST, as a picture on the map surface. Not time-enabled. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/sst_icon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="2dp"
+                    android:layout_marginRight="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_layer_sst" />
+
+                <Button
+                    android:id="@+id/sst_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/sst_off" />
+
+                <ImageButton
+                    android:id="@+id/sst_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/sst_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/sst_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/sst_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/tropical_icon"
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_hurricane" />
+
+
+                <Button
+                    android:id="@+id/tropical_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/tropical_off" />
+
+                <ImageButton
+                    android:id="@+id/tropical_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- What is running, one line each: an empty map and a broken layer look
+                 the same, and most of the year "no storms" is the true answer. -->
+            <LinearLayout
+                android:id="@+id/tropical_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tropical_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <!-- What the track colors mean, on the Saffir-Simpson scale every
+                     track map uses. Built in code so the swatches come from the same
+                     table the map draws with and cannot drift from it. -->
+                <LinearLayout
+                    android:id="@+id/tropical_scale"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="horizontal" />
+
+                <LinearLayout
+                    android:id="@+id/tropical_rows"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/group_snow"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <!-- Avalanche forecast zones, filled in the danger color the center
+                 publishes; gray off season so the map still says where a forecast
+                 would come from. Not time-enabled; on beside anything. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/avalanche_icon"
+                    android:layout_width="30dp"
+
+                    android:layout_height="30dp"
+
+                    android:layout_gravity="center_vertical"
+
+                    android:layout_marginLeft="2dp"
+
+                    android:layout_marginRight="8dp"
+
+                    android:contentDescription="@null"
+
+                    android:src="@drawable/ic_layer_avalanche" />
+
+
+                <Button
+                    android:id="@+id/avalanche_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/avalanche_off" />
+
+                <ImageButton
+                    android:id="@+id/avalanche_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/avalanche_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/avalanche_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <!-- The danger scale, built in code from the table the map draws with. -->
+                <LinearLayout
+                    android:id="@+id/avalanche_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <!-- SNOTEL stations: snow depth, water equivalent and temperature at each, colored like the analysis. Not time-enabled. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/snotel_icon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="2dp"
+                    android:layout_marginRight="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_layer_snotel" />
+
+                <Button
+                    android:id="@+id/snotel_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/snotel_off" />
+
+                <ImageButton
+                    android:id="@+id/snotel_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/snotel_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/snotel_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/snotel_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
+            <!-- NOHRSC's daily snow depth analysis, as a picture on the map surface. Not time-enabled. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/snow_icon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="2dp"
+                    android:layout_marginRight="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_layer_snow" />
+
+                <Button
+                    android:id="@+id/snow_toggle"
+
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/snow_off" />
+
+                <ImageButton
+                    android:id="@+id/snow_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/snow_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/snow_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/snow_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Credits what this page draws, which is not what the forecast page draws:
+             the wind comes from NOAA's model files and the radar from an NWS map
+             service, neither of them the forecast API. The forecast's own credit
+             sits on the forecast page, where it used to be written into this view. -->
+        <TextView
+            android:id="@+id/layers_attribution"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:layout_marginTop="@dimen/auto_margin"
+            android:text="" />
+    </LinearLayout>
+</ScrollView>
