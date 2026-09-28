@@ -45,7 +45,7 @@
     <string name="stations_label_gate_heading">Draw their readings at this zoom or closer</string>
     <string name="stations_always">Always</string>
     <string name="stations_allow_title">Show weather stations?</string>
-    <string name="stations_allow_text">Atmosphere will ask the National Interagency Fire Center for the fire weather stations around you and what they are reading.\n\nUnlike the other layers, this one sends a position: the point you measure from, rounded as far as your precision setting says. Switch it to Map center if you would rather it never send where you are.\n\nServer: services3.arcgis.com</string>
+    <string name="stations_allow_text">Atmosphere will ask the National Interagency Fire Center for the fire weather stations around you and what they are reading.\n\nUnlike the other layers, this one sends a position: the point you measure from, rounded to about 100 m. Switch it to Map center if you would rather it never send where you are.\n\nServer: services3.arcgis.com</string>
     <string name="stations_on">Weather stations ON</string>
     <string name="gauges_on">River gauges ON</string>
     <string name="gauges_open_list">Open the gauge list</string>
@@ -54,7 +54,7 @@
     <string name="gauges_gate_heading">Draw gauges at this zoom or closer</string>
     <string name="gauges_off">River gauges OFF</string>
     <string name="gauges_allow_title">Show river gauges?</string>
-    <string name="gauges_allow_text">Atmosphere will ask the National Water Prediction Service for the river gauges around you, what they read and what they forecast.\n\nLike the weather stations, this one sends a position: a box around the point you measure from, rounded as far as your precision setting says. Switch it to Map center if you would rather it never send where you are.\n\nServer: api.water.noaa.gov</string>
+    <string name="gauges_allow_text">Atmosphere will ask the National Water Prediction Service for the river gauges around you, what they read and what they forecast.\n\nLike the weather stations, this one sends a position: a box around the point you measure from, rounded to about 100 m. Switch it to Map center if you would rather it never send where you are.\n\nServer: api.water.noaa.gov</string>
     <string name="buoys_on">Buoys ON</string>
     <string name="buoys_off">Buoys OFF</string>
     <string name="buoys_open_list">Open the buoy list</string>
@@ -245,7 +245,6 @@
     <string name="radar_allow_text">Radar comes from the US National Weather Service, the same picture their own radar site draws.\n\nOver Canada the picture is Environment Canada\'s. Everywhere else, from Mexico south of the border radars to the rest of the world, it is RainViewer\'s composite of the public radars of some 150 countries.\n\nTurning it on lets Atmosphere ask them for radar over the part of the map you are looking at. Nothing else about you is sent.\n\nServers: opengeo.ncep.noaa.gov, geo.weather.gc.ca, api.rainviewer.com, tilecache.rainviewer.com</string>
     <string name="variables">What to show</string>
     <string name="sources">Weather services</string>
-    <string name="privacy">Position sent</string>
     <string name="pick_point">Pick a point</string>
     <string name="pick_prompt">Tap the map to pick the point</string>
     <string name="picked_point">Picked point</string>
@@ -284,15 +283,11 @@
     <string name="remove">Remove</string>
 
     <!-- Dialogs -->
-    <string name="allow_source">Allow %1$s</string>
-    <string name="not_allowed_suffix">, not allowed</string>
-    <string name="source_allow_title">Allow %1$s?</string>
-    <string name="source_allow_text">The forecast will come from %1$s. Allowing it lets Atmosphere ask it for the forecast at the point you are reading, rounded as set in Position sent. Nothing else about you is sent.\n\nServers: %2$s</string>
     <string name="source_title">Weather service</string>
+    <string name="forecast_from">Forecast from %1$s</string>
     <string name="label_source">Weather service</string>
     <string name="label_where">Where</string>
     <string name="variables_title">What to show</string>
-    <string name="privacy_title">Position sent</string>
     <string name="no_sources">No weather service available</string>
     <string name="source_problems">Weather service problems</string>
     <string name="close">Close</string>

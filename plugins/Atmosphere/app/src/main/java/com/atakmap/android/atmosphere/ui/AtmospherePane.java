@@ -174,8 +174,6 @@ public final class AtmospherePane {
     private final Button settingsButton;
     private final TextView positionText;
     private final TextView statusText;
-    /** Under the status line, only while the chosen weather service is not allowed. */
-    private final Button allowSourceButton;
     private final TextView currentHeading;
     private final LinearLayout currentContainer;
     private final TextView seriesHeading;
@@ -505,7 +503,6 @@ public final class AtmospherePane {
         settingsButton = find(R.id.settings_button);
         positionText = find(R.id.position_text);
         statusText = find(R.id.status_text);
-        allowSourceButton = find(R.id.allow_source_button);
         currentHeading = find(R.id.current_heading);
         currentContainer = find(R.id.current_container);
         seriesHeading = find(R.id.series_heading);
@@ -716,8 +713,11 @@ public final class AtmospherePane {
         wireLayers();
 
         final SharedPreferences prefs = MapCompat.prefs();
+        // US units until someone picks otherwise, the same default every layer
+        // already had (operator, 2026-09-28: "this is like a north american tool
+        // ... for like first start up").
         units = UnitSystem.fromName(prefs == null ? null
-                : prefs.getString(PREF_UNITS, null), UnitSystem.METRIC);
+                : prefs.getString(PREF_UNITS, null), UnitSystem.IMPERIAL);
         favorites = new Favorites(MapCompat.atakContext());
         favorite = favorites.byName(prefs == null ? null : prefs.getString(PREF_FAVORITE, null));
         pickedPoint = parsePoint(prefs == null ? null : prefs.getString(PREF_PICKED, null));
@@ -4969,22 +4969,6 @@ public final class AtmospherePane {
                     : line + "\n" + pluginContext.getString(R.string.smoke_cropped);
         smokeReading.setText(line);
     }
-
-    /**
-     * A distance a crew can picture, for the position-rounding choices. Decimal places
-     * are a way of storing a number, not a thing anybody can stand in.
-     */
-    private String roughly(int meters) {
-        if (units == UnitSystem.METRIC)
-            return meters >= 1000 ? Math.round(meters / 1000.0) + " km" : meters + " m";
-        final double feet = meters / 0.3048;
-        if (feet >= 5280)
-            return Math.round(feet / 5280) + " mi";
-        if (feet >= 900)
-            return (Math.round(feet / 528) / 10.0) + " mi";
-        return Math.round(feet / 3) + " yd";
-    }
-
     /** The legend's numbers follow the operator's unit, like every other speed. */
     private void updateWindScale() {
         final float[] breaks = new float[WindScaleView.bandCount() - 1];
@@ -5026,52 +5010,17 @@ public final class AtmospherePane {
 
     private void loadSelectedSource(SharedPreferences prefs) {
         final String storedId = prefs == null ? null : prefs.getString(PREF_SOURCE, null);
+        // NWS on a new install, by name rather than by the order the files load in.
+        final String wanted = storedId != null ? storedId : "nws";
         int index = 0;
         for (int i = 0; i < sources.size(); i++) {
-            if (sources.get(i).id.equals(storedId)) {
+            if (sources.get(i).id.equals(wanted)) {
                 index = i;
                 break;
             }
         }
         if (!sources.isEmpty())
             selected = sources.get(index);
-    }
-
-    /**
-     * The source picker: a single-choice dialog on ATAK's own context. Never a
-     * Spinner: its dropdown is a Dialog built from the context that inflated the
-     * view, and on the plugin context that is a BadTokenException that kills ATAK
-     * (plugin UI standard, CLAUDE.md).
-     */
-    private void showSourceDialog() {
-        if (sources.isEmpty())
-            return;
-        final Context ctx = MapCompat.atakContext();
-        if (ctx == null)
-            return;
-        final String[] names = sourceNames();
-        // A service that is chosen but not allowed is not marked. NWS is the
-        // default, so a new install opened this list with NWS already marked and
-        // nothing to say it was not allowed: nobody picks what is already picked.
-        final int checked = selected == null || !egress.isEnabled(selected) ? -1
-                : sources.indexOf(selected);
-        new AlertDialog.Builder(ctx)
-                .setTitle(pluginContext.getString(R.string.source_title))
-                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        d.dismiss();
-                        if (which < 0 || which >= sources.size())
-                            return;
-                        final WxSourceDef def = sources.get(which);
-                        if (egress.isEnabled(def))
-                            chooseSource(def);
-                        else
-                            askToAllowSource(def);
-                    }
-                })
-                .setNegativeButton(pluginContext.getString(R.string.close), null)
-                .show();
     }
 
     private void chooseSource(WxSourceDef def) {
@@ -5083,92 +5032,48 @@ public final class AtmospherePane {
         refresh(true);
     }
 
-    /**
-     * Choosing a service that is not allowed yet asks for it right there, naming
-     * its servers, the way a layer does. The operator's first run on the S22
-     * (2026-09-27) picked NWS in the service list, got nothing, and had to find a
-     * second, look-alike row to turn it on: "thats confusing AF". Allow turns it
-     * on and chooses it in one step; Close leaves both as they were. The Forecast
-     * page's Allow button asks the same question.
-     */
-    private void askToAllowSource(final WxSourceDef def) {
-        final Context ctx = MapCompat.atakContext();
-        if (ctx == null)
-            return;
-        if (def.requiresApiKey) {
-            Toast.makeText(ctx, egress.refuse(def), Toast.LENGTH_LONG).show();
-            return;
-        }
-        new AlertDialog.Builder(ctx)
-                .setTitle(pluginContext.getString(R.string.source_allow_title, def.displayName))
-                .setMessage(pluginContext.getString(R.string.source_allow_text, def.displayName,
-                        hosts(def)))
-                .setPositiveButton(pluginContext.getString(R.string.allow),
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                egress.setEnabled(def, true);
-                                chooseSource(def);
-                            }
-                        })
-                .setNegativeButton(pluginContext.getString(R.string.close), null)
-                .show();
-    }
-
-    /**
-     * The Allow button shows while the chosen service is not allowed, right under
-     * the line that says so. Saying "not allowed" on the page and keeping the fix
-     * two dialogs away, in a list that already showed NWS as chosen, took a first
-     * run two steps and a search (operator, 2026-09-27: "it was confusing").
-     */
-    private void updateAllowButton() {
-        final boolean show = selected != null && !selected.requiresApiKey
-                && !egress.isEnabled(selected);
-        allowSourceButton.setVisibility(show ? View.VISIBLE : View.GONE);
-        if (show)
-            allowSourceButton.setText(pluginContext.getString(R.string.allow_source,
-                    selected.displayName));
-    }
-
     /** The gear: everything that is not the readout itself. */
     private void showSettingsDialog() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
             return;
-        // No "Allowed services" row. It was the only place a service could be
-        // allowed before choosing one asked by itself; after that all it did was
-        // hold a second switch for the same thing, and a first run needed both
-        // (operator, 2026-09-27: "why even have the allowed services? seems
-        // redundant"). Only the chosen service is ever asked, so choosing is enough.
-        final String[] items = {
-                pluginContext.getString(R.string.source_title) + ": "
-                        + (selected == null ? pluginContext.getString(R.string.no_sources)
-                                : sourceName(selected) + (egress.isEnabled(selected) ? ""
-                                        : pluginContext.getString(R.string.not_allowed_suffix))),
-                pluginContext.getString(R.string.variables_title),
-                pluginContext.getString(R.string.privacy_title),
-        };
-        new AlertDialog.Builder(ctx)
-                .setTitle(pluginContext.getString(R.string.settings_title))
-                .setItems(items, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        switch (which) {
-                            case 0: showSourceDialog(); break;
-                            case 1: showVariablesDialog(); break;
-                            default: showPrivacyDialog(); break;
-                        }
-                    }
-                })
-                .setNegativeButton(pluginContext.getString(R.string.close), null)
-                .show();
-    }
-
-    private String[] sourceNames() {
+        // One window: the services are the list, picked with one tap, and What
+        // to show is its button. Picking a service is the whole
+        // decision, no allow step (operator, 2026-09-28: "dont have allow just
+        // pick one ... your just picking a forecast service"; "you click on
+        // forecast settings why am i not just picking weather service all at
+        // once"). It only changes the Forecast page; every map layer has its own
+        // source and its own one-time question. No Position sent button: the point
+        // is always rounded to about 100 m ("just remove it its confusing").
         final String[] names = new String[sources.size()];
         for (int i = 0; i < sources.size(); i++)
-            names[i] = sourceName(sources.get(i));
-        return names;
+            names[i] = pluginContext.getString(R.string.forecast_from, sourceName(sources.get(i)));
+        final int checked = selected == null ? -1 : sources.indexOf(selected);
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.settings_title))
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (which < 0 || which >= sources.size())
+                            return;
+                        final WxSourceDef def = sources.get(which);
+                        if (def.requiresApiKey) {
+                            Toast.makeText(ctx, egress.refuse(def), Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        if (def != selected)
+                            chooseSource(def);
+                    }
+                })
+                .setNeutralButton(pluginContext.getString(R.string.variables_title),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                showVariablesDialog();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
     }
 
     /** External (operator-dropped) definitions are marked, as the Sources dialog marks them. */
@@ -5233,14 +5138,6 @@ public final class AtmospherePane {
             @Override
             public void onClick(View v) {
                 showSettingsDialog();
-            }
-        });
-
-        allowSourceButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (selected != null)
-                    askToAllowSource(selected);
             }
         });
     }
@@ -5443,7 +5340,6 @@ public final class AtmospherePane {
     }
 
     private void refresh(boolean force) {
-        updateAllowButton();
         if (selected == null) {
             statusText.setText(R.string.no_sources);
             return;
@@ -5459,7 +5355,7 @@ public final class AtmospherePane {
         }
 
         // The point being read, and nothing about how it is rounded on the way
-        // out; that belongs in Position sent, not on a line read every time.
+        // out; that is fixed at about 100 m and is not a line read every time.
         positionText.setText(modeLabel() + " \u2014 " + egress.latitude(p) + ", "
                 + egress.longitude(p));
         statusText.setTextColor(Color.parseColor("#dfb228"));
@@ -5488,9 +5384,11 @@ public final class AtmospherePane {
                             + Snapshot.describeAge(age));
                     render();
                 } else {
+                    // Every section, not just Now: the hours strip and the days
+                    // from the last point stayed drawn under the message.
                     statusText.setText(message);
-                    currentContainer.removeAllViews();
-                    trendChips.removeAllViews();
+                    snapshot = null;
+                    render();
                 }
             }
         });
@@ -6336,47 +6234,6 @@ public final class AtmospherePane {
                     }
                 })
                 .setNegativeButton(pluginContext.getString(R.string.close), null)
-                .show();
-    }
-
-    private void showPrivacyDialog() {
-        final Context ctx = MapCompat.atakContext();
-        if (ctx == null)
-            return;
-
-        final int[] choices = {0, 1, 2, 3, 4};
-        final String[] labels = new String[choices.length];
-        for (int i = 0; i < choices.length; i++) {
-            labels[i] = "Rounded to about " + roughly(
-                    EgressPolicy.approximateMeters(choices[i]));
-        }
-
-        int current = 0;
-        for (int i = 0; i < choices.length; i++) {
-            if (choices[i] == egress.positionDecimals()) {
-                current = i;
-                break;
-            }
-        }
-
-        new AlertDialog.Builder(ctx)
-                .setTitle(pluginContext.getString(R.string.privacy_title))
-                .setMessage("Asking for a forecast means saying roughly where you "
-                        + "are. This sets how exact that is. Nothing else about you "
-                        + "is sent.")
-                .setSingleChoiceItems(labels, current,
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                egress.setPositionDecimals(choices[which]);
-                            }
-                        })
-                .setPositiveButton(pluginContext.getString(R.string.close), new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        refresh(false);
-                    }
-                })
                 .show();
     }
 

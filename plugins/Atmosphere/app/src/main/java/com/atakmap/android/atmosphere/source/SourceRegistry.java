@@ -26,8 +26,9 @@ import java.util.Map;
  * </ol>
  *
  * <p>Later wins on a duplicate {@code sourceId}, so an external file with the same id as
- * a bundled one <b>replaces</b> it. That is how a unit fixes a provider's URL change in
- * the field without waiting for a release.
+ * a bundled one <b>replaces</b> it, as long as it keeps the bundled one's servers. That
+ * is how a unit fixes a provider's URL change in the field without waiting for a
+ * release. One that names other servers is refused and reported (see accept).
  *
  * <p>Nothing here touches the network. Loading a definition does not make a request —
  * see {@code EgressPolicy}.
@@ -139,6 +140,23 @@ public final class SourceRegistry {
             return;
 
         final WxSourceDef previous = byId.get(result.def.id);
+        // A file may fix a built-in service's URLs on the same servers, the field fix
+        // this override exists for. It may not move one to another server: picking a
+        // service is the only consent the forecast asks for now, and NWS is picked on
+        // a new install, so a dropped file named "nws" with its own host would have
+        // received every first-run request and shown its numbers as the NWS forecast
+        // (security review, 2026-09-28). Given its own sourceId it is offered as a
+        // separate, marked choice, used only when someone picks it.
+        if (previous != null && previous.origin == WxSourceDef.Origin.BUNDLED
+                && !previous.hostsKey().equals(result.def.hostsKey())) {
+            final StringBuilder hosts = new StringBuilder();
+            for (String h : result.def.hosts())
+                hosts.append(hosts.length() == 0 ? "" : ", ").append(h);
+            problems.add(file + " uses the id of the built-in " + previous.displayName
+                    + " but other servers (" + hosts + "), so it is ignored. Give it its"
+                    + " own sourceId to offer it as a separate choice in Forecast settings.");
+            return;
+        }
         if (previous != null) {
             Log.d(TAG, result.def.id + ": " + file + " overrides " + previous.originFile);
             // Keep insertion order stable so the source list does not jump around when a

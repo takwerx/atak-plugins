@@ -15,27 +15,20 @@ import java.util.Locale;
  * spread across the request code:
  *
  * <ol>
- *   <li><b>A source cannot reach the network until the operator enables it.</b> Bundled
- *       definitions ship disabled. There is no "default provider" quietly fetching.</li>
+ *   <li><b>Nothing reaches the network without the operator's choice.</b> A map layer
+ *       asks once, naming its server, before its first request. The forecast asks only
+ *       the weather service the operator has picked: picking it is the choice, with no
+ *       second allow step (operator, 2026-09-28: "your just picking a forecast
+ *       service"). NWS is picked on a new install.</li>
  *   <li><b>Position precision is a decision, not an accident.</b> A weather query needs
  *       to know roughly where you are; a provider does not need your exact position to
- *       three decimal places of a second. Coordinates are rounded before they leave, and
- *       the operator picks how coarse.</li>
+ *       three decimal places of a second. Coordinates are rounded to about 100 m before they
+ *       leave.</li>
  * </ol>
  */
 public final class EgressPolicy {
 
-    private static final String PREF_ENABLED_PREFIX = "weather.source.enabled.";
-    /**
-     * The hosts the operator saw when enabling a source. A definition file on the
-     * sdcard may replace a bundled source under the same id (that is how a provider's
-     * URL change is fixed in the field), and consent keyed by id alone would carry
-     * over to whatever hosts the new file names. Consent is to the hosts, so a
-     * changed host asks again (security review, 2026-09-27).
-     */
-    private static final String PREF_HOSTS_PREFIX = "weather.source.hosts.";
     private static final String PREF_LAYER_PREFIX = "weather.layer.enabled.";
-    private static final String PREF_PRECISION = "weather.position.decimals";
 
     /** ~110 m at the equator. Plenty for a forecast, coarse enough not to be a fix. */
     public static final int DEFAULT_DECIMALS = 3;
@@ -53,37 +46,9 @@ public final class EgressPolicy {
         return userAgent;
     }
 
-    public boolean isEnabled(WxSourceDef def) {
-        if (def == null)
-            return false;
-        final SharedPreferences prefs = MapCompat.prefs();
-        if (prefs == null)
-            return false;
-        return prefs.getBoolean(PREF_ENABLED_PREFIX + def.id, false)
-                && def.hostsKey().equals(prefs.getString(PREF_HOSTS_PREFIX + def.id, null));
-    }
-
-    /** Enabled once, but the definition's hosts have changed since. */
-    public boolean hostsChanged(WxSourceDef def) {
-        final SharedPreferences prefs = MapCompat.prefs();
-        if (prefs == null || def == null)
-            return false;
-        final String seen = prefs.getString(PREF_HOSTS_PREFIX + def.id, null);
-        return prefs.getBoolean(PREF_ENABLED_PREFIX + def.id, false)
-                && seen != null && !seen.equals(def.hostsKey());
-    }
-
-    public void setEnabled(WxSourceDef def, boolean enabled) {
-        final SharedPreferences prefs = MapCompat.prefs();
-        if (prefs == null || def == null)
-            return;
-        prefs.edit().putBoolean(PREF_ENABLED_PREFIX + def.id, enabled)
-                .putString(PREF_HOSTS_PREFIX + def.id, enabled ? def.hostsKey() : null).apply();
-    }
-
     /**
-     * Map layers are gated like sources: off until the operator allows the host, once,
-     * by name. A layer request carries no position beyond the map view's extent.
+     * Map layers are off until the operator allows the host, once, by name. A layer
+     * request carries no position beyond the map view's extent unless the layer says so.
      */
     public boolean isLayerEnabled(String layerId) {
         final SharedPreferences prefs = MapCompat.prefs();
@@ -98,40 +63,15 @@ public final class EgressPolicy {
         prefs.edit().putBoolean(PREF_LAYER_PREFIX + layerId, enabled).apply();
     }
 
-    /** Decimal places kept on coordinates sent to a provider. 0 disables rounding. */
+    /**
+     * Decimal places kept on coordinates sent to a provider: always about 100 m. It was
+     * a setting ("Position sent") until 2026-09-28, when the operator took it out as
+     * confusing; a value an older build stored is ignored, so no phone keeps a
+     * rounding nobody can see or change.
+     */
     public int positionDecimals() {
-        final SharedPreferences prefs = MapCompat.prefs();
-        if (prefs == null)
-            return DEFAULT_DECIMALS;
-        final int d = prefs.getInt(PREF_PRECISION, DEFAULT_DECIMALS);
-        return d < 0 ? DEFAULT_DECIMALS : Math.min(d, 6);
+        return DEFAULT_DECIMALS;
     }
-
-    public void setPositionDecimals(int decimals) {
-        final SharedPreferences prefs = MapCompat.prefs();
-        if (prefs == null)
-            return;
-        prefs.edit().putInt(PREF_PRECISION, Math.max(0, Math.min(decimals, 6))).apply();
-    }
-
-    /** How coarse the current setting is, in meters, for the settings UI. */
-    public static int approximateMeters(int decimals) {
-        switch (decimals) {
-            case 0:
-                return 111000;
-            case 1:
-                return 11100;
-            case 2:
-                return 1110;
-            case 3:
-                return 111;
-            case 4:
-                return 11;
-            default:
-                return 1;
-        }
-    }
-
     /** The latitude as it will be sent — rounded, formatted, no locale surprises. */
     public String latitude(GeoPoint point) {
         return format(point.getLatitude());
@@ -156,32 +96,10 @@ public final class EgressPolicy {
     public String refuse(WxSourceDef def) {
         if (def == null)
             return "no source selected";
-        if (!isEnabled(def))
-            // The path is named the way the pane names it: nothing on screen is
-            // called "Sources" (the operator's first run on the S22, 2026-09-27).
-            // The Forecast page puts an Allow button under this line; it points
-            // there, not into the settings.
-            return def.displayName + (hostsChanged(def)
-                    ? " now sends its requests to " + hostList(def) + ", not where it did "
-                            + "when it was allowed. Tap Allow below to allow that."
-                    : " is not allowed yet, so nothing has been sent to "
-                            + hostList(def) + ". Tap Allow below.");
         if (def.requiresApiKey)
             return def.displayName + " needs an API key, and this build does not store "
                     + "keys yet.";
         return null;
     }
 
-    private static String hostList(WxSourceDef def) {
-        final java.util.List<String> hosts = def.hosts();
-        if (hosts.isEmpty())
-            return "its provider";
-        final StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < hosts.size(); i++) {
-            if (i > 0)
-                sb.append(", ");
-            sb.append(hosts.get(i));
-        }
-        return sb.toString();
-    }
 }
