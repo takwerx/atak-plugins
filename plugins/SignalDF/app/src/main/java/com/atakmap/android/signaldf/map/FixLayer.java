@@ -94,7 +94,16 @@ public final class FixLayer {
     public FixLayer(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
         this.plugin = pluginContext;
-        this.iconDir = pluginContext.getFilesDir();
+        // ATAK's own area, NOT pluginContext.getFilesDir(). A plugin's code
+        // runs inside ATAK's process under ATAK's uid, and the plugin
+        // package's private data directory belongs to a different uid -- so
+        // that path names a directory this process can neither create nor
+        // write, mkdirs() and all. The PNG write fails with ENOENT, icon()
+        // returns null, and the marker goes on the map with no icon: present,
+        // tappable, and completely invisible. Atmosphere writes its storm
+        // icons under tools/atmosphere for the same reason.
+        this.iconDir = com.atakmap.coremap.filesystem.FileSystemUtils
+                .getItem("tools/signaldf");
     }
 
     /**
@@ -111,6 +120,15 @@ public final class FixLayer {
     private Icon icon(int drawableId, String name, int size, int tint) {
         File out = new File(iconDir, name + ".png");
         if (!out.isFile()) {
+            // getFilesDir() names the directory; it does not create it on a
+            // plugin context, which ATAK builds with createPackageContext and
+            // never writes to. Without this the PNG write fails with ENOENT,
+            // icon() returns null, and the marker goes onto the map with no
+            // icon -- present, tappable, and completely invisible, which is a
+            // much worse failure than a missing marker would have been.
+            if (!iconDir.isDirectory())
+                //noinspection ResultOfMethodCallIgnored
+                iconDir.mkdirs();
             Bitmap bmp = null;
             try {
                 Drawable d = plugin.getResources().getDrawable(drawableId);
@@ -230,8 +248,13 @@ public final class FixLayer {
         if (advice != null)
             remarks.append('\n').append(advice);
         m.setMetaString("remarks", remarks.toString());
-        if (m.getGroup() == null)
+        if (m.getGroup() == null) {
             group().addItem(m);
+            com.atakmap.coremap.log.Log.d("SignalDF.FixLayer",
+                    "fix marker on the map at " + at.getLatitude() + ","
+                            + at.getLongitude() + " icon="
+                            + (m.getIcon() != null));
+        }
     }
 
     // ---- the uncertainty ----------------------------------------------------
@@ -275,8 +298,12 @@ public final class FixLayer {
         s.setFillColor(ELLIPSE_FILL);
         s.setStrokeWeight(2.0);
         s.setTitle("95% area");
-        if (s.getGroup() == null)
+        if (s.getGroup() == null) {
             group().addItem(s);
+            com.atakmap.coremap.log.Log.d("SignalDF.FixLayer",
+                    "ellipse on the map, " + Math.round(semiMajorM) + " by "
+                            + Math.round(semiMinorM) + " m");
+        }
     }
 
     // ---- where you have been ------------------------------------------------
