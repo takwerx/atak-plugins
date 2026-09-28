@@ -350,6 +350,8 @@ public final class BearingPublisher implements KrakenLink.Listener {
         // bearing with no heading behind it is relative to an antenna and must
         // never be published as if it were a compass bearing.
         ArrayHeading heading = ArrayHeading.resolve(operatorHeading(),
+                ArrayHeading.vehicleDegrees(
+                        prefs.getBoolean(ArrayHeading.PREF_FORWARD, false)),
                 frame.bearings.get(0));
         if (!heading.isKnown())
             return;

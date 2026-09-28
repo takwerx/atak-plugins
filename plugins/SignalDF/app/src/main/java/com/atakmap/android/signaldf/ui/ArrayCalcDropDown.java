@@ -22,6 +22,8 @@ import com.atakmap.android.signaldf.data.ShortDistance;
 import com.atakmap.android.signaldf.net.KrakenLink;
 import com.atakmap.android.signaldf.plugin.R;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -33,22 +35,33 @@ import java.util.Locale;
  * frequency of interest changes. {@link ArrayCalc} is the arithmetic, tested
  * against the workbook's own cells; this is the screen.
  *
- * <p>It answers two questions with the same controls, which is the reason it is
- * one screen and not two:
- * <ul>
- * <li><b>What should I build?</b> Enter the frequency, press <i>Size it for
- *     me</i>, and it fills in an array sized just under the ambiguity limit --
- *     the biggest aperture, and so the best resolution, that still cannot
- *     alias.
- * <li><b>Will what I have work?</b> Enter the array you already have and it
- *     says yes, or says which way to move it and why.
- * </ul>
+ * <p><b>One input: the frequency.</b> Everything else on screen is an answer.
+ * The first build of this screen was not like that -- it had the array shape,
+ * the element count, a radius, a "size it for me" button and a template picker
+ * across the top -- and the operator's reaction was one question per control:
+ * what does From radio mean, when would I use linear, why would I enter my own
+ * radius, what does size it for me mean, why am I picking a template when you
+ * know all the sizes anyway. Every one of those was fair. A screen whose whole
+ * purpose is "tell me how to set my array up" must not begin by asking the
+ * operator to configure the thing that tells them.
+ *
+ * <p>So the array is sized from the frequency, and the answer names every jig
+ * at once -- the hole on KrakenRF's paper arms, the position on the 3D-printed
+ * template, and the tape measurement -- because the operator has whichever one
+ * they have and reads past the other two in a second. Picking between them was
+ * a control that existed only to hide two lines of text.
+ *
+ * <p>Circular with five elements, because that is a KrakenSDR: five coherent
+ * channels, and the vendor's templates are all circular. Somebody with a
+ * different array reaches it through <i>My array is a different size</i>, which
+ * is also where the "will what I already have work" question lives, with its
+ * verdict.
  *
  * <p><b>It reads the radio when the radio is there.</b> <i>From radio</i> pulls
- * the frequency, the arrangement and the spacing the Kraken is actually
- * configured with, so the answer is about the operator's real array rather than
- * one they typed from memory. That is the thing a spreadsheet cannot do, and
- * the reason this is worth having in the plugin at all.
+ * the frequency the Kraken is actually tuned to, so the answer is about what
+ * the operator is really hunting rather than a number typed from memory. That
+ * is the thing a spreadsheet cannot do, and the reason this is worth having in
+ * the plugin at all.
  *
  * <p>Opens wide: this is a screen with a drawing and numbers on it, and the map
  * is not the point while somebody is holding a tape measure.
@@ -68,22 +81,26 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
 
     private final Button freqButton;
     private final Button fromRadioButton;
-    private final Button geometryButton;
-    private final Button elementsButton;
-    private final Button sizeButton;
-    private final Button sizeItButton;
+    private final Button myArrayButton;
     private final TextView verdict;
+    private final TextView layoutSteps;
     private final TextView numbers;
-    private final Button templateButton;
     private final TextView antenna;
-    private final TextView band;
     private final TextView note;
     private final ArrayPlanView plan;
 
     private Geometry geometry = Geometry.CIRCULAR;
     private int elements = 5;
     private double freqMHz = 416.588;
-    private double sizeCm = 30.0;
+
+    /**
+     * An array the operator already has, in centimeters, or -1 for "work it out
+     * from the frequency". Only the second case is on the main screen; the
+     * first is what <i>My array is a different size</i> sets, and it is the
+     * only state in which a verdict is shown, because a size this screen chose
+     * is always one that works.
+     */
+    private double customCm = -1;
 
     public ArrayCalcDropDown(MapView mapView, Context pluginContext) {
         super(mapView);
@@ -92,15 +109,11 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
 
         freqButton = root.findViewById(R.id.freq);
         fromRadioButton = root.findViewById(R.id.from_radio);
-        geometryButton = root.findViewById(R.id.geometry);
-        elementsButton = root.findViewById(R.id.elements);
-        sizeButton = root.findViewById(R.id.size);
-        sizeItButton = root.findViewById(R.id.size_it);
+        myArrayButton = root.findViewById(R.id.my_array);
         verdict = root.findViewById(R.id.verdict);
+        layoutSteps = root.findViewById(R.id.layout_steps);
         numbers = root.findViewById(R.id.numbers);
-        templateButton = root.findViewById(R.id.template);
         antenna = root.findViewById(R.id.antenna);
-        band = root.findViewById(R.id.band);
         note = root.findViewById(R.id.note);
         plan = root.findViewById(R.id.plan);
 
@@ -129,63 +142,10 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
             }
         });
 
-        geometryButton.setOnClickListener(new View.OnClickListener() {
+        myArrayButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                pickGeometry();
-            }
-        });
-
-        elementsButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                pickElements();
-            }
-        });
-
-        sizeButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                askNumber(geometry == Geometry.CIRCULAR ? "Array radius" : "Array length",
-                        (geometry == Geometry.CIRCULAR
-                                ? "Center of the array to any element, in "
-                                : "First element to last, in ")
-                                + (ShortDistance.imperial() ? "inches." : "centimeters."),
-                        ShortDistance.valueFromCm(sizeCm), new OnNumber() {
-                            @Override
-                            public void got(double value) {
-                                if (value <= 0) {
-                                    toast("a size has to be above zero");
-                                    return;
-                                }
-                                // Typed in the operator's unit, kept in cm.
-                                sizeCm = ShortDistance.toCm(value);
-                                refresh();
-                            }
-                        });
-            }
-        });
-
-        sizeItButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Snap to a hole on KrakenRF's printed template when one fits.
-                // An exact radius is no use to somebody holding arms drilled at
-                // 50 mm intervals; "use the 15 cm hole" is.
-                double hole = geometry == Geometry.CIRCULAR
-                        && template == TEMPLATE_KRAKENRF
-                        ? ArrayCalc.templateRadiusCm(elements, freqMHz) : -1;
-                sizeCm = hole > 0 ? hole
-                        : ArrayCalc.sizeFor(geometry, freqMHz, elements,
-                                RECOMMENDED_MULTIPLIER).sizeCm;
-                refresh();
-            }
-        });
-
-        templateButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                pickTemplate();
+                myArray();
             }
         });
 
@@ -213,12 +173,24 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         refresh();
     }
 
-    /** Takes the frequency and array from the radio, and says so. */
+    /**
+     * Fills the frequency in with whatever the Kraken is currently tuned to,
+     * so nobody types a number they are already looking at on the radio.
+     *
+     * <p>The screen does this by itself when it opens and a radio is
+     * connected. The button is for the retune afterwards: change the VFO in
+     * the radio's own setup and press it, rather than closing and reopening
+     * this screen. It was called "From radio", which the operator asked the
+     * meaning of twice, so it is now called what it gives you.
+     */
     private void fromRadio() {
         if (!applyRadio()) {
-            toast("not connected to a radio -- connect first, or type it in");
+            toast("no radio connected -- connect one, or tap the frequency "
+                    + "and type it in");
             return;
         }
+        toast(String.format(Locale.US,
+                "the radio is tuned to %.4f MHz", freqMHz));
         refresh();
     }
 
@@ -240,34 +212,6 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         if (f > 0 && !Double.isNaN(f))
             freqMHz = f;
         return true;
-    }
-
-    /**
-     * Which jig the operator is laying the array out with. It changes nothing
-     * about the arithmetic and everything about the answer: the same radius is
-     * "use the 15 cm hole" on one template, "use the position labeled with
-     * the next frequency above yours" on another, and a tape measurement on
-     * neither.
-     */
-    private void pickTemplate() {
-        final String[] names = {
-                "KrakenRF printed arms -- holes at fixed radii",
-                "3D-printed template -- positions labeled by frequency",
-                "None -- measuring it myself"
-        };
-        new AlertDialog.Builder(getMapView().getContext())
-                .setTitle("What are you laying it out with?")
-                .setSingleChoiceItems(names, template,
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface d, int which) {
-                                template = which;
-                                d.dismiss();
-                                refresh();
-                            }
-                        })
-                .setNegativeButton("Cancel", null)
-                .show();
     }
 
     private void pickGeometry() {
@@ -344,63 +288,195 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         Toast.makeText(getMapView().getContext(), s, Toast.LENGTH_LONG).show();
     }
 
-    private static final int TEMPLATE_KRAKENRF = 0;
-    private static final int TEMPLATE_3D = 1;
-    private static final int TEMPLATE_NONE = 2;
+    /**
+     * The radius this screen works to: the nearest hole on KrakenRF's printed
+     * arms when one suits the frequency, and otherwise the vendor's own
+     * multiplier.
+     *
+     * <p>Those two agree by construction -- {@code templateRadiusCm} snaps to
+     * the hole nearest s=0.33, which is what KrakenRF say they build to -- so
+     * the measurement on screen and the hole named beside it are the same
+     * place. That is the whole reason this screen can size itself without
+     * asking anything: there is one right answer and the operator does not
+     * have to choose it.
+     */
+    private double sizeCm() {
+        if (customCm > 0)
+            return customCm;
+        if (geometry == Geometry.CIRCULAR) {
+            double hole = ArrayCalc.templateRadiusCm(elements, freqMHz);
+            if (hole > 0)
+                return hole;
+        }
+        return ArrayCalc.sizeFor(geometry, freqMHz, elements,
+                RECOMMENDED_MULTIPLIER).sizeCm;
+    }
 
-    private int template = TEMPLATE_KRAKENRF;
+    /**
+     * The pocket for somebody whose array is already built: shape, element
+     * count and size, plus the way back. Everything in here was on the main
+     * screen once and each of it raised a question the operator should not
+     * have had to ask.
+     */
+    private void myArray() {
+        final boolean custom = customCm > 0;
+        final List<String> rows = new ArrayList<>();
+        final List<Integer> what = new ArrayList<>();
+        rows.add("Shape: " + (geometry == Geometry.CIRCULAR
+                ? "circle" : "straight line"));
+        what.add(0);
+        rows.add("Antennas: " + elements);
+        what.add(1);
+        rows.add((geometry == Geometry.CIRCULAR
+                ? "Radius: " : "End to end: ") + ShortDistance.fromCm(sizeCm()));
+        what.add(2);
+        if (custom) {
+            rows.add("Forget it and size it for me again");
+            what.add(3);
+        }
+        new AlertDialog.Builder(getMapView().getContext())
+                .setTitle("The array you already have")
+                .setItems(rows.toArray(new String[0]),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                switch (what.get(which)) {
+                                    case 0:
+                                        pickGeometry();
+                                        break;
+                                    case 1:
+                                        pickElements();
+                                        break;
+                                    case 2:
+                                        askSize();
+                                        break;
+                                    default:
+                                        customCm = -1;
+                                        refresh();
+                                }
+                            }
+                        })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void askSize() {
+        askNumber(geometry == Geometry.CIRCULAR ? "Array radius" : "Array length",
+                (geometry == Geometry.CIRCULAR
+                        ? "Center of the array to any antenna, in "
+                        : "First antenna to last, in ")
+                        + (ShortDistance.imperial() ? "inches." : "centimeters."),
+                ShortDistance.valueFromCm(sizeCm()), new OnNumber() {
+                    @Override
+                    public void got(double value) {
+                        if (value <= 0) {
+                            toast("a size has to be above zero");
+                            return;
+                        }
+                        // Typed in the operator's unit, kept in cm.
+                        customCm = ShortDistance.toCm(value);
+                        refresh();
+                    }
+                });
+    }
 
     private void refresh() {
-        Result r = ArrayCalc.atSize(geometry, freqMHz, elements, sizeCm);
+        final double size = sizeCm();
+        final Result r = ArrayCalc.atSize(geometry, freqMHz, elements, size);
+        final boolean custom = customCm > 0;
 
         freqButton.setText(String.format(Locale.US, "%.4f MHz", freqMHz));
-        geometryButton.setText(geometry == Geometry.CIRCULAR ? "Circular" : "Linear");
-        elementsButton.setText(elements + " elements");
-        templateButton.setText("Template: "
-                + (template == TEMPLATE_KRAKENRF ? "KrakenRF printed arms"
-                        : template == TEMPLATE_3D ? "3D-printed" : "none"));
-        sizeButton.setText((geometry == Geometry.CIRCULAR ? "Radius " : "Length ")
-                + ShortDistance.fromCm(sizeCm));
+        myArrayButton.setText(custom
+                ? "My array: " + ShortDistance.fromCm(size)
+                        + (geometry == Geometry.CIRCULAR ? " radius" : " long")
+                : "My array is a different size");
 
-        plan.set(geometry, elements, sizeCm, r.spacingCm, r.usable());
+        plan.set(geometry, elements, size, r.spacingCm, r.usable());
 
-        if (r.usable()) {
-            verdict.setText("This array works at this frequency.");
-            verdict.setTextColor(pluginContext.getResources().getColor(R.color.on_green));
+        // A verdict only means something about an array the operator brought.
+        // One this screen sized is always one that works, and saying so every
+        // time trains people to stop reading it.
+        if (!custom) {
+            verdict.setVisibility(View.GONE);
         } else {
-            verdict.setText(r.problem());
-            verdict.setTextColor(pluginContext.getResources().getColor(R.color.off_red));
+            verdict.setVisibility(View.VISIBLE);
+            verdict.setText(r.usable()
+                    ? "This array works at this frequency." : r.problem());
+            verdict.setTextColor(pluginContext.getResources().getColor(
+                    r.usable() ? R.color.on_green : R.color.off_red));
         }
 
-        // Said the way it gets measured, not the way it gets calculated. The
-        // operator is laying antennas out with a tape and KrakenRF's printed
-        // arms: the hub sets the angles, the arms set the radius, and the
-        // neighbor-to-neighbor distance is how you check the result without
-        // a protractor.
+        layoutSteps.setText(layoutText(r, size, custom));
+        antenna.setText(antennaText());
+
+        // What it buys, in the order somebody cares: how tight a bearing will
+        // be, and whether they will have to rebuild when the frequency moves.
+        numbers.setText(String.format(Locale.US,
+                "Bearings good to about %.0f degrees\n"
+                        + "Works from %.0f to %.0f MHz without rebuilding\n"
+                        + "Antennas sit %.2f wavelengths apart "
+                        + "(a wavelength is %.2f m)",
+                r.resolutionDeg,
+                ArrayCalc.lowestUsableMHz(geometry, elements, size),
+                ArrayCalc.highestUsableMHz(geometry, elements, size),
+                r.multiplier, r.wavelengthM));
+
+        note.setText("Antennas closer than half a wavelength apart, or the "
+                + "array cannot tell some directions apart. Bigger arrays "
+                + "resolve better, so this sizes as big as it safely can. "
+                + "The resolution figure is KrakenRF's own, which allows for "
+                + "the super-resolution the radio's MUSIC processing gets.");
+    }
+
+    /** The instructions, naming every jig so nobody has to pick one first. */
+    private String layoutText(Result r, double size, boolean custom) {
         StringBuilder n = new StringBuilder();
-        if (geometry == Geometry.CIRCULAR) {
+        if (geometry != Geometry.CIRCULAR) {
             n.append(String.format(Locale.US,
-                    "Measure %s out from the center, along each arm\n"
-                            + "Arms %.0f degrees apart, numbered clockwise "
-                            + "from the forward one\n"
-                            + "Check: neighboring antennas %s apart\n",
-                    ShortDistance.fromCm(sizeCm), 360.0 / elements,
+                    "%d antennas in a straight line\n"
+                            + "%s from the first to the last\n"
+                            + "%s between neighbors",
+                    elements, ShortDistance.fromCm(size),
                     ShortDistance.fromCm(r.spacingCm)));
-        } else {
-            n.append(String.format(Locale.US,
-                    "%s from the first antenna to the last\n"
-                            + "%s between neighbors, in a straight line\n",
-                    ShortDistance.fromCm(sizeCm), ShortDistance.fromCm(r.spacingCm)));
+            return n.toString();
         }
-        n.append(String.format(Locale.US,
-                "Spacing is %.2f wavelengths (wavelength %.2f m)\n"
-                        + "Resolution about %.1f degrees",
-                r.multiplier, r.wavelengthM, r.resolutionDeg));
-        numbers.setText(n.toString());
 
-        // How long each whip is, which the vendor's workbook does not answer
-        // and somebody standing at a vehicle with a telescopic antenna in
-        // their hand needs before the array geometry is any use to them.
+        // Counted out rather than written "1, 2, 3", which is what it said
+        // when the array has five antennas in it. The operator spotted that
+        // the moment they read it.
+        StringBuilder rest = new StringBuilder();
+        for (int i = 1; i < elements; i++)
+            rest.append(i < elements - 1 ? i + ", " : String.valueOf(i));
+        n.append(String.format(Locale.US,
+                "%d antennas in a circle, %.0f degrees apart\n"
+                        + "Antenna 0 points the way the vehicle faces, "
+                        + "then %s clockwise\n",
+                elements, 360.0 / elements, rest));
+
+        n.append("\nUse whichever you have:\n");
+        int hole = custom ? -1 : ArrayCalc.templateHoleNumber(elements, freqMHz);
+        if (hole > 0)
+            n.append("  KrakenRF paper arms -- the ")
+                    .append(ArrayCalc.ordinal(hole))
+                    .append(" hole out from the center\n");
+        else
+            n.append("  KrakenRF paper arms -- no hole fits this, measure it\n");
+        // The 3D template labels its seven positions with the highest
+        // frequency each is good for, so its rule needs no table from us.
+        n.append(String.format(Locale.US,
+                "  3D-printed template -- the position labeled just above "
+                        + "%.1f MHz\n", freqMHz));
+        n.append("  A tape measure -- ")
+                .append(ShortDistance.fromCm(size))
+                .append(" from the center to each antenna\n");
+        n.append("\nCheck it: neighboring antennas end up ")
+                .append(ShortDistance.fromCm(r.spacingCm))
+                .append(" apart.");
+        return n.toString();
+    }
+
+    /** How long each whip goes, which the vendor's workbook does not answer. */
+    private String antennaText() {
         StringBuilder a = new StringBuilder(String.format(Locale.US,
                 "Extend each whip to %s, a %s wavelength\n",
                 ShortDistance.fromCm(ArrayCalc.whipLengthCm(freqMHz)),
@@ -420,67 +496,11 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         else
             a.append("KrakenRF publish no section count for this frequency; "
                     + "extend to the closest one they list\n");
-        a.append("All five identical, on a metal ground plane such as a "
-                + "vehicle roof");
-        antenna.setText(a.toString());
-
-        double hi = ArrayCalc.highestUsableMHz(geometry, elements, sizeCm);
-        double lo = ArrayCalc.lowestUsableMHz(geometry, elements, sizeCm);
-        StringBuilder b = new StringBuilder(String.format(Locale.US,
-                "%.0f to %.0f MHz", lo, hi));
-        if (geometry == Geometry.CIRCULAR && template == TEMPLATE_KRAKENRF) {
-            double hole = ArrayCalc.templateRadiusCm(elements, freqMHz);
-            int holeNo = ArrayCalc.templateHoleNumber(elements, freqMHz);
-            if (hole > 0 && holeNo > 0)
-                // Counted out from the center first, because that is what
-                // somebody holding the arm does; the measurements follow for
-                // checking. The hole's printed name stays metric -- it is a
-                // name, not a distance.
-                b.append("\n\nOn KrakenRF's printed arms, use the "
-                        + ArrayCalc.ordinal(holeNo) + " hole out from the center ("
-                        + ShortDistance.labelCm(hole)
-                        + (ShortDistance.imperial()
-                                ? ", " + ShortDistance.fromCm(hole) + " out"
-                                : "") + ").");
-            else
-                b.append("\n\nNo hole on KrakenRF's printed arms covers this "
-                        + "frequency; the array has to be built to size.");
-        } else if (geometry == Geometry.CIRCULAR && template == TEMPLATE_3D) {
-            // Its seven positions are labeled with the highest frequency each
-            // one is good for, so the rule is the author's own and needs no
-            // table: take the next label above the frequency being hunted.
-            // Deliberately not naming a label -- the seven numbers are in the
-            // OpenSCAD source behind a login, and a position named wrong is
-            // found out on a car roof.
-            b.append(String.format(Locale.US,
-                    "\n\nOn the 3D-printed template, use the position "
-                            + "labeled with the next frequency above %.1f MHz. "
-                            + "Its arm points antenna 0 forward.", freqMHz));
-            if (freqMHz < 150)
-                b.append(" Below 150 MHz this template runs out; "
-                        + "its widest position is only good down to there.");
-        }
-        band.setText(b.toString());
-
-        String jig = template == TEMPLATE_KRAKENRF
-                ? "KrakenRF publish printable arms and a hub for laying this "
-                        + "out: the hub sets the angles, the arms set the "
-                        + "radius. "
-                : template == TEMPLATE_3D
-                        ? "The 3D-printed template is a magnetic hub and one "
-                                + "arm you move round five positions; its "
-                                + "seven layout positions are each labeled "
-                                + "with the highest frequency that position is "
-                                + "good for, and the arm doubles as a scale "
-                                + "for setting the whips. "
-                        : "";
-        note.setText(jig
-                + "Spacing must stay under 0.5 wavelengths or the array cannot "
-                + "tell some directions apart. Bigger arrays resolve better, so aim "
-                + "just under the limit unless the vehicle says otherwise. Resolution "
-                + "is KrakenRF's own figure, which allows for the super-resolution "
-                + "the radio's MUSIC processing gets.");
+        a.append("All ").append(elements).append(" identical, on a metal "
+                + "ground plane such as a vehicle roof");
+        return a.toString();
     }
+
 
     @Override
     public void onReceive(Context context, Intent intent) {

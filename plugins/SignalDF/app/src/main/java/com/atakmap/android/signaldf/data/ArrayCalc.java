@@ -88,6 +88,29 @@ public final class ArrayCalc {
     public static final double TYPICAL_MULTIPLIER = 0.33;
 
     /**
+     * The largest spacing this will put an operator on, in wavelengths.
+     *
+     * <p>The vendor says two things that pull apart. The workbook: "Ideally
+     * you want use a radius with a spacing multiplier close to 0.5. But
+     * physical size limitations may take priority" -- bigger resolves better,
+     * so reach for the limit. The wiki: "we typically set our arrays to
+     * s=0.33" -- and 0.33 is what their template's holes land on.
+     *
+     * <p>Both are right about different things, and the thing that settles it
+     * is that the holes are discrete. At 416.588 MHz the 200 mm hole gives
+     * 0.33 and 12.6 degrees of resolution, and the 250 mm hole gives 0.41 and
+     * 10.1 degrees. Both are ambiguity-free, both are on the same printed arm,
+     * one is a fifth sharper, and nothing about the bigger one is harder: they
+     * are the same five magnets on the same roof.
+     *
+     * <p>So: the biggest hole at or under this, which leaves about ten percent
+     * of frequency headroom before the array goes ambiguous. Sitting at 0.49
+     * would resolve better still and go ambiguous if the emitter moved two
+     * percent up the band, which is the failure this margin exists to avoid.
+     */
+    public static final double PREFERRED_MAX_MULTIPLIER = 0.45;
+
+    /**
      * The radii KrakenRF's printed template can actually give you, in
      * centimeters. Their arms have holes at 50 mm intervals, so an array built
      * with the template is one of these four and nothing in between -- which is
@@ -277,16 +300,18 @@ public final class ArrayCalc {
      * @return a radius from {@link #TEMPLATE_RADII_CM}, or -1
      */
     public static double templateRadiusCm(int elements, double freqMHz) {
-        double best = -1, bestDistance = Double.MAX_VALUE;
+        // Biggest first, and take the first that is not too wide: a larger
+        // aperture resolves better and costs nothing, since every hole is on
+        // the same arm. See PREFERRED_MAX_MULTIPLIER for why not simply the
+        // biggest that is ambiguity-free.
+        double best = -1;
         for (double radius : TEMPLATE_RADII_CM) {
             Result r = atSize(Geometry.CIRCULAR, freqMHz, elements, radius);
-            if (!ambiguityFree(r.multiplier) || r.multiplier < MIN_MULTIPLIER)
+            if (r.multiplier > PREFERRED_MAX_MULTIPLIER
+                    || r.multiplier < MIN_MULTIPLIER)
                 continue;
-            double d = Math.abs(r.multiplier - TYPICAL_MULTIPLIER);
-            if (d < bestDistance) {
-                bestDistance = d;
+            if (radius > best)
                 best = radius;
-            }
         }
         return best;
     }

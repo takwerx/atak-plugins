@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Antenna array sizing. Two questions, one screen: what should I build for
-    the frequency I am hunting, and will the array I already have work at it.
+    Antenna array sizing. ONE input: the frequency. Everything else is an
+    answer.
 
-    The plan drawing sits between the inputs and the numbers on purpose , the
-    picture is what stops somebody building to the radius when they meant the
-    spacing.
+    The first build of this screen had five controls across the top - shape,
+    element count, radius, "size it for me", and a template picker - and the
+    operator's reaction was a question per control: what does From radio mean,
+    when would I use linear, why would I enter my own radius, what does size it
+    for me mean, why am I picking a template when you know all the sizes
+    anyway. Every one of those was fair. A screen whose purpose is "tell me how
+    to set up my array" should not be asking the operator to configure the
+    thing that tells them.
+
+    So: frequency at the top, the drawing, then the instructions, and one way
+    out at the bottom for somebody whose array is already built to a size of
+    its own.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -48,91 +57,35 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginLeft="4dp"
-                    android:text="From radio" />
+                    android:text="Radio's frequency" />
             </LinearLayout>
-
-            <TextView
-                style="@style/SectionHeading"
-                android:text="Your array" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/geometry"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="Circular" />
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/elements"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="4dp"
-                    android:text="5 elements" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingTop="4dp">
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/size"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="Radius 30.7 cm" />
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/size_it"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="4dp"
-                    android:text="Size it for me" />
-            </LinearLayout>
-
-            <Button
-                style="@style/TakwerxButton"
-                android:id="@+id/template"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Template: KrakenRF printed arms" />
 
             <com.atakmap.android.signaldf.ui.ArrayPlanView
                 android:id="@+id/plan"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp" />
+                android:layout_marginTop="6dp" />
 
             <TextView
                 android:id="@+id/verdict"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="15sp"
-                android:paddingTop="6dp"
-                android:paddingBottom="2dp" />
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp"
+                android:visibility="gone" />
 
             <TextView
                 style="@style/SectionHeading"
-                android:text="What you get" />
+                android:text="Lay the antennas out" />
 
             <TextView
-                android:id="@+id/numbers"
+                android:id="@+id/layout_steps"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="13sp"
-                android:lineSpacingMultiplier="1.15" />
+                android:lineSpacingMultiplier="1.15"
+                android:paddingBottom="8dp" />
 
             <TextView
                 style="@style/SectionHeading"
@@ -148,14 +101,22 @@
 
             <TextView
                 style="@style/SectionHeading"
-                android:text="This array covers" />
+                android:text="What this array gives you" />
 
             <TextView
-                android:id="@+id/band"
+                android:id="@+id/numbers"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="13sp"
+                android:lineSpacingMultiplier="1.15"
                 android:paddingBottom="8dp" />
+
+            <Button
+                style="@style/TakwerxButton"
+                android:id="@+id/my_array"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="My array is a different size" />
 
             <TextView
                 android:id="@+id/note"
@@ -163,6 +124,7 @@
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
                 android:alpha="0.7"
+                android:paddingTop="8dp"
                 android:paddingBottom="8dp" />
 
         </LinearLayout>

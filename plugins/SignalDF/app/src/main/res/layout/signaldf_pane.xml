@@ -119,6 +119,14 @@
                     android:text="Use radio" />
             </LinearLayout>
 
+            <Button
+                style="@style/TakwerxButton"
+                android:id="@+id/antenna0_forward"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="ANTENNA 0 POINTS FORWARD: OFF" />
+
             <TextView
                 style="@style/SectionHeading"
                 android:text="Share" />

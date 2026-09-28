@@ -38,6 +38,12 @@ public final class ArrayHeading {
     public enum Source {
         /** The operator typed or calibrated it. Trusted above the radio's. */
         MANUAL,
+        /**
+         * The operator said antenna 0 points down the vehicle, and ATAK's own
+         * self marker is supplying the course. The normal case once the array
+         * is bolted on the way both templates tell you to bolt it.
+         */
+        VEHICLE,
         /** The radio reported a non-zero heading of its own. */
         RADIO,
         /**
@@ -67,6 +73,28 @@ public final class ArrayHeading {
     }
 
     /**
+     * The preference key for "antenna 0 points down the vehicle". One key,
+     * read by the pane and by the publisher, so the map and what goes on the
+     * wire can never disagree about which way the array is facing.
+     */
+    public static final String PREF_FORWARD = "signaldf.antenna0_forward";
+
+    /**
+     * ATAK's course when the operator has said antenna 0 points forward and
+     * the vehicle is moving; null otherwise. The one place that rule lives.
+     */
+    public static Double vehicleDegrees(boolean antenna0Forward) {
+        if (!antenna0Forward)
+            return null;
+        VehicleHeading v = VehicleHeading.get();
+        return v == null ? null : v.degrees();
+    }
+
+    public static ArrayHeading vehicle(double degrees) {
+        return new ArrayHeading(degrees, Source.VEHICLE);
+    }
+
+    /**
      * Resolves what to use, given the operator's setting and the newest bearing
      * the radio produced.
      *
@@ -76,16 +104,18 @@ public final class ArrayHeading {
      * <em>claim</em> is not, which is the entire point of returning this type
      * rather than a double.
      *
-     * <p>Not yet a source: the phone's own track. On a vehicle the self marker
-     * already knows which way the truck is going and that is the right answer
-     * for a Kraken bolted to it, but it is only honest above a minimum speed --
-     * a stationary phone's track heading is as meaningless as the radio's zero,
-     * and shipping it without that gate would swap one silent wrong answer for
-     * another. It lands with the vehicle work.
+     * <p>{@code vehicleDeg} is ATAK's own course, already speed-gated and
+     * hold-limited by {@link VehicleHeading}, and non-null only when the
+     * operator has said antenna 0 points down the vehicle. It outranks the
+     * radio because it is a statement the operator made about their own
+     * install, and the radio's heading field is zero on most units.
      */
-    public static ArrayHeading resolve(Double operatorSetting, Bearing newest) {
+    public static ArrayHeading resolve(Double operatorSetting, Double vehicleDeg,
+            Bearing newest) {
         if (operatorSetting != null)
             return manual(operatorSetting);
+        if (vehicleDeg != null)
+            return vehicle(vehicleDeg);
         if (newest != null && newest.headingReported && newest.headingDeg != 0.0)
             return new ArrayHeading(newest.headingDeg, Source.RADIO);
         if (newest != null && newest.headingReported)
@@ -108,7 +138,8 @@ public final class ArrayHeading {
      * everything displaying it has to say so.
      */
     public boolean isKnown() {
-        return source == Source.MANUAL || source == Source.RADIO;
+        return source == Source.MANUAL || source == Source.VEHICLE
+                || source == Source.RADIO;
     }
 
     /**
@@ -121,6 +152,10 @@ public final class ArrayHeading {
             case MANUAL:
                 return String.format(Locale.US,
                         "Array heading: %.0f deg, you set it", degrees);
+            case VEHICLE:
+                return String.format(Locale.US,
+                        "Array heading: %.0f deg, the way you are driving",
+                        degrees);
             case RADIO:
                 return String.format(Locale.US,
                         "Array heading: %.0f deg, from the radio", degrees);

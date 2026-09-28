@@ -22,6 +22,7 @@ import com.atakmap.android.signaldf.data.Age;
 import com.atakmap.android.signaldf.map.BearingLayer;
 import com.atakmap.android.signaldf.net.BearingPublisher;
 import com.atakmap.android.signaldf.model.ArrayHeading;
+import com.atakmap.android.signaldf.model.VehicleHeading;
 import com.atakmap.android.signaldf.model.Bearing;
 import com.atakmap.android.signaldf.model.FeedFrame;
 import com.atakmap.android.signaldf.net.KrakenHost;
@@ -78,6 +79,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final Context pluginContext;
     private final AtakPreferences prefs;
     private final BearingLayer layer;
+    private Button forwardButton;
     private Button shareFeedButton;
     private Button shareStaleButton;
     private Button shareToggleButton;
@@ -130,6 +132,18 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.signaldf_pane, null);
         status = root.findViewById(R.id.status);
         feedLine = root.findViewById(R.id.feed_line);
+        forwardButton = root.findViewById(R.id.antenna0_forward);
+        forwardButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean on = !prefs.get(ArrayHeading.PREF_FORWARD, false);
+                prefs.set(ArrayHeading.PREF_FORWARD, on);
+                if (on)
+                    toast("bearings will follow the direction you are driving");
+                refresh();
+                draw();
+            }
+        });
         shareFeedButton = root.findViewById(R.id.share_feed);
         shareStaleButton = root.findViewById(R.id.share_stale);
         shareToggleButton = root.findViewById(R.id.share_toggle);
@@ -508,7 +522,9 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         KrakenLink link = KrakenLink.get();
         List<Bearing> latest = link == null ? null : link.latest();
         Bearing newest = latest == null || latest.isEmpty() ? null : latest.get(0);
-        return ArrayHeading.resolve(operatorHeading(), newest);
+        return ArrayHeading.resolve(operatorHeading(),
+                ArrayHeading.vehicleDegrees(
+                        prefs.get(ArrayHeading.PREF_FORWARD, false)), newest);
     }
 
     private void draw() {
@@ -613,6 +629,31 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
      * reads ON tells the operator nothing about whether anything is actually
      * leaving the phone.
      */
+    /**
+     * The forward toggle, and what it is doing right now. ON is not enough on
+     * its own: a parked truck has no course, so the button has to say whether
+     * it is actually supplying a heading or waiting for the vehicle to move.
+     */
+    private void refreshForward() {
+        if (forwardButton == null)
+            return;
+        boolean on = prefs.get(ArrayHeading.PREF_FORWARD, false);
+        String state = "OFF";
+        if (on) {
+            VehicleHeading v = VehicleHeading.get();
+            Double deg = v == null ? null : v.degrees();
+            if (deg == null)
+                state = "ON, waiting to move";
+            else if (v.isHeld())
+                state = String.format(Locale.US, "ON, held at %.0f deg", deg);
+            else
+                state = String.format(Locale.US, "ON, %.0f deg", deg);
+        }
+        forwardButton.setText("ANTENNA 0 POINTS FORWARD: " + state);
+        forwardButton.setTextColor(pluginContext.getResources().getColor(
+                on ? R.color.on_green : R.color.off_red));
+    }
+
     private void refreshSharing() {
         BearingPublisher p = BearingPublisher.get();
         if (p == null || shareFeedButton == null)
@@ -641,6 +682,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     }
 
     private void refresh() {
+        refreshForward();
         refreshSharing();
         KrakenLink link = KrakenLink.get();
         if (link == null)

@@ -206,24 +206,42 @@ public class ArrayCalcTest {
     }
 
     /**
-     * Which hole to use is answered from the published bands. 416 MHz sits in
-     * the 150 mm and 200 mm bands; the one nearer KrakenRF's typical s=0.33 is
-     * chosen rather than simply the biggest that fits.
+     * Which hole to use is answered from the published bands, and when more
+     * than one fits, the biggest one that is not too wide wins: a larger
+     * aperture resolves better and every hole is on the same printed arm.
      */
     @Test
-    public void picksTheTemplateHoleNearestTheirTypicalSpacing() {
+    public void picksTheBiggestTemplateHoleThatIsNotTooWide() {
         double radius = ArrayCalc.templateRadiusCm(5, 416.588);
         assertTrue("a hole must fit at 416 MHz", radius > 0);
         Result r = ArrayCalc.atSize(Geometry.CIRCULAR, 416.588, 5, radius);
         assertTrue(r.usable());
-        // Nothing else in the table is closer to 0.33 than the one chosen.
+        assertTrue("never above the preferred ceiling",
+                r.multiplier <= ArrayCalc.PREFERRED_MAX_MULTIPLIER + 1e-9);
+        // 150, 200 and 250 mm all fit at this frequency; 250 is the answer.
+        assertEquals(25.0, radius, 1e-9);
+        // And nothing in the table that also fits is bigger.
         for (double other : ArrayCalc.TEMPLATE_RADII_CM) {
             Result o = ArrayCalc.atSize(Geometry.CIRCULAR, 416.588, 5, other);
-            if (!o.usable())
+            if (o.multiplier > ArrayCalc.PREFERRED_MAX_MULTIPLIER
+                    || o.multiplier < ArrayCalc.MIN_MULTIPLIER)
                 continue;
-            assertTrue(Math.abs(r.multiplier - ArrayCalc.TYPICAL_MULTIPLIER)
-                    <= Math.abs(o.multiplier - ArrayCalc.TYPICAL_MULTIPLIER) + 1e-9);
+            assertTrue(radius >= other - 1e-9);
         }
+    }
+
+    /**
+     * The ceiling is what keeps it off a hole that is ambiguity-free today and
+     * ambiguous after a small retune. At 490 MHz the 250 mm hole is 0.48 --
+     * legal, and two percent from failing -- so the 200 mm hole is chosen.
+     */
+    @Test
+    public void theCeilingLeavesHeadroom() {
+        Result wide = ArrayCalc.atSize(Geometry.CIRCULAR, 490.0, 5, 25.0);
+        assertTrue("250 mm really is ambiguity-free at 490 MHz", wide.usable());
+        assertTrue("and really is above the ceiling",
+                wide.multiplier > ArrayCalc.PREFERRED_MAX_MULTIPLIER);
+        assertEquals(20.0, ArrayCalc.templateRadiusCm(5, 490.0), 1e-9);
     }
 
     /** And outside every published band, it says so rather than guessing. */

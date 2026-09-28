@@ -9,6 +9,7 @@ import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.signaldf.net.KrakenLink;
+import com.atakmap.android.signaldf.model.VehicleHeading;
 import com.atakmap.android.signaldf.net.BearingPublisher;
 import com.atakmap.android.signaldf.ui.SignalDfDropDown;
 import com.atakmap.coremap.log.Log;
@@ -61,6 +62,7 @@ public class SignalDF implements IPlugin {
 
     private KrakenLink link;
     private BearingPublisher publisher;
+    private VehicleHeading vehicleHeading;
     private SignalDfDropDown dropDown;
 
     /** The sharing component, for the pane's settings screen. */
@@ -118,6 +120,7 @@ public class SignalDF implements IPlugin {
         if (publisher == null) {
             MapView mv = MapView.getMapView();
             if (mv != null) {
+                vehicleHeading = new VehicleHeading(mv);
                 publisher = new BearingPublisher(mv);
                 link.addListener(publisher);
             }
@@ -150,6 +153,10 @@ public class SignalDF implements IPlugin {
                 link.removeListener(publisher);
             publisher.dispose();
             publisher = null;
+        }
+        if (vehicleHeading != null) {
+            vehicleHeading.dispose();
+            vehicleHeading = null;
         }
         if (link != null) {
             link.dispose();
