@@ -64,6 +64,77 @@ before anything appears is normal.
 
 ---
 
+## Part 1b — Which network, in the vehicle
+
+**Your phone has one WiFi radio and can only be on one WiFi network.** It cannot
+sit on the Kraken's access point and a Starlink at the same time. So the first
+decision in any vehicle build is where the radio lives.
+
+### Scenario A — Starlink in the truck: hardwire the Kraken (recommended)
+
+Put everything on one network and the problem disappears.
+
+1. Run ethernet from the Pi to the Starlink router.
+2. On the Pi, set `eth0` to DHCP. **The KrakenSDR image does not do this out of
+   the box** — it is WiFi-first, and a cable alone gets you link lights and
+   nothing else.
+3. Reboot the Pi and find its new address on your network.
+4. On the phone: join Starlink's WiFi as normal. Nothing special.
+5. In Signal DF, set the address to the Pi's address on that network — or try
+   `krakensdr.local`, which usually resolves once it is on a real network.
+
+You get bearings, TAK server, and internet, all at once, over a cable that does
+not care about three radios competing in a metal box.
+
+### Scenario B — No Starlink, but you have cell service
+
+Join the radio's own network and let the phone's mobile data carry the server.
+
+1. **Settings → Connections → Wi-Fi**
+2. Tap **krakensdr**, password **krakensdr**
+3. Android says *"Internet may not be available"* → choose **Stay connected**.
+   Not "Allow switch" — that drops you off the radio.
+4. Leave **mobile data ON**. The WiFi has no internet, so Android should route
+   the TAK server over cellular while the radio stays on WiFi.
+5. In Signal DF, set the address to **192.168.50.5** and Connect.
+
+> **Verify this one before you trust it.** The behavior above is how Android is
+> meant to handle a WiFi network with no internet alongside mobile data, but it
+> has not been confirmed on a phone with a SIM in it. Check that your TAK server
+> stays connected while you are on the radio's network, somewhere it does not
+> matter, before you need it somewhere it does.
+
+Also turn **off** the phone's "switch to mobile data" helper, or it will keep
+trying to move you off a network it thinks is broken:
+**Settings → Connections → Wi-Fi → ⋮ → Advanced → Switch to mobile data → off.**
+
+### Scenario C — Nothing but the radio
+
+No Starlink, no cell. Same steps as B, and you simply have no server: bearings
+on your own map, nothing shared, which is what the plugin does by default
+anyway. Worth rehearsing on purpose before a day when it is the only option.
+
+### Scenario D — You need both and cannot hardwire
+
+You have to choose, and it is worth choosing deliberately rather than
+discovering it mid-search:
+
+| Phone on | You get | You lose |
+|---|---|---|
+| Kraken's WiFi | bearings on the map | Starlink — server and internet, unless cell covers it |
+| Starlink's WiFi | server, internet, the team | bearings; Signal DF cannot see the radio |
+
+If this comes up often, that is the argument for spending an afternoon on
+Scenario A.
+
+### Going back to your normal network
+
+**Settings → Connections → Wi-Fi**, tap your usual network. Android may do it
+for you when the radio powers down; the pane will say *"nothing for N s"* and
+you will know why.
+
+---
+
 ## Part 2 — Connect Signal DF
 
 Open Signal DF from the ATAK toolbar. The top section is **RADIO**.
