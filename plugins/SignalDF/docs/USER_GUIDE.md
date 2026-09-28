@@ -50,12 +50,16 @@ So after the Pi boots, look at your phone's WiFi list. You should see:
 phone and the radio on the same little network, which is exactly how it works
 on a vehicle.
 
-### Android will try to talk you out of it
+### Android will ask about the missing internet
 
 That network has no internet, so Android pops up *"Internet may not be
-available"* and offers to switch you back. **Choose "Stay connected."** If you
-do not, the phone quietly hops back to your normal WiFi and Signal DF stops
-being able to see the radio.
+available"*. Either answer works — Signal DF sends its own traffic down the
+WiFi explicitly rather than relying on which network Android has picked as the
+default. See [Scenario B](#scenario-b--no-starlink-but-you-have-cell-service)
+for why that matters.
+
+If the phone hops back to your normal WiFi on its own and Signal DF stops seeing
+the radio, rejoin **krakensdr** and choose **Stay connected** that time.
 
 ### Give it time on the first boot
 
@@ -289,7 +293,7 @@ confident, steady, plausible line pointing somewhere the transmitter is not.
 | What you see | What it usually is |
 |---|---|
 | Nothing in the WiFi list | Pi still booting, or it joined a `krakensdr` network you already had |
-| Phone keeps leaving the radio's WiFi | you chose "Allow switch" — reconnect and pick **Stay connected** |
+| Phone keeps leaving the radio's WiFi | Android moved it off a network with no internet — rejoin **krakensdr** and choose **Stay connected** |
 | `answering but not updating` | the receiver is not attached, not powered, or was plugged in after the Pi booted. Plug it all in, then power-cycle the Pi |
 | `cannot find that host on this network` | wrong address, or the phone is on a different WiFi |
 | `nothing answering on that port` | the radio is reachable but its software is not running |
