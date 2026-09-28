@@ -682,9 +682,16 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         if (deg == null)
             headingModeButton.setText(
                     "How you know it: from your driving, waiting to move");
-        else if (v.isHeld())
+        else if (v.isHeld()) {
+            // ATAK puts a "driving" widget on screen while it is holding a GPS
+            // bearing through a stop. This is the same statement, in words,
+            // with the age on it so the operator can judge whether the truck
+            // has been turned round since.
+            long s = v.heldSeconds();
             headingModeButton.setText(String.format(Locale.US,
-                    "How you know it: from your driving, held at %.0f deg", deg));
+                    "How you know it: from your driving, %.0f deg held %s",
+                    deg, s < 90 ? s + " s" : (s / 60) + " min"));
+        }
         else
             headingModeButton.setText(String.format(Locale.US,
                     "How you know it: from your driving, %.0f deg", deg));
