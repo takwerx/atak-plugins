@@ -459,11 +459,17 @@ public final class BearingPublisher implements KrakenLink.Listener {
 
         // Says what the line is and, deliberately, what its length is not.
         CotDetail remarks = new CotDetail("remarks");
+        // The caveat rides on everything that leaves the phone. The operator
+        // has been told, once, in a pane, and can remember; a teammate who
+        // receives this was never told anything at all -- they see an ordinary
+        // ATAK line and nothing about it suggests it rests on an unvalidated
+        // convention.
         remarks.setInnerText(String.format(Locale.US,
                 "Signal DF bearing %.0f degrees true at %.4f MHz. "
                         + "Direction only -- the line's length is fixed and "
-                        + "says nothing about range. %s",
-                trueDeg, b.frequencyMHz(), heading.provenance()));
+                        + "says nothing about range. %s\n%s",
+                trueDeg, b.frequencyMHz(), heading.provenance(),
+                com.atakmap.android.signaldf.data.Caveat.UNVERIFIED_BEARING));
         d.addChild(remarks);
 
         e.setDetail(d);

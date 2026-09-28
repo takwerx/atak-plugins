@@ -300,6 +300,11 @@ public final class FixLayer {
         String advice = r.fix.advice();
         if (advice != null)
             remarks.append('\n').append(advice);
+        // A marker saying "the transmitter is here, within 200 m" is a far
+        // stronger claim than a line, and the ellipse is a claim about how
+        // wrong it can be -- which is exactly what is not yet known.
+        remarks.append("\n\n").append(
+                com.atakmap.android.signaldf.data.Caveat.UNVERIFIED_BEARING);
         m.setMetaString("remarks", remarks.toString());
         if (m.getGroup() == null) {
             group().addItem(m);
