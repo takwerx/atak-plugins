@@ -76,17 +76,21 @@ public final class WeatherClient {
         final String cacheKey = SnapshotStore.key(def.id + "@" + def.shape(), lat, lon);
         final long now = System.currentTimeMillis();
 
+        // Asked before the cache, and nothing from the cache is shown while the
+        // service is not allowed: a forecast under "tap Allow" reads as if it
+        // were working. The operator filmed exactly that for the 0.4 release
+        // (2026-09-28): an old reading under the Allow button on a reset phone.
+        final String refusal = egress.refuse(def);
+        if (refusal != null) {
+            listener.onError(refusal, null);
+            return;
+        }
+
         final SnapshotStore.Entry cached = store.read(cacheKey);
         if (cached != null && !force && cached.ageMillis(now) < FRESH_MS) {
             final Snapshot snapshot = parse(def, cached, lat, lon, listener);
             if (snapshot != null)
                 listener.onSnapshot(snapshot, true);
-            return;
-        }
-
-        final String refusal = egress.refuse(def);
-        if (refusal != null) {
-            listener.onError(refusal, cached == null ? null : parse(def, cached, lat, lon, null));
             return;
         }
 

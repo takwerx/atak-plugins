@@ -787,7 +787,7 @@ public final class StationOverlay {
         headers.put("Accept", "application/json");
         // Rounded the way every other outbound coordinate in this plugin is rounded.
         // This layer is the one that sends the operator's own position -- the others
-        // send a map extent or nothing -- so the precision setting has to reach it,
+        // send a map extent or nothing -- so the rounding has to reach it,
         // and a radius of tens of miles loses nothing to a coarser origin.
         final String url = Raws.nearUrl(Double.parseDouble(egress.latitude(from)),
                 Double.parseDouble(egress.longitude(from)), miles);
