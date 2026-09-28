@@ -52,6 +52,7 @@ public final class FixLayer {
     private static final String UID_FIX = "signaldf.fix.";
     private static final String UID_ELLIPSE = "signaldf.fix.ellipse.";
     private static final String UID_TRACK = "signaldf.track.";
+    private static final String UID_TRACE = "signaldf.trace.";
     private static final String UID_NEXT = "signaldf.next.";
 
     /**
@@ -83,6 +84,38 @@ public final class FixLayer {
     private static final int ELLIPSE_FILL = Color.argb(0x33, 0xFF, 0x3D, 0xD7);
     /** ATAK's own spot orange: argb(255, 255, 119, 0). */
     private static final int NEXT_COLOR = Color.argb(255, 255, 119, 0);
+
+    /**
+     * How many collected bearings are drawn behind the live one.
+     *
+     * <p>Forty. Enough to see the fan converge and to spot the one line that
+     * misses the crowd -- a bearing that arrived off a hillside or a metal
+     * building rather than from the transmitter, which is the single biggest
+     * source of wrong answers in direction finding and which no number on the
+     * screen can point at. Few enough that the map does not turn to spaghetti:
+     * half an hour of driving keeps around five hundred samples, and five
+     * hundred lines is a picture of nothing.
+     *
+     * <p>Deliberately not a control. The operator has been clear about the
+     * cost of a screen full of settings, and a cap nobody has complained about
+     * does not need one.
+     */
+    private static final int TRACE_MAX = 40;
+
+    /** Faintest and brightest a trace line gets, as an alpha. */
+    private static final int TRACE_ALPHA_OLD = 0x22;
+    private static final int TRACE_ALPHA_NEW = 0x8C;
+
+    /**
+     * How far past the fix a trace line is drawn, as a multiple of its own
+     * range to it.
+     *
+     * <p>A quarter over, so the lines visibly cross rather than stopping at
+     * the crossing point in a way that looks deliberate. Lines that all end
+     * exactly at a point read as a drawing of a point; lines that pass
+     * through it read as evidence for it.
+     */
+    private static final double TRACE_OVERSHOOT = 1.25;
 
     /** Points around the ellipse. Enough that it never reads as a polygon. */
     private static final int ELLIPSE_POINTS = 48;
@@ -147,6 +180,9 @@ public final class FixLayer {
     private final Map<Integer, Marker> fixes = new HashMap<>();
     private final Map<Integer, DrawingShape> ellipses = new HashMap<>();
     private final Map<Integer, DrawingShape> tracks = new HashMap<>();
+    private final Map<String, DrawingShape> traces = new HashMap<>();
+    /** Sample count each VFO's trace was last built at. */
+    private final Map<Integer, Integer> traceBuiltAt = new HashMap<>();
     private final Map<Integer, Marker> nexts = new HashMap<>();
     /** Where the fix was when each waypoint was placed. */
     private final Map<Integer, GeoPoint> nextAnchors = new HashMap<>();
@@ -185,6 +221,11 @@ public final class FixLayer {
         removeAll(tracks);
         removeAll(nexts);
         nextAnchors.clear();
+        for (DrawingShape sh : traces.values())
+            if (sh != null)
+                sh.removeFromGroup();
+        traces.clear();
+        traceBuiltAt.clear();
     }
 
     /** Take one VFO's answer off the map, leaving the others. */
@@ -194,6 +235,7 @@ public final class FixLayer {
         remove(tracks, vfo);
         remove(nexts, vfo);
         nextAnchors.remove(vfo);
+        clearTrace(vfo);
     }
 
     /**
@@ -209,6 +251,7 @@ public final class FixLayer {
     public void draw(int vfo, String label, SampleLog log,
             SampleLog.Result result) {
         drawTrack(vfo, log);
+        drawTrace(vfo, log, result);
         if (result == null) {
             remove(fixes, vfo);
             remove(ellipses, vfo);
@@ -352,6 +395,105 @@ public final class FixLayer {
                 samples.size()));
         if (s.getGroup() == null)
             group().addItem(s);
+    }
+
+    /**
+     * Every collected bearing, drawn faint, fading with age.
+     *
+     * <p>This is the picture a number cannot give. Each line runs from where
+     * it was taken, along the direction the radio reported, far enough to pass
+     * through the fix. Good bearings pile up on each other at the transmitter;
+     * a bearing that came off a reflection goes somewhere else entirely and is
+     * the one line obviously missing the crowd. Seeing which one is wrong, and
+     * where it was taken, is what lets an operator learn that the readings by
+     * the substation are worthless -- something the ellipse can only report as
+     * a slightly larger number.
+     *
+     * <p>Rebuilt only when a new sample is kept, which the movement gate makes
+     * every fifty meters rather than every frame. Forty shapes redrawn once a
+     * second would be a rendering cost for a picture that had not changed.
+     */
+    private void drawTrace(int vfo, SampleLog log, SampleLog.Result result) {
+        List<SampleLog.Sample> all = log == null ? null : log.samples();
+        if (all == null || all.size() < 2) {
+            clearTrace(vfo);
+            return;
+        }
+        Integer builtAt = traceBuiltAt.get(vfo);
+        if (builtAt != null && builtAt == all.size())
+            return;
+        traceBuiltAt.put(vfo, all.size());
+
+        int from = Math.max(0, all.size() - TRACE_MAX);
+        int shown = all.size() - from;
+        GeoPoint fix = result == null ? null
+                : new GeoPoint(result.lat, result.lon);
+
+        for (int i = 0; i < shown; i++) {
+            SampleLog.Sample sm = all.get(from + i);
+            GeoPoint at = new GeoPoint(sm.lat, sm.lon);
+            double len = fix == null ? 8000.0
+                    : Math.max(800.0, com.atakmap.coremap.maps.coords
+                            .GeoCalculations.distanceTo(at, fix)
+                            * TRACE_OVERSHOOT);
+            GeoPoint to = com.atakmap.coremap.maps.coords.GeoCalculations
+                    .pointAtDistance(at, sm.degTrue, len);
+            if (to == null)
+                continue;
+
+            String key = vfo + ":" + i;
+            DrawingShape sh = traces.get(key);
+            if (sh == null) {
+                sh = new DrawingShape(mapView, group(), UID_TRACE + key);
+                sh.setClosed(false);
+                sh.setAltitudeMode(Feature.AltitudeMode.ClampToGround);
+                sh.setMetaBoolean("archive", false);
+                sh.setMetaBoolean("editable", false);
+                sh.setMovable(false);
+                // Not tappable, and not in any list. Forty thin lines fanning
+                // out from a road is the single biggest thing on the map by
+                // area, and leaving them hit-testable meant a tap anywhere
+                // near the fan opened ATAK's "Select Item" picker full of
+                // signaldf.trace.0:17 rows -- burying the fix marker the
+                // operator was actually reaching for. They are a backdrop,
+                // not objects: read with the eye, never touched.
+                sh.setClickable(false);
+                sh.setMetaBoolean("addToObjList", false);
+                sh.setMetaBoolean("ignoreOffscreen", true);
+                traces.put(key, sh);
+            }
+            List<GeoPointMetaData> pts = new ArrayList<>(2);
+            pts.add(GeoPointMetaData.wrap(at));
+            pts.add(GeoPointMetaData.wrap(to));
+            sh.setPoints(pts,
+                    new android.util.SparseArray<com.atakmap.android.maps.PointMapItem>());
+            // Oldest faintest, newest brightest, so the fan reads as a
+            // history rather than a tangle.
+            double age = shown <= 1 ? 1.0 : (double) i / (shown - 1);
+            int alpha = (int) Math.round(TRACE_ALPHA_OLD
+                    + age * (TRACE_ALPHA_NEW - TRACE_ALPHA_OLD));
+            sh.setStrokeColor(Color.argb(alpha, 0x00, 0xE5, 0xFF));
+            sh.setStrokeWeight(1.0);
+            sh.setTitle("");
+            if (sh.getGroup() == null)
+                group().addItem(sh);
+        }
+
+        // Anything left over from a longer trace.
+        for (int i = shown; i < TRACE_MAX; i++) {
+            DrawingShape sh = traces.remove(vfo + ":" + i);
+            if (sh != null)
+                sh.removeFromGroup();
+        }
+    }
+
+    private void clearTrace(int vfo) {
+        for (int i = 0; i < TRACE_MAX; i++) {
+            DrawingShape sh = traces.remove(vfo + ":" + i);
+            if (sh != null)
+                sh.removeFromGroup();
+        }
+        traceBuiltAt.remove(vfo);
     }
 
     // ---- where to go next ---------------------------------------------------
