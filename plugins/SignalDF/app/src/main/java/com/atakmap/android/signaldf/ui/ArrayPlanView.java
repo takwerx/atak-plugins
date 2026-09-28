@@ -112,8 +112,8 @@ public class ArrayPlanView extends View {
         // whose scrolling viewport is only a few hundred pixels tall: a plan
         // taller than that can never be seen whole, however far it is
         // scrolled. 185dp cut elements 2 and 3 off the bottom on an S10.
-        int h = (int) Math.min(w * 0.5f, dp(140));
-        setMeasuredDimension(w, Math.max(h, (int) dp(110)));
+        int h = (int) Math.min(w * 0.55f, dp(155));
+        setMeasuredDimension(w, Math.max(h, (int) dp(115)));
     }
 
     /** Draw {@code s} centred on a point rather than sitting on a baseline. */
@@ -126,8 +126,12 @@ public class ArrayPlanView extends View {
         double[][] p = ArrayCalc.positions(geometry, elements, sizeCm);
         int elemColor = usable ? COLOR_ELEMENT : COLOR_BAD;
 
-        // Room for a label outside the ring on every side.
-        float pad = dp(24);
+        // Room for a label outside the ring on every side, measured rather
+        // than guessed: the dot, the gap, and the text's own height. A round
+        // number here clipped the top off "0 = forward" against the button
+        // above the drawing, which is the one label that reaches furthest.
+        float r = dp(7);
+        float pad = r + dp(13) + Math.abs(text.ascent()) + dp(2);
         float cx = getWidth() / 2f;
         float cy = getHeight() / 2f;
         float scale;
@@ -180,7 +184,6 @@ public class ArrayPlanView extends View {
         }
 
 
-        float r = dp(7);
         for (int i = 0; i < p.length; i++) {
             boolean forward = i == 0 && geometry == Geometry.CIRCULAR;
             fill.setColor(forward ? COLOR_FORWARD : elemColor);

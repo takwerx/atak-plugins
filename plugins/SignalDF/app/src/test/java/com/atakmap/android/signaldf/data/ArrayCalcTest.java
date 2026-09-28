@@ -367,4 +367,26 @@ public class ArrayCalcTest {
         assertEquals(-1, ArrayCalc.krakenTennaExtensions(200.0));
     }
 
+
+    @Test
+    public void whipGoesThreeQuarterWaveAboveAGigahertz() {
+        // Below the threshold it is a plain quarter wave.
+        assertEquals(ArrayCalc.quarterWaveCm(416.588),
+                ArrayCalc.whipLengthCm(416.588), 0.001);
+        // The template author's own cross-check: the 3/4-wave setting for
+        // 1800 MHz is the same length as the 1/4-wave setting for 600 MHz.
+        assertEquals(ArrayCalc.quarterWaveCm(600.0),
+                ArrayCalc.whipLengthCm(1800.0), 0.001);
+        // And that length is 12.5 cm, by hand.
+        assertEquals(12.5, ArrayCalc.whipLengthCm(1800.0), 0.01);
+    }
+
+    @Test
+    public void theThresholdItselfIsStillAQuarterWave() {
+        // At exactly 1000 MHz the retracted whip IS a quarter wave, so the
+        // rule only applies strictly above it.
+        assertEquals(7.5, ArrayCalc.whipLengthCm(1000.0), 0.01);
+        assertEquals(22.5, ArrayCalc.whipLengthCm(1000.1), 0.02);
+    }
+
 }

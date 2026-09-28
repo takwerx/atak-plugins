@@ -101,6 +101,14 @@
                     android:text="Size it for me" />
             </LinearLayout>
 
+            <Button
+                style="@style/TakwerxButton"
+                android:id="@+id/template"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Template: KrakenRF printed arms" />
+
             <com.atakmap.android.signaldf.ui.ArrayPlanView
                 android:id="@+id/plan"
                 android:layout_width="match_parent"

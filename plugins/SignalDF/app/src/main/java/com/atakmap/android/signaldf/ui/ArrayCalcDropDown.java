@@ -74,6 +74,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
     private final Button sizeItButton;
     private final TextView verdict;
     private final TextView numbers;
+    private final Button templateButton;
     private final TextView antenna;
     private final TextView band;
     private final TextView note;
@@ -97,6 +98,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         sizeItButton = root.findViewById(R.id.size_it);
         verdict = root.findViewById(R.id.verdict);
         numbers = root.findViewById(R.id.numbers);
+        templateButton = root.findViewById(R.id.template);
         antenna = root.findViewById(R.id.antenna);
         band = root.findViewById(R.id.band);
         note = root.findViewById(R.id.note);
@@ -171,11 +173,19 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
                 // An exact radius is no use to somebody holding arms drilled at
                 // 50 mm intervals; "use the 15 cm hole" is.
                 double hole = geometry == Geometry.CIRCULAR
+                        && template == TEMPLATE_KRAKENRF
                         ? ArrayCalc.templateRadiusCm(elements, freqMHz) : -1;
                 sizeCm = hole > 0 ? hole
                         : ArrayCalc.sizeFor(geometry, freqMHz, elements,
                                 RECOMMENDED_MULTIPLIER).sizeCm;
                 refresh();
+            }
+        });
+
+        templateButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickTemplate();
             }
         });
 
@@ -230,6 +240,34 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         if (f > 0 && !Double.isNaN(f))
             freqMHz = f;
         return true;
+    }
+
+    /**
+     * Which jig the operator is laying the array out with. It changes nothing
+     * about the arithmetic and everything about the answer: the same radius is
+     * "use the 15 cm hole" on one template, "use the position labelled with
+     * the next frequency above yours" on another, and a tape measurement on
+     * neither.
+     */
+    private void pickTemplate() {
+        final String[] names = {
+                "KrakenRF printed arms -- holes at fixed radii",
+                "3D-printed template -- positions labelled by frequency",
+                "None -- measuring it myself"
+        };
+        new AlertDialog.Builder(getMapView().getContext())
+                .setTitle("What are you laying it out with?")
+                .setSingleChoiceItems(names, template,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                template = which;
+                                d.dismiss();
+                                refresh();
+                            }
+                        })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void pickGeometry() {
@@ -306,12 +344,21 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         Toast.makeText(getMapView().getContext(), s, Toast.LENGTH_LONG).show();
     }
 
+    private static final int TEMPLATE_KRAKENRF = 0;
+    private static final int TEMPLATE_3D = 1;
+    private static final int TEMPLATE_NONE = 2;
+
+    private int template = TEMPLATE_KRAKENRF;
+
     private void refresh() {
         Result r = ArrayCalc.atSize(geometry, freqMHz, elements, sizeCm);
 
         freqButton.setText(String.format(Locale.US, "%.4f MHz", freqMHz));
         geometryButton.setText(geometry == Geometry.CIRCULAR ? "Circular" : "Linear");
         elementsButton.setText(elements + " elements");
+        templateButton.setText("Template: "
+                + (template == TEMPLATE_KRAKENRF ? "KrakenRF printed arms"
+                        : template == TEMPLATE_3D ? "3D-printed" : "none"));
         sizeButton.setText((geometry == Geometry.CIRCULAR ? "Radius " : "Length ")
                 + ShortDistance.fromCm(sizeCm));
 
@@ -355,8 +402,14 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         // and somebody standing at a vehicle with a telescopic antenna in
         // their hand needs before the array geometry is any use to them.
         StringBuilder a = new StringBuilder(String.format(Locale.US,
-                "Extend each whip to %s, a quarter wavelength\n",
-                ShortDistance.fromCm(ArrayCalc.quarterWaveCm(freqMHz))));
+                "Extend each whip to %s, a %s wavelength\n",
+                ShortDistance.fromCm(ArrayCalc.whipLengthCm(freqMHz)),
+                freqMHz > ArrayCalc.RETRACTED_QUARTER_WAVE_MHZ
+                        ? "three quarter" : "quarter"));
+        if (freqMHz > ArrayCalc.RETRACTED_QUARTER_WAVE_MHZ)
+            a.append("A quarter wave would be shorter than these whips "
+                    + "retract to, so go three quarters instead; all five "
+                    + "shift together, so the bearing is unaffected\n");
         int ext = ArrayCalc.krakenTennaExtensions(freqMHz);
         if (ext == 0)
             a.append("On a KrakenTenna, leave the sections collapsed\n");
@@ -375,7 +428,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         double lo = ArrayCalc.lowestUsableMHz(geometry, elements, sizeCm);
         StringBuilder b = new StringBuilder(String.format(Locale.US,
                 "%.0f to %.0f MHz", lo, hi));
-        if (geometry == Geometry.CIRCULAR) {
+        if (geometry == Geometry.CIRCULAR && template == TEMPLATE_KRAKENRF) {
             double hole = ArrayCalc.templateRadiusCm(elements, freqMHz);
             if (hole > 0)
                 b.append("\n\nOn KrakenRF's printed arms, use the "
@@ -383,11 +436,36 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
             else
                 b.append("\n\nNo hole on KrakenRF's printed arms covers this "
                         + "frequency; the array has to be built to size.");
+        } else if (geometry == Geometry.CIRCULAR && template == TEMPLATE_3D) {
+            // Its seven positions are labelled with the highest frequency each
+            // one is good for, so the rule is the author's own and needs no
+            // table: take the next label above the frequency being hunted.
+            // Deliberately not naming a label -- the seven numbers are in the
+            // OpenSCAD source behind a login, and a position named wrong is
+            // found out on a car roof.
+            b.append(String.format(Locale.US,
+                    "\n\nOn the 3D-printed template, use the position "
+                            + "labelled with the next frequency above %.1f MHz. "
+                            + "Its arm points antenna 0 forward.", freqMHz));
+            if (freqMHz < 150)
+                b.append(" Below 150 MHz this template runs out; "
+                        + "its widest position is only good down to there.");
         }
         band.setText(b.toString());
 
-        note.setText("KrakenRF publish printable arms and a hub for laying this out: "
-                + "the hub sets the angles, the arms set the radius. "
+        String jig = template == TEMPLATE_KRAKENRF
+                ? "KrakenRF publish printable arms and a hub for laying this "
+                        + "out: the hub sets the angles, the arms set the "
+                        + "radius. "
+                : template == TEMPLATE_3D
+                        ? "The 3D-printed template is a magnetic hub and one "
+                                + "arm you move round five positions; its "
+                                + "seven layout positions are each labelled "
+                                + "with the highest frequency that position is "
+                                + "good for, and the arm doubles as a scale "
+                                + "for setting the whips. "
+                        : "";
+        note.setText(jig
                 + "Spacing must stay under 0.5 wavelengths or the array cannot "
                 + "tell some directions apart. Bigger arrays resolve better, so aim "
                 + "just under the limit unless the vehicle says otherwise. Resolution "

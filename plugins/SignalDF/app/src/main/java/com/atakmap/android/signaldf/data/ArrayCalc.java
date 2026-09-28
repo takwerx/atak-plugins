@@ -394,4 +394,29 @@ public final class ArrayCalc {
             { 127, 150, 235, 282, 450, 1050 },
     };
 
+
+    /**
+     * Above this frequency a KrakenRF telescopic whip cannot be made short
+     * enough: fully retracted it is already a quarter wave at 1000 MHz.
+     *
+     * <p>The 3D template's author gives the way round it -- extend to three
+     * quarters of a wavelength instead: <i>"the telescope must be extended by
+     * one half-wavelength above the quarter-wavelength ... This shifts the
+     * signal phase by 180 degrees, but as you do it on all 5 antennas it does
+     * not adulterate the DOA measurement."</i> His own cross-check is that the
+     * 3/4-wave setting for 1800 MHz is the same length as the 1/4-wave setting
+     * for 600 MHz, which {@link #whipLengthCm} reproduces exactly.
+     */
+    public static final double RETRACTED_QUARTER_WAVE_MHZ = 1000.0;
+
+    /**
+     * How long to extend a telescopic whip: a quarter wavelength, or three
+     * quarters above {@link #RETRACTED_QUARTER_WAVE_MHZ} where a quarter is
+     * shorter than the antenna retracts to.
+     */
+    public static double whipLengthCm(double freqMHz) {
+        double q = quarterWaveCm(freqMHz);
+        return freqMHz > RETRACTED_QUARTER_WAVE_MHZ ? q * 3.0 : q;
+    }
+
 }
