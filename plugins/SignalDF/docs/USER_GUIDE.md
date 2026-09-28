@@ -114,11 +114,19 @@ the WiFi network and sends **its own** requests down it explicitly, leaving your
 phone's default network alone. Your mobile data keeps carrying ATAK; the radio
 traffic goes out the WiFi; nobody has to choose.
 
-> **One piece still unproven.** The pinning itself is confirmed working on
-> hardware. What has *not* been tested is the whole picture on a phone with a
-> SIM in it — the dev phone here has none, so nothing could verify that the TAK
-> server really stays up over cellular while the radio runs on WiFi. It should.
-> Check it somewhere it does not matter before you need it somewhere it does.
+**Confirmed on hardware**, 2026-09-27, on a phone with a live SIM joined to the
+radio's access point:
+
+| | |
+|---|---|
+| Signal DF reaching the radio | works — live bearings |
+| Internet and the TAK server over cellular, at the same time | works |
+| Anything *not* going through Signal DF reaching the radio | fails |
+
+That last row is not a problem, it is the proof. On that phone the default route
+sends the radio's own subnet out the cell modem, where it goes nowhere — so a
+command-line tool could not reach the radio at the moment the plugin was reading
+it happily. The pinning is what makes the difference.
 
 ### Scenario C — Nothing but the radio
 
