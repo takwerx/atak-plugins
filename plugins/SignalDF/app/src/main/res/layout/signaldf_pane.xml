@@ -96,36 +96,13 @@
                 android:textSize="13sp"
                 android:text="Array heading: unknown" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingTop="4dp">
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/set_heading"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="Set heading" />
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/clear_heading"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="4dp"
-                    android:text="Use radio" />
-            </LinearLayout>
-
             <Button
                 style="@style/TakwerxButton"
-                android:id="@+id/antenna0_forward"
+                android:id="@+id/heading_mode"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="ANTENNA 0 POINTS FORWARD: OFF" />
+                android:text="How you know it: not set" />
 
             <TextView
                 style="@style/SectionHeading"

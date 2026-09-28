@@ -79,7 +79,6 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final Context pluginContext;
     private final AtakPreferences prefs;
     private final BearingLayer layer;
-    private Button forwardButton;
     private Button shareFeedButton;
     private Button shareStaleButton;
     private Button shareToggleButton;
@@ -95,8 +94,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final TextView unverified;
     private final Button hostButton;
     private final Button connectButton;
-    private final Button setHeadingButton;
-    private final Button clearHeadingButton;
+    private final Button headingModeButton;
     private final Button radioSetupButton;
     private final Button arrayCalcButton;
     private final Button wideNarrowButton;
@@ -132,18 +130,6 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.signaldf_pane, null);
         status = root.findViewById(R.id.status);
         feedLine = root.findViewById(R.id.feed_line);
-        forwardButton = root.findViewById(R.id.antenna0_forward);
-        forwardButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                boolean on = !prefs.get(ArrayHeading.PREF_FORWARD, false);
-                prefs.set(ArrayHeading.PREF_FORWARD, on);
-                if (on)
-                    toast("bearings will follow the direction you are driving");
-                refresh();
-                draw();
-            }
-        });
         shareFeedButton = root.findViewById(R.id.share_feed);
         shareStaleButton = root.findViewById(R.id.share_stale);
         shareToggleButton = root.findViewById(R.id.share_toggle);
@@ -154,8 +140,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         unverified = root.findViewById(R.id.unverified);
         hostButton = root.findViewById(R.id.host);
         connectButton = root.findViewById(R.id.connect);
-        setHeadingButton = root.findViewById(R.id.set_heading);
-        clearHeadingButton = root.findViewById(R.id.clear_heading);
+        headingModeButton = root.findViewById(R.id.heading_mode);
         radioSetupButton = root.findViewById(R.id.radio_setup);
         arrayCalcButton = root.findViewById(R.id.array_calc);
         wideNarrowButton = root.findViewById(R.id.wide_narrow);
@@ -173,17 +158,10 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
                 toggleConnection();
             }
         });
-        setHeadingButton.setOnClickListener(new View.OnClickListener() {
+        headingModeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                askForHeading();
-            }
-        });
-        clearHeadingButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                prefs.remove(PREF_HEADING);
-                refresh();
+                pickHeadingMode();
             }
         });
         radioSetupButton.setOnClickListener(new View.OnClickListener() {
@@ -630,28 +608,86 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
      * leaving the phone.
      */
     /**
-     * The forward toggle, and what it is doing right now. ON is not enough on
-     * its own: a parked truck has no course, so the button has to say whether
-     * it is actually supplying a heading or waiting for the vehicle to move.
+     * Which way the array is pointing, and how we claim to know -- one
+     * control, three answers.
+     *
+     * <p>It was three controls: <i>Set heading</i>, <i>Use radio</i> and a
+     * <i>ANTENNA 0 POINTS FORWARD</i> toggle. The operator asked what each of
+     * them was for and then said the pane was "confusing as fuck", which is
+     * the correct reading of three buttons that between them answer one
+     * question.
+     *
+     * <p>The three answers are also KrakenRF's own. Their app calls this
+     * Bearing Mode and offers GPS, compass, manual and "from the Kraken
+     * server", so a Kraken operator already knows the shape of this question;
+     * they just have not been asked it in one place before. Compass is the one
+     * we leave out, and their own guide is lukewarm about it -- "you will need
+     * to be careful with the direction that the physical device points
+     * toward".
+     */
+    private void pickHeadingMode() {
+        final String[] names = {
+                "On the vehicle, antenna 0 forward -- follows your driving",
+                "Fixed, pointing a direction I will type",
+                "The radio knows -- its own GPS or compass"
+        };
+        int current = prefs.get(PREF_HEADING, "").trim().isEmpty()
+                ? (prefs.get(ArrayHeading.PREF_FORWARD, false) ? 0 : 2)
+                : 1;
+        new android.app.AlertDialog.Builder(getMapView().getContext())
+                .setTitle("Which way is the array pointing?")
+                .setSingleChoiceItems(names, current,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                d.dismiss();
+                                if (which == 0) {
+                                    prefs.remove(PREF_HEADING);
+                                    prefs.set(ArrayHeading.PREF_FORWARD, true);
+                                } else if (which == 2) {
+                                    prefs.remove(PREF_HEADING);
+                                    prefs.set(ArrayHeading.PREF_FORWARD, false);
+                                } else {
+                                    prefs.set(ArrayHeading.PREF_FORWARD, false);
+                                    askForHeading();
+                                    return;
+                                }
+                                refresh();
+                                draw();
+                            }
+                        })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /**
+     * What the button says. Never just the mode: a vehicle that is parked has
+     * no course, so "on the vehicle" alone would read as working while
+     * supplying nothing.
      */
     private void refreshForward() {
-        if (forwardButton == null)
+        if (headingModeButton == null)
             return;
-        boolean on = prefs.get(ArrayHeading.PREF_FORWARD, false);
-        String state = "OFF";
-        if (on) {
-            VehicleHeading v = VehicleHeading.get();
-            Double deg = v == null ? null : v.degrees();
-            if (deg == null)
-                state = "ON, waiting to move";
-            else if (v.isHeld())
-                state = String.format(Locale.US, "ON, held at %.0f deg", deg);
-            else
-                state = String.format(Locale.US, "ON, %.0f deg", deg);
+        String fixed = prefs.get(PREF_HEADING, "");
+        if (fixed != null && !fixed.trim().isEmpty()) {
+            headingModeButton.setText("How you know it: fixed, you typed it");
+            return;
         }
-        forwardButton.setText("ANTENNA 0 POINTS FORWARD: " + state);
-        forwardButton.setTextColor(pluginContext.getResources().getColor(
-                on ? R.color.on_green : R.color.off_red));
+        if (!prefs.get(ArrayHeading.PREF_FORWARD, false)) {
+            headingModeButton.setText("How you know it: from the radio");
+            return;
+        }
+        VehicleHeading v = VehicleHeading.get();
+        Double deg = v == null ? null : v.degrees();
+        if (deg == null)
+            headingModeButton.setText(
+                    "How you know it: from your driving, waiting to move");
+        else if (v.isHeld())
+            headingModeButton.setText(String.format(Locale.US,
+                    "How you know it: from your driving, held at %.0f deg", deg));
+        else
+            headingModeButton.setText(String.format(Locale.US,
+                    "How you know it: from your driving, %.0f deg", deg));
     }
 
     private void refreshSharing() {
@@ -692,6 +728,15 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         hostButton.setText(prefs.get(PREF_HOST, KrakenHost.DEFAULT_HOST));
 
         boolean running = link.isRunning();
+        // Radio setup is the Kraken's own web GUI in a WebView. With no radio
+        // answering there is nothing at the other end of it, and a button that
+        // opens a blank page reads as a broken plugin rather than as a missing
+        // radio. ATAK's own btn_gray selector already draws a disabled state,
+        // so this needs no color of its own.
+        radioSetupButton.setEnabled(running);
+        radioSetupButton.setText(running
+                ? "Radio setup" : "Radio setup (connect first)");
+
         connectButton.setText(running ? "Disconnect" : "Connect");
         connectButton.setTextColor(pluginContext.getResources().getColor(
                 running ? R.color.on_green : R.color.off_red));
