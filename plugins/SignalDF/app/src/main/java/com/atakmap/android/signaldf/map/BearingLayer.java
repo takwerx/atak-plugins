@@ -64,7 +64,12 @@ public final class BearingLayer {
     /** The group's name in ATAK's overlay list. */
     private static final String GROUP = "Signal DF";
 
-    private static final String UID_PREFIX = "signaldf.bearing.";
+    /**
+     * The UID a bearing line carries, locally and when shared. One UID, so an
+     * echo of a shared bearing lands on the line that is already there:
+     * ATAK resolves an incoming event against the whole root group by UID.
+     */
+    public static final String UID_PREFIX = "signaldf.bearing.";
 
     /** Bright enough to read over imagery; distinct from ATAK's own lines. */
     private static final int LIVE_COLOR = Color.rgb(0x00, 0xE5, 0xFF);
@@ -182,7 +187,7 @@ public final class BearingLayer {
      * 0.1 supports. Null when neither is available, and then nothing is drawn
      * rather than a line from a guess.
      */
-    private GeoPoint receiverPoint(Bearing b, GeoPoint fallback) {
+    public static GeoPoint receiverPoint(Bearing b, GeoPoint fallback) {
         if (b.positionReported)
             return new GeoPoint(b.latitude, b.longitude);
         return fallback;

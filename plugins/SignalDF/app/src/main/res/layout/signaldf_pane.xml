@@ -121,6 +121,50 @@
 
             <TextView
                 style="@style/SectionHeading"
+                android:text="Share" />
+
+            <Button
+                style="@style/TakwerxButton"
+                android:id="@+id/share_feed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Feed: not set" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingTop="4dp">
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/share_stale"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Ages out: 30 seconds" />
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/share_toggle"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="SHARING OFF" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/share_note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:alpha="0.75"
+                android:paddingTop="2dp"
+                android:text="Not sharing." />
+
+            <TextView
+                style="@style/SectionHeading"
                 android:id="@+id/bearings_heading"
                 android:text="Bearings" />
 

@@ -9,6 +9,7 @@ import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.signaldf.net.KrakenLink;
+import com.atakmap.android.signaldf.net.BearingPublisher;
 import com.atakmap.android.signaldf.ui.SignalDfDropDown;
 import com.atakmap.coremap.log.Log;
 
@@ -59,7 +60,13 @@ public class SignalDF implements IPlugin {
     ToolbarItem toolbarItem;
 
     private KrakenLink link;
+    private BearingPublisher publisher;
     private SignalDfDropDown dropDown;
+
+    /** The sharing component, for the pane's settings screen. */
+    public BearingPublisher publisher() {
+        return publisher;
+    }
 
     public SignalDF(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -105,6 +112,17 @@ public class SignalDF implements IPlugin {
             link = new KrakenLink(mv == null ? null : mv.getContext());
         }
 
+        // Sharing lives out here with the link, not in the pane, because
+        // transmitting has to outlive the tap that started it: the operator
+        // switches base maps or presses Back and the bearings keep going out.
+        if (publisher == null) {
+            MapView mv = MapView.getMapView();
+            if (mv != null) {
+                publisher = new BearingPublisher(mv);
+                link.addListener(publisher);
+            }
+        }
+
         uiService.addToolbarItem(toolbarItem);
         AtakBroadcast.getInstance().registerSystemReceiver(showReceiver,
                 new DocumentedIntentFilter(ACTION_SHOW, "Open the Signal DF pane"));
@@ -127,6 +145,12 @@ public class SignalDF implements IPlugin {
         }
         // The link is stopped rather than left running: a stopped plugin that
         // is still polling a radio is a battery drain nobody can see.
+        if (publisher != null) {
+            if (link != null)
+                link.removeListener(publisher);
+            publisher.dispose();
+            publisher = null;
+        }
         if (link != null) {
             link.dispose();
             link = null;

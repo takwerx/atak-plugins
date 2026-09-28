@@ -20,6 +20,7 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.preference.AtakPreferences;
 import com.atakmap.android.signaldf.data.Age;
 import com.atakmap.android.signaldf.map.BearingLayer;
+import com.atakmap.android.signaldf.net.BearingPublisher;
 import com.atakmap.android.signaldf.model.ArrayHeading;
 import com.atakmap.android.signaldf.model.Bearing;
 import com.atakmap.android.signaldf.model.FeedFrame;
@@ -77,6 +78,10 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final Context pluginContext;
     private final AtakPreferences prefs;
     private final BearingLayer layer;
+    private Button shareFeedButton;
+    private Button shareStaleButton;
+    private Button shareToggleButton;
+    private TextView shareNote;
     private RadioSetupDropDown radioSetup;
     private ArrayCalcDropDown arrayCalc;
     private final View root;
@@ -125,6 +130,11 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.signaldf_pane, null);
         status = root.findViewById(R.id.status);
         feedLine = root.findViewById(R.id.feed_line);
+        shareFeedButton = root.findViewById(R.id.share_feed);
+        shareStaleButton = root.findViewById(R.id.share_stale);
+        shareToggleButton = root.findViewById(R.id.share_toggle);
+        shareNote = root.findViewById(R.id.share_note);
+        wireSharing();
         headingProvenance = root.findViewById(R.id.heading_provenance);
         bearingsNote = root.findViewById(R.id.bearings_note);
         unverified = root.findViewById(R.id.unverified);
@@ -508,7 +518,130 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         layer.draw(link.latest(), heading(), BearingLayer.selfPoint(getMapView()));
     }
 
+    // ---- sharing -----------------------------------------------------------
+
+    private void wireSharing() {
+        shareFeedButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final BearingPublisher p = BearingPublisher.get();
+                if (p == null)
+                    return;
+                if (p.feed() != null) {
+                    new android.app.AlertDialog.Builder(getMapView().getContext())
+                            .setTitle("Sharing to " + p.feed())
+                            .setItems(new String[] { "Pick a different feed",
+                                    "Stop sharing to this feed" },
+                                    new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface d, int which) {
+                                            if (which == 0)
+                                                chooseFeed(p);
+                                            else {
+                                                p.clearFeed();
+                                                refreshSharing();
+                                            }
+                                        }
+                                    })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                    return;
+                }
+                chooseFeed(p);
+            }
+        });
+
+        shareStaleButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final BearingPublisher p = BearingPublisher.get();
+                if (p == null)
+                    return;
+                final int[] choices = BearingPublisher.STALE_CHOICES_S;
+                String[] names = new String[choices.length];
+                int current = 0;
+                for (int i = 0; i < choices.length; i++) {
+                    names[i] = choices[i] < 60
+                            ? choices[i] + " seconds"
+                            : (choices[i] / 60) + (choices[i] == 60 ? " minute" : " minutes");
+                    if (choices[i] == p.staleSeconds())
+                        current = i;
+                }
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("Ages off other maps after")
+                        .setSingleChoiceItems(names, current,
+                                new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface d, int which) {
+                                        p.setStaleSeconds(choices[which]);
+                                        d.dismiss();
+                                        refreshSharing();
+                                    }
+                                })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+
+        shareToggleButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                BearingPublisher p = BearingPublisher.get();
+                if (p == null)
+                    return;
+                if (p.feed() == null) {
+                    chooseFeed(p);
+                    return;
+                }
+                p.setOn(!p.isOn());
+                refreshSharing();
+            }
+        });
+    }
+
+    private void chooseFeed(final BearingPublisher p) {
+        p.choose(new BearingPublisher.OnChosen() {
+            @Override
+            public void chosen(String server, String feed) {
+                refreshSharing();
+            }
+        });
+    }
+
+    /**
+     * Says what is going out and where, in those words. A toggle that only
+     * reads ON tells the operator nothing about whether anything is actually
+     * leaving the phone.
+     */
+    private void refreshSharing() {
+        BearingPublisher p = BearingPublisher.get();
+        if (p == null || shareFeedButton == null)
+            return;
+        String feed = p.feed();
+        shareFeedButton.setText(feed == null ? "Feed: not set" : "Feed: " + feed);
+
+        int s = p.staleSeconds();
+        shareStaleButton.setText("Ages out: " + (s < 60 ? s + " seconds"
+                : (s / 60) + (s == 60 ? " minute" : " minutes")));
+
+        boolean on = p.isOn();
+        shareToggleButton.setText(on ? "SHARING ON" : "SHARING OFF");
+        shareToggleButton.setTextColor(pluginContext.getResources().getColor(
+                on ? R.color.on_green : R.color.off_red));
+
+        if (feed == null)
+            shareNote.setText("Not sharing. Pick a Data Sync feed and everyone "
+                    + "subscribed to it sees the bearings.");
+        else if (!on)
+            shareNote.setText("Ready to share to " + feed + ". Nothing is going out.");
+        else
+            shareNote.setText("Sharing to " + feed + ". " + p.sentCount()
+                    + " sent. Lines age off other maps by themselves; nothing "
+                    + "is stored in the feed.");
+    }
+
     private void refresh() {
+        refreshSharing();
         KrakenLink link = KrakenLink.get();
         if (link == null)
             return;
