@@ -19,8 +19,9 @@ waves, the sea and snow — each one a layer you switch on when you need it.
 <img src="screenshots/1_toolbar.png" width="640">
 
 Everything it shows is read by your device from public services and stays on
-your device. Nothing is published to a server or to anyone else's map. No layer
-talks to the network until you allow it, once, by name.
+your device. Nothing is published to a server or to anyone else's map. The
+forecast asks the National Weather Service for the point you are reading; every
+map layer asks you once, naming its server, before it talks to the network.
 
 Warnings, watches and advisories are not here on purpose: they are the
 [IPAWS Alerts](https://github.com/takwerx/ipaws-alerts) plugin's job, and the
@@ -32,17 +33,14 @@ two are meant to run side by side.
 
 - Published builds exist for **ATAK-CIV 5.6, 5.7 and 5.8**. Install the one that
   matches your ATAK exactly; a build for another version will not load.
-- The phone needs a network path to the weather services; each layer names its
-  server when it first asks to be allowed. A reading that has been fetched stays
+- The phone needs a network path to the weather services; each map layer names
+  its server when it first asks to be allowed. A reading that has been fetched stays
   readable when the network drops, with its age on it.
-- The first time, the forecast's weather service has to be allowed. **NWS
-  (United States)** is already chosen, and the Forecast page says it is not
-  allowed yet, with an **Allow NWS (United States)** button under it. Tap it: it
-  names the server and what is sent, and **Allow** turns it on and reads the
-  forecast. Outside the US, choose **Open-Meteo** in **Forecast settings**,
-  **Weather service** instead; it asks the same way.
+- The forecast needs nothing set up: it reads from the National Weather Service
+  (NWS) as soon as Atmosphere opens, in US units. Outside the US, open
+  **Forecast settings** and tap **Forecast from Open-Meteo**.
 
-<img src="screenshots/2_first_run.png" width="300"> <img src="screenshots/12_weather_service.png" width="300"> <img src="screenshots/13_allow_service.png" width="300">
+<img src="screenshots/2_first_run.png" width="420">
 
 ## 2. The pane
 
@@ -87,10 +85,10 @@ old the reading is.
 <img src="screenshots/7_next_hours.png" width="420"> <img src="screenshots/10_next_days.png" width="420">
 
 **Refresh** at the top of this page reads the forecast again. **Forecast
-settings** beside it picks the **Weather service** the forecast comes from —
-only that one is ever asked, and it says "not allowed" until you allow it —
-**What to show**, and **Position sent** — how coarsely your position is
-rounded before it leaves the device. **Favorites** keeps places by name.
+settings** beside it picks where the forecast comes from, **NWS (United
+States)** or **Open-Meteo** for anywhere else, with one tap, and **What to
+show** picks the readings. The point is sent rounded to about 100 m.
+**Favorites** keeps places by name.
 
 <img src="screenshots/11_forecast_settings.png" width="420"> <img src="screenshots/14_favorites.png" width="420">
 
@@ -216,5 +214,5 @@ Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
 - It publishes nothing: no path puts anything on another phone or a server.
 - It records nothing about you: no callsign, device identifier or TAK server
   detail is ever sent. Your position leaves the device only for the forecast
-  you ask for, rounded as coarsely as you set, and for the station, gauge and
-  buoy lists when they are set to My position.
+  when it is set to My position, rounded to about 100 m, and for the station,
+  gauge and buoy lists when they are set to My position.

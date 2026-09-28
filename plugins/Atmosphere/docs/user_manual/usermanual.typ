@@ -24,8 +24,10 @@ layer you switch on when you need it.
 Open it from the ATAK toolbar, or from Tools if it is not on the bar.
 
 Everything it shows is read by this device from public services and stays on
-this device. Nothing is published to a server or to anyone else's map. No
-layer talks to the network until you allow it, once, by name. Warnings,
+this device. Nothing is published to a server or to anyone else's map. The
+forecast asks the National Weather Service for the point you are reading; every
+map layer asks you once, naming its server, before it talks to the network.
+Warnings,
 watches and advisories are not here on purpose: they are the IPAWS Alerts
 plugin's job, and the two are meant to run side by side.
 ]
@@ -33,23 +35,16 @@ plugin's job, and the two are meant to run side by side.
 #tak-slide[
 = The first time
 
-#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+#toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("2.png", width: 100%)
-  #cap[A new install: the forecast's service is not allowed yet.]
+  #cap[A new install: the forecast from NWS, in US units.]
 ][
-  #image("12.png", width: 100%)
-  #cap[Outside the US: Forecast settings, Weather service, Open-Meteo.]
-][
-  #image("13.png", width: 100%)
-  #cap[The first time, it asks, naming the server.]
-]
+  There is nothing to set up. Atmosphere reads the forecast from the National
+  Weather Service (*NWS*) as soon as it opens, for the point you are reading,
+  rounded to about 100 m.
 
-#v(4pt)
-*NWS (United States)* is already chosen, but nothing goes out until you allow
-it. The Forecast page says so, with an *Allow NWS (United States)* button under
-it. Tap it: the question names the server and says what is sent, and *Allow*
-turns it on and reads the forecast at once. Outside the US, choose *Open-Meteo*
-in *Forecast settings*, *Weather service* instead; it asks the same way.
+  Outside the US, open *Forecast settings* and tap *Forecast from Open-Meteo*.
+]
 ]
 
 #tak-slide[
@@ -154,11 +149,10 @@ away again, and it stays the way you left it.
 ]
 
 #v(4pt)
-*Forecast settings* holds everything about the forecast: the *Weather
-service* it comes from (only that one is ever asked, and it says "not allowed"
-until you allow it), *What to show* in the Now tiles and the table, and
-*Position sent* - how coarsely your position is rounded before it leaves the
-device. *Favorites* keeps places by name: *Add
+*Forecast settings* holds everything about the forecast: where it comes from,
+*NWS (United States)* or *Open-Meteo* for anywhere else, picked with one tap,
+and *What to show* in the Now tiles and the table. *Favorites* keeps places by
+name: *Add
 this place* saves the point being read, and picking one later reads the
 forecast there.
 ]
@@ -608,11 +602,11 @@ USNG string.
 #tak-slide[
 = What leaves the device
 
-Nothing until you allow a layer or a weather service. Then:
+Only what you ask for:
 
-- A *forecast* sends the point it is for, rounded as coarsely as *Position
-  sent* says, to the weather service you picked.
-- A *map layer* sends the area of the map it is drawing, never your position,
+- A *forecast* sends the point it is for, rounded to about 100 m, to the
+  service picked in *Forecast settings*: NWS unless you pick Open-Meteo.
+- A *map layer*, once you have allowed it, sends the area of the map it is drawing, never your position,
   except the station, gauge and buoy layers when set to *My position*, which
   send that position rounded.
 - An *address* you type goes to the US Census Bureau, and to ATAK's own
