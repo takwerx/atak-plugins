@@ -151,10 +151,10 @@ public final class ArrayHeading {
         switch (source) {
             case MANUAL:
                 return String.format(Locale.US,
-                        "Array heading: %.0f deg, you set it", degrees);
+                        "Array heading: %.0f deg, set manually", degrees);
             case VEHICLE:
                 return String.format(Locale.US,
-                        "Array heading: %.0f deg, the way you are driving",
+                        "Array heading: %.0f deg, from your GPS track",
                         degrees);
             case RADIO:
                 return String.format(Locale.US,
@@ -172,8 +172,10 @@ public final class ArrayHeading {
                 // make use of the smartphone GPS instead". So on most rigs
                 // this line is the first thing the operator sees and it has
                 // to name the fix.
-                return "Array heading: unknown -- bearings are relative to the "
-                        + "antenna, not to north. Set a heading source.";
+                return "Array heading: not set. The radio measures direction "
+                        + "from antenna 0, not from north, so a line on the "
+                        + "map is turned by however far the array is turned. "
+                        + "Set a heading source.";
         }
     }
 
