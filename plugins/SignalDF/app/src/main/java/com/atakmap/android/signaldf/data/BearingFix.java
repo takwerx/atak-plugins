@@ -180,7 +180,14 @@ public final class BearingFix {
                 return String.format(Locale.US,
                         "The fix is long and thin along %03.0f. Moving across "
                                 + "that line will shorten it fastest.", e[2]);
-            return null;
+            // The other half of the advice, and it was missing. There are two
+            // regimes and they call for opposite things: while the crossing
+            // angle is poor, drive ACROSS the bearings, which is what the
+            // waypoint is for. Once it is good, the waypoint disappears and
+            // the right move is the opposite -- drive AT the fix. Saying
+            // nothing at that moment leaves the operator watching a waypoint
+            // vanish with no idea that the answer is now the marker itself.
+            return "Geometry is good. The fix marker is the place to go.";
         }
     }
 

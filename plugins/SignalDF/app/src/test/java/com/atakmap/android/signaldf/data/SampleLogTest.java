@@ -150,7 +150,11 @@ public class SampleLogTest {
         assertNotNull(r);
         double err = LocalFrame.distanceM(TX_LAT, TX_LON, r.lat, r.lon);
         assertTrue("should land on the transmitter, off by " + err, err < 50);
-        assertNull("good geometry needs no advice", r.fix.advice());
+        // Good geometry does not mean silence: it means the advice flips from
+        // "drive across your bearings" to "the fix marker is the place to go".
+        assertNotNull(r.fix.advice());
+        assertTrue(r.fix.advice(),
+                r.fix.advice().toLowerCase().contains("fix marker"));
     }
 
     @Test

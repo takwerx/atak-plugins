@@ -171,4 +171,54 @@ public final class SampleLog {
             this.lon = lon;
         }
     }
+
+    /**
+     * The mean direction of the last few bearings, degrees true, or NaN when
+     * there are none.
+     *
+     * <p>A circular mean, not an arithmetic one: averaging 359 and 001 the
+     * naive way gives 180, which points at the opposite side of the world.
+     *
+     * <p>This is the stable half of a direction-finding picture. Early in a
+     * search the estimated <em>range</em> slides by kilometers between
+     * updates, because every bearing so far runs almost parallel; the
+     * <em>direction</em> those bearings point is pinned down from the first
+     * few samples and barely moves. Anything that has to stay put while an
+     * operator drives toward it should be built on this and not on the fix.
+     */
+    public double meanBearingDeg(int lastN) {
+        int n = samples.size();
+        if (n == 0)
+            return Double.NaN;
+        int from = Math.max(0, n - Math.max(1, lastN));
+        double x = 0, y = 0;
+        for (int i = from; i < n; i++) {
+            double r = Math.toRadians(samples.get(i).degTrue);
+            x += Math.sin(r);
+            y += Math.cos(r);
+        }
+        if (x == 0 && y == 0)
+            return Double.NaN;
+        return Angles.norm360(Math.toDegrees(Math.atan2(x, y)));
+    }
+
+    /**
+     * Which way the receiver is travelling, from the last two samples kept,
+     * or NaN when there are fewer than two.
+     *
+     * <p>Used only to choose between two equally good perpendiculars: the one
+     * nearer the current heading does not ask for a U-turn.
+     */
+    public double travelBearingDeg() {
+        int n = samples.size();
+        if (n < 2)
+            return Double.NaN;
+        Sample a = samples.get(n - 2), b = samples.get(n - 1);
+        LocalFrame f = new LocalFrame(a.lat, a.lon);
+        double east = f.east(b.lon), north = f.north(b.lat);
+        if (east == 0 && north == 0)
+            return Double.NaN;
+        return Angles.norm360(Math.toDegrees(Math.atan2(east, north)));
+    }
+
 }

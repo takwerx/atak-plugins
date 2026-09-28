@@ -1,6 +1,7 @@
 package com.atakmap.android.signaldf.data;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -158,7 +159,11 @@ public class BearingFixTest {
             b[i] = az(x[i], y[i], tx, ty);
         Fix f = BearingFix.solve(x, y, b, null, 4);
         assertNotNull(f);
-        assertNull("clean geometry should say nothing", f.advice());
+        String advice = f.advice();
+        assertNotNull("good geometry still has something to say", advice);
+        assertTrue(advice, advice.toLowerCase().contains("fix marker"));
+        assertFalse("and it must not still be telling them to drive across",
+                advice.toLowerCase().contains("across"));
     }
 
     @Test

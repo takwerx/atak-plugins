@@ -7,6 +7,7 @@ import com.atakmap.android.drawing.mapItems.DrawingShape;
 import com.atakmap.android.maps.MapGroup;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.maps.Marker;
+import com.atakmap.android.signaldf.data.Angles;
 import com.atakmap.android.signaldf.data.SampleLog;
 import com.atakmap.android.icons.UserIcon;
 import com.atakmap.coremap.maps.coords.GeoPoint;
@@ -87,19 +88,31 @@ public final class FixLayer {
     private static final int ELLIPSE_POINTS = 48;
 
     /**
-     * How far along the suggested heading the next waypoint is placed, as a
-     * fraction of the ellipse's long axis.
+     * How far to send the operator, as a fraction of the fix's long axis.
      *
-     * <p>It has to be somewhere a vehicle can plausibly get to and far enough
-     * that going there actually changes the crossing angle. Three quarters of
-     * the current uncertainty is both: if the fix is a two kilometer cigar,
-     * moving fifteen hundred meters across it is a real improvement and a
-     * couple of minutes' drive.
+     * <p>Half. The crossing angle gained by moving {@code d} perpendicular to
+     * a target at range {@code R} is about {@code d/R}, so the useful distance
+     * <b>scales with range</b> -- two kilometers is decisive against a
+     * transmitter a kilometer away and nearly worthless against one ten
+     * kilometers off. The ellipse's long axis is the best range proxy
+     * available, and half of it buys roughly thirty degrees of crossing, which
+     * turns a cigar into something round.
      */
-    private static final double NEXT_FRACTION = 0.75;
+    private static final double NEXT_FRACTION = 0.5;
+
+    /**
+     * And clamped, because the operator has to be able to drive there.
+     *
+     * <p>Nothing under 500 m is worth a detour; nothing over 5 km is a
+     * suggestion somebody will follow. The waypoint is a hint rather than a
+     * survey point -- it will land in a field or a reservoir as often as not,
+     * and turn-by-turn will route to the nearest road regardless, so precision
+     * here is wasted effort.
+     */
+    private static final double NEXT_MAX_M = 5000.0;
 
     /** And never closer than this, or the waypoint lands under the truck. */
-    private static final double NEXT_MIN_M = 400.0;
+    private static final double NEXT_MIN_M = 500.0;
 
     /**
      * Close enough to count as having got there, meters.
@@ -372,36 +385,50 @@ public final class FixLayer {
         SampleLog.Sample last = log.samples().get(log.samples().size() - 1);
         GeoPoint from = new GeoPoint(last.lat, last.lon);
 
-        // Held, not recomputed. See NEXT_RECOMPUTE_M.
-        GeoPoint pick = null;
+        // Held, not recomputed, and no longer anchored to the fix at all.
+        // Arriving is the only thing that makes it stale: the reason it was
+        // there was that nothing had been sampled from that side, and standing
+        // on it fixes that. The fix moving does NOT invalidate it -- early in
+        // a search the fix slides kilometers along its own cigar between
+        // updates, and a waypoint that followed it would re-route Bloodhound
+        // every few seconds.
         Marker held = nexts.get(vfo);
-        GeoPoint anchor = nextAnchors.get(vfo);
-        if (held != null && anchor != null) {
-            boolean arrived = com.atakmap.coremap.maps.coords.GeoCalculations
-                    .distanceTo(from, held.getPoint()) < NEXT_REACHED_M;
-            boolean moved = com.atakmap.coremap.maps.coords.GeoCalculations
-                    .distanceTo(anchor, at) > NEXT_RECOMPUTE_M;
-            if (!arrived && !moved)
-                return;
-        }
+        if (held != null
+                && com.atakmap.coremap.maps.coords.GeoCalculations
+                        .distanceTo(from, held.getPoint()) > NEXT_REACHED_M)
+            return;
 
-        double dist = Math.max(NEXT_MIN_M, e[0] * NEXT_FRACTION);
-        double across = e[2] + 90.0;
-
-        GeoPoint a = com.atakmap.coremap.maps.coords.GeoCalculations
-                .pointAtDistance(at, across, dist);
-        GeoPoint b = com.atakmap.coremap.maps.coords.GeoCalculations
-                .pointAtDistance(at, across + 180.0, dist);
-        if (a == null || b == null) {
+        // Built on the bearing direction, which is pinned from the first few
+        // samples, rather than on the fix's position, which is not.
+        double meanBearing = log.meanBearingDeg(20);
+        if (Double.isNaN(meanBearing)) {
             remove(nexts, vfo);
             nextAnchors.remove(vfo);
             return;
         }
-        // The side further from everywhere already sampled.
-        pick = com.atakmap.coremap.maps.coords.GeoCalculations
-                .distanceTo(from, a) > com.atakmap.coremap.maps.coords
-                        .GeoCalculations.distanceTo(from, b) ? a : b;
-        nextAnchors.put(vfo, at);
+        double dist = Math.max(NEXT_MIN_M,
+                Math.min(NEXT_MAX_M, e[0] * NEXT_FRACTION));
+
+        // Either perpendicular opens the crossing angle equally well, so take
+        // the one nearer the way the vehicle is already pointing: no U-turn
+        // when a turn will do.
+        double travel = log.travelBearingDeg();
+        double left = meanBearing - 90.0, right = meanBearing + 90.0;
+        double across = right;
+        if (!Double.isNaN(travel)) {
+            double dl = Math.abs(Angles.diff180(travel, left));
+            double dr = Math.abs(Angles.diff180(travel, right));
+            across = dl < dr ? left : right;
+        }
+
+        GeoPoint pick = com.atakmap.coremap.maps.coords.GeoCalculations
+                .pointAtDistance(from, across, dist);
+        if (pick == null) {
+            remove(nexts, vfo);
+            nextAnchors.remove(vfo);
+            return;
+        }
+        nextAnchors.put(vfo, from);
 
         Marker m = nexts.get(vfo);
         if (m == null) {
@@ -415,11 +442,14 @@ public final class FixLayer {
         m.setPoint(pick);
         m.setTitle("Drive here");
         m.setMetaString("callsign", "Drive here");
-        m.setMetaString("remarks",
-                "Signal DF: the fix is long and thin, and bearings from here "
-                        + "would cross the ones you already have. Anywhere "
-                        + "along this side of the ellipse will do -- the "
-                        + "point is to get off the line you have been on.");
+        m.setMetaString("remarks", String.format(Locale.US,
+                "Signal DF: drive here to tighten the fix. It is %s away "
+                        + "across your bearings, which all run about %03.0f. "
+                        + "Anywhere near it will do -- the point is to get off "
+                        + "the line you have been on, and the roads decide the "
+                        + "rest. This waypoint stays put until you reach it.",
+                com.atakmap.android.signaldf.data.Units.format(dist),
+                meanBearing));
         if (m.getGroup() == null)
             group().addItem(m);
     }
