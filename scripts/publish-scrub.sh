@@ -91,7 +91,15 @@ done < <(list_files)
 
 # ---- 2. content patterns ----------------------------------------------------
 # Each pattern is an extended regex; ALLOW is applied to matching lines.
-ALLOW='noreply@anthropic\.com|com\.atakmap\.app@[0-9]+\.[0-9]+\.[0-9]+\.[A-Z]+|example\.com|schemas\.android\.com|w3\.org|0\.0\.0\.0|127\.0\.0\.1|localhost|tnttnt|wintec_mapping|takrepoUser|takrepoPassword|storePassword|keyPassword'
+#
+# 192.168.50.5 is the KrakenSDR's own documented default -- the address its Pi
+# image serves on when it falls back to being its own access point, published in
+# KrakenRF's wiki. It is a vendor constant in the same class as localhost and
+# example.com, not anybody's infrastructure, and Signal DF's setup guide cannot
+# be written without it. Allowlisting a literal like this is only ever right when
+# the number is a third party's published default; a real address of ours still
+# fails, which is the whole point.
+ALLOW='noreply@anthropic\.com|com\.atakmap\.app@[0-9]+\.[0-9]+\.[0-9]+\.[A-Z]+|example\.com|schemas\.android\.com|w3\.org|0\.0\.0\.0|127\.0\.0\.1|localhost|192\.168\.50\.5|tnttnt|wintec_mapping|takrepoUser|takrepoPassword|storePassword|keyPassword'
 
 # The tak.gov submission README must carry a point-of-contact address, and the
 # generic email scan would otherwise block the very zip that needs it. This is the
