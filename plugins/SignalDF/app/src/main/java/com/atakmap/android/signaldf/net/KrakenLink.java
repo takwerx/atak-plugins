@@ -53,6 +53,16 @@ import java.util.Locale;
  * move -- it counts through Doze, and everything that reads a bearing from here
  * can ask whether it is still {@link #isLive()}.
  *
+ * <p><b>A successful read is not a new frame.</b> Measured on real hardware,
+ * 2026-09-27: a Pi running krakensdr_doa 1.8.1 with no receiver attached
+ * (`daq_ok: false`, empty `hardware_id`) still serves a perfectly well-formed
+ * doa.xml on port 8081 -- a leftover file baked into the image, frozen at one
+ * timestamp and one bearing forever. Measuring age from the moment of the fetch
+ * called that a healthy 0.0 s old feed and would have drawn a bearing from a
+ * radio that does not exist. So a read whose body is byte-identical to the last
+ * one does not advance the clock and does not reach the listeners: the age goes
+ * on climbing and the pane says the radio is answering but not producing.
+ *
  * <p>Threading: everything that mutates state happens on the main thread.
  * {@link Http} does its I/O on a bounded pool and delivers back to main, and the
  * poll loop is a {@link Handler} on the main looper, so listeners are always
@@ -141,6 +151,18 @@ public final class KrakenLink implements ToolListener {
 
     private List<Bearing> latest = Collections.emptyList();
 
+    /**
+     * The last response body, so an unchanged one can be recognized. Compared
+     * whole rather than by the frame's own timestamp because not every feed
+     * carries one, and because a radio that has stopped producing can leave any
+     * single field looking plausible. Identical bytes cannot be a new frame:
+     * the timestamp, the confidence and the power all jitter between real ones.
+     */
+    private String lastBody;
+
+    /** Monotonic time the body last actually changed, or -1. */
+    private long lastChangeRealtime = -1;
+
     /** A poll already in flight; a late answer from an older one is ignored. */
     private int generation;
 
@@ -205,11 +227,26 @@ public final class KrakenLink implements ToolListener {
         return host;
     }
 
-    /** Milliseconds since the last frame with a bearing in it, or -1 for none. */
+    /**
+     * Milliseconds since the feed last produced something new, or -1 if it
+     * never has. Deliberately not "since the last successful read": a frozen
+     * file reads successfully forever.
+     */
     public long ageMs() {
         if (lastFrameRealtime < 0)
             return -1;
         return SystemClock.elapsedRealtime() - lastFrameRealtime;
+    }
+
+    /**
+     * True when the radio is answering but serving the same bytes over and
+     * over. Distinct from a network drop, and the operator needs to be told
+     * which one they have: this one usually means the receiver is not attached
+     * or the DSP has stopped, and no amount of waiting will fix it.
+     */
+    public boolean isRepeating() {
+        return state == State.LIVE && lastChangeRealtime >= 0
+                && SystemClock.elapsedRealtime() - lastChangeRealtime >= STALE_AFTER_MS;
     }
 
     /**
@@ -264,6 +301,13 @@ public final class KrakenLink implements ToolListener {
                 long age = ageMs();
                 if (age < 0)
                     return active.source().label() + " answering, no bearing yet";
+                if (isRepeating())
+                    // Not a network problem, and saying "nothing for 40 s"
+                    // would send the operator to check the wrong thing.
+                    return String.format(Locale.US,
+                            "%s answering but not updating for %.0f s -- check the "
+                                    + "receiver is attached",
+                            active.source().label(), age / 1000.0);
                 if (age < STALE_AFTER_MS)
                     return String.format(Locale.US, "%s, %.1f s ago",
                             active.source().label(), age / 1000.0);
@@ -295,6 +339,9 @@ public final class KrakenLink implements ToolListener {
         this.lastNote = "";
         this.backoffMs = BACKOFF_START_MS;
         this.consecutiveFailures = 0;
+        this.lastBody = null;
+        this.lastChangeRealtime = -1;
+        this.lastFrameRealtime = -1;
         Log.d(TAG, "starting on " + host);
         notifyChanged();
         poll();
@@ -378,8 +425,21 @@ public final class KrakenLink implements ToolListener {
         lastError = "";
         backoffMs = BACKOFF_START_MS;
         consecutiveFailures = 0;
+
+        // A body identical to the last one is the same frame served again, not
+        // a new measurement. See the class comment: a radio with no receiver
+        // attached serves a frozen doa.xml indefinitely.
+        boolean changed = lastBody == null || !lastBody.equals(body);
+        lastBody = body;
+        if (!changed) {
+            notifyChanged();
+            scheduleNext(POLL_INTERVAL_MS);
+            return;
+        }
+
         framesRead++;
         lastFrameRealtime = SystemClock.elapsedRealtime();
+        lastChangeRealtime = lastFrameRealtime;
         latest = frame.bearings;
 
         notifyBearings(frame);
