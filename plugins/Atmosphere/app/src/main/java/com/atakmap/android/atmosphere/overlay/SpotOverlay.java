@@ -1,0 +1,422 @@
+
+package com.atakmap.android.atmosphere.overlay;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.data.Spot;
+import com.atakmap.android.atmosphere.data.States;
+import com.atakmap.android.atmosphere.net.EgressPolicy;
+import com.atakmap.android.atmosphere.net.Http;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.log.Log;
+import com.atakmap.coremap.maps.coords.GeoPoint;
+import com.atakmap.map.layer.feature.AttributeSet;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Open spot forecast requests on the map, drawn the way NWS's own Spot Forecast
+ * Monitor draws them (operator, 2026-09-25, with the Monitor's screenshots: "for spot
+ * weather can we have a map layer please and make a similar design").
+ *
+ * <p>The same list the spot page already reads -- NWS's published Fire Weather Spot
+ * map service, no key, updated every fifteen minutes -- put on the map instead of in
+ * a list. A disc per request, one letter for what it is, colored by how far along it
+ * is; see {@link SpotIcons} for the legend, which is NWS's, not ours.
+ *
+ * <p>Each kind is its own feature set, so Overlay Manager lists Wildfire, Prescribed
+ * Fire, HAZMAT and the rest separately and ATAK's own visibility switches work on
+ * them one at a time. That is what makes this behave like the Feature Layer plugin's
+ * layers rather than like a heap of markers.
+ */
+public final class SpotOverlay {
+
+    private static final String TAG = "AtmosphereSpot";
+
+    public static final String LAYER_ID = "spotforecasts";
+    public static final String HOST = Spot.HOST;
+    private static final String NAME = "Spot forecasts";
+
+    /** NWS's own three status colors, so the pane's legend and the map agree. */
+    public static final int DONE = SpotIcons.DONE;
+    public static final int WAITING = SpotIcons.WAITING;
+    public static final int PENDING = SpotIcons.PENDING;
+
+    private static final String PREF_ON = "weather.layer.spot.on";
+    private static final String PREF_RECENT_ONLY = "weather.layer.spot.recentonly";
+    /**
+     * How far back a request still counts as current. Three days covers a fire's
+     * operational periods without dragging in last week's.
+     */
+    public static final long RECENT_MS = 3 * 24 * 60 * 60 * 1000L;
+
+    /** The service says it republishes every fifteen minutes; match it, no faster. */
+    private static final long POLL_MS = 15 * 60 * 1000L;
+    private static final long REFRESH_MS = 5 * 60 * 1000L;
+
+    public interface Listener {
+        void onStatus(String status);
+
+        /** How many are drawn, and of how many, for the line under the toggle. */
+        void onDrawn(int drawn, int total);
+    }
+
+    private final MapView mapView;
+    private final Context pluginContext;
+    private final EgressPolicy egress;
+    private final AtmosphereFeatures features;
+    private final SpotIcons icons = new SpotIcons();
+    private final ExecutorService worker = Executors.newSingleThreadExecutor();
+
+    private Listener listener;
+    private boolean started, on, inFlight;
+    private boolean recentOnly;
+    private long lastPoll;
+    private int generation;
+    private States states;
+    private List<Spot.Request> requests = new ArrayList<>();
+
+    private final Runnable autoPoll = new Runnable() {
+        @Override
+        public void run() {
+            if (!on || !started)
+                return;
+            refresh(true);
+            mapView.postDelayed(this, POLL_MS);
+        }
+    };
+
+    public SpotOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
+        this.mapView = mapView;
+        this.pluginContext = pluginContext;
+        this.egress = egress;
+        this.features = new AtmosphereFeatures(mapView, pluginContext, TAG, NAME,
+                "spot.sqlite", "spot", false);
+        final SharedPreferences p = MapCompat.prefs();
+        // Most of the list is finished work from the past week. A crew looking at the
+        // map wants what is still open, so that is where this starts.
+        recentOnly = p == null || p.getBoolean(PREF_RECENT_ONLY, true);
+    }
+
+    public void setListener(Listener l) {
+        listener = l;
+    }
+
+    public void start() {
+        started = true;
+        features.attach();
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
+            setOn(true);
+        // The store outlives the session: last week's requests would otherwise draw
+        // now, hours after they were filled.
+        if (!on)
+            clearOffMain();
+    }
+
+    public void stop() {
+        started = false;
+        on = false;
+        generation++;
+        mapView.removeCallbacks(autoPoll);
+        worker.shutdownNow();
+        features.detach();
+    }
+
+    public boolean isOn() {
+        return on;
+    }
+
+    public void setOn(boolean value) {
+        if (!started || on == value)
+            return;
+        on = value;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putBoolean(PREF_ON, value).apply();
+        mapView.removeCallbacks(autoPoll);
+        generation++;
+        inFlight = false;
+        if (value) {
+            refresh(true);
+            mapView.postDelayed(autoPoll, POLL_MS);
+        } else {
+            requests = new ArrayList<>();
+            clearOffMain();
+            status("");
+            drawn(0, 0);
+        }
+    }
+
+    /** Whether only requests from the last few days are drawn. */
+    public boolean isRecentOnly() {
+        return recentOnly;
+    }
+
+    /** Switch it; redrawn from what is already held, no new request. */
+    public void setRecentOnly(boolean value) {
+        recentOnly = value;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putBoolean(PREF_RECENT_ONLY, value).apply();
+        if (!on)
+            return;
+        final int mine = generation;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                rebuild(mine);
+            }
+        });
+    }
+
+    /** Ask for the country's spot requests, unless that was done very recently. */
+    public void refresh(boolean force) {
+        if (!on || !started || inFlight)
+            return;
+        final long now = System.currentTimeMillis();
+        if (!force && now - lastPoll < REFRESH_MS)
+            return;
+        lastPoll = now;
+        inFlight = true;
+        final int mine = generation;
+        if (requests.isEmpty())
+            status("Getting spot forecasts…");
+        final Map<String, String> headers = new HashMap<>();
+        headers.put("Accept", "application/json");
+        // 717 KB as it stands, 79 KB gzipped.
+        headers.put("Accept-Encoding", "gzip");
+        Http.get(Spot.LIST_URL, egress.userAgent(), headers, new Http.Callback() {
+            @Override
+            public void onSuccess(final String body) {
+                if (mine != generation || !on) {
+                    inFlight = false;
+                    return;
+                }
+                // A few hundred milliseconds of JSON for the whole country; not on
+                // the thread the map draws on.
+                worker.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        List<Spot.Request> parsed = null;
+                        try {
+                            if (states == null)
+                                states = loadStates();
+                            parsed = Spot.parse(body, states);
+                        } catch (Exception e) {
+                            Log.w(TAG, "spot list unreadable", e);
+                        }
+                        if (parsed == null) {
+                            mapView.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    inFlight = false;
+                                    if (mine == generation && on)
+                                        status("Could not read the spot list");
+                                }
+                            });
+                            return;
+                        }
+                        requests = parsed;
+                        // Still on the worker: composing icons and writing the
+                        // feature store are both too slow for main.
+                        rebuild(mine);
+                        mapView.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                inFlight = false;
+                            }
+                        });
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(String error) {
+                inFlight = false;
+                if (mine != generation || !on)
+                    return;
+                Log.w(TAG, "spot list failed: " + error);
+                status("Could not reach the spot service");
+            }
+        });
+    }
+
+    /**
+     * Draw what is held, under the switch that is set. <b>Worker thread only.</b>
+     *
+     * <p>This was a loop of {@code addIcon} on the main thread and it hung ATAK: 417
+     * requests is 417 SQLite inserts, and the ANR trace on 2026-09-25 was exactly
+     * that stack -- rebuild, addIcon, insertFeature, StatementImpl.execute, on main.
+     * {@code rewrite} is the API the other layers use and it says worker-only on the
+     * tin: one modify lock for the whole write, the new sets in before the old come
+     * out, so the map never blanks between two polls.
+     */
+    private void rebuild(int mine) {
+        if (mine != generation || !on)
+            return;
+        final List<Spot.Request> held = requests;
+        final long now = System.currentTimeMillis();
+        // One disc per incident, the newest. Three Wheeler requests otherwise stack
+        // on the same point and a tap offers all three.
+        final List<Spot.Request> one = newestPerIncident(held, null);
+        final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
+        for (Spot.Request r : one) {
+            if (recentOnly && !isRecent(r, now))
+                continue;
+            if (Double.isNaN(r.lat) || Double.isNaN(r.lon))
+                continue;
+            final int color = SpotIcons.color(r);
+            final String uri = icons.uri(SpotIcons.letter(r), color);
+            if (uri == null)
+                continue;
+            // The set is the kind, so Overlay Manager lists Wildfire and HAZMAT
+            // separately and ATAK's own switches work on one at a time.
+            drawn.add(new AtmosphereFeatures.Drawn(setName(r), label(r),
+                    AtmosphereFeatures.point(r.lat, r.lon),
+                    AtmosphereFeatures.icon(uri, SpotIcons.size(), SpotIcons.size()),
+                    attrs(r, color)));
+        }
+        if (mine != generation || !on)
+            return;
+        features.rewrite(drawn);
+        final int n = drawn.size();
+        final int total = held.size();
+        mapView.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mine != generation || !on)
+                    return;
+                status("");
+                drawn(n, total);
+            }
+        });
+        Log.d(TAG, String.format(Locale.US, "drew %d of %d spot requests, recentOnly=%b",
+                n, total, recentOnly));
+    }
+
+    /**
+     * Empty the store without holding the UI. Clearing is a database write like any
+     * other and 417 features is not work for the thread that draws the map.
+     */
+    private void clearOffMain() {
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                features.clear();
+            }
+        });
+    }
+
+    /**
+     * Recent, not "unfilled". Nearly every spot request is filled within the hour, so
+     * a status filter hid the very thing a crew wants: today's issued forecast for an
+     * active fire. The Wheeler Incident had three requests, all completed, and the
+     * newest was an hour old when it was being looked for and could not be found
+     * (operator, 2026-09-25). Age is the axis that means "I do not care about past
+     * forecasts"; status never was.
+     */
+    /**
+     * Collapse to the newest request per incident, counting what was folded in.
+     *
+     * <p>Lives here so the map and the list share it. It was on the page alone, which
+     * left three Wheeler Incident discs stacked on the map and ATAK's Select Item
+     * chooser offering all three while the list beside it had already folded them
+     * into one (operator, 2026-09-25: "you are listing all the forecasts, i just want
+     * the latest").
+     *
+     * <p>Keyed by name AND office: two unrelated fires can share a plain name --
+     * there were five "Dry River" requests -- and merging them because a word matched
+     * would hide one of them.
+     */
+    public static List<Spot.Request> newestPerIncident(List<Spot.Request> all,
+            Map<String, Integer> countsOut) {
+        final Map<String, Spot.Request> newest = new java.util.LinkedHashMap<>();
+        for (Spot.Request r : all) {
+            final String key = incidentKey(r);
+            if (countsOut != null)
+                countsOut.put(key,
+                        (countsOut.containsKey(key) ? countsOut.get(key) : 0) + 1);
+            final Spot.Request had = newest.get(key);
+            if (had == null || when(r) > when(had))
+                newest.put(key, r);
+        }
+        return new ArrayList<>(newest.values());
+    }
+
+    public static String incidentKey(Spot.Request r) {
+        return (r.project == null ? "" : r.project.trim().toLowerCase(Locale.US))
+                + "|" + (r.office == null ? "" : r.office);
+    }
+
+    /** Filled if it has been, else when it was asked for. */
+    public static long when(Spot.Request r) {
+        return r.filledAt > 0 ? r.filledAt : r.requestedAt;
+    }
+
+    public static boolean isRecent(Spot.Request r, long now) {
+        final long when = r.filledAt > 0 ? r.filledAt : r.requestedAt;
+        return when > 0 && now - when <= RECENT_MS;
+    }
+
+    private static String setName(Spot.Request r) {
+        return r.kind == null || r.kind.isEmpty() ? "Other" : r.kind;
+    }
+
+    /** What the chooser and the details pane call it. */
+    private static String label(Spot.Request r) {
+        final String p = r.project == null ? "" : r.project.trim();
+        return p.isEmpty() ? ("Spot request " + r.id) : p;
+    }
+
+    /**
+     * Everything a tap should be able to read back. The renderer keeps these with
+     * the feature, so the details pane does not have to hold a parallel list.
+     */
+    private static AttributeSet attrs(Spot.Request r, int color) {
+        final AttributeSet a = new AttributeSet();
+        a.setAttribute("spotId", r.id);
+        a.setAttribute("project", label(r));
+        a.setAttribute("kind", r.kind == null ? "" : r.kind);
+        a.setAttribute("status", SpotIcons.statusLabel(color));
+        a.setAttribute("office", r.office == null ? "" : r.office);
+        a.setAttribute("officeName", r.officeName == null ? "" : r.officeName);
+        a.setAttribute("state", r.state == null ? "" : r.state);
+        a.setAttribute("region", r.region == null ? "" : r.region);
+        a.setAttribute("requestedAt", r.requestedAt);
+        a.setAttribute("filledAt", r.filledAt);
+        return a;
+    }
+
+    private States loadStates() {
+        try (java.io.InputStream in = pluginContext.getAssets().open("us_states.json")) {
+            final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            final byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0)
+                out.write(buf, 0, n);
+            return States.parse(out.toString("UTF-8"));
+        } catch (Exception e) {
+            Log.w(TAG, "state outlines unreadable", e);
+            return null;
+        }
+    }
+
+    private void status(String s) {
+        if (listener != null)
+            listener.onStatus(s);
+    }
+
+    private void drawn(int n, int total) {
+        if (listener != null)
+            listener.onDrawn(n, total);
+    }
+}
