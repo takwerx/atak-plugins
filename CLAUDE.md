@@ -158,8 +158,9 @@ list and search show, and they are invisible from inside the README:
 "Before you start" note listing which ATAK versions have published builds.
 
 **How a guide gets built — shot list first.** The guide and the typst manual
-are written around screenshots, and the screenshots come from a signed build
-on an official phone (a dev build watermarks every frame). The order is fixed:
+are written around screenshots. Pictures where the map is the point come from a
+signed build on an official phone (a dev build watermarks the map); pictures of
+the plugin's own UI do not, see below. The order is fixed:
 
 1. Write `../atak-plugins-notes/docs/SHOTLIST-<Name>-manual.md`: framing rules,
    then a table of numbered shots (section, what it shows, crop). Cam Depot's
@@ -173,6 +174,22 @@ on an official phone (a dev build watermarks every frame). The order is fixed:
    manual's set into `docs/user_manual/` as `<n>.png`.
 4. Write USER_GUIDE.md and `usermanual.typ` around them, add the Tool
    Preferences entry if the plugin has none, and submit the second build.
+
+**UI pictures come from the dev build, in the same submission.** A picture of
+the plugin's own UI (the pane, a dialog, a menu, a settings list) is a crop,
+and the DEVELOPER BUILD watermark sits on the map, never inside a pane or a
+dialog. So the session shoots it on the dev phone with the local build, crops
+it to the pane or the dialog, and commits it with the change that altered the
+screen. Before zipping any change that alters a screen the manual shows, grep
+the manual and guide for that screen and retake those pictures first. Never
+leave a UI picture for "the signed build": Atmosphere 0.3 went to tak.gov on
+2026-09-28 with two stale pictures listed that way, and the operator had to
+resubmit (*"anytime we can take and crop use the dev build and not waste a
+trip. like menus ... that arent map features"*). Only map shots wait for the
+signed build, and the operator frames those on the screenshot phone.
+`submission-zip.sh` stops when a release changes layouts, strings or UI code
+and no manual picture; `PICTURES_CHECKED=1` answers it when the manual shows
+none of those screens, or only map shots need retaking. `/ship` asks again.
 
 A plugin's *support surface* is its own repo: its Releases carry the
 tak.gov-signed APKs, its Issues take the bug reports. Anything that is not a
