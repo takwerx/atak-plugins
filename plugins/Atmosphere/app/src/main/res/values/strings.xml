@@ -284,7 +284,8 @@
     <string name="remove">Remove</string>
 
     <!-- Dialogs -->
-    <string name="sources_title">Allowed services</string>
+    <string name="allow_source">Allow %1$s</string>
+    <string name="not_allowed_suffix">, not allowed</string>
     <string name="source_allow_title">Allow %1$s?</string>
     <string name="source_allow_text">The forecast will come from %1$s. Allowing it lets Atmosphere ask it for the forecast at the point you are reading, rounded as set in Position sent. Nothing else about you is sent.\n\nServers: %2$s</string>
     <string name="source_title">Weather service</string>

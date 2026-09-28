@@ -159,12 +159,13 @@ public final class EgressPolicy {
         if (!isEnabled(def))
             // The path is named the way the pane names it: nothing on screen is
             // called "Sources" (the operator's first run on the S22, 2026-09-27).
+            // The Forecast page puts an Allow button under this line; it points
+            // there, not into the settings.
             return def.displayName + (hostsChanged(def)
                     ? " now sends its requests to " + hostList(def) + ", not where it did "
-                            + "when it was allowed. Choose it again in Forecast settings, "
-                            + "Weather service, to allow that."
-                    : " is not allowed yet. Choose it in Forecast settings, Weather service, "
-                            + "to allow requests to " + hostList(def) + ".");
+                            + "when it was allowed. Tap Allow below to allow that."
+                    : " is not allowed yet, so nothing has been sent to "
+                            + hostList(def) + ". Tap Allow below.");
         if (def.requiresApiKey)
             return def.displayName + " needs an API key, and this build does not store "
                     + "keys yet.";

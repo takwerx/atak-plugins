@@ -14,8 +14,12 @@ import com.atakmap.map.layer.feature.AttributeSet;
 import com.atakmap.map.layer.feature.geometry.Geometry;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * EPA AirNow's latest Air Quality Index on the map: the country in six colored bands,
@@ -27,6 +31,11 @@ import java.util.Locale;
  * the layer is on it asks for the stamp alone every quarter hour, a few hundred bytes,
  * and fetches the shapes only when the hour has moved. Nothing about the operator is
  * in either request.
+ *
+ * <p>Every store write is on {@link #worker}, never on main: the store is opened on
+ * a thread of its own and registered on the map by a hop back to main, so a write
+ * from main can end up waiting for main. This layer did that from start() and froze
+ * ATAK for 20 s on every start with the layer off (2026-09-27).
  */
 public final class AirQualityOverlay {
 
@@ -70,8 +79,11 @@ public final class AirQualityOverlay {
     /** The stamp on the map, as the service wrote it; 0 when nothing is drawn. */
     private long drawnStamp;
     private AirNow.Contours drawn;
-    private int generation;
+    /** Read on the worker, to drop a write a newer refresh or a toggle has overtaken. */
+    private volatile int generation;
     private boolean inFlight;
+    /** Parses the country and writes the store, in order, off the map's thread. */
+    private final ExecutorService worker = Executors.newSingleThreadExecutor();
 
     private final Runnable autoRefresh = new Runnable() {
         @Override
@@ -102,17 +114,21 @@ public final class AirQualityOverlay {
         final SharedPreferences p = MapCompat.prefs();
         if (p != null && p.getBoolean(PREF_ON, false) && egress.isLayerEnabled(LAYER_ID))
             setOn(true);
-        // The store outlives a session: a killed ATAK leaves last session's contours
-        // in it, and with the layer off they would still draw.
-        if (!on)
-            features.clear();
+        // Nothing to clear with the layer off. This cleared the store here, on main,
+        // for "a killed ATAK leaves last session's contours" -- but attach() opens an
+        // empty file every time now, and the clear waited for a hop to main that only
+        // main could run: 20 s of frozen ATAK on every start (2026-09-27).
     }
 
     public void stop() {
         started = false;
         on = false;
         mapView.removeCallbacks(autoRefresh);
-        clear();
+        // Forget what is drawn, but write nothing: detach takes the layer off the map
+        // and the next attach opens an empty file, so a clear queued now could only
+        // land after the detach. The shutdown drops anything still queued.
+        forget();
+        worker.shutdownNow();
         features.detach();
     }
 
@@ -190,19 +206,18 @@ public final class AirQualityOverlay {
         inFlight = true;
         Http.get(AirNow.contoursUrl(), egress.userAgent(), null, new Http.Callback() {
             @Override
-            public void onSuccess(String body) {
+            public void onSuccess(final String body) {
                 inFlight = false;
                 if (mine != generation || !on)
                     return;
-                final AirNow.Contours c;
-                try {
-                    c = AirNow.parse(body);
-                } catch (Exception e) {
-                    Log.w(TAG, "contours unreadable", e);
-                    status("Air quality could not be read");
-                    return;
-                }
-                draw(c);
+                // The country's shapes are 92 KB to parse and a store write to draw;
+                // neither is work for the thread that draws the map.
+                run(new Runnable() {
+                    @Override
+                    public void run() {
+                        draw(body, mine);
+                    }
+                });
             }
 
             @Override
@@ -217,10 +232,28 @@ public final class AirQualityOverlay {
         });
     }
 
-    private void draw(AirNow.Contours c) {
-        features.clear();
+    /**
+     * Worker: read the contours and replace the layer with them in one pass, then
+     * hand the result to main. A single rewrite, so the map goes from one hour to the
+     * next without the blank a clear-then-draw put between them.
+     */
+    private void draw(String body, final int mine) {
+        final AirNow.Contours c;
+        try {
+            c = AirNow.parse(body);
+        } catch (Exception e) {
+            Log.w(TAG, "contours unreadable", e);
+            onMain(mine, new Runnable() {
+                @Override
+                public void run() {
+                    status("Air quality could not be read");
+                }
+            });
+            return;
+        }
         final String when = clock(AirNow.observedAt(c.unixtime));
-        int n = 0, skipped = 0;
+        final List<AtmosphereFeatures.Drawn> shapes = new ArrayList<>();
+        int skipped = 0;
         for (AirNow.Contour k : c.contours) {
             final Geometry g;
             try {
@@ -237,17 +270,47 @@ public final class AirQualityOverlay {
             }
             final int rgb = k.category.color & 0x00FFFFFF;
             final int fillAlpha = k.category == AirNow.Category.GOOD ? GOOD_FILL_ALPHA : FILL_ALPHA;
-            features.addShape(NAME, k.category.label, g, (STROKE_ALPHA << 24) | rgb,
-                    STROKE_WEIGHT, (fillAlpha << 24) | rgb, attributes(k.category, when));
-            n++;
+            shapes.add(new AtmosphereFeatures.Drawn(NAME, k.category.label, g,
+                    AtmosphereFeatures.area((STROKE_ALPHA << 24) | rgb, STROKE_WEIGHT,
+                            (fillAlpha << 24) | rgb),
+                    attributes(k.category, when)));
         }
-        drawn = c;
-        drawnStamp = c.unixtime;
-        Log.d(TAG, "drew " + n + " contours for " + when + (skipped > 0 ? ", skipped "
-                + skipped : "") + (c.truncated ? ", the service stopped short" : ""));
-        status(c.truncated ? statusLine() + " (not all of it arrived)" : statusLine());
-        if (listener != null)
-            listener.onContours();
+        // Turned off while parsing: the clear queued behind this is the last word.
+        if (mine != generation)
+            return;
+        features.rewrite(shapes);
+        Log.d(TAG, "drew " + shapes.size() + " contours for " + when + (skipped > 0
+                ? ", skipped " + skipped : "") + (c.truncated ? ", the service stopped short" : ""));
+        onMain(mine, new Runnable() {
+            @Override
+            public void run() {
+                drawn = c;
+                drawnStamp = c.unixtime;
+                status(c.truncated ? statusLine() + " (not all of it arrived)" : statusLine());
+                if (listener != null)
+                    listener.onContours();
+            }
+        });
+    }
+
+    /** Back on main, unless a toggle or a newer refresh has overtaken this one. */
+    private void onMain(final int mine, final Runnable r) {
+        mapView.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mine == generation && on)
+                    r.run();
+            }
+        });
+    }
+
+    /** Off the main thread, and never after stop() has shut the worker down. */
+    private void run(Runnable r) {
+        try {
+            worker.execute(r);
+        } catch (RuntimeException shuttingDown) {
+            Log.d(TAG, "worker is gone, dropping an air quality write");
+        }
     }
 
     /**
@@ -290,12 +353,23 @@ public final class AirQualityOverlay {
                 .replace("AM", "am").replace("PM", "pm");
     }
 
+    /** Take the contours off the map. The store write is the worker's. */
     private void clear() {
+        forget();
+        run(new Runnable() {
+            @Override
+            public void run() {
+                features.clear();
+            }
+        });
+    }
+
+    /** Drop what is drawn and make any response in flight land nowhere. Main only. */
+    private void forget() {
         generation++;
         inFlight = false;
         drawn = null;
         drawnStamp = 0;
-        features.clear();
         if (listener != null)
             listener.onContours();
     }

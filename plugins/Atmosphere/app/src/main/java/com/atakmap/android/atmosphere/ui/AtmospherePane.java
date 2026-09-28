@@ -174,6 +174,8 @@ public final class AtmospherePane {
     private final Button settingsButton;
     private final TextView positionText;
     private final TextView statusText;
+    /** Under the status line, only while the chosen weather service is not allowed. */
+    private final Button allowSourceButton;
     private final TextView currentHeading;
     private final LinearLayout currentContainer;
     private final TextView seriesHeading;
@@ -503,6 +505,7 @@ public final class AtmospherePane {
         settingsButton = find(R.id.settings_button);
         positionText = find(R.id.position_text);
         statusText = find(R.id.status_text);
+        allowSourceButton = find(R.id.allow_source_button);
         currentHeading = find(R.id.current_heading);
         currentContainer = find(R.id.current_container);
         seriesHeading = find(R.id.series_heading);
@@ -5047,7 +5050,11 @@ public final class AtmospherePane {
         if (ctx == null)
             return;
         final String[] names = sourceNames();
-        final int checked = selected == null ? -1 : sources.indexOf(selected);
+        // A service that is chosen but not allowed is not marked. NWS is the
+        // default, so a new install opened this list with NWS already marked and
+        // nothing to say it was not allowed: nobody picks what is already picked.
+        final int checked = selected == null || !egress.isEnabled(selected) ? -1
+                : sources.indexOf(selected);
         new AlertDialog.Builder(ctx)
                 .setTitle(pluginContext.getString(R.string.source_title))
                 .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
@@ -5081,7 +5088,8 @@ public final class AtmospherePane {
      * its servers, the way a layer does. The operator's first run on the S22
      * (2026-09-27) picked NWS in the service list, got nothing, and had to find a
      * second, look-alike row to turn it on: "thats confusing AF". Allow turns it
-     * on and chooses it in one step; Close leaves both as they were.
+     * on and chooses it in one step; Close leaves both as they were. The Forecast
+     * page's Allow button asks the same question.
      */
     private void askToAllowSource(final WxSourceDef def) {
         final Context ctx = MapCompat.atakContext();
@@ -5107,16 +5115,36 @@ public final class AtmospherePane {
                 .show();
     }
 
+    /**
+     * The Allow button shows while the chosen service is not allowed, right under
+     * the line that says so. Saying "not allowed" on the page and keeping the fix
+     * two dialogs away, in a list that already showed NWS as chosen, took a first
+     * run two steps and a search (operator, 2026-09-27: "it was confusing").
+     */
+    private void updateAllowButton() {
+        final boolean show = selected != null && !selected.requiresApiKey
+                && !egress.isEnabled(selected);
+        allowSourceButton.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show)
+            allowSourceButton.setText(pluginContext.getString(R.string.allow_source,
+                    selected.displayName));
+    }
+
     /** The gear: everything that is not the readout itself. */
     private void showSettingsDialog() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
             return;
+        // No "Allowed services" row. It was the only place a service could be
+        // allowed before choosing one asked by itself; after that all it did was
+        // hold a second switch for the same thing, and a first run needed both
+        // (operator, 2026-09-27: "why even have the allowed services? seems
+        // redundant"). Only the chosen service is ever asked, so choosing is enough.
         final String[] items = {
                 pluginContext.getString(R.string.source_title) + ": "
                         + (selected == null ? pluginContext.getString(R.string.no_sources)
-                                : sourceName(selected)),
-                pluginContext.getString(R.string.sources_title),
+                                : sourceName(selected) + (egress.isEnabled(selected) ? ""
+                                        : pluginContext.getString(R.string.not_allowed_suffix))),
                 pluginContext.getString(R.string.variables_title),
                 pluginContext.getString(R.string.privacy_title),
         };
@@ -5127,8 +5155,7 @@ public final class AtmospherePane {
                     public void onClick(DialogInterface dialog, int which) {
                         switch (which) {
                             case 0: showSourceDialog(); break;
-                            case 1: showSourcesDialog(); break;
-                            case 2: showVariablesDialog(); break;
+                            case 1: showVariablesDialog(); break;
                             default: showPrivacyDialog(); break;
                         }
                     }
@@ -5206,6 +5233,14 @@ public final class AtmospherePane {
             @Override
             public void onClick(View v) {
                 showSettingsDialog();
+            }
+        });
+
+        allowSourceButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (selected != null)
+                    askToAllowSource(selected);
             }
         });
     }
@@ -5408,6 +5443,7 @@ public final class AtmospherePane {
     }
 
     private void refresh(boolean force) {
+        updateAllowButton();
         if (selected == null) {
             statusText.setText(R.string.no_sources);
             return;
@@ -6138,48 +6174,6 @@ public final class AtmospherePane {
     }
 
     // ---- dialogs -----------------------------------------------------------------
-
-    private void showSourcesDialog() {
-        final Context ctx = MapCompat.atakContext();
-        if (ctx == null || sources.isEmpty())
-            return;
-
-        final String[] labels = new String[sources.size()];
-        final boolean[] enabled = new boolean[sources.size()];
-        for (int i = 0; i < sources.size(); i++) {
-            final WxSourceDef def = sources.get(i);
-            final StringBuilder sb = new StringBuilder(def.displayName);
-            sb.append("\n").append(hosts(def));
-            if (def.origin == WxSourceDef.Origin.EXTERNAL)
-                sb.append("\nfrom ").append(def.originFile);
-            if (def.requiresApiKey)
-                sb.append("\nnot available in this build");
-            labels[i] = sb.toString();
-            enabled[i] = egress.isEnabled(def);
-        }
-
-        new AlertDialog.Builder(ctx)
-                .setTitle(pluginContext.getString(R.string.sources_title))
-                .setMultiChoiceItems(labels, enabled,
-                        new DialogInterface.OnMultiChoiceClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which,
-                                    boolean isChecked) {
-                                egress.setEnabled(sources.get(which), isChecked);
-                            }
-                        })
-                .setPositiveButton(pluginContext.getString(R.string.close), null)
-                // However it is closed -- the button, Back, a tap outside -- the
-                // pane reads again: a tick saved with Back used to leave "not
-                // turned on" on screen until something else refreshed.
-                .setOnDismissListener(new DialogInterface.OnDismissListener() {
-                    @Override
-                    public void onDismiss(DialogInterface dialog) {
-                        refresh(false);
-                    }
-                })
-                .show();
-    }
 
     private void showVariablesDialog() {
         final Context ctx = MapCompat.atakContext();
