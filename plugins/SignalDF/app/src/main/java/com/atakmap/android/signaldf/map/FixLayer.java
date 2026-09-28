@@ -1,23 +1,18 @@
 package com.atakmap.android.signaldf.map;
 
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 
 import com.atakmap.android.drawing.mapItems.DrawingShape;
 import com.atakmap.android.maps.MapGroup;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.maps.Marker;
 import com.atakmap.android.signaldf.data.SampleLog;
-import com.atakmap.coremap.maps.assets.Icon;
+import com.atakmap.android.icons.UserIcon;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 import com.atakmap.coremap.maps.coords.GeoPointMetaData;
 import com.atakmap.map.layer.feature.Feature;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -58,11 +53,35 @@ public final class FixLayer {
     private static final String UID_TRACK = "signaldf.track.";
     private static final String UID_NEXT = "signaldf.next.";
 
-    /** Magenta, which ATAK's own tools do not reach for. */
-    private static final int FIX_COLOR = Color.rgb(0xFF, 0x3D, 0xD7);
+    /**
+     * Both markers are ATAK <b>spot map</b> markers, {@code b-m-p-s-m}, which
+     * is what ATAK's own point dropper makes.
+     *
+     * <p>The operator asked for them by name, and the reason is the one that
+     * matters in a truck: a spot marker carries ATAK's whole marker menu, so
+     * Bloodhound will navigate to it. A custom icon on a custom type looks
+     * better and does nothing, and the thing an operator wants to do with
+     * "the transmitter is here" and "drive here" is drive to them.
+     *
+     * <p>The colours are ATAK's own palette, to the digit, so they match what
+     * the point dropper's swatches produce:
+     * {@code SpotMapPalletFragment} sets orange as {@code argb(255,255,119,0)}
+     * and magenta as {@code Color.MAGENTA}. Orange reads on every basemap,
+     * which is why the operator picked it for the waypoint. Magenta for the
+     * fix because it is the same colour as its own error ellipse -- marker and
+     * uncertainty read as one object -- and because ATAK uses it for nothing
+     * else, so it cannot be confused with a hostile track, an alert or a
+     * route. Red would also read as "the target" and is left free for things
+     * that actually are one.
+     */
+    private static final String SPOT_TYPE = "b-m-p-s-m";
+    private static final String SPOT_ICONSET = "COT_MAPPING_SPOTMAP";
+
+    private static final int FIX_COLOR = Color.MAGENTA;
     private static final int ELLIPSE_STROKE = Color.argb(0xC0, 0xFF, 0x3D, 0xD7);
     private static final int ELLIPSE_FILL = Color.argb(0x33, 0xFF, 0x3D, 0xD7);
-    private static final int NEXT_COLOR = Color.rgb(0x4C, 0xD9, 0x64);
+    /** ATAK's own spot orange: argb(255, 255, 119, 0). */
+    private static final int NEXT_COLOR = Color.argb(255, 255, 119, 0);
 
     /** Points around the ellipse. Enough that it never reads as a polygon. */
     private static final int ELLIPSE_POINTS = 48;
@@ -82,83 +101,64 @@ public final class FixLayer {
     /** And never closer than this, or the waypoint lands under the truck. */
     private static final double NEXT_MIN_M = 400.0;
 
+    /**
+     * Close enough to count as having got there, meters.
+     *
+     * <p>Arriving is what makes a waypoint stale: the whole reason it was
+     * there was that nothing had been sampled from that side, and standing on
+     * it fixes that.
+     */
+    private static final double NEXT_REACHED_M = 250.0;
+
+    /**
+     * How far the fix must move before the waypoint is reconsidered, meters.
+     *
+     * <p><b>A waypoint that moves while you drive toward it is worse than no
+     * waypoint.</b> The first version recomputed this from scratch on every
+     * frame, and it had four separate reasons to jump: the fix moves, the
+     * ellipse changes length, its axis rotates, and the side-of-the-line
+     * choice flips as the vehicle drives past. The operator watched it
+     * wandering about the map within a minute of the demo starting.
+     *
+     * <p>So it is placed once and held. It is only reconsidered when the
+     * picture has actually changed -- the fix has jumped half a kilometer, or
+     * the vehicle has arrived, or the geometry has come good and no waypoint
+     * is needed at all. Somewhere slightly sub-optimal that stays put is worth
+     * far more to somebody driving than the ideal spot recomputed every
+     * second.
+     */
+    private static final double NEXT_RECOMPUTE_M = 500.0;
+
     private final MapView mapView;
     private final Context plugin;
-    private final File iconDir;
     private final Map<Integer, Marker> fixes = new HashMap<>();
     private final Map<Integer, DrawingShape> ellipses = new HashMap<>();
     private final Map<Integer, DrawingShape> tracks = new HashMap<>();
     private final Map<Integer, Marker> nexts = new HashMap<>();
+    /** Where the fix was when each waypoint was placed. */
+    private final Map<Integer, GeoPoint> nextAnchors = new HashMap<>();
 
 
     public FixLayer(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
         this.plugin = pluginContext;
-        // ATAK's own area, NOT pluginContext.getFilesDir(). A plugin's code
-        // runs inside ATAK's process under ATAK's uid, and the plugin
-        // package's private data directory belongs to a different uid -- so
-        // that path names a directory this process can neither create nor
-        // write, mkdirs() and all. The PNG write fails with ENOENT, icon()
-        // returns null, and the marker goes on the map with no icon: present,
-        // tappable, and completely invisible. Atmosphere writes its storm
-        // icons under tools/atmosphere for the same reason.
-        this.iconDir = com.atakmap.coremap.filesystem.FileSystemUtils
-                .getItem("tools/signaldf");
     }
 
     /**
-     * A plugin drawable as a {@code file://} icon ATAK can actually load.
+     * Make a marker one of ATAK's spot map markers, in a colour.
      *
-     * <p>Not {@code android.resource://}. A plugin's resource ids belong to
-     * the plugin's own R class, and the obvious URI built from the host's
-     * package name resolves to nothing at all -- the marker goes on the map
-     * with no icon and is invisible, which is a great deal harder to diagnose
-     * than an error would have been. Atmosphere's StormIcons hit this first
-     * and settled on rendering the drawable to a PNG once and pointing the
-     * icon at the file; this is the same approach, minus the composition.
+     * <p>Three pieces, and all three are needed: the type, so ATAK treats it
+     * as a spot and gives it the marker menu Bloodhound reaches through; the
+     * iconset path, which is where ATAK looks up the glyph; and the colour
+     * metadata, which is what tints it. Setting an {@code Icon} instead loses
+     * to ATAK's own rendering for a typed marker, which is how the fix spent
+     * an afternoon drawing as a plain crosshair.
      */
-    private Icon icon(int drawableId, String name, int size, int tint) {
-        File out = new File(iconDir, name + ".png");
-        if (!out.isFile()) {
-            // getFilesDir() names the directory; it does not create it on a
-            // plugin context, which ATAK builds with createPackageContext and
-            // never writes to. Without this the PNG write fails with ENOENT,
-            // icon() returns null, and the marker goes onto the map with no
-            // icon -- present, tappable, and completely invisible, which is a
-            // much worse failure than a missing marker would have been.
-            if (!iconDir.isDirectory())
-                //noinspection ResultOfMethodCallIgnored
-                iconDir.mkdirs();
-            Bitmap bmp = null;
-            try {
-                Drawable d = plugin.getResources().getDrawable(drawableId);
-                bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-                Canvas c = new Canvas(bmp);
-                d.setBounds(0, 0, size, size);
-                d.draw(c);
-                File tmp = new File(out.getPath() + ".tmp");
-                FileOutputStream o = new FileOutputStream(tmp);
-                try {
-                    bmp.compress(Bitmap.CompressFormat.PNG, 100, o);
-                } finally {
-                    o.close();
-                }
-                //noinspection ResultOfMethodCallIgnored
-                tmp.renameTo(out);
-            } catch (Exception e) {
-                com.atakmap.coremap.log.Log.w("SignalDF.FixLayer",
-                        "could not render " + name, e);
-                return null;
-            } finally {
-                if (bmp != null)
-                    bmp.recycle();
-            }
-        }
-        return new Icon.Builder()
-                .setImageUri(Icon.STATE_DEFAULT, "file://" + out.getAbsolutePath())
-                .setAnchor(size / 2, size / 2)
-                .setColor(Icon.STATE_DEFAULT, tint)
-                .build();
+    private static void spot(Marker m, int color) {
+        m.setType(SPOT_TYPE);
+        m.setMetaString(UserIcon.IconsetPath,
+                SPOT_ICONSET + "/" + SPOT_TYPE + "/" + color);
+        m.setMetaInteger("color", color);
     }
 
     public void dispose() {
@@ -171,6 +171,7 @@ public final class FixLayer {
         removeAll(ellipses);
         removeAll(tracks);
         removeAll(nexts);
+        nextAnchors.clear();
     }
 
     /** Take one VFO's answer off the map, leaving the others. */
@@ -179,6 +180,7 @@ public final class FixLayer {
         remove(ellipses, vfo);
         remove(tracks, vfo);
         remove(nexts, vfo);
+        nextAnchors.remove(vfo);
     }
 
     /**
@@ -215,16 +217,11 @@ public final class FixLayer {
         Marker m = fixes.get(vfo);
         if (m == null) {
             m = new Marker(at, UID_FIX + vfo);
-            m.setType("b-m-p-s-p-loc");
-            m.setMetaBoolean("readiness", true);
+            spot(m, FIX_COLOR);
             m.setMetaBoolean("archive", false);
             m.setMetaBoolean("editable", false);
             m.setMovable(false);
             m.setMetaBoolean("removable", true);
-            Icon i = icon(com.atakmap.android.signaldf.plugin.R.drawable.ic_fix,
-                    "signaldf_fix", 96, FIX_COLOR);
-            if (i != null)
-                m.setIcon(i);
             fixes.put(vfo, m);
         }
         m.setPoint(at);
@@ -363,13 +360,31 @@ public final class FixLayer {
     private void drawNext(int vfo, GeoPoint at, double[] e, SampleLog log) {
         if (log == null || log.samples().size() < 2) {
             remove(nexts, vfo);
+            nextAnchors.remove(vfo);
             return;
         }
         // Only worth suggesting while the geometry is actually poor.
         if (e[1] > 0 && e[0] / e[1] < 3.0) {
             remove(nexts, vfo);
+            nextAnchors.remove(vfo);
             return;
         }
+        SampleLog.Sample last = log.samples().get(log.samples().size() - 1);
+        GeoPoint from = new GeoPoint(last.lat, last.lon);
+
+        // Held, not recomputed. See NEXT_RECOMPUTE_M.
+        GeoPoint pick = null;
+        Marker held = nexts.get(vfo);
+        GeoPoint anchor = nextAnchors.get(vfo);
+        if (held != null && anchor != null) {
+            boolean arrived = com.atakmap.coremap.maps.coords.GeoCalculations
+                    .distanceTo(from, held.getPoint()) < NEXT_REACHED_M;
+            boolean moved = com.atakmap.coremap.maps.coords.GeoCalculations
+                    .distanceTo(anchor, at) > NEXT_RECOMPUTE_M;
+            if (!arrived && !moved)
+                return;
+        }
+
         double dist = Math.max(NEXT_MIN_M, e[0] * NEXT_FRACTION);
         double across = e[2] + 90.0;
 
@@ -379,26 +394,22 @@ public final class FixLayer {
                 .pointAtDistance(at, across + 180.0, dist);
         if (a == null || b == null) {
             remove(nexts, vfo);
+            nextAnchors.remove(vfo);
             return;
         }
         // The side further from everywhere already sampled.
-        SampleLog.Sample last = log.samples().get(log.samples().size() - 1);
-        GeoPoint from = new GeoPoint(last.lat, last.lon);
-        GeoPoint pick = com.atakmap.coremap.maps.coords.GeoCalculations
+        pick = com.atakmap.coremap.maps.coords.GeoCalculations
                 .distanceTo(from, a) > com.atakmap.coremap.maps.coords
                         .GeoCalculations.distanceTo(from, b) ? a : b;
+        nextAnchors.put(vfo, at);
 
         Marker m = nexts.get(vfo);
         if (m == null) {
             m = new Marker(pick, UID_NEXT + vfo);
-            m.setType("b-m-p-w");
+            spot(m, NEXT_COLOR);
             m.setMetaBoolean("archive", false);
             m.setMetaBoolean("editable", false);
             m.setMovable(false);
-            Icon i = icon(com.atakmap.android.signaldf.plugin.R.drawable.ic_next,
-                    "signaldf_next", 80, NEXT_COLOR);
-            if (i != null)
-                m.setIcon(i);
             nexts.put(vfo, m);
         }
         m.setPoint(pick);
