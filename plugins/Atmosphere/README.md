@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.3/ATAK-Plugin-Atmosphere-0.3--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.3/ATAK-Plugin-Atmosphere-0.3--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.3/ATAK-Plugin-Atmosphere-0.3--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.4/ATAK-Plugin-Atmosphere-0.4--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.4/ATAK-Plugin-Atmosphere-0.4--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.4/ATAK-Plugin-Atmosphere-0.4--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -58,7 +58,7 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.3, for ATAK-CIV 5.6, 5.7 and 5.8. It fixes a freeze of up to 20 seconds
+0.4, for ATAK-CIV 5.6, 5.7 and 5.8. It fixes a freeze of up to 20 seconds
 when ATAK starts with the Air quality layer off, and the forecast's weather
 service is now allowed with one button on the Forecast page. Developed on a
 Samsung Galaxy XCover Pro running ATAK-CIV 5.8.0.3 and checked on official
