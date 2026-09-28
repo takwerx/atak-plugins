@@ -77,6 +77,14 @@
                 android:layout_marginTop="4dp"
                 android:text="Radio setup" />
 
+            <Button
+                style="@style/TakwerxButton"
+                android:id="@+id/array_calc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Antenna array sizing" />
+
             <TextView
                 style="@style/SectionHeading"
                 android:text="Array heading" />
@@ -88,6 +96,62 @@
                 android:textSize="13sp"
                 android:text="Array heading: unknown" />
 
+            <Button
+                style="@style/TakwerxButton"
+                android:id="@+id/heading_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Heading source: radio" />
+
+            <TextView
+                style="@style/SectionHeading"
+                android:text="Find" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/collect_toggle"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="COLLECTING OFF" />
+
+                <Button
+                    style="@style/TakwerxButton"
+                    android:id="@+id/collect_clear"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="4dp"
+                    android:text="Clear" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/collect_note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:alpha="0.85"
+                android:lineSpacingMultiplier="1.15"
+                android:paddingTop="2dp"
+                android:paddingBottom="6dp"
+                android:text="Not collecting." />
+
+            <TextView
+                style="@style/SectionHeading"
+                android:text="Transmit" />
+
+            <Button
+                style="@style/TakwerxButton"
+                android:id="@+id/share_feed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Feed: not set" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -96,20 +160,30 @@
 
                 <Button
                     style="@style/TakwerxButton"
-                    android:id="@+id/set_heading"
+                    android:id="@+id/share_stale"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:text="Set heading" />
+                    android:text="Stale time: 30 seconds" />
 
                 <Button
                     style="@style/TakwerxButton"
-                    android:id="@+id/clear_heading"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/share_toggle"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:layout_marginLeft="4dp"
-                    android:text="Use radio" />
+                    android:text="TRANSMIT OFF" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/share_note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:alpha="0.75"
+                android:paddingTop="2dp"
+                android:text="Not transmitting." />
 
             <TextView
                 style="@style/SectionHeading"

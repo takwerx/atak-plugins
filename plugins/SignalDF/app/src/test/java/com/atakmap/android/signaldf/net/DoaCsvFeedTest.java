@@ -82,7 +82,7 @@ public class DoaCsvFeedTest {
         assertTrue(Double.isNaN(b.snrDb));
     }
 
-    /** One line per active VFO, in order, unlabelled. Two emitters, two rows. */
+    /** One line per active VFO, in order, unlabeled. Two emitters, two rows. */
     @Test
     public void everyActiveVfoGetsItsOwnBearing() {
         FeedFrame f = new DoaCsvFeed().parse(Fixtures.load("DOA_value_two_vfo.html"), RX);

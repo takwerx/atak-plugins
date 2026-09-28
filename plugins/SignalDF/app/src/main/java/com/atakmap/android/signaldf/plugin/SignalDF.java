@@ -9,6 +9,10 @@ import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.signaldf.net.KrakenLink;
+import com.atakmap.android.signaldf.find.Collector;
+import com.atakmap.android.signaldf.map.SignalDfGroup;
+import com.atakmap.android.signaldf.model.VehicleHeading;
+import com.atakmap.android.signaldf.net.BearingPublisher;
 import com.atakmap.android.signaldf.ui.SignalDfDropDown;
 import com.atakmap.coremap.log.Log;
 
@@ -59,7 +63,15 @@ public class SignalDF implements IPlugin {
     ToolbarItem toolbarItem;
 
     private KrakenLink link;
+    private BearingPublisher publisher;
+    private VehicleHeading vehicleHeading;
+    private Collector collector;
     private SignalDfDropDown dropDown;
+
+    /** The sharing component, for the pane's settings screen. */
+    public BearingPublisher publisher() {
+        return publisher;
+    }
 
     public SignalDF(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -105,6 +117,23 @@ public class SignalDF implements IPlugin {
             link = new KrakenLink(mv == null ? null : mv.getContext());
         }
 
+        // Sharing lives out here with the link, not in the pane, because
+        // transmitting has to outlive the tap that started it: the operator
+        // switches base maps or presses Back and the bearings keep going out.
+        if (publisher == null) {
+            MapView mv = MapView.getMapView();
+            if (mv != null) {
+                vehicleHeading = new VehicleHeading(mv);
+                publisher = new BearingPublisher(mv);
+                link.addListener(publisher);
+                // Collecting runs for the length of a search -- across base
+                // map switches, other tools, Back, and the pane being closed
+                // -- so it lives out here with the link, never in the pane.
+                collector = new Collector(mv, pluginContext);
+                link.addListener(collector);
+            }
+        }
+
         uiService.addToolbarItem(toolbarItem);
         AtakBroadcast.getInstance().registerSystemReceiver(showReceiver,
                 new DocumentedIntentFilter(ACTION_SHOW, "Open the Signal DF pane"));
@@ -127,6 +156,25 @@ public class SignalDF implements IPlugin {
         }
         // The link is stopped rather than left running: a stopped plugin that
         // is still polling a radio is a battery drain nobody can see.
+        MapView mv = MapView.getMapView();
+        if (mv != null)
+            SignalDfGroup.unregister(mv);
+        if (collector != null) {
+            if (link != null)
+                link.removeListener(collector);
+            collector.dispose();
+            collector = null;
+        }
+        if (publisher != null) {
+            if (link != null)
+                link.removeListener(publisher);
+            publisher.dispose();
+            publisher = null;
+        }
+        if (vehicleHeading != null) {
+            vehicleHeading.dispose();
+            vehicleHeading = null;
+        }
         if (link != null) {
             link.dispose();
             link = null;

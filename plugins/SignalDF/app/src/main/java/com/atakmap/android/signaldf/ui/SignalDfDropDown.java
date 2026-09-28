@@ -20,7 +20,10 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.preference.AtakPreferences;
 import com.atakmap.android.signaldf.data.Age;
 import com.atakmap.android.signaldf.map.BearingLayer;
+import com.atakmap.android.signaldf.find.Collector;
+import com.atakmap.android.signaldf.net.BearingPublisher;
 import com.atakmap.android.signaldf.model.ArrayHeading;
+import com.atakmap.android.signaldf.model.VehicleHeading;
 import com.atakmap.android.signaldf.model.Bearing;
 import com.atakmap.android.signaldf.model.FeedFrame;
 import com.atakmap.android.signaldf.net.KrakenHost;
@@ -77,7 +80,15 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final Context pluginContext;
     private final AtakPreferences prefs;
     private final BearingLayer layer;
+    private Button collectToggleButton;
+    private Button collectClearButton;
+    private TextView collectNote;
+    private Button shareFeedButton;
+    private Button shareStaleButton;
+    private Button shareToggleButton;
+    private TextView shareNote;
     private RadioSetupDropDown radioSetup;
+    private ArrayCalcDropDown arrayCalc;
     private final View root;
 
     private final TextView status;
@@ -87,9 +98,9 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final TextView unverified;
     private final Button hostButton;
     private final Button connectButton;
-    private final Button setHeadingButton;
-    private final Button clearHeadingButton;
+    private final Button headingModeButton;
     private final Button radioSetupButton;
+    private final Button arrayCalcButton;
     private final Button wideNarrowButton;
     private final LinearLayout vfoRows;
 
@@ -123,14 +134,23 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.signaldf_pane, null);
         status = root.findViewById(R.id.status);
         feedLine = root.findViewById(R.id.feed_line);
+        collectToggleButton = root.findViewById(R.id.collect_toggle);
+        collectClearButton = root.findViewById(R.id.collect_clear);
+        collectNote = root.findViewById(R.id.collect_note);
+        wireCollecting();
+        shareFeedButton = root.findViewById(R.id.share_feed);
+        shareStaleButton = root.findViewById(R.id.share_stale);
+        shareToggleButton = root.findViewById(R.id.share_toggle);
+        shareNote = root.findViewById(R.id.share_note);
+        wireSharing();
         headingProvenance = root.findViewById(R.id.heading_provenance);
         bearingsNote = root.findViewById(R.id.bearings_note);
         unverified = root.findViewById(R.id.unverified);
         hostButton = root.findViewById(R.id.host);
         connectButton = root.findViewById(R.id.connect);
-        setHeadingButton = root.findViewById(R.id.set_heading);
-        clearHeadingButton = root.findViewById(R.id.clear_heading);
+        headingModeButton = root.findViewById(R.id.heading_mode);
         radioSetupButton = root.findViewById(R.id.radio_setup);
+        arrayCalcButton = root.findViewById(R.id.array_calc);
         wideNarrowButton = root.findViewById(R.id.wide_narrow);
         vfoRows = root.findViewById(R.id.vfo_rows);
 
@@ -146,23 +166,24 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
                 toggleConnection();
             }
         });
-        setHeadingButton.setOnClickListener(new View.OnClickListener() {
+        headingModeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                askForHeading();
-            }
-        });
-        clearHeadingButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                prefs.remove(PREF_HEADING);
-                refresh();
+                pickHeadingMode();
             }
         });
         radioSetupButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 openRadioSetup();
+            }
+        });
+        arrayCalcButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (arrayCalc == null)
+                    arrayCalc = new ArrayCalcDropDown(getMapView(), pluginContext);
+                arrayCalc.show();
             }
         });
         wideNarrowButton.setOnClickListener(new View.OnClickListener() {
@@ -294,6 +315,10 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         if (radioSetup != null) {
             radioSetup.dispose();
             radioSetup = null;
+        }
+        if (arrayCalc != null) {
+            arrayCalc.dispose();
+            arrayCalc = null;
         }
     }
 
@@ -483,17 +508,299 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         KrakenLink link = KrakenLink.get();
         List<Bearing> latest = link == null ? null : link.latest();
         Bearing newest = latest == null || latest.isEmpty() ? null : latest.get(0);
-        return ArrayHeading.resolve(operatorHeading(), newest);
+        return ArrayHeading.resolve(operatorHeading(),
+                ArrayHeading.vehicleDegrees(
+                        prefs.get(ArrayHeading.PREF_FORWARD, false)), newest);
     }
 
     private void draw() {
         KrakenLink link = KrakenLink.get();
         if (link == null)
             return;
-        layer.draw(link.latest(), heading(), BearingLayer.selfPoint(getMapView()));
+        Collector c = Collector.get();
+        layer.draw(link.latest(), heading(), BearingLayer.selfPoint(getMapView()),
+                c == null ? Double.NaN : c.minConfidence(),
+                c == null ? Double.NaN : c.minPowerDb());
+    }
+
+    // ---- sharing -----------------------------------------------------------
+
+    private void wireSharing() {
+        shareFeedButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final BearingPublisher p = BearingPublisher.get();
+                if (p == null)
+                    return;
+                if (p.feed() != null) {
+                    new android.app.AlertDialog.Builder(getMapView().getContext())
+                            .setTitle("Feed: " + p.feed())
+                            .setItems(new String[] { "Select a different feed",
+                                    "Clear feed selection" },
+                                    new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface d, int which) {
+                                            if (which == 0)
+                                                chooseFeed(p);
+                                            else {
+                                                p.clearFeed();
+                                                refreshSharing();
+                                            }
+                                        }
+                                    })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                    return;
+                }
+                chooseFeed(p);
+            }
+        });
+
+        shareStaleButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final BearingPublisher p = BearingPublisher.get();
+                if (p == null)
+                    return;
+                final int[] choices = BearingPublisher.STALE_CHOICES_S;
+                String[] names = new String[choices.length];
+                int current = 0;
+                for (int i = 0; i < choices.length; i++) {
+                    names[i] = choices[i] < 60
+                            ? choices[i] + " seconds"
+                            : (choices[i] / 60) + (choices[i] == 60 ? " minute" : " minutes");
+                    if (choices[i] == p.staleSeconds())
+                        current = i;
+                }
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("Stale time")
+                        .setSingleChoiceItems(names, current,
+                                new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface d, int which) {
+                                        p.setStaleSeconds(choices[which]);
+                                        d.dismiss();
+                                        refreshSharing();
+                                    }
+                                })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+
+        shareToggleButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                BearingPublisher p = BearingPublisher.get();
+                if (p == null)
+                    return;
+                if (p.feed() == null) {
+                    chooseFeed(p);
+                    return;
+                }
+                p.setOn(!p.isOn());
+                refreshSharing();
+            }
+        });
+    }
+
+    private void chooseFeed(final BearingPublisher p) {
+        p.choose(new BearingPublisher.OnChosen() {
+            @Override
+            public void chosen(String server, String feed) {
+                refreshSharing();
+            }
+        });
+    }
+
+    /**
+     * Says what is going out and where, in those words. A toggle that only
+     * reads ON tells the operator nothing about whether anything is actually
+     * leaving the phone.
+     */
+    /**
+     * Which way the array is pointing, and how we claim to know -- one
+     * control, three answers.
+     *
+     * <p>It was three controls: <i>Set heading</i>, <i>Use radio</i> and a
+     * <i>ANTENNA 0 POINTS FORWARD</i> toggle. The operator asked what each of
+     * them was for and then said the pane was "confusing as fuck", which is
+     * the correct reading of three buttons that between them answer one
+     * question.
+     *
+     * <p>The three answers are also KrakenRF's own. Their app calls this
+     * Bearing Mode and offers GPS, compass, manual and "from the Kraken
+     * server", so a Kraken operator already knows the shape of this question;
+     * they just have not been asked it in one place before. Compass is the one
+     * we leave out, and their own guide is lukewarm about it -- "you will need
+     * to be careful with the direction that the physical device points
+     * toward".
+     */
+    private void pickHeadingMode() {
+        final String[] names = {
+                "GPS track -- vehicle mounted, antenna 0 forward",
+                "Manual -- fixed installation, entered once",
+                "Radio -- requires a USB GPS on the Pi"
+        };
+        int current = prefs.get(PREF_HEADING, "").trim().isEmpty()
+                ? (prefs.get(ArrayHeading.PREF_FORWARD, false) ? 0 : 2)
+                : 1;
+        new android.app.AlertDialog.Builder(getMapView().getContext())
+                .setTitle("Heading source")
+                .setSingleChoiceItems(names, current,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                d.dismiss();
+                                if (which == 0) {
+                                    prefs.remove(PREF_HEADING);
+                                    prefs.set(ArrayHeading.PREF_FORWARD, true);
+                                } else if (which == 2) {
+                                    prefs.remove(PREF_HEADING);
+                                    prefs.set(ArrayHeading.PREF_FORWARD, false);
+                                } else {
+                                    prefs.set(ArrayHeading.PREF_FORWARD, false);
+                                    askForHeading();
+                                    return;
+                                }
+                                refresh();
+                                draw();
+                            }
+                        })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /**
+     * What the button says. Never just the mode: a vehicle that is parked has
+     * no course, so "on the vehicle" alone would read as working while
+     * supplying nothing.
+     */
+    private void refreshForward() {
+        if (headingModeButton == null)
+            return;
+        String fixed = prefs.get(PREF_HEADING, "");
+        if (fixed != null && !fixed.trim().isEmpty()) {
+            headingModeButton.setText("Heading source: fixed, set manually");
+            return;
+        }
+        if (!prefs.get(ArrayHeading.PREF_FORWARD, false)) {
+            headingModeButton.setText("Heading source: radio");
+            return;
+        }
+        VehicleHeading v = VehicleHeading.get();
+        Double deg = v == null ? null : v.degrees();
+        if (deg == null)
+            headingModeButton.setText(
+                    "Heading source: GPS track, no track until moving");
+        else if (v.isHeld()) {
+            // ATAK puts a "driving" widget on screen while it is holding a GPS
+            // bearing through a stop. This is the same statement, in words,
+            // with the age on it so the operator can judge whether the truck
+            // has been turned round since.
+            long s = v.heldSeconds();
+            headingModeButton.setText(String.format(Locale.US,
+                    "Heading source: GPS track, %.0f deg, held %s",
+                    deg, s < 90 ? s + " s" : (s / 60) + " min"));
+        }
+        else
+            headingModeButton.setText(String.format(Locale.US,
+                    "Heading source: GPS track, %.0f deg", deg));
+    }
+
+    // ---- finding -----------------------------------------------------------
+
+    private void wireCollecting() {
+        collectToggleButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Collector c = Collector.get();
+                if (c == null)
+                    return;
+                boolean on = !c.isOn();
+                c.setOn(on);
+                if (on && !heading().isKnown())
+                    toast("set a heading source first -- without one a bearing "
+                            + "cannot be crossed with another");
+                refresh();
+            }
+        });
+
+        collectClearButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final Collector c = Collector.get();
+                if (c == null || c.collected() == 0) {
+                    if (c != null)
+                        c.clear();
+                    refresh();
+                    return;
+                }
+                // An afternoon's driving is behind this number, so it is not
+                // thrown away on one tap.
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("Clear " + c.collected() + " bearings?")
+                        .setMessage("This throws away everything collected and "
+                                + "takes the fix off the map. Start a new "
+                                + "search this way; turning collecting off "
+                                + "keeps what you have.")
+                        .setPositiveButton("Clear",
+                                new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface d, int w) {
+                                        c.clear();
+                                        refresh();
+                                    }
+                                })
+                        .setNegativeButton("Keep", null)
+                        .show();
+            }
+        });
+    }
+
+    private void refreshCollecting() {
+        Collector c = Collector.get();
+        if (c == null || collectToggleButton == null)
+            return;
+        boolean on = c.isOn();
+        collectToggleButton.setText(on ? "COLLECTING ON" : "COLLECTING OFF");
+        collectToggleButton.setTextColor(pluginContext.getResources().getColor(
+                on ? R.color.on_green : R.color.off_red));
+        collectClearButton.setEnabled(c.collected() > 0);
+        collectNote.setText(c.status());
+    }
+
+    private void refreshSharing() {
+        BearingPublisher p = BearingPublisher.get();
+        if (p == null || shareFeedButton == null)
+            return;
+        String feed = p.feed();
+        shareFeedButton.setText(feed == null ? "Feed: not set" : "Feed: " + feed);
+
+        int s = p.staleSeconds();
+        shareStaleButton.setText("Stale time: " + (s < 60 ? s + " seconds"
+                : (s / 60) + (s == 60 ? " minute" : " minutes")));
+
+        boolean on = p.isOn();
+        shareToggleButton.setText(on ? "TRANSMIT ON" : "TRANSMIT OFF");
+        shareToggleButton.setTextColor(pluginContext.getResources().getColor(
+                on ? R.color.on_green : R.color.off_red));
+
+        if (feed == null)
+            shareNote.setText("Not transmitting. Select a Data Sync feed; every "
+                    + "subscriber to that feed receives the bearings.");
+        else if (!on)
+            shareNote.setText("Ready. Feed selected, transmitter off.");
+        else
+            shareNote.setText("Transmitting to " + feed + ". " + p.sentCount()
+                    + " sent. Bearings expire on receiving maps at the stale "
+                    + "time; nothing is stored in the feed.");
     }
 
     private void refresh() {
+        refreshForward();
+        refreshCollecting();
+        refreshSharing();
         KrakenLink link = KrakenLink.get();
         if (link == null)
             return;
@@ -502,6 +809,15 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         hostButton.setText(prefs.get(PREF_HOST, KrakenHost.DEFAULT_HOST));
 
         boolean running = link.isRunning();
+        // Radio setup is the Kraken's own web GUI in a WebView. With no radio
+        // answering there is nothing at the other end of it, and a button that
+        // opens a blank page reads as a broken plugin rather than as a missing
+        // radio. ATAK's own btn_gray selector already draws a disabled state,
+        // so this needs no color of its own.
+        radioSetupButton.setEnabled(running);
+        radioSetupButton.setText(running
+                ? "Radio setup" : "Radio setup (connect first)");
+
         connectButton.setText(running ? "Disconnect" : "Connect");
         connectButton.setTextColor(pluginContext.getResources().getColor(
                 running ? R.color.on_green : R.color.off_red));
@@ -560,6 +876,19 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         }
 
         boolean live = link.isLive();
+        // The house rule is that a panel says what it is not showing, and
+        // nothing is more worth saying than an empty map that has bearings
+        // behind it: with no array heading the map stays clear on purpose,
+        // and without this line that reads as a broken plugin.
+        if (!h.isKnown()) {
+            bearingsNote.setVisibility(View.VISIBLE);
+            bearingsNote.setText("Not on the map: these are measured from "
+                    + "antenna 0, and nothing knows which way that points. "
+                    + "Set a heading source above.");
+            for (Bearing b : latest)
+                vfoRows.addView(row(b, h, live));
+            return;
+        }
         bearingsNote.setVisibility(live ? View.GONE : View.VISIBLE);
         if (!live) {
             long age = link.ageMs();

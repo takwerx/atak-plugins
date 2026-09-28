@@ -61,14 +61,30 @@ import java.util.Map;
  */
 public final class BearingLayer {
 
-    /** The group's name in ATAK's overlay list. */
-    private static final String GROUP = "Signal DF";
 
-    private static final String UID_PREFIX = "signaldf.bearing.";
+    /**
+     * The UID a bearing line carries, locally and when shared. One UID, so an
+     * echo of a shared bearing lands on the line that is already there:
+     * ATAK resolves an incoming event against the whole root group by UID.
+     */
+    public static final String UID_PREFIX = "signaldf.bearing.";
 
     /** Bright enough to read over imagery; distinct from ATAK's own lines. */
     private static final int LIVE_COLOR = Color.rgb(0x00, 0xE5, 0xFF);
     private static final int STALE_COLOR = Color.rgb(0x80, 0x80, 0x80);
+
+    /**
+     * A bearing the radio produced but the quality gate rejected.
+     *
+     * <p>Drawn, and drawn faint. Weak is not the same as wrong: a
+     * low-confidence bearing is a real measurement that happens to be poor,
+     * and hiding it would leave the operator staring at an empty map while the
+     * radio is plainly hearing something. What it must not do is look like the
+     * good ones, or go into anything built on top of it -- the fix and the
+     * team's feed both refuse it.
+     */
+    private static final int WEAK_COLOR = Color.argb(0x70, 0x00, 0xE5, 0xFF);
+    private static final double STROKE_WEAK = 1.5;
 
     private static final double STROKE_LIVE = 3.0;
     private static final double STROKE_STALE = 2.0;
@@ -92,7 +108,6 @@ public final class BearingLayer {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Map<Integer, DrawingShape> lines = new HashMap<>();
 
-    private MapGroup group;
     private long lastDrawRealtime = -1;
     private boolean ticking;
 
@@ -100,16 +115,18 @@ public final class BearingLayer {
         this.mapView = mapView;
     }
 
-    /** Plugin stop. Everything this drew comes off the map. */
+    /**
+     * Plugin stop. Every line this drew comes off the map.
+     *
+     * <p>The group itself stays: it is shared with {@link FixLayer} and with
+     * Overlay Manager, and ATAK hit-tests by walking the root group's
+     * children, so pulling a group out from under live items is how a plugin
+     * ends up with markers that cannot be tapped. {@link SignalDfGroup}
+     * handles the Overlay Manager row on plugin stop.
+     */
     public void dispose() {
         stopTicking();
         clear();
-        if (group != null) {
-            MapGroup parent = group.getParentGroup();
-            if (parent != null)
-                parent.removeGroup(group);
-            group = null;
-        }
     }
 
     /** Take every line off the map. */
@@ -134,7 +151,33 @@ public final class BearingLayer {
      *                 normally the phone's own. Null means do not draw.
      */
     public void draw(List<Bearing> bearings, ArrayHeading heading, GeoPoint fallback) {
+        draw(bearings, heading, fallback, Double.NaN, Double.NaN);
+    }
+
+    /** As above, dimming anything the quality gate would reject. */
+    public void draw(List<Bearing> bearings, ArrayHeading heading,
+            GeoPoint fallback, double minConfidence, double minPowerDb) {
         if (bearings == null || bearings.isEmpty()) {
+            clear();
+            return;
+        }
+
+        // No heading, no line. Operator's call, 2026-09-28, and the right one.
+        //
+        // This used to draw the bearing anyway, treating the array's zero as
+        // north and labeling the line "47 deg rel" so nobody was lied to in
+        // writing. But a line on a map is a claim about a direction on the
+        // earth, and that one is wrong by however far the array is turned --
+        // pointing at the exact opposite of the transmitter when the vehicle
+        // happens to be heading south. Four small words beside it are no
+        // defense against a glance at a screen while driving, and the whole
+        // reason ArrayHeading is a type rather than a double is that a wrong
+        // heading never looks wrong.
+        //
+        // The relative bearing is still real information and the pane still
+        // lists it. It is only the map that stays empty, and the heading line
+        // above the list says why and what to do about it.
+        if (!heading.isKnown()) {
             clear();
             return;
         }
@@ -150,7 +193,9 @@ public final class BearingLayer {
             GeoPoint to = GeoCalculations.pointAtDistance(from, trueDeg, lengthM);
             if (to == null)
                 continue;
-            drawLine(b, from, to, trueDeg, heading);
+            drawLine(b, from, to, trueDeg, heading,
+                    com.atakmap.android.signaldf.data.Quality.usable(
+                            b, minConfidence, minPowerDb));
             drawn.add(b.vfo);
         }
 
@@ -182,7 +227,7 @@ public final class BearingLayer {
      * 0.1 supports. Null when neither is available, and then nothing is drawn
      * rather than a line from a guess.
      */
-    private GeoPoint receiverPoint(Bearing b, GeoPoint fallback) {
+    public static GeoPoint receiverPoint(Bearing b, GeoPoint fallback) {
         if (b.positionReported)
             return new GeoPoint(b.latitude, b.longitude);
         return fallback;
@@ -205,7 +250,7 @@ public final class BearingLayer {
     }
 
     private void drawLine(Bearing b, GeoPoint from, GeoPoint to, double trueDeg,
-            ArrayHeading heading) {
+            ArrayHeading heading, boolean good) {
         DrawingShape shape = lines.get(b.vfo);
         if (shape == null) {
             shape = new DrawingShape(mapView, group(), UID_PREFIX + b.vfo);
@@ -223,9 +268,9 @@ public final class BearingLayer {
         pts.add(GeoPointMetaData.wrap(from));
         pts.add(GeoPointMetaData.wrap(to));
         shape.setPoints(pts, new android.util.SparseArray<com.atakmap.android.maps.PointMapItem>());
-        shape.setStrokeColor(LIVE_COLOR);
-        shape.setStrokeWeight(STROKE_LIVE);
-        shape.setTitle(label(b, trueDeg, heading));
+        shape.setStrokeColor(good ? LIVE_COLOR : WEAK_COLOR);
+        shape.setStrokeWeight(good ? STROKE_LIVE : STROKE_WEAK);
+        shape.setTitle(label(b, trueDeg, heading) + (good ? "" : "  weak"));
 
         if (shape.getGroup() == null)
             group().addItem(shape);
@@ -245,13 +290,7 @@ public final class BearingLayer {
     }
 
     private MapGroup group() {
-        if (group == null) {
-            MapGroup root = mapView.getRootGroup();
-            group = root.findMapGroup(GROUP);
-            if (group == null)
-                group = root.addGroup(GROUP);
-        }
-        return group;
+        return SignalDfGroup.get(mapView);
     }
 
     // ---- staleness ---------------------------------------------------------

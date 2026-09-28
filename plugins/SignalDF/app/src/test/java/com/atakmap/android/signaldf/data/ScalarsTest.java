@@ -62,7 +62,7 @@ public class ScalarsTest {
     }
 
     /**
-     * Frame time is milliseconds and GPS time is seconds, neither labelled.
+     * Frame time is milliseconds and GPS time is seconds, neither labeled.
      * 1e11 ms is 1973 and 1e11 s is the year 5138, so the split is unambiguous
      * for any timestamp this decade.
      */

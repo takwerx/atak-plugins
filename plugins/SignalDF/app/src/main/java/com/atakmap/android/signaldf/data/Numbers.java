@@ -59,7 +59,7 @@ public final class Numbers {
      * Normalizes a timestamp to milliseconds since the epoch.
      *
      * <p>The Kraken writes its frame time in milliseconds and its GPS time in
-     * seconds, and neither is labelled. Anything below 1e11 -- which as
+     * seconds, and neither is labeled. Anything below 1e11 -- which as
      * milliseconds would be March 1973, and as seconds is any time up to the
      * year 5138 -- is read as seconds. Returns 0 for anything unparseable, and
      * 0 means "no time", never 1970.
