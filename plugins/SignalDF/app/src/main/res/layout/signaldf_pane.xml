@@ -69,6 +69,14 @@
                     android:text="Connect" />
             </LinearLayout>
 
+            <Button
+                style="@style/TakwerxButton"
+                android:id="@+id/radio_setup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Radio setup" />
+
             <TextView
                 style="@style/SectionHeading"
                 android:text="Array heading" />

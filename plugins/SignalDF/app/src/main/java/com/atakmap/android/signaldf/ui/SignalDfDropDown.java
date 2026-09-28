@@ -64,6 +64,9 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     /** Where the radio's address is remembered between sessions. */
     private static final String PREF_HOST = "signaldf.host";
 
+    /** The Dash GUI's port, fixed by the radio and not the operator's to move. */
+    private static final int GUI_PORT = 8080;
+
     /**
      * The operator's own array heading, degrees, or absent for "use the radio's".
      * Stored as a string so that absent and zero are different values -- which
@@ -74,6 +77,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final Context pluginContext;
     private final AtakPreferences prefs;
     private final BearingLayer layer;
+    private RadioSetupDropDown radioSetup;
     private final View root;
 
     private final TextView status;
@@ -85,6 +89,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final Button connectButton;
     private final Button setHeadingButton;
     private final Button clearHeadingButton;
+    private final Button radioSetupButton;
     private final Button wideNarrowButton;
     private final LinearLayout vfoRows;
 
@@ -125,6 +130,7 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         connectButton = root.findViewById(R.id.connect);
         setHeadingButton = root.findViewById(R.id.set_heading);
         clearHeadingButton = root.findViewById(R.id.clear_heading);
+        radioSetupButton = root.findViewById(R.id.radio_setup);
         wideNarrowButton = root.findViewById(R.id.wide_narrow);
         vfoRows = root.findViewById(R.id.vfo_rows);
 
@@ -151,6 +157,12 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
             public void onClick(View v) {
                 prefs.remove(PREF_HEADING);
                 refresh();
+            }
+        });
+        radioSetupButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openRadioSetup();
             }
         });
         wideNarrowButton.setOnClickListener(new View.OnClickListener() {
@@ -279,6 +291,10 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         if (link != null)
             link.removeListener(this);
         layer.dispose();
+        if (radioSetup != null) {
+            radioSetup.dispose();
+            radioSetup = null;
+        }
     }
 
     /** Applies the wide/narrow detail columns once the pane has laid out. */
@@ -419,6 +435,28 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /**
+     * Opens the radio's own web GUI, in a drop down of our own.
+     *
+     * <p>See {@link RadioSetupDropDown} for why the radio's setup stays the
+     * radio's rather than being rebuilt here, and why ATAK's own
+     * {@code WebViewer} cannot show it.
+     */
+    private void openRadioSetup() {
+        KrakenHost h;
+        try {
+            h = KrakenHost.parse(prefs.get(PREF_HOST, KrakenHost.DEFAULT_HOST));
+        } catch (KrakenHost.InvalidHost e) {
+            toast(e.getMessage());
+            askForHost();
+            return;
+        }
+        if (radioSetup == null)
+            radioSetup = new RadioSetupDropDown(getMapView(), pluginContext);
+        // The GUI is on the Dash port, not the status-file port.
+        radioSetup.show("http://" + h.host() + ":" + GUI_PORT + "/");
     }
 
     private void toast(String message) {
