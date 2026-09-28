@@ -2,6 +2,7 @@
 package com.atakmap.android.atmosphere.overlay;
 
 import android.content.Context;
+import android.os.Looper;
 
 import com.atakmap.android.features.FeatureDataStoreMapOverlay;
 import com.atakmap.android.overlay.MapOverlay;
@@ -627,8 +628,20 @@ final class AtmosphereFeatures {
      *
      * <p>Bounded: if the open failed there is nothing to wait for, and a layer that
      * hangs its own worker forever is worse than one that misses a refresh.
+     *
+     * <p>Refused on the main thread, loudly. {@link #registered} is released by
+     * {@link #registerOnMap}, a Runnable posted to main, so main waiting for it is
+     * main waiting for itself until the timeout. Air quality cleared its store from
+     * start() on main and froze ATAK for 20 s on every start; a touch in that window
+     * was "ATAK isn't responding" (Windows Dell, 2026-09-27, twice). The stack in the
+     * log names whoever asked.
      */
     private boolean awaitStore() {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            Log.w(tag, layerName + ": store write asked for on the main thread, skipped",
+                    new IllegalStateException("AtmosphereFeatures is worker-only"));
+            return false;
+        }
         try {
             if (store == null)
                 ready.await(20, java.util.concurrent.TimeUnit.SECONDS);
@@ -639,7 +652,8 @@ final class AtmosphereFeatures {
             Thread.currentThread().interrupt();
             return false;
         }
-        return store != null;
+        // A stop that overtook the open leaves a store with no layer: nothing to write.
+        return store != null && !detached;
     }
 
     private void attachStore() {
@@ -1144,7 +1158,7 @@ final class AtmosphereFeatures {
         if (!awaitStore())
             return;
         synchronized (lock) {
-            if (store == null)
+            if (store == null || detached)
                 return;
             boolean bulk = false;
             try {
@@ -1250,33 +1264,18 @@ final class AtmosphereFeatures {
         }
     }
 
-    /** Empty the store without taking the layer off the map. */
+    /**
+     * Empty the store without taking the layer off the map. <b>Worker thread only</b>,
+     * like {@link #rewrite}, because it is one: a rewrite with nothing in it.
+     *
+     * <p>It was its own write, and wrong in two ways. It deleted with
+     * {@code deleteFeatureSets} and default parameters, the call the rewrite above
+     * records as a silent no-op on this store (2026-09-25); and it took no lock, so a
+     * stop could take the store away mid-delete. A rewrite deletes set by set, under
+     * the lock, and not at all once the layer is detached.
+     */
     void clear() {
-        if (!awaitStore())
-            return;
-        try {
-            store.deleteFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
-        } catch (Exception e) {
-            Log.w(tag, layerName + " store would not clear", e);
-        }
-        sets.clear();
-    }
-
-    /** "Hurricane Polo - Cone": one set per storm and product, listed on its own. */
-    private long setFor(String name) {
-        final Long known = sets.get(name);
-        if (known != null)
-            return known;
-        try {
-            final long id = store.insertFeatureSet(
-                    new FeatureSet(PROVIDER, type, name, MIN_GSD, MAX_GSD));
-            store.setFeatureSetVisible(id, true);
-            sets.put(name, id);
-            return id;
-        } catch (Exception e) {
-            Log.w(tag, "feature set " + name, e);
-            return -1;
-        }
+        rewrite(java.util.Collections.<Drawn>emptyList());
     }
 
     private static LineString ring(GeoPoint[] pts) {
@@ -1284,92 +1283,6 @@ final class AtmosphereFeatures {
         for (GeoPoint p : pts)
             l.addPoint(p.getLongitude(), p.getLatitude());
         return l;
-    }
-
-    void addPolygon(String setName, String name, GeoPoint[] pts, int stroke, float weight,
-            int fill, AttributeSet attrs) {
-        insert(setName, name, new Polygon(ring(pts)),
-                new CompositeStyle(new Style[] {
-                        new BasicFillStyle(fill), new BasicStrokeStyle(stroke, weight) }),
-                attrs);
-    }
-
-    /**
-     * A shape that arrived already built, holes and all: a contour band is a polygon
-     * with the worse bands cut out of it, and flattening it to its outer ring stacks
-     * every band on top of the ones inside it.
-     */
-    void addShape(String setName, String name, com.atakmap.map.layer.feature.geometry.Geometry g,
-            int stroke, float weight, int fill, AttributeSet attrs) {
-        insert(setName, name, g,
-                new CompositeStyle(new Style[] {
-                        new BasicFillStyle(fill), new BasicStrokeStyle(stroke, weight) }),
-                attrs);
-    }
-
-    void addLine(String setName, String name, GeoPoint[] pts, int stroke, float weight,
-            AttributeSet attrs) {
-        addLine(setName, name, pts, stroke, weight, attrs, false);
-    }
-
-    /**
-     * A line, optionally with its name drawn along it.
-     *
-     * <p>ATAK does not label a line feature from its name the way it labels a point:
-     * the arrival contours were correctly named "Sat 8 pm" and the map showed nothing
-     * (operator, 2026-09-23: "no arrival times"). A LabelPointStyle in the composite
-     * is what puts text on a line, and the hour is the only reason that line is drawn.
-     */
-    void addLine(String setName, String name, GeoPoint[] pts, int stroke, float weight,
-            AttributeSet attrs, boolean labelled) {
-        final Style stroked = new BasicStrokeStyle(stroke, weight);
-        Style style = stroked;
-        if (labelled && name != null && !name.isEmpty()) {
-            final LabelPointStyle label = new LabelPointStyle(name, 0xFFFFFFFF,
-                    0x99000000, LabelPointStyle.ScrollMode.DEFAULT);
-            style = new CompositeStyle(new Style[] { stroked, label });
-        }
-        insert(setName, name, ring(pts), style, attrs);
-    }
-
-    /**
-     * A point drawn as an already-composed icon. The label is inside that bitmap, so
-     * the style carries no label of its own: ATAK's own would be trimmed, and two
-     * labels on one point is worse than one.
-     */
-    void addIcon(String setName, String name, GeoPoint p, String iconUri,
-            int width, int height, AttributeSet attrs) {
-        // Named, but with an EMPTY label style beside the icon.
-        //
-        // A named feature draws its name as a label, and the label is already inside
-        // this icon, so naming it drew every storm twice a few pixels apart. Leaving
-        // the name off fixed that and cost something else: ATAK's Select Item chooser
-        // reads the feature's NAME, so every forecast position listed as "[Unnamed]"
-        // while the cone and track listed properly (XCover, 2026-09-23). An empty
-        // LabelPointStyle is what Feature Layer calls withoutLabel(): the engine
-        // draws that instead of the default name, which is to say nothing.
-        insert(setName, name, new Point(p.getLongitude(), p.getLatitude()),
-                new CompositeStyle(new Style[] {
-                        new IconPointStyle(0xFFFFFFFF, iconUri, width, height, 0, 0,
-                                0f, true),
-                        new LabelPointStyle("", 0x00FFFFFF, 0x00000000,
-                                LabelPointStyle.ScrollMode.DEFAULT) }),
-                attrs);
-    }
-
-    private void insert(String setName, String name, com.atakmap.map.layer.feature.geometry.Geometry g,
-            Style style, AttributeSet attrs) {
-        if (store == null)
-            return;
-        final long fsid = setFor(setName);
-        if (fsid < 0)
-            return;
-        try {
-            store.insertFeature(new Feature(fsid, name, g, style, attrs,
-                    Feature.AltitudeMode.ClampToGround, 0d));
-        } catch (Exception e) {
-            Log.w(tag, "insert " + setName + "/" + name, e);
-        }
     }
 
     /** Which feature set a feature belongs to, by name, for the details subtitle. */
