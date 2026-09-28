@@ -59,9 +59,8 @@ be treated as surveyed until that validation is done.
 _________________________________________________________________
 POINT OF CONTACTS
 
-Andreas Johansson, TAKWERX.
-
-Issues and feedback: the plugin's own repository issue tracker.
+Andreas Johansson, takwerx
+https://github.com/takwerx/signal-df/issues
 
 
 _________________________________________________________________
