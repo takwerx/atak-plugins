@@ -35,10 +35,12 @@ two are meant to run side by side.
 - The phone needs a network path to the weather services; each layer names its
   server when it first asks to be allowed. A reading that has been fetched stays
   readable when the network drops, with its age on it.
-- The first time, the forecast needs a weather service. Open **Forecast
-  settings** at the top of the Forecast page, tap **Weather service** and pick
-  one — **NWS (United States)** for the US, **Open-Meteo** anywhere else. It asks
-  once, naming the server; **Allow** turns it on and reads the forecast.
+- The first time, the forecast's weather service has to be allowed. **NWS
+  (United States)** is already chosen, and the Forecast page says it is not
+  allowed yet, with an **Allow NWS (United States)** button under it. Tap it: it
+  names the server and what is sent, and **Allow** turns it on and reads the
+  forecast. Outside the US, choose **Open-Meteo** in **Forecast settings**,
+  **Weather service** instead; it asks the same way.
 
 <img src="screenshots/2_first_run.png" width="300"> <img src="screenshots/12_weather_service.png" width="300"> <img src="screenshots/13_allow_service.png" width="300">
 
@@ -85,10 +87,10 @@ old the reading is.
 <img src="screenshots/7_next_hours.png" width="420"> <img src="screenshots/10_next_days.png" width="420">
 
 **Refresh** at the top of this page reads the forecast again. **Forecast
-settings** beside it picks the **Weather service** the forecast comes from,
-lists the **Allowed services**, **What to show**, and **Position sent** — how
-coarsely your position is rounded before it leaves the device. **Favorites**
-keeps places by name.
+settings** beside it picks the **Weather service** the forecast comes from —
+only that one is ever asked, and it says "not allowed" until you allow it —
+**What to show**, and **Position sent** — how coarsely your position is
+rounded before it leaves the device. **Favorites** keeps places by name.
 
 <img src="screenshots/11_forecast_settings.png" width="420"> <img src="screenshots/14_favorites.png" width="420">
 

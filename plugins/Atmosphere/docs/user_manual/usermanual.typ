@@ -38,18 +38,18 @@ plugin's job, and the two are meant to run side by side.
   #cap[A new install: the forecast's service is not allowed yet.]
 ][
   #image("12.png", width: 100%)
-  #cap[Forecast settings, Weather service: pick one.]
+  #cap[Outside the US: Forecast settings, Weather service, Open-Meteo.]
 ][
   #image("13.png", width: 100%)
   #cap[The first time, it asks, naming the server.]
 ]
 
 #v(4pt)
-The forecast needs a weather service, and nothing goes out until you allow
-one. Open *Forecast settings* at the top of the Forecast page, tap *Weather
-service* and pick one: *NWS (United States)* for the US, *Open-Meteo* for
-anywhere else. The first time, it asks; the question names the server and says
-what is sent. *Allow* turns it on and reads the forecast at once.
+*NWS (United States)* is already chosen, but nothing goes out until you allow
+it. The Forecast page says so, with an *Allow NWS (United States)* button under
+it. Tap it: the question names the server and says what is sent, and *Allow*
+turns it on and reads the forecast at once. Outside the US, choose *Open-Meteo*
+in *Forecast settings*, *Weather service* instead; it asks the same way.
 ]
 
 #tak-slide[
@@ -155,9 +155,10 @@ away again, and it stays the way you left it.
 
 #v(4pt)
 *Forecast settings* holds everything about the forecast: the *Weather
-service* it comes from, the *Allowed services*, *What to show* in the Now
-tiles and the table, and *Position sent* - how coarsely your position is
-rounded before it leaves the device. *Favorites* keeps places by name: *Add
+service* it comes from (only that one is ever asked, and it says "not allowed"
+until you allow it), *What to show* in the Now tiles and the table, and
+*Position sent* - how coarsely your position is rounded before it leaves the
+device. *Favorites* keeps places by name: *Add
 this place* saves the point being read, and picking one later reads the
 forecast there.
 ]
