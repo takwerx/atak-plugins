@@ -1,17 +1,15 @@
 ATAK Plugin — Signal DF
 
-**Download Signal DF 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Signal DF 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- [ATAK-CIV 5.6](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.6.0-civ-release.apk)
-- [ATAK-CIV 5.7](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.7.0-civ-release.apk)
-- [ATAK-CIV 5.8](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.8.0-civ-release.apk)
+- **ATAK-CIV 5.6:** https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/signal-df/releases
 
 **User guide with screenshots: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)**
-
-https://github.com/takwerx/signal-df/blob/main/docs/USER_GUIDE.md
-
+(https://github.com/takwerx/signal-df/blob/main/docs/USER_GUIDE.md)
 
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
@@ -28,14 +26,23 @@ Intended for search and rescue on a beacon or a handheld, interference hunting
 (a stuck mic, a keyed repeater, a transmitter desensing a fire channel), and
 locating an unknown transmitter on a tactical channel.
 
-Version 0.1 does one thing deliberately: connect to the radio and draw one
-bearing per active VFO, correctly, with its provenance stated. It finds the
-radio whichever output mode it was left in, falling back between the interfaces
-by itself. It states in words where the array heading came from, and labels
-bearings as relative to the antenna when nothing knows which way the array
-points. It shows the age of the newest bearing, greys the line when the feed
-goes stale, and distinguishes a radio that has stopped answering from one that
-is answering but not producing.
+Version 0.2 does the whole hunt. It connects to the radio and draws a bearing
+per active VFO with its provenance stated; it collects bearings while the
+vehicle drives, crosses them into a position with a 95% error ellipse, draws
+every bearing it collected so a reflection is visible as the one line missing
+the crowd, and puts a waypoint where driving next will tighten the answer
+fastest. Bearings can be transmitted live to a TAK Server Data Sync feed, with
+a stale time, so a team sees them and nothing is left stored.
+
+It finds the radio whichever output mode it was left in, falling back between
+the interfaces by itself. It states in words where the array heading came from,
+takes that heading from ATAK's own GPS track when the array is vehicle-mounted,
+and draws nothing at all on the map when nothing knows which way the array
+points. It sizes the antenna array for a frequency, naming the hole on
+KrakenRF's printed arms, the position on the 3D-printed template and the plain
+measurement, and says how long to extend each whip. It shows the age of the
+newest bearing, greys the line when the feed goes stale, and distinguishes a
+radio that has stopped answering from one that is answering but not producing.
 
 It also opens the radio's own web interface inside ATAK, so tuning, gain,
 squelch and calibration are reachable without leaving the map application.
@@ -51,22 +58,30 @@ between several operators so one crew's receivers all contribute to one fix.
 _________________________________________________________________
 STATUS
 
-Version 0.1 — pre-release, for evaluation and feedback. Not yet published.
+Version 0.2 — beta, for field use and feedback.
 
 Runs on ATAK-CIV 5.6, 5.7 and 5.8.
 
-Verified against a KrakenSDR running `krakensdr_doa` 1.8.1: the plugin selects
-an available feed, falls back when the preferred one is absent, reads live
-direction-of-arrival data, and reports staleness correctly.
+Verified against a KrakenSDR running `krakensdr_doa` 1.8.1: the plugin finds an
+available feed by itself, falls back when the preferred one is absent, reads
+live direction-of-arrival data, and reports staleness correctly. The finding
+loop — collect while driving, cross the bearings, draw the fix and its error
+ellipse — is verified end to end against a simulated radio driving a known
+route past a known transmitter, and by 60 unit tests over the arithmetic.
+ATAK's Bloodhound navigates to both the fix and the suggested waypoint.
 
-Known limitation, stated plainly: the absolute bearing convention has not yet
-been validated against a transmitter at a measured bearing. The two interfaces
-the radio exposes disagree by a mirror, and which one corresponds to a compass
-bearing is taken from the radio's own source and from agreement with an
-independent implementation, not from a controlled measurement. Feedback on
-setup, the interface and the radio connection is useful now; bearings should not
-be treated as surveyed until that validation is done.
+Known limitation, stated plainly, and it governs everything else here: the
+absolute bearing convention has not been validated against a transmitter at a
+measured bearing. The two interfaces the radio exposes disagree by a mirror,
+and which one corresponds to a compass bearing is taken from the radio's own
+source and from agreement with an independent implementation, not from a
+controlled measurement. Every fix, ellipse and shared bearing carries that
+caveat in its remarks. Directions are useful for hunting and should not be
+treated as surveyed until that validation is done.
 
+Not yet built: the grid heatmap, which is what handles two transmitters on one
+frequency and heavy multipath. The bearing trace shows the same information to
+the eye in the meantime.
 
 _________________________________________________________________
 POINT OF CONTACTS
@@ -172,12 +187,32 @@ LICENSE
 
 Copyright (C) 2026 Andreas Johansson (TAKWERX).
 
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU Affero General Public License as published by the Free
-Software Foundation, either version 3 of the License, or (at your option) any
-later version, with an additional permission under section 7 for the TAK
-Software. See `LICENSE` and `LICENSE-EXCEPTION.md`.
+Signal DF is free software, licensed under the
+**[GNU Affero General Public License v3.0 or later](LICENSE)**
+(AGPL-3.0-or-later), with an
+**[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
+this plugin may be built against the TAK SDK, loaded into ATAK and distributed
+without the AGPL reaching into ATAK itself.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+You may run it, study it, modify it, and share it -- for any purpose, commercial
+or not, with no fee and no per-seat license. What the AGPL adds over a permissive
+license is a guarantee that it **stays** free: modify Signal DF and pass it on,
+and the people you pass it to are owed the complete corresponding source of your
+version under the same license. Nobody can take this, close it, and sell it back
+to the emergency-services community.
+
+**If you only install and use Signal DF, this obligation never touches you.**
+Running it, in any agency, on any number of devices, triggers nothing.
+
+**Scope.** The AGPL covers Signal DF's own code. It does not change the license
+of the TAK Software, which stays under the TAK Software License Agreement, and it
+does not cover the parts of this repository scaffolded from the TAK-SDK plugin
+template -- those are listed under Provenance in
+[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md). No SDK binary is distributed here.
+
+The KrakenSDR and `krakensdr_doa` are by KrakenRF. Signal DF is not a KrakenRF
+product and carries none of their branding -- it speaks to the radio over the
+interfaces their software already publishes.
+
+Contributions are welcome -- see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+contribution terms and the [Contributor License Agreement](CLA.md).
