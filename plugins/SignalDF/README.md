@@ -1,5 +1,17 @@
 ATAK Plugin — Signal DF
 
+**Download Signal DF 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+
+- [ATAK-CIV 5.6](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.6.0-civ-release.apk)
+- [ATAK-CIV 5.7](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.7.0-civ-release.apk)
+- [ATAK-CIV 5.8](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.8.0-civ-release.apk)
+
+All releases: https://github.com/takwerx/signal-df/releases
+
+**User guide with screenshots: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)**
+
+https://github.com/takwerx/signal-df/blob/main/docs/USER_GUIDE.md
+
 
 _________________________________________________________________
 PURPOSE AND CAPABILITIES

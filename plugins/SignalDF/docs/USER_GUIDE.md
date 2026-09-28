@@ -6,9 +6,16 @@ Signal DF puts direction-finding bearings from a KrakenSDR onto the ATAK map.
 and draws one bearing. The fix, the power lobe and sharing between operators
 come later.
 
-> **Not released yet.** There is no signed build to download. This guide is here
-> so the setup is written down while it is fresh; download links go in at the
-> first release.
+**Download Signal DF 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+
+- [ATAK-CIV 5.6](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.6.0-civ-release.apk)
+- [ATAK-CIV 5.7](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.7.0-civ-release.apk)
+- [ATAK-CIV 5.8](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.8.0-civ-release.apk)
+
+All releases: https://github.com/takwerx/signal-df/releases
+
+**Before you start:** builds are published for ATAK-CIV 5.6, 5.7 and 5.8. Take
+the one matching your ATAK; the wrong one will not load.
 
 ---
 
