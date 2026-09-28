@@ -1045,6 +1045,11 @@ public final class AtmospherePane {
     /** Called every time the pane is shown, so a stale pane never lingers. */
     public void onShown() {
         refresh(false);
+        final MapView mv = MapView.getMapView();
+        if (mv != null && !followingMap) {
+            mv.addOnMapMovedListener(mapMoved);
+            followingMap = true;
+        }
         // The frame list ages while the pane is closed; a stale one is re-read.
         if (radar != null && radar.isOn())
             radar.refreshFrames(false);
@@ -1350,6 +1355,10 @@ public final class AtmospherePane {
                 scrubberLabel.setText(windLabel(index, validTime));
                 // The model can change with the height, so the level line follows.
                 updateWindLevel();
+                // And the reading, which is read off the grid now on the map: it
+                // said "outside the area being drawn" over Hurricane Polo after the
+                // map had moved there and the grid had followed (S22, 2026-09-27).
+                updateWindReading();
             }
 
             @Override
@@ -1361,6 +1370,7 @@ public final class AtmospherePane {
                 else
                     scrubberLabel.setText(
                             windLabel(wind.hourIndex(), wind.validTime(wind.hourIndex())));
+                updateWindReading();
             }
         });
         updateLayerControls();
@@ -4575,6 +4585,9 @@ public final class AtmospherePane {
         updateWindLevel();
         // A unit change is a display change: re-render, never re-fetch.
         render();
+        // The Here lines too: the wind said km/h beside a mph legend after the
+        // units were switched to imperial (XCover, 2026-09-27).
+        updateHereLines();
     }
 
     /**
@@ -4928,6 +4941,12 @@ public final class AtmospherePane {
     public void onClosed() {
         disarmPick();
         updateModeIcons();
+        final MapView mv = MapView.getMapView();
+        if (mv != null && followingMap) {
+            mv.removeOnMapMovedListener(mapMoved);
+            mv.removeCallbacks(centerSettled);
+            followingMap = false;
+        }
     }
 
     /** The plugin is going away: stop the spot page's worker and its fetches. */
@@ -5148,7 +5167,50 @@ public final class AtmospherePane {
         updateModeIcons();
         snapshot = null;
         refresh(false);
+        updateHereLines();
     }
+
+    /**
+     * Every layer's "Here:" line, read again at the pane's point. Called when the
+     * point changes: a new mode, or the map moving under Map center. Each line was
+     * refreshed only when its own layer redrew, so choosing Map center over a
+     * hurricane left the wind reading the Denver favorite chosen before it.
+     */
+    private void updateHereLines() {
+        if (wind != null && wind.isOn())
+            updateWindReading();
+        if (waves != null && waves.isOn())
+            updateWavesReading();
+        if (rain != null && rain.isOn())
+            updateRainReading();
+        if (smoke != null && smoke.isOn())
+            updateSmokeReading();
+        if (air != null && air.isOn())
+            updateAirReading();
+    }
+
+    /** Map center follows the map: the Here lines read again once a move settles. */
+    private final Runnable centerSettled = new Runnable() {
+        @Override
+        public void run() {
+            if (mode == PointMode.CENTER)
+                updateHereLines();
+        }
+    };
+
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener mapMoved =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView view, boolean animate) {
+                    // GL thread: post and coalesce, touch nothing here.
+                    final MapView mv = MapView.getMapView();
+                    if (mv == null)
+                        return;
+                    mv.removeCallbacks(centerSettled);
+                    mv.postDelayed(centerSettled, 500);
+                }
+            };
+    private boolean followingMap;
 
     private void setFavorite(Favorites.Place place) {
         favorite = place;
