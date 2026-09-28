@@ -326,4 +326,72 @@ public final class ArrayCalc {
         }
         return p;
     }
+
+    /**
+     * The length one antenna element should be, in centimetres: a quarter of
+     * the wavelength.
+     *
+     * <p>This is not in the vendor's workbook, which sizes the array and stops.
+     * It is in their antenna setup guide, and it is the other measurement
+     * somebody standing at a vehicle with a telescopic whip in their hand
+     * needs: <i>"Under normal circumstances, you will want the length to be a
+     * quarter of the wavelength of the frequency of interest for best
+     * reception."</i>
+     *
+     * <p>Plain lambda/4, with no end-effect shortening factor applied. A
+     * telescopic whip is set by eye against a tape to the nearest few
+     * millimetres, the guide itself says <i>"using shorter than optimal antenna
+     * lengths will be acceptable in most cases"</i>, and quoting 17.1 cm where
+     * the vendor's own rule gives 18.0 would be false precision about a number
+     * nobody can hit anyway.
+     */
+    public static double quarterWaveCm(double freqMHz) {
+        if (freqMHz <= 0)
+            return 0;
+        return wavelengthM(freqMHz) * 100.0 / 4.0;
+    }
+
+    /**
+     * The KrakenTenna telescopic sets the vendor sells come in sections, and
+     * their guide publishes the frequencies each number of extensions is
+     * usable at. Rows overlap heavily, so this returns the FEWEST extensions
+     * listed as usable at {@code freqMHz}, or -1 when no row covers it.
+     *
+     * <p>Fewest, rather than nearest to a quarter wave, for two reasons the
+     * guide gives itself: <i>"if you are running the antennas on a vehicle,
+     * you do not want the antennas to be extended too long for safety"</i>,
+     * and <i>"using shorter than optimal antenna lengths will be acceptable in
+     * most cases"</i>. The shortest whip the vendor calls usable at a
+     * frequency is the one to put on a roof.
+     *
+     * <p>The ranges are SWR measurements taken over a ground plane, which is
+     * why the screen that shows this says so; on a wooden bench they mean much
+     * less than on a car roof.
+     */
+    public static int krakenTennaExtensions(double freqMHz) {
+        for (int i = 0; i < KRAKENTENNA_MHZ.length; i++) {
+            double[] row = KRAKENTENNA_MHZ[i];
+            for (int j = 0; j + 1 < row.length; j += 2)
+                if (freqMHz >= row[j] && freqMHz <= row[j + 1])
+                    return i;
+        }
+        return -1;
+    }
+
+    /**
+     * Usable frequency ranges per number of extensions, from the vendor's
+     * antenna setup guide, transcribed in order: index is the extension count,
+     * each row is pairs of low/high MHz.
+     */
+    private static final double[][] KRAKENTENNA_MHZ = {
+            { 440, 1050 },
+            { 366, 950 },
+            { 330, 1000 },
+            { 145, 158, 290, 420, 612, 1050 },
+            { 140, 156, 270, 360, 595, 1030 },
+            { 135, 155, 250, 330, 520, 1050 },
+            { 130, 150, 240, 290, 460, 1050 },
+            { 127, 150, 235, 282, 450, 1050 },
+    };
+
 }

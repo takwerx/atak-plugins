@@ -74,6 +74,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
     private final Button sizeItButton;
     private final TextView verdict;
     private final TextView numbers;
+    private final TextView antenna;
     private final TextView band;
     private final TextView note;
     private final ArrayPlanView plan;
@@ -96,6 +97,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         sizeItButton = root.findViewById(R.id.size_it);
         verdict = root.findViewById(R.id.verdict);
         numbers = root.findViewById(R.id.numbers);
+        antenna = root.findViewById(R.id.antenna);
         band = root.findViewById(R.id.band);
         note = root.findViewById(R.id.note);
         plan = root.findViewById(R.id.plan);
@@ -332,7 +334,8 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         if (geometry == Geometry.CIRCULAR) {
             n.append(String.format(Locale.US,
                     "Measure %s out from the center, along each arm\n"
-                            + "Arms %.0f degrees apart\n"
+                            + "Arms %.0f degrees apart, numbered clockwise "
+                            + "from the forward one\n"
                             + "Check: neighboring antennas %s apart\n",
                     ShortDistance.fromCm(sizeCm), 360.0 / elements,
                     ShortDistance.fromCm(r.spacingCm)));
@@ -347,6 +350,26 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
                         + "Resolution about %.1f degrees",
                 r.multiplier, r.wavelengthM, r.resolutionDeg));
         numbers.setText(n.toString());
+
+        // How long each whip is, which the vendor's workbook does not answer
+        // and somebody standing at a vehicle with a telescopic antenna in
+        // their hand needs before the array geometry is any use to them.
+        StringBuilder a = new StringBuilder(String.format(Locale.US,
+                "Extend each whip to %s, a quarter wavelength\n",
+                ShortDistance.fromCm(ArrayCalc.quarterWaveCm(freqMHz))));
+        int ext = ArrayCalc.krakenTennaExtensions(freqMHz);
+        if (ext == 0)
+            a.append("On a KrakenTenna, leave the sections collapsed\n");
+        else if (ext > 0)
+            a.append(String.format(Locale.US,
+                    "On a KrakenTenna, extend %d section%s\n",
+                    ext, ext == 1 ? "" : "s"));
+        else
+            a.append("KrakenRF publish no section count for this frequency; "
+                    + "extend to the closest one they list\n");
+        a.append("All five identical, on a metal ground plane such as a "
+                + "vehicle roof");
+        antenna.setText(a.toString());
 
         double hi = ArrayCalc.highestUsableMHz(geometry, elements, sizeCm);
         double lo = ArrayCalc.lowestUsableMHz(geometry, elements, sizeCm);

@@ -4,42 +4,54 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.util.AttributeSet;
 import android.view.View;
 
 import com.atakmap.android.signaldf.data.ArrayCalc;
-import com.atakmap.android.signaldf.data.ShortDistance;
 import com.atakmap.android.signaldf.data.ArrayCalc.Geometry;
 
-import java.util.Locale;
-
 /**
- * A top-down plan of the antenna array: where each element goes, to scale, with
- * the measurement somebody has to take with a tape on it.
+ * A top-down plan of the antenna array: which antenna goes where, and which way
+ * the array faces.
  *
- * <p>This is the half of the vendor's spreadsheet that does not survive being
- * read as a table of numbers. "Radius 30.7 cm, spacing 36.1 cm" is two numbers
- * that are easy to mix up, and mixing them up builds the wrong array; a picture
- * with the elements in their places and the spacing drawn between two of them
- * is not.
+ * <p><b>It deliberately carries no measurements.</b> Every element sits the
+ * same distance out and the arms are always 360/N apart, so a radius drawn on
+ * the picture and a neighbour-to-neighbour distance drawn between two dots add
+ * nothing the table underneath does not already say -- and they cost a great
+ * deal, because the only places those labels fit are on top of each other and
+ * on top of the drawing. Three rounds of this screen went on finding somewhere
+ * for them to live before the operator pointed out they did not need to. The
+ * numbers are in the table; the picture answers the one question a table
+ * cannot, which is which way round the thing goes.
  *
- * <p>Element 0 is drawn filled and labelled as the forward direction, because
- * the array's zero is what every bearing the radio reports is measured from.
- * The rest run clockwise, matching the workbook and a compass.
+ * <p>Element 0 is filled green at the top and labelled as the forward
+ * direction, because the workbook's own note reads "ANT 0 points to the
+ * forward direction of the array", and every bearing the radio reports is
+ * measured from it. The rest run clockwise, so element n sits at n * (360/N)
+ * degrees and the plan reads as a compass rose.
+ *
+ * <p>Two earlier mistakes worth not repeating. The workbook puts element 0 on
+ * the +x axis, so drawing its coordinates straight put forward out to the
+ * right of a top-down plan while the caption said forward; the drawing is now
+ * turned a quarter turn. And every label was drawn a fixed distance above its
+ * element, which on the left of the ring put it inside the ring; labels are
+ * now placed radially outward, the one direction always clear of the drawing.
  *
  * <p>Deliberately not a chart library. ATAK bundles achartengine and Signal DF
- * will want it for the DoA spectrum, but this is a handful of circles and a
- * line, and it has to stay legible at the size of a pane on a phone.
+ * will want it for the DoA spectrum, but this is a handful of circles and it
+ * has to stay legible at the size of a pane on a phone.
  */
 public class ArrayPlanView extends View {
 
     private static final int COLOR_ELEMENT = Color.rgb(0x00, 0xE5, 0xFF);
     private static final int COLOR_FORWARD = Color.rgb(0x4C, 0xD9, 0x64);
-    private static final int COLOR_RULE = Color.rgb(0xB0, 0xB0, 0xB0);
+    private static final int COLOR_RULE = Color.rgb(0x90, 0x90, 0x90);
     private static final int COLOR_BAD = Color.rgb(0xFF, 0x5B, 0x5B);
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint thin = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint dash = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -62,13 +74,15 @@ public class ArrayPlanView extends View {
     private void init() {
         fill.setStyle(Paint.Style.FILL);
         stroke.setStyle(Paint.Style.STROKE);
-        stroke.setStrokeWidth(dp(2));
+        stroke.setStrokeWidth(dp(2.5f));
+        thin.setStyle(Paint.Style.STROKE);
+        thin.setStrokeWidth(dp(1.5f));
         dash.setStyle(Paint.Style.STROKE);
         dash.setStrokeWidth(dp(1));
         dash.setPathEffect(new android.graphics.DashPathEffect(
                 new float[] { dp(6), dp(5) }, 0));
         text.setColor(Color.WHITE);
-        text.setTextSize(dp(12));
+        text.setTextSize(dp(13));
         text.setTextAlign(Paint.Align.CENTER);
     }
 
@@ -89,24 +103,37 @@ public class ArrayPlanView extends View {
     @Override
     protected void onMeasure(int wSpec, int hSpec) {
         int w = MeasureSpec.getSize(wSpec);
-        // Deliberately short. A square would be prettier and is wrong: on a
-        // phone pane it pushes the verdict and the numbers below the fold, and
-        // the first build of this screen showed only the top of the circle with
-        // element 0 off screen. The plan scales itself to whatever height it
-        // gets, so a short one is a small drawing, not a cropped one.
-        int h = (int) dp(100);
-        setMeasuredDimension(w, h);
+        // Tall enough that the ring is a drawing rather than a postage stamp,
+        // short enough that the verdict underneath it stays above the fold on a
+        // phone. A square would be prettier and is wrong on both counts: the
+        // first build of this screen was 260dp and pushed everything off, the
+        // second was 100dp and crushed the labels into each other.
+        // Capped, because the pane this lives in is a landscape half-screen
+        // whose scrolling viewport is only a few hundred pixels tall: a plan
+        // taller than that can never be seen whole, however far it is
+        // scrolled. 185dp cut elements 2 and 3 off the bottom on an S10.
+        int h = (int) Math.min(w * 0.5f, dp(140));
+        setMeasuredDimension(w, Math.max(h, (int) dp(110)));
+    }
+
+    /** Draw {@code s} centred on a point rather than sitting on a baseline. */
+    private void centred(Canvas c, String s, float x, float y) {
+        c.drawText(s, x, y - (text.ascent() + text.descent()) / 2f, text);
     }
 
     @Override
     protected void onDraw(Canvas c) {
         double[][] p = ArrayCalc.positions(geometry, elements, sizeCm);
+        int elemColor = usable ? COLOR_ELEMENT : COLOR_BAD;
 
-        float pad = dp(22);
+        // Room for a label outside the ring on every side.
+        float pad = dp(24);
         float cx = getWidth() / 2f;
         float cy = getHeight() / 2f;
         float scale;
         float originX, originY;
+        float[] sx = new float[p.length];
+        float[] sy = new float[p.length];
 
         if (geometry == Geometry.CIRCULAR) {
             // Draw in the array's OWN frame: the origin is the center of the
@@ -117,48 +144,63 @@ public class ArrayPlanView extends View {
             scale = (float) (half / Math.max(sizeCm, 0.001));
             originX = cx;
             originY = cy;
+
+            for (int i = 0; i < p.length; i++) {
+                // A quarter turn anticlockwise, then y flipped for the canvas.
+                // The workbook's frame is y-up with element 0 on +x; a canvas
+                // is y-down; and a plan wants forward at the top. Both steps
+                // collapse into this: screen x from -y, screen y from -x.
+                sx[i] = originX - (float) (p[i][1] * scale);
+                sy[i] = originY - (float) (p[i][0] * scale);
+            }
+
             dash.setColor(COLOR_RULE);
             c.drawCircle(originX, originY, (float) sizeCm * scale, dash);
+
+            // An arm to every element, the way the vendor's template is a hub
+            // with arms, and the radius called out on the one furthest from
+            // the spacing figure so the two measurements never share a corner.
+            thin.setColor(COLOR_RULE);
+            for (int i = 0; i < p.length; i++)
+                c.drawLine(originX, originY, sx[i], sy[i], thin);
+            fill.setColor(COLOR_RULE);
+            c.drawCircle(originX, originY, dp(2.5f), fill);
+
         } else {
             // A line: fit its length across the width, and sit it on the middle.
             scale = (float) ((getWidth() - 2 * pad) / Math.max(sizeCm, 0.001));
             originX = cx - (float) sizeCm * scale / 2f;
             originY = cy;
+            for (int i = 0; i < p.length; i++) {
+                sx[i] = originX + (float) (p[i][0] * scale);
+                sy[i] = originY;
+            }
             dash.setColor(COLOR_RULE);
-            c.drawLine(originX, originY, originX + (float) sizeCm * scale, originY, dash);
+            c.drawLine(sx[0], originY, sx[p.length - 1], originY, dash);
         }
+
 
         float r = dp(7);
-        float[] sx = new float[p.length];
-        float[] sy = new float[p.length];
         for (int i = 0; i < p.length; i++) {
-            sx[i] = originX + (float) p[i][0] * scale;
-            // MINUS, not plus. The workbook's coordinates are in a y-up frame
-            // and a canvas is y-down, so adding them mirrors the array: element
-            // 1 rendered above the center, anticlockwise, when the workbook
-            // puts it below and clockwise. The operator spotted it by looking
-            // at the picture, which is the whole argument for drawing one.
-            sy[i] = originY - (float) p[i][1] * scale;
-        }
-
-        // The spacing first, so the elements sit on top of its line.
-        if (p.length >= 2) {
-            stroke.setColor(usable ? COLOR_ELEMENT : COLOR_BAD);
-            c.drawLine(sx[0], sy[0], sx[1], sy[1], stroke);
-            text.setColor(usable ? COLOR_ELEMENT : COLOR_BAD);
-            c.drawText(ShortDistance.fromCm(spacingCm),
-                    (sx[0] + sx[1]) / 2f, (sy[0] + sy[1]) / 2f - dp(7), text);
-        }
-
-        for (int i = 0; i < p.length; i++) {
-            fill.setColor(i == 0 ? COLOR_FORWARD : (usable ? COLOR_ELEMENT : COLOR_BAD));
+            boolean forward = i == 0 && geometry == Geometry.CIRCULAR;
+            fill.setColor(forward ? COLOR_FORWARD : elemColor);
             c.drawCircle(sx[i], sy[i], r, fill);
-            text.setColor(Color.WHITE);
-            c.drawText(String.valueOf(i), sx[i], sy[i] - r - dp(5), text);
-        }
 
-        text.setColor(COLOR_FORWARD);
-        c.drawText("0 = forward", cx, getHeight() - dp(5), text);
+            // Radially outward is the one direction that is always clear of
+            // the ring, the arms and the chord.
+            float ox = sx[i] - originX, oy = sy[i] - originY;
+            float len = (float) Math.hypot(ox, oy);
+            float lx, ly;
+            if (geometry == Geometry.CIRCULAR && len > 1) {
+                lx = sx[i] + ox / len * (r + dp(13));
+                ly = sy[i] + oy / len * (r + dp(13));
+            } else {
+                lx = sx[i];
+                ly = sy[i] - r - dp(11);
+            }
+            text.setColor(forward ? COLOR_FORWARD : Color.WHITE);
+            centred(c, forward ? "0 = forward" : String.valueOf(i), lx, ly);
+        }
     }
 
 }

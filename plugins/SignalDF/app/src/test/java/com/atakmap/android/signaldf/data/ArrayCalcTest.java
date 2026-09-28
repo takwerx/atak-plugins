@@ -301,4 +301,70 @@ public class ArrayCalcTest {
         assertTrue("and should resolve usefully", ArrayCalc.resolutionUsable(r.resolutionDeg));
         assertTrue(r.usable());
     }
+
+    // ---- antenna element length -------------------------------------------
+    // The vendor's rule is a quarter wavelength; these pin the arithmetic at
+    // frequencies where lambda is easy to check by hand.
+
+    @Test
+    public void quarterWaveIsLambdaOverFour() {
+        // 300 MHz is exactly 1 m, so a quarter wave is exactly 25 cm.
+        assertEquals(25.0, ArrayCalc.quarterWaveCm(300.0), 0.01);
+        // 150 MHz is 2 m; 50 cm.
+        assertEquals(50.0, ArrayCalc.quarterWaveCm(150.0), 0.01);
+        // The radio's own default tuning.
+        assertEquals(18.0, ArrayCalc.quarterWaveCm(416.588), 0.05);
+    }
+
+    @Test
+    public void quarterWaveRefusesNonsense() {
+        assertEquals(0.0, ArrayCalc.quarterWaveCm(0.0), 0.0);
+        assertEquals(0.0, ArrayCalc.quarterWaveCm(-5.0), 0.0);
+    }
+
+    // ---- KrakenTenna extension count --------------------------------------
+    // Straight off the published table. Rows overlap, and the contract is the
+    // FEWEST extensions listed at a frequency, so these check the overlaps
+    // rather than only the easy cases.
+
+    @Test
+    public void collapsedWhipCoversUhf() {
+        // 440 - 1050 at 0 extensions, and both edges are inclusive.
+        assertEquals(0, ArrayCalc.krakenTennaExtensions(440.0));
+        assertEquals(0, ArrayCalc.krakenTennaExtensions(1050.0));
+        assertEquals(0, ArrayCalc.krakenTennaExtensions(700.0));
+    }
+
+    @Test
+    public void overlappingRowsPickTheShortestWhip() {
+        // 400 MHz is in row 1 (366-950), row 2 (330-1000) and row 3
+        // (290-420). The shortest whip the vendor calls usable wins.
+        assertEquals(1, ArrayCalc.krakenTennaExtensions(400.0));
+        // 350 is out of row 1 but inside row 2.
+        assertEquals(2, ArrayCalc.krakenTennaExtensions(350.0));
+        // 300 falls in the second band of rows 3, 4 and 5 only.
+        assertEquals(3, ArrayCalc.krakenTennaExtensions(300.0));
+    }
+
+    @Test
+    public void vhfNeedsThreeExtensions() {
+        // 145 - 158 first appears at 3 extensions.
+        assertEquals(3, ArrayCalc.krakenTennaExtensions(155.0));
+        assertEquals(3, ArrayCalc.krakenTennaExtensions(145.0));
+    }
+
+    @Test
+    public void lowVhfNeedsTheLongestWhip() {
+        // 127 - 150 is row 7 alone at the bottom end.
+        assertEquals(7, ArrayCalc.krakenTennaExtensions(128.0));
+    }
+
+    @Test
+    public void frequenciesOffTheTableSaySo() {
+        // Below every row, above every row, and in a gap between the bands.
+        assertEquals(-1, ArrayCalc.krakenTennaExtensions(50.0));
+        assertEquals(-1, ArrayCalc.krakenTennaExtensions(1500.0));
+        assertEquals(-1, ArrayCalc.krakenTennaExtensions(200.0));
+    }
+
 }
