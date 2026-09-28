@@ -26,7 +26,7 @@ import java.util.Locale;
  * nothing.
  *
  * <p>Requests are plaintext {@code http} because that is all the Kraken serves.
- * Its status files are unauthenticated, so nothing secret crosses the wire, but
+ * Its status files are unauthenticated, so nothing private crosses the wire, but
  * this is still a LAN-only design and the pane says so rather than implying a
  * private channel.
  */

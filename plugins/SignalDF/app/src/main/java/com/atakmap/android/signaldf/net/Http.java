@@ -29,7 +29,7 @@ import java.util.concurrent.ThreadFactory;
  *     anything that is not https; this is the mirror image, because the Kraken
  *     serves plaintext only and an https attempt would fail with a TLS error
  *     that reads like a broken radio. The status files are unauthenticated and
- *     nothing secret crosses the wire, but this is a LAN-only design and the
+ *     nothing private crosses the wire, but this is a LAN-only design and the
  *     pane says so rather than implying otherwise.
  * <li><b>Short timeouts.</b> CamDepot waits 10 and 20 seconds. Here the poll
  *     interval is about a second and the host is one hop away, so a request
