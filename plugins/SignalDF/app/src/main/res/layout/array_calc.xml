@@ -38,27 +38,12 @@
                 style="@style/SectionHeading"
                 android:text="Frequency you are hunting" />
 
-            <LinearLayout
+            <Button
+                style="@style/TakwerxButton"
+                android:id="@+id/freq"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/freq"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="416.588 MHz" />
-
-                <Button
-                    style="@style/TakwerxButton"
-                    android:id="@+id/from_radio"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="4dp"
-                    android:text="Radio's frequency" />
-            </LinearLayout>
+                android:text="416.588 MHz" />
 
             <com.atakmap.android.signaldf.ui.ArrayPlanView
                 android:id="@+id/plan"
@@ -110,13 +95,6 @@
                 android:textSize="13sp"
                 android:lineSpacingMultiplier="1.15"
                 android:paddingBottom="8dp" />
-
-            <Button
-                style="@style/TakwerxButton"
-                android:id="@+id/my_array"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="My array is a different size" />
 
             <TextView
                 android:id="@+id/note"

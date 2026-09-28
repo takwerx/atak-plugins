@@ -22,8 +22,6 @@ import com.atakmap.android.signaldf.data.ShortDistance;
 import com.atakmap.android.signaldf.net.KrakenLink;
 import com.atakmap.android.signaldf.plugin.R;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
 /**
@@ -80,8 +78,6 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
     private final View root;
 
     private final Button freqButton;
-    private final Button fromRadioButton;
-    private final Button myArrayButton;
     private final TextView verdict;
     private final TextView layoutSteps;
     private final TextView numbers;
@@ -93,14 +89,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
     private int elements = 5;
     private double freqMHz = 416.588;
 
-    /**
-     * An array the operator already has, in centimeters, or -1 for "work it out
-     * from the frequency". Only the second case is on the main screen; the
-     * first is what <i>My array is a different size</i> sets, and it is the
-     * only state in which a verdict is shown, because a size this screen chose
-     * is always one that works.
-     */
-    private double customCm = -1;
+
 
     public ArrayCalcDropDown(MapView mapView, Context pluginContext) {
         super(mapView);
@@ -108,8 +97,6 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.array_calc, null);
 
         freqButton = root.findViewById(R.id.freq);
-        fromRadioButton = root.findViewById(R.id.from_radio);
-        myArrayButton = root.findViewById(R.id.my_array);
         verdict = root.findViewById(R.id.verdict);
         layoutSteps = root.findViewById(R.id.layout_steps);
         numbers = root.findViewById(R.id.numbers);
@@ -120,34 +107,10 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         freqButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                askNumber("Frequency", "Megahertz. What you are trying to find.",
-                        freqMHz, new OnNumber() {
-                            @Override
-                            public void got(double value) {
-                                if (value <= 0) {
-                                    toast("a frequency has to be above zero");
-                                    return;
-                                }
-                                freqMHz = value;
-                                refresh();
-                            }
-                        });
+                askFrequency();
             }
         });
 
-        fromRadioButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                fromRadio();
-            }
-        });
-
-        myArrayButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                myArray();
-            }
-        });
 
         root.findViewById(R.id.close).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -171,6 +134,70 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         // about the operator's own array rather than a default.
         fromRadioIfConnected();
         refresh();
+    }
+
+    /**
+     * The one control on this screen. Type a frequency, or take the radio's.
+     *
+     * <p>Taking the radio's used to be a button of its own beside this one,
+     * labeled "From radio" and then "Radio's frequency", and the operator
+     * asked what it meant three times. Two words cannot carry it, and the
+     * screen is supposed to have one input. So it lives in here, where there
+     * is room to say what it gives you AND to show the number, which settles
+     * the question completely: a button reading "Use 416.5880 MHz from the
+     * radio" needs no explaining.
+     */
+    private void askFrequency() {
+        final EditText input = new EditText(getMapView().getContext());
+        input.setInputType(InputType.TYPE_CLASS_NUMBER
+                | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setSingleLine(true);
+        input.setText(String.format(Locale.US, "%.4f", freqMHz));
+
+        AlertDialog.Builder b = new AlertDialog.Builder(getMapView().getContext())
+                .setTitle("Frequency you are hunting")
+                .setMessage("Megahertz.")
+                .setView(input)
+                .setPositiveButton("Set", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        try {
+                            double value = Double.parseDouble(
+                                    input.getText().toString().trim());
+                            if (value <= 0) {
+                                toast("a frequency has to be above zero");
+                                return;
+                            }
+                            freqMHz = value;
+                            refresh();
+                        } catch (NumberFormatException e) {
+                            toast("that is not a number");
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null);
+
+        final Double tuned = radioFrequency();
+        if (tuned != null)
+            b.setNeutralButton(String.format(Locale.US,
+                    "Use %.4f MHz from the radio", tuned),
+                    new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface d, int which) {
+                            freqMHz = tuned;
+                            refresh();
+                        }
+                    });
+        b.show();
+    }
+
+    /** What the Kraken is tuned to, or null when no radio is answering. */
+    private Double radioFrequency() {
+        KrakenLink link = KrakenLink.get();
+        if (link == null || link.latest() == null || link.latest().isEmpty())
+            return null;
+        double f = link.latest().get(0).frequencyMHz();
+        return f > 0 && !Double.isNaN(f) ? Double.valueOf(f) : null;
     }
 
     /**
@@ -214,76 +241,6 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
         return true;
     }
 
-    private void pickGeometry() {
-        final String[] names = {
-                "Circular (UCA) -- elements on a circle",
-                "Linear (ULA) -- elements in a line"
-        };
-        // No Spinner, ever, and on the MapView context.
-        new AlertDialog.Builder(getMapView().getContext())
-                .setTitle("Array shape")
-                .setSingleChoiceItems(names, geometry == Geometry.CIRCULAR ? 0 : 1,
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface d, int which) {
-                                geometry = which == 0 ? Geometry.CIRCULAR : Geometry.LINEAR;
-                                d.dismiss();
-                                refresh();
-                            }
-                        })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void pickElements() {
-        final int[] counts = { 3, 4, 5 };
-        final String[] names = { "3 elements", "4 elements", "5 elements (KrakenSDR)" };
-        int current = 2;
-        for (int i = 0; i < counts.length; i++)
-            if (counts[i] == elements)
-                current = i;
-        new AlertDialog.Builder(getMapView().getContext())
-                .setTitle("How many elements")
-                .setSingleChoiceItems(names, current, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        elements = counts[which];
-                        d.dismiss();
-                        refresh();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private interface OnNumber {
-        void got(double value);
-    }
-
-    private void askNumber(String title, String message, double current, final OnNumber cb) {
-        final EditText input = new EditText(getMapView().getContext());
-        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        input.setSingleLine(true);
-        input.setText(String.format(Locale.US, "%.3f", current).replaceAll("0+$", "")
-                .replaceAll("\\.$", ""));
-        new AlertDialog.Builder(getMapView().getContext())
-                .setTitle(title)
-                .setMessage(message)
-                .setView(input)
-                .setPositiveButton("Set", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        try {
-                            cb.got(Double.parseDouble(input.getText().toString().trim()));
-                        } catch (NumberFormatException e) {
-                            toast("that is not a number");
-                        }
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
     private void toast(String s) {
         Toast.makeText(getMapView().getContext(), s, Toast.LENGTH_LONG).show();
     }
@@ -301,8 +258,6 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
      * have to choose it.
      */
     private double sizeCm() {
-        if (customCm > 0)
-            return customCm;
         if (geometry == Geometry.CIRCULAR) {
             double hole = ArrayCalc.templateRadiusCm(elements, freqMHz);
             if (hole > 0)
@@ -312,101 +267,16 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
                 RECOMMENDED_MULTIPLIER).sizeCm;
     }
 
-    /**
-     * The pocket for somebody whose array is already built: shape, element
-     * count and size, plus the way back. Everything in here was on the main
-     * screen once and each of it raised a question the operator should not
-     * have had to ask.
-     */
-    private void myArray() {
-        final boolean custom = customCm > 0;
-        final List<String> rows = new ArrayList<>();
-        final List<Integer> what = new ArrayList<>();
-        rows.add("Shape: " + (geometry == Geometry.CIRCULAR
-                ? "circle" : "straight line"));
-        what.add(0);
-        rows.add("Antennas: " + elements);
-        what.add(1);
-        rows.add((geometry == Geometry.CIRCULAR
-                ? "Radius: " : "End to end: ") + ShortDistance.fromCm(sizeCm()));
-        what.add(2);
-        if (custom) {
-            rows.add("Forget it and size it for me again");
-            what.add(3);
-        }
-        new AlertDialog.Builder(getMapView().getContext())
-                .setTitle("The array you already have")
-                .setItems(rows.toArray(new String[0]),
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface d, int which) {
-                                switch (what.get(which)) {
-                                    case 0:
-                                        pickGeometry();
-                                        break;
-                                    case 1:
-                                        pickElements();
-                                        break;
-                                    case 2:
-                                        askSize();
-                                        break;
-                                    default:
-                                        customCm = -1;
-                                        refresh();
-                                }
-                            }
-                        })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void askSize() {
-        askNumber(geometry == Geometry.CIRCULAR ? "Array radius" : "Array length",
-                (geometry == Geometry.CIRCULAR
-                        ? "Center of the array to any antenna, in "
-                        : "First antenna to last, in ")
-                        + (ShortDistance.imperial() ? "inches." : "centimeters."),
-                ShortDistance.valueFromCm(sizeCm()), new OnNumber() {
-                    @Override
-                    public void got(double value) {
-                        if (value <= 0) {
-                            toast("a size has to be above zero");
-                            return;
-                        }
-                        // Typed in the operator's unit, kept in cm.
-                        customCm = ShortDistance.toCm(value);
-                        refresh();
-                    }
-                });
-    }
-
     private void refresh() {
         final double size = sizeCm();
         final Result r = ArrayCalc.atSize(geometry, freqMHz, elements, size);
-        final boolean custom = customCm > 0;
 
         freqButton.setText(String.format(Locale.US, "%.4f MHz", freqMHz));
-        myArrayButton.setText(custom
-                ? "My array: " + ShortDistance.fromCm(size)
-                        + (geometry == Geometry.CIRCULAR ? " radius" : " long")
-                : "My array is a different size");
 
         plan.set(geometry, elements, size, r.spacingCm, r.usable());
 
-        // A verdict only means something about an array the operator brought.
-        // One this screen sized is always one that works, and saying so every
-        // time trains people to stop reading it.
-        if (!custom) {
-            verdict.setVisibility(View.GONE);
-        } else {
-            verdict.setVisibility(View.VISIBLE);
-            verdict.setText(r.usable()
-                    ? "This array works at this frequency." : r.problem());
-            verdict.setTextColor(pluginContext.getResources().getColor(
-                    r.usable() ? R.color.on_green : R.color.off_red));
-        }
-
-        layoutSteps.setText(layoutText(r, size, custom));
+        verdict.setVisibility(View.GONE);
+        layoutSteps.setText(layoutText(r, size));
         antenna.setText(antennaText());
 
         // What it buys, in the order somebody cares: how tight a bearing will
@@ -429,7 +299,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
     }
 
     /** The instructions, naming every jig so nobody has to pick one first. */
-    private String layoutText(Result r, double size, boolean custom) {
+    private String layoutText(Result r, double size) {
         StringBuilder n = new StringBuilder();
         if (geometry != Geometry.CIRCULAR) {
             n.append(String.format(Locale.US,
@@ -454,7 +324,7 @@ public class ArrayCalcDropDown extends DropDownReceiver implements OnStateListen
                 elements, 360.0 / elements, rest));
 
         n.append("\nUse whichever you have:\n");
-        int hole = custom ? -1 : ArrayCalc.templateHoleNumber(elements, freqMHz);
+        int hole = ArrayCalc.templateHoleNumber(elements, freqMHz);
         if (hole > 0)
             n.append("  KrakenRF paper arms -- the ")
                     .append(ArrayCalc.ordinal(hole))
