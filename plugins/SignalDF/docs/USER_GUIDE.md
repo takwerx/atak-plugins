@@ -2,15 +2,16 @@
 
 Signal DF puts direction-finding bearings from a KrakenSDR onto the ATAK map.
 
-**This guide covers version 0.1**, which does one thing: connects to the radio
-and draws one bearing. The fix, the power lobe and sharing between operators
-come later.
+**This guide covers version 0.2**, which does the whole hunt: connects to the
+radio, draws bearings, collects them while you drive, crosses them to work out
+where the transmitter is, and tells you where to drive next to sharpen the
+answer.
 
-**Download Signal DF 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Signal DF 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- [ATAK-CIV 5.6](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.6.0-civ-release.apk)
-- [ATAK-CIV 5.7](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.7.0-civ-release.apk)
-- [ATAK-CIV 5.8](https://github.com/takwerx/signal-df/releases/download/v0.1/ATAK-Plugin-SignalDF-0.1--5.8.0-civ-release.apk)
+- [ATAK-CIV 5.6](https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.6.0-civ-release.apk)
+- [ATAK-CIV 5.7](https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.7.0-civ-release.apk)
+- [ATAK-CIV 5.8](https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.8.0-civ-release.apk)
 
 All releases: https://github.com/takwerx/signal-df/releases
 
@@ -218,7 +219,7 @@ so a dead receiver cannot masquerade as a live one.
 
 ---
 
-## Part 3 — Array heading, and why it is in orange
+## Part 3 — Heading source, and why it comes first
 
 This is the most important thing in the plugin, so read this bit.
 
@@ -230,21 +231,61 @@ way the array is pointing.
 Worse: the radio reports a heading of `0` both when the array genuinely faces
 true north **and when it has no idea.** Those are identical on the wire.
 
-So Signal DF never shows you a bearing without telling you what it is claiming:
+So there is one control, **Heading source**, with three answers:
 
-| What the pane says | What it means |
+| Choice | Use it when |
 |---|---|
-| `Array heading: 142 deg, you set it` | you told it, and bearings are to true north |
-| `Array heading: 142 deg, from the radio` | the radio reported a real heading |
-| `the radio says 0 deg, which is also what it says when it has none — set one to be sure` | ambiguous; treat with suspicion |
-| `unknown — bearings are relative to the antenna, not to north` | nothing knows |
+| **GPS track** | the array is on a vehicle with antenna 0 pointing forward — the normal case. ATAK supplies the heading from your own GPS as you drive. |
+| **Manual** | a fixed installation. Stand at the array once with a compass, measure which way antenna 0 points, type it, never touch it again. |
+| **Radio** | only if you have fitted a USB GPS to the Pi, or typed a fixed offset into the KrakenSDR's own web page. The KrakenSDR has no GPS of its own. |
 
-When the heading is unknown, every bearing is labelled **`rel`** — on the map
-and in the list — because a number of degrees on a north-up map otherwise reads
-as a bearing to north when it is not.
+These are the same choices KrakenRF's own app calls Bearing Mode, so if you have
+used that, you already know this question.
 
-**Set heading** — type the direction the array's zero is pointing, in degrees
-true. **Use radio** — clear yours and go back to whatever the radio says.
+**GPS track only works while you are moving.** A parked vehicle has no course —
+successive GPS fixes differ by less than their own error, so the direction
+between them is noise. Signal DF uses ATAK's own rule here: it needs about five
+miles an hour, and it holds your last good heading for five minutes after you
+stop, so a traffic light or a gate does not lose it. The button tells you which
+it is doing:
+
+- `Heading source: GPS track, 142 deg` — measured, you are moving
+- `Heading source: GPS track, 142 deg, held 3 min` — remembered; if you have
+  turned the truck round since, do not trust it
+- `Heading source: GPS track, no track until moving` — nothing yet, drive
+
+**With no heading, nothing is drawn on the map.** Not a faint line, not a line
+labeled "approximate" — nothing. A line on a map is a claim about a direction
+on the earth, and without a heading that claim would be wrong by however far
+your array happens to be turned: point the truck south and every line would
+point at the exact opposite of the transmitter. The bearings still appear in the
+list, because a direction relative to your antenna is real information, and the
+pane tells you what is missing and how to fix it.
+
+---
+
+## Part 3b — Sizing the array
+
+**Antenna array sizing** answers one question: given the frequency you are
+hunting, how do I set the antennas up.
+
+Type the frequency — or take it from the radio, which the button offers with the
+number already on it — and it tells you the rest:
+
+- **How far out from the center** each antenna goes, named three ways so you can
+  use whichever you have: which hole on KrakenRF's printed paper arms, counted
+  out from the middle; which position on the community 3D-printed template; or
+  the plain measurement if you have a tape.
+- **How long to extend each whip** — a quarter of a wavelength, which is
+  KrakenRF's own rule — and how many sections that is on a KrakenTenna.
+- **How good the result will be**: roughly how many degrees of resolution, and
+  what frequency range the same array covers so you know whether a retune means
+  rebuilding.
+
+The picture shows which way round the array goes: antenna 0 points the way the
+vehicle faces, then 1, 2, 3, 4 clockwise. It carries no measurements on purpose
+— every arm is the same length and they are always 360/N apart, so the numbers
+belong in the text and the picture answers the one thing text cannot.
 
 ---
 
@@ -253,7 +294,7 @@ true. **Use radio** — clear yours and go back to whatever the radio says.
 Each active VFO gets a row: the frequency, the bearing, and how good it is.
 
 - **The big number** is the bearing. `rel` after it means it is relative to the
-  antenna, not to north.
+  antenna, not to north — which also means it is not on the map.
 - **Confidence** is the radio's own figure. Low confidence with a bearing that
   jumps around usually means there is nothing to hear — or no antennas on it.
 - **Power** in dB. `(at the floor)` means the radio clamped the value and it is
@@ -264,12 +305,120 @@ Each active VFO gets a row: the frequency, the bearing, and how good it is.
 On the map, one line per VFO runs from the receiver out along the bearing,
 clamped to the ground so it does not disappear behind terrain. The line's length
 follows your map scale — it shows a *direction*, not a distance, and a fixed
-length would imply we know how far away the transmitter is. We do not. That is
-what the fix is for, in a later version.
+length would imply we know how far away the transmitter is. Working that out is
+what Part 4b is for.
+
+**Weak bearings are drawn faint.** If the radio's confidence in a bearing is
+below the threshold, the line is still drawn — thin and dim, labeled `weak` —
+because hiding it would leave you staring at an empty map while the radio is
+plainly hearing something. What a weak bearing does not do is feed the fix or go
+out to your team. Those are products, and a product built on data you would not
+show at full brightness is not one to hand to somebody else.
 
 **When bearings go stale the lines turn grey**, the numbers turn red, and the
 pane tells you how long it has been. A two-minute-old bearing draws exactly the
 same line as a live one, so it has to say so.
+
+---
+
+## Part 4b — Finding the transmitter
+
+One bearing is a line, not a place. Five people standing in different spots all
+pointing at the same church steeple give you five lines that cross at the
+steeple — and that crossing point is the answer. Driving is how you get the
+different spots.
+
+**Turn COLLECTING ON and drive.** That is the whole procedure.
+
+A bearing is kept every 50 m of movement. Sitting still adds nothing: a hundred
+bearings from one parking space have no crossing angle between them and would
+only outvote the handful taken from everywhere else. After about 100 m of
+driving you have three, which is enough for a first answer.
+
+### What appears on the map
+
+| What you see | What it is |
+|---|---|
+| **A faint cyan fan** | every bearing you have collected, fading with age. Where they pile up is the transmitter. |
+| **A magenta dot** with the frequency on it | the fix — where the maths says the transmitter is |
+| **A magenta outline** around it | the 95% error area. Long and thin means you know the direction well and the distance badly. |
+| **A yellow line** | everywhere you have collected from — your coverage, and by its absence, where you have not been |
+| **An orange dot** | **Drive here.** Where to go next to sharpen the fix. |
+
+### Reading the fan
+
+This is the part worth learning, because it is the only thing that can catch a
+bad bearing.
+
+Radio bounces. A signal reflects off a hillside, a metal barn, a water tower,
+and your antennas hear the reflection instead of the transmitter. The radio
+cannot tell the difference — it honestly reports the direction the energy
+arrived from, which is the direction of the bounce. This is called multipath
+and it is the single biggest source of wrong answers in direction finding.
+
+On the fan, a bad bearing is **the one line that misses the crowd.** Everything
+else converges; that one goes off on its own. Usually you will know why —
+"that was right as I passed the substation" — and then you know to distrust
+readings from there, and to **Clear** and start again if you took a lot of them.
+
+The error area can only tell you the bearings disagree. The fan tells you which
+one, and where you were standing.
+
+### Drive here, and when to stop using it
+
+While your bearings all run nearly parallel, the fix is a long thin sliver:
+the direction is pinned and the distance along it is not. More bearings from
+the same road will not fix that. Driving **across** them will.
+
+That is what the orange dot is. It sits perpendicular to your bearings, at a
+distance scaled to how uncertain the fix currently is, and **it stays where it
+is** until you get there. You can Bloodhound to it, and it will not move while
+you drive, which is the whole point.
+
+When the geometry comes good the orange dot disappears and the pane says:
+
+> Geometry is good. The fix marker is the place to go.
+
+That is the handover. The orange dot is a tactic; the magenta dot is the
+destination. From then on, Bloodhound the fix.
+
+### What the pane tells you
+
+> Collecting. 47 bearings, each from a different place. Fix within 1.2 mi.
+> Poor crossing angle — your bearings only span 6 degrees. Drive across them,
+> toward 073 or 253, to tighten this.
+> 18 dropped: 18 with the front end saturated — turn the radio's gain down.
+
+"Fix within" is the **worst case** — the long axis of the error area, not an
+average. If it says 200 ft, the transmitter is within 200 ft.
+
+The dropped count matters. A filter that quietly eats data looks exactly like a
+radio that has stopped working, so it says what it threw away and, where there
+is one, what to do about it.
+
+**Clear** throws everything away and starts a new search. Turning COLLECTING off
+keeps what you have.
+
+---
+
+## Part 4c — Sharing with your team
+
+Off by default. Nothing leaves your phone until you turn it on.
+
+Pick a **Feed** — that is a TAK Server Data Sync feed, and everyone subscribed
+to it will see your bearings. Set a **Stale time**, then **TRANSMIT ON**.
+
+What goes out is an ordinary CoT line, so a teammate without this plugin still
+sees something on their map rather than nothing. It carries the frequency, the
+bearing, how the heading was known, and the caveat below. It expires by itself
+at the stale time.
+
+**Nothing is stored in the feed.** Bearings age off other people's maps on their
+own and leave nothing behind. This is live data, not a product.
+
+Bearings are only transmitted when the heading is known and the quality gate
+passes — the same rules that govern your own map. What your team sees is never
+better than what you see.
 
 ---
 
@@ -327,16 +476,31 @@ later.
 
 ---
 
-## What 0.1 does not do yet
+## What 0.2 does not do yet
 
-Said plainly, so nothing here is a surprise:
+Said plainly, so nothing here is a surprise.
 
-- **No fix.** It draws bearings; it does not yet compute where the transmitter
-  is, or how sure it is.
-- **No power lobe.** The single line hides the ambiguity in a bearing.
-- **Nothing is shared.** Everything stays on your phone. Bearings do not go to
-  the server or to other ATAK users.
-- **No WebSocket.** Signal DF polls about once a second, which is plenty.
+**The bearing direction has not been validated against a known transmitter.**
+This is the important one. Which way round the radio writes its bearings was
+read out of its own source and cross-checked against another implementation,
+but nobody has yet put a transmitter at a measured angle and confirmed the line
+points at it. Every fix and every shared bearing carries that caveat in its
+remarks. Use it to hunt; do not treat a bearing as surveyed.
+
+**No heatmap.** The fix crosses your bearings into a single point. That is the
+right answer for one transmitter and the wrong one for two on the same
+frequency — it will report a confident position somewhere between them. A grid
+heatmap would show two hot spots instead; it is not built. Until it is, the fan
+is what shows you: two clusters of crossings instead of one.
+
+**No power lobe.** The single line hides how sharp or vague each individual
+bearing was.
+
+**No receiving.** You can send your bearings to a team; you cannot yet fold
+*their* bearings into your fix. Two vehicles on opposite sides of a valley is
+the geometry that actually solves a search, and it is the next big thing.
+
+**No WebSocket.** Signal DF polls about once a second, which is plenty.
 
 ---
 
