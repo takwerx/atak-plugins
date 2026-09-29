@@ -60,7 +60,12 @@ public final class FireZoneOverlay {
     /** The warnings are asked for again this often while the layer is on. */
     private static final long ALERTS_POLL_MS = 10 * 60 * 1000L;
     private static final int FILL_ALPHA = 0x59;
-    private static final int PLAIN = 0xE6FFFFFF;
+    /**
+     * Orange, not white: white outlines read poorly over the satellite map
+     * (operator, 2026-09-29: "drawing the boundaries in white is not good can they
+     * be orange?"). Starred stays yellow and heavier so it still stands apart.
+     */
+    private static final int PLAIN = 0xFFFF8C1A;
     private static final int STARRED = 0xFFFFD84D;
 
     /** The key: what each look on the map means. */
@@ -372,7 +377,7 @@ public final class FireZoneOverlay {
                     } else if (starred.contains(z.id)) {
                         style = AtmosphereFeatures.area(STARRED, 3.5f, 0x00000000);
                     } else {
-                        style = AtmosphereFeatures.area(PLAIN, 1.5f, 0x00000000);
+                        style = AtmosphereFeatures.area(PLAIN, 2f, 0x00000000);
                     }
                     drawn.add(new AtmosphereFeatures.Drawn(NAME,
                             ugc + " " + z.name, g, style, attributes(z, st)));
