@@ -3159,87 +3159,87 @@ public final class AtmospherePane {
      */
     private void allLayers(boolean on) {
         int blocked = 0;
-        if (radar != null && on == allowed(RadarOverlay.LAYER_ID))
+        if (radar != null && (!on || allowed(RadarOverlay.LAYER_ID)))
             radar.setOn(on);
         else if (radar != null && on)
             blocked++;
-        if (wind != null && on == allowed(WindOverlay.LAYER_ID))
+        if (wind != null && (!on || allowed(WindOverlay.LAYER_ID)))
             wind.setOn(on);
         else if (wind != null && on)
             blocked++;
-        if (waves != null && on == allowed(WaveOverlay.LAYER_ID))
+        if (waves != null && (!on || allowed(WaveOverlay.LAYER_ID)))
             waves.setOn(on);
         else if (waves != null && on)
             blocked++;
-        if (rain != null && on == allowed(RainOverlay.LAYER_ID))
+        if (rain != null && (!on || allowed(RainOverlay.LAYER_ID)))
             rain.setOn(on);
         else if (rain != null && on)
             blocked++;
-        if (smoke != null && on == allowed(SmokeOverlay.LAYER_ID))
+        if (smoke != null && (!on || allowed(SmokeOverlay.LAYER_ID)))
             smoke.setOn(on);
         else if (smoke != null && on)
             blocked++;
-        if (air != null && on == allowed(AirQualityOverlay.LAYER_ID))
+        if (air != null && (!on || allowed(AirQualityOverlay.LAYER_ID)))
             air.setOn(on);
         else if (air != null && on)
             blocked++;
-        if (spotLayer != null && on == allowed(SpotOverlay.LAYER_ID))
+        if (spotLayer != null && (!on || allowed(SpotOverlay.LAYER_ID)))
             spotLayer.setOn(on);
         else if (spotLayer != null && on)
             blocked++;
-        if (tropical != null && on == allowed(TropicalOverlay.LAYER_ID))
+        if (tropical != null && (!on || allowed(TropicalOverlay.LAYER_ID)))
             tropical.setOn(on);
         else if (tropical != null && on)
             blocked++;
-        if (snotel != null && on == allowed(SnotelOverlay.LAYER_ID))
+        if (snotel != null && (!on || allowed(SnotelOverlay.LAYER_ID)))
             snotel.setOn(on);
         else if (snotel != null && on)
             blocked++;
-        if (highflow != null && on == allowed(HighFlowOverlay.LAYER_ID))
+        if (highflow != null && (!on || allowed(HighFlowOverlay.LAYER_ID)))
             highflow.setOn(on);
         else if (highflow != null && on)
             blocked++;
-        if (floodground != null && on == allowed(FloodedGroundOverlay.LAYER_ID))
+        if (floodground != null && (!on || allowed(FloodedGroundOverlay.LAYER_ID)))
             floodground.setOn(on);
         else if (floodground != null && on)
             blocked++;
-        if (satellite != null && on == allowed(SatelliteOverlay.LAYER_ID))
+        if (satellite != null && (!on || allowed(SatelliteOverlay.LAYER_ID)))
             satellite.setOn(on);
         else if (satellite != null && on)
             blocked++;
-        if (snow != null && on == allowed(SnowOverlay.LAYER_ID))
+        if (snow != null && (!on || allowed(SnowOverlay.LAYER_ID)))
             snow.setOn(on);
         else if (snow != null && on)
             blocked++;
-        if (sst != null && on == allowed(SstOverlay.LAYER_ID))
+        if (sst != null && (!on || allowed(SstOverlay.LAYER_ID)))
             sst.setOn(on);
         else if (sst != null && on)
             blocked++;
-        if (beach != null && on == allowed(BeachOverlay.LAYER_ID))
+        if (beach != null && (!on || allowed(BeachOverlay.LAYER_ID)))
             beach.setOn(on);
         else if (beach != null && on)
             blocked++;
-        if (flood != null && on == allowed(FloodOutlookOverlay.LAYER_ID))
+        if (flood != null && (!on || allowed(FloodOutlookOverlay.LAYER_ID)))
             flood.setOn(on);
         else if (flood != null && on)
             blocked++;
-        if (firewx != null && on == allowed(FireWxOutlookOverlay.LAYER_ID))
+        if (firewx != null && (!on || allowed(FireWxOutlookOverlay.LAYER_ID)))
             firewx.setOn(on);
         else if (firewx != null && on)
             blocked++;
-        if (avalanche != null && on == allowed(AvalancheOverlay.LAYER_ID))
+        if (avalanche != null && (!on || allowed(AvalancheOverlay.LAYER_ID)))
             avalanche.setOn(on);
         else if (avalanche != null && on)
             blocked++;
-        if (stationLayer != null && on == allowed(StationOverlay.LAYER_ID))
+        if (stationLayer != null && (!on || allowed(StationOverlay.LAYER_ID)))
             stationLayer.setOn(on);
         else if (stationLayer != null && on)
             blocked++;
-        if (gaugeLayer != null && on == allowed(GaugeOverlay.LAYER_ID))
+        if (gaugeLayer != null && (!on || allowed(GaugeOverlay.LAYER_ID)))
             gaugeLayer.setOn(on);
         else if (gaugeLayer != null && on)
             blocked++;
-        if (buoyLayer != null && on == allowed(BuoyOverlay.LAYER_ID))
+        if (buoyLayer != null && (!on || allowed(BuoyOverlay.LAYER_ID)))
             buoyLayer.setOn(on);
         else if (buoyLayer != null && on)
             blocked++;
