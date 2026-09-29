@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fire zones: the NWS fire weather planning forecast for one zone, as the office
+     wrote it. The zone the pane is reading, a search by number or name, the starred
+     zones; a row opens the zone's forecast. Read the way the spot forecasts are. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fadeScrollbars="false"
+    android:focusableInTouchMode="true"
+    android:descendantFocusability="beforeDescendants">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/heading_zones"
+            android:textSize="10sp"
+            android:textAllCaps="true"
+            android:paddingTop="8dp"
+            android:alpha="0.6" />
+
+        <!-- Before the operator has allowed it: what it is and one button. -->
+        <LinearLayout
+            android:id="@+id/zones_gate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:text="@string/zones_gate_text" />
+
+            <Button
+                android:id="@+id/zones_load"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/zones_load" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/zones_browse"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- The zone the pane's point is in. -->
+            <TextView
+                android:id="@+id/zones_here_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/heading_zones_here"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <TextView
+                android:id="@+id/zones_here_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:text="" />
+
+            <LinearLayout
+                android:id="@+id/zones_here_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <!-- By number or name. flagNoExtractUi keeps a landscape Samsung keyboard
+                 from replacing the pane with a full-screen editor (see page_spot). -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/heading_zones_find"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <LinearLayout
+                android:id="@+id/zones_search_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+
+                <EditText
+                    android:id="@+id/zones_search"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:hint="@string/zones_search_hint"
+                    android:inputType="text|textNoSuggestions"
+                    android:imeOptions="actionSearch|flagNoExtractUi"
+                    android:maxLines="1"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/zones_search_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:minWidth="64dp"
+                    android:gravity="center"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    android:text="" />
+
+                <Button
+                    android:id="@+id/zones_search_clear"
+                    style="@style/TakwerxButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="@string/clear" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/zones_found_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:text="@string/zones_search_help" />
+
+            <LinearLayout
+                android:id="@+id/zones_found_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/heading_zones_starred"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <TextView
+                android:id="@+id/zones_starred_none"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:text="@string/zones_starred_none" />
+
+            <LinearLayout
+                android:id="@+id/zones_starred_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <!-- One zone: its forecast as the office wrote it. -->
+        <LinearLayout
+            android:id="@+id/zones_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/zones_back"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="4dp"
+                    android:text="@string/back" />
+
+                <Button
+                    android:id="@+id/zones_goto"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="4dp"
+                    android:text="@string/go_to" />
+
+                <Button
+                    android:id="@+id/zones_star"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/zones_detail_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/white"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/zones_detail_facts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:lineSpacingExtra="2dp"
+                android:text="" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/heading_zones_forecast"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <!-- As written: the eastern offices' tables are 74 columns wide, so it
+                 scrolls sideways in a half-width pane rather than wrapping a row. -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:id="@+id/zones_detail_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/white"
+                    android:textSize="12sp"
+                    android:typeface="monospace"
+                    android:textIsSelectable="true"
+                    android:text="" />
+            </HorizontalScrollView>
+
+            <!-- The office's headlines and discussion cover every zone it forecasts;
+                 folded closed under the zone's own part. -->
+            <Button
+                android:id="@+id/zones_discussion_toggle"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/zones_show_discussion"
+                android:visibility="gone" />
+
+            <HorizontalScrollView
+                android:id="@+id/zones_discussion_scroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/zones_discussion_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/white"
+                    android:textSize="12sp"
+                    android:typeface="monospace"
+                    android:textIsSelectable="true"
+                    android:text="" />
+            </HorizontalScrollView>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/zones_attribution"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:layout_marginTop="@dimen/auto_margin"
+            android:text="@string/credit_zones" />
+    </LinearLayout>
+</ScrollView>

@@ -166,10 +166,12 @@ public final class AtmospherePane {
     private final ImageButton pagePrev, pageNext;
     private final Button pagePick;
     private static final int[] TAB_NAMES = { R.string.tab_forecast, R.string.tab_layers,
-            R.string.tab_spots, R.string.tab_stations, R.string.tab_gauges, R.string.tab_buoys };
+            R.string.tab_spots, R.string.tab_zones, R.string.tab_stations, R.string.tab_gauges, R.string.tab_buoys };
     private final View[] pages;
     /** Page 3, its own class; the pane only hosts it. */
     private final SpotPage spotPage;
+    /** Fire weather zones and their planning forecast, beside the spot forecasts. */
+    private final FireZonePage zonePage;
     private final Button refreshButton;
     private final Button settingsButton;
     private final TextView positionText;
@@ -447,6 +449,17 @@ public final class AtmospherePane {
                         return units;
                     }
                 });
+        zonePage = new FireZonePage(pluginContext, mapView(), egress, new FireZonePage.Host() {
+            @Override
+            public GeoPoint point() {
+                return AtmospherePane.this.point();
+            }
+
+            @Override
+            public String pointLabel() {
+                return modeLabel();
+            }
+        });
         stationPage = new StationPage(pluginContext, mapView(), new StationPage.Host() {
             @Override
             public UnitSystem units() {
@@ -479,6 +492,7 @@ public final class AtmospherePane {
                 inflater.inflate(R.layout.page_forecast, null),
                 inflater.inflate(R.layout.page_layers, null),
                 spotPage.view(),
+                zonePage.view(),
                 stationPage.view(),
                 gaugePage.view(),
                 buoyPage.view()
@@ -1084,6 +1098,8 @@ public final class AtmospherePane {
             sst.refresh(false);
         if (pages[pager.getCurrentItem()] == spotPage.view())
             spotPage.onShown();
+        if (pages[pager.getCurrentItem()] == zonePage.view())
+            zonePage.onShown();
         updateLayerControls();
     }
 
@@ -1135,6 +1151,8 @@ public final class AtmospherePane {
                 updatePageDots(position);
                 if (pages[position] == spotPage.view())
                     spotPage.onShown();
+                if (pages[position] == zonePage.view())
+                    zonePage.onShown();
                 // A list page re-reads its layer when it comes into view: the tile
                 // counts are otherwise as old as the last redraw, and the operator
                 // saw "Red Flag (1)" over a list of two (2026-09-26).
@@ -5006,6 +5024,7 @@ public final class AtmospherePane {
     public void dispose() {
         onClosed();
         spotPage.dispose();
+        zonePage.dispose();
     }
 
     private void loadSelectedSource(SharedPreferences prefs) {
@@ -5187,12 +5206,21 @@ public final class AtmospherePane {
             updateAirReading();
     }
 
-    /** Map center follows the map: the Here lines read again once a move settles. */
+    /**
+     * Map center follows the map: the Here lines read again once a move settles, and
+     * so does the fire zone, which otherwise only heard of a new point when the
+     * forecast was refreshed (operator, 2026-09-28: "if i move the map the fire
+     * weather zone [does not update]"). A move within the same half-degree cell is
+     * answered from what the page already holds.
+     */
     private final Runnable centerSettled = new Runnable() {
         @Override
         public void run() {
-            if (mode == PointMode.CENTER)
-                updateHereLines();
+            if (mode != PointMode.CENTER)
+                return;
+            updateHereLines();
+            if (zonePage != null && pager != null)
+                zonePage.pointChanged(pages[pager.getCurrentItem()] == zonePage.view());
         }
     };
 
@@ -5340,6 +5368,9 @@ public final class AtmospherePane {
     }
 
     private void refresh(boolean force) {
+        // The fire zones page follows the same point, whatever the forecast does.
+        if (zonePage != null && pager != null)
+            zonePage.pointChanged(pages[pager.getCurrentItem()] == zonePage.view());
         if (selected == null) {
             statusText.setText(R.string.no_sources);
             return;

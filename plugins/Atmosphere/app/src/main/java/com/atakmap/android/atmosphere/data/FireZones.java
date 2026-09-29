@@ -3,6 +3,8 @@ package com.atakmap.android.atmosphere.data;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +50,100 @@ public final class FireZones {
                 + "&geometry=" + trim(lon) + "," + trim(lat);
     }
 
+    /** The side of a lookup cell, degrees. */
+    private static final double CELL = 0.5;
+
+    /**
+     * Every zone touching the half-degree cell a point is in: which cell, never the
+     * point. The zone the point stands in is then found on the phone. Around Los
+     * Angeles a cell is 12 zones and 15 KB (2026-09-28).
+     */
+    public static String cellUrl(double lat, double lon) {
+        final double s = Math.floor(lat / CELL) * CELL, w = Math.floor(lon / CELL) * CELL;
+        return LAYER + "/query?f=json&returnGeometry=true&outSR=4326"
+                + "&maxAllowableOffset=0.002"
+                + "&outFields=state_zone,cwa,name"
+                + "&geometryType=esriGeometryEnvelope&inSR=4326"
+                + "&spatialRel=esriSpatialRelIntersects"
+                + "&geometry=" + trim(w) + "," + trim(s) + "," + trim(w + CELL) + ","
+                + trim(s + CELL);
+    }
+
+    /** Which cell a point is in, so a point moved within it is not asked for again. */
+    public static String cellKey(double lat, double lon) {
+        return (long) Math.floor(lat / CELL) + "," + (long) Math.floor(lon / CELL);
+    }
+
+    /**
+     * What was typed as a zone number, the way the service keys it: {@code CAZ548},
+     * {@code CA548}, {@code caz 548} and {@code CA 548} are all {@code CA548}. Null
+     * when it is not a state and a number.
+     */
+    public static String normalize(String typed) {
+        if (typed == null)
+            return null;
+        final String t = typed.trim().toUpperCase(Locale.US).replaceAll("[^A-Z0-9]", "");
+        if (!t.matches("[A-Z]{2}Z?[0-9]{1,3}"))
+            return null;
+        final String num = t.substring(t.charAt(2) == 'Z' ? 3 : 2);
+        return t.substring(0, 2) + pad3(num);
+    }
+
+    /** {@code CA548} as the products write it, {@code CAZ548}. */
+    public static String ugc(String stateZone) {
+        if (stateZone == null || stateZone.length() != 5)
+            return stateZone == null ? "" : stateZone;
+        return stateZone.substring(0, 2) + "Z" + stateZone.substring(2);
+    }
+
+    /** One zone by its number, with its outline. */
+    public static String byIdUrl(String stateZone) {
+        return whereUrl("state_zone='" + stateZone + "'", "0.002");
+    }
+
+    /**
+     * Zones answering to what was typed: a zone number with its state
+     * ({@code CAZ548}), a bare number ({@code 548}, every state that has one), or
+     * words of a zone's name ({@code san gabriel}). Null when there is nothing to
+     * search for.
+     *
+     * <p>Only letters, digits and spaces reach the service; the where clause is
+     * built from nothing else, so there is no quote to close.
+     */
+    public static String searchUrl(String typed) {
+        final String id = normalize(typed);
+        if (id != null)
+            return whereUrl("state_zone='" + id + "'", "0.01");
+        if (typed == null)
+            return null;
+        final String t = typed.trim().toUpperCase(Locale.US).replaceAll("[^A-Z0-9 ]", " ")
+                .replaceAll("\\s+", " ").trim();
+        if (t.matches("[0-9]{1,3}"))
+            return whereUrl("zone='" + pad3(t) + "'", "0.01");
+        if (t.replace(" ", "").length() < 3)
+            return null;
+        return whereUrl("UPPER(name) LIKE '%" + t.replace(' ', '%') + "%'", "0.01");
+    }
+
+    private static String whereUrl(String where, String offset) {
+        try {
+            return LAYER + "/query?f=json&returnGeometry=true&outSR=4326"
+                    + "&maxAllowableOffset=" + offset
+                    + "&outFields=state_zone,cwa,name"
+                    + "&orderByFields=state_zone&resultRecordCount=50"
+                    + "&where=" + URLEncoder.encode(where, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static String pad3(String digits) {
+        final StringBuilder b = new StringBuilder(digits);
+        while (b.length() < 3)
+            b.insert(0, '0');
+        return b.toString();
+    }
+
     private static String trim(double d) {
         return String.format(Locale.US, "%.5f", d).replaceAll("0+$", "").replaceAll("\\.$", "");
     }
@@ -70,6 +166,26 @@ public final class FireZones {
             this.name = name;
             this.source = source;
             this.rings = rings;
+        }
+
+        /** {@code CAZ548}, the number a crew reads in a product or a warning. */
+        public String ugc() {
+            return FireZones.ugc(id);
+        }
+
+        /** West, south, east, north of the outline. */
+        public double[] bbox() {
+            double w = 180, s = 90, e = -180, n = -90;
+            for (double[][] ring : rings)
+                for (double[] p : ring) {
+                    if (Double.isNaN(p[0]) || Double.isNaN(p[1]))
+                        continue;
+                    w = Math.min(w, p[0]);
+                    e = Math.max(e, p[0]);
+                    s = Math.min(s, p[1]);
+                    n = Math.max(n, p[1]);
+                }
+            return new double[] { w, s, e, n };
         }
 
         /** "CA548 -- Los Angeles County San Gabriel Valley (LOX)" */
