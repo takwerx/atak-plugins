@@ -5016,6 +5016,7 @@ public final class AtmospherePane {
         if (mv != null && followingMap) {
             mv.removeOnMapMovedListener(mapMoved);
             mv.removeCallbacks(centerSettled);
+            mv.removeCallbacks(forecastSettled);
             followingMap = false;
         }
     }
@@ -5224,6 +5225,36 @@ public final class AtmospherePane {
         }
     };
 
+    /** How long the map has to stay still before the forecast follows it. */
+    private static final long FORECAST_SETTLE_MS = 1500L;
+    /**
+     * How far the center has to move for a new forecast. The NWS grid is 2.5 km, so
+     * a nudge closer than this reads the same forecast and is not asked for again.
+     */
+    private static final double FORECAST_FOLLOW_M = 1000d;
+    /** Where the forecast was last asked for. */
+    private GeoPoint forecastAt;
+
+    /**
+     * Map center follows the map for the forecast too, once the map has been still
+     * for a moment and the center has moved far enough to be another forecast
+     * (operator, 2026-09-28: the forecast stayed on the old place after a pan until
+     * Refresh was pressed).
+     */
+    private final Runnable forecastSettled = new Runnable() {
+        @Override
+        public void run() {
+            if (mode != PointMode.CENTER)
+                return;
+            final GeoPoint p = point();
+            if (p == null)
+                return;
+            if (forecastAt != null && forecastAt.distanceTo(p) < FORECAST_FOLLOW_M)
+                return;
+            refresh(false);
+        }
+    };
+
     private final com.atakmap.map.AtakMapView.OnMapMovedListener mapMoved =
             new com.atakmap.map.AtakMapView.OnMapMovedListener() {
                 @Override
@@ -5234,6 +5265,8 @@ public final class AtmospherePane {
                         return;
                     mv.removeCallbacks(centerSettled);
                     mv.postDelayed(centerSettled, 500);
+                    mv.removeCallbacks(forecastSettled);
+                    mv.postDelayed(forecastSettled, FORECAST_SETTLE_MS);
                 }
             };
     private boolean followingMap;
@@ -5389,6 +5422,7 @@ public final class AtmospherePane {
         // out; that is fixed at about 100 m and is not a line read every time.
         positionText.setText(modeLabel() + " \u2014 " + egress.latitude(p) + ", "
                 + egress.longitude(p));
+        forecastAt = p;
         statusText.setTextColor(Color.parseColor("#dfb228"));
         statusText.setText("Getting the forecast\u2026");
 
