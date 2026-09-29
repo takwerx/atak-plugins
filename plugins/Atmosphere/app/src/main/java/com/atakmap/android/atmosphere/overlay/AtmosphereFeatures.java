@@ -323,6 +323,41 @@ final class AtmosphereFeatures {
         hits.removeAll(dropped);
     }
 
+    /**
+     * A layer's own say in what a tap hit. ATAK's hit test on a polygon feature
+     * returns the neighbors whose box holds the tap as well: a tap in the middle of
+     * the San Gabriel Valley zone listed the Orange County zone beside it (XCover,
+     * 2026-09-28). A layer that knows its shapes answers whether the tap is really
+     * inside one.
+     */
+    interface HitFilter {
+        boolean keep(MapItem item, com.atakmap.coremap.maps.coords.GeoPoint tap);
+    }
+
+    private volatile HitFilter hitFilter;
+
+    void setHitFilter(HitFilter f) {
+        hitFilter = f;
+    }
+
+    /** Drop the hits the layer says are not under the tap, but never all of them. */
+    private void narrow(java.util.SortedSet<MapItem> hits,
+            com.atakmap.coremap.maps.coords.GeoPoint tap) {
+        final HitFilter f = hitFilter;
+        if (f == null || hits == null || tap == null || hits.size() < 2)
+            return;
+        final java.util.List<MapItem> out = new java.util.ArrayList<>();
+        for (MapItem m : hits)
+            try {
+                if (!f.keep(m, tap))
+                    out.add(m);
+            } catch (RuntimeException e) {
+                // a filter that fails keeps the hit
+            }
+        if (!out.isEmpty() && out.size() < hits.size())
+            hits.removeAll(out);
+    }
+
     /** Meters from the tap to where the item says it is; far when it does not say. */
     private static double distance(MapItem m, com.atakmap.coremap.maps.coords.GeoPoint tap) {
         final com.atakmap.coremap.maps.coords.GeoPoint at = placeOf(m);
@@ -712,6 +747,7 @@ final class AtmosphereFeatures {
                                     super.deepHitTest(view, params, controls);
                             final int raw = hits == null ? -1 : hits.size();
                             onePerPlace(hits, params == null ? null : params.geo);
+                            narrow(hits, params == null ? null : params.geo);
                             Log.d(tag, "deepHitTest: " + (controls == null ? -1 : controls.size())
                                     + " controls, " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
@@ -725,6 +761,7 @@ final class AtmosphereFeatures {
                                     super.deepHitTestItems(x, y, point, view);
                             final int raw = hits == null ? -1 : hits.size();
                             onePerPlace(hits, point);
+                            narrow(hits, point);
                             Log.d(tag, "deepHitTestItems: " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
                             return hits;
@@ -868,6 +905,16 @@ final class AtmosphereFeatures {
                                     if (a.containsAttribute("_buoyId"))
                                         item.setMetaString("buoyId",
                                                 a.getStringAttribute("_buoyId"));
+                                    if (a.containsAttribute("_zoneId")) {
+                                        item.setMetaString("zoneId",
+                                                a.getStringAttribute("_zoneId"));
+                                        if (a.containsAttribute("_zoneName"))
+                                            item.setMetaString("zoneName",
+                                                    a.getStringAttribute("_zoneName"));
+                                        if (a.containsAttribute("_zoneCwa"))
+                                            item.setMetaString("zoneCwa",
+                                                    a.getStringAttribute("_zoneCwa"));
+                                    }
                                 } catch (Exception ignored) {
                                     // not a spot feature
                                 }

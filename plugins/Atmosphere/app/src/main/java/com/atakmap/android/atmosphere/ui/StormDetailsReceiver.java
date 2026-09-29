@@ -64,6 +64,9 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
 
         /** A buoy opens its record on the buoy page. */
         void openBuoy(String id);
+
+        /** A fire weather zone opens its planning forecast on the Fire zones page. */
+        void openZone(String id, String name, String cwa);
     }
 
     private static SpotOpener spotOpener;
@@ -97,6 +100,12 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         final String buoyId = item.getMetaString("buoyId", "");
         if (!buoyId.isEmpty() && spotOpener != null) {
             spotOpener.openBuoy(buoyId);
+            return;
+        }
+        final String zoneId = item.getMetaString("zoneId", "");
+        if (!zoneId.isEmpty() && spotOpener != null) {
+            spotOpener.openZone(zoneId, item.getMetaString("zoneName", ""),
+                    item.getMetaString("zoneCwa", ""));
             return;
         }
         final String title = item.getMetaString("title", item.getMetaString("callsign", ""));

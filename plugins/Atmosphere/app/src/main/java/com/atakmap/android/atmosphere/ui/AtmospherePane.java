@@ -57,6 +57,7 @@ import com.atakmap.android.atmosphere.overlay.SatelliteOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
+import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.WorldRadar;
@@ -223,6 +224,14 @@ public final class AtmospherePane {
     private final LinearLayout firewxDayRow;
     private FireWxOutlookOverlay firewx;
     private boolean firewxOpen = true;
+    private static final String PREF_FIREZONES_OPEN = "weather.firezones.open";
+    private final LinearLayout firezonesSettings;
+    private final ImageButton firezonesExpand;
+    private final Button firezonesToggle;
+    private final TextView firezonesStatus;
+    private final LinearLayout firezonesLegend;
+    private FireZoneOverlay fireZones;
+    private boolean firezonesOpen = true;
     private static final String PREF_FLOOD_OPEN = "weather.flood.open";
     private final LinearLayout floodSettings;
     private final ImageButton floodExpand;
@@ -459,6 +468,12 @@ public final class AtmospherePane {
             public String pointLabel() {
                 return modeLabel();
             }
+
+            @Override
+            public void starsChanged() {
+                if (fireZones != null)
+                    fireZones.restyle();
+            }
         });
         stationPage = new StationPage(pluginContext, mapView(), new StationPage.Host() {
             @Override
@@ -568,6 +583,11 @@ public final class AtmospherePane {
         firewxStatus = find(R.id.firewx_status);
         firewxLegend = find(R.id.firewx_legend);
         firewxDayRow = find(R.id.firewx_day_row);
+        firezonesSettings = find(R.id.firezones_settings);
+        firezonesExpand = find(R.id.firezones_expand);
+        firezonesToggle = find(R.id.firezones_toggle);
+        firezonesStatus = find(R.id.firezones_status);
+        firezonesLegend = find(R.id.firezones_legend);
         floodSettings = find(R.id.flood_settings);
         floodExpand = find(R.id.flood_expand);
         floodToggle = find(R.id.flood_toggle);
@@ -835,6 +855,15 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        firezonesOpen = prefs == null || prefs.getBoolean(PREF_FIREZONES_OPEN, true);
+        firezonesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                firezonesOpen = !firezonesOpen;
+                rememberFold(PREF_FIREZONES_OPEN, firezonesOpen);
+                updateLayerControls();
+            }
+        });
         avalancheOpen = prefs == null || prefs.getBoolean(PREF_AVALANCHE_OPEN, true);
         avalancheExpand.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1080,6 +1109,8 @@ public final class AtmospherePane {
             avalanche.refresh(false);
         if (firewx != null && firewx.isOn())
             firewx.refresh(false);
+        if (fireZones != null && fireZones.isOn())
+            fireZones.refresh();
         if (flood != null && flood.isOn())
             flood.refresh(false);
         if (beach != null && beach.isOn())
@@ -1703,6 +1734,23 @@ public final class AtmospherePane {
     }
 
     /** SPC's fire weather outlook, owned by the plugin. Not time-enabled. */
+    public void setFireZones(FireZoneOverlay overlay) {
+        fireZones = overlay;
+        if (fireZones == null)
+            return;
+        fireZones.setListener(new FireZoneOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                firezonesStatus.setText(status);
+                firezonesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        firezonesLegend.removeAllViews();
+        for (String[] row : FireZoneOverlay.LEGEND)
+            firezonesLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
     public void setFireWx(FireWxOutlookOverlay overlay) {
         firewx = overlay;
         if (firewx == null)
@@ -1992,6 +2040,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowFireWx();
+                }
+            }
+        });
+        firezonesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (fireZones == null)
+                    return;
+                if (fireZones.isOn()) {
+                    fireZones.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FireZoneOverlay.LAYER_ID)) {
+                    fireZones.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFireZones();
                 }
             }
         });
@@ -3245,6 +3309,10 @@ public final class AtmospherePane {
             firewx.setOn(on);
         else if (firewx != null && on)
             blocked++;
+        if (fireZones != null && (!on || allowed(FireZoneOverlay.LAYER_ID)))
+            fireZones.setOn(on);
+        else if (fireZones != null && on)
+            blocked++;
         if (avalanche != null && (!on || allowed(AvalancheOverlay.LAYER_ID)))
             avalanche.setOn(on);
         else if (avalanche != null && on)
@@ -3808,6 +3876,20 @@ public final class AtmospherePane {
         spotPage.showById(spotId);
     }
 
+    /** A fire weather zone tapped on the map: its planning forecast. */
+    public void openZone(String id, String name, String cwa) {
+        if (id == null || id.isEmpty())
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == zonePage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.show();
+        zonePage.showZone(id, name, cwa);
+    }
+
     /** A gauge tapped on the map: its page, its record, its hydrograph. */
     public void openGauge(final String lid) {
         if (lid == null || lid.isEmpty() || gaugePage == null)
@@ -4109,6 +4191,27 @@ public final class AtmospherePane {
                                 egress.setLayerEnabled(FireWxOutlookOverlay.LAYER_ID, true);
                                 if (firewx != null)
                                     firewx.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowFireZones() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.firezones_allow_title))
+                .setMessage(pluginContext.getString(R.string.firezones_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FireZoneOverlay.LAYER_ID, true);
+                                if (fireZones != null)
+                                    fireZones.setOn(true);
                                 updateLayerControls();
                             }
                         })
@@ -4437,6 +4540,13 @@ public final class AtmospherePane {
         firewxExpand.setVisibility(firewxOn ? View.VISIBLE : View.GONE);
         firewxExpand.setRotation(firewxOpen ? 180f : 0f);
         firewxSettings.setVisibility(firewxOn && firewxOpen ? View.VISIBLE : View.GONE);
+        final boolean firezonesOn = fireZones != null && fireZones.isOn();
+        firezonesToggle.setText(firezonesOn ? R.string.firezones_on : R.string.firezones_off);
+        firezonesToggle.setTextColor(pluginContext.getResources().getColor(
+                firezonesOn ? R.color.state_on : R.color.state_off));
+        firezonesExpand.setVisibility(firezonesOn ? View.VISIBLE : View.GONE);
+        firezonesExpand.setRotation(firezonesOpen ? 180f : 0f);
+        firezonesSettings.setVisibility(firezonesOn && firezonesOpen ? View.VISIBLE : View.GONE);
         final boolean avalancheOn = avalanche != null && avalanche.isOn();
         avalancheToggle.setText(avalancheOn ? R.string.avalanche_on : R.string.avalanche_off);
         avalancheToggle.setTextColor(pluginContext.getResources().getColor(

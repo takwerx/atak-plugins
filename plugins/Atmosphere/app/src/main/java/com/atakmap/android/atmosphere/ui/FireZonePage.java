@@ -17,6 +17,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.data.FireAlerts;
 import com.atakmap.android.atmosphere.data.FireZones;
 import com.atakmap.android.atmosphere.data.Fwf;
 import com.atakmap.android.atmosphere.data.ZoneFavorites;
@@ -70,6 +71,9 @@ public final class FireZonePage {
 
         /** What the pane calls that point: "My position", "Map center"... */
         String pointLabel();
+
+        /** A zone was starred or unstarred, so the map can draw it the new way. */
+        void starsChanged();
     }
 
     /** A zone as a row and a detail: from the cell, a search, or the stars. */
@@ -107,6 +111,17 @@ public final class FireZonePage {
     private final Button star, discussionToggle;
     private final View discussionScroll;
     private final TextView detailTitle, detailFacts, detailText, discussionText;
+    private final Button redTile, watchTile;
+    private final TextView warnedStatus;
+    private final LinearLayout warnedList;
+
+    /** Which warned zones are listed: none, the Red Flag Warnings, or the watches. */
+    private String warnedFilter = "";
+    /** The zones under either product, by UGC, from the last answer. */
+    private Map<String, FireAlerts.Status> alerts = java.util.Collections.emptyMap();
+    /** Names and offices of warned zones, by UGC, read once per set of zones. */
+    private final Map<String, FireZones.Zone> warnedNames = new java.util.HashMap<>();
+    private int warnedGeneration;
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     /** Zones per cell key, most recent last. */
@@ -156,6 +171,10 @@ public final class FireZonePage {
         discussionToggle = root.findViewById(R.id.zones_discussion_toggle);
         discussionScroll = root.findViewById(R.id.zones_discussion_scroll);
         discussionText = root.findViewById(R.id.zones_discussion_text);
+        redTile = root.findViewById(R.id.zones_red);
+        watchTile = root.findViewById(R.id.zones_watch);
+        warnedStatus = root.findViewById(R.id.zones_warned_status);
+        warnedList = root.findViewById(R.id.zones_warned_list);
 
         final SharedPreferences p = MapCompat.prefs();
         discussionOpen = p != null && p.getBoolean(PREF_DISCUSSION, false);
@@ -176,6 +195,7 @@ public final class FireZonePage {
         if (pointDirty)
             locate();
         renderStarred();
+        fetchAlerts();
     }
 
     /**
@@ -259,6 +279,19 @@ public final class FireZonePage {
                     bringSearchToTop();
             }
         });
+        redTile.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setWarnedFilter(FireAlerts.RED_FLAG.equals(warnedFilter) ? ""
+                        : FireAlerts.RED_FLAG);
+            }
+        });
+        watchTile.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setWarnedFilter(FireAlerts.WATCH.equals(warnedFilter) ? "" : FireAlerts.WATCH);
+            }
+        });
         root.findViewById(R.id.zones_search_clear).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
@@ -289,6 +322,7 @@ public final class FireZonePage {
                     return;
                 favorites.toggle(showing.id, showing.name, showing.cwa);
                 paintStar();
+                host.starsChanged();
             }
         });
         discussionToggle.setOnClickListener(new View.OnClickListener() {
@@ -435,6 +469,130 @@ public final class FireZonePage {
             foundList.addView(row(Pick.of(z)));
     }
 
+    // ---- warnings and watches -----------------------------------------------------------
+
+    /** The zones under either product, shared with the map layer, five minutes fresh. */
+    private void fetchAlerts() {
+        final long now = System.currentTimeMillis();
+        final Map<String, FireAlerts.Status> known = FireAlerts.cached(now, 5 * 60 * 1000L);
+        if (known != null) {
+            alerts = known;
+            renderWarned();
+            return;
+        }
+        Http.get(FireAlerts.URL, egress.userAgent(), null, new Http.Callback() {
+            @Override
+            public void onSuccess(String body) {
+                final long at = System.currentTimeMillis();
+                FireAlerts.remember(FireAlerts.parse(body, at), at);
+                alerts = FireAlerts.last();
+                renderWarned();
+                renderStarred();
+            }
+
+            @Override
+            public void onFailure(String error) {
+                warnedStatus.setText("Could not reach the Weather Service: " + error);
+            }
+        });
+    }
+
+    private void setWarnedFilter(String f) {
+        warnedFilter = f;
+        renderWarned();
+    }
+
+    /** The two tiles with their counts, and the list under the one picked. */
+    private void renderWarned() {
+        int red = 0, watch = 0;
+        final List<String> picked = new ArrayList<>();
+        for (Map.Entry<String, FireAlerts.Status> e : alerts.entrySet()) {
+            if (e.getValue().isRedFlag())
+                red++;
+            else
+                watch++;
+            if (e.getValue().event.equals(warnedFilter))
+                picked.add(e.getKey());
+        }
+        redTile.setText(pluginContext.getString(R.string.zones_red) + " (" + red + ")");
+        watchTile.setText(pluginContext.getString(R.string.zones_watch) + " (" + watch + ")");
+        redTile.setTextColor(FireAlerts.RED_FLAG.equals(warnedFilter)
+                ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+        watchTile.setTextColor(FireAlerts.WATCH.equals(warnedFilter)
+                ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+        warnedList.removeAllViews();
+        if (warnedFilter.isEmpty()) {
+            warnedStatus.setText(red + watch == 0
+                    ? "No Red Flag Warning or Fire Weather Watch is in effect anywhere."
+                    : "Tap one to list its zones.");
+            return;
+        }
+        if (picked.isEmpty()) {
+            warnedStatus.setText("No " + warnedFilter + " is in effect anywhere.");
+            return;
+        }
+        java.util.Collections.sort(picked);
+        final List<String> unnamed = new ArrayList<>();
+        for (String ugc : picked)
+            if (!warnedNames.containsKey(ugc))
+                unnamed.add(ugc);
+        if (!unnamed.isEmpty()) {
+            nameWarned(unnamed);
+            warnedStatus.setText("Getting the zone names\u2026");
+        } else {
+            warnedStatus.setText(picked.size() + (picked.size() == 1 ? " zone" : " zones")
+                    + " under a " + warnedFilter + ".");
+        }
+        for (String ugc : picked) {
+            final FireZones.Zone z = warnedNames.get(ugc);
+            warnedList.addView(row(z != null ? Pick.of(z)
+                    : new Pick(FireZones.normalize(ugc), "", "", null)));
+        }
+    }
+
+    /** Names and offices for zones known only by number, one request for all of them. */
+    private void nameWarned(List<String> ugcs) {
+        final String url = FireZones.idsUrl(ugcs);
+        if (url == null)
+            return;
+        final int mine = ++warnedGeneration;
+        Http.get(url, egress.userAgent(), null, new Http.Callback() {
+            @Override
+            public void onSuccess(final String body) {
+                offMain(new Runnable() {
+                    @Override
+                    public void run() {
+                        final List<FireZones.Zone> got = FireZones.parse(body);
+                        mapView.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (mine != warnedGeneration)
+                                    return;
+                                for (FireZones.Zone z : got)
+                                    warnedNames.put(z.ugc(), z);
+                                renderWarned();
+                            }
+                        });
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(String error) {
+                if (mine == warnedGeneration)
+                    warnedStatus.setText("Could not reach the Weather Service: " + error);
+            }
+        });
+    }
+
+    /** "Red Flag Warning until Tue 8:00 pm", or null when nothing is in effect. */
+    private String inEffect(String ugc) {
+        final FireAlerts.Status st = alerts.get(ugc);
+        if (st == null)
+            return null;
+        return st.ends > 0 ? st.event + " until " + clock(st.ends) : st.event + " in effect";
+    }
+
     // ---- starred ------------------------------------------------------------------------
 
     private void renderStarred() {
@@ -471,6 +629,16 @@ public final class FireZonePage {
         name.setTextSize(13);
         row.addView(name);
 
+        final String warned = inEffect(z.ugc());
+        if (warned != null) {
+            final TextView w = new TextView(pluginContext);
+            w.setText(warned);
+            w.setTextColor(alerts.get(z.ugc()).color());
+            w.setTextSize(13);
+            w.setTypeface(Typeface.DEFAULT_BOLD);
+            row.addView(w);
+        }
+
         row.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -487,8 +655,20 @@ public final class FireZonePage {
         final String n = FireZones.normalize(id);
         if (n == null)
             return;
-        showDetail(new Pick(n, name, cwa, null));
+        final Pick z = new Pick(n, name, cwa, null);
+        // The map layer's allow is not this page's: a tap on a zone drawn by the
+        // layer waits behind the page's own gate and opens once it is allowed,
+        // rather than fetching the forecast under it (security review, 2026-09-29).
+        if (!egress.isLayerEnabled(LAYER_ID)) {
+            pendingZone = z;
+            showGateOrList();
+            return;
+        }
+        showDetail(z);
     }
+
+    /** A zone tapped on the map before this page was allowed. */
+    private Pick pendingZone;
 
     private void showDetail(final Pick z) {
         showing = z;
@@ -568,6 +748,9 @@ public final class FireZonePage {
     private void showForecast(Pick z, String text, String section, long issuedAt) {
         final String office = Fwf.office(text);
         final StringBuilder facts = new StringBuilder();
+        final String warned = inEffect(z.ugc());
+        if (warned != null)
+            facts.append(warned).append('\n');
         facts.append(office.isEmpty() ? z.cwa + " office" : office + " office");
         if (issuedAt > 0) {
             facts.append("\nIssued ").append(clock(issuedAt));
@@ -657,6 +840,11 @@ public final class FireZonePage {
                                 egress.setLayerEnabled(LAYER_ID, true);
                                 pointDirty = true;
                                 onShown();
+                                if (pendingZone != null) {
+                                    final Pick z = pendingZone;
+                                    pendingZone = null;
+                                    showDetail(z);
+                                }
                             }
                         })
                 .setNegativeButton(pluginContext.getString(R.string.close), null)

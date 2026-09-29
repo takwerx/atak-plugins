@@ -80,6 +80,55 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
+            <!-- The zones under a Red Flag Warning or a Fire Weather Watch, the
+                 country over: the operator's one exception to "alerts are IPAWS's"
+                 (2026-09-28). A filter says its count before it is tapped. -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/heading_zones_warned"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/zones_red"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="4dp"
+                    android:text="@string/zones_red" />
+
+                <Button
+                    android:id="@+id/zones_watch"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/zones_watch" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/zones_warned_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:text="" />
+
+            <LinearLayout
+                android:id="@+id/zones_warned_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
             <!-- By number or name. flagNoExtractUi keeps a landscape Samsung keyboard
                  from replacing the pane with a full-screen editor (see page_spot). -->
             <TextView

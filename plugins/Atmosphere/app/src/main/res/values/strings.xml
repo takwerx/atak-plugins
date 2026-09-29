@@ -90,6 +90,10 @@
     <string name="firewx_off">Fire weather outlook OFF</string>
     <string name="firewx_allow_title">Show the fire weather outlook?</string>
     <string name="firewx_allow_text">Atmosphere will ask the National Weather Service for the Storm Prediction Center\'s fire weather outlook areas for the next three days and draw them on the map. Your position is not sent. Server: mapservices.weather.noaa.gov</string>
+    <string name="firezones_on">Fire zones ON</string>
+    <string name="firezones_off">Fire zones OFF</string>
+    <string name="firezones_allow_title">Show the fire weather zones?</string>
+    <string name="firezones_allow_text">Atmosphere will ask the National Weather Service for the fire weather zones in the map view, and which of them are under a Red Flag Warning or Fire Weather Watch, and draw them on the map. The map view is sent, not your position.\n\nServers: mapservices.weather.noaa.gov and api.weather.gov</string>
     <string name="credit_firewx">Fire weather outlook from the NOAA Storm Prediction Center (%1$s)</string>
     <string name="flood_on">Flash flood outlook ON</string>
     <string name="flood_off">Flash flood outlook OFF</string>
@@ -247,6 +251,9 @@
     <string name="zones_load">Show fire zone forecasts</string>
     <string name="zones_allow_title">Show fire zone forecasts?</string>
     <string name="zones_allow_text">Atmosphere will ask the National Weather Service which fire weather zone you are in and for that zone\'s planning forecast.\n\nTo find the zone it sends the half-degree square the point is in, about 30 miles across, never the point itself.\n\nServers: mapservices.weather.noaa.gov and api.weather.gov</string>
+    <string name="heading_zones_warned">Warnings and watches</string>
+    <string name="zones_red">Red Flag Warning</string>
+    <string name="zones_watch">Fire Weather Watch</string>
     <string name="zones_search_hint">Zone number or name</string>
     <string name="zones_search_help">Type a zone number (CAZ548, CA548 or 548) or part of its name.</string>
     <string name="zones_starred_none">None yet. Open a zone and tap its star to keep it here.</string>

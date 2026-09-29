@@ -16,6 +16,7 @@ import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
 import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
+import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
@@ -90,6 +91,7 @@ public class Atmosphere implements IPlugin {
     private RadarOverlay radar;
     private TropicalOverlay tropical;
     private AvalancheOverlay avalanche;
+    private FireZoneOverlay fireZones;
     private FireWxOutlookOverlay firewx;
     private FloodOutlookOverlay flood;
     private BeachOverlay beach;
@@ -249,6 +251,8 @@ public class Atmosphere implements IPlugin {
         tropical.start();
         avalanche = new AvalancheOverlay(mapView, pluginContext, egress);
         avalanche.start();
+        fireZones = new FireZoneOverlay(mapView, pluginContext, egress);
+        fireZones.start();
         firewx = new FireWxOutlookOverlay(mapView, pluginContext, egress);
         firewx.start();
         flood = new FloodOutlookOverlay(mapView, pluginContext, egress);
@@ -295,6 +299,14 @@ public class Atmosphere implements IPlugin {
                     }
 
                     @Override
+                    public void openZone(String id, String name, String cwa) {
+                        if (atmospherePane == null)
+                            showPane();
+                        if (atmospherePane != null)
+                            atmospherePane.openZone(id, name, cwa);
+                    }
+
+                    @Override
                     public void openBuoy(String id) {
                         if (atmospherePane == null)
                             showPane();
@@ -313,6 +325,8 @@ public class Atmosphere implements IPlugin {
             atmospherePane.setAirQuality(air);
             if (avalanche != null)
                 atmospherePane.setAvalanche(avalanche);
+            if (fireZones != null)
+                atmospherePane.setFireZones(fireZones);
             if (firewx != null)
                 atmospherePane.setFireWx(firewx);
             if (flood != null)
@@ -412,6 +426,10 @@ public class Atmosphere implements IPlugin {
             firewx.stop();
             firewx = null;
         }
+        if (fireZones != null) {
+            fireZones.stop();
+            fireZones = null;
+        }
         if (avalanche != null) {
             avalanche.stop();
             avalanche = null;
@@ -484,6 +502,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setAirQuality(air);
             if (avalanche != null)
                 atmospherePane.setAvalanche(avalanche);
+            if (fireZones != null)
+                atmospherePane.setFireZones(fireZones);
             if (firewx != null)
                 atmospherePane.setFireWx(firewx);
             if (flood != null)

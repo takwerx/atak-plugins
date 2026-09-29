@@ -96,6 +96,42 @@ public final class FireZones {
         return stateZone.substring(0, 2) + "Z" + stateZone.substring(2);
     }
 
+    /**
+     * Every zone touching a box of the map, outlines generalized to {@code offset}
+     * degrees, for drawing. The map layer's request: the view, not a position.
+     */
+    public static String boxUrl(double west, double south, double east, double north,
+            double offset) {
+        return LAYER + "/query?f=json&returnGeometry=true&outSR=4326"
+                + "&maxAllowableOffset=" + trim(offset)
+                + "&outFields=state_zone,cwa,name"
+                + "&geometryType=esriGeometryEnvelope&inSR=4326"
+                + "&spatialRel=esriSpatialRelIntersects"
+                + "&geometry=" + trim(west) + "," + trim(south) + "," + trim(east) + ","
+                + trim(north);
+    }
+
+    /**
+     * The named zones, coarse outlines, for a list built from zone numbers (the
+     * zones under a warning). Only numbers {@link #normalize} accepts are sent, so
+     * the list can hold nothing else; null when none are left.
+     */
+    public static String idsUrl(Iterable<String> ids) {
+        final StringBuilder in = new StringBuilder();
+        for (String id : ids) {
+            final String n = normalize(id);
+            if (n == null)
+                continue;
+            if (in.length() > 0)
+                in.append(',');
+            in.append('\'').append(n).append('\'');
+        }
+        if (in.length() == 0)
+            return null;
+        return whereUrl("state_zone IN (" + in + ")", "0.01").replace(
+                "&resultRecordCount=50", "&resultRecordCount=500");
+    }
+
     /** One zone by its number, with its outline. */
     public static String byIdUrl(String stateZone) {
         return whereUrl("state_zone='" + stateZone + "'", "0.002");
@@ -173,6 +209,42 @@ public final class FireZones {
             return FireZones.ugc(id);
         }
 
+        /**
+         * The outline as polygons, each its outer ring first and its holes after.
+         * The service winds an outer ring clockwise and a hole counterclockwise; a
+         * hole goes with the outer ring that holds its first point, and one that
+         * none holds is drawn as an outer ring of its own rather than dropped.
+         */
+        public List<List<double[][]>> polygons() {
+            final List<List<double[][]>> out = new ArrayList<>();
+            final List<double[][]> holes = new ArrayList<>();
+            for (double[][] r : rings) {
+                if (signedArea(r) <= 0) {
+                    final List<double[][]> p = new ArrayList<>();
+                    p.add(r);
+                    out.add(p);
+                } else {
+                    holes.add(r);
+                }
+            }
+            for (double[][] h : holes) {
+                List<double[][]> home = null;
+                for (List<double[][]> p : out)
+                    if (inRing(p.get(0), h[0][0], h[0][1])) {
+                        home = p;
+                        break;
+                    }
+                if (home != null) {
+                    home.add(h);
+                } else {
+                    final List<double[][]> p = new ArrayList<>();
+                    p.add(h);
+                    out.add(p);
+                }
+            }
+            return out;
+        }
+
         /** West, south, east, north of the outline. */
         public double[] bbox() {
             double w = 180, s = 90, e = -180, n = -90;
@@ -209,6 +281,14 @@ public final class FireZones {
                     inside++;
             return (inside & 1) == 1;
         }
+    }
+
+    /** Shoelace area in lon/lat: negative when the ring runs clockwise. */
+    static double signedArea(double[][] ring) {
+        double a = 0;
+        for (int i = 0, j = ring.length - 1; i < ring.length; j = i++)
+            a += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+        return a / 2;
     }
 
     /** Ray casting, even-odd, on the ring as given in lon/lat. */
