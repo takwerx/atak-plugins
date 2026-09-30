@@ -25,7 +25,9 @@ map layer asks you once, naming its server, before it talks to the network.
 
 Warnings, watches and advisories are not here on purpose: they are the
 [IPAWS Alerts](https://github.com/takwerx/ipaws-alerts) plugin's job, and the
-two are meant to run side by side.
+two are meant to run side by side. The one exception is fire: a fire weather
+zone under a Red Flag Warning or a Fire Weather Watch is shaded, and the
+Fire Weather Zones page lists them.
 
 ---
 
@@ -48,19 +50,22 @@ Open Atmosphere from the ATAK toolbar, or from Tools if it is not on the bar.
 The pane opens at half width. The top row is the same on every page:
 
 - **My position**, **Map center** and **Pick a point** choose the point every
-  reading is for; the one in use is green.
+  reading is for; the one in use is green. Map center follows the map: the
+  forecast and the fire weather zone are read again when the map stops.
 - The star is **Favorites**: places kept by name.
 - **Units** switches every number between US, metric and aviation units.
 - **Full size** makes the pane full width and back; at full size every button
   has its name under it.
 - The arrows step through the pages; the page name between them opens a list of
-  all six.
+  all seven.
 
 <img src="screenshots/3_pane_half.png" width="420"> <img src="screenshots/5_page_list.png" width="420">
 
-The six pages are **Forecast**, the readout for a point; **Layers**, every map
-layer with its switch and settings; **Spots**, the open spot forecast requests;
-and **Stations**, **Gauges** and **Buoys**, the ones around you as lists. Back
+The seven pages are **Forecast**, the readout for a point; **Layers**, every map
+layer with its switch and settings; **Spot Weather Forecast**, the open spot
+forecast requests; **Fire Weather Zones**, the planning forecast for a zone;
+and **Weather Stations**, **River Gauges** and **Buoys**, the ones around you as
+lists. Back
 closes the pane, or narrows a full-size one first.
 
 <img src="screenshots/4_pane_wide.png" width="860">
@@ -94,8 +99,8 @@ show** picks the readings. The point is sent rounded to about 100 m.
 
 ## 4. The layers
 
-The second page lists every layer under a heading for what it is about: spot
-forecasts and weather stations at the top, then **Wind**, **Fire**, **Rain and
+The second page lists every layer under a heading for what it is about: **Spot
+Weather Forecast** and **Weather Stations** at the top, then **Wind**, **Fire**, **Rain and
 rivers**, **Ocean** and **Snow**. Each row is a switch that shows its state —
 green ON, red OFF — with the layer's icon beside it. **All on** and **All off**
 switch every allowed layer at once.
@@ -109,6 +114,11 @@ The first time a layer is switched on it asks once, naming the server it will
 talk to and what is sent: the area of the map, never your position, unless the
 layer says so. **Allow** remembers the answer.
 
+Tap anything Atmosphere draws and it opens straight away: a fire weather zone,
+spot request, gauge or buoy opens its page, anything else its details. There is
+no radial menu on Atmosphere's items; bloodhound and the rest are ATAK's own
+tools.
+
 Every layer that draws on the map is a row inside one **Atmosphere** row in
 ATAK's Overlay Manager, each with its own icon, where it can be hidden without
 opening the plugin.
@@ -117,27 +127,28 @@ opening the plugin.
 
 | Group | Layer | What it draws |
 |---|---|---|
-| | Spot forecasts | Every open spot forecast request, with the office's forecast behind a tap |
-| | Weather stations | The stations around you, wind barb and readings, colored against the Red Flag criteria for their zone |
+| | Spot Weather Forecast | Every open spot forecast request, with the office's forecast behind a tap |
+| | Weather Stations | The stations around you, wind barb and readings, colored against the Red Flag criteria for their zone |
 | Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber |
 | Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches the open ocean where no radar does |
 | Wind | Rain | The model's rain rate, light to violent, hour by hour for five days with the rate "Here"; a forecast, not radar |
 | Wind | Wind | The forecast wind as moving streaks colored by speed, with a time scrubber, heights to the jet stream, and the wind "Here" |
-| Fire | Fire weather outlook | Elevated, critical and extreme areas and dry thunderstorms, Day 1, 2, 3 or all; from Day 3 as a chance of critical |
+| Fire | Fire Weather Outlook | Elevated, critical and extreme areas and dry thunderstorms, Day 1, 2, 3 or all; from Day 3 as a chance of critical |
+| Fire | Fire Weather Zones | The NWS fire weather zones with their numbers, shaded under a Red Flag Warning or a Fire Weather Watch; the zone's planning forecast behind a tap |
 | Fire | Smoke | Forecast smoke at the ground or through the whole sky, with the amount "Here" |
-| Fire | Air quality | The EPA's air quality areas and the index "Here" |
-| Rain and rivers | Flash flood outlook | Excessive rainfall areas for three days, marginal to high |
-| Rain and rivers | River gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
-| Rain and rivers | Flooded ground | Where the river model puts water over the banks, now or at the worst of the next 5 days (experimental) |
-| Rain and rivers | Streams running high | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
+| Fire | Air Quality | The EPA's air quality areas and the index "Here" |
+| Rain and rivers | Flash Flood Outlook | Excessive rainfall areas for three days, marginal to high |
+| Rain and rivers | River Gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
+| Rain and rivers | Flooded Ground | Where the river model puts water over the banks, now or at the worst of the next 5 days (experimental) |
+| Rain and rivers | Streams Running High | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
 | Ocean | Buoys | Buoys and coastal stations, readings colored by sea state; tides, currents and the marine forecast behind a tap |
 | Ocean | Waves | The wave forecast: seas colored by state, the swell as moving crests, five days on the time strip, with the seas "Here" |
-| Ocean | Beach forecast | Beach areas colored by rip current risk |
-| Ocean | Sea temperature | Sea surface temperature as a picture |
+| Ocean | Beach Forecast | Beach areas colored by rip current risk |
+| Ocean | Sea Temperature | Sea surface temperature as a picture |
 | Ocean | Hurricanes | Active storms: track, cone, wind fields, advisory |
 | Snow | Avalanche | Forecast zones by danger rating, travel advice behind a tap |
-| Snow | Snow stations | Mountain snow stations: depth, water equivalent, temperature |
-| Snow | Snow depth | The daily snow analysis as a picture |
+| Snow | Snow Stations | Mountain snow stations: depth, water equivalent, temperature |
+| Snow | Snow Depth | The daily snow analysis as a picture |
 
 ## 5. What the layers look like
 
@@ -158,9 +169,9 @@ opening the plugin.
 <td><img src="screenshots/54_stations.jpg" width="420"><br>Weather stations with wind and humidity</td></tr>
 </table>
 
-## 6. Stations, gauges and buoys as lists
+## 6. Weather stations, river gauges and buoys as lists
 
-The **Stations**, **Gauges** and **Buoys** pages list what their layers draw,
+The **Weather Stations**, **River Gauges** and **Buoys** pages list what their layers draw,
 nearest first from your position or the map center, out to the distance you
 pick. The filters at the top say what each will show, with a count, before you
 tap. A star keeps one as a favorite, and a favorite stays on the map and in the
@@ -185,14 +196,48 @@ Two settings per layer decide when things draw: at this zoom or closer for the
 markers, and for their readings. **Use this zoom** takes what the scale bar
 reads now; **Always** never hides them.
 
-## 7. Spot forecasts
+## 7. Fire weather zones
+
+**Fire Weather Zones** draws the National Weather Service's fire weather zones
+in the map view: orange outlines, each with its zone number, a starred zone in
+yellow, a zone under a Red Flag Warning filled pink and one under a Fire Weather
+Watch beige. Tap a zone for its forecast. Two zoom settings under the layer's
+arrow decide when the zones and their numbers draw; a view wider than a few
+states says to zoom in.
+
+<img src="screenshots/71_zones_map.png" width="860">
+
+<img src="screenshots/72_zones_layer.png" width="420"> <img src="screenshots/73_zones_key.png" width="420">
+
+The **Fire Weather Zones** page shows the zone the point you are reading is in,
+**Red Flag Warning** and **Fire Weather Watch** with how many zones are under
+each anywhere in the country, a search by zone number (CAZ548, CA548 or 548)
+or by name, and your starred zones. Tap one for the office's Fire Weather
+Planning Forecast for that zone, as the office wrote it: western offices write
+it by period, eastern ones as a table; slide sideways for a wide line. The star
+keeps the zone on the page and yellow on the map. **Show the office
+discussion** opens the office's discussion for the day under it, and a
+forecast more than a day old says so.
+
+<img src="screenshots/68_zones_find.png" width="280"> <img src="screenshots/69_zone_forecast.png" width="280"> <img src="screenshots/70_zone_forecast_body.png" width="280">
+
+## 8. Spot Weather Forecast
 
 The layer draws every spot forecast request the National Weather Service has
 open, with the forecast the office wrote for each. The page lists them — All,
-Near me, On map, by State or by Region — and a search box finds one by incident
-name. Tap a request for its forecast.
+Near me, On map, by State or by Region — **Newest** or **Closest** first, and a
+search box finds one by incident name. Tap a request for its forecast.
 
-<img src="screenshots/58_spots.jpg" width="420"> <img src="screenshots/60_spot_forecast.png" width="420">
+<img src="screenshots/58_spots.jpg" width="420"> <img src="screenshots/59_spot_list.png" width="420">
+
+**All Types** picks one kind of request, with how many there are of each; the
+kind picked applies to the map as well as the list. Under the layer's arrow the
+key shows each kind's icon and what the three colors mean, and **Last 3 days
+only** keeps both to requests asked for or answered in the last three days.
+
+<img src="screenshots/74_spot_types.png" width="420"> <img src="screenshots/75_spot_key.png" width="420">
+
+<img src="screenshots/60_spot_forecast.png" width="420">
 
 **Request a spot forecast** prepares yours: pick the point — My position, Map
 center, Pick on map, a Favorite, or an Address — and the plugin copies it in the
@@ -202,17 +247,20 @@ first; you see what came back before it is used.
 
 <img src="screenshots/61_spot_request.png" width="420"> <img src="screenshots/64_address_match.png" width="420">
 
-## 8. The user manual
+## 9. The user manual
 
 The manual is inside the plugin. Open ATAK's **Settings**, then **Tool
 Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
 **Atmosphere user manual**.
 
-## 9. What it does not do
+## 10. What it does not do
 
-- It draws no warnings, watches or advisories. IPAWS Alerts does.
+- It draws no warnings, watches or advisories, except Red Flag Warnings and
+  Fire Weather Watches on its fire weather zones. IPAWS Alerts does the rest.
 - It publishes nothing: no path puts anything on another phone or a server.
 - It records nothing about you: no callsign, device identifier or TAK server
   detail is ever sent. Your position leaves the device only for the forecast
   when it is set to My position, rounded to about 100 m, and for the station,
-  gauge and buoy lists when they are set to My position.
+  gauge and buoy lists when they are set to My position. The Fire Weather Zones
+  page finds your zone by sending the half-degree square the point is in, about
+  30 miles across, never the point.
