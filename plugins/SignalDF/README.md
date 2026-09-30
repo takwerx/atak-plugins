@@ -1,10 +1,10 @@
 ATAK Plugin — Signal DF
 
-**Download Signal DF 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Signal DF 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/signal-df/releases/download/v0.3/ATAK-Plugin-SignalDF-0.3--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/signal-df/releases/download/v0.3/ATAK-Plugin-SignalDF-0.3--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/signal-df/releases/download/v0.3/ATAK-Plugin-SignalDF-0.3--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/signal-df/releases
 
@@ -58,7 +58,7 @@ between several operators so one crew's receivers all contribute to one fix.
 _________________________________________________________________
 STATUS
 
-Version 0.2 — beta, for field use and feedback.
+Version 0.3 — beta, for field use and feedback.
 
 Runs on ATAK-CIV 5.6, 5.7 and 5.8.
 
@@ -68,7 +68,17 @@ live direction-of-arrival data, and reports staleness correctly. The finding
 loop — collect while driving, cross the bearings, draw the fix and its error
 ellipse — is verified end to end against a simulated radio driving a known
 route past a known transmitter, and by 60 unit tests over the arithmetic.
-ATAK's Bloodhound navigates to both the fix and the suggested waypoint.
+ATAK's Bloodhound navigates to the fix.
+
+0.3 replaces the single "drive here" waypoint with a band: an arc drawn round
+the estimate that asks the operator to swing round it and close on it at the
+same time, since angle width and range are the two quantities the published
+work names. Its thresholds and wording come from FM 24-18, which defines a fix
+as three or more bearings, and from Haskell and Ballard (2007), who put best
+accuracy at 90-100 degrees of angle width; they live in one class so the map,
+the pane and the notifications cannot disagree. Driven against a simulated
+vehicle that turns, rather than one that only goes straight, which is the
+only way guidance of this kind can be exercised at all.
 
 Known limitation, stated plainly, and it governs everything else here: the
 absolute bearing convention has not been validated against a transmitter at a
