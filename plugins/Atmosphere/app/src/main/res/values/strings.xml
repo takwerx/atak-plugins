@@ -36,7 +36,7 @@
     <string name="stations_guide">Station legend</string>
     <string name="stations_open_list">Open the station list</string>
     <string name="spot_open_list">Open the Spot Weather Forecast list</string>
-    <string name="stations_page_heading">Weather stations</string>
+    <string name="stations_page_heading">Weather Stations</string>
     <string name="credit_stations">Fire weather stations from the National Interagency Fire Center (services3.arcgis.com). Red Flag colors use common national thresholds, not your local office\'s zone criteria.</string>
     <string name="layers_all_on">All on</string>
     <string name="layers_all_off">All off</string>
@@ -49,7 +49,7 @@
     <string name="stations_on">Weather Stations ON</string>
     <string name="gauges_on">River Gauges ON</string>
     <string name="gauges_open_list">Open the gauge list</string>
-    <string name="gauges_page_heading">River gauges</string>
+    <string name="gauges_page_heading">River Gauges</string>
     <string name="gauges_show_heading">Show on the map</string>
     <string name="gauges_gate_heading">Draw gauges at this zoom or closer</string>
     <string name="gauges_off">River Gauges OFF</string>
@@ -292,8 +292,8 @@
     <string name="tab_layers">Layers</string>
     <string name="tab_spots">Spot Weather Forecast</string>
     <string name="tab_zones">Fire Weather Zones</string>
-    <string name="tab_stations">Stations</string>
-    <string name="tab_gauges">Gauges</string>
+    <string name="tab_stations">Weather Stations</string>
+    <string name="tab_gauges">River Gauges</string>
     <string name="tab_buoys">Buoys</string>
     <string name="page_forecast">Forecast</string>
     <string name="page_layers">Layers</string>
