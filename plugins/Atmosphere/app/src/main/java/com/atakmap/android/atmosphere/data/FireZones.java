@@ -351,6 +351,14 @@ public final class FireZones {
         return out;
     }
 
+    /**
+     * Whether the service stopped short: it returns at most 2,000 records and says
+     * {@code exceededTransferLimit} when there were more.
+     */
+    public static boolean truncated(String body) {
+        return body != null && body.replace(" ", "").contains("\"exceededTransferLimit\":true");
+    }
+
     /** The zone the point stands in, or null when none of these hold it. */
     public static Zone at(double lat, double lon, List<Zone> zones) {
         if (zones == null || Double.isNaN(lat) || Double.isNaN(lon))

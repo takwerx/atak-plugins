@@ -3479,6 +3479,12 @@ public final class AtmospherePane {
                 fireZones.setGate(gsd);
             }
         });
+        // The layer has a limit of its own past any gate; say so here, where the
+        // gate would otherwise read as drawing.
+        if (fireZones.tooWide())
+            firezonesGateText.setText(firezonesGateText.getText()
+                    + "  \u2014 hidden, the view is too wide; zones draw at "
+                    + fireZones.widestBar() + " or closer");
         gateRow(firezonesLabelGateRow, firezonesLabelGateText, "Zone numbers",
                 fireZones.labelGate(), new Gate() {
                     @Override

@@ -55,9 +55,14 @@ public final class FireZoneOverlay {
 
     /**
      * The layer's own limit, degrees of longitude: wider than this it says to zoom
-     * in whatever the gate says, because a view that wide is hundreds of zones.
+     * in whatever the gate says. It was 8, which hid a whole-state view with no
+     * word from the gate row (operator, 2026-09-29: "im at 180 and it wont but its
+     * not warning me"). Measured 2026-09-29: California and Nevada, 12 degrees, are
+     * 216 zones and 258 KB; the West at 22 degrees 504 zones and 434 KB; the East
+     * at 22 degrees 1,736 zones and 798 KB, under the service's 2,000-record cap.
+     * The whole country is over the cap, so there is a limit at all.
      */
-    private static final double MAX_SPAN_LON = 8d;
+    private static final double MAX_SPAN_LON = 20d;
     /**
      * The zoom gates, the way the station, gauge and buoy layers keep theirs
      * (operator, 2026-09-29: "can i get a zoom gate like the others?"): the
@@ -70,6 +75,7 @@ public final class FireZoneOverlay {
     private static final double DEFAULT_BIG = 50d;
     private static final double DEFAULT_LABEL_BIG = 15d;
     private double gate, labelGate;
+    private static final double GATE_SLACK = 1.01;
     private static final long MOVE_SETTLE_MS = 700L;
     /** The warnings are asked for again this often while the layer is on. */
     private static final long ALERTS_POLL_MS = 10 * 60 * 1000L;
@@ -278,6 +284,22 @@ public final class FireZoneOverlay {
         }
     }
 
+    /** Whether the view is wider than the zones are ever drawn at, whatever the gate. */
+    public boolean tooWide() {
+        final GeoBounds b = mapView.getBounds();
+        return b != null && !Double.isNaN(b.getEast()) && !Double.isNaN(b.getWest())
+                && b.getEast() > b.getWest() && b.getEast() - b.getWest() > MAX_SPAN_LON;
+    }
+
+    /** The scale-bar reading at which the view is as wide as the zones are drawn. */
+    public String widestBar() {
+        final GeoBounds b = mapView.getBounds();
+        final double m = ScaleBar.meters(mapView);
+        if (b == null || m <= 0 || b.getEast() <= b.getWest())
+            return "a few states across";
+        return ScaleBar.describe(m * MAX_SPAN_LON / (b.getEast() - b.getWest()));
+    }
+
     /** A zone was starred or unstarred; draw it the new way. */
     public void restyle() {
         if (on && !zones.isEmpty())
@@ -293,8 +315,16 @@ public final class FireZoneOverlay {
         final double w = b.getWest(), e = b.getEast(), s = b.getSouth(), n = b.getNorth();
         final double res = mapView.getMapResolution();
         // A gate of "Always" is the largest float, which every resolution is under.
-        if (Double.isNaN(w) || Double.isNaN(e) || Double.isNaN(s) || Double.isNaN(n)
-                || e <= w || e - w > MAX_SPAN_LON || res > gate) {
+        final boolean bad = Double.isNaN(w) || Double.isNaN(e) || Double.isNaN(s)
+                || Double.isNaN(n) || e <= w;
+        // One percent of slack: "Use this zoom" stores the gate as a float, and the
+        // map read back at that same zoom is a hair coarser, which hid the zones at
+        // exactly the zoom the operator had just picked (2026-09-29, 180 mi).
+        final boolean gated = res > gate * GATE_SLACK;
+        if (!bad)
+            Log.d(TAG, String.format(Locale.US, "view %.1f deg, res %.1f, gate %.1f%s",
+                    e - w, res, gate, gated ? " (gated)" : ""));
+        if (bad || e - w > MAX_SPAN_LON || gated) {
             if (region != null || !zones.isEmpty() || force) {
                 region = null;
                 zones = new ArrayList<>();
@@ -302,11 +332,17 @@ public final class FireZoneOverlay {
                 generation++;
                 drawNothing();
             }
-            status("Zoom in to see the fire weather zones");
+            // Say which of the two is hiding them, and for the layer's own limit,
+            // how far to zoom: the gate row can read "drawn" while this limit holds.
+            if (!bad && e - w > MAX_SPAN_LON)
+                status("This view is too wide for fire weather zones. Zoom in to about "
+                        + widestBar() + " on the scale bar.");
+            else
+                status("Zoom in to see the fire weather zones");
             return;
         }
         final double span = e - w;
-        final boolean labels = res <= labelGate;
+        final boolean labels = res <= labelGate * GATE_SLACK;
         boolean refetch = force || region == null
                 || w < region[0] || s < region[1] || e > region[2] || n > region[3];
         if (!refetch)
@@ -345,11 +381,22 @@ public final class FireZoneOverlay {
                             @Override
                             public void run() {
                                 final List<FireZones.Zone> parsed = FireZones.parse(body);
+                                final boolean cut = FireZones.truncated(body);
                                 mapView.post(new Runnable() {
                                     @Override
                                     public void run() {
                                         if (mine != generation || !on)
                                             return;
+                                        if (cut) {
+                                            // A partial answer drawn would read as the
+                                            // whole picture; say so instead.
+                                            zones = new ArrayList<>();
+                                            region = null;
+                                            drawNothing();
+                                            status("Too many fire weather zones for this"
+                                                    + " view. Zoom in.");
+                                            return;
+                                        }
                                         zones = parsed;
                                         region = r;
                                         regionLabels = labels;
