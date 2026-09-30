@@ -479,8 +479,11 @@ public final class FireZoneOverlay {
                         final double[] at = pill == null ? null
                                 : AtmosphereFeatures.labelPoint(g);
                         if (at != null) {
-                            final AttributeSet la = new AttributeSet();
-                            la.setAttribute("_labelOnly", 1);
+                            // Not a label-only point: a tap on the number is a tap on
+                            // the zone, and it was dropped as a label (XCover,
+                            // 2026-09-29: "1 hits, 0 kept"). One row per name keeps
+                            // the pill and its polygon from listing the zone twice.
+                            final AttributeSet la = attributes(z, st);
                             drawn.add(new AtmosphereFeatures.Drawn(NAME, ugc + " " + z.name,
                                     AtmosphereFeatures.point(at[0], at[1]),
                                     AtmosphereFeatures.icon(pill.uri, pill.width, pill.height),
@@ -569,6 +572,7 @@ public final class FireZoneOverlay {
         a.setAttribute("_zoneId", z.id);
         a.setAttribute("_zoneName", z.name);
         a.setAttribute("_zoneCwa", z.cwa);
+        a.setAttribute("_oneRowPerName", 1);
         a.setAttribute("Zone", z.ugc() + " " + z.name);
         a.setAttribute("Office", z.cwa);
         if (st != null)

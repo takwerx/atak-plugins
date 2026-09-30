@@ -92,6 +92,30 @@ public class Atmosphere implements IPlugin {
     private TropicalOverlay tropical;
     private AvalancheOverlay avalanche;
     private FireZoneOverlay fireZones;
+    /**
+     * A tap on an item that has a page of its own opens the page, not ATAK's radial
+     * (takwerx/atmosphere#1; operator, 2026-09-29: "if i click on a fire weather
+     * zone it should open the forecast for that zone"). ATAK asks these listeners
+     * before it opens a radial, and one that answers true stops it. Everything else
+     * keeps its radial.
+     */
+    private final com.atakmap.android.menu.MapMenuEventListener tapOpensPage =
+            new com.atakmap.android.menu.MapMenuEventListener() {
+                @Override
+                public boolean onShowMenu(com.atakmap.android.maps.MapItem item) {
+                    try {
+                        return com.atakmap.android.atmosphere.ui.StormDetailsReceiver
+                                .openPage(item);
+                    } catch (RuntimeException e) {
+                        Log.w(TAG, "tap to page", e);
+                        return false;
+                    }
+                }
+
+                @Override
+                public void onHideMenu(com.atakmap.android.maps.MapItem item) {
+                }
+            };
     private FireWxOutlookOverlay firewx;
     private FloodOutlookOverlay flood;
     private BeachOverlay beach;
@@ -282,10 +306,18 @@ public class Atmosphere implements IPlugin {
         // whether or not the pane exists yet: the overlays start with the plugin and
         // the pane is not built until it is first shown, so anything set inside that
         // check is set only on the paths where the pane already happens to be there.
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.addEventListener(tapOpensPage);
+        else
+            Log.w(TAG, "no radial menu receiver; taps keep the radial");
         com.atakmap.android.atmosphere.ui.StormDetailsReceiver.setSpotOpener(
                 new com.atakmap.android.atmosphere.ui.StormDetailsReceiver.SpotOpener() {
                     @Override
                     public void openSpot(String spotId) {
+                        if (atmospherePane == null)
+                            showPane();
                         if (atmospherePane != null)
                             atmospherePane.openSpot(spotId);
                     }
@@ -363,6 +395,10 @@ public class Atmosphere implements IPlugin {
         } catch (RuntimeException e) {
             Log.w(TAG, "show receiver was not registered", e);
         }
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.removeEventListener(tapOpensPage);
         if (stormDetails != null) {
             try {
                 AtakBroadcast.getInstance().unregisterReceiver(stormDetails);

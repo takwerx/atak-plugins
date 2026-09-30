@@ -75,6 +75,46 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         spotOpener = opener;
     }
 
+    /**
+     * Open the page a tapped item belongs to, when it has one: a spot request its
+     * forecast, a gauge its hydrograph, a buoy its record, a fire weather zone its
+     * planning forecast. Used by the radial's details button and, since
+     * takwerx/atmosphere#1, by the tap itself, so these open without the radial
+     * ("going right to the plug in window, upon selecting a marker would speed up
+     * things and remove an unneeded step").
+     *
+     * @return true if a page was opened
+     */
+    public static boolean openPage(MapItem item) {
+        if (item == null || spotOpener == null)
+            return false;
+        // A spot request opens its forecast rather than a list of its own fields:
+        // kind and office are on the row already, and the forecast is the thing
+        // somebody tapped it for (operator, 2026-09-25).
+        final String spotId = item.getMetaString("spotId", "");
+        if (!spotId.isEmpty()) {
+            spotOpener.openSpot(spotId);
+            return true;
+        }
+        final String gaugeId = item.getMetaString("gaugeId", "");
+        if (!gaugeId.isEmpty()) {
+            spotOpener.openGauge(gaugeId);
+            return true;
+        }
+        final String buoyId = item.getMetaString("buoyId", "");
+        if (!buoyId.isEmpty()) {
+            spotOpener.openBuoy(buoyId);
+            return true;
+        }
+        final String zoneId = item.getMetaString("zoneId", "");
+        if (!zoneId.isEmpty()) {
+            spotOpener.openZone(zoneId, item.getMetaString("zoneName", ""),
+                    item.getMetaString("zoneCwa", ""));
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         final String uid = intent.getStringExtra("targetUID");
@@ -84,30 +124,8 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
             Log.d(TAG, "storm details: no map item for " + uid);
             return;
         }
-        // A spot request opens its forecast rather than a list of its own fields:
-        // kind and office are on the row already, and the forecast is the thing
-        // somebody tapped it for (operator, 2026-09-25).
-        final String spotId = item.getMetaString("spotId", "");
-        if (!spotId.isEmpty() && spotOpener != null) {
-            spotOpener.openSpot(spotId);
+        if (openPage(item))
             return;
-        }
-        final String gaugeId = item.getMetaString("gaugeId", "");
-        if (!gaugeId.isEmpty() && spotOpener != null) {
-            spotOpener.openGauge(gaugeId);
-            return;
-        }
-        final String buoyId = item.getMetaString("buoyId", "");
-        if (!buoyId.isEmpty() && spotOpener != null) {
-            spotOpener.openBuoy(buoyId);
-            return;
-        }
-        final String zoneId = item.getMetaString("zoneId", "");
-        if (!zoneId.isEmpty() && spotOpener != null) {
-            spotOpener.openZone(zoneId, item.getMetaString("zoneName", ""),
-                    item.getMetaString("zoneCwa", ""));
-            return;
-        }
         final String title = item.getMetaString("title", item.getMetaString("callsign", ""));
         final String body = item.getMetaString("remarks", "");
         ((TextView) view.findViewById(R.id.details_title))
