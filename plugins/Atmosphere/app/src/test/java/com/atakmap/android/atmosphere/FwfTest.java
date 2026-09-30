@@ -121,6 +121,8 @@ public class FwfTest {
     public void theSearchSendsNothingButLettersAndDigits() {
         assertTrue(FireZones.searchUrl("CAZ548").contains("where=state_zone%3D%27CA548%27"));
         assertTrue(FireZones.searchUrl("548").contains("where=zone%3D%27548%27"));
+        assertTrue(FireZones.searchUrl("z548").contains("where=zone%3D%27548%27"));
+        assertTrue(FireZones.searchUrl("Z 548").contains("where=zone%3D%27548%27"));
         final String byName = FireZones.searchUrl("san gabriel");
         assertTrue(byName, byName.contains("%25SAN%25GABRIEL%25"));
         // A quote typed into the box is not a quote in the query.

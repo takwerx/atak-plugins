@@ -154,8 +154,11 @@ public final class FireZones {
             return null;
         final String t = typed.trim().toUpperCase(Locale.US).replaceAll("[^A-Z0-9 ]", " ")
                 .replaceAll("\\s+", " ").trim();
-        if (t.matches("[0-9]{1,3}"))
-            return whereUrl("zone='" + pad3(t) + "'", "0.01");
+        // "Z548" is how a zone is said without its state (operator, 2026-09-30,
+        // typed it and got none); it is the bare number.
+        final String bare = t.matches("Z ?[0-9]{1,3}") ? t.replaceAll("[^0-9]", "") : t;
+        if (bare.matches("[0-9]{1,3}"))
+            return whereUrl("zone='" + pad3(bare) + "'", "0.01");
         if (t.replace(" ", "").length() < 3)
             return null;
         return whereUrl("UPPER(name) LIKE '%" + t.replace(' ', '%') + "%'", "0.01");
