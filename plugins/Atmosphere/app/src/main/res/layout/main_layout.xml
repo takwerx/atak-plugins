@@ -15,11 +15,16 @@
              44 dp targets on ATAK's own button background, white masks tinted green
              for the mode in use (the Traffic toggle convention). Replaces the Source
              and Where button rows, so the readout starts one row down. -->
+        <!-- baselineAligned off: a horizontal row lines its children up by their
+             text, and the page button's two-line "Fire Weather / Zones" was pushed
+             down by its first line, a gap over it and its foot below the row
+             (operator, 2026-09-29). Every button here is 44dp, so tops line up. -->
         <LinearLayout
             android:id="@+id/icon_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:baselineAligned="false"
             android:paddingTop="4dp">
 
             <ImageButton
