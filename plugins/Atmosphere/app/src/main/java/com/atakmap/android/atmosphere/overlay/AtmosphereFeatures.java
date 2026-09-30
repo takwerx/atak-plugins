@@ -885,6 +885,9 @@ final class AtmosphereFeatures {
                             item.setMetaString("title", title);
                             item.setMetaString("callsign", title);
                             item.setMetaString("storm_set", setOf(feature.getId()));
+                            // Marks it as ours, so a tap opens its page or its details
+                            // instead of ATAK's radial (the plugin's menu listener).
+                            item.setMetaBoolean("atmosphere", true);
                             // A spot request knows how to open something better than
                             // a list of its own fields: the forecast NWS wrote for it.
                             // Carried as plain meta so the details receiver can route

@@ -93,19 +93,29 @@ public class Atmosphere implements IPlugin {
     private AvalancheOverlay avalanche;
     private FireZoneOverlay fireZones;
     /**
-     * A tap on an item that has a page of its own opens the page, not ATAK's radial
-     * (takwerx/atmosphere#1; operator, 2026-09-29: "if i click on a fire weather
-     * zone it should open the forecast for that zone"). ATAK asks these listeners
-     * before it opens a radial, and one that answers true stops it. Everything else
-     * keeps its radial.
+     * A tap on anything Atmosphere draws opens what it is, never ATAK's radial
+     * (takwerx/atmosphere#1; operator, 2026-09-29: "make all those just go to the
+     * page i dont need a radial menu really on any of that stuff ... if i wanted to
+     * i could just use bloodhound"). An item with a page of its own opens the page;
+     * the rest open the details the radial's first button used to. ATAK asks these
+     * listeners before it opens a radial, and one that answers true stops it; items
+     * that are not ours keep theirs.
      */
     private final com.atakmap.android.menu.MapMenuEventListener tapOpensPage =
             new com.atakmap.android.menu.MapMenuEventListener() {
                 @Override
                 public boolean onShowMenu(com.atakmap.android.maps.MapItem item) {
+                    if (item == null || !item.getMetaBoolean("atmosphere", false))
+                        return false;
                     try {
-                        return com.atakmap.android.atmosphere.ui.StormDetailsReceiver
-                                .openPage(item);
+                        if (com.atakmap.android.atmosphere.ui.StormDetailsReceiver
+                                .openPage(item))
+                            return true;
+                        final android.content.Intent details = new android.content.Intent(
+                                com.atakmap.android.atmosphere.ui.StormDetailsReceiver.ACTION);
+                        details.putExtra("targetUID", item.getUID());
+                        AtakBroadcast.getInstance().sendBroadcast(details);
+                        return true;
                     } catch (RuntimeException e) {
                         Log.w(TAG, "tap to page", e);
                         return false;
