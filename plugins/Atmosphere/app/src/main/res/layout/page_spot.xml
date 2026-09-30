@@ -113,6 +113,41 @@
                     android:text="@string/spot_region" />
             </LinearLayout>
 
+            <!-- The order and the kind (operator, 2026-09-29: "can i filter by newest
+                 and closest? filter by type?"). The kind is shared with the map. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/spot_sort_newest"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="4dp"
+                    android:text="@string/spot_sort_newest" />
+
+                <Button
+                    android:id="@+id/spot_sort_closest"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginRight="4dp"
+                    android:text="@string/spot_sort_closest" />
+
+                <Button
+                    android:id="@+id/spot_kind"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1.4"
+                    android:layout_height="wrap_content"
+                    android:text="@string/spot_kind_all" />
+            </LinearLayout>
+
             <!-- By name, on top of whichever area is picked. A crew looking for one
                  incident knows its name and not which of five scopes it falls in
                  (operator, 2026-09-25: "can we have a search for incident name?").

@@ -71,9 +71,13 @@
     <string name="stations_from_me">My position</string>
     <string name="stations_from_map">Map center</string>
     <string name="heading_legend">Legend</string>
+    <string name="spot_sort_newest">Newest</string>
+    <string name="spot_sort_closest">Closest</string>
+    <string name="spot_kind_all">All Types</string>
+    <string name="spot_pick_kind">Show this type</string>
     <string name="spot_search_hint">Search by incident name</string>
     <string name="clear">Clear</string>
-    <string name="spot_filters_elsewhere">The last-3-days switch applies to the list too. Near me, on the map, by state or region: swipe on to the Spot Weather Forecast page.</string>
+    <string name="spot_filters_elsewhere">The last-3-days switch and the type picked on the Spot Weather Forecast page apply to both the map and the list. Near me, on the map, by state or region, newest or closest: swipe on to that page.</string>
     <string name="spot_layer_allow_title">Show spot forecasts on the map?</string>
     <string name="spot_layer_allow_text">Atmosphere will ask the National Weather Service for the open spot forecast requests and draw them on the map. Your position is not sent. Server: mapservices.weather.noaa.gov</string>
     <string name="back">Back</string>

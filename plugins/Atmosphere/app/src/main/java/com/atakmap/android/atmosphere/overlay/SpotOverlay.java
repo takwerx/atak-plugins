@@ -53,6 +53,17 @@ public final class SpotOverlay {
     private static final String PREF_ON = "weather.layer.spot.on";
     private static final String PREF_RECENT_ONLY = "weather.layer.spot.recentonly";
     /**
+     * One kind of request, by its letter, or "" for every kind. Shared by the map
+     * and the Spot Weather Forecast list, the way the last-3-days switch is, so the
+     * two never disagree about what exists (operator, 2026-09-29: "filter by type?").
+     */
+    private static final String PREF_KIND = "weather.layer.spot.kind";
+
+    /** NWS's kinds, by the letter on their icon, in the Monitor's order. */
+    public static final String[][] KINDS = {
+            { "W", "Wildfire" }, { "P", "Prescribed Fire" }, { "M", "Marine" },
+            { "H", "HAZMAT" }, { "S", "Search and Rescue" }, { "O", "Other" } };
+    /**
      * How far back a request still counts as current. Three days covers a fire's
      * operational periods without dragging in last week's.
      */
@@ -79,6 +90,7 @@ public final class SpotOverlay {
     private Listener listener;
     private boolean started, on, inFlight;
     private boolean recentOnly;
+    private String kind = "";
     private long lastPoll;
     private int generation;
     private States states;
@@ -104,6 +116,68 @@ public final class SpotOverlay {
         // Most of the list is finished work from the past week. A crew looking at the
         // map wants what is still open, so that is where this starts.
         recentOnly = p == null || p.getBoolean(PREF_RECENT_ONLY, true);
+        kind = kindFilter();
+    }
+
+    /** The kind picked, "" for all, read from the shared preference. */
+    public static String kindFilter() {
+        final SharedPreferences p = MapCompat.prefs();
+        final String k = p == null ? "" : p.getString(PREF_KIND, "");
+        return k == null ? "" : k;
+    }
+
+    /** Whether a request is of the kind picked. */
+    public static boolean ofKind(Spot.Request r, String kind) {
+        return kind == null || kind.isEmpty() || SpotIcons.letter(r) == kind.charAt(0);
+    }
+
+    /** The letter NWS puts on this kind of request. */
+    public static char letterOf(Spot.Request r) {
+        return SpotIcons.letter(r);
+    }
+
+    /** What a letter stands for, "Wildfire" for W. */
+    public static String kindName(String letter) {
+        for (String[] k : KINDS)
+            if (k[0].equals(letter))
+                return k[1];
+        return "Other";
+    }
+
+    private static SpotIcons keyIcons;
+
+    /**
+     * The icon the map draws for this letter in this color, for the key on the
+     * Layers page: the real disc, not a letter in the text (operator, 2026-09-29:
+     * "bring the icon for the type not just W Wildfire but the actual icon").
+     */
+    public static synchronized android.graphics.Bitmap keyIcon(char letter, int color) {
+        if (keyIcons == null)
+            keyIcons = new SpotIcons();
+        final String uri = keyIcons.uri(letter, color);
+        return uri == null ? null
+                : android.graphics.BitmapFactory.decodeFile(uri.substring("file://".length()));
+    }
+
+    public String kind() {
+        return kind;
+    }
+
+    /** Pick a kind, "" for all; redrawn from what is already held, no new request. */
+    public void setKind(String value) {
+        kind = value == null ? "" : value;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putString(PREF_KIND, kind).apply();
+        if (!on)
+            return;
+        final int mine = generation;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                rebuild(mine);
+            }
+        });
     }
 
     public void setListener(Listener l) {
@@ -271,6 +345,8 @@ public final class SpotOverlay {
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         for (Spot.Request r : one) {
             if (recentOnly && !isRecent(r, now))
+                continue;
+            if (!ofKind(r, kind))
                 continue;
             if (Double.isNaN(r.lat) || Double.isNaN(r.lon))
                 continue;

@@ -459,6 +459,17 @@ public final class AtmospherePane {
                     public UnitSystem units() {
                         return units;
                     }
+
+                    @Override
+                    public void setSpotKind(String letter) {
+                        if (spotLayer != null) {
+                            spotLayer.setKind(letter);
+                        } else {
+                            final SharedPreferences p = MapCompat.prefs();
+                            if (p != null)
+                                p.edit().putString("weather.layer.spot.kind", letter).apply();
+                        }
+                    }
                 });
         zonePage = new FireZonePage(pluginContext, mapView(), egress, new FireZonePage.Host() {
             @Override
@@ -3837,19 +3848,38 @@ public final class AtmospherePane {
     private void buildSpotLegend() {
         if (spotLegend.getChildCount() > 0)
             return;
-        final String[][] kinds = {
-                { "W", "Wildfire" }, { "P", "Prescribed fire" }, { "M", "Marine" },
-                { "H", "HAZMAT" }, { "S", "Search and rescue" }, { "O", "Other" } };
-        final StringBuilder letters = new StringBuilder();
-        for (String[] k : kinds) {
-            if (letters.length() > 0)
-                letters.append("   ");
-            letters.append(k[0]).append(' ').append(k[1]);
-        }
-        spotLegend.addView(legendLine(letters.toString(), 0));
-        spotLegend.addView(legendLine("Forecast issued", SpotOverlay.DONE));
-        spotLegend.addView(legendLine("Update requested", SpotOverlay.WAITING));
-        spotLegend.addView(legendLine("Waiting for the forecast", SpotOverlay.PENDING));
+        // The discs themselves, as the map draws them (operator, 2026-09-29: "bring
+        // the icon for the type not just W Wildfire but the actual icon"): each kind
+        // in the color of a forecast issued, then what the three colors mean.
+        for (String[] k : SpotOverlay.KINDS)
+            spotLegend.addView(iconLine(SpotOverlay.keyIcon(k[0].charAt(0), SpotOverlay.DONE),
+                    k[1]));
+        spotLegend.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.DONE),
+                "Forecast issued"));
+        spotLegend.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.WAITING),
+                "Update requested"));
+        spotLegend.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.PENDING),
+                "Waiting for the forecast"));
+    }
+
+    /** One legend row led by an icon, at the size a key row reads at. */
+    private View iconLine(android.graphics.Bitmap icon, String text) {
+        final LinearLayout row = new LinearLayout(pluginContext);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(3), 0, dp(3));
+        final ImageView iv = new ImageView(pluginContext);
+        if (icon != null)
+            iv.setImageBitmap(icon);
+        final LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(20), dp(20));
+        ip.rightMargin = dp(8);
+        row.addView(iv, ip);
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(12);
+        t.setTextColor(Color.WHITE);
+        row.addView(t);
+        return row;
     }
 
     /** One legend row: a swatch in the status color, or none for the letter key. */
