@@ -26,7 +26,7 @@ public final class SnowOverlay extends ImageOverlay {
             { "25 to 33 ft", "#FF992B50" }, { "Over 33 ft", "#FF8B4545" } };
 
     public SnowOverlay(MapView mapView, EgressPolicy egress) {
-        super(mapView, egress, "AtmosphereSnow", LAYER_ID, "Snow depth");
+        super(mapView, egress, "AtmosphereSnow", LAYER_ID, "Snow Depth");
     }
 
     @Override

@@ -65,7 +65,7 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         /** A buoy opens its record on the buoy page. */
         void openBuoy(String id);
 
-        /** A fire weather zone opens its planning forecast on the Fire zones page. */
+        /** A fire weather zone opens its planning forecast on the Fire Weather Zones page. */
         void openZone(String id, String name, String cwa);
     }
 

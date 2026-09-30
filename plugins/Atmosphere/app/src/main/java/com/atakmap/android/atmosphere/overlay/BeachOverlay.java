@@ -35,7 +35,7 @@ public final class BeachOverlay {
     private static final String TAG = "AtmosphereBeach";
     public static final String LAYER_ID = "beach";
     public static final String HOST = BeachForecast.HOST;
-    public static final String NAME = "Beach forecast";
+    public static final String NAME = "Beach Forecast";
     private static final String PREF_ON = "weather.layer.beach.on";
     private static final long POLL_MS = 30 * 60 * 1000L;
     private static final long MOVE_SETTLE_MS = 700L;

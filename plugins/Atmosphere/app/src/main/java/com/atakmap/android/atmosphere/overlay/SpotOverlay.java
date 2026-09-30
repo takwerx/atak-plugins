@@ -43,7 +43,7 @@ public final class SpotOverlay {
 
     public static final String LAYER_ID = "spotforecasts";
     public static final String HOST = Spot.HOST;
-    private static final String NAME = "Spot forecasts";
+    private static final String NAME = "Spot Weather Forecast";
 
     /** NWS's own three status colors, so the pane's legend and the map agree. */
     public static final int DONE = SpotIcons.DONE;

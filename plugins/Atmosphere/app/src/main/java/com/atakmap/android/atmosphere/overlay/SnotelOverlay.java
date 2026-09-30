@@ -42,7 +42,7 @@ public final class SnotelOverlay {
     private static final String TAG = "AtmosphereSnotel";
     public static final String LAYER_ID = "snotel";
     public static final String HOST = Snotel.HOST;
-    public static final String NAME = "Snow stations";
+    public static final String NAME = "Snow Stations";
     private static final String PREF_ON = "weather.layer.snotel.on";
     private static final String PREF_UNITS = "weather.units";
     private static final long POLL_MS = 15 * 60 * 1000L;

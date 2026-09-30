@@ -28,7 +28,7 @@ public final class FloodOutlookOverlay extends OutlookOverlay {
     private final String[] urls;
 
     public FloodOutlookOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
-        super(mapView, pluginContext, egress, "AtmosphereFlood", LAYER_ID, "Flash flood outlook");
+        super(mapView, pluginContext, egress, "AtmosphereFlood", LAYER_ID, "Flash Flood Outlook");
         urls = new String[WpcEro.DAYS];
         for (int d = 1; d <= WpcEro.DAYS; d++)
             urls[d - 1] = WpcEro.url(d);

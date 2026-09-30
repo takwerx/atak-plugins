@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.compat.ScaleBar;
 import com.atakmap.android.atmosphere.data.FireAlerts;
 import com.atakmap.android.atmosphere.data.FireZones;
 import com.atakmap.android.atmosphere.data.ZoneFavorites;
@@ -34,7 +35,7 @@ import java.util.concurrent.RejectedExecutionException;
 /**
  * The NWS fire weather zones on the map: outlines with the zone number, shaded in
  * the NWS colors where a Red Flag Warning or a Fire Weather Watch is in effect, and
- * a tap that opens the zone's planning forecast on the Fire zones page.
+ * a tap that opens the zone's planning forecast on the Fire Weather Zones page.
  *
  * <p>Read-only reference data through {@link AtmosphereFeatures}, like the storms:
  * listed in Overlay Manager, nothing to recolor or send. Outlines only where
@@ -49,13 +50,26 @@ import java.util.concurrent.RejectedExecutionException;
 public final class FireZoneOverlay {
     private static final String TAG = "AtmosphereZoneLayer";
     public static final String LAYER_ID = "firezonelayer";
-    public static final String NAME = "Fire weather zones";
+    public static final String NAME = "Fire Weather Zones";
     private static final String PREF_ON = "weather.layer.firezones.on";
 
-    /** A view wider than this, degrees of longitude, is told to zoom in. */
+    /**
+     * The layer's own limit, degrees of longitude: wider than this it says to zoom
+     * in whatever the gate says, because a view that wide is hundreds of zones.
+     */
     private static final double MAX_SPAN_LON = 8d;
-    /** Zone numbers are drawn when the view is narrower than this. */
-    private static final double LABEL_SPAN_LON = 3d;
+    /**
+     * The zoom gates, the way the station, gauge and buoy layers keep theirs
+     * (operator, 2026-09-29: "can i get a zoom gate like the others?"): the
+     * coarsest meters per pixel at which the zones, and their numbers, still draw,
+     * picked as a scale-bar reading. Defaults: zones at 50 of the big unit or
+     * closer, numbers at 15.
+     */
+    private static final String PREF_GATE = "weather.layer.firezones.gate";
+    private static final String PREF_LABEL_GATE = "weather.layer.firezones.labelgate";
+    private static final double DEFAULT_BIG = 50d;
+    private static final double DEFAULT_LABEL_BIG = 15d;
+    private double gate, labelGate;
     private static final long MOVE_SETTLE_MS = 700L;
     /** The warnings are asked for again this often while the layer is on. */
     private static final long ALERTS_POLL_MS = 10 * 60 * 1000L;
@@ -129,6 +143,9 @@ public final class FireZoneOverlay {
         this.egress = egress;
         this.features = new AtmosphereFeatures(mapView, pluginContext, TAG, NAME,
                 "firezones.sqlite", "firezones", false);
+        final SharedPreferences p = MapCompat.prefs();
+        gate = storedGate(p, PREF_GATE, gsdForBig(DEFAULT_BIG));
+        labelGate = storedGate(p, PREF_LABEL_GATE, gsdForBig(DEFAULT_LABEL_BIG));
         // A tap lists the zone it is inside, not every zone whose box holds it.
         features.setHitFilter(new AtmosphereFeatures.HitFilter() {
             @Override
@@ -210,6 +227,57 @@ public final class FireZoneOverlay {
         ensure(false);
     }
 
+    public double gate() {
+        return gate;
+    }
+
+    public double labelGate() {
+        return labelGate;
+    }
+
+    public void setGate(double metersPerPixel) {
+        if (gate == metersPerPixel)
+            return;
+        gate = metersPerPixel;
+        remember(PREF_GATE, metersPerPixel);
+        if (on)
+            ensure(true);
+    }
+
+    public void setLabelGate(double metersPerPixel) {
+        if (labelGate == metersPerPixel)
+            return;
+        labelGate = metersPerPixel;
+        remember(PREF_LABEL_GATE, metersPerPixel);
+        if (on)
+            ensure(false);
+    }
+
+    /** A scale-bar distance as a map resolution, against this device's own bar. */
+    private double gsdForBig(double big) {
+        final double res = mapView.getMapResolution();
+        final double m = res <= 0 ? 0 : ScaleBar.meters(mapView);
+        final double barPx = m > 0 && res > 0 ? m / res : ScaleBar.FALLBACK_BAR_PIXELS;
+        return ScaleBar.bigToMeters(big) / barPx;
+    }
+
+    private static void remember(String key, double metersPerPixel) {
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putFloat(key, (float) Math.min(metersPerPixel, Float.MAX_VALUE)).apply();
+    }
+
+    private static double storedGate(SharedPreferences p, String key, double fallback) {
+        if (p == null)
+            return fallback;
+        try {
+            return p.getFloat(key, (float) Math.min(fallback, Float.MAX_VALUE));
+        } catch (ClassCastException oldFormat) {
+            p.edit().remove(key).apply();
+            return fallback;
+        }
+    }
+
     /** A zone was starred or unstarred; draw it the new way. */
     public void restyle() {
         if (on && !zones.isEmpty())
@@ -223,8 +291,10 @@ public final class FireZoneOverlay {
         if (b == null)
             return;
         final double w = b.getWest(), e = b.getEast(), s = b.getSouth(), n = b.getNorth();
+        final double res = mapView.getMapResolution();
+        // A gate of "Always" is the largest float, which every resolution is under.
         if (Double.isNaN(w) || Double.isNaN(e) || Double.isNaN(s) || Double.isNaN(n)
-                || e <= w || e - w > MAX_SPAN_LON) {
+                || e <= w || e - w > MAX_SPAN_LON || res > gate) {
             if (region != null || !zones.isEmpty() || force) {
                 region = null;
                 zones = new ArrayList<>();
@@ -236,14 +306,19 @@ public final class FireZoneOverlay {
             return;
         }
         final double span = e - w;
-        final boolean labels = span <= LABEL_SPAN_LON;
+        final boolean labels = res <= labelGate;
         boolean refetch = force || region == null
-                || w < region[0] || s < region[1] || e > region[2] || n > region[3]
-                || labels != regionLabels;
+                || w < region[0] || s < region[1] || e > region[2] || n > region[3];
         if (!refetch)
             refetch = span < (region[2] - region[0]) / 3.5;
-        if (!refetch)
+        if (!refetch) {
+            // Crossing the numbers' gate is a redraw of what is held, not a fetch.
+            if (labels != regionLabels) {
+                regionLabels = labels;
+                rebuild(generation);
+            }
             return;
+        }
         final double padX = span * 0.25, padY = (n - s) * 0.25;
         final double[] r = { Math.max(-180, w - padX), Math.max(-85, s - padY),
                 Math.min(180, e + padX), Math.min(85, n + padY) };

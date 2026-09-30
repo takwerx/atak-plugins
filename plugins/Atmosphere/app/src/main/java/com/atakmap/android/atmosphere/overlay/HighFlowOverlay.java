@@ -39,7 +39,7 @@ public final class HighFlowOverlay {
     private static final String TAG = "AtmosphereHighFlow";
     public static final String LAYER_ID = "highflow";
     public static final String HOST = HighFlow.HOST;
-    public static final String NAME = "Streams running high";
+    public static final String NAME = "Streams Running High";
     private static final String PREF_ON = "weather.layer.highflow.on";
     private static final long POLL_MS = 30 * 60 * 1000L;
     private static final long MOVE_SETTLE_MS = 700L;

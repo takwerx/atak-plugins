@@ -20,7 +20,7 @@ public final class SstOverlay extends ImageOverlay {
             + "&format=image/png";
 
     public SstOverlay(MapView mapView, EgressPolicy egress) {
-        super(mapView, egress, "AtmosphereSst", LAYER_ID, "Sea surface temperature");
+        super(mapView, egress, "AtmosphereSst", LAYER_ID, "Sea Surface Temperature");
     }
 
     @Override

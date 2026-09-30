@@ -230,6 +230,8 @@ public final class AtmospherePane {
     private final Button firezonesToggle;
     private final TextView firezonesStatus;
     private final LinearLayout firezonesLegend;
+    private final LinearLayout firezonesGateRow, firezonesLabelGateRow;
+    private final TextView firezonesGateText, firezonesLabelGateText;
     private FireZoneOverlay fireZones;
     private boolean firezonesOpen = true;
     private static final String PREF_FLOOD_OPEN = "weather.flood.open";
@@ -516,6 +518,11 @@ public final class AtmospherePane {
         pagePrev = root.findViewById(R.id.page_prev);
         pageNext = root.findViewById(R.id.page_next);
         pagePick = root.findViewById(R.id.page_pick);
+        // A long page name shrinks to fit two lines rather than being cut off; the
+        // short ones stay at 13sp. Older Android keeps 13sp and the ellipsis.
+        if (pagePick != null && android.os.Build.VERSION.SDK_INT >= 26)
+            pagePick.setAutoSizeTextTypeUniformWithConfiguration(9, 13, 1,
+                    android.util.TypedValue.COMPLEX_UNIT_SP);
         iconCaptions = root.findViewById(R.id.icon_captions);
         wideCaption = root.findViewById(R.id.cap_wide);
         iconRow = root.findViewById(R.id.icon_row);
@@ -588,6 +595,10 @@ public final class AtmospherePane {
         firezonesToggle = find(R.id.firezones_toggle);
         firezonesStatus = find(R.id.firezones_status);
         firezonesLegend = find(R.id.firezones_legend);
+        firezonesGateRow = find(R.id.firezones_gate_row);
+        firezonesGateText = find(R.id.firezones_gate_text);
+        firezonesLabelGateRow = find(R.id.firezones_label_gate_row);
+        firezonesLabelGateText = find(R.id.firezones_label_gate_text);
         floodSettings = find(R.id.flood_settings);
         floodExpand = find(R.id.flood_expand);
         floodToggle = find(R.id.flood_toggle);
@@ -3461,6 +3472,22 @@ public final class AtmospherePane {
                 });
     }
 
+    private void buildFireZonesGateRows() {
+        gateRow(firezonesGateRow, firezonesGateText, "Zones", fireZones.gate(), new Gate() {
+            @Override
+            public void set(double gsd) {
+                fireZones.setGate(gsd);
+            }
+        });
+        gateRow(firezonesLabelGateRow, firezonesLabelGateText, "Zone numbers",
+                fireZones.labelGate(), new Gate() {
+                    @Override
+                    public void set(double gsd) {
+                        fireZones.setLabelGate(gsd);
+                    }
+                });
+    }
+
     /** Feature Layer's ladder, as scale-bar readings in the operator's big unit. */
     private static final double[] GATE_BIG = { 0.25, 1, 5, 15, 50 };
 
@@ -4547,6 +4574,8 @@ public final class AtmospherePane {
         firezonesExpand.setVisibility(firezonesOn ? View.VISIBLE : View.GONE);
         firezonesExpand.setRotation(firezonesOpen ? 180f : 0f);
         firezonesSettings.setVisibility(firezonesOn && firezonesOpen ? View.VISIBLE : View.GONE);
+        if (firezonesOn && stationLayer != null)
+            buildFireZonesGateRows();
         final boolean avalancheOn = avalanche != null && avalanche.isOn();
         avalancheToggle.setText(avalancheOn ? R.string.avalanche_on : R.string.avalanche_off);
         avalancheToggle.setTextColor(pluginContext.getResources().getColor(

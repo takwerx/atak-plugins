@@ -76,6 +76,10 @@
                 android:contentDescription="@string/caption_prev"
                 android:src="@drawable/ic_page_next" />
 
+            <!-- Two lines allowed, and the text shrinks to fit (set in code, API 26+):
+                 "Fire Weather Zones" does not fit one line at half width and was cut
+                 to "Fire Weath..." (operator, 2026-09-29). The short names stay one
+                 line at 13sp. -->
             <Button
                 android:id="@+id/page_pick"
                 style="@style/TakwerxButton"
@@ -86,6 +90,11 @@
                 android:layout_marginRight="2dp"
                 android:paddingLeft="4dp"
                 android:paddingRight="4dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:singleLine="false"
+                android:maxLines="2"
+                android:lineSpacingMultiplier="0.9"
                 android:textSize="13sp"
                 android:text="@string/tab_forecast" />
 
