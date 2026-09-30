@@ -3849,17 +3849,31 @@ public final class AtmospherePane {
         if (spotLegend.getChildCount() > 0)
             return;
         // The discs themselves, as the map draws them (operator, 2026-09-29: "bring
-        // the icon for the type not just W Wildfire but the actual icon"): each kind
-        // in the color of a forecast issued, then what the three colors mean.
+        // the icon for the type not just W Wildfire but the actual icon"), in two
+        // columns: the kinds on the left in the color of a forecast issued, what the
+        // three colors mean on the right ("two columns with the types on left and
+        // the status on right").
+        final LinearLayout cols = new LinearLayout(pluginContext);
+        cols.setOrientation(LinearLayout.HORIZONTAL);
+        cols.setBaselineAligned(false);
+        final LinearLayout kinds = new LinearLayout(pluginContext);
+        kinds.setOrientation(LinearLayout.VERTICAL);
+        final LinearLayout states = new LinearLayout(pluginContext);
+        states.setOrientation(LinearLayout.VERTICAL);
         for (String[] k : SpotOverlay.KINDS)
-            spotLegend.addView(iconLine(SpotOverlay.keyIcon(k[0].charAt(0), SpotOverlay.DONE),
+            kinds.addView(iconLine(SpotOverlay.keyIcon(k[0].charAt(0), SpotOverlay.DONE),
                     k[1]));
-        spotLegend.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.DONE),
+        states.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.DONE),
                 "Forecast issued"));
-        spotLegend.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.WAITING),
+        states.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.WAITING),
                 "Update requested"));
-        spotLegend.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.PENDING),
+        states.addView(iconLine(SpotOverlay.keyIcon('W', SpotOverlay.PENDING),
                 "Waiting for the forecast"));
+        cols.addView(kinds, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        cols.addView(states, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        spotLegend.addView(cols);
     }
 
     /** One legend row led by an icon, at the size a key row reads at. */
