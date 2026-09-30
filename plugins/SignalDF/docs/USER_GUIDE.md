@@ -2,16 +2,16 @@
 
 Signal DF puts direction-finding bearings from a KrakenSDR onto the ATAK map.
 
-**This guide covers version 0.2**, which does the whole hunt: connects to the
+**This guide covers version 0.3**, which does the whole hunt: connects to the
 radio, draws bearings, collects them while you drive, crosses them to work out
 where the transmitter is, and tells you where to drive next to sharpen the
 answer.
 
-**Download Signal DF 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Signal DF 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- [ATAK-CIV 5.6](https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.6.0-civ-release.apk)
-- [ATAK-CIV 5.7](https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.7.0-civ-release.apk)
-- [ATAK-CIV 5.8](https://github.com/takwerx/signal-df/releases/download/v0.2/ATAK-Plugin-SignalDF-0.2--5.8.0-civ-release.apk)
+- [ATAK-CIV 5.6](https://github.com/takwerx/signal-df/releases/download/v0.3/ATAK-Plugin-SignalDF-0.3--5.6.0-civ-release.apk)
+- [ATAK-CIV 5.7](https://github.com/takwerx/signal-df/releases/download/v0.3/ATAK-Plugin-SignalDF-0.3--5.7.0-civ-release.apk)
+- [ATAK-CIV 5.8](https://github.com/takwerx/signal-df/releases/download/v0.3/ATAK-Plugin-SignalDF-0.3--5.8.0-civ-release.apk)
 
 All releases: https://github.com/takwerx/signal-df/releases
 
@@ -340,10 +340,12 @@ driving you have three, which is enough for a first answer.
 | What you see | What it is |
 |---|---|
 | **A faint cyan fan** | every bearing you have collected, fading with age. Where they pile up is the transmitter. |
-| **A magenta dot** with the frequency on it | the fix — where the maths says the transmitter is |
-| **A magenta outline** around it | the 95% error area. Long and thin means you know the direction well and the distance badly. |
-| **A yellow line** | everywhere you have collected from — your coverage, and by its absence, where you have not been |
-| **An orange dot** | **Drive here.** Where to go next to sharpen the fix. |
+| **A filled magenta shape**, labelled with the frequency and a ± figure | the fix and its 95% error area, together. Long and thin means you know the direction well and the distance badly. There is no dot in the middle on purpose — a point would claim the transmitter is exactly there, and the whole reason for the shape is that it is not. |
+| **A lime line** | everywhere you have collected from — your coverage, and by its absence, where you have not been |
+| **An orange band** | **Drive into this.** Where to go next to sharpen the fix. |
+
+The frequency label turns **green** when the geometry has reached the range
+that gives the best accuracy. White means it is still worth driving.
 
 ### Reading the fan
 
@@ -364,30 +366,53 @@ readings from there, and to **Clear** and start again if you took a lot of them.
 The error area can only tell you the bearings disagree. The fan tells you which
 one, and where you were standing.
 
-### Drive here, and when to stop using it
+### The orange band, and when it disappears
 
 While your bearings all run nearly parallel, the fix is a long thin sliver:
 the direction is pinned and the distance along it is not. More bearings from
-the same road will not fix that. Driving **across** them will.
+the same road will not fix that. Going **around** the transmitter will.
 
-That is what the orange dot is. It sits perpendicular to your bearings, at a
-distance scaled to how uncertain the fix currently is, and **it stays where it
-is** until you get there. You can Bloodhound to it, and it will not move while
-you drive, which is the whole point.
+That is what the band is. It is an arc centred on the fix, and it asks for two
+things at once:
 
-When the geometry comes good the orange dot disappears and the pane says:
+- **Swing round.** Driving straight at a transmitter changes the bearing not at
+  all — every bearing taken from along that line is the same line, and lines
+  lying on top of each other never cross. Moving sideways is what makes them
+  cross.
+- **Come in.** Range is the strongest single driver of error, so the band is
+  drawn inside where you are now. Reaching it shortens the range, which draws
+  the next band in closer still. Over a search that is a spiral.
 
-> Geometry is good. The fix marker is the place to go.
+**Anywhere inside the band will do.** It is a region and not a point because
+"anywhere in here, the roads decide the rest" is the honest instruction — a dot
+would claim a precision the advice does not have.
 
-That is the handover. The orange dot is a tactic; the magenta dot is the
-destination. From then on, Bloodhound the fix.
+**How wide it is tells you something.** Early on the band is a deep wedge,
+because the range to the transmitter is still a guess and the band covers the
+possibilities. As the fix firms up it narrows and pulls inward. It shrinking is
+the search working.
+
+When your bearings span the angle that gives the best accuracy, the band
+**removes itself** — there is nothing left for it to tell you — and the
+frequency label on the map turns green.
 
 ### What the pane tells you
 
-> Collecting. 47 bearings, each from a different place. Fix within 1.2 mi.
-> Poor crossing angle — your bearings only span 6 degrees. Drive across them,
-> toward 073 or 253, to tighten this.
+> Collecting. 47 bearings.
+> Fix within 1.2 mi.
+> Fix from three or more bearings.
+> Angle width 34 of the 90 wanted. Drive into the orange band.
 > 18 dropped: 18 with the front end saturated — turn the radio's gain down.
+
+One fact to a line, and the whole block is coloured: **white** while there is
+no fix yet, **green** once there is one.
+
+The words are the manuals'. One bearing gives a direction; two give a **cut**;
+**three or more make a fix**, which is why nothing crosses until you have three
+from three places. **Angle width** is the angle between your outermost
+bearings — for one vehicle driving around a transmitter, it is simply how far
+round it you have got. Ninety degrees is where published trials put the best
+accuracy, and the band exists to get you there.
 
 "Fix within" is the **worst case** — the long axis of the error area, not an
 average. If it says 200 ft, the transmitter is within 200 ft.
@@ -476,7 +501,7 @@ later.
 
 ---
 
-## What 0.2 does not do yet
+## What 0.3 does not do yet
 
 Said plainly, so nothing here is a surprise.
 

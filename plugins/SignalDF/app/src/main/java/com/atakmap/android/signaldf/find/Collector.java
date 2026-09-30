@@ -73,6 +73,11 @@ public final class Collector implements KrakenLink.Listener {
     private final SharedPreferences prefs;
     private final FixLayer layer;
 
+    /** What the pane switches on and off, and asks to jump to. */
+    public FixLayer layer() {
+        return layer;
+    }
+
     private final Map<Integer, SampleLog> logs = new HashMap<>();
     private final Map<Integer, SampleLog.Result> results = new HashMap<>();
     private final Quality.Tally tally = new Quality.Tally();
@@ -170,6 +175,22 @@ public final class Collector implements KrakenLink.Listener {
      * kept -- an operator parked at a gate with the toggle on is collecting
      * exactly nothing and should be told so.
      */
+    /**
+     * How far along the search is, for the pane to colour its status by. The
+     * same rule the map draws the band from, so the two cannot disagree.
+     */
+    public com.atakmap.android.signaldf.data.Guidance.Stage stage() {
+        if (!isOn())
+            return com.atakmap.android.signaldf.data.Guidance.Stage.HUNTING;
+        SampleLog.Result best = null;
+        for (SampleLog.Result r : results.values())
+            if (r != null && (best == null
+                    || r.fix.accuracyM() < best.fix.accuracyM()))
+                best = r;
+        return com.atakmap.android.signaldf.data.Guidance.stage(
+                best == null ? Double.NaN : best.fix.spreadDeg, best != null);
+    }
+
     public String status() {
         if (!isOn()) {
             int n = collected();
@@ -186,26 +207,32 @@ public final class Collector implements KrakenLink.Listener {
                     + com.atakmap.android.signaldf.data.Units.format(
                             SampleLog.MIN_MOVE_M) + " from the last one.";
 
-        // Not "%d bearings from %d places" with the same number twice, which
-        // is true -- the movement gate guarantees one per place -- and reads
-        // like a bug.
+        // One fact to a line. The count used to carry "each from a
+        // different place" to head off "7 bearings from 7 places" reading like
+        // a bug -- but the movement gate makes that true by construction, so
+        // it was explaining an implementation detail to somebody driving.
         StringBuilder s = new StringBuilder(String.format(Locale.US,
-                "Collecting. %d bearings, each from a different place.", n));
+                "Collecting. %d bearings.", n));
         SampleLog.Result best = null;
         for (SampleLog.Result r : results.values())
             if (r != null && (best == null
                     || r.fix.accuracyM() < best.fix.accuracyM()))
                 best = r;
         if (best == null) {
-            s.append(" No crossing yet.");
+            s.append("\nNo crossing yet.");
         } else {
-            s.append(String.format(Locale.US, " Fix within %s.",
+            s.append(String.format(Locale.US, "\nFix within %s.",
                     com.atakmap.android.signaldf.data.Units.format(
                             best.fix.accuracyM())));
-            String advice = best.fix.advice();
-            if (advice != null)
-                s.append('\n').append(advice);
         }
+        // What to do about it, from the same rule the band on the map and the
+        // notification use. This replaced BearingFix.advice() here: that text
+        // was written for the old perpendicular waypoint and told the operator
+        // to "drive across them, toward 129 or 309" while the line under it
+        // said to drive into the band. Two sentences, one instruction, and the
+        // older one named a heading the map no longer showed.
+        s.append('\n').append(com.atakmap.android.signaldf.data.Guidance.line(
+                stage(), best == null ? Double.NaN : best.fix.spreadDeg));
         String dropped = tally.describe();
         if (dropped != null)
             s.append('\n').append(dropped);
