@@ -82,6 +82,9 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
     private final BearingLayer layer;
     private Button collectToggleButton;
     private Button collectClearButton;
+    private Button showLobsButton;
+    private Button showFixButton;
+    private Button goToFixButton;
     private TextView collectNote;
     private Button shareFeedButton;
     private Button shareStaleButton;
@@ -137,7 +140,11 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         collectToggleButton = root.findViewById(R.id.collect_toggle);
         collectClearButton = root.findViewById(R.id.collect_clear);
         collectNote = root.findViewById(R.id.collect_note);
+        showLobsButton = root.findViewById(R.id.show_lobs);
+        showFixButton = root.findViewById(R.id.show_fix);
+        goToFixButton = root.findViewById(R.id.go_to_fix);
         wireCollecting();
+        wireMapSwitches();
         shareFeedButton = root.findViewById(R.id.share_feed);
         shareStaleButton = root.findViewById(R.id.share_stale);
         shareToggleButton = root.findViewById(R.id.share_toggle);
@@ -710,6 +717,49 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
 
     // ---- finding -----------------------------------------------------------
 
+    /**
+     * What is on the map, and getting to it.
+     *
+     * <p>Two switches and a button, because all three answer the same
+     * complaint: the bearing lines are what show a reflection as the one line
+     * missing the crowd, and they are also what buries the answer once it is
+     * found. Rather than guess a middle ground -- a fainter line, a louder
+     * ellipse -- the operator turns off whichever is in the way.
+     */
+    private void wireMapSwitches() {
+        showLobsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Collector c = Collector.get();
+                if (c == null)
+                    return;
+                c.layer().setShowLobs(!c.layer().isShowingLobs());
+                refresh();
+            }
+        });
+
+        showFixButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Collector c = Collector.get();
+                if (c == null)
+                    return;
+                c.layer().setShowFix(!c.layer().isShowingFix());
+                refresh();
+            }
+        });
+
+        goToFixButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Collector c = Collector.get();
+                if (c == null || !c.layer().goToAnyFix())
+                    toast("no fix to go to yet -- three bearings from three "
+                            + "places are needed before anything crosses");
+            }
+        });
+    }
+
     private void wireCollecting() {
         collectToggleButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -768,6 +818,31 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
                 on ? R.color.on_green : R.color.off_red));
         collectClearButton.setEnabled(c.collected() > 0);
         collectNote.setText(c.status());
+        boolean lobs = c.layer().isShowingLobs();
+        boolean fix = c.layer().isShowingFix();
+        showLobsButton.setText(lobs ? "LOBS ON" : "LOBS OFF");
+        showLobsButton.setTextColor(pluginContext.getResources().getColor(
+                lobs ? R.color.on_green : R.color.off_red));
+        showFixButton.setText(fix ? "FIX ON" : "FIX OFF");
+        showFixButton.setTextColor(pluginContext.getResources().getColor(
+                fix ? R.color.on_green : R.color.off_red));
+        // The state reads at a glance, the way the toggles do: green once the
+        // geometry is good, amber while there is still arc to drive, plain
+        // while nothing crosses yet.
+        int stageColor;
+        switch (c.stage()) {
+            case GOOD:
+                stageColor = R.color.on_green;
+                break;
+            case FIRST_FIX:
+                stageColor = R.color.warn_amber;
+                break;
+            default:
+                stageColor = R.color.white;
+                break;
+        }
+        collectNote.setTextColor(
+                pluginContext.getResources().getColor(stageColor));
     }
 
     private void refreshSharing() {
@@ -912,6 +987,13 @@ public class SignalDfDropDown extends DropDownReceiver implements OnStateListene
         TextView detail = v.findViewById(R.id.detail);
 
         freq.setText(String.format(Locale.US, "VFO %d   %.4f MHz", b.vfo, b.frequencyMHz()));
+        // Green once this VFO has a fix -- three or more bearings that have
+        // crossed. The frequency is what an operator scans the list for, so it
+        // is the right place to carry "this one is solved".
+        Collector fc = Collector.get();
+        boolean haveFix = fc != null && fc.result(b.vfo) != null;
+        freq.setTextColor(pluginContext.getResources().getColor(
+                haveFix ? R.color.on_green : R.color.white));
 
         // "rel" when the heading is unknown: a number of degrees on a north-up
         // map reads as a bearing to north, and this one is to an antenna.
