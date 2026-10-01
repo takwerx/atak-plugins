@@ -58,6 +58,7 @@ import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
+import com.atakmap.android.atmosphere.overlay.LightningOverlay;
 import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -237,6 +238,14 @@ public final class AtmospherePane {
     private final LinearLayout sawtiDayRow;
     private SawtiOverlay sawti;
     private boolean sawtiOpen = true;
+    private static final String PREF_LIGHTNING_OPEN = "weather.lightning.open";
+    private final LinearLayout lightningSettings;
+    private final ImageButton lightningExpand;
+    private final Button lightningToggle;
+    private final TextView lightningStatus;
+    private final LinearLayout lightningLegend;
+    private LightningOverlay lightning;
+    private boolean lightningOpen = true;
     private static final String PREF_FIREZONES_OPEN = "weather.firezones.open";
     private final LinearLayout firezonesSettings;
     private final ImageButton firezonesExpand;
@@ -627,6 +636,11 @@ public final class AtmospherePane {
         sawtiStatus = find(R.id.sawti_status);
         sawtiLegend = find(R.id.sawti_legend);
         sawtiDayRow = find(R.id.sawti_day_row);
+        lightningSettings = find(R.id.lightning_settings);
+        lightningExpand = find(R.id.lightning_expand);
+        lightningToggle = find(R.id.lightning_toggle);
+        lightningStatus = find(R.id.lightning_status);
+        lightningLegend = find(R.id.lightning_legend);
         firezonesSettings = find(R.id.firezones_settings);
         firezonesExpand = find(R.id.firezones_expand);
         firezonesToggle = find(R.id.firezones_toggle);
@@ -912,6 +926,15 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        lightningOpen = prefs == null || prefs.getBoolean(PREF_LIGHTNING_OPEN, true);
+        lightningExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                lightningOpen = !lightningOpen;
+                rememberFold(PREF_LIGHTNING_OPEN, lightningOpen);
+                updateLayerControls();
+            }
+        });
         firezonesOpen = prefs == null || prefs.getBoolean(PREF_FIREZONES_OPEN, true);
         firezonesExpand.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1168,6 +1191,8 @@ public final class AtmospherePane {
             firewx.refresh(false);
         if (sawti != null && sawti.isOn())
             sawti.refresh(false);
+        if (lightning != null && lightning.isOn())
+            lightning.refresh(false);
         if (fireZones != null && fireZones.isOn())
             fireZones.refresh();
         if (flood != null && flood.isOn())
@@ -1855,6 +1880,26 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** Lightning strike density; the newest frame, its time and age on the status line. */
+    public void setLightning(LightningOverlay overlay) {
+        lightning = overlay;
+        if (lightning == null)
+            return;
+        lightning.setListener(new LightningOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                lightningStatus.setText(status);
+                lightningStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        lightningLegend.removeAllViews();
+        lightningLegend.addView(legendLine(pluginContext.getString(R.string.lightning_legend_heading), 0));
+        for (int i = 0; i < com.atakmap.android.atmosphere.data.Lightning.BANDS.length; i++)
+            lightningLegend.addView(legendLine(com.atakmap.android.atmosphere.data.Lightning.BANDS[i],
+                    com.atakmap.android.atmosphere.data.Lightning.BAND_COLORS[i]));
+        updateLayerControls();
+    }
+
     /**
      * Which day of an outlook is on the map: one at a time by default, because
      * three days of bands stacked on one map hide each other and a tap on the
@@ -2143,6 +2188,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowSawti();
+                }
+            }
+        });
+        lightningToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (lightning == null)
+                    return;
+                if (lightning.isOn()) {
+                    lightning.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(LightningOverlay.LAYER_ID)) {
+                    lightning.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowLightning();
                 }
             }
         });
@@ -3416,6 +3477,10 @@ public final class AtmospherePane {
             sawti.setOn(on);
         else if (sawti != null && on)
             blocked++;
+        if (lightning != null && (!on || allowed(LightningOverlay.LAYER_ID)))
+            lightning.setOn(on);
+        else if (lightning != null && on)
+            blocked++;
         if (fireZones != null && (!on || allowed(FireZoneOverlay.LAYER_ID)))
             fireZones.setOn(on);
         else if (fireZones != null && on)
@@ -4402,6 +4467,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowLightning() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.lightning_allow_title))
+                .setMessage(pluginContext.getString(R.string.lightning_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(LightningOverlay.LAYER_ID, true);
+                                if (lightning != null)
+                                    lightning.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowFireZones() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -4751,6 +4837,13 @@ public final class AtmospherePane {
         sawtiExpand.setVisibility(sawtiOn ? View.VISIBLE : View.GONE);
         sawtiExpand.setRotation(sawtiOpen ? 180f : 0f);
         sawtiSettings.setVisibility(sawtiOn && sawtiOpen ? View.VISIBLE : View.GONE);
+        final boolean lightningOn = lightning != null && lightning.isOn();
+        lightningToggle.setText(lightningOn ? R.string.lightning_on : R.string.lightning_off);
+        lightningToggle.setTextColor(pluginContext.getResources().getColor(
+                lightningOn ? R.color.state_on : R.color.state_off));
+        lightningExpand.setVisibility(lightningOn ? View.VISIBLE : View.GONE);
+        lightningExpand.setRotation(lightningOpen ? 180f : 0f);
+        lightningSettings.setVisibility(lightningOn && lightningOpen ? View.VISIBLE : View.GONE);
         final boolean firezonesOn = fireZones != null && fireZones.isOn();
         firezonesToggle.setText(firezonesOn ? R.string.firezones_on : R.string.firezones_off);
         firezonesToggle.setTextColor(pluginContext.getResources().getColor(
@@ -4872,6 +4965,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_sawti, SawtiOverlay.HOST));
+        }
+        if (lightning != null && lightning.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_lightning, LightningOverlay.HOST));
         }
         if (flood != null && flood.isOn()) {
             if (out.length() > 0)

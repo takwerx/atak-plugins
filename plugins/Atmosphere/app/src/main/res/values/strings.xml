@@ -116,6 +116,12 @@
     <string name="heading_sawti_event">Event Description</string>
     <string name="heading_sawti_actions">Recommended Actions</string>
     <string name="heading_sawti_table">All Zones</string>
+    <string name="lightning_on">Lightning ON</string>
+    <string name="lightning_off">Lightning OFF</string>
+    <string name="lightning_allow_title">Show lightning?</string>
+    <string name="lightning_allow_text">Atmosphere will ask NOAA where lightning has struck in the last 15 minutes around the map view, and draw it by how many strikes. It arrives 10 to 25 minutes after the strikes: it shows which storms are making lightning and whether they are building, not where the next strike will be, and is not a reason to call it safe to be outside. The map view is sent, not your position.\n\nServer: nowcoast.noaa.gov</string>
+    <string name="lightning_legend_heading">Strikes in a 5-mile square in 15 minutes</string>
+    <string name="credit_lightning">Lightning strike density from NOAA nowCOAST and the NWS Ocean Prediction Center, from the NLDN and GLD360 detection networks (%1$s)</string>
     <string name="credit_firewx">Fire weather outlook from the NOAA Storm Prediction Center (%1$s)</string>
     <string name="flood_on">Flash Flood Outlook ON</string>
     <string name="flood_off">Flash Flood Outlook OFF</string>
