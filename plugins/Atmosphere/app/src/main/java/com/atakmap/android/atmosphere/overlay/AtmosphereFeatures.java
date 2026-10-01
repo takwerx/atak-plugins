@@ -984,6 +984,7 @@ final class AtmosphereFeatures {
             case "gauges": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_gauges;
             case "firewx": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_firewx;
             case "sawti": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_sawti;
+            case "psps": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_psps;
             case "flood": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_flood;
             case "beach": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_beach;
             case "buoys": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_buoys;

@@ -59,6 +59,7 @@ import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
 import com.atakmap.android.atmosphere.overlay.LightningOverlay;
+import com.atakmap.android.atmosphere.overlay.PspsOverlay;
 import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -246,6 +247,14 @@ public final class AtmospherePane {
     private final LinearLayout lightningLegend;
     private LightningOverlay lightning;
     private boolean lightningOpen = true;
+    private static final String PREF_PSPS_OPEN = "weather.psps.open";
+    private final LinearLayout pspsSettings;
+    private final ImageButton pspsExpand;
+    private final Button pspsToggle;
+    private final TextView pspsStatus;
+    private final LinearLayout pspsLegend;
+    private PspsOverlay psps;
+    private boolean pspsOpen = true;
     private static final String PREF_FIREZONES_OPEN = "weather.firezones.open";
     private final LinearLayout firezonesSettings;
     private final ImageButton firezonesExpand;
@@ -641,6 +650,11 @@ public final class AtmospherePane {
         lightningToggle = find(R.id.lightning_toggle);
         lightningStatus = find(R.id.lightning_status);
         lightningLegend = find(R.id.lightning_legend);
+        pspsSettings = find(R.id.psps_settings);
+        pspsExpand = find(R.id.psps_expand);
+        pspsToggle = find(R.id.psps_toggle);
+        pspsStatus = find(R.id.psps_status);
+        pspsLegend = find(R.id.psps_legend);
         firezonesSettings = find(R.id.firezones_settings);
         firezonesExpand = find(R.id.firezones_expand);
         firezonesToggle = find(R.id.firezones_toggle);
@@ -935,6 +949,15 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        pspsOpen = prefs == null || prefs.getBoolean(PREF_PSPS_OPEN, true);
+        pspsExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pspsOpen = !pspsOpen;
+                rememberFold(PREF_PSPS_OPEN, pspsOpen);
+                updateLayerControls();
+            }
+        });
         firezonesOpen = prefs == null || prefs.getBoolean(PREF_FIREZONES_OPEN, true);
         firezonesExpand.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1193,6 +1216,8 @@ public final class AtmospherePane {
             sawti.refresh(false);
         if (lightning != null && lightning.isOn())
             lightning.refresh(false);
+        if (psps != null && psps.isOn())
+            psps.refresh(false);
         if (fireZones != null && fireZones.isOn())
             fireZones.refresh();
         if (flood != null && flood.isOn())
@@ -1880,6 +1905,24 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** Public Safety Power Shutoffs, California, from Cal OES. */
+    public void setPsps(PspsOverlay overlay) {
+        psps = overlay;
+        if (psps == null)
+            return;
+        psps.setListener(new PspsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                pspsStatus.setText(status);
+                pspsStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        pspsLegend.removeAllViews();
+        for (String[] row : PspsOverlay.LEGEND)
+            pspsLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
     /** Lightning strike density; the newest frame, its time and age on the status line. */
     public void setLightning(LightningOverlay overlay) {
         lightning = overlay;
@@ -2188,6 +2231,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowSawti();
+                }
+            }
+        });
+        pspsToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (psps == null)
+                    return;
+                if (psps.isOn()) {
+                    psps.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(PspsOverlay.LAYER_ID)) {
+                    psps.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowPsps();
                 }
             }
         });
@@ -3481,6 +3540,10 @@ public final class AtmospherePane {
             lightning.setOn(on);
         else if (lightning != null && on)
             blocked++;
+        if (psps != null && (!on || allowed(PspsOverlay.LAYER_ID)))
+            psps.setOn(on);
+        else if (psps != null && on)
+            blocked++;
         if (fireZones != null && (!on || allowed(FireZoneOverlay.LAYER_ID)))
             fireZones.setOn(on);
         else if (fireZones != null && on)
@@ -4467,6 +4530,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowPsps() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.psps_allow_title))
+                .setMessage(pluginContext.getString(R.string.psps_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(PspsOverlay.LAYER_ID, true);
+                                if (psps != null)
+                                    psps.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowLightning() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -4844,6 +4928,13 @@ public final class AtmospherePane {
         lightningExpand.setVisibility(lightningOn ? View.VISIBLE : View.GONE);
         lightningExpand.setRotation(lightningOpen ? 180f : 0f);
         lightningSettings.setVisibility(lightningOn && lightningOpen ? View.VISIBLE : View.GONE);
+        final boolean pspsOn = psps != null && psps.isOn();
+        pspsToggle.setText(pspsOn ? R.string.psps_on : R.string.psps_off);
+        pspsToggle.setTextColor(pluginContext.getResources().getColor(
+                pspsOn ? R.color.state_on : R.color.state_off));
+        pspsExpand.setVisibility(pspsOn ? View.VISIBLE : View.GONE);
+        pspsExpand.setRotation(pspsOpen ? 180f : 0f);
+        pspsSettings.setVisibility(pspsOn && pspsOpen ? View.VISIBLE : View.GONE);
         final boolean firezonesOn = fireZones != null && fireZones.isOn();
         firezonesToggle.setText(firezonesOn ? R.string.firezones_on : R.string.firezones_off);
         firezonesToggle.setTextColor(pluginContext.getResources().getColor(
@@ -4970,6 +5061,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_lightning, LightningOverlay.HOST));
+        }
+        if (psps != null && psps.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_psps, PspsOverlay.HOST));
         }
         if (flood != null && flood.isOn()) {
             if (out.length() > 0)

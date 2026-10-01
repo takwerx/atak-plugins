@@ -32,6 +32,7 @@ import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
 import com.atakmap.android.atmosphere.overlay.LightningOverlay;
+import com.atakmap.android.atmosphere.overlay.PspsOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
@@ -131,6 +132,7 @@ public class Atmosphere implements IPlugin {
     private FireWxOutlookOverlay firewx;
     private SawtiOverlay sawti;
     private LightningOverlay lightning;
+    private PspsOverlay psps;
     private FloodOutlookOverlay flood;
     private BeachOverlay beach;
     private HighFlowOverlay highflow;
@@ -297,6 +299,8 @@ public class Atmosphere implements IPlugin {
         sawti.start();
         lightning = new LightningOverlay(mapView, egress);
         lightning.start();
+        psps = new PspsOverlay(mapView, pluginContext, egress);
+        psps.start();
         flood = new FloodOutlookOverlay(mapView, pluginContext, egress);
         flood.start();
         beach = new BeachOverlay(mapView, pluginContext, egress);
@@ -391,6 +395,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setSawti(sawti);
             if (lightning != null)
                 atmospherePane.setLightning(lightning);
+            if (psps != null)
+                atmospherePane.setPsps(psps);
             if (flood != null)
                 atmospherePane.setFlood(flood);
             if (beach != null)
@@ -488,6 +494,10 @@ public class Atmosphere implements IPlugin {
             flood.stop();
             flood = null;
         }
+        if (psps != null) {
+            psps.stop();
+            psps = null;
+        }
         if (lightning != null) {
             lightning.stop();
             lightning = null;
@@ -584,6 +594,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setSawti(sawti);
             if (lightning != null)
                 atmospherePane.setLightning(lightning);
+            if (psps != null)
+                atmospherePane.setPsps(psps);
             if (flood != null)
                 atmospherePane.setFlood(flood);
             if (beach != null)

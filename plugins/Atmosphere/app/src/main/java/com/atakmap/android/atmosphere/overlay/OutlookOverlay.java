@@ -98,7 +98,7 @@ public abstract class OutlookOverlay {
             if (!on || !started)
                 return;
             refresh(true);
-            mapView.postDelayed(this, POLL_MS);
+            mapView.postDelayed(this, pollMs());
         }
     };
 
@@ -126,6 +126,11 @@ public abstract class OutlookOverlay {
 
     /** What the status says while the first answer is on its way, and on failure. */
     protected abstract String noun();
+
+    /** How often every request is made again while on; half an hour unless the source moves faster. */
+    protected long pollMs() {
+        return POLL_MS;
+    }
 
     /** How many days the day row offers. Called from the constructor: a constant. */
     public int days() {
@@ -213,7 +218,7 @@ public abstract class OutlookOverlay {
         inFlight = false;
         if (value) {
             refresh(true);
-            mapView.postDelayed(autoPoll, POLL_MS);
+            mapView.postDelayed(autoPoll, pollMs());
         } else {
             areas = new ArrayList<>();
             drawNothing();

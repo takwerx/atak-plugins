@@ -122,6 +122,11 @@
     <string name="lightning_allow_text">Atmosphere will ask NOAA where lightning has struck in the last 15 minutes around the map view, and draw it by how many strikes. It arrives 10 to 25 minutes after the strikes: it shows which storms are making lightning and whether they are building, not where the next strike will be, and is not a reason to call it safe to be outside. The map view is sent, not your position.\n\nServer: nowcoast.noaa.gov</string>
     <string name="lightning_legend_heading">Strikes in a 5-mile square in 15 minutes</string>
     <string name="credit_lightning">Lightning strike density from NOAA nowCOAST and the NWS Ocean Prediction Center, from the NLDN and GLD360 detection networks (%1$s)</string>
+    <string name="psps_on">PSPS ON</string>
+    <string name="psps_off">PSPS OFF</string>
+    <string name="psps_allow_title">Show PSPS?</string>
+    <string name="psps_allow_text">Atmosphere will ask Cal OES which California counties a utility has warned may have a Public Safety Power Shutoff, and where the power has been cut, and draw them. It covers PG&amp;E, SCE and SDG&amp;E customers only. Your position is not sent.\n\nServer: services.arcgis.com</string>
+    <string name="credit_psps">Public Safety Power Shutoffs from the California Governor\'s Office of Emergency Services (Cal OES), as reported by PG&amp;E, SCE and SDG&amp;E (%1$s)</string>
     <string name="credit_firewx">Fire weather outlook from the NOAA Storm Prediction Center (%1$s)</string>
     <string name="flood_on">Flash Flood Outlook ON</string>
     <string name="flood_off">Flash Flood Outlook OFF</string>
