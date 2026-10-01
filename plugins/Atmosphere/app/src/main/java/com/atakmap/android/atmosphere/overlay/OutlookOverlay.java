@@ -72,7 +72,7 @@ public abstract class OutlookOverlay {
     private final AtmosphereFeatures features;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final String tag, layerId, prefOn, prefDay;
-    /** 0 draws every day; 1-3 one day. Three days stacked hid each other (2026-09-26). */
+    /** 0 draws every day; 1 to {@link #days()} one day. Three days stacked hid each other (2026-09-26). */
     private int day = 1;
     private Listener listener;
     private boolean started, on, inFlight;
@@ -99,7 +99,7 @@ public abstract class OutlookOverlay {
         this.prefOn = "weather.layer." + layerId + ".on";
         this.prefDay = "weather.layer." + layerId + ".day";
         final SharedPreferences p0 = MapCompat.prefs();
-        day = p0 == null ? 1 : Math.max(0, Math.min(3, p0.getInt(prefDay, 1)));
+        day = p0 == null ? 1 : clampDay(p0.getInt(prefDay, 1));
         this.features = new AtmosphereFeatures(mapView, pluginContext, tag, name,
                 layerId + ".sqlite", layerId, false);
     }
@@ -114,6 +114,53 @@ public abstract class OutlookOverlay {
 
     /** What the status says while the first answer is on its way, and on failure. */
     protected abstract String noun();
+
+    /** How many days the day row offers. Called from the constructor: a constant. */
+    public int days() {
+        return 3;
+    }
+
+    /** Whether the day row offers "All days"; not for areas that are the same places every day. */
+    public boolean allDays() {
+        return true;
+    }
+
+    /** The day row's button for a day, 1 to {@link #days()}. */
+    public String dayLabel(int day) {
+        return "Day " + day;
+    }
+
+    /** A request whose failure is logged and passed over, not the end of the refresh. */
+    protected boolean optional(int index) {
+        return false;
+    }
+
+    /** The fill's alpha for an area; 0 draws the outline alone. */
+    protected int fillAlpha(Area a) {
+        return FILL_ALPHA;
+    }
+
+    /**
+     * The label's own colors, {text, background}, or null for the default: a tile
+     * in the edge's color, drawn only when zoomed well in.
+     */
+    protected int[] labelColors(Area a) {
+        return null;
+    }
+
+    /** With {@link #labelColors}: the coarsest map resolution, meters per pixel, the label draws at. */
+    protected double labelMaxResolution() {
+        return 14d;
+    }
+
+    /** The edge's color for an area, opaque; the category's own color by default. */
+    protected int strokeColor(Area a) {
+        return 0xFF000000 | a.color;
+    }
+
+    private int clampDay(int value) {
+        return Math.max(allDays() ? 0 : 1, Math.min(days(), value));
+    }
 
     public void setListener(Listener l) {
         listener = l;
@@ -170,9 +217,9 @@ public abstract class OutlookOverlay {
         return day;
     }
 
-    /** Which day to draw, 0 for all; redrawn from what is held, no new request. */
+    /** Which day to draw, 0 for all where offered; redrawn from what is held, no new request. */
     public void setDay(int value) {
-        final int v = Math.max(0, Math.min(3, value));
+        final int v = clampDay(value);
         if (v == day)
             return;
         day = v;
@@ -218,6 +265,10 @@ public abstract class OutlookOverlay {
             @Override
             public void onFailure(String error) {
                 Log.w(tag, "request " + index + ": " + error);
+                if (optional(index)) {
+                    fetch(index + 1, got, mine);
+                    return;
+                }
                 inFlight = false;
                 if (mine == generation && on)
                     status(capitalize(noun()) + ": " + error);
@@ -250,9 +301,13 @@ public abstract class OutlookOverlay {
                     final AttributeSet s = new AttributeSet();
                     s.setAttribute("_details", a.details);
                     s.setAttribute("Outlook", a.title);
+                    final int fill = (fillAlpha(a) << 24) | c;
+                    final int[] lc = labelColors(a);
                     drawn.add(new AtmosphereFeatures.Drawn("Day " + a.day, a.title, g,
-                            AtmosphereFeatures.area(0xFF000000 | c, WEIGHT, (FILL_ALPHA << 24) | c,
-                                    a.title), s));
+                            lc == null
+                                    ? AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title)
+                                    : AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title,
+                                            lc[0], lc[1], labelMaxResolution()), s));
                 }
                 features.rewrite(drawn);
                 final String line = summary(snapshot);

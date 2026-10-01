@@ -242,6 +242,24 @@ final class AtmosphereFeatures {
                         LabelPointStyle.ScrollMode.DEFAULT) });
     }
 
+    /**
+     * An area whose label carries its own colors and zoom band rather than the
+     * edge's: a rating's tile, the way the issuing site prints it (SAWTI, the
+     * operator, 2026-10-01: "can the label ... change color based on the rating?").
+     * The background must be opaque; that is how the center label tells it from
+     * the default. {@code labelMaxResolution} is the coarsest map resolution, meters
+     * per pixel, the label still draws at; ATAK's default is 14, which hid a label
+     * on a zone a hundred miles across until the map was a few miles wide.
+     */
+    static Style area(int stroke, float weight, int fill, String label, int labelText,
+            int labelBackground, double labelMaxResolution) {
+        return new CompositeStyle(new Style[] {
+                new BasicFillStyle(fill), new BasicStrokeStyle(stroke, weight),
+                new LabelPointStyle(label, labelText, 0xFF000000 | labelBackground,
+                        LabelPointStyle.ScrollMode.DEFAULT, 0f, 0, 0, 0f, false,
+                        labelMaxResolution) });
+    }
+
     AtmosphereFeatures(MapView mapView, Context pluginContext, String logTag, String layerName,
             String storeName, String type, boolean sweepOldStormDrawings) {
         this.mapView = mapView;
@@ -482,6 +500,19 @@ final class AtmosphereFeatures {
                     final String t = ((LabelPointStyle) c.getStyle(i)).getText();
                     return t == null || t.isEmpty() ? null : t;
                 }
+        }
+        return null;
+    }
+
+    /** The label inside a style, or null. */
+    private static LabelPointStyle labelStyleOf(Style s) {
+        if (s instanceof LabelPointStyle)
+            return (LabelPointStyle) s;
+        if (s instanceof CompositeStyle) {
+            final CompositeStyle c = (CompositeStyle) s;
+            for (int i = 0; i < c.getNumStyles(); i++)
+                if (c.getStyle(i) instanceof LabelPointStyle)
+                    return (LabelPointStyle) c.getStyle(i);
         }
         return null;
     }
@@ -947,6 +978,7 @@ final class AtmosphereFeatures {
             case "highflow": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_highflow;
             case "gauges": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_gauges;
             case "firewx": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_firewx;
+            case "sawti": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_sawti;
             case "flood": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_flood;
             case "beach": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_beach;
             case "buoys": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_buoys;
@@ -1259,11 +1291,20 @@ final class AtmosphereFeatures {
                             // polygon wider than the screen still reads as that polygon's
                             // (operator, 2026-09-26: "some random flood watch label").
                             final int edge = strokeColorOf(d.style);
-                            final int bg = (edge & 0x00FFFFFF) | 0xD9000000;
-                            final int text = luminance(edge) > 150 ? 0xFF000000 : 0xFFFFFFFF;
+                            final LabelPointStyle own = labelStyleOf(d.style);
+                            final boolean colored = own != null
+                                    && (own.getBackgroundColor() >>> 24) == 0xFF;
+                            final int bg = ((colored ? own.getBackgroundColor() : edge)
+                                    & 0x00FFFFFF) | 0xD9000000;
+                            final int text = colored ? own.getTextColor()
+                                    : luminance(edge) > 150 ? 0xFF000000 : 0xFFFFFFFF;
                             store.insertFeature(new Feature(fsid, d.name, new Point(c[1], c[0]),
-                                    new LabelPointStyle(centered, text, bg,
-                                            LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f, true),
+                                    colored
+                                            ? new LabelPointStyle(centered, text, bg,
+                                                    LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f,
+                                                    true, own.getLabelMinRenderResolution())
+                                            : new LabelPointStyle(centered, text, bg,
+                                                    LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f, true),
                                     la, Feature.AltitudeMode.ClampToGround, 0d));
                         }
                     }

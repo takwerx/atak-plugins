@@ -57,6 +57,7 @@ import com.atakmap.android.atmosphere.overlay.SatelliteOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
+import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
 import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -224,6 +225,15 @@ public final class AtmospherePane {
     private final LinearLayout firewxDayRow;
     private FireWxOutlookOverlay firewx;
     private boolean firewxOpen = true;
+    private static final String PREF_SAWTI_OPEN = "weather.sawti.open";
+    private final LinearLayout sawtiSettings;
+    private final ImageButton sawtiExpand;
+    private final Button sawtiToggle;
+    private final TextView sawtiStatus;
+    private final LinearLayout sawtiLegend;
+    private final LinearLayout sawtiDayRow;
+    private SawtiOverlay sawti;
+    private boolean sawtiOpen = true;
     private static final String PREF_FIREZONES_OPEN = "weather.firezones.open";
     private final LinearLayout firezonesSettings;
     private final ImageButton firezonesExpand;
@@ -601,6 +611,12 @@ public final class AtmospherePane {
         firewxStatus = find(R.id.firewx_status);
         firewxLegend = find(R.id.firewx_legend);
         firewxDayRow = find(R.id.firewx_day_row);
+        sawtiSettings = find(R.id.sawti_settings);
+        sawtiExpand = find(R.id.sawti_expand);
+        sawtiToggle = find(R.id.sawti_toggle);
+        sawtiStatus = find(R.id.sawti_status);
+        sawtiLegend = find(R.id.sawti_legend);
+        sawtiDayRow = find(R.id.sawti_day_row);
         firezonesSettings = find(R.id.firezones_settings);
         firezonesExpand = find(R.id.firezones_expand);
         firezonesToggle = find(R.id.firezones_toggle);
@@ -877,6 +893,15 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        sawtiOpen = prefs == null || prefs.getBoolean(PREF_SAWTI_OPEN, true);
+        sawtiExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sawtiOpen = !sawtiOpen;
+                rememberFold(PREF_SAWTI_OPEN, sawtiOpen);
+                updateLayerControls();
+            }
+        });
         firezonesOpen = prefs == null || prefs.getBoolean(PREF_FIREZONES_OPEN, true);
         firezonesExpand.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1131,6 +1156,8 @@ public final class AtmospherePane {
             avalanche.refresh(false);
         if (firewx != null && firewx.isOn())
             firewx.refresh(false);
+        if (sawti != null && sawti.isOn())
+            sawti.refresh(false);
         if (fireZones != null && fireZones.isOn())
             fireZones.refresh();
         if (flood != null && flood.isOn())
@@ -1792,6 +1819,29 @@ public final class AtmospherePane {
     }
 
     /**
+     * The Santa Ana Wildfire Threat Index. Its day row is rebuilt with each answer,
+     * because the buttons name the dates the forecast covers.
+     */
+    public void setSawti(SawtiOverlay overlay) {
+        sawti = overlay;
+        if (sawti == null)
+            return;
+        sawti.setListener(new SawtiOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                sawtiStatus.setText(status);
+                sawtiStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+                buildDayRow(sawtiDayRow, sawti);
+            }
+        });
+        sawtiLegend.removeAllViews();
+        for (String[] row : SawtiOverlay.LEGEND)
+            sawtiLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(sawtiDayRow, sawti);
+        updateLayerControls();
+    }
+
+    /**
      * Which day of an outlook is on the map: one at a time by default, because
      * three days of bands stacked on one map hide each other and a tap on the
      * overlap lists all three (operator, 2026-09-26).
@@ -1800,14 +1850,15 @@ public final class AtmospherePane {
         row.removeAllViews();
         if (layer == null)
             return;
-        final String[] labels = { "Day 1", "Day 2", "Day 3", "All days" };
-        final int[] values = { 1, 2, 3, 0 };
-        for (int i = 0; i < labels.length; i++) {
-            final int value = values[i];
+        final int n = layer.days();
+        final int count = layer.allDays() ? n + 1 : n;
+        for (int i = 0; i < count; i++) {
+            // Days 1..n, then "All days" where the layer offers it (value 0).
+            final int value = i < n ? i + 1 : 0;
             final boolean chosen = layer.day() == value;
             final Button b = (Button) LayoutInflater.from(pluginContext)
                     .inflate(R.layout.trend_chip, row, false);
-            b.setText(labels[i]);
+            b.setText(value == 0 ? "All days" : layer.dayLabel(value));
             b.setTextSize(12);
             b.setTextColor(chosen ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
             b.setOnClickListener(new View.OnClickListener() {
@@ -2062,6 +2113,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowFireWx();
+                }
+            }
+        });
+        sawtiToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (sawti == null)
+                    return;
+                if (sawti.isOn()) {
+                    sawti.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(SawtiOverlay.LAYER_ID)) {
+                    sawti.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowSawti();
                 }
             }
         });
@@ -3331,6 +3398,10 @@ public final class AtmospherePane {
             firewx.setOn(on);
         else if (firewx != null && on)
             blocked++;
+        if (sawti != null && (!on || allowed(SawtiOverlay.LAYER_ID)))
+            sawti.setOn(on);
+        else if (sawti != null && on)
+            blocked++;
         if (fireZones != null && (!on || allowed(FireZoneOverlay.LAYER_ID)))
             fireZones.setOn(on);
         else if (fireZones != null && on)
@@ -4275,6 +4346,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowSawti() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.sawti_allow_title))
+                .setMessage(pluginContext.getString(R.string.sawti_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(SawtiOverlay.LAYER_ID, true);
+                                if (sawti != null)
+                                    sawti.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowFireZones() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -4617,6 +4709,13 @@ public final class AtmospherePane {
         firewxExpand.setVisibility(firewxOn ? View.VISIBLE : View.GONE);
         firewxExpand.setRotation(firewxOpen ? 180f : 0f);
         firewxSettings.setVisibility(firewxOn && firewxOpen ? View.VISIBLE : View.GONE);
+        final boolean sawtiOn = sawti != null && sawti.isOn();
+        sawtiToggle.setText(sawtiOn ? R.string.sawti_on : R.string.sawti_off);
+        sawtiToggle.setTextColor(pluginContext.getResources().getColor(
+                sawtiOn ? R.color.state_on : R.color.state_off));
+        sawtiExpand.setVisibility(sawtiOn ? View.VISIBLE : View.GONE);
+        sawtiExpand.setRotation(sawtiOpen ? 180f : 0f);
+        sawtiSettings.setVisibility(sawtiOn && sawtiOpen ? View.VISIBLE : View.GONE);
         final boolean firezonesOn = fireZones != null && fireZones.isOn();
         firezonesToggle.setText(firezonesOn ? R.string.firezones_on : R.string.firezones_off);
         firezonesToggle.setTextColor(pluginContext.getResources().getColor(
@@ -4733,6 +4832,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_firewx, FireWxOutlookOverlay.HOST));
+        }
+        if (sawti != null && sawti.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_sawti, SawtiOverlay.HOST));
         }
         if (flood != null && flood.isOn()) {
             if (out.length() > 0)

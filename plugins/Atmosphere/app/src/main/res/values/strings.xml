@@ -100,6 +100,11 @@
     <string name="firezones_label_gate_heading">Draw zone numbers at this zoom or closer</string>
     <string name="firezones_allow_title">Show the fire weather zones?</string>
     <string name="firezones_allow_text">Atmosphere will ask the National Weather Service for the fire weather zones in the map view, and which of them are under a Red Flag Warning or Fire Weather Watch, and draw them on the map. The map view is sent, not your position.\n\nServers: mapservices.weather.noaa.gov and api.weather.gov</string>
+    <string name="sawti_on">SAWTI ON</string>
+    <string name="sawti_off">SAWTI OFF</string>
+    <string name="sawti_allow_title">Show SAWTI?</string>
+    <string name="sawti_allow_text">Atmosphere will ask the US Forest Service for SAWTI, the Santa Ana Wildfire Threat Index, the next four days for four Southern California zones, and draw it on the map. Your position is not sent.\n\nServer: fsapps.nwcg.gov</string>
+    <string name="credit_sawti">Santa Ana Wildfire Threat Index (SAWTI) from the USDA Forest Service Predictive Services, developed with SDG&amp;E and UCLA (%1$s)</string>
     <string name="credit_firewx">Fire weather outlook from the NOAA Storm Prediction Center (%1$s)</string>
     <string name="flood_on">Flash Flood Outlook ON</string>
     <string name="flood_off">Flash Flood Outlook OFF</string>
