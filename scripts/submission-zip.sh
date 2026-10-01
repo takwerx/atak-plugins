@@ -55,6 +55,47 @@ echo "==> version code (the MDM must see this as an update)"
 "$REPO_ROOT/scripts/check-version-code.sh" "$NAME" --target "$ATAK_VERSION" || {
     echo "error: not zipping a version an MDM could not push as an update — bump PLUGIN_VERSION" >&2; exit 1; }
 
+# Manual pictures, before anything is built. A release that changes a screen
+# the manual shows has to carry new pictures of it, and a picture of the
+# plugin's own UI (pane, dialog, menu, settings) is shot on the dev phone and
+# cropped: the DEVELOPER BUILD watermark is on the map, never inside the crop.
+# So it rides this submission; only map shots wait for a signed build.
+# Atmosphere 0.3 went to tak.gov on 2026-09-28 with two stale UI pictures and
+# had to be resubmitted as 0.4 (operator: "anytime we can take and crop use
+# the dev build and not waste a trip").
+echo "==> manual pictures (did this release change a screen?)"
+if [ -d "$PROJECT/docs/user_manual" ]; then
+    PIC_BASE="$(git -C "$REPO_ROOT" merge-base HEAD main 2>/dev/null || true)"
+    REL="${PROJECT#"$REPO_ROOT"/}"
+    if [ -n "$PIC_BASE" ]; then
+        UI_CHANGED="$(git -C "$REPO_ROOT" diff --name-only "$PIC_BASE" -- "$REL/app/src/main" \
+            | grep -E '/res/layout/|/res/values/strings\.xml$|/ui/' || true)"
+        PICS_CHANGED="$(git -C "$REPO_ROOT" diff --name-only "$PIC_BASE" -- "$REL/docs/user_manual" \
+            | grep -Ei '\.(png|jpe?g)$' || true)"
+        if [ -z "$UI_CHANGED" ]; then
+            echo "  PASS  no layout, string or UI code changed since main"
+        elif [ -n "$PICS_CHANGED" ]; then
+            echo "  PASS  screens changed and $(echo "$PICS_CHANGED" | wc -l | tr -d ' ') manual picture(s) changed with them"
+        elif [ "${PICTURES_CHECKED:-}" = 1 ]; then
+            echo "  PASS  screens changed, no manual picture; PICTURES_CHECKED=1 says none is needed now"
+        else
+            echo "  STOP  this release changes screens and no manual picture:"
+            echo "$UI_CHANGED" | sed 's/^/          /'
+            echo "        Does the manual show any of them? Pane, dialog, menu or settings:"
+            echo "        retake them NOW on the dev phone and crop to the pane or dialog --"
+            echo "        the watermark is on the map, not in the crop -- then zip again."
+            echo "        Only map shots wait for the signed build. If no manual picture"
+            echo "        shows a changed screen, or only map shots do, rerun with"
+            echo "        PICTURES_CHECKED=1 and say which in the handoff."
+            exit 1
+        fi
+    else
+        echo "  WARN  no merge base with main; check the manual pictures by hand"
+    fi
+else
+    echo "  PASS  no manual in this plugin"
+fi
+
 # The branch must contain every commit on main. Shared release rules reach
 # main on their own tooling ship, and a plugin branch that has not merged main
 # builds without them: FOBS 0.5's zips were built on 2026-09-06 without the
