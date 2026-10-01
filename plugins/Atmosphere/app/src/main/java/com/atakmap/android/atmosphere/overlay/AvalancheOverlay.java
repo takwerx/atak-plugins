@@ -33,7 +33,7 @@ public final class AvalancheOverlay {
     private static final String TAG = "AtmosphereAvalanche";
     public static final String LAYER_ID = "avalanche";
     public static final String HOST = Avalanche.HOST;
-    public static final String NAME = "Avalanche zones";
+    public static final String NAME = "Avalanche Zones";
     private static final String PREF_ON = "weather.layer.avalanche.on";
     private static final long POLL_MS = 30 * 60 * 1000L;
     private static final long REFRESH_MS = 10 * 60 * 1000L;

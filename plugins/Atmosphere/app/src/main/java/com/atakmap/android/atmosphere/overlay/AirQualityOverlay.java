@@ -44,7 +44,7 @@ public final class AirQualityOverlay {
     public static final String LAYER_ID = "airquality";
     public static final String HOST = AirNow.HOST;
     /** The layer's name in Overlay Manager and the details pane's subtitle. */
-    public static final String NAME = "Air quality";
+    public static final String NAME = "Air Quality";
 
     private static final String PREF_ON = "weather.layer.airquality.on";
     /** AirNow publishes hourly, a little before the next hour. */

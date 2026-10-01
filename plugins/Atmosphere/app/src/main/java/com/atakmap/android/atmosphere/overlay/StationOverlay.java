@@ -52,7 +52,7 @@ public final class StationOverlay {
 
     public static final String LAYER_ID = "stations";
     public static final String HOST = Raws.HOST;
-    private static final String NAME = "Weather stations";
+    private static final String NAME = "Weather Stations";
 
     /** The three states, so the pane's legend and the map can never disagree. */
     public static final int NORMAL = StationIcons.NORMAL;

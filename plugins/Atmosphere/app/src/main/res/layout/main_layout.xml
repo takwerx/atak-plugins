@@ -15,11 +15,16 @@
              44 dp targets on ATAK's own button background, white masks tinted green
              for the mode in use (the Traffic toggle convention). Replaces the Source
              and Where button rows, so the readout starts one row down. -->
+        <!-- baselineAligned off: a horizontal row lines its children up by their
+             text, and the page button's two-line "Fire Weather / Zones" was pushed
+             down by its first line, a gap over it and its foot below the row
+             (operator, 2026-09-29). Every button here is 44dp, so tops line up. -->
         <LinearLayout
             android:id="@+id/icon_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:baselineAligned="false"
             android:paddingTop="4dp">
 
             <ImageButton
@@ -76,6 +81,10 @@
                 android:contentDescription="@string/caption_prev"
                 android:src="@drawable/ic_page_next" />
 
+            <!-- Two lines allowed, and the text shrinks to fit (set in code, API 26+):
+                 "Fire Weather Zones" does not fit one line at half width and was cut
+                 to "Fire Weath..." (operator, 2026-09-29). The short names stay one
+                 line at 13sp. -->
             <Button
                 android:id="@+id/page_pick"
                 style="@style/TakwerxButton"
@@ -86,6 +95,11 @@
                 android:layout_marginRight="2dp"
                 android:paddingLeft="4dp"
                 android:paddingRight="4dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:singleLine="false"
+                android:maxLines="2"
+                android:lineSpacingMultiplier="0.9"
                 android:textSize="13sp"
                 android:text="@string/tab_forecast" />
 

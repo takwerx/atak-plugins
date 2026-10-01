@@ -801,17 +801,50 @@ public final class TropicalOverlay {
         synchronized (extents) {
             double[] e = extents.get(bin);
             if (e == null) {
+                // South, west, north, east, and in [4] the longitude the others are
+                // measured against: the first point this storm drew.
                 e = new double[] { Double.MAX_VALUE, Double.MAX_VALUE,
-                        -Double.MAX_VALUE, -Double.MAX_VALUE };
+                        -Double.MAX_VALUE, -Double.MAX_VALUE, Double.NaN };
                 extents.put(bin, e);
             }
             for (GeoPoint p : ring) {
+                if (Double.isNaN(e[4]))
+                    e[4] = p.getLongitude();
+                final double lon = unwrap(p.getLongitude(), e[4]);
                 e[0] = Math.min(e[0], p.getLatitude());
-                e[1] = Math.min(e[1], p.getLongitude());
+                e[1] = Math.min(e[1], lon);
                 e[2] = Math.max(e[2], p.getLatitude());
-                e[3] = Math.max(e[3], p.getLongitude());
+                e[3] = Math.max(e[3], lon);
             }
         }
+    }
+
+    /**
+     * A longitude moved by whole turns to within half a turn of {@code ref}.
+     *
+     * <p>The service splits a cone that crosses the date line into two polygons,
+     * one ending at -180 and one starting at +180. Boxed as they come, Hurricane
+     * Nolo's ran from -180 to +180 and Go to centered the map on longitude 0, off
+     * Africa (operator, 2026-09-29). Measured from the storm, the piece at +179.5
+     * is -180.5, and the box is the storm's.
+     */
+    static double unwrap(double lon, double ref) {
+        double l = lon;
+        while (l - ref > 180)
+            l -= 360;
+        while (l - ref < -180)
+            l += 360;
+        return l;
+    }
+
+    /** Back into -180..180 for the map. */
+    static double wrap(double lon) {
+        double l = lon;
+        while (l > 180)
+            l -= 360;
+        while (l < -180)
+            l += 360;
+        return l;
     }
 
     /**
@@ -838,7 +871,7 @@ public final class TropicalOverlay {
                 pan(here, Double.NaN);
             return;
         }
-        final GeoPoint center = new GeoPoint((e[0] + e[2]) / 2, (e[1] + e[3]) / 2);
+        final GeoPoint center = new GeoPoint((e[0] + e[2]) / 2, wrap((e[1] + e[3]) / 2));
         pan(center, fitResolution(e));
     }
 

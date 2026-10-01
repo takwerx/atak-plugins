@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.5/ATAK-Plugin-Atmosphere-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.5/ATAK-Plugin-Atmosphere-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.5/ATAK-Plugin-Atmosphere-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.7/ATAK-Plugin-Atmosphere-0.7--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.7/ATAK-Plugin-Atmosphere-0.7--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.7/ATAK-Plugin-Atmosphere-0.7--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -46,23 +46,34 @@ Capabilities:
     active storms; avalanche forecast zones by danger; mountain snow stations
     and the daily snow depth analysis. Every colored area carries its label;
     every layer says in words what it is not showing.
+  - Fire weather zones: the NWS zones on the map with their numbers, shaded
+    under a Red Flag Warning or a Fire Weather Watch; the office's Fire
+    Weather Planning Forecast for a zone as written, found by the point being
+    read, by zone number or name, with starred zones.
   - Spot forecasts: every open request the National Weather Service has, with
-    the office's forecast, and help preparing your own request.
+    the office's forecast, newest or closest first and by type, and help
+    preparing your own request.
+  - A tap on anything Atmosphere draws opens its page or its details, with no
+    radial menu.
   - The forecast asks the weather service picked in Forecast settings (NWS by
     default) for the point being read. Every map layer asks the operator once,
     by name, before it touches the network; the dialog names the server and
     says what is sent. Coordinates that leave the device are rounded to about
     100 m. A failed refresh keeps the last good reading and says how old it is.
-  - Warnings, watches and advisories are deliberately absent: the companion
+  - Warnings, watches and advisories are deliberately absent, except Red Flag
+    Warnings and Fire Weather Watches on the fire weather zones: the companion
     IPAWS Alerts plugin draws them, on the same map.
 
 _________________________________________________________________
 STATUS
 
-0.5, for ATAK-CIV 5.6, 5.7 and 5.8. The forecast needs nothing set up: it
-reads from the National Weather Service as soon as Atmosphere opens, in US
-units, and Forecast settings is one window. 0.4 fixed a freeze of up to 20
-seconds when ATAK started with the Air quality layer off. Developed on a
+0.7, for ATAK-CIV 5.6, 5.7 and 5.8. New: fire weather zones and their
+planning forecast, with Red Flag Warnings and Fire Weather Watches shaded;
+spot forecasts newest or closest and by type; a tap opens an item's page with
+no radial menu; layer and page names in Title Case. Fixed: All off left the
+layers that were on, and a picture layer turned off left its last frame on the
+map; Map center now follows the map; Go to on a storm whose cone crosses the
+date line. (0.6 was a picture build for the manual and was not published.) Developed on a
 Samsung Galaxy XCover Pro running ATAK-CIV 5.8.0.3 and checked on official
 ATAK-CIV 5.8 with the tak.gov-signed 0.1; compiled clean against the 5.6.0.23
 and 5.7.0.14 SDKs. The manual and the user guide carry screenshots from the

@@ -16,6 +16,7 @@ import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
 import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
+import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
 import com.atakmap.android.atmosphere.overlay.StationOverlay;
 import com.atakmap.android.atmosphere.overlay.AvalancheOverlay;
@@ -90,6 +91,41 @@ public class Atmosphere implements IPlugin {
     private RadarOverlay radar;
     private TropicalOverlay tropical;
     private AvalancheOverlay avalanche;
+    private FireZoneOverlay fireZones;
+    /**
+     * A tap on anything Atmosphere draws opens what it is, never ATAK's radial
+     * (takwerx/atmosphere#1; operator, 2026-09-29: "make all those just go to the
+     * page i dont need a radial menu really on any of that stuff ... if i wanted to
+     * i could just use bloodhound"). An item with a page of its own opens the page;
+     * the rest open the details the radial's first button used to. ATAK asks these
+     * listeners before it opens a radial, and one that answers true stops it; items
+     * that are not ours keep theirs.
+     */
+    private final com.atakmap.android.menu.MapMenuEventListener tapOpensPage =
+            new com.atakmap.android.menu.MapMenuEventListener() {
+                @Override
+                public boolean onShowMenu(com.atakmap.android.maps.MapItem item) {
+                    if (item == null || !item.getMetaBoolean("atmosphere", false))
+                        return false;
+                    try {
+                        if (com.atakmap.android.atmosphere.ui.StormDetailsReceiver
+                                .openPage(item))
+                            return true;
+                        final android.content.Intent details = new android.content.Intent(
+                                com.atakmap.android.atmosphere.ui.StormDetailsReceiver.ACTION);
+                        details.putExtra("targetUID", item.getUID());
+                        AtakBroadcast.getInstance().sendBroadcast(details);
+                        return true;
+                    } catch (RuntimeException e) {
+                        Log.w(TAG, "tap to page", e);
+                        return false;
+                    }
+                }
+
+                @Override
+                public void onHideMenu(com.atakmap.android.maps.MapItem item) {
+                }
+            };
     private FireWxOutlookOverlay firewx;
     private FloodOutlookOverlay flood;
     private BeachOverlay beach;
@@ -249,6 +285,8 @@ public class Atmosphere implements IPlugin {
         tropical.start();
         avalanche = new AvalancheOverlay(mapView, pluginContext, egress);
         avalanche.start();
+        fireZones = new FireZoneOverlay(mapView, pluginContext, egress);
+        fireZones.start();
         firewx = new FireWxOutlookOverlay(mapView, pluginContext, egress);
         firewx.start();
         flood = new FloodOutlookOverlay(mapView, pluginContext, egress);
@@ -278,10 +316,18 @@ public class Atmosphere implements IPlugin {
         // whether or not the pane exists yet: the overlays start with the plugin and
         // the pane is not built until it is first shown, so anything set inside that
         // check is set only on the paths where the pane already happens to be there.
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.addEventListener(tapOpensPage);
+        else
+            Log.w(TAG, "no radial menu receiver; taps keep the radial");
         com.atakmap.android.atmosphere.ui.StormDetailsReceiver.setSpotOpener(
                 new com.atakmap.android.atmosphere.ui.StormDetailsReceiver.SpotOpener() {
                     @Override
                     public void openSpot(String spotId) {
+                        if (atmospherePane == null)
+                            showPane();
                         if (atmospherePane != null)
                             atmospherePane.openSpot(spotId);
                     }
@@ -292,6 +338,14 @@ public class Atmosphere implements IPlugin {
                             showPane();
                         if (atmospherePane != null)
                             atmospherePane.openGauge(lid);
+                    }
+
+                    @Override
+                    public void openZone(String id, String name, String cwa) {
+                        if (atmospherePane == null)
+                            showPane();
+                        if (atmospherePane != null)
+                            atmospherePane.openZone(id, name, cwa);
                     }
 
                     @Override
@@ -313,6 +367,8 @@ public class Atmosphere implements IPlugin {
             atmospherePane.setAirQuality(air);
             if (avalanche != null)
                 atmospherePane.setAvalanche(avalanche);
+            if (fireZones != null)
+                atmospherePane.setFireZones(fireZones);
             if (firewx != null)
                 atmospherePane.setFireWx(firewx);
             if (flood != null)
@@ -349,6 +405,10 @@ public class Atmosphere implements IPlugin {
         } catch (RuntimeException e) {
             Log.w(TAG, "show receiver was not registered", e);
         }
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.removeEventListener(tapOpensPage);
         if (stormDetails != null) {
             try {
                 AtakBroadcast.getInstance().unregisterReceiver(stormDetails);
@@ -411,6 +471,10 @@ public class Atmosphere implements IPlugin {
         if (firewx != null) {
             firewx.stop();
             firewx = null;
+        }
+        if (fireZones != null) {
+            fireZones.stop();
+            fireZones = null;
         }
         if (avalanche != null) {
             avalanche.stop();
@@ -484,6 +548,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setAirQuality(air);
             if (avalanche != null)
                 atmospherePane.setAvalanche(avalanche);
+            if (fireZones != null)
+                atmospherePane.setFireZones(fireZones);
             if (firewx != null)
                 atmospherePane.setFireWx(firewx);
             if (flood != null)

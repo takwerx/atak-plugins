@@ -53,7 +53,7 @@ public final class FloodedGroundOverlay extends ImageOverlay {
     private int horizon;
 
     public FloodedGroundOverlay(MapView mapView, EgressPolicy egress) {
-        super(mapView, egress, "AtmosphereFloodGround", LAYER_ID, "Flooded ground");
+        super(mapView, egress, "AtmosphereFloodGround", LAYER_ID, "Flooded Ground");
         horizon = horizonPref();
     }
 

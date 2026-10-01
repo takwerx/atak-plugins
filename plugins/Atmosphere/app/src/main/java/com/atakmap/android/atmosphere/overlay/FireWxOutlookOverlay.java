@@ -36,7 +36,7 @@ public final class FireWxOutlookOverlay extends OutlookOverlay {
     private final String[] urls;
 
     public FireWxOutlookOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
-        super(mapView, pluginContext, egress, "AtmosphereFireWx", LAYER_ID, "Fire weather outlook");
+        super(mapView, pluginContext, egress, "AtmosphereFireWx", LAYER_ID, "Fire Weather Outlook");
         urls = new String[SpcFireWx.LAYERS.length];
         for (int i = 0; i < urls.length; i++)
             urls[i] = SpcFireWx.LAYERS[i].url();

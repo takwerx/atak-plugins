@@ -39,7 +39,7 @@ final class GaugeIcons {
     private static final String TAG = "AtmosphereGauges";
 
     /** Bump when the drawing changes, or a stale file is served under the same name. */
-    private static final int VERSION = 3;
+    private static final int VERSION = 4;
 
     static final int MAJOR = 0xFFCC33FF;
     static final int MODERATE = 0xFFFF0000;
@@ -135,7 +135,14 @@ final class GaugeIcons {
         final int textW = Math.round(Math.max(r.isEmpty() ? 0 : big.measureText(r),
                 n.isEmpty() ? 0 : small.measureText(n)));
         final int pillW = textW + 2 * padX, pillH = lineOne + lineTwo + 2 * padY;
-        final int disc = Math.max(8, Math.round(SIZE_DP * density));
+        // The disc at the size the plain icon renders: ATAK draws a feature icon at
+        // its reported size times its render scaling (density / 1.5, 1.75 on the
+        // XCover), and this bitmap is reported at its own pixels divided by that.
+        // Drawn at SIZE_DP x density it came out 1.5 times the plain disc, so the
+        // discs grew as the zoom crossed the readings gate (operator, 2026-09-29:
+        // "why are the river gauge icons changing sizes ... getting larger").
+        final int disc = Math.max(8, Math.round(SIZE_DP * Math.max(1f,
+                gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling())));
         final int pad = 2;
         final int w = Math.max(disc, pillW) + 2 * pad;
         final int h = disc + gap + pillH + 2 * pad;

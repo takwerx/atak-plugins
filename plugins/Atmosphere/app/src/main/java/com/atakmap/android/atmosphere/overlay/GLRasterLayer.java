@@ -64,6 +64,8 @@ public final class GLRasterLayer extends GLAbstractLayer
 
     private final RasterLayer subject;
     private Data frame;
+    /** Where the picture on the map is, so the ground is repainted when it goes. */
+    private GeoBounds drawn;
 
     public GLRasterLayer(MapRenderer surface, RasterLayer subject) {
         super(surface, subject);
@@ -103,6 +105,17 @@ public final class GLRasterLayer extends GLAbstractLayer
         final Bitmap bitmap = layer.getBitmap();
         final GeoPoint[] pts = layer.getPoints();
         final GeoBounds bounds = layer.getBounds();
+        final GeoBounds was;
+        synchronized (this) {
+            was = drawn;
+            drawn = bitmap == null || pts == null ? null : bounds;
+        }
+        // The ground the old picture covered is repainted too. The surface keeps
+        // what it drew, so a layer turned off left its last picture on the map
+        // wherever nothing else redrew that ground (XCover, 2026-09-28: a square
+        // of satellite after Layers -> All off).
+        if (was != null)
+            markDirty(was);
         if (bitmap == null || pts == null || bounds == null) {
             renderContext.queueEvent(new Runnable() {
                 @Override

@@ -79,6 +79,8 @@ public final class SpotPage {
     private static final String PREF_STATE = "weather.spot.state";
     private static final String PREF_REGION = "weather.spot.region";
     private static final String PREF_RADIUS = "weather.spot.radius";
+    /** Closest first instead of newest first, whatever the scope. */
+    private static final String PREF_CLOSEST = "weather.spot.sort.closest";
 
     /** A list older than this is fetched again when the page is looked at. */
     private static final long STALE_MS = 5 * 60 * 1000L;
@@ -98,6 +100,9 @@ public final class SpotPage {
         String pointLabel();
 
         UnitSystem units();
+
+        /** A kind was picked here; the map layer draws only that kind too. */
+        void setSpotKind(String letter);
     }
 
     private final Context pluginContext;
@@ -107,6 +112,8 @@ public final class SpotPage {
     private final View root;
     private final View gate, browse, detail;
     private final Button all, near, onMap, state, region;
+    private final Button sortNewest, sortClosest, kindButton;
+    private boolean closest;
     private final TextView status;
     private final android.widget.EditText search;
     private final TextView searchCount;
@@ -135,8 +142,18 @@ public final class SpotPage {
         return p == null || p.getBoolean("weather.layer.spot.recentonly", true);
     }
 
-    /** The requests the page is willing to show, under the shared age filter. */
+    /** The requests the page is willing to show, under the shared age and kind filters. */
     private List<Spot.Request> visible() {
+        final String kind = com.atakmap.android.atmosphere.overlay.SpotOverlay.kindFilter();
+        final List<Spot.Request> out = new ArrayList<>();
+        for (Spot.Request r : anyKind())
+            if (com.atakmap.android.atmosphere.overlay.SpotOverlay.ofKind(r, kind))
+                out.add(r);
+        return out;
+    }
+
+    /** Under the age filter only, for counting each kind before one is picked. */
+    private List<Spot.Request> anyKind() {
         if (!recentOnly())
             return requests;
         final long now = System.currentTimeMillis();
@@ -173,6 +190,9 @@ public final class SpotPage {
         onMap = root.findViewById(R.id.spot_map);
         state = root.findViewById(R.id.spot_state);
         region = root.findViewById(R.id.spot_region);
+        sortNewest = root.findViewById(R.id.spot_sort_newest);
+        sortClosest = root.findViewById(R.id.spot_sort_closest);
+        kindButton = root.findViewById(R.id.spot_kind);
         status = root.findViewById(R.id.spot_status);
         search = root.findViewById(R.id.spot_search);
         searchCount = root.findViewById(R.id.spot_search_count);
@@ -237,6 +257,7 @@ public final class SpotPage {
             stateCode = p.getString(PREF_STATE, "");
             regionCode = p.getString(PREF_REGION, "");
             radiusIndex = Math.max(0, Math.min(RADII.length - 1, p.getInt(PREF_RADIUS, 1)));
+            closest = p.getBoolean(PREF_CLOSEST, false);
         }
         wire();
         showGateOrList();
@@ -349,6 +370,24 @@ public final class SpotPage {
                 pickRegion();
             }
         });
+        sortNewest.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setClosest(false);
+            }
+        });
+        sortClosest.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setClosest(true);
+            }
+        });
+        kindButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickKind();
+            }
+        });
         root.findViewById(R.id.spot_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -368,6 +407,52 @@ public final class SpotPage {
             @Override
             public void onClick(View v) {
                 showRequestDialog();
+            }
+        });
+    }
+
+    private void setClosest(boolean value) {
+        closest = value;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putBoolean(PREF_CLOSEST, value).apply();
+        render();
+    }
+
+    /**
+     * Where "closest" is measured from: the operator's position, or the map's center
+     * when there is no fix yet. Null when neither is known.
+     */
+    private GeoPoint closestFrom() {
+        final GeoPoint self = MapCompat.selfPoint();
+        if (self != null)
+            return self;
+        final double[] box = viewBox();
+        return box == null ? null : new GeoPoint((box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
+    }
+
+    /** Every kind with how many of each, the current one green; picked for map and list. */
+    private void pickKind() {
+        final String current = com.atakmap.android.atmosphere.overlay.SpotOverlay.kindFilter();
+        final List<Spot.Request> pool = com.atakmap.android.atmosphere.overlay.SpotOverlay.newestPerIncident(anyKind(), null);
+        final String[][] kinds = com.atakmap.android.atmosphere.overlay.SpotOverlay.KINDS;
+        final String[] labels = new String[kinds.length + 1];
+        labels[0] = pluginContext.getString(R.string.spot_kind_all) + " (" + pool.size() + ")";
+        int chosen = 0;
+        for (int i = 0; i < kinds.length; i++) {
+            int n = 0;
+            for (Spot.Request r : pool)
+                if (com.atakmap.android.atmosphere.overlay.SpotOverlay.ofKind(r, kinds[i][0]))
+                    n++;
+            labels[i + 1] = kinds[i][1] + " (" + n + ")";
+            if (kinds[i][0].equals(current))
+                chosen = i + 1;
+        }
+        tiles(pluginContext.getString(R.string.spot_pick_kind), labels, chosen, 2, new Picked() {
+            @Override
+            public void picked(int which) {
+                host.setSpotKind(which == 0 ? "" : kinds[which - 1][0]);
+                render();
             }
         });
     }
@@ -611,6 +696,13 @@ public final class SpotPage {
         final Map<String, Integer> perIncident = new LinkedHashMap<>();
         shown = com.atakmap.android.atmosphere.overlay.SpotOverlay
                 .newestPerIncident(shown, perIncident);
+        // The order is the operator's, whatever the scope: newest first, or closest
+        // to them first (operator, 2026-09-29: "can i filter by newest and closest?").
+        final GeoPoint from = closest ? closestFrom() : null;
+        if (from != null)
+            Spot.sortByDistance(shown, from.getLatitude(), from.getLongitude());
+        else
+            sortByWhen(shown);
 
         // Beside the box, so a search that is working says so while the keyboard is
         // still covering the rows.
@@ -618,8 +710,10 @@ public final class SpotPage {
                 : (shown.isEmpty() ? "none" : String.valueOf(shown.size())));
 
         // Say what is not being shown: a trimmed list reads as the whole picture.
-        final String order = filter == Filter.NEAR || filter == Filter.MAP
-                ? "nearest" : "newest";
+        final String order = from != null ? "closest" : "newest";
+        final String kind = com.atakmap.android.atmosphere.overlay.SpotOverlay.kindFilter();
+        if (!kind.isEmpty())
+            what = what + ", " + com.atakmap.android.atmosphere.overlay.SpotOverlay.kindName(kind) + " only";
         if (shown.isEmpty())
             status.setText("No open spot requests " + what);
         else if (shown.size() > MAX_ROWS)
@@ -637,6 +731,16 @@ public final class SpotPage {
                     .incidentKey(r));
             list.addView(row(r, self, n == null ? 1 : n));
         }
+    }
+
+    /** Newest first by when it was filled, or asked for if it has not been. */
+    private static void sortByWhen(List<Spot.Request> list) {
+        java.util.Collections.sort(list, new java.util.Comparator<Spot.Request>() {
+            @Override
+            public int compare(Spot.Request a, Spot.Request b) {
+                return Long.compare(com.atakmap.android.atmosphere.overlay.SpotOverlay.when(b), com.atakmap.android.atmosphere.overlay.SpotOverlay.when(a));
+            }
+        });
     }
 
     /** Each filter says what it would show before it is tapped. */
@@ -657,6 +761,12 @@ public final class SpotPage {
                 : Spot.stateName(stateCode) + count(Spot.inState(can, stateCode).size()));
         region.setText(regionCode.isEmpty() ? pluginContext.getString(R.string.spot_region)
                 : Spot.regionName(regionCode) + count(Spot.inRegion(can, regionCode).size()));
+        green(sortNewest, !closest);
+        green(sortClosest, closest);
+        final String kind = com.atakmap.android.atmosphere.overlay.SpotOverlay.kindFilter();
+        kindButton.setText(kind.isEmpty() ? pluginContext.getString(R.string.spot_kind_all)
+                : com.atakmap.android.atmosphere.overlay.SpotOverlay.kindName(kind));
+        green(kindButton, !kind.isEmpty());
         green(all, filter == Filter.ALL);
         green(near, filter == Filter.NEAR);
         green(onMap, filter == Filter.MAP);

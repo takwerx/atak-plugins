@@ -45,7 +45,7 @@ public final class GaugeOverlay {
 
     public static final String LAYER_ID = "gauges";
     public static final String HOST = Nwps.HOST;
-    private static final String NAME = "River gauges";
+    private static final String NAME = "River Gauges";
 
     private static final String PREF_ON = "weather.layer.gauges.on";
     private static final String PREF_MILES = "weather.layer.gauges.miles";
