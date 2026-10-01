@@ -17,8 +17,9 @@ Atmosphere is the weather on the ATAK map for fire and hazmat crews: the
 forecast at a point, the fire weather planning forecast for a zone, the
 readings from the stations, gauges and buoys around you, and the pictures the
 weather services publish - radar, satellite, wind,
-rain, smoke, air quality, outlooks, flooding, the sea and snow - each one a
-layer you switch on when you need it.
+rain, smoke, air quality, lightning, outlooks, the Santa Ana wildfire threat,
+power shutoffs, flooding, the sea and snow - each one a layer you switch on
+when you need it.
 
 #image("1.png", width: 90%)
 
@@ -65,7 +66,7 @@ shaded, and the zones page lists them.
   - *Units* switches every number between US, metric and aviation units.
   - *Full size* makes the pane full width and back.
   - The arrows step through the pages; the name between them opens a list of
-    all seven.
+    all eight.
 
   Back closes the pane, or narrows a full-size one first.
 ]
@@ -83,9 +84,10 @@ shaded, and the zones page lists them.
 ]
 
 #v(4pt)
-There are seven pages: *Forecast*, the readout for a point; *Layers*, every
+There are eight pages: *Forecast*, the readout for a point; *Layers*, every
 map layer with its switch and settings; *Spot Weather Forecast*, the open spot
 forecast requests; *Fire Weather Zones*, the planning forecast for a zone;
+*SAWTI*, the Santa Ana Wildfire Threat Index;
 *Weather Stations*, *River Gauges* and *Buoys*, the ones around you as lists. Swipe, use the
 arrows, or pick from the list.
 ]
@@ -349,6 +351,103 @@ office wrote it: western offices write it by period, eastern ones as a table;
 slide sideways for a wide line. The star keeps the zone on the page and yellow
 on the map. *Show the office discussion* opens the office's discussion for the
 day under it. A forecast more than a day old says so.
+]
+
+#tak-slide[
+= SAWTI
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("80.png", width: 100%)
+][
+  #image("81.png", width: 100%)
+]
+
+#v(4pt)
+*SAWTI* draws the US Forest Service's Santa Ana Wildfire Threat Index for its
+four Southern California zones: LA-Ventura, Orange-Inland Empire, San Diego and
+Santa Barbara, where it rates Sundowner winds. It rates how hard a fire would be
+to fight if one started during an offshore wind: No Rating, Marginal, Moderate,
+High or Extreme. A rated zone is filled in its level's color, with its label in
+the same color; a No Rating zone is a cyan outline. The date buttons pick one of
+the four days the Forest Service shows. Tap a zone to open its page.
+]
+
+#tak-slide[
+= The SAWTI page
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("76.png", width: 100%)
+  #cap[The zone, the four days and the day's level.]
+][
+  #image("77.png", width: 100%)
+  #cap[The gauges, the forecaster's words and what to do.]
+]
+
+#v(4pt)
+The *SAWTI* page is the Forest Service site's forecast page. It opens on the
+zone the point you are reading is in, and the zone button picks another. Each
+day button shows that day's level. Under the level are the site's three gauges,
+*Threat Level*, *Wind Strength* (weak to strong) and *Fuel Moisture* (moist to
+dry), then the forecaster's *Event Description* and *Recommended Actions*, with
+the county links the site gives for the zone.
+]
+
+#tak-slide[
+= SAWTI: all zones
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("78.png", width: 100%)
+][
+  #image("79.png", width: 100%)
+]
+
+#v(4pt)
+*All Zones* puts every zone and day side by side in the level colors; tap a
+square for that zone and day. The issue time is under it: the Forest Service
+posts a new index every morning and again when a forecaster updates it, and an
+issue more than a day old says so. When the wind and fuel numbers cannot be had,
+the gauges say *Not available* and the page asks again the next time you look.
+]
+
+#tak-slide[
+= Lightning
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("83.png", width: 100%)
+][
+  #image("82.png", width: 100%)
+][
+  *Lightning* draws NOAA's lightning strike density: how many strikes the
+  ground networks counted in each 5-mile square in 15 minutes, from yellow
+  (under 1) to deep purple (over 150). It counts ground strikes and some cloud
+  flashes.
+
+  A new frame comes every 15 minutes and arrives 10 to 25 minutes after the
+  strikes; the line under the switch says which 15 minutes and how old. It
+  shows which storms are making lightning and whether they are building. It is
+  not a reason to call it safe to be outside.
+]
+]
+
+#tak-slide[
+= Power shutoffs (PSPS)
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("85.png", width: 100%)
+  #image("86.png", width: 100%)
+][
+  #image("84.png", width: 100%)
+][
+  *PSPS* draws California's Public Safety Power Shutoffs as Cal OES reports
+  them from PG&E, SCE and SDG&E: a county a utility has warned may have a
+  shutoff in amber, where the power is off in red, off because a line feeding
+  it was cut in orange, and back on in green. Tap one for its details.
+
+  The line under the switch says what is warned and off and when Cal OES last
+  updated; if Cal OES goes quiet for 45 minutes it says the status is unknown
+  rather than none. It does not cover PacifiCorp, Liberty, Bear Valley or any
+  other state: ask the utility.
+]
 ]
 
 #tak-slide[
@@ -681,14 +780,16 @@ Only what you ask for:
 - The *Fire Weather Zones* page finds your zone by sending the half-degree
   square the point is in, about 30 miles across, never the point. The Red Flag
   Warning and Fire Weather Watch list is one request for the whole country.
+- *SAWTI* and *PSPS* send nothing about where you are: each asks for its whole
+  set, and the SAWTI page finds your zone on this device.
 - An *address* you type goes to the US Census Bureau, and to ATAK's own
   address finder if the Census has no answer.
 - Every request carries the plugin's name and version, which public services
   require. No callsign, device identifier or TAK server detail is ever sent.
 
 All of it is outbound HTTPS: to the National Weather Service and its centers,
-NOAA, the EPA, the USGS, the Forest Service, Environment Canada, RainViewer and
-the avalanche centers, and to the one weather service you pick.
+NOAA, the EPA, the USGS, the Forest Service, Cal OES, Environment Canada,
+RainViewer and the avalanche centers, and to the one weather service you pick.
 ]
 
 #tak-slide[

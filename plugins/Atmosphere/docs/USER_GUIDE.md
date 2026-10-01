@@ -13,8 +13,9 @@ All releases: https://github.com/takwerx/atmosphere/releases
 Atmosphere is the weather on the ATAK map for fire and hazmat crews: the
 forecast at a point, the readings from the weather stations, river gauges and
 buoys around you, and the pictures the weather services publish — radar,
-satellite, wind, rain, smoke, air quality, fire and flood outlooks, flooding,
-waves, the sea and snow — each one a layer you switch on when you need it.
+satellite, wind, rain, smoke, air quality, lightning, fire and flood outlooks,
+the Santa Ana wildfire threat, power shutoffs, flooding, waves, the sea and
+snow — each one a layer you switch on when you need it.
 
 <img src="screenshots/1_toolbar.png" width="640">
 
@@ -57,14 +58,14 @@ The pane opens at half width. The top row is the same on every page:
 - **Full size** makes the pane full width and back; at full size every button
   has its name under it.
 - The arrows step through the pages; the page name between them opens a list of
-  all seven.
+  all eight.
 
 <img src="screenshots/3_pane_half.png" width="420"> <img src="screenshots/5_page_list.png" width="420">
 
-The seven pages are **Forecast**, the readout for a point; **Layers**, every map
+The eight pages are **Forecast**, the readout for a point; **Layers**, every map
 layer with its switch and settings; **Spot Weather Forecast**, the open spot
 forecast requests; **Fire Weather Zones**, the planning forecast for a zone;
-and **Weather Stations**, **River Gauges** and **Buoys**, the ones around you as
+**SAWTI**, the Santa Ana Wildfire Threat Index; and **Weather Stations**, **River Gauges** and **Buoys**, the ones around you as
 lists. Back
 closes the pane, or narrows a full-size one first.
 
@@ -135,6 +136,9 @@ opening the plugin.
 | Wind | Wind | The forecast wind as moving streaks colored by speed, with a time scrubber, heights to the jet stream, and the wind "Here" |
 | Fire | Fire Weather Outlook | Elevated, critical and extreme areas and dry thunderstorms, Day 1, 2, 3 or all; from Day 3 as a chance of critical |
 | Fire | Fire Weather Zones | The NWS fire weather zones with their numbers, shaded under a Red Flag Warning or a Fire Weather Watch; the zone's planning forecast behind a tap |
+| Fire | SAWTI | The Forest Service's Santa Ana Wildfire Threat Index for four Southern California zones, colored by level for each of four days; the SAWTI page behind a tap |
+| Fire | Lightning | NOAA's lightning strike density, the newest 15 minutes, in five bands from under 1 to over 150 strikes in a 5-mile square |
+| Fire | PSPS | California's Public Safety Power Shutoffs from Cal OES: counties warned, power off, power back on |
 | Fire | Smoke | Forecast smoke at the ground or through the whole sky, with the amount "Here" |
 | Fire | Air Quality | The EPA's air quality areas and the index "Here" |
 | Rain and rivers | Flash Flood Outlook | Excessive rainfall areas for three days, marginal to high |
@@ -221,7 +225,57 @@ forecast more than a day old says so.
 
 <img src="screenshots/68_zones_find.png" width="280"> <img src="screenshots/69_zone_forecast.png" width="280"> <img src="screenshots/70_zone_forecast_body.png" width="280">
 
-## 8. Spot Weather Forecast
+## 8. SAWTI, Lightning and PSPS
+
+**SAWTI** draws the US Forest Service's Santa Ana Wildfire Threat Index for its
+four Southern California zones: LA-Ventura, Orange-Inland Empire, San Diego and
+Santa Barbara, where it rates Sundowner winds. It rates how hard a fire would be
+to fight if one started during an offshore wind: No Rating, Marginal, Moderate,
+High or Extreme. A rated zone is filled in its level's color, with its label in
+the same color; a No Rating zone is a cyan outline. The date buttons pick one of
+the four days the Forest Service shows. Tap a zone to open its page.
+
+<img src="screenshots/80_sawti_map.png" width="560"> <img src="screenshots/81_sawti_layer_block.png" width="300">
+
+The **SAWTI** page is the Forest Service site's forecast page. It opens on the
+zone the point you are reading is in, and the zone button picks another. Each
+day button shows that day's level. Under the level are the site's three gauges,
+**Threat Level**, **Wind Strength** (weak to strong) and **Fuel Moisture**
+(moist to dry), then the forecaster's **Event Description** and **Recommended
+Actions**, with the county links the site gives for the zone. **All Zones**
+puts every zone and day side by side; tap a square for that zone and day. The
+issue time is under it, and an issue more than a day old says so. When the wind
+and fuel numbers cannot be had, the gauges say *Not available* and the page asks
+again the next time you look.
+
+<img src="screenshots/76_sawti_page_top.png" width="420"> <img src="screenshots/77_sawti_page_middle.png" width="420">
+
+<img src="screenshots/78_sawti_page_table.png" width="420"> <img src="screenshots/79_sawti_zone_picker.png" width="420">
+
+**Lightning** draws NOAA's lightning strike density: how many strikes the
+ground networks counted in each 5-mile square in 15 minutes, from yellow (under
+1) to deep purple (over 150). It counts ground strikes and some cloud flashes.
+A new frame comes every 15 minutes and arrives 10 to 25 minutes after the
+strikes; the line under the switch says which 15 minutes and how old. It shows
+which storms are making lightning and whether they are building. It is not a
+reason to call it safe to be outside.
+
+<img src="screenshots/83_lightning_map.png" width="360"> <img src="screenshots/82_lightning_layer_block.png" width="420">
+
+**PSPS** draws California's Public Safety Power Shutoffs as Cal OES reports
+them from PG&E, SCE and SDG&E: a county a utility has warned may have a shutoff
+in amber, where the power is off in red, off because a line feeding it was cut
+in orange, and back on in green. Tap one for its details. The line under the
+switch says what is warned and off and when Cal OES last updated; if Cal OES
+goes quiet for 45 minutes it says the status is unknown rather than none. It
+does not cover PacifiCorp, Liberty, Bear Valley or any other state: ask the
+utility.
+
+<img src="screenshots/85_psps_map.png" width="420"> <img src="screenshots/84_psps_layer_block.png" width="420">
+
+<img src="screenshots/86_psps_details.png" width="420">
+
+## 9. Spot Weather Forecast
 
 The layer draws every spot forecast request the National Weather Service has
 open, with the forecast the office wrote for each. The page lists them — All,
@@ -247,16 +301,20 @@ first; you see what came back before it is used.
 
 <img src="screenshots/61_spot_request.png" width="420"> <img src="screenshots/64_address_match.png" width="420">
 
-## 9. The user manual
+## 10. The user manual
 
 The manual is inside the plugin. Open ATAK's **Settings**, then **Tool
 Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
 **Atmosphere user manual**.
 
-## 10. What it does not do
+## 11. What it does not do
 
 - It draws no warnings, watches or advisories, except Red Flag Warnings and
   Fire Weather Watches on its fire weather zones. IPAWS Alerts does the rest.
+- Its lightning is a 15-minute density map that arrives 10 to 25 minutes
+  late, not single strikes as they happen, and not a lightning safety trigger.
+- Its power shutoffs are California's three big utilities only, as Cal OES
+  reports them; anywhere else, ask the utility.
 - It publishes nothing: no path puts anything on another phone or a server.
 - It records nothing about you: no callsign, device identifier or TAK server
   detail is ever sent. Your position leaves the device only for the forecast
