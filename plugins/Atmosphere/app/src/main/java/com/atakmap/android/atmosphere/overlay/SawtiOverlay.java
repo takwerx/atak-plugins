@@ -38,13 +38,16 @@ public final class SawtiOverlay extends OutlookOverlay {
     /** The feed posts daily; past this it has missed a day. */
     private static final long STALE_MS = 36L * 60 * 60 * 1000;
 
-    /** The levels, in order, with the site's own words. */
+    /** A No Rating zone's outline on the map. */
+    private static final int NO_RATING_EDGE = 0xFF00E5FF;
+
+    /** The levels, in order, with the site's own words; No Rating keyed by its cyan outline. */
     public static final String[][] LEGEND;
     static {
         LEGEND = new String[Sawti.LEVELS.length][];
         for (int i = 0; i < Sawti.LEVELS.length; i++)
-            LEGEND[i] = new String[] { Sawti.LEVELS[i] + ": " + Sawti.MEANINGS[i],
-                    String.valueOf(Sawti.COLORS[i]) };
+            LEGEND[i] = new String[] { Sawti.LEVELS[i] + (i == 0 ? " (cyan outline)" : "") + ": "
+                    + Sawti.MEANINGS[i], String.valueOf(i == 0 ? NO_RATING_EDGE : Sawti.COLORS[i]) };
     }
 
     private static final String[] URLS = { Sawti.TROUBLE_URL, Sawti.FORECAST_URL };
@@ -126,12 +129,15 @@ public final class SawtiOverlay extends OutlookOverlay {
     }
 
     /**
-     * The site's own zone border, dark gray on every zone. The No Rating gray
-     * (#D9D9D9) as an edge vanished on a light base map (XCover, 2026-10-01).
+     * The site's own dark gray border on a rated zone, whose fill says what it is;
+     * cyan on a No Rating zone, which has no fill and otherwise could not be seen
+     * (operator, 2026-10-01: "i need sawti zone when off like cyan so i can see
+     * them"). The No Rating gray (#D9D9D9) as an edge had vanished on a light
+     * base map, and the site's #5A5A5A was hard to pick out on the terrain.
      */
     @Override
     protected int strokeColor(Area a) {
-        return 0xFF5A5A5A;
+        return Sawti.LEVELS[0].equals(a.label) ? NO_RATING_EDGE : 0xFF5A5A5A;
     }
 
     @Override
