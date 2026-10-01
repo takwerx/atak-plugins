@@ -55,6 +55,15 @@ public final class PspsOverlay extends OutlookOverlay {
         return URLS;
     }
 
+    /**
+     * PSPS has no days; the details pane printed "Day 1" under a county's title on
+     * the signed 0.8 (S22 Ultra, 2026-10-01).
+     */
+    @Override
+    protected String setName(Area a) {
+        return "Public Safety Power Shutoffs, California";
+    }
+
     /** Without the stamp the areas still draw, and the status says it cannot vouch for them. */
     @Override
     protected boolean optional(int index) {

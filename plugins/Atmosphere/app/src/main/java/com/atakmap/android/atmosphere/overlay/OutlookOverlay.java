@@ -132,6 +132,14 @@ public abstract class OutlookOverlay {
         return POLL_MS;
     }
 
+    /**
+     * The feature set an area goes in, which ATAK's details pane prints under the
+     * title: "Day 1" for an outlook. A layer without days names its own.
+     */
+    protected String setName(Area a) {
+        return "Day " + a.day;
+    }
+
     /** How many days the day row offers. Called from the constructor: a constant. */
     public int days() {
         return 3;
@@ -322,7 +330,7 @@ public abstract class OutlookOverlay {
                         s.setAttribute("_ref", a.ref);
                     final int fill = (fillAlpha(a) << 24) | c;
                     final int[] lc = labelColors(a);
-                    drawn.add(new AtmosphereFeatures.Drawn("Day " + a.day, a.title, g,
+                    drawn.add(new AtmosphereFeatures.Drawn(setName(a), a.title, g,
                             lc == null
                                     ? AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title)
                                     : AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title,

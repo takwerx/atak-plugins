@@ -18,6 +18,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
@@ -56,6 +57,12 @@ public final class SawtiPage {
     private static final String PREF_ZONE = "weather.sawti.zone";
     private static final long REFRESH_MS = 30 * 60 * 1000L;
     private static final long STALE_MS = 36L * 60 * 60 * 1000;
+    /**
+     * The wind and fuel file alone is asked again this soon after it failed: it
+     * took over two minutes to answer at 11:20Z on 2026-10-01 and the phone gave up,
+     * and waiting the full half hour left the gauges empty for no reason.
+     */
+    private static final long MODEL_RETRY_MS = 2 * 60 * 1000L;
     private static final int LINK_COLOR = 0xFF4FC3F7;
 
     /** What the page needs from the pane around it. */
@@ -79,7 +86,7 @@ public final class SawtiPage {
     private Sawti.Forecast forecast;
     private Sawti.Model model;
     private boolean troubled, inFlight, pointDirty = true;
-    private long fetchedAt;
+    private long fetchedAt, modelTriedAt;
     private int generation;
     private int zone;
     /** 1 to 4, the day showing. */
@@ -163,6 +170,7 @@ public final class SawtiPage {
         pendingDate = date;
         resolvePendingDate();
         onShown();
+        scrollToTop();
     }
 
     public void dispose() {
@@ -209,8 +217,14 @@ public final class SawtiPage {
     private void fetch(boolean force) {
         if (inFlight)
             return;
-        if (!force && forecast != null && System.currentTimeMillis() - fetchedAt < REFRESH_MS)
+        final long now = System.currentTimeMillis();
+        if (!force && forecast != null && now - fetchedAt < REFRESH_MS) {
+            if (model == null && !troubled && now - modelTriedAt > MODEL_RETRY_MS) {
+                inFlight = true;
+                fetchModel(++generation, false);
+            }
             return;
+        }
         inFlight = true;
         error = "";
         final int mine = ++generation;
@@ -249,7 +263,7 @@ public final class SawtiPage {
                 }
                 forecast = f;
                 resolvePendingDate();
-                fetchModel(mine);
+                fetchModel(mine, true);
             }
 
             @Override
@@ -261,14 +275,16 @@ public final class SawtiPage {
         });
     }
 
-    private void fetchModel(final int mine) {
+    /** @param stamp whether this ends a whole refresh (the forecast's age restarts) or retries the model alone */
+    private void fetchModel(final int mine, final boolean stamp) {
+        modelTriedAt = System.currentTimeMillis();
         Http.get(Sawti.MODEL_URL, egress.userAgent(), null, new Http.Callback() {
             @Override
             public void onSuccess(String b) {
                 if (mine != generation)
                     return;
                 model = Sawti.parseModel(b);
-                done(mine, "");
+                done(mine, "", stamp);
             }
 
             @Override
@@ -277,24 +293,57 @@ public final class SawtiPage {
                     return;
                 Log.w(TAG, "model: " + e);
                 model = null;
-                done(mine, "");
+                done(mine, "", stamp);
             }
         });
     }
 
     private void done(int mine, String err) {
+        done(mine, err, true);
+    }
+
+    private void done(int mine, String err, boolean stamp) {
         if (mine != generation)
             return;
         inFlight = false;
         error = err;
-        if (err.isEmpty())
+        if (stamp && err.isEmpty())
             fetchedAt = System.currentTimeMillis();
         render();
     }
 
     // ---- drawing ------------------------------------------------------------------------
 
+    /**
+     * Redraw from what is held, leaving the page where the operator scrolled it.
+     * The day chips, links and table are rebuilt each time, and on the signed 0.8
+     * (S22 Ultra, 2026-10-01) the page kept settling with the zone button under the
+     * icon row and the heading out of sight, though the scroller takes focus
+     * itself; so the position is put back after the rebuild as well.
+     */
     private void render() {
+        final int y = root instanceof ScrollView ? root.getScrollY() : 0;
+        draw();
+        if (root instanceof ScrollView)
+            root.post(new Runnable() {
+                @Override
+                public void run() {
+                    ((ScrollView) root).scrollTo(0, y);
+                }
+            });
+    }
+
+    private void scrollToTop() {
+        if (root instanceof ScrollView)
+            root.post(new Runnable() {
+                @Override
+                public void run() {
+                    ((ScrollView) root).scrollTo(0, 0);
+                }
+            });
+    }
+
+    private void draw() {
         zoneButton.setText(Sawti.zoneTitle(zone) + "  ▾");
         final Sawti.Forecast f = troubled ? null : forecast;
         final List<String> dates = f == null ? null : f.dates();
@@ -536,6 +585,7 @@ public final class SawtiPage {
                             public void onClick(DialogInterface d, int which) {
                                 egress.setLayerEnabled(SawtiOverlay.LAYER_ID, true);
                                 onShown();
+                                scrollToTop();
                             }
                         })
                 .setNegativeButton(pluginContext.getString(R.string.close), null)
