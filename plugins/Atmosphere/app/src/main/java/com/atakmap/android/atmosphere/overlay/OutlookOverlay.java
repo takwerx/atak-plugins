@@ -51,15 +51,27 @@ public abstract class OutlookOverlay {
         public final JSONObject geometry;
         /** The record's text, lines in reading order. */
         public final String details;
+        /**
+         * What a tap opens on the layer's page, in the layer's own words ("3|2026-09-30"
+         * for a SAWTI zone and day), or empty for the details. Carried to the map item
+         * as {@code atmosphereRef} beside {@code atmosphereLayer}.
+         */
+        public final String ref;
 
         public Area(int day, String title, String label, int color, JSONObject geometry,
                 String details) {
+            this(day, title, label, color, geometry, details, "");
+        }
+
+        public Area(int day, String title, String label, int color, JSONObject geometry,
+                String details, String ref) {
             this.day = day;
             this.title = title;
             this.label = label;
             this.color = color;
             this.geometry = geometry;
             this.details = details;
+            this.ref = ref == null ? "" : ref;
         }
     }
 
@@ -301,6 +313,8 @@ public abstract class OutlookOverlay {
                     final AttributeSet s = new AttributeSet();
                     s.setAttribute("_details", a.details);
                     s.setAttribute("Outlook", a.title);
+                    if (!a.ref.isEmpty())
+                        s.setAttribute("_ref", a.ref);
                     final int fill = (fillAlpha(a) << 24) | c;
                     final int[] lc = labelColors(a);
                     drawn.add(new AtmosphereFeatures.Drawn("Day " + a.day, a.title, g,

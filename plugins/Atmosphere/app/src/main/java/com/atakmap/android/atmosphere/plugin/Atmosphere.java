@@ -353,6 +353,14 @@ public class Atmosphere implements IPlugin {
                     }
 
                     @Override
+                    public void openSawti(String ref) {
+                        if (atmospherePane == null)
+                            showPane();
+                        if (atmospherePane != null)
+                            atmospherePane.openSawti(ref);
+                    }
+
+                    @Override
                     public void openBuoy(String id) {
                         if (atmospherePane == null)
                             showPane();

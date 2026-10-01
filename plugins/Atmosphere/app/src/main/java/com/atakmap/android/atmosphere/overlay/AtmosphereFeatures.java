@@ -939,6 +939,11 @@ final class AtmosphereFeatures {
                                     if (a.containsAttribute("_buoyId"))
                                         item.setMetaString("buoyId",
                                                 a.getStringAttribute("_buoyId"));
+                                    if (a.containsAttribute("_ref")) {
+                                        item.setMetaString("atmosphereRef",
+                                                a.getStringAttribute("_ref"));
+                                        item.setMetaString("atmosphereLayer", type);
+                                    }
                                     if (a.containsAttribute("_zoneId")) {
                                         item.setMetaString("zoneId",
                                                 a.getStringAttribute("_zoneId"));

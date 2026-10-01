@@ -168,12 +168,15 @@ public final class AtmospherePane {
     private final ImageButton pagePrev, pageNext;
     private final Button pagePick;
     private static final int[] TAB_NAMES = { R.string.tab_forecast, R.string.tab_layers,
-            R.string.tab_spots, R.string.tab_zones, R.string.tab_stations, R.string.tab_gauges, R.string.tab_buoys };
+            R.string.tab_spots, R.string.tab_zones, R.string.tab_sawti, R.string.tab_stations,
+            R.string.tab_gauges, R.string.tab_buoys };
     private final View[] pages;
     /** Page 3, its own class; the pane only hosts it. */
     private final SpotPage spotPage;
     /** Fire weather zones and their planning forecast, beside the spot forecasts. */
     private final FireZonePage zonePage;
+    /** SAWTI, the Forest Service site's forecast page, beside the fire weather zones. */
+    private final SawtiPage sawtiPage;
     private final Button refreshButton;
     private final Button settingsButton;
     private final TextView positionText;
@@ -498,6 +501,12 @@ public final class AtmospherePane {
                     fireZones.restyle();
             }
         });
+        sawtiPage = new SawtiPage(pluginContext, mapView(), egress, new SawtiPage.Host() {
+            @Override
+            public GeoPoint point() {
+                return AtmospherePane.this.point();
+            }
+        });
         stationPage = new StationPage(pluginContext, mapView(), new StationPage.Host() {
             @Override
             public UnitSystem units() {
@@ -531,6 +540,7 @@ public final class AtmospherePane {
                 inflater.inflate(R.layout.page_layers, null),
                 spotPage.view(),
                 zonePage.view(),
+                sawtiPage.view(),
                 stationPage.view(),
                 gaugePage.view(),
                 buoyPage.view()
@@ -1180,6 +1190,8 @@ public final class AtmospherePane {
             spotPage.onShown();
         if (pages[pager.getCurrentItem()] == zonePage.view())
             zonePage.onShown();
+        if (pages[pager.getCurrentItem()] == sawtiPage.view())
+            sawtiPage.onShown();
         updateLayerControls();
     }
 
@@ -1233,6 +1245,8 @@ public final class AtmospherePane {
                     spotPage.onShown();
                 if (pages[position] == zonePage.view())
                     zonePage.onShown();
+                if (pages[position] == sawtiPage.view())
+                    sawtiPage.onShown();
                 // A list page re-reads its layer when it comes into view: the tile
                 // counts are otherwise as old as the last redraw, and the operator
                 // saw "Red Flag (1)" over a list of two (2026-09-26).
@@ -4038,6 +4052,27 @@ public final class AtmospherePane {
         zonePage.showZone(id, name, cwa);
     }
 
+    /** A SAWTI zone tapped on the map ("3|2026-09-30"): the SAWTI page on that zone and day. */
+    public void openSawti(String ref) {
+        if (ref == null)
+            return;
+        final int bar = ref.indexOf('|');
+        final int zone;
+        try {
+            zone = Integer.parseInt(bar < 0 ? ref : ref.substring(0, bar));
+        } catch (NumberFormatException e) {
+            return;
+        }
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == sawtiPage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.show();
+        sawtiPage.show(zone, bar < 0 ? null : ref.substring(bar + 1));
+    }
+
     /** A gauge tapped on the map: its page, its record, its hydrograph. */
     public void openGauge(final String lid) {
         if (lid == null || lid.isEmpty() || gaugePage == null)
@@ -5319,6 +5354,7 @@ public final class AtmospherePane {
         onClosed();
         spotPage.dispose();
         zonePage.dispose();
+        sawtiPage.dispose();
     }
 
     private void loadSelectedSource(SharedPreferences prefs) {
@@ -5515,6 +5551,8 @@ public final class AtmospherePane {
             updateHereLines();
             if (zonePage != null && pager != null)
                 zonePage.pointChanged(pages[pager.getCurrentItem()] == zonePage.view());
+            if (sawtiPage != null && pager != null)
+                sawtiPage.pointChanged(pages[pager.getCurrentItem()] == sawtiPage.view());
         }
     };
 
@@ -5694,9 +5732,11 @@ public final class AtmospherePane {
     }
 
     private void refresh(boolean force) {
-        // The fire zones page follows the same point, whatever the forecast does.
+        // The fire zones and SAWTI pages follow the same point, whatever the forecast does.
         if (zonePage != null && pager != null)
             zonePage.pointChanged(pages[pager.getCurrentItem()] == zonePage.view());
+        if (sawtiPage != null && pager != null)
+            sawtiPage.pointChanged(pages[pager.getCurrentItem()] == sawtiPage.view());
         if (selected == null) {
             statusText.setText(R.string.no_sources);
             return;

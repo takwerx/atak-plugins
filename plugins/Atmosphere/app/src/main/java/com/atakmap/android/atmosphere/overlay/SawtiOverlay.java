@@ -97,10 +97,14 @@ public final class SawtiOverlay extends OutlookOverlay {
     /**
      * Half strength, between the other outlooks' faint wash and the site's 70
      * percent: the level is the point of this layer, and the ground still shows.
+     * No Rating keeps a fill too faint to see (1 of 255): an unfilled area answers
+     * a tap on its edge only, and a tap anywhere in a zone is what opens its page
+     * (operator, 2026-10-01: "when i click on the zone can it take me to the zone
+     * report").
      */
     @Override
     protected int fillAlpha(Area a) {
-        return Sawti.LEVELS[0].equals(a.label) ? 0 : 0x80;
+        return Sawti.LEVELS[0].equals(a.label) ? 0x01 : 0x80;
     }
 
     /** Each zone's label is its level's tile, in the site's colors. */
@@ -163,7 +167,8 @@ public final class SawtiOverlay extends OutlookOverlay {
                     t.append("\n\nIssued: ").append(issued);
                 t.append("\nFrom: USDA Forest Service Predictive Services, Santa Ana Wildfire Threat Index (SAWTI)");
                 out.add(new Area(n, Sawti.zoneName(zone) + ": " + Sawti.level(d.value),
-                        Sawti.level(d.value), Sawti.color(d.value), shape, t.toString()));
+                        Sawti.level(d.value), Sawti.color(d.value), shape, t.toString(),
+                        zone + "|" + date));
             }
         }
         return out;

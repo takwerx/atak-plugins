@@ -33,6 +33,8 @@ public final class Sawti {
     public static final String FORECAST_URL = API + "forecast";
     /** {@code {"status":false}}; true means the site hides its forecast, and so do we. */
     public static final String TROUBLE_URL = API + "TechnicalDifficulties";
+    /** SDG&E's model numbers behind the site's wind and fuel gauges, about 32 KB. */
+    public static final String MODEL_URL = API + "wrf";
     public static final String ZONES_ASSET = "sawti_zones.json";
 
     /** The site shows days 1-4 of the six the feed carries. */
@@ -84,6 +86,30 @@ public final class Sawti {
 
     private static int clamp(int value) {
         return Math.max(0, Math.min(LEVELS.length - 1, value));
+    }
+
+    /**
+     * The links the site prints under each zone's recommended actions
+     * ({@code PredefinedActionLinks} in its script, read 2026-10-01), as https; every
+     * one answered over https that day.
+     */
+    private static final String[][] LINKS = {
+            { "alert.lacounty.gov", "https://alert.lacounty.gov",
+                    "readyventuracounty.org", "https://www.readyventuracounty.org" },
+            { "ocfa.org/RSG", "https://ocfa.org/RSG", "rvcfire.org", "https://www.rvcfire.org",
+                    "sbcfire.org", "https://www.sbcfire.org" },
+            { "ReadySanDiego.org", "https://www.readysandiego.org" },
+            { "sbsheriff.org", "https://www.sbsheriff.org" } };
+    private static final String[] LINK_ALL = { "preventwildfireca.org",
+            "https://www.preventwildfireca.org" };
+
+    /** {label, url, label, url, ...} for a zone, the statewide link last. */
+    public static String[] links(int zone) {
+        final String[] own = zone >= 1 && zone <= LINKS.length ? LINKS[zone - 1] : new String[0];
+        final String[] out = new String[own.length + LINK_ALL.length];
+        System.arraycopy(own, 0, out, 0, own.length);
+        System.arraycopy(LINK_ALL, 0, out, own.length, LINK_ALL.length);
+        return out;
     }
 
     /** One zone on one day. */
@@ -165,6 +191,114 @@ public final class Sawti {
             return new Forecast(0L, new ArrayList<Day>());
         }
         return new Forecast(issued, out);
+    }
+
+    /**
+     * The wind and fuel numbers behind the site's gauges, by zone and date. The run
+     * is SDG&E's and is usually a day behind the forecast (run 2026-09-29 12Z covered
+     * 09-29 to 10-02 while the forecast covered 09-30 to 10-05), so they are matched
+     * by date. The site matched them by position and showed the day before's.
+     */
+    public static final class Model {
+        private final java.util.Map<String, Double> wind = new java.util.HashMap<>();
+        private final java.util.Map<String, Double> fuel = new java.util.HashMap<>();
+
+        /** The site's wind gauge value ({@code W^2}, read on 100-1000), or NaN. */
+        public double wind(int zone, String date) {
+            final Double v = wind.get(zone + "|" + date);
+            return v == null ? Double.NaN : v;
+        }
+
+        /** The site's fuel gauge value ({@code FMC} x 10, read on 0-8), or NaN. */
+        public double fuel(int zone, String date) {
+            final Double v = fuel.get(zone + "|" + date);
+            return v == null ? Double.NaN : v * 10;
+        }
+    }
+
+    public static Model parseModel(String body) {
+        final Model m = new Model();
+        if (body == null || body.isEmpty())
+            return m;
+        try {
+            final JSONArray rows = new JSONObject(body).optJSONArray("data");
+            if (rows == null)
+                return m;
+            for (int i = 0; i < rows.length(); i++) {
+                final JSONObject r = rows.optJSONObject(i);
+                if (r == null)
+                    continue;
+                final String var = r.optString("variable", "");
+                final String date = r.optString("date", "");
+                final int zone = r.optInt("zone", 0);
+                if (date.length() < 10 || zone < 1 || zone > ZONE_NAMES.length)
+                    continue;
+                final double v;
+                try {
+                    v = Double.parseDouble(r.optString("value", ""));
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+                if (Double.isNaN(v) || Double.isInfinite(v))
+                    continue;
+                final String key = zone + "|" + date.substring(0, 10);
+                if ("W^2".equals(var))
+                    m.wind.put(key, v);
+                else if ("FMC".equals(var))
+                    m.fuel.put(key, v);
+            }
+        } catch (Exception e) {
+            return new Model();
+        }
+        return m;
+    }
+
+    /**
+     * The zone outlines from {@link #ZONES_ASSET}: per zone (index zone - 1) the
+     * exterior ring as {lon, lat} pairs, null where the asset has none.
+     */
+    public static double[][][] parseZones(String body) {
+        final double[][][] out = new double[ZONE_NAMES.length][][];
+        if (body == null)
+            return out;
+        try {
+            final JSONArray fs = new JSONObject(body).getJSONArray("features");
+            for (int i = 0; i < fs.length(); i++) {
+                final JSONObject f = fs.getJSONObject(i);
+                final int zone = f.getJSONObject("properties").getInt("zone");
+                if (zone < 1 || zone > out.length)
+                    continue;
+                final JSONArray ring = f.getJSONObject("geometry").getJSONArray("coordinates")
+                        .getJSONArray(0);
+                final double[][] pts = new double[ring.length()][];
+                for (int k = 0; k < ring.length(); k++) {
+                    final JSONArray c = ring.getJSONArray(k);
+                    pts[k] = new double[] { c.getDouble(0), c.getDouble(1) };
+                }
+                out[zone - 1] = pts;
+            }
+        } catch (Exception e) {
+            return out;
+        }
+        return out;
+    }
+
+    /** The zone a point is in, 1-4, or 0 outside all four. */
+    public static int zoneAt(double[][][] zones, double lat, double lon) {
+        for (int z = 0; z < zones.length; z++) {
+            final double[][] ring = zones[z];
+            if (ring == null || ring.length < 3)
+                continue;
+            boolean in = false;
+            for (int i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                final double xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+                if ((yi > lat) != (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)
+                    in = !in;
+            }
+            if (in)
+                return z + 1;
+        }
+        return 0;
     }
 
     /** True only for a body that says {@code "status":true}. */

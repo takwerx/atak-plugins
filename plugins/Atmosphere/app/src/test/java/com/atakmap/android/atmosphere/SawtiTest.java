@@ -94,6 +94,42 @@ public class SawtiTest {
     }
 
     @Test
+    public void theModelIsMatchedByDateNotPosition() throws IOException {
+        // Run 2026-09-29 12Z covers 09-29..10-02; the forecast of 09-30 starts a day later.
+        final Sawti.Model m = Sawti.parseModel(resource("sawti_model.json"));
+        assertEquals(56, m.wind(3, "2026-09-30"), 1e-9);
+        assertEquals(108, m.wind(3, "2026-09-29"), 1e-9);
+        assertEquals(5.3, m.fuel(3, "2026-09-30"), 1e-9);
+        assertTrue(Double.isNaN(m.wind(3, "2026-10-03")));
+        assertTrue(Double.isNaN(m.fuel(5, "2026-09-30")));
+        assertTrue(Double.isNaN(Sawti.parseModel("<html>").wind(1, "2026-09-30")));
+    }
+
+    @Test
+    public void aPointFindsItsZone() throws Exception {
+        final double[][][] zones = Sawti.parseZones(read(new FileInputStream(
+                new File("src/main/assets/" + Sawti.ZONES_ASSET))));
+        assertEquals(1, Sawti.zoneAt(zones, 34.0522, -118.2437));   // downtown LA
+        assertEquals(2, Sawti.zoneAt(zones, 33.6846, -117.8265));   // Irvine
+        assertEquals(3, Sawti.zoneAt(zones, 32.7157, -117.1611));   // downtown San Diego
+        assertEquals(4, Sawti.zoneAt(zones, 34.4208, -119.6982));   // Santa Barbara
+        assertEquals(0, Sawti.zoneAt(zones, 33.8303, -116.5453));   // Palm Springs, the desert
+        assertEquals(0, Sawti.zoneAt(Sawti.parseZones("nope"), 34.0522, -118.2437));
+    }
+
+    @Test
+    public void everyZoneHasItsLinksAndTheStatewideOne() {
+        for (int z = 1; z <= 4; z++) {
+            final String[] l = Sawti.links(z);
+            assertEquals(0, l.length % 2);
+            assertEquals("https://www.preventwildfireca.org", l[l.length - 1]);
+            for (int i = 1; i < l.length; i += 2)
+                assertTrue(l[i].startsWith("https://"));
+        }
+        assertEquals("https://www.readysandiego.org", Sawti.links(3)[1]);
+    }
+
+    @Test
     public void theShippedZonesAreTheFourInOrder() throws Exception {
         final String body = read(new FileInputStream(new File("src/main/assets/" + Sawti.ZONES_ASSET)));
         final JSONArray fs = new JSONObject(body).getJSONArray("features");

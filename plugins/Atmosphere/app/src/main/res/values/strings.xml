@@ -105,6 +105,17 @@
     <string name="sawti_allow_title">Show SAWTI?</string>
     <string name="sawti_allow_text">Atmosphere will ask the US Forest Service for SAWTI, the Santa Ana Wildfire Threat Index, the next four days for four Southern California zones, and draw it on the map. Your position is not sent.\n\nServer: fsapps.nwcg.gov</string>
     <string name="credit_sawti">Santa Ana Wildfire Threat Index (SAWTI) from the USDA Forest Service Predictive Services, developed with SDG&amp;E and UCLA (%1$s)</string>
+    <string name="heading_sawti">SAWTI, the Santa Ana Wildfire Threat Index</string>
+    <string name="sawti_gate_text">The US Forest Service\'s daily Santa Ana Wildfire Threat Index for four Southern California zones: how hard a fire would be to fight if one started, the next four days, with the forecaster\'s words and the wind and fuel gauges from its site.</string>
+    <string name="sawti_load">Show SAWTI</string>
+    <string name="sawti_page_allow_text">Atmosphere will ask the US Forest Service for SAWTI, the Santa Ana Wildfire Threat Index, and the wind and fuel moisture numbers behind its gauges. Your position is not sent: the zone is picked out on the phone.\n\nServer: fsapps.nwcg.gov</string>
+    <string name="sawti_zone_pick">SAWTI zone</string>
+    <string name="heading_sawti_threat">Threat Level</string>
+    <string name="heading_sawti_wind">Wind Strength</string>
+    <string name="heading_sawti_fuel">Fuel Moisture</string>
+    <string name="heading_sawti_event">Event Description</string>
+    <string name="heading_sawti_actions">Recommended Actions</string>
+    <string name="heading_sawti_table">All Zones</string>
     <string name="credit_firewx">Fire weather outlook from the NOAA Storm Prediction Center (%1$s)</string>
     <string name="flood_on">Flash Flood Outlook ON</string>
     <string name="flood_off">Flash Flood Outlook OFF</string>
@@ -301,6 +312,7 @@
     <string name="tab_layers">Layers</string>
     <string name="tab_spots">Spot Weather Forecast</string>
     <string name="tab_zones">Fire Weather Zones</string>
+    <string name="tab_sawti">SAWTI</string>
     <string name="tab_stations">Weather Stations</string>
     <string name="tab_gauges">River Gauges</string>
     <string name="tab_buoys">Buoys</string>
