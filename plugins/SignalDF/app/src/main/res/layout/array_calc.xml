@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Antenna array sizing. ONE input: the frequency. Everything else is an
+    answer.
+
+    The first build of this screen had five controls across the top - shape,
+    element count, radius, "size it for me", and a template picker - and the
+    operator's reaction was a question per control: what does From radio mean,
+    when would I use linear, why would I enter my own radius, what does size it
+    for me mean, why am I picking a template when you know all the sizes
+    anyway. Every one of those was fair. A screen whose purpose is "tell me how
+    to set up my array" should not be asking the operator to configure the
+    thing that tells them.
+
+    So: frequency at the top, the drawing, then the instructions, and one way
+    out at the bottom for somebody whose array is already built to a size of
+    its own.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingLeft="6dp"
+    android:paddingRight="6dp">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fadeScrollbars="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/SectionHeading"
+                android:text="Frequency you are hunting" />
+
+            <Button
+                style="@style/TakwerxButton"
+                android:id="@+id/freq"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="416.588 MHz" />
+
+            <com.atakmap.android.signaldf.ui.ArrayPlanView
+                android:id="@+id/plan"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" />
+
+            <TextView
+                android:id="@+id/verdict"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp"
+                android:visibility="gone" />
+
+            <TextView
+                style="@style/SectionHeading"
+                android:text="Lay the antennas out" />
+
+            <TextView
+                android:id="@+id/layout_steps"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:lineSpacingMultiplier="1.15"
+                android:paddingBottom="8dp" />
+
+            <TextView
+                style="@style/SectionHeading"
+                android:text="Each antenna" />
+
+            <TextView
+                android:id="@+id/antenna"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:lineSpacingMultiplier="1.15"
+                android:paddingBottom="8dp" />
+
+            <TextView
+                style="@style/SectionHeading"
+                android:text="What this array gives you" />
+
+            <TextView
+                android:id="@+id/numbers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:lineSpacingMultiplier="1.15"
+                android:paddingBottom="8dp" />
+
+            <TextView
+                android:id="@+id/note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:alpha="0.7"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <Button
+        style="@style/TakwerxButton"
+        android:id="@+id/close"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:text="Done" />
+
+</LinearLayout>
