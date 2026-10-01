@@ -357,7 +357,7 @@ day under it. A forecast more than a day old says so.
 = SAWTI
 
 #toolbox.side-by-side(columns: (7fr, 5fr))[
-  #image("80.png", width: 100%)
+  #image("80.jpg", width: 100%)
 ][
   #image("81.png", width: 100%)
 ]
@@ -413,7 +413,7 @@ the gauges say *Not available* and the page asks again the next time you look.
 = Lightning
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("83.png", width: 100%)
+  #image("83.jpg", width: 100%)
 ][
   #image("82.png", width: 100%)
 ][
@@ -433,7 +433,7 @@ the gauges say *Not available* and the page asks again the next time you look.
 = Power shutoffs (PSPS)
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("85.png", width: 100%)
+  #image("85.jpg", width: 100%)
   #image("86.png", width: 100%)
 ][
   #image("84.png", width: 100%)

@@ -235,7 +235,7 @@ High or Extreme. A rated zone is filled in its level's color, with its label in
 the same color; a No Rating zone is a cyan outline. The date buttons pick one of
 the four days the Forest Service shows. Tap a zone to open its page.
 
-<img src="screenshots/80_sawti_map.png" width="560"> <img src="screenshots/81_sawti_layer_block.png" width="300">
+<img src="screenshots/80_sawti_map.jpg" width="560"> <img src="screenshots/81_sawti_layer_block.png" width="300">
 
 The **SAWTI** page is the Forest Service site's forecast page. It opens on the
 zone the point you are reading is in, and the zone button picks another. Each
@@ -260,7 +260,7 @@ strikes; the line under the switch says which 15 minutes and how old. It shows
 which storms are making lightning and whether they are building. It is not a
 reason to call it safe to be outside.
 
-<img src="screenshots/83_lightning_map.png" width="360"> <img src="screenshots/82_lightning_layer_block.png" width="420">
+<img src="screenshots/83_lightning_map.jpg" width="360"> <img src="screenshots/82_lightning_layer_block.png" width="420">
 
 **PSPS** draws California's Public Safety Power Shutoffs as Cal OES reports
 them from PG&E, SCE and SDG&E: a county a utility has warned may have a shutoff
@@ -271,7 +271,7 @@ goes quiet for 45 minutes it says the status is unknown rather than none. It
 does not cover PacifiCorp, Liberty, Bear Valley or any other state: ask the
 utility.
 
-<img src="screenshots/85_psps_map.png" width="420"> <img src="screenshots/84_psps_layer_block.png" width="420">
+<img src="screenshots/85_psps_map.jpg" width="420"> <img src="screenshots/84_psps_layer_block.png" width="420">
 
 <img src="screenshots/86_psps_details.png" width="420">
 
