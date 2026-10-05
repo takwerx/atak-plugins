@@ -2,7 +2,10 @@ package com.atakmap.android.featurelayer;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
 
 import com.atakmap.coremap.log.Log;
 import com.atakmap.map.layer.feature.style.IconPointStyle;
@@ -15,13 +18,13 @@ import java.io.FileOutputStream;
 import java.util.Locale;
 
 /**
- * New Fire Starts, as NIFC draws them on its own "New Starts" page: wildfires red,
- * prescribed fires orange, circles sized by acres. The colors and the size rule are the
- * service's renderer (read 2026-10-05): uniqueValue on IncidentTypeCategory, WF
- * 255,0,0 and RX 255,170,0, sizeInfo 6 to 18 pt over 1 to 10,000 acres.
+ * New Fire Starts on DART's disc, at DART's size: a red flame for a wildfire, a green RX
+ * for a prescribed fire (operator, 2026-10-05: "a different icon for a fire, same size
+ * as the dart icons, like a flame, and RX for a prescribed fire, prescribed green, red
+ * for wildfire"). NIFC's own page draws red and orange circles sized by acres; the
+ * first build did that, and at a glance a circle said nothing.
  *
- * <p>One thing NIFC does not do: a wildfire with no size reported is its own type, drawn
- * as a red ring. On 2026-10-05, 18 of 105 starts were LA County Fire dispatch records,
+ * <p>A wildfire with no size reported is its own type, drawn as the flame's outline. On 2026-10-05, 18 of 105 starts were LA County Fire dispatch records,
  * created by its CAD and never touched again: a dispatch number for a name, 0.01 acres
  * as a placeholder, no size, no containment, no update. They are real IRWIN records and
  * none was older than the service's 24 hours, but nothing was ever reported about them,
@@ -35,9 +38,8 @@ public final class NewStartsStyles {
     public static final String NO_SIZE = "Wildfire, No Size Yet";
     public static final String PRESCRIBED = "Prescribed Fire";
 
-    private static final int RED = 0xFFFF0000, ORANGE = 0xFFFFAA00;
     /** Bumped when the drawing changes, so an older composite is never reused. */
-    private static final int V = 1;
+    private static final int V = 3;
 
     private NewStartsStyles() {
     }
@@ -96,58 +98,97 @@ public final class NewStartsStyles {
         return s + " ac";
     }
 
-    /**
-     * NIFC's size rule in points (6 to 18 over 1 to 10,000 acres, linear, clamped), drawn
-     * at 2.5 times that in dp: the service's 6 pt is a speck over imagery on a phone,
-     * which is what DART's own 4 pt dots were. Snapped to even dp so a day of starts
-     * makes a handful of files, not one per acreage.
-     */
-    static int sizeDp(double acres) {
-        final double a = acres > 0 ? acres : 1;
-        final double pt = 6 + Math.max(0, Math.min(1, (a - 1) / (10000.1 - 1))) * 12;
-        return 2 * (int) Math.round(pt * 2.5 / 2);
-    }
+    /** DART's marker edge, so a fire start sits beside a DART engine at the same size (DartStyles.PX). */
+    static final float PX = 32f;
+    /** DART's canvas and disc: near-black, light edge, the glyph inside. */
+    private static final int CANVAS = 96, DISC = 0xD9101010, EDGE = 0xFFE6E6E6;
+    /** A wildfire's flame; brighter than NIFC's pure red, which goes muddy on the dark disc. */
+    private static final int FLAME = 0xFFFF3B2F;
+    /** A prescribed fire's RX: the pane's ON green (operator, 2026-10-05: "prescribed is green, red for wildfire"). */
+    private static final int RX_GREEN = 0xFF3DDC61;
 
-    /** The start's circle, composed once per color, kind and size; null when it cannot be drawn. */
+    /** The start's marker, composed once per kind; null when it cannot be drawn. */
     static Style style(JSONObject props, File iconDir) {
-        final boolean ring = NO_SIZE.equals(type(props));
-        final int color = prescribed(props) ? ORANGE : RED;
-        final int dp = sizeDp(acres(props));
-        final float scale = gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling();
-        final File f = disc(color, ring, dp, scale, iconDir);
+        final String type = type(props);
+        final String kind = PRESCRIBED.equals(type) ? "rx" : NO_SIZE.equals(type) ? "wf_nosize" : "wf";
+        final File f = marker(kind, iconDir);
         if (f == null)
             return null;
         // Level when the map turns, like every icon this plugin draws (see NwcgStyles.point).
-        return new IconPointStyle(0xFFFFFFFF, "file://" + f.getAbsolutePath(), dp, dp, 0, 0, 0f, false);
+        return new IconPointStyle(0xFFFFFFFF, "file://" + f.getAbsolutePath(), PX, PX, 0, 0, 0f, false);
     }
 
-    private static File disc(int color, boolean ring, int dp, float scale, File iconDir) {
+    /**
+     * A flame, Atmosphere's fire weather glyph (ic_layer_firewx, our own drawing), in its
+     * 24-unit box: the body with a round base and an inner tongue cut out of it.
+     */
+    private static Path flame() {
+        final Path p = new Path();
+        p.setFillType(Path.FillType.EVEN_ODD);
+        p.moveTo(13f, 2f);
+        p.cubicTo(13.5f, 5.5f, 11f, 6.5f, 10.5f, 9f);
+        p.cubicTo(10f, 7.5f, 9f, 7f, 8f, 6.5f);
+        p.cubicTo(9.5f, 9f, 6.5f, 11f, 6.5f, 14.5f);
+        p.arcTo(new RectF(6.5f, 9f, 17.5f, 20f), 180f, -180f); // the round base
+        p.cubicTo(17.5f, 11.5f, 15.5f, 10f, 15f, 7.5f);
+        p.cubicTo(14.8f, 9f, 14f, 9.8f, 13.5f, 10.5f);
+        p.cubicTo(14.5f, 7.5f, 12.5f, 4f, 13f, 2f);
+        p.close();
+        p.moveTo(12f, 12f);
+        p.cubicTo(11f, 13.5f, 10.2f, 14.3f, 10.2f, 15.5f);
+        p.arcTo(new RectF(10.2f, 13.7f, 13.8f, 17.3f), 180f, -180f);
+        p.cubicTo(13.8f, 14.3f, 13f, 13.5f, 12f, 12f);
+        p.close();
+        return p;
+    }
+
+    private static synchronized File marker(String kind, File iconDir) {
         if (iconDir == null)
             return null;
-        final File out = new File(iconDir, String.format(Locale.US, "ns%d_%08x_%s_%d_s%d.png", V, color,
-                ring ? "ring" : "disc", dp, Math.round(scale * 100)));
+        final File out = new File(iconDir, "ns" + V + "_" + kind + ".png");
         if (out.isFile())
             return out;
         try {
-            final int px = Math.max(8, Math.round(dp * scale));
-            final Bitmap bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888);
+            final Bitmap bmp = Bitmap.createBitmap(CANVAS, CANVAS, Bitmap.Config.ARGB_8888);
             final Canvas c = new Canvas(bmp);
-            final float r = px / 2f;
-            final float edge = Math.max(1.5f, 1.5f * scale);
+            final float mid = CANVAS / 2f;
             final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-            // A thin light edge, NIFC's own white outline made strong enough to read over imagery.
             p.setStyle(Paint.Style.FILL);
-            p.setColor(0x99FFFFFF);
-            c.drawCircle(r, r, r, p);
-            if (ring) {
-                // Nothing reported but the call: a dark center inside a red ring.
-                p.setColor(color);
-                c.drawCircle(r, r, r - edge, p);
-                p.setColor(0xB0000000);
-                c.drawCircle(r, r, (r - edge) * 0.55f, p);
+            p.setColor(DISC);
+            c.drawCircle(mid, mid, mid - 3f, p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(4f);
+            p.setColor(EDGE);
+            c.drawCircle(mid, mid, mid - 3f, p);
+            if ("rx".equals(kind)) {
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(RX_GREEN);
+                p.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                p.setTextAlign(Paint.Align.CENTER);
+                p.setTextSize(CANVAS * 0.42f);
+                final android.graphics.Rect b = new android.graphics.Rect();
+                p.getTextBounds("RX", 0, 2, b);
+                c.drawText("RX", mid, mid + b.height() / 2f, p);
             } else {
-                p.setColor(color);
-                c.drawCircle(r, r, r - edge, p);
+                // The flame's 18-unit height at 72% of the canvas, its box centered on the
+                // disc: DART fits its glyphs to 74%, and a flame is narrower than a truck.
+                final float sc = CANVAS * 0.72f / 18f;
+                final Path f = flame();
+                final Matrix m = new Matrix();
+                m.setTranslate(-12f, -11f);
+                m.postScale(sc, sc);
+                m.postTranslate(mid, mid);
+                f.transform(m);
+                p.setColor(FLAME);
+                if ("wf_nosize".equals(kind)) {
+                    // Reported and nothing added since: the flame's outline only.
+                    p.setStyle(Paint.Style.STROKE);
+                    p.setStrokeWidth(5f);
+                    p.setStrokeJoin(Paint.Join.ROUND);
+                } else {
+                    p.setStyle(Paint.Style.FILL);
+                }
+                c.drawPath(f, p);
             }
             final File tmp = new File(out.getPath() + ".tmp");
             final FileOutputStream o = new FileOutputStream(tmp);
@@ -161,7 +202,7 @@ public final class NewStartsStyles {
             tmp.renameTo(out);
             return out.isFile() ? out : null;
         } catch (Exception e) {
-            Log.w(TAG, "new start symbol " + out.getName(), e);
+            Log.w(TAG, "new start marker " + kind, e);
             return null;
         }
     }

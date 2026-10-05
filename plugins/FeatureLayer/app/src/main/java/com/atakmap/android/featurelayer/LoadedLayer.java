@@ -45,9 +45,10 @@ public class LoadedLayer {
      * Bumped whenever this plugin changes how it draws anything. A layer whose store was
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store. 53: every icon and pill level when
-     * the map is spun, and drawn from ATAK's private storage instead of the card.
+     * the map is spun, and drawn from ATAK's private storage instead of the card. 54: New
+     * Fire Starts as flame and RX markers.
      */
-    private static final int STYLE_VERSION = 53;
+    private static final int STYLE_VERSION = 54;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(

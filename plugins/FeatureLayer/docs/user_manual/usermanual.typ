@@ -492,9 +492,9 @@ takes any ArcGIS Online organization you sign in to.
   it is contained, controlled or out, or for 24 hours after it was found.
   Public, no login. *Add new starts* puts it in the list.
 
-  Each start is a circle the way NIFC draws them: red for a wildfire, orange for
-  a prescribed fire, larger for more acres. A red ring is a wildfire reported
-  with no size and nothing added since.
+  Each start is a marker the size of a DART one: a red flame for a wildfire, a
+  green *RX* for a prescribed fire. A flame drawn in outline is a wildfire
+  reported with no size and nothing added since.
 
   Its Features list has three types, each *ON/OFF*: *Wildfire*, *Wildfire, No
   Size Yet* and *Prescribed Fire*. No Size Yet holds starts a dispatch center
