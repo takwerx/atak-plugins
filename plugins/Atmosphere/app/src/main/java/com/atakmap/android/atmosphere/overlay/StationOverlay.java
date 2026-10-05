@@ -162,10 +162,14 @@ public final class StationOverlay {
         void onStationsStatus(String message);
 
         /**
-         * @param drawn   fire weather stations drawn
-         * @param utility utility stations held, which the map shows only zoomed in
+         * @param drawn           fire weather stations drawn
+         * @param critical        how many of those are hitting their criteria
+         * @param utility         utility stations held, which the map shows only zoomed in
+         * @param utilityCritical how many of those are hitting their criteria, counted
+         *                        apart because their wind reads higher
          */
-        void onStationsDrawn(int drawn, int total, int critical, int utility);
+        void onStationsDrawn(int drawn, int total, int critical, int utility,
+                int utilityCritical);
 
         /** The map moved: anything ordered by distance needs reordering. */
         void onOriginMoved();
@@ -843,7 +847,7 @@ public final class StationOverlay {
             zoneOf = new HashMap<>();
             clearOffMain();
             status("");
-            drawn(0, 0, 0, 0);
+            drawn(0, 0, 0, 0, 0);
         }
     }
 
@@ -1088,6 +1092,7 @@ public final class StationOverlay {
         int critical = 0;
         int stations = 0;
         int utility = 0;
+        int utilityCritical = 0;
         // Never coarser than the stations' own gate: zoomed out past it, nothing draws.
         final double utilityAt = Math.min(gate, isAlways(utilityGate) ? ALWAYS : utilityGate);
         final boolean utilityShown = drawingNow(utilityAt);
@@ -1112,6 +1117,8 @@ public final class StationOverlay {
                 // written: rewriting all 472 around Vista took 3.4 s a pan (XCover,
                 // 2026-10-05), and the zoom and the pan both redraw anyway.
                 utility++;
+                if (level == RedFlag.CRITICAL)
+                    utilityCritical++;
                 if (!utilityShown || !onScreen(s, view))
                     continue;
             } else if (level == RedFlag.CRITICAL) {
@@ -1146,13 +1153,14 @@ public final class StationOverlay {
         final int total = held.size();
         final int red = critical;
         final int fromUtilities = utility;
+        final int utilityRed = utilityCritical;
         mapView.post(new Runnable() {
             @Override
             public void run() {
                 if (mine != generation || !on)
                     return;
                 status("");
-                drawn(n, total, red, fromUtilities);
+                drawn(n, total, red, fromUtilities, utilityRed);
             }
         });
         Log.d(TAG, String.format(Locale.US,
@@ -1512,9 +1520,9 @@ public final class StationOverlay {
             l.onStationsStatus(message);
     }
 
-    private void drawn(int n, int total, int critical, int utility) {
+    private void drawn(int n, int total, int critical, int utility, int utilityCritical) {
         final Listener l = listener;
         if (l != null)
-            l.onStationsDrawn(n, total, critical, utility);
+            l.onStationsDrawn(n, total, critical, utility, utilityCritical);
     }
 }

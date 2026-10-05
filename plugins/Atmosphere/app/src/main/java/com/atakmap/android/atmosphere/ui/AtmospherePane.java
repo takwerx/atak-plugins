@@ -3073,14 +3073,16 @@ public final class AtmospherePane {
             }
 
             @Override
-            public void onStationsDrawn(int drawn, int total, int critical, int utility) {
+            public void onStationsDrawn(int drawn, int total, int critical, int utility,
+                    int utilityCritical) {
                 // The utility stations are counted apart, and said to be hidden when
                 // the zoom hides them: a count the map does not show reads as a fault.
                 if (stationsStatus != null)
                     stationsStatus.setText(total == 0 ? ""
                             : drawn + " stations, " + critical + " at criteria"
                                     + (utility == 0 ? "" : "\n" + utility
-                                            + " utility stations"
+                                            + " utility stations, " + utilityCritical
+                                            + " at criteria"
                                             + (stationLayer.drawingNow(
                                                     stationLayer.utilityGate())
                                                     ? "" : ", shown when zoomed in")));
