@@ -46,7 +46,7 @@ public class LayerManager {
     private final String clientId;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private final File root, iconDir, layersDir, stateFile;
+    private final File root, iconDir, legacyIconDir, layersDir, stateFile;
     private final Map<String, String> nwcgIcons = new HashMap<>();
     private final Map<String, String> sarcopIcons = new HashMap<>();
     private String lineGlyph, polygonGlyph;
@@ -80,7 +80,14 @@ public class LayerManager {
         this.pluginContext = pluginContext;
         this.clientId = clientId;
         root = FileSystemUtils.getItem("tools/featurelayer");
-        iconDir = new File(root, "icons");
+        // The pictures this plugin draws for itself -- symbols, labelled pills, DART discs,
+        // chooser glyphs -- go in ATAK's own private storage, not on the card. They are
+        // caches ATAK reads back by file:// in this same process; on the card they were
+        // thousands of ordinary PNGs any app could list and a gallery could index as
+        // photos (takwerx/atmosphere#2, the same fix). ATAK's context, never the plugin's:
+        // the plugin package's own files dir belongs to another uid and mkdirs there fails.
+        iconDir = new File(new File(mapView.getContext().getFilesDir(), "featurelayer"), "icons");
+        legacyIconDir = new File(root, "icons");
         layersDir = new File(root, "layers");
         stateFile = new File(root, "layers.json");
     }
@@ -167,15 +174,13 @@ public class LayerManager {
         attachFollow();
         iconDir.mkdirs();
         layersDir.mkdirs();
-        // Thousands of composed PNGs and a few sqlite stores are not media: without this
-        // Android's media scanner indexed every one and fought the plugin for the disk
-        // at load (75% of a core in the 2026-09-18 14:26 ANR dump).
-        for (File d : new File[] { iconDir, layersDir }) {
-            try {
-                //noinspection ResultOfMethodCallIgnored
-                new File(d, ".nomedia").createNewFile();
-            } catch (Exception ignored) {
-            }
+        // The sqlite stores are not media: without this Android's media scanner indexed
+        // them, and the composed PNGs when they lived beside them, and fought the plugin
+        // for the disk at load (75% of a core in the 2026-09-18 14:26 ANR dump).
+        try {
+            //noinspection ResultOfMethodCallIgnored
+            new File(layersDir, ".nomedia").createNewFile();
+        } catch (Exception ignored) {
         }
         worker.execute(new Runnable() {
             @Override
@@ -203,8 +208,41 @@ public class LayerManager {
         startLog("start: restored " + snapshot().size() + " layers, queuing refreshes");
         for (LoadedLayer l : snapshot())
             refresh(l);
+        // After the refreshes, on the same thread: with no layers, or all of them already
+        // redrawn by this build, the old folder goes now.
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                sweepLegacyIcons();
+            }
+        });
         main.postDelayed(timer, TICK_MS);
         startLog("start: done");
+    }
+
+    /**
+     * Removes the icon folder 0.11 and earlier composed on the card, once nothing draws
+     * from it. A restored layer keeps the styles it was stored with, old paths included,
+     * until a fetch rewrites it under this build's style version; deleting the folder at
+     * start would leave an offline restart with every symbol missing. So it waits until
+     * every layer has been rewritten, which online is the first round of refreshes. The
+     * folder carries a .nomedia meanwhile, so nothing indexes it. Worker thread only.
+     */
+    private void sweepLegacyIcons() {
+        if (!legacyIconDir.isDirectory())
+            return;
+        for (LoadedLayer l : snapshot())
+            if (!l.drawnByThisBuild())
+                return;
+        int gone = 0;
+        final File[] all = legacyIconDir.listFiles();
+        if (all != null)
+            for (File f : all)
+                if (f.delete())
+                    gone++;
+        //noinspection ResultOfMethodCallIgnored
+        legacyIconDir.delete();
+        startLog("old icon folder on the card removed, " + gone + " files");
     }
 
     public void stop() {
@@ -617,6 +655,7 @@ public class LayerManager {
         });
         startLog("refreshNow " + l.spec.id + " done: " + l.status);
         save();
+        sweepLegacyIcons();
     }
 
     public void refreshAll() {

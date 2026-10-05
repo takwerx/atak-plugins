@@ -44,9 +44,10 @@ public class LoadedLayer {
     /**
      * Bumped whenever this plugin changes how it draws anything. A layer whose store was
      * written under an older number is fully rewritten on its next refresh, because the
-     * style travels with the feature into the store.
+     * style travels with the feature into the store. 53: every icon and pill level when
+     * the map is spun, and drawn from ATAK's private storage instead of the card.
      */
-    private static final int STYLE_VERSION = 52;
+    private static final int STYLE_VERSION = 53;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -379,6 +380,11 @@ public class LoadedLayer {
 
     public boolean isVisible() {
         return layerOn;
+    }
+
+    /** Whether the store was last written with this build's styles, so nothing in it points at older files. */
+    boolean drawnByThisBuild() {
+        return spec.styleVersion == STYLE_VERSION;
     }
 
     /**
@@ -1792,7 +1798,7 @@ public class LoadedLayer {
                 if (f == null)
                     return null;
                 final Style icon = new com.atakmap.map.layer.feature.style.IconPointStyle(0xFFFFFFFF,
-                        "file://" + f.getAbsolutePath(), dim[0] / scale, dim[1] / scale, 0, 0, 0f, true);
+                        "file://" + f.getAbsolutePath(), dim[0] / scale, dim[1] / scale, 0, 0, 0f, false); // level, see NwcgStyles.point
                 return NwcgStyles.withoutLabel(icon);
             } catch (Exception e) {
                 Log.w(TAG, "labelled text \"" + text + "\"", e);
@@ -1837,7 +1843,7 @@ public class LoadedLayer {
             if (f == null)
                 return null;
             final Style icon = new com.atakmap.map.layer.feature.style.IconPointStyle(0xFFFFFFFF,
-                    "file://" + f.getAbsolutePath(), dim[0] / scale, dim[1] / scale, 0, 0, 0f, true);
+                    "file://" + f.getAbsolutePath(), dim[0] / scale, dim[1] / scale, 0, 0, 0f, false); // level, see NwcgStyles.point
             return NwcgStyles.withoutLabel(icon);
         } catch (Exception e) {
             Log.w(TAG, "labelled point \"" + text + "\"", e);
