@@ -30,6 +30,9 @@ import com.atakmap.android.atmosphere.overlay.SnotelOverlay;
 import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
+import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
+import com.atakmap.android.atmosphere.overlay.LightningOverlay;
+import com.atakmap.android.atmosphere.overlay.PspsOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
@@ -127,6 +130,9 @@ public class Atmosphere implements IPlugin {
                 }
             };
     private FireWxOutlookOverlay firewx;
+    private SawtiOverlay sawti;
+    private LightningOverlay lightning;
+    private PspsOverlay psps;
     private FloodOutlookOverlay flood;
     private BeachOverlay beach;
     private HighFlowOverlay highflow;
@@ -289,6 +295,12 @@ public class Atmosphere implements IPlugin {
         fireZones.start();
         firewx = new FireWxOutlookOverlay(mapView, pluginContext, egress);
         firewx.start();
+        sawti = new SawtiOverlay(mapView, pluginContext, egress);
+        sawti.start();
+        lightning = new LightningOverlay(mapView, egress);
+        lightning.start();
+        psps = new PspsOverlay(mapView, pluginContext, egress);
+        psps.start();
         flood = new FloodOutlookOverlay(mapView, pluginContext, egress);
         flood.start();
         beach = new BeachOverlay(mapView, pluginContext, egress);
@@ -349,6 +361,14 @@ public class Atmosphere implements IPlugin {
                     }
 
                     @Override
+                    public void openSawti(String ref) {
+                        if (atmospherePane == null)
+                            showPane();
+                        if (atmospherePane != null)
+                            atmospherePane.openSawti(ref);
+                    }
+
+                    @Override
                     public void openBuoy(String id) {
                         if (atmospherePane == null)
                             showPane();
@@ -371,6 +391,12 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFireZones(fireZones);
             if (firewx != null)
                 atmospherePane.setFireWx(firewx);
+            if (sawti != null)
+                atmospherePane.setSawti(sawti);
+            if (lightning != null)
+                atmospherePane.setLightning(lightning);
+            if (psps != null)
+                atmospherePane.setPsps(psps);
             if (flood != null)
                 atmospherePane.setFlood(flood);
             if (beach != null)
@@ -468,6 +494,18 @@ public class Atmosphere implements IPlugin {
             flood.stop();
             flood = null;
         }
+        if (psps != null) {
+            psps.stop();
+            psps = null;
+        }
+        if (lightning != null) {
+            lightning.stop();
+            lightning = null;
+        }
+        if (sawti != null) {
+            sawti.stop();
+            sawti = null;
+        }
         if (firewx != null) {
             firewx.stop();
             firewx = null;
@@ -552,6 +590,12 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFireZones(fireZones);
             if (firewx != null)
                 atmospherePane.setFireWx(firewx);
+            if (sawti != null)
+                atmospherePane.setSawti(sawti);
+            if (lightning != null)
+                atmospherePane.setLightning(lightning);
+            if (psps != null)
+                atmospherePane.setPsps(psps);
             if (flood != null)
                 atmospherePane.setFlood(flood);
             if (beach != null)

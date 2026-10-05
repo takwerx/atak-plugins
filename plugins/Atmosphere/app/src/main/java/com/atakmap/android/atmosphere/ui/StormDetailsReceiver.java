@@ -67,6 +67,9 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
 
         /** A fire weather zone opens its planning forecast on the Fire Weather Zones page. */
         void openZone(String id, String name, String cwa);
+
+        /** A SAWTI zone opens the SAWTI page on that zone and day ("3|2026-09-30"). */
+        void openSawti(String ref);
     }
 
     private static SpotOpener spotOpener;
@@ -104,6 +107,11 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         final String buoyId = item.getMetaString("buoyId", "");
         if (!buoyId.isEmpty()) {
             spotOpener.openBuoy(buoyId);
+            return true;
+        }
+        final String ref = item.getMetaString("atmosphereRef", "");
+        if (!ref.isEmpty() && "sawti".equals(item.getMetaString("atmosphereLayer", ""))) {
+            spotOpener.openSawti(ref);
             return true;
         }
         final String zoneId = item.getMetaString("zoneId", "");
