@@ -376,9 +376,16 @@ public class FeatureLayer implements IPlugin {
                         toast(org.title + ": signed out");
                         return;
                     }
+                    // The sign-in page is a drop-down of its own, and opening it closes
+                    // this pane; nothing brought the pane back, so every sign-in ended on
+                    // the bare map (operator, 2026-10-05: "after i log into nifc the pane
+                    // closes i have to reopen plugin"). It comes back when the sign-in
+                    // ends either way but cancelled: a cancel may be another tool taking
+                    // the side of the screen, and reopening here would fight it.
                     auth.signIn(new ArcGisAuth.Callback() {
                         @Override
                         public void onSignedIn(String username) {
+                            showPane();
                             refreshOrgUi();
                             toast(org.title + ": signed in as " + username);
                             if (org.custom && org.title.equals(LayerManager.hostOf(org.portal)))
