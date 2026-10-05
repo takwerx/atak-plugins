@@ -61,6 +61,12 @@ public class LayerSpec {
     public String scopeRings;           // "shape": the Esri JSON rings of a drawn shape
     /** A date field to window on, and how far back: "poly_DateCurrent", 72 h. 0 = everything. */
     public String timeField;
+    /**
+     * The date field the "anything new?" check reads, when it is not {@link #timeField}:
+     * a fire start is windowed by when it was found, but its size arrives later as an
+     * edit, so the check reads the edit time. Not saved; the source sets it on load.
+     */
+    public String stampField;
     public int sinceHours;
     /** Split the layer's features into types by this field's value (FIRIS: "source"), instead of one type per source layer. */
     public String setField;
@@ -91,6 +97,8 @@ public class LayerSpec {
     public String windowLabel() {
         if (timeField == null || sinceHours <= 0)
             return "All time";
+        if (sinceHours == 1)
+            return "Last hour";
         if (sinceHours < 48)
             return "Last " + sinceHours + " hours";
         return "Last " + (sinceHours / 24) + " days";

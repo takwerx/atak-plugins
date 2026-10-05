@@ -44,6 +44,9 @@ takes any ArcGIS Online organization you sign in to.
 
   *SARCOP Training* is NAPSG's public search-and-rescue sandbox.
 
+  *New Fire Starts* is new wildfires and prescribed fires across the country,
+  the last 24 hours, public.
+
   *CA Air Intel* is statewide California fire perimeters, public.
 
   *NIFS Archive (demo)* is last year's Dragon Bravo fire, public, for trying the
@@ -479,6 +482,28 @@ takes any ArcGIS Online organization you sign in to.
   *Time window* picks how far back to look, the last 24 hours up to thirty days
   or all time. Widening the window adds fires, not copies.
 ]
+]
+
+#tak-slide[
+= New Fire Starts
+
+  New wildfires and prescribed fires across the country, from the moment a
+  dispatch center enters them: NIFC's own "New Starts" view. A start stays until
+  it is contained, controlled or out, or for 24 hours after it was found.
+  Public, no login. *Add new starts* puts it in the list.
+
+  Each start is a circle the way NIFC draws them: red for a wildfire, orange for
+  a prescribed fire, larger for more acres. A red ring is a wildfire reported
+  with no size and nothing added since.
+
+  Its Features list has three types, each *ON/OFF*: *Wildfire*, *Wildfire, No
+  Size Yet* and *Prescribed Fire*. No Size Yet holds starts a dispatch center
+  entered and never updated; turn it off to see only the fires someone has
+  sized.
+
+  *Where* works like DART's: what is in view, at any width, or within a distance
+  of My Location or the map center. *Time window* picks the last hour, 3, 6, 12
+  or 24 hours. The layer refreshes every 5 minutes.
 ]
 
 #tak-slide[

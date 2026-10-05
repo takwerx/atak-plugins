@@ -433,7 +433,7 @@ public class LoadedLayer {
                     // The kind's own zoom default, never the store's number: the store holds
                     // the gate-capped value, and rebuilding from it made the cap permanent
                     // (Plaskett gated at level 14 on every type, perimeter included, 2026-09-09).
-                    loaded.add(new Pending(setName, defaultGsd(setName, f.getGeometry()), f.getName(), f.getGeometry(),
+                    loaded.add(new Pending(setName, kindGsd(setName, f.getGeometry()), f.getName(), f.getGeometry(),
                             f.getStyle(), f.getAttributes()));
                 }
             } finally {
@@ -508,6 +508,21 @@ public class LoadedLayer {
             if (!cache.isEmpty())
                 rewriteStore();
         }
+    }
+
+    /**
+     * How far out this layer's points draw before the layer's own zoom gate: 120 m/px for
+     * most, every zoom for New Fire Starts, a national layer of a few hundred points that
+     * is looked at a state or a region at a time (at 120 m/px it vanished past a county).
+     */
+    private double pointGsd() {
+        return NewStartsStyles.handles(spec) ? GSD_ALWAYS : GSD_POINTS;
+    }
+
+    /** {@link #defaultGsd} for this layer: its points' own default where it has one. */
+    private double kindGsd(String setName, Geometry g) {
+        final double d = defaultGsd(setName, g);
+        return d == GSD_POINTS ? pointGsd() : d;
     }
 
     /** The zoom default a set's kind gets at fetch time: repair points close in, points, lines, areas always. */
@@ -1011,7 +1026,7 @@ public class LoadedLayer {
         try {
             if ("view".equals(spec.scopeKind)) {
                 if (viewTooWide)
-                    return viewWidthM() <= MAX_VIEW_M; // refused for width: fetch once it is narrower
+                    return viewWidthM() <= viewCeilingM(); // refused for width: fetch once it is narrower
                 final double[] fb = fetchedBox;
                 final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
                 if (fb == null || b == null)
@@ -1047,6 +1062,15 @@ public class LoadedLayer {
 
     /** The widest view a "What is in view" layer fetches for: 500 km, about 300 mi, across. */
     static final double MAX_VIEW_M = 500_000;
+    /**
+     * The widest view this layer fetches for. DART's ceiling is the 4,000 vehicles a
+     * national view asks for; New Fire Starts is a few hundred starts across the country,
+     * so it has none and a national view shows the nation.
+     */
+    private double viewCeilingM() {
+        return NewStartsStyles.handles(spec) ? Double.MAX_VALUE : MAX_VIEW_M;
+    }
+
     /** Whether the last view-scoped fetch was refused for width; a narrower view fetches again. */
     private volatile boolean viewTooWide;
 
@@ -1079,15 +1103,17 @@ public class LoadedLayer {
             // minute and composed a thousand callsigns (2026-09-18, "1000 so far"). Past
             // the ceiling the layer keeps what it has and says to zoom in.
             final double width = viewWidthM();
-            viewTooWide = width > MAX_VIEW_M;
+            viewTooWide = width > viewCeilingM();
             if (viewTooWide)
                 throw new IllegalStateException("zoom in to load: the view is " + Units.formatBig(width)
-                        + " across, the most is " + Units.formatBig(MAX_VIEW_M));
+                        + " across, the most is " + Units.formatBig(viewCeilingM()));
             // A margin, so a small pan still has features under it before the next fetch.
             final double padLat = Math.max(0.01, (b.getNorth() - b.getSouth()) * 0.2);
             final double padLon = Math.max(0.01, (b.getEast() - b.getWest()) * 0.2);
-            fetchedBox = new double[] { b.getSouth() - padLat, b.getWest() - padLon,
-                    b.getNorth() + padLat, b.getEast() + padLon };
+            // Kept on the globe: with no ceiling (New Fire Starts) a national view's margin
+            // reaches past the poles and the date line, which a query envelope cannot.
+            fetchedBox = new double[] { Math.max(-90, b.getSouth() - padLat), Math.max(-180, b.getWest() - padLon),
+                    Math.min(90, b.getNorth() + padLat), Math.min(180, b.getEast() + padLon) };
             scopeNote = null;
             return Esri.Scope.box(fetchedBox[0], fetchedBox[1], fetchedBox[2], fetchedBox[3]);
         }
@@ -1156,7 +1182,8 @@ public class LoadedLayer {
             if (!restyle && spec.timeField != null && spec.live && !cache.isEmpty()) {
                 final StringBuilder now = new StringBuilder();
                 for (int layerId : spec.layerIds)
-                    now.append(Esri.stamp(spec.base, layerId, spec.whereNow(), scope(), token, spec.timeField))
+                    now.append(Esri.stamp(spec.base, layerId, spec.whereNow(), scope(), token,
+                            spec.stampField != null ? spec.stampField : spec.timeField))
                             .append(';');
                 if (now.toString().equals(lastStamp) && !lastStampWhere.equals(spec.whereNow().replaceAll("'[^']*'", ""))) {
                     // the where changed shape (a new window), so fetch anyway
@@ -1376,7 +1403,7 @@ public class LoadedLayer {
             spec.setKind.remove(info.name);
         final int fill = spec.fillFor(info.name);
         final EsriRenderer generic = nwcg ? null : new EsriRenderer(info.drawingInfo, info.geometryType, iconDir, fill);
-        final double gsd = isPointLayer ? GSD_POINTS : isLineLayer ? GSD_LINES : GSD_ALWAYS;
+        final double gsd = isPointLayer ? pointGsd() : isLineLayer ? GSD_LINES : GSD_ALWAYS;
         final String setName = info.name;
         final String repairName = (nwcg && isPointLayer) ? info.name + " (repair)" : null;
         final Set<String> dates = info.dateFields;
@@ -1404,6 +1431,10 @@ public class LoadedLayer {
                             // One type per value of the field (FIRIS: USFS, CAL FIRE, NIFC...), so each can be toggled.
                             final String v = props.isNull(spec.setField) ? null : props.optString(spec.setField, null);
                             target = v == null || v.isEmpty() ? "Other" : v;
+                            // "WF"/"RX" are codes; the types are named, and a wildfire with
+                            // no size reported is a type of its own (NewStartsStyles).
+                            if (NewStartsStyles.handles(spec))
+                                target = NewStartsStyles.type(props);
                             spec.setKind.put(target, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
                         }
                         double targetGsd = gsd;
@@ -1476,7 +1507,20 @@ public class LoadedLayer {
                                 name = FireGuardStyles.title(props, name);
                                 title = name + " (" + layerName + ")";
                             }
+                            if (NewStartsStyles.handles(spec)) {
+                                // "Ridge · 12 ac"; the type's own name when the start has none.
+                                name = NewStartsStyles.title(props, NewStartsStyles.type(props));
+                                title = name + " (" + layerName + ")";
+                            }
                             style = generic.styleFor(props);
+                            if (NewStartsStyles.handles(spec) && isPointLayer) {
+                                // NIFC's colors and size rule on a composed circle, so the
+                                // name pill is drawn whole (a renderer dot has no icon to
+                                // compose it with, and the engine trims its label).
+                                final Style ns = NewStartsStyles.style(props, iconDir);
+                                if (ns != null)
+                                    style = ns;
+                            }
                             if (DartStyles.handles(spec) && isPointLayer) {
                                 // EGP's symbology, not the services' own: personnel declare a
                                 // 22.5 pt marker and vehicles an esriSMS dot of size 4, which
@@ -1560,7 +1604,8 @@ public class LoadedLayer {
                         // "Pickup", "IHC"), so the picker lists kinds and a row says what it
                         // is; the layer's name was standing in (operator, 2026-09-18: "when i
                         // click on vehicle how come i dont get a sub type?").
-                        final String dartType = (DartStyles.handles(spec) || FireGuardStyles.handles(spec)) && spec.setField != null
+                        final String dartType = NewStartsStyles.handles(spec) ? NewStartsStyles.type(props)
+                                : (DartStyles.handles(spec) || FireGuardStyles.handles(spec)) && spec.setField != null
                                 ? props.optString(spec.setField, "").trim() : "";
                         attrs.setAttribute("_type", !dartType.isEmpty() && !"null".equalsIgnoreCase(dartType) ? dartType
                                 : nwcg ? (cat != null ? cat : layerName)

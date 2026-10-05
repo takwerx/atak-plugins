@@ -33,6 +33,11 @@ Built-in sources:
     intel flights, USFS, NIFC and WFIGS, public. Each source toggles on its own,
     a time window picks how far back to look, and only the latest perimeter per
     fire per source is drawn.
+  - New Fire Starts: NIFC's public view of new wildfires and prescribed fires,
+    nationwide, for 24 hours after each is found or until it is contained.
+    Wildfires, wildfires with no size reported yet, and prescribed fires toggle
+    on their own; a time window of 1 to 24 hours, and the same distance-from-me
+    or map-center control DART has.
   - Add your own org: any ArcGIS Online organization. Sign in, search its
     content, add a layer; it draws with the service's own renderer.
 

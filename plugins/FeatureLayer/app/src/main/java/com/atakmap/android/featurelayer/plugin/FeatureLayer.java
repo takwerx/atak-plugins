@@ -167,6 +167,8 @@ public class FeatureLayer implements IPlugin {
 
     private static final Org[] BUILT_IN = {
             new Org("nifc", "NIFC", Sources.NIFC_PORTAL, "Find fire", "Search"),
+            new Org("new-starts", "New Fire Starts", null, "Add new starts",
+                    "Wildfires and prescribed fires reported in the last 24 hours, public"),
             new Org("sarcop-live", "SARCOP Live", Sources.NAPSG_PORTAL, "Find incident", "Search"),
             new Org("sarcop-training", "SARCOP Training", null, "Find incident", "Search"),
             new Org("ca-air-intel", "CA Air Intel", null, "Add perimeters", "Statewide fire perimeters, public"),
@@ -395,6 +397,8 @@ public class FeatureLayer implements IPlugin {
 
                         @Override
                         public void onFailed(String reason) {
+                            if (!"cancelled".equals(reason))
+                                showPane();
                             toast(org.title + ": sign-in failed: " + reason);
                         }
                     });
@@ -1124,12 +1128,14 @@ public class FeatureLayer implements IPlugin {
         searchRow.setVisibility(View.VISIBLE);
         find.setText(org.findLabel);
         search.setHint(org.hint);
-        search.setVisibility("nifs-archive".equals(org.id) || "ca-air-intel".equals(org.id) ? View.GONE : View.VISIBLE);
+        search.setVisibility("nifs-archive".equals(org.id) || "ca-air-intel".equals(org.id)
+                || "new-starts".equals(org.id) ? View.GONE : View.VISIBLE);
         // A source that is one fixed layer has nothing to search: its button adds the
         // layer, and once the layer is in the list below the button goes away (the
         // operator read "Add perimeters" over an added layer as a second thing to add).
         final String fixedLayer = "ca-air-intel".equals(org.id) ? "ca-air-intel"
-                : "nifs-archive".equals(org.id) ? "nifs-archive:Dragon Bravo" : null;
+                : "nifs-archive".equals(org.id) ? "nifs-archive:Dragon Bravo"
+                : "new-starts".equals(org.id) ? Sources.NEW_STARTS_ID : null;
         if (fixedLayer != null && manager != null) {
             boolean loaded = false;
             for (LoadedLayer l : manager.snapshot())
@@ -1162,6 +1168,9 @@ public class FeatureLayer implements IPlugin {
                 return;
             case "ca-air-intel":
                 manager.add(Sources.caAirIntel());
+                return;
+            case "new-starts":
+                manager.add(Sources.newStarts());
                 return;
             case "sarcop-live":
                 toast("SARCOP Live is not wired up yet; SARCOP Training is");
@@ -1573,16 +1582,21 @@ public class FeatureLayer implements IPlugin {
             final Button win = row.findViewById(R.id.feature_fill);
             win.setText(l.spec.windowLabel());
             row.findViewById(R.id.feature_toggle).setVisibility(View.GONE);
-            final int[] hours = { 6, 12, 24, 72, 168, 720, 0 };
-            final String[] labels = { "Last 6 hours", "Last 12 hours", "Last 24 hours", "Last 3 days", "Last 7 days", "Last 30 days", "All time" };
+            // New Fire Starts holds 24 hours and nothing older, so it offers the
+            // hours inside that; every other windowed layer reaches back days.
+            final boolean starts = com.atakmap.android.featurelayer.NewStartsStyles.handles(l.spec);
+            final int[] hours = starts ? new int[] { 1, 3, 6, 12, 24 } : new int[] { 6, 12, 24, 72, 168, 720, 0 };
+            final String[] labels = starts
+                    ? new String[] { "Last hour", "Last 3 hours", "Last 6 hours", "Last 12 hours", "Last 24 hours" }
+                    : new String[] { "Last 6 hours", "Last 12 hours", "Last 24 hours", "Last 3 days", "Last 7 days", "Last 30 days", "All time" };
             win.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    int checked = 3;
+                    int checked = starts ? hours.length - 1 : 3;
                     for (int i = 0; i < hours.length; i++)
                         if (hours[i] == l.spec.sinceHours)
                             checked = i;
-                    new AlertDialog.Builder(mapView.getContext()).setTitle("Perimeters from")
+                    new AlertDialog.Builder(mapView.getContext()).setTitle(starts ? "Fires reported in" : "Perimeters from")
                             .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
                                 @Override
                                 public void onClick(DialogInterface d, int which) {

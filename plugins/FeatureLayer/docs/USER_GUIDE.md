@@ -34,6 +34,8 @@ closes the pane.
 - **NIFC** is the live National Incident Feature Service. It needs your own NIFC
   ArcGIS login.
 - **SARCOP Training** is NAPSG's public search-and-rescue sandbox.
+- **New Fire Starts** is new wildfires and prescribed fires across the country,
+  the last 24 hours, public.
 - **CA Air Intel** is statewide California fire perimeters, public.
 - **NIFS Archive (demo)** is last year's Dragon Bravo fire, public, for trying the
   symbology without a login.
@@ -65,8 +67,8 @@ latest fires. Pick one from the list and it loads: event points, event lines, th
 perimeter lines and polygons, IR points and polygons, accountable property and
 label points.
 
-SARCOP Training works the same way with **Find incident**. CA Air Intel needs no
-search: **Add perimeters**.
+SARCOP Training works the same way with **Find incident**. CA Air Intel and New
+Fire Starts need no search: **Add perimeters**, **Add new starts**.
 
 ## Layers
 
@@ -355,6 +357,33 @@ all time. Widening the window adds fires, not copies.
 
 Active perimeters draw in orange with a dark red edge, named at the center.
 Inactive ones are not fetched.
+
+## New Fire Starts
+
+New wildfires and prescribed fires across the country, from the moment a dispatch
+center enters them: NIFC's own "New Starts" view. A start stays until it is
+contained, controlled or out, or for 24 hours after it was found. Public, no
+login. **Add new starts** puts it in the list.
+
+Each start is a circle the way NIFC draws them: red for a wildfire, orange for a
+prescribed fire, larger for more acres. A red ring is a wildfire reported with no
+size and nothing added since. Names and acres show from five miles in.
+
+Its Features list has three types, each **ON/OFF**: **Wildfire**, **Wildfire, No
+Size Yet** and **Prescribed Fire**. Turn off Prescribed Fire to see only
+wildfires. Wildfire, No Size Yet holds starts that came in from a dispatch center
+and were never updated: some centers enter every fire call this way, with a
+dispatch number for a name, and never touch it again. Turn it off to see only the
+fires someone has sized.
+
+**Where** works like DART's: what is in view (the default, at any width, so a
+zoomed-out map shows the whole country), or within a distance of My Location or
+the map center. **Time window** picks the last hour, 3, 6, 12 or 24 hours. The
+**Zoom gate** is off at first, so starts draw at every zoom. The layer refreshes
+every 5 minutes, as often as NIFC's view does.
+
+**Find** in its Features lists the starts by type, nearest first, from you or
+from the map center.
 
 ## Your own organization
 

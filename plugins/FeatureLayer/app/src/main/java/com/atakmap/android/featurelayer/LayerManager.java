@@ -122,7 +122,9 @@ public class LayerManager {
      * top"). The sort is stable, so nothing else changes place.
      */
     private static int rank(LoadedLayer l) {
-        return DartStyles.handles(l.spec) ? 0 : FireGuardStyles.handles(l.spec) ? 1 : 2;
+        // New Fire Starts sits with FireGuard: both are national "what just started" layers.
+        return DartStyles.handles(l.spec) ? 0
+                : FireGuardStyles.handles(l.spec) || NewStartsStyles.handles(l.spec) ? 1 : 2;
     }
 
     public List<LoadedLayer> snapshot() {

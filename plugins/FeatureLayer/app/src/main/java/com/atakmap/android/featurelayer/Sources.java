@@ -205,6 +205,47 @@ public final class Sources {
         return s;
     }
 
+    static final String NEW_STARTS = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Last24h/FeatureServer";
+    public static final String NEW_STARTS_ID = "nifc-new-starts";
+
+    /**
+     * New fire starts: IRWIN wildfires and prescribed fires found in the last 24 hours
+     * and not yet contained, controlled or out, NIFC's public "New Starts" view
+     * (operator, 2026-10-05: "this for new initial attack starts"). About a hundred
+     * nationally on an October afternoon, so the scope is a choice rather than a need
+     * and a national view is allowed (no ceiling, see LoadedLayer.viewCeilingM). Typed
+     * by NewStartsStyles: wildfire, wildfire with no size reported, prescribed fire.
+     */
+    public static LayerSpec newStarts() {
+        final LayerSpec s = new LayerSpec();
+        s.id = NEW_STARTS_ID;
+        s.title = "New Fire Starts";
+        s.subtitle = "NIFC";
+        s.layerTitle = "Fire Start";
+        s.portal = null; // public
+        s.base = NEW_STARTS;
+        s.layerIds = new int[] { 0 };
+        s.where = "1=1";
+        s.geojson = false;
+        s.profile = LayerSpec.Profile.GENERIC;
+        s.labelField = "IncidentName"; // the service's display field is the incident commander's name
+        s.setField = "IncidentTypeCategory";
+        s.timeField = "FireDiscoveryDateTime";
+        // A start's size and containment arrive as edits, after it was found; checking
+        // discovery time alone would call those refreshes "no change" and keep the old size.
+        s.stampField = "ModifiedOnDateTime_dt";
+        s.sinceHours = 24; // the service's own window; it holds nothing older
+        s.live = true;
+        s.refreshMinutes = 5; // the service is refreshed from IRWIN every 5 minutes
+        s.iconSet = "newstarts";
+        s.labelGsd = LayerSpec.DEFAULT_LABEL_GSD_WIDE;
+        s.scopeKind = "view";
+        s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
+        s.maxFeatures = 2000; // the service's own page; a national fetch is a few hundred
+        NewStartsStyles.notes(s);
+        return s;
+    }
+
     /** USFS and DOI fire vehicles, every row inside 24 hours and most inside the hour. */
     public static LayerSpec dartVehicles() {
         return dart("dart-vehicles", "Vehicles", "Vehicle", DART_VEHICLES, "ResourceName", "ResourceType",
@@ -226,7 +267,8 @@ public final class Sources {
             return;
         final LayerSpec now = "dart-personnel".equals(s.id) ? dartPersonnel()
                 : "dart-vehicles".equals(s.id) ? dartVehicles()
-                : "nifc-fireguard".equals(s.id) ? fireGuard() : null;
+                : "nifc-fireguard".equals(s.id) ? fireGuard()
+                : NEW_STARTS_ID.equals(s.id) ? newStarts() : null;
         if (now == null)
             return;
         s.base = now.base;
@@ -241,8 +283,17 @@ public final class Sources {
         s.labelField = now.labelField;
         s.setField = now.setField;
         s.timeField = now.timeField;
-        s.sinceHours = now.sinceHours;
+        s.stampField = now.stampField;
         s.maxFeatures = now.maxFeatures;
+        for (java.util.Map.Entry<String, String> n : now.setNotes.entrySet()) {
+            s.setNotes.put(n.getKey(), n.getValue());
+            if (!s.setKind.containsKey(n.getKey()))
+                s.setKind.put(n.getKey(), now.setKind.get(n.getKey()));
+        }
+        // DART's views hold 24 hours and nothing else, so its window is the plugin's;
+        // New Fire Starts has a window control and the operator's choice stands.
+        if (!NEW_STARTS_ID.equals(s.id) || s.sinceHours <= 0 || s.sinceHours > now.sinceHours)
+            s.sinceHours = now.sinceHours;
         // The scope is the operator's choice and the pane has a control for it now; a
         // saved layer keeps whatever they set. Only a layer with no scope at all gets the
         // default.
