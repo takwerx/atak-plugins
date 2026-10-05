@@ -69,6 +69,15 @@
                 android:contentDescription="@string/wide"
                 android:src="@drawable/ic_wide" />
 
+            <!-- Straight to the Layers page, from any page: the page everyone comes
+                 back to, and the picker was two taps away from it (operator,
+                 2026-10-05). Green while the Layers page is showing. -->
+            <ImageButton
+                android:id="@+id/layers_button"
+                style="@style/TakwerxIconButton"
+                android:contentDescription="@string/tab_layers"
+                android:src="@drawable/ic_layers" />
+
             <!-- The pages: back, the page showing (a tap lists all six), forward.
                  At the right end, under the thumb that holds a phone in landscape.
                  In this row rather than a row of their own so the pane keeps its
@@ -151,6 +160,11 @@
                 android:id="@+id/cap_wide"
                 style="@style/TakwerxIconCaption"
                 android:text="@string/caption_full" />
+
+            <TextView
+                android:id="@+id/cap_layers"
+                style="@style/TakwerxIconCaption"
+                android:text="@string/tab_layers" />
 
             <TextView
                 android:id="@+id/cap_prev"

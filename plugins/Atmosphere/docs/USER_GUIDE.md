@@ -57,6 +57,8 @@ The pane opens at half width. The top row is the same on every page:
 - **Units** switches every number between US, metric and aviation units.
 - **Full size** makes the pane full width and back; at full size every button
   has its name under it.
+- The stacked sheets are **Layers**: straight to the Layers page from any page.
+  It is green while Layers is showing.
 - The arrows step through the pages; the page name between them opens a list of
   all eight.
 

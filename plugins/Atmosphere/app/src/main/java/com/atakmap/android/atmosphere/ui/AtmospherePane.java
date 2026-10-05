@@ -168,10 +168,14 @@ public final class AtmospherePane {
     private final ViewPager pager;
     /** Back, the page showing (a tap lists them all), forward; in the top row. */
     private final ImageButton pagePrev, pageNext;
+    /** Straight to the Layers page from wherever the pane is; green while it shows. */
+    private final ImageButton layersButton;
     private final Button pagePick;
     private static final int[] TAB_NAMES = { R.string.tab_forecast, R.string.tab_layers,
             R.string.tab_spots, R.string.tab_zones, R.string.tab_sawti, R.string.tab_stations,
             R.string.tab_gauges, R.string.tab_buoys };
+    /** Where the Layers page sits in {@link #TAB_NAMES} and the pager. */
+    private static final int LAYERS_PAGE = 1;
     private final View[] pages;
     /** Page 3, its own class; the pane only hosts it. */
     private final SpotPage spotPage;
@@ -567,6 +571,7 @@ public final class AtmospherePane {
         pagePrev = root.findViewById(R.id.page_prev);
         pageNext = root.findViewById(R.id.page_next);
         pagePick = root.findViewById(R.id.page_pick);
+        layersButton = root.findViewById(R.id.layers_button);
         // A long page name shrinks to fit two lines rather than being cut off; the
         // short ones stay at 13sp. Older Android keeps 13sp and the ellipsis.
         if (pagePick != null && android.os.Build.VERSION.SDK_INT >= 26)
@@ -1328,6 +1333,13 @@ public final class AtmospherePane {
                 showPagePicker();
             }
         });
+        if (layersButton != null)
+            layersButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openPage(pages[LAYERS_PAGE]);
+                }
+            });
         updatePageDots(0);
     }
 
@@ -1365,6 +1377,9 @@ public final class AtmospherePane {
         pagePrev.setAlpha(current > 0 ? 1f : 0.35f);
         pageNext.setEnabled(current < pages.length - 1);
         pageNext.setAlpha(current < pages.length - 1 ? 1f : 0.35f);
+        if (layersButton != null)
+            layersButton.setColorFilter(current == LAYERS_PAGE
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
     }
 
     /**
