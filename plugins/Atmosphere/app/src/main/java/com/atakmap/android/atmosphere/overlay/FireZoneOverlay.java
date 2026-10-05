@@ -81,14 +81,14 @@ public final class FireZoneOverlay {
     private static final long ALERTS_POLL_MS = 10 * 60 * 1000L;
     private static final int FILL_ALPHA = 0x59;
     /**
-     * Lime. White read poorly over the satellite map (operator, 2026-09-29); the
-     * orange that replaced it read as something happening, orange being the color of
-     * warnings and of fire ("orange just looks too much like an active area"); and
-     * cyan read as a waterway (both 2026-10-05). A yellow-green line is nothing on
-     * imagery or a terrain map, and the plugin's other greens are fills and gauge
-     * symbols, not outlines. Starred stays yellow and heavier so it still stands apart.
+     * Purple, which reads on imagery and on a terrain map alike. White read poorly
+     * over the satellite map (operator, 2026-09-29); then, all on 2026-10-05, orange
+     * read as something happening ("orange just looks too much like an active area"),
+     * cyan as a waterway, and lime vanished on the terrain map. Bright enough for dark
+     * imagery, dark enough for a pale map; the plugin's other purples are fills.
+     * Starred stays yellow and heavier so it still stands apart.
      */
-    private static final int PLAIN = 0xFFC6FF00;
+    private static final int PLAIN = 0xFFB040FF;
     private static final int STARRED = 0xFFFFD84D;
 
     /** The key: what each look on the map means. */
