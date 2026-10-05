@@ -205,7 +205,7 @@ reads now; **Always** never hides them.
 ## 7. Fire weather zones
 
 **Fire Weather Zones** draws the National Weather Service's fire weather zones
-in the map view: orange outlines, each with its zone number, a starred zone in
+in the map view: cyan outlines, each with its zone number, a starred zone in
 yellow, a zone under a Red Flag Warning filled pink and one under a Fire Weather
 Watch beige. Tap a zone for its forecast. Two zoom settings under the layer's
 arrow decide when the zones and their numbers draw; a view wider than a few
