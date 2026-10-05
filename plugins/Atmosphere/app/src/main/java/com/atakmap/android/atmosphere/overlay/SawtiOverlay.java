@@ -38,15 +38,19 @@ public final class SawtiOverlay extends OutlookOverlay {
     /** The feed posts daily; past this it has missed a day. */
     private static final long STALE_MS = 36L * 60 * 60 * 1000;
 
-    /** A No Rating zone's outline on the map. */
-    private static final int NO_RATING_EDGE = 0xFF00E5FF;
+    /**
+     * A No Rating zone's outline on the map: royal blue. Cyan read as a waterway,
+     * purple is this scale's Extreme, pink is a Red Flag Warning, and yellow, orange
+     * and red are its other levels (operator, 2026-10-05).
+     */
+    private static final int NO_RATING_EDGE = 0xFF2962FF;
 
-    /** The levels, in order, with the site's own words; No Rating keyed by its cyan outline. */
+    /** The levels, in order, with the site's own words; No Rating keyed by its blue outline. */
     public static final String[][] LEGEND;
     static {
         LEGEND = new String[Sawti.LEVELS.length][];
         for (int i = 0; i < Sawti.LEVELS.length; i++)
-            LEGEND[i] = new String[] { Sawti.LEVELS[i] + (i == 0 ? " (cyan outline)" : "") + ": "
+            LEGEND[i] = new String[] { Sawti.LEVELS[i] + (i == 0 ? " (blue outline)" : "") + ": "
                     + Sawti.MEANINGS[i], String.valueOf(i == 0 ? NO_RATING_EDGE : Sawti.COLORS[i]) };
     }
 
@@ -130,9 +134,9 @@ public final class SawtiOverlay extends OutlookOverlay {
 
     /**
      * The site's own dark gray border on a rated zone, whose fill says what it is;
-     * cyan on a No Rating zone, which has no fill and otherwise could not be seen
-     * (operator, 2026-10-01: "i need sawti zone when off like cyan so i can see
-     * them"). The No Rating gray (#D9D9D9) as an edge had vanished on a light
+     * a strong color on a No Rating zone, which has no fill and otherwise could not
+     * be seen (operator, 2026-10-01: "i need sawti zone when off like cyan so i can
+     * see them"; blue since 2026-10-05, see NO_RATING_EDGE). The No Rating gray (#D9D9D9) as an edge had vanished on a light
      * base map, and the site's #5A5A5A was hard to pick out on the terrain.
      */
     @Override

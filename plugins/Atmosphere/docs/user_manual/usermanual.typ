@@ -370,7 +370,7 @@ four Southern California zones: LA-Ventura, Orange-Inland Empire, San Diego and
 Santa Barbara, where it rates Sundowner winds. It rates how hard a fire would be
 to fight if one started during an offshore wind: No Rating, Marginal, Moderate,
 High or Extreme. A rated zone is filled in its level's color, with its label in
-the same color; a No Rating zone is a cyan outline. The date buttons pick one of
+the same color; a No Rating zone is a blue outline. The date buttons pick one of
 the four days the Forest Service shows. Tap a zone to open its page.
 ]
 
