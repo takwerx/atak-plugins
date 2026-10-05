@@ -464,6 +464,162 @@ final class StationIcons {
     }
 
     /**
+     * The disc and its barb alone, centered on the disc, for a symbol that turns with
+     * the map.
+     *
+     * <p>The barb is a bearing, so it has to turn when the map is spun or it points
+     * the wrong way; and anything that turns must be centered on its point, because
+     * the renderer turns a bitmap about its own middle and applies an offset on
+     * screen, unturned. So this is the square around the disc that a barb reaches
+     * across at any angle -- mostly empty, which costs nothing: the renderer discards
+     * clear pixels when it draws and when it hit-tests, and the chooser has its own
+     * icon ({@link #compose}).
+     */
+    Composed symbol(double windFrom, double knots, int state) {
+        final float scale = Math.max(1f,
+                gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling());
+        final boolean barb = !Double.isNaN(windFrom) && !WindBarb.isCalm(knots);
+        final long fives = Double.isNaN(knots) ? -1 : Math.round(knots / 5.0);
+        final String key = "sym_" + (barb ? bucket(windFrom) + "_k" + fives : "calm")
+                + "_" + Integer.toHexString(state) + "_v" + VERSION
+                + "_s" + Math.round(scale * 100);
+        final Composed hit = cache.get(key);
+        if (hit != null)
+            return hit;
+        final int half = barb ? Math.round((DISC_R + STAFF + FEATHER) * scale) + 4
+                : Math.round(DISC_R * scale) + 4;
+        final int size = 2 * half;
+        final File out = new File(dir, "wx_" + key + ".png");
+        if (!out.isFile() && !write(out, size, size, new Painter() {
+            @Override
+            public void paint(Canvas c, Paint p) {
+                barb(c, p, half, half, scale, windFrom, knots);
+                disc(c, p, half, half, scale);
+                anemometer(c, p, half, half, scale, state);
+            }
+        }))
+            return null;
+        final Composed made = new Composed("file://" + out.getAbsolutePath(),
+                Math.round(size / scale), Math.round(size / scale), 0f, 0f,
+                Math.round(half / scale), Math.round(half / scale), size, size, half, half);
+        cache.put(key, made);
+        return made;
+    }
+
+    /**
+     * The readings and the name, as a level label beside a {@link #symbol}, on the
+     * side of the disc the barb is not.
+     *
+     * <p>The label does not turn with the map -- it is read, so it stays level the
+     * way ATAK's own marker labels do -- but the barb does, so which side is clear of
+     * it depends on how far the map is turned: {@code mapRotation}, in degrees, is
+     * the map's rotation when this is drawn, and the layer draws again when it has
+     * turned far enough to matter. The bitmap is only the pill; where it sits is the
+     * style's offset, so a turn of the map writes no new file.
+     *
+     * @return null when there is nothing to say or it could not be written
+     */
+    Composed label(String name, double speed, double gust, String unit, double humidity,
+            double fuel, double windFrom, double knots, double mapRotation) {
+        final float scale = Math.max(1f,
+                gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling());
+        final MapTextFormat tf = MapView.getDefaultTextFormat();
+        float textPx = tf == null ? 0f : tf.getDensityAdjustedFontSize();
+        if (textPx <= 0f)
+            textPx = 14f * scale;
+        final List<Piece> pieces = pieces(speed, gust, unit, humidity, fuel);
+        final StringBuilder flat = new StringBuilder();
+        for (Piece piece : pieces)
+            flat.append(piece.text);
+        final String readings = flat.toString();
+        final String title = name == null ? "" : name.trim();
+        final Paint big = text(tf, textPx, true);
+        final Paint small = text(tf, textPx * 0.85f, false);
+        final Paint.FontMetricsInt bm = big.getFontMetricsInt();
+        final Paint.FontMetricsInt sm = small.getFontMetricsInt();
+        final int lineOne = readings.isEmpty() ? 0 : bm.descent - bm.ascent;
+        final int lineTwo = title.isEmpty() ? 0 : sm.descent - sm.ascent;
+        if (lineOne + lineTwo == 0)
+            return null;
+        final int textW = (int) Math.ceil(Math.max(measure(big, pieces),
+                title.isEmpty() ? 0 : small.measureText(title)));
+        final int pillW = textW + 2 * PAD_X;
+        final int pillH = lineOne + lineTwo + 2 * PAD_Y;
+        final int pad = 2;
+        final int w = pillW + 2 * pad, h = pillH + 2 * pad;
+
+        final String key = "lbl_" + Integer.toHexString((readings + "|" + title).hashCode())
+                + "_v" + VERSION + "_s" + Math.round(scale * 100)
+                + "_f" + Math.round(textPx * 10);
+        Composed pill = cache.get(key);
+        if (pill == null) {
+            final File out = new File(dir, "wx_" + key + ".png");
+            if (!out.isFile() && !write(out, w, h, new Painter() {
+                @Override
+                public void paint(Canvas c, Paint p) {
+                    pill(c, p, w / 2f, h / 2f, pillW, pillH, pieces, title, big, small,
+                            bm, sm);
+                }
+            }))
+                return null;
+            pill = new Composed("file://" + out.getAbsolutePath(),
+                    Math.round(w / scale), Math.round(h / scale), 0f, 0f,
+                    Math.round(w / 2f / scale), Math.round(h / 2f / scale), w, h, w / 2, h / 2);
+            cache.put(key, pill);
+        }
+
+        // Opposite the barb as it points on screen now: its bearing less the map's
+        // turn. Below the disc when there is no barb to oppose.
+        float ox = 0f, oy = 1f;
+        if (!Double.isNaN(windFrom) && !WindBarb.isCalm(knots)) {
+            final double rad = Math.toRadians(windFrom - mapRotation);
+            ox = -(float) Math.sin(rad);
+            oy = (float) Math.cos(rad);
+        }
+        // Far enough out that the pill's own box clears the disc in that direction.
+        final float away = DISC_R * scale + GAP + (Math.abs(ox) * w + Math.abs(oy) * h) / 2f;
+        // The renderer adds x and subtracts y (GL's origin is the lower left), so the
+        // pill's middle relative to the station is (x, -y) in the bitmap's y-down terms
+        // -- the same signs compose() measured against the radial menu.
+        return new Composed(pill.uri, pill.width, pill.height,
+                ox * away / scale, -oy * away / scale,
+                pill.anchorX, pill.anchorY, pill.pxWidth, pill.pxHeight,
+                pill.pxAnchorX, pill.pxAnchorY);
+    }
+
+    /** What one icon draws, for {@link #write}. */
+    private interface Painter {
+        void paint(Canvas c, Paint p);
+    }
+
+    /** Paint a bitmap and write it whole: to a temporary name, then renamed. */
+    private static boolean write(File out, int w, int h, Painter painter) {
+        Bitmap bmp = null;
+        try {
+            bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            painter.paint(new Canvas(bmp), new Paint(Paint.ANTI_ALIAS_FLAG));
+            final File tmp = new File(out.getPath() + ".tmp");
+            final FileOutputStream o = new FileOutputStream(tmp);
+            try {
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, o);
+            } finally {
+                o.close();
+            }
+            //noinspection ResultOfMethodCallIgnored
+            tmp.renameTo(out);
+            return out.isFile();
+        } catch (Exception e) {
+            Log.w(TAG, "could not compose a station icon", e);
+            //noinspection ResultOfMethodCallIgnored
+            out.delete();
+            return false;
+        } finally {
+            if (bmp != null)
+                bmp.recycle();
+        }
+    }
+
+    /**
      * "6 mph · 37%", or "20G28 mph · 42%" when the station is gusting.
      *
      * <p>The gust is shown because it is what decides the color: the state is taken

@@ -169,6 +169,19 @@ public final class StationOverlay {
     private double stationGate, labelGate;
     /** Whether the pills are on the icons as drawn right now. */
     private boolean labelsWanted;
+    /**
+     * The map's rotation, in degrees, when the labels were last placed. A label sits
+     * opposite its barb on screen, and the barb turns with the map while the label
+     * stays level, so a turn of more than {@link #TURN_DEG} places them again.
+     */
+    private volatile double placedAtRotation;
+    /**
+     * How far the map turns before the labels are placed again. A label is far
+     * enough from its barb that it only meets it after nearly a quarter turn, and
+     * track-up moves the map with every bend in the road: each placement is a
+     * rewrite of every station.
+     */
+    private static final double TURN_DEG = 30d;
     private List<Raws.Station> stations = new ArrayList<>();
     /**
      * Starred stations the radius did not reach, fetched by id. Held apart from the
@@ -513,7 +526,7 @@ public final class StationOverlay {
             // here was the same compose-and-rewrite of every station again. Every
             // crossing paid twice -- the log showed them in pairs, 19,280 ms then
             // 1,436 ms, 1,351 then 1,135 (XCover, 2026-09-26).
-            if (labelsWanted && !crossed && labeledSetChanged())
+            if (labelsWanted && !crossed && (labeledSetChanged() || turned()))
                 redraw();
             // Even when nothing is refetched, anything ordered by distance from the
             // map is now in the wrong order.
@@ -850,6 +863,8 @@ public final class StationOverlay {
         final UnitSystem system = units();
         final boolean withLabels = labelsWanted;
         final double[] view = viewBounds();
+        final double rotation = mapView.getMapRotation();
+        placedAtRotation = rotation;
         {
             final java.util.Set<String> labeled = new java.util.HashSet<>();
             if (withLabels)
@@ -863,6 +878,7 @@ public final class StationOverlay {
         final double gate = isAlways(stationGate) ? 100_000d : stationGate;
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         int critical = 0;
+        int stations = 0;
         for (Raws.Station s : held) {
             // A station with nothing to say is left off rather than drawn as a reading
             // of nothing, and one that stopped reporting days ago is not current
@@ -894,13 +910,14 @@ public final class StationOverlay {
             final AttributeSet a = attrs(s, color, now, system, labelThis);
             // The set is the state, so Overlay Manager can show the stations at
             // criteria on their own and ATAK's own switches work on one at a time.
-            add(drawn, s, StationIcons.stateLabel(color), a, color, system, labelThis,
-                    gate, FINEST);
+            if (add(drawn, s, StationIcons.stateLabel(color), a, color, system, labelThis,
+                    rotation, gate, FINEST))
+                stations++;
         }
         if (mine != generation || !on)
             return;
         features.rewrite(drawn);
-        final int n = drawn.size();
+        final int n = stations;
         final int total = held.size();
         final int red = critical;
         mapView.post(new Runnable() {
@@ -919,24 +936,46 @@ public final class StationOverlay {
                 android.os.SystemClock.elapsedRealtime() - began));
     }
 
-    /** One station in one zoom band, with or without its pill. */
-    private void add(List<AtmosphereFeatures.Drawn> drawn, Raws.Station s, String set,
+    /**
+     * One station in one zoom band: its symbol, and its pill when labeled.
+     *
+     * <p>Two features at one point, because they turn differently when the map is
+     * spun: the barb is a bearing and turns with the map, the pill is read and stays
+     * level (operator, 2026-10-05: labels "not rotating when spinning"). One bitmap
+     * cannot do both, and a composite style draws only its first icon. Both carry the
+     * station's name and attributes, so a tap on either opens the station and the
+     * chooser lists it once (one row per name and place).
+     *
+     * @return whether the station was drawn
+     */
+    private boolean add(List<AtmosphereFeatures.Drawn> drawn, Raws.Station s, String set,
             AttributeSet a, int color, UnitSystem system, boolean withLabel,
-            double minGsd, double maxGsd) {
+            double mapRotation, double minGsd, double maxGsd) {
+        final StationIcons.Composed symbol = icons.symbol(s.windFromDeg, knots(s.windMph),
+                color);
+        if (symbol == null)
+            return false;
+        final com.atakmap.map.layer.feature.geometry.Geometry at =
+                AtmosphereFeatures.point(s.latitude, s.longitude);
+        drawn.add(new AtmosphereFeatures.Drawn(set, s.name, at,
+                AtmosphereFeatures.turning(symbol.uri, symbol.width, symbol.height),
+                a, minGsd, maxGsd));
+        if (!withLabel)
+            return true;
         // The feathers count the sustained wind, which is what a barb shows; the
         // color is decided by the strongest wind the station has, gust included, so
         // the gust is printed beside it or the color has nothing behind it.
-        final StationIcons.Composed icon = icons.compose(s.name,
+        final StationIcons.Composed pill = icons.label(s.name,
                 speed(s.windMph, system), speed(s.gustMph, system), speedUnit(),
                 s.relativeHumidity, s.fuelMoisture, s.windFromDeg, knots(s.windMph),
-                color, withLabel);
-        if (icon == null)
-            return;
-        drawn.add(new AtmosphereFeatures.Drawn(set, s.name,
-                AtmosphereFeatures.point(s.latitude, s.longitude),
-                AtmosphereFeatures.icon(icon.uri, icon.width, icon.height,
-                        icon.offsetX, icon.offsetY),
-                a, minGsd, maxGsd));
+                mapRotation);
+        if (pill != null)
+            drawn.add(new AtmosphereFeatures.Drawn(set, s.name,
+                    AtmosphereFeatures.point(s.latitude, s.longitude),
+                    AtmosphereFeatures.icon(pill.uri, pill.width, pill.height,
+                            pill.offsetX, pill.offsetY),
+                    a, minGsd, maxGsd));
+        return true;
     }
 
     /**
@@ -947,6 +986,13 @@ public final class StationOverlay {
      * when it is panned to, rather than arriving a redraw later. Null on the globe,
      * where the bounds read as NaN.
      */
+
+    /** Whether the map has turned far enough since the labels were placed to place them again. */
+    private boolean turned() {
+        final double d = Math.abs(((mapView.getMapRotation() - placedAtRotation) % 360d
+                + 540d) % 360d - 180d);
+        return d >= TURN_DEG;
+    }
 
     /** The ids that carried a label at the last rebuild, so a pan that changes none of them is not a rewrite. */
     private java.util.Set<String> lastLabeled = new java.util.HashSet<>();

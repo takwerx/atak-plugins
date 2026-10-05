@@ -183,9 +183,30 @@ final class AtmosphereFeatures {
      * offset the bitmap can be trimmed to its own ink and still land on its point.
      */
     static Style icon(String iconUri, int width, int height, float offsetX, float offsetY) {
+        return icon(iconUri, width, height, offsetX, offsetY, false);
+    }
+
+    /**
+     * An icon that turns with the map, for a mark whose direction is a bearing --
+     * a wind barb. It must be centered on its point: the renderer turns the bitmap
+     * about its own middle and applies the offset on screen, unturned, so an offset
+     * icon that turns swings off its point as the map spins.
+     */
+    static Style turning(String iconUri, int width, int height) {
+        return icon(iconUri, width, height, 0f, 0f, true);
+    }
+
+    /**
+     * Every other icon stays level when the map is spun, the way ATAK's own marker
+     * labels do (operator, 2026-10-05: "all labels for all features should rotate").
+     * They were drawn turning with the map, so a name read sideways at 90 degrees and
+     * upside down at 180, and an offset icon slid off its point as it turned.
+     */
+    private static Style icon(String iconUri, int width, int height, float offsetX,
+            float offsetY, boolean turnsWithMap) {
         return new CompositeStyle(new Style[] {
                 new IconPointStyle(0xFFFFFFFF, iconUri, width, height,
-                        offsetX, offsetY, 0, 0, 0f, true),
+                        offsetX, offsetY, 0, 0, 0f, turnsWithMap),
                 new LabelPointStyle("", 0x00FFFFFF, 0x00000000,
                         LabelPointStyle.ScrollMode.DEFAULT) });
     }
@@ -1310,9 +1331,9 @@ final class AtmosphereFeatures {
                                     colored
                                             ? new LabelPointStyle(centered, text, bg,
                                                     LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f,
-                                                    true, own.getLabelMinRenderResolution())
+                                                    false, own.getLabelMinRenderResolution())
                                             : new LabelPointStyle(centered, text, bg,
-                                                    LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f, true),
+                                                    LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f, false),
                                     la, Feature.AltitudeMode.ClampToGround, 0d));
                         }
                     }
