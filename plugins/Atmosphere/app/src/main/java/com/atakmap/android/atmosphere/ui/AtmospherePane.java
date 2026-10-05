@@ -406,7 +406,10 @@ public final class AtmospherePane {
     private View stationsSettings;
     private LinearLayout stationsOriginRow, stationsDistanceRow, stationsLegend;
     private LinearLayout stationsGateRow, stationsLabelGateRow, stationsShowRow;
-    private TextView stationsGateText, stationsLabelGateText;
+    private TextView stationsGateText, stationsLabelGateText, stationsUtilityGateText;
+    private LinearLayout stationsUtilityGateRow;
+    private View stationsUtilitySettings;
+    private Button stationsUtility;
     private Button stationsLabels, stationsGuideToggle;
     private ImageButton stationsGuideExpand;
     private LinearLayout stationsGuide;
@@ -762,6 +765,10 @@ public final class AtmospherePane {
         stationsGateText = find(R.id.stations_gate_text);
         stationsLabelGateText = find(R.id.stations_label_gate_text);
         stationsLabels = find(R.id.stations_labels);
+        stationsUtility = find(R.id.stations_utility);
+        stationsUtilitySettings = find(R.id.stations_utility_settings);
+        stationsUtilityGateRow = find(R.id.stations_utility_gate_row);
+        stationsUtilityGateText = find(R.id.stations_utility_gate_text);
         stationsGuide = find(R.id.stations_guide);
         stationsGuideToggle = find(R.id.stations_guide_toggle);
         stationsGuideExpand = find(R.id.stations_guide_expand);
@@ -1105,6 +1112,20 @@ public final class AtmospherePane {
                 if (stationLayer == null)
                     return;
                 stationLayer.setLabels(!stationLayer.hasLabels());
+                updateLayerControls();
+            }
+        });
+        stationsUtility.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (stationLayer == null)
+                    return;
+                if (!stationLayer.isUtilityOn()
+                        && !egress.isLayerEnabled(StationOverlay.UTILITY_ID)) {
+                    askToAllowUtilityStations();
+                    return;
+                }
+                stationLayer.setUtilityOn(!stationLayer.isUtilityOn());
                 updateLayerControls();
             }
         });
@@ -3052,10 +3073,17 @@ public final class AtmospherePane {
             }
 
             @Override
-            public void onStationsDrawn(int drawn, int total, int critical) {
+            public void onStationsDrawn(int drawn, int total, int critical, int utility) {
+                // The utility stations are counted apart, and said to be hidden when
+                // the zoom hides them: a count the map does not show reads as a fault.
                 if (stationsStatus != null)
                     stationsStatus.setText(total == 0 ? ""
-                            : drawn + " stations, " + critical + " at criteria");
+                            : drawn + " stations, " + critical + " at criteria"
+                                    + (utility == 0 ? "" : "\n" + utility
+                                            + " utility stations"
+                                            + (stationLayer.drawingNow(
+                                                    stationLayer.utilityGate())
+                                                    ? "" : ", shown when zoomed in")));
                 if (stationPage != null)
                     stationPage.refresh();
                 updateLayerControls();
@@ -3406,6 +3434,28 @@ public final class AtmospherePane {
                     GaugeOverlay.legendColor(category)));
     }
 
+    /** Cal OES is another server than NIFC, so it is allowed on its own, by name. */
+    private void askToAllowUtilityStations() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.stations_utility_allow_title))
+                .setMessage(pluginContext.getString(R.string.stations_utility_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(StationOverlay.UTILITY_ID, true);
+                                if (stationLayer != null)
+                                    stationLayer.setUtilityOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowStations() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -3688,6 +3738,14 @@ public final class AtmospherePane {
                         stationLayer.setLabelGate(gsd);
                     }
                 });
+        if (stationLayer.isUtilityOn())
+            gateRow(stationsUtilityGateRow, stationsUtilityGateText, "Utility stations",
+                    stationLayer.utilityGate(), new Gate() {
+                        @Override
+                        public void set(double gsd) {
+                            stationLayer.setUtilityGate(gsd);
+                        }
+                    });
     }
 
     private interface Gate {
@@ -4781,6 +4839,13 @@ public final class AtmospherePane {
             stationsLabels.setText(withLabels ? "Readings and names  ON" : "Readings and names  OFF");
             stationsLabels.setTextColor(pluginContext.getResources().getColor(
                     withLabels ? R.color.state_on : R.color.state_off));
+            final boolean utilityOn = stationLayer.isUtilityOn()
+                    && egress.isLayerEnabled(StationOverlay.UTILITY_ID);
+            stationsUtility.setText(utilityOn ? R.string.stations_utility_on
+                    : R.string.stations_utility_off);
+            stationsUtility.setTextColor(pluginContext.getResources().getColor(
+                    utilityOn ? R.color.state_on : R.color.state_off));
+            stationsUtilitySettings.setVisibility(utilityOn ? View.VISIBLE : View.GONE);
             buildStationsOriginRow();
             buildStationsDistanceRow();
             buildStationsShowRow();
@@ -5081,6 +5146,14 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_psps, PspsOverlay.HOST));
+        }
+        // Synoptic asks for its credit, Cal OES that its extract is not called verified.
+        if (stationLayer != null && stationLayer.isOn() && stationLayer.isUtilityOn()
+                && egress.isLayerEnabled(StationOverlay.UTILITY_ID)) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_utility_stations,
+                    StationOverlay.UTILITY_HOST));
         }
         if (flood != null && flood.isOn()) {
             if (out.length() > 0)

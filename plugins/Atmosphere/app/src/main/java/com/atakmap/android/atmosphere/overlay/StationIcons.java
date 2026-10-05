@@ -77,6 +77,11 @@ final class StationIcons {
 
     /** The disc the barb turns on: the NWCG symbol's own blue, with a white edge. */
     private static final int DISC = 0xFF1B3B8B;
+    /**
+     * A utility network's station: the same symbol on slate rather than the NWCG blue,
+     * so a RAWS -- ten-minute wind, fuel moisture -- is never mistaken for one.
+     */
+    private static final int UTILITY_DISC = 0xFF37474F;
     private static final int DISC_EDGE = 0xFFFFFFFF;
 
     /**
@@ -282,7 +287,7 @@ final class StationIcons {
                 // Filling the frame: a chooser row is small enough already without
                 // the symbol leaving a margin inside it.
                 final float scale = (size / 2f - 2f) / DISC_R;
-                disc(c, p, size / 2, size / 2, scale);
+                disc(c, p, size / 2, size / 2, scale, DISC);
                 anemometer(c, p, size / 2, size / 2, scale, state);
                 final FileOutputStream o = new FileOutputStream(out);
                 try {
@@ -332,6 +337,14 @@ final class StationIcons {
     Composed compose(String name, double speed, double gust, String unit,
             double humidity, double fuel, double windFrom, double knots, int state,
             boolean withLabel) {
+        return compose(name, speed, gust, unit, humidity, fuel, windFrom, knots, state,
+                withLabel, false);
+    }
+
+    /** The same, on the utility stations' slate disc when {@code utility}. */
+    Composed compose(String name, double speed, double gust, String unit,
+            double humidity, double fuel, double windFrom, double knots, int state,
+            boolean withLabel, boolean utility) {
         final float scale = Math.max(1f,
                 gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling());
         final MapTextFormat tf = MapView.getDefaultTextFormat();
@@ -351,7 +364,7 @@ final class StationIcons {
         // The feathers change only in steps of five knots, so that is what the name
         // needs to carry -- not the raw speed, which would be a new file every hour.
         final long fives = Double.isNaN(knots) ? -1 : Math.round(knots / 5.0);
-        final String key = (withLabel ? "L" : "n")
+        final String key = (withLabel ? "L" : "n") + (utility ? "u" : "")
                 + Integer.toHexString((readings + "|" + title).hashCode())
                 + "_" + bucket(windFrom) + "_k" + fives + "_" + Integer.toHexString(state)
                 + "_v" + VERSION + "_s" + Math.round(scale * 100)
@@ -450,7 +463,8 @@ final class StationIcons {
 
         final File out = new File(dir, "wx_" + key + ".png");
         if (!out.isFile() && !draw(out, w, h, cx, cy, scale, windFrom, knots, state,
-                pieces, title, big, small, bm, sm, pillW, pillH, pillCx, pillCy))
+                utility ? UTILITY_DISC : DISC, pieces, title, big, small, bm, sm, pillW,
+                pillH, pillCx, pillCy))
             return null;
         // Composed at device pixels and asked back at the same pixels, so nothing is
         // resampled: ATAK scales an icon by dp, and these are already scaled.
@@ -475,12 +489,13 @@ final class StationIcons {
      * clear pixels when it draws and when it hit-tests, and the chooser has its own
      * icon ({@link #compose}).
      */
-    Composed symbol(double windFrom, double knots, int state) {
+    Composed symbol(double windFrom, double knots, int state, boolean utility) {
         final float scale = Math.max(1f,
                 gov.tak.api.commons.graphics.DisplaySettings.getRelativeScaling());
         final boolean barb = !Double.isNaN(windFrom) && !WindBarb.isCalm(knots);
         final long fives = Double.isNaN(knots) ? -1 : Math.round(knots / 5.0);
-        final String key = "sym_" + (barb ? bucket(windFrom) + "_k" + fives : "calm")
+        final String key = "sym_" + (utility ? "u_" : "")
+                + (barb ? bucket(windFrom) + "_k" + fives : "calm")
                 + "_" + Integer.toHexString(state) + "_v" + VERSION
                 + "_s" + Math.round(scale * 100);
         final Composed hit = cache.get(key);
@@ -494,7 +509,7 @@ final class StationIcons {
             @Override
             public void paint(Canvas c, Paint p) {
                 barb(c, p, half, half, scale, windFrom, knots);
-                disc(c, p, half, half, scale);
+                disc(c, p, half, half, scale, utility ? UTILITY_DISC : DISC);
                 anemometer(c, p, half, half, scale, state);
             }
         }))
@@ -715,7 +730,8 @@ final class StationIcons {
     }
 
     private boolean draw(File out, int w, int h, int cx, int cy, float scale,
-            double windFrom, double knots, int state, List<Piece> pieces, String title,
+            double windFrom, double knots, int state, int fill, List<Piece> pieces,
+            String title,
             Paint big, Paint small, Paint.FontMetricsInt bm, Paint.FontMetricsInt sm,
             int pillW, int pillH, float pillCx, float pillCy) {
         Bitmap bmp = null;
@@ -725,7 +741,7 @@ final class StationIcons {
             final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
             barb(c, p, cx, cy, scale, windFrom, knots);
-            disc(c, p, cx, cy, scale);
+            disc(c, p, cx, cy, scale, fill);
             anemometer(c, p, cx, cy, scale, state);
             pill(c, p, pillCx, pillCy, pillW, pillH, pieces, title, big, small, bm, sm);
 
@@ -849,9 +865,9 @@ final class StationIcons {
         }
     }
 
-    private void disc(Canvas c, Paint p, int cx, int cy, float scale) {
+    private void disc(Canvas c, Paint p, int cx, int cy, float scale, int fill) {
         p.setStyle(Paint.Style.FILL);
-        p.setColor(DISC);
+        p.setColor(fill);
         c.drawCircle(cx, cy, DISC_R * scale, p);
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeWidth(2f * scale);

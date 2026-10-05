@@ -8,6 +8,7 @@ import com.atakmap.android.atmosphere.data.RedFlag;
 import com.atakmap.android.atmosphere.data.RedFlagCriteria;
 import com.atakmap.android.atmosphere.data.Raws;
 import com.atakmap.android.atmosphere.data.StationFavorites;
+import com.atakmap.android.atmosphere.data.UtilityStations;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
 import com.atakmap.android.atmosphere.units.Quantity;
@@ -64,6 +65,21 @@ public final class StationOverlay {
     private static final String PREF_FROM_ME = "weather.layer.stations.fromme";
     private static final String PREF_LABELS = "weather.layer.stations.labels";
     private static final String PREF_SHOW = "weather.layer.stations.show";
+
+    /**
+     * California's utility stations, from Cal OES (see {@link UtilityStations}). Their
+     * own allow, because they go to another server with the same position, their own
+     * switch, and their own closer zoom: 371 of them sit within 25 miles of Santa
+     * Clarita beside 31 RAWS (2026-10-05).
+     */
+    public static final String UTILITY_ID = "utility_stations";
+    public static final String UTILITY_HOST = UtilityStations.HOST;
+    private static final String PREF_UTILITY = "weather.layer.stations.utility";
+    private static final String PREF_GATE_UTILITY = "weather.layer.stations.utilitygate";
+    /** They start at a scale bar of five miles: about forty of them on a phone there. */
+    private static final double DEFAULT_UTILITY_BIG = 5d;
+    /** The Overlay Manager set they are drawn in, one switch for all of them. */
+    private static final String UTILITY_SET = "Utility Stations";
 
     /** Every station the feed gives back. */
     public static final int SHOW_ALL = 0;
@@ -145,7 +161,11 @@ public final class StationOverlay {
     public interface Listener {
         void onStationsStatus(String message);
 
-        void onStationsDrawn(int drawn, int total, int critical);
+        /**
+         * @param drawn   fire weather stations drawn
+         * @param utility utility stations held, which the map shows only zoomed in
+         */
+        void onStationsDrawn(int drawn, int total, int critical, int utility);
 
         /** The map moved: anything ordered by distance needs reordering. */
         void onOriginMoved();
@@ -189,6 +209,13 @@ public final class StationOverlay {
      * request.
      */
     private List<Raws.Station> beyond = new ArrayList<>();
+    /** Utility stations around the origin, and the starred ones from beyond it. */
+    private volatile List<Raws.Station> utilityNear = new ArrayList<>();
+    private volatile List<Raws.Station> utilityBeyond = new ArrayList<>();
+    private boolean utilityOn, utilityInFlight;
+    /** Whether the last rebuild was zoomed in far enough to write the utility stations. */
+    private volatile boolean utilityWasShown;
+    private double utilityGate;
     private final StationFavorites favorites;
     /** The fire weather zones around the origin, and where they were asked for. */
     private List<FireZones.Zone> zones = new ArrayList<>();
@@ -226,6 +253,42 @@ public final class StationOverlay {
         // real bar differs by -- here that is most of a factor of two, so a gate
         // labeled "30 mi or closer" was still drawing at 53 (operator, 2026-09-25).
         labelGate = storedGate(p, PREF_GATE_LABELS, gsdForBig(DEFAULT_LABEL_BIG));
+        utilityOn = p != null && p.getBoolean(PREF_UTILITY, false);
+        utilityGate = storedGate(p, PREF_GATE_UTILITY, gsdForBig(DEFAULT_UTILITY_BIG));
+    }
+
+    /** Whether the utility stations are wanted; they also need their server allowed. */
+    public boolean isUtilityOn() {
+        return utilityOn;
+    }
+
+    public void setUtilityOn(boolean value) {
+        if (utilityOn == value)
+            return;
+        utilityOn = value;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putBoolean(PREF_UTILITY, value).apply();
+        if (value) {
+            fetchUtility(origin(), generation);
+        } else {
+            utilityNear = new ArrayList<>();
+            utilityBeyond = new ArrayList<>();
+            redraw();
+        }
+    }
+
+    /** Coarsest meters per pixel at which the utility stations still draw. */
+    public double utilityGate() {
+        return utilityGate;
+    }
+
+    public void setUtilityGate(double metersPerPixel) {
+        if (utilityGate == metersPerPixel)
+            return;
+        utilityGate = metersPerPixel;
+        remember(PREF_GATE_UTILITY, metersPerPixel);
+        redraw();
     }
 
     /** How wide the map may be, in miles, and still draw the stations. 0 is always. */
@@ -387,22 +450,158 @@ public final class StationOverlay {
         for (Raws.Station s : beyond)
             if (favorites.contains(s.wxId))
                 n++;
+        for (Raws.Station s : utilityBeyond)
+            if (favorites.contains(s.wxId))
+                n++;
         return n;
     }
 
-    /** Everything drawn: the radius answer, and the starred stations beyond it. */
+    /**
+     * Everything drawn: the radius answer, the starred stations beyond it, and the
+     * utility stations when they are on.
+     *
+     * <p>A utility station NIFC already gave is never held twice. The network filter
+     * already leaves RAWS out of the utility answer; this is the check that it did, by
+     * MesoWest id, keeping NIFC's copy, which alone carries fuel moisture.
+     */
     private List<Raws.Station> held() {
         final List<Raws.Station> near = stations;
         final List<Raws.Station> far = beyond;
-        if (far.isEmpty())
+        final List<Raws.Station> uNear = utilityNear;
+        final List<Raws.Station> uFar = utilityBeyond;
+        if (far.isEmpty() && uNear.isEmpty() && uFar.isEmpty())
             return near;
-        final List<Raws.Station> out = new ArrayList<>(near.size() + far.size());
+        final List<Raws.Station> out = new ArrayList<>(
+                near.size() + far.size() + uNear.size() + uFar.size());
         out.addAll(near);
         for (Raws.Station s : far)
             // Unstarred since it was fetched: it is outside the radius, so it goes.
             if (favorites.contains(s.wxId))
                 out.add(s);
+        if (uNear.isEmpty() && uFar.isEmpty())
+            return out;
+        final java.util.Set<String> nifc = new java.util.HashSet<>();
+        for (Raws.Station s : out)
+            if (!s.mesowestId.isEmpty())
+                nifc.add(s.mesowestId);
+        final java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Raws.Station s : uNear)
+            if (!nifc.contains(s.mesowestId) && seen.add(s.wxId))
+                out.add(s);
+        for (Raws.Station s : uFar)
+            if (favorites.contains(s.wxId) && !nifc.contains(s.mesowestId)
+                    && seen.add(s.wxId))
+                out.add(s);
         return out;
+    }
+
+    /**
+     * Ask Cal OES for the utility stations around the origin, and for the starred ones
+     * beyond it, then draw. Beside the RAWS request rather than after it: a utility
+     * answer that is slow or fails leaves the RAWS on the map as they were.
+     */
+    private void fetchUtility(final GeoPoint from, final int mine) {
+        if (!utilityOn || !on || !started || utilityInFlight
+                || !egress.isLayerEnabled(UTILITY_ID))
+            return;
+        final List<String> starred = new ArrayList<>();
+        for (String id : favorites.ids()) {
+            final String stid = UtilityStations.stidOf(id);
+            if (stid != null)
+                starred.add(stid);
+        }
+        final boolean inCalifornia = from != null
+                && UtilityStations.covers(from.getLatitude(), from.getLongitude());
+        if (!inCalifornia) {
+            utilityNear = new ArrayList<>();
+            if (starred.isEmpty()) {
+                if (!utilityBeyond.isEmpty()) {
+                    utilityBeyond = new ArrayList<>();
+                    redraw();
+                }
+                return;
+            }
+            utilityInFlight = true;
+            fetchUtilityBeyond(starred, mine);
+            return;
+        }
+        utilityInFlight = true;
+        final Map<String, String> headers = new HashMap<>();
+        headers.put("Accept", "application/json");
+        // Rounded like the RAWS request: this one sends the same point.
+        final String url = UtilityStations.nearUrl(
+                Double.parseDouble(egress.latitude(from)),
+                Double.parseDouble(egress.longitude(from)), miles);
+        Http.get(url, egress.userAgent(), headers, new Http.Callback() {
+            @Override
+            public void onSuccess(final String body) {
+                if (mine != generation || !on) {
+                    utilityInFlight = false;
+                    return;
+                }
+                worker.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        final List<Raws.Station> got = UtilityStations.parse(body);
+                        utilityNear = got;
+                        Log.d(TAG, "holding " + got.size() + " utility station(s)");
+                        final java.util.Set<String> have = new java.util.HashSet<>();
+                        for (Raws.Station s : got)
+                            have.add(s.mesowestId);
+                        final List<String> missing = new ArrayList<>();
+                        for (String stid : starred)
+                            if (!have.contains(stid))
+                                missing.add(stid);
+                        if (missing.isEmpty()) {
+                            utilityBeyond = new ArrayList<>();
+                            utilityInFlight = false;
+                            rebuild(mine);
+                        } else {
+                            fetchUtilityBeyond(missing, mine);
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(String error) {
+                // What was held stays on the map; the next poll asks again.
+                Log.w(TAG, "utility stations: " + error);
+                utilityInFlight = false;
+            }
+        });
+    }
+
+    /** The starred utility stations outside the radius, by MesoWest id. */
+    private void fetchUtilityBeyond(List<String> stids, final int mine) {
+        final List<String> chunk = stids.size() > UtilityStations.MAX_IDS_PER_QUERY
+                ? stids.subList(0, UtilityStations.MAX_IDS_PER_QUERY) : stids;
+        final Map<String, String> headers = new HashMap<>();
+        headers.put("Accept", "application/json");
+        Http.get(UtilityStations.byIdUrl(chunk), egress.userAgent(), headers,
+                new Http.Callback() {
+                    @Override
+                    public void onSuccess(final String body) {
+                        if (mine != generation || !on) {
+                            utilityInFlight = false;
+                            return;
+                        }
+                        worker.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                utilityBeyond = UtilityStations.parse(body);
+                                utilityInFlight = false;
+                                rebuild(mine);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onFailure(String error) {
+                        Log.w(TAG, "starred utility stations: " + error);
+                        utilityInFlight = false;
+                    }
+                });
     }
 
     /** The starred ids the radius answer does not carry. */
@@ -414,7 +613,8 @@ public final class StationOverlay {
         for (Raws.Station s : near)
             have.add(s.wxId);
         for (String id : favorites.ids())
-            if (!have.contains(id))
+            // A starred utility station is asked of Cal OES, not of NIFC.
+            if (!have.contains(id) && UtilityStations.stidOf(id) == null)
                 missing.add(id);
         return missing;
     }
@@ -528,6 +728,10 @@ public final class StationOverlay {
             // 1,436 ms, 1,351 then 1,135 (XCover, 2026-09-26).
             if (labelsWanted && !crossed && (labeledSetChanged() || turned()))
                 redraw();
+            // Only the utility stations in view at their zoom are written, so a zoom
+            // across their gate needs them written, or taken away.
+            else if (!crossed && utilityOn && utilityShownNow() != utilityWasShown)
+                redraw();
             // Even when nothing is refetched, anything ordered by distance from the
             // map is now in the wrong order.
             final Listener l = listener;
@@ -631,12 +835,15 @@ public final class StationOverlay {
         } else {
             stations = new ArrayList<>();
             beyond = new ArrayList<>();
+            utilityNear = new ArrayList<>();
+            utilityBeyond = new ArrayList<>();
+            utilityInFlight = false;
             zones = new ArrayList<>();
             zonesFrom = null;
             zoneOf = new HashMap<>();
             clearOffMain();
             status("");
-            drawn(0, 0, 0);
+            drawn(0, 0, 0, 0);
         }
     }
 
@@ -794,6 +1001,7 @@ public final class StationOverlay {
         fetchedFrom = from;
         final int mine = generation;
         fetchZones(from, mine);
+        fetchUtility(from, mine);
         if (stations.isEmpty())
             status("Getting stations…");
         final Map<String, String> headers = new HashMap<>();
@@ -879,6 +1087,11 @@ public final class StationOverlay {
         final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         int critical = 0;
         int stations = 0;
+        int utility = 0;
+        // Never coarser than the stations' own gate: zoomed out past it, nothing draws.
+        final double utilityAt = Math.min(gate, isAlways(utilityGate) ? ALWAYS : utilityGate);
+        final boolean utilityShown = drawingNow(utilityAt);
+        utilityWasShown = utilityShown;
         for (Raws.Station s : held) {
             // A station with nothing to say is left off rather than drawn as a reading
             // of nothing, and one that stopped reporting days ago is not current
@@ -892,8 +1105,18 @@ public final class StationOverlay {
             // (2026-09-26), because this line still held the common pair.
             final int level = stateOf(s);
             final int color = color(level);
-            if (level == RedFlag.CRITICAL)
+            final boolean fromUtility = s.isUtility();
+            if (fromUtility) {
+                // Counted whether drawn or not, so the status can say how many there
+                // are. Only the ones on screen, zoomed in far enough to be drawn, are
+                // written: rewriting all 472 around Vista took 3.4 s a pan (XCover,
+                // 2026-10-05), and the zoom and the pan both redraw anyway.
+                utility++;
+                if (!utilityShown || !onScreen(s, view))
+                    continue;
+            } else if (level == RedFlag.CRITICAL) {
                 critical++;
+            }
             // The pill gets the operator's unit; the feathers get knots, which is
             // what a barb has always counted in.
             // The feathers count the sustained wind, which is what a barb shows; the
@@ -909,9 +1132,11 @@ public final class StationOverlay {
             final boolean labelThis = withLabels && onScreen(s, view);
             final AttributeSet a = attrs(s, color, now, system, labelThis);
             // The set is the state, so Overlay Manager can show the stations at
-            // criteria on their own and ATAK's own switches work on one at a time.
-            if (add(drawn, s, StationIcons.stateLabel(color), a, color, system, labelThis,
-                    rotation, gate, FINEST))
+            // criteria on their own and ATAK's own switches work on one at a time;
+            // the utility stations are one set of their own.
+            if (add(drawn, s, fromUtility ? UTILITY_SET : StationIcons.stateLabel(color), a,
+                    color, system, labelThis, rotation, fromUtility ? utilityAt : gate,
+                    FINEST) && !fromUtility)
                 stations++;
         }
         if (mine != generation || !on)
@@ -920,19 +1145,20 @@ public final class StationOverlay {
         final int n = stations;
         final int total = held.size();
         final int red = critical;
+        final int fromUtilities = utility;
         mapView.post(new Runnable() {
             @Override
             public void run() {
                 if (mine != generation || !on)
                     return;
                 status("");
-                drawn(n, total, red);
+                drawn(n, total, red, fromUtilities);
             }
         });
         Log.d(TAG, String.format(Locale.US,
-                "drew %d of %d stations within %d mi of %s, %d at criteria, "
+                "drew %d of %d stations (%d utility) within %d mi of %s, %d at criteria, "
                         + "labels=%b, took %d ms",
-                n, total, miles, fromMe ? "me" : "the map", red, withLabels,
+                n, total, fromUtilities, miles, fromMe ? "me" : "the map", red, withLabels,
                 android.os.SystemClock.elapsedRealtime() - began));
     }
 
@@ -952,7 +1178,7 @@ public final class StationOverlay {
             AttributeSet a, int color, UnitSystem system, boolean withLabel,
             double mapRotation, double minGsd, double maxGsd) {
         final StationIcons.Composed symbol = icons.symbol(s.windFromDeg, knots(s.windMph),
-                color);
+                color, s.isUtility());
         if (symbol == null)
             return false;
         final com.atakmap.map.layer.feature.geometry.Geometry at =
@@ -986,6 +1212,12 @@ public final class StationOverlay {
      * when it is panned to, rather than arriving a redraw later. Null on the globe,
      * where the bounds read as NaN.
      */
+
+    /** Whether the map is zoomed in far enough for the utility stations to draw. */
+    private boolean utilityShownNow() {
+        final double gate = isAlways(stationGate) ? ALWAYS : stationGate;
+        return drawingNow(Math.min(gate, isAlways(utilityGate) ? ALWAYS : utilityGate));
+    }
 
     /** Whether the map has turned far enough since the labels were placed to place them again. */
     private boolean turned() {
@@ -1117,6 +1349,11 @@ public final class StationOverlay {
     public List<String[]> describe(Raws.Station s, UnitSystem system, long now) {
         final List<String[]> out = new ArrayList<>();
         row(out, "Status", StationIcons.stateLabel(colorFor(s)));
+        // Said first after the state, because it changes how the numbers read.
+        if (s.isUtility())
+            row(out, "Utility station", s.network + ". Wind is averaged over a minute or "
+                    + "two, not ten like a RAWS, so it reads higher than a RAWS beside it. "
+                    + "No fuel moisture.");
         // Which zone it stands in, and the pair it is held against -- with where the
         // pair came from, because a color that claims to be the zone's criteria and
         // is the common rule of thumb is worse than one that says which it is.
@@ -1142,8 +1379,11 @@ public final class StationOverlay {
         row(out, "County", s.county);
         row(out, "State", s.state);
         row(out, "Station status", s.status);
-        row(out, "Station id", s.wxId);
+        if (!s.isUtility())
+            row(out, "Station id", s.wxId);
         row(out, "MesoWest id", s.mesowestId);
+        if (s.isUtility())
+            row(out, "Source", "Synoptic Data via Cal OES, not verified by Cal OES");
         row(out, "Position", String.format(Locale.US, "%.5f, %.5f",
                 s.latitude, s.longitude));
         return out;
@@ -1167,14 +1407,15 @@ public final class StationOverlay {
             put(a, r[0], r[1]);
         // Plumbing, not a field. Underscored so the details pane skips it.
         //
-        // The icon THIS station is drawn with, for the map item a tap materializes:
-        // same key as add() composes, so one PNG per station. In the bitmap's own
-        // pixels, because a Marker icon is sized in pixels and not scaled by density
-        // the way the feature's width is (StationIcons.Composed).
+        // The station whole -- symbol, barb and pill in one bitmap -- for the map item a
+        // tap materializes and the Select Item row it is listed by; the map draws the
+        // symbol and the pill apart (add()). In the bitmap's own pixels, because a
+        // Marker icon is sized in pixels and not scaled by density the way the
+        // feature's width is (StationIcons.Composed).
         final StationIcons.Composed own = icons.compose(s.name,
                 speed(s.windMph, system), speed(s.gustMph, system), speedUnit(),
                 s.relativeHumidity, s.fuelMoisture, s.windFromDeg, knots(s.windMph),
-                color, withLabel);
+                color, withLabel, s.isUtility());
         if (own != null) {
             put(a, "_chooserIcon", own.uri);
             a.setAttribute("_chooserW", own.pxWidth);
@@ -1271,9 +1512,9 @@ public final class StationOverlay {
             l.onStationsStatus(message);
     }
 
-    private void drawn(int n, int total, int critical) {
+    private void drawn(int n, int total, int critical, int utility) {
         final Listener l = listener;
         if (l != null)
-            l.onStationsDrawn(n, total, critical);
+            l.onStationsDrawn(n, total, critical, utility);
     }
 }
