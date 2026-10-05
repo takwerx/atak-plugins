@@ -71,7 +71,7 @@ public abstract class ImageOverlay {
             if (!on || !started)
                 return;
             ensureRegion(true);
-            mapView.postDelayed(this, POLL_MS);
+            mapView.postDelayed(this, pollMs());
         }
     };
 
@@ -115,6 +115,20 @@ public abstract class ImageOverlay {
      */
     protected int alpha() {
         return 255;
+    }
+
+    /** How often the picture is asked for again while on; half an hour unless the layer moves faster. */
+    protected long pollMs() {
+        return POLL_MS;
+    }
+
+    /**
+     * The picture as it arrived, before it is drawn: a layer whose server's colors
+     * say the wrong thing repaints them here (lightning). Runs on the main thread,
+     * once per picture. Return the same bitmap or a new one; the old is not reused.
+     */
+    protected Bitmap repaint(Bitmap picture) {
+        return picture;
     }
 
     /** The widest box asked for, degrees; a wider view is cropped around its center. */
@@ -239,7 +253,7 @@ public abstract class ImageOverlay {
             layer.setVisible(true);
             mapView.addOnMapMovedListener(moved);
             ensureRegion(true);
-            mapView.postDelayed(autoPoll, POLL_MS);
+            mapView.postDelayed(autoPoll, pollMs());
         } else {
             mapView.removeOnMapMovedListener(moved);
             layer.clear();
@@ -270,7 +284,7 @@ public abstract class ImageOverlay {
             return;
         }
         double w = bounds.getWest(), e = bounds.getEast(), s = bounds.getSouth(), n = bounds.getNorth();
-        final boolean stale = System.currentTimeMillis() - fetchedAt > POLL_MS;
+        final boolean stale = System.currentTimeMillis() - fetchedAt > pollMs();
         boolean refetch = force || stale || region == null || !contains(region, bounds);
         if (!refetch) {
             final double viewSpan = e - w, regionSpan = region.getEast() - region.getWest();
@@ -322,8 +336,9 @@ public abstract class ImageOverlay {
                 region = r;
                 fetchedAt = System.currentTimeMillis();
                 failures = 0;
-                layer.setImage(translucent(bitmap, alpha()), r);
-                Log.d(tag, "picture " + bitmap.getWidth() + "x" + bitmap.getHeight() + " for " + key);
+                final String size = bitmap.getWidth() + "x" + bitmap.getHeight();
+                layer.setImage(translucent(repaint(bitmap), alpha()), r);
+                Log.d(tag, "picture " + size + " for " + key);
                 status(shown());
             }
 
