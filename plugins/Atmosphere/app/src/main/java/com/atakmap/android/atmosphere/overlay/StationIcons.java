@@ -10,7 +10,7 @@ import com.atakmap.android.atmosphere.data.Snooper;
 import com.atakmap.android.atmosphere.data.WindBarb;
 import com.atakmap.android.maps.MapTextFormat;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.coremap.filesystem.FileSystemUtils;
+import com.atakmap.android.atmosphere.compat.GeneratedFiles;
 import com.atakmap.coremap.log.Log;
 
 import java.io.File;
@@ -178,7 +178,7 @@ final class StationIcons {
     }
 
     StationIcons() {
-        final File live = FileSystemUtils.getItem("tools/atmosphere/station-icons");
+        final File live = GeneratedFiles.icons("station");
         dir = live;
         if (live == null)
             return;

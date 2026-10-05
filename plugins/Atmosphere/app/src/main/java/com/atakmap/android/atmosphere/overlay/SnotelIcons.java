@@ -8,7 +8,7 @@ import android.graphics.RectF;
 import com.atakmap.android.maps.MapTextFormat;
 import com.atakmap.android.maps.MapView;
 
-import com.atakmap.coremap.filesystem.FileSystemUtils;
+import com.atakmap.android.atmosphere.compat.GeneratedFiles;
 import com.atakmap.coremap.log.Log;
 
 import java.io.File;
@@ -40,7 +40,7 @@ final class SnotelIcons {
 
     SnotelIcons(float density) {
         this.density = density <= 0 ? 1f : density;
-        dir = FileSystemUtils.getItem("tools/atmosphere/snotel-icons");
+        dir = GeneratedFiles.icons("snotel");
         if (dir != null && !dir.isDirectory())
             //noinspection ResultOfMethodCallIgnored
             dir.mkdirs();

@@ -192,13 +192,11 @@ public final class TropicalOverlay {
         this.egress = egress;
         // ATAK's own storage, not the plugin's: the plugin package's cache dir belongs
         // to a different uid than the process this runs in, so mkdirs there fails and
-        // every composite lands on ENOENT (XCover, 2026-09-23). Feature Layer keeps its
-        // label composites under tools/ for the same reason.
+        // every composite lands on ENOENT (XCover, 2026-09-23). See GeneratedFiles.
         this.features = new AtmosphereFeatures(mapView, pluginContext, TAG, GROUP,
                 "storms.sqlite", "tropical", true);
         this.icons = new StormIcons(pluginContext,
-                com.atakmap.coremap.filesystem.FileSystemUtils.getItem(
-                        "tools/atmosphere/storm-icons"));
+                com.atakmap.android.atmosphere.compat.GeneratedFiles.icons("storm"));
     }
 
     /**

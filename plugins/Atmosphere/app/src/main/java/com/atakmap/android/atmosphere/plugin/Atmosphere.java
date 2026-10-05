@@ -9,6 +9,7 @@ import android.view.View;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.atmosphere.compat.GeneratedFiles;
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.SnapshotStore;
 import com.atakmap.android.atmosphere.data.WeatherClient;
@@ -220,6 +221,7 @@ public class Atmosphere implements IPlugin {
      * The warnings layer was removed on 2026-09-26: alerts are IPAWS's, the
      * companion plugin, which draws the same feed and sends notifications. A phone
      * that ran it holds 600 zone shapes (28 MB) and a store it no longer reads.
+     * The symbol folders that 0.9 and earlier composed on the card go the same way.
      * Swept once, on a daemon thread, never on the load thread.
      */
     private static void sweepRemovedLayerFiles() {
@@ -236,6 +238,15 @@ public class Atmosphere implements IPlugin {
                             "warnings.sqlite-wal", "warnings.sqlite-shm" })
                         //noinspection ResultOfMethodCallIgnored
                         new java.io.File(root, f).delete();
+                    // The icons moved to ATAK's private storage in 0.10 (takwerx/atmosphere#2).
+                    // By name only: the stores and the manual beside them stay.
+                    for (String f : GeneratedFiles.LEGACY)
+                        deleteTree(new java.io.File(root, f));
+                    final String[] left = root.list();
+                    if (left != null)
+                        for (String f : left)
+                            if (f.startsWith(GeneratedFiles.LEGACY_SET_ASIDE))
+                                deleteTree(new java.io.File(root, f));
                 } catch (Exception e) {
                     Log.w(TAG, "could not sweep the removed warnings layer's files", e);
                 }

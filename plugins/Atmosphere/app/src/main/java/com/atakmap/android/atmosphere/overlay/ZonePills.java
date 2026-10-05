@@ -7,7 +7,7 @@ import android.graphics.RectF;
 
 import com.atakmap.android.maps.MapTextFormat;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.coremap.filesystem.FileSystemUtils;
+import com.atakmap.android.atmosphere.compat.GeneratedFiles;
 import com.atakmap.coremap.log.Log;
 
 import java.io.File;
@@ -55,7 +55,7 @@ final class ZonePills {
     private final Map<String, Pill> cache = new HashMap<>();
 
     ZonePills() {
-        dir = FileSystemUtils.getItem("tools/atmosphere/zone-pills");
+        dir = GeneratedFiles.icons("zone");
         if (dir != null && !dir.isDirectory())
             //noinspection ResultOfMethodCallIgnored
             dir.mkdirs();

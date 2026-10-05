@@ -9,7 +9,7 @@ import com.atakmap.android.maps.MapTextFormat;
 import com.atakmap.android.maps.MapView;
 
 import com.atakmap.android.atmosphere.data.Nwps;
-import com.atakmap.coremap.filesystem.FileSystemUtils;
+import com.atakmap.android.atmosphere.compat.GeneratedFiles;
 import com.atakmap.coremap.log.Log;
 
 import java.io.File;
@@ -60,7 +60,7 @@ final class GaugeIcons {
 
     GaugeIcons(float density) {
         this.density = density <= 0 ? 1f : density;
-        dir = FileSystemUtils.getItem("tools/atmosphere/gauge-icons");
+        dir = GeneratedFiles.icons("gauge");
         if (dir != null && !dir.isDirectory())
             //noinspection ResultOfMethodCallIgnored
             dir.mkdirs();

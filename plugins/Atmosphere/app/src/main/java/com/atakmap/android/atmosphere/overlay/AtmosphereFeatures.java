@@ -544,8 +544,10 @@ final class AtmosphereFeatures {
             if (swatchUri != null)
                 return;
             try {
-                final File dir = FileSystemUtils.getItem("tools/atmosphere");
-                if (dir != null && !dir.isDirectory())
+                final File dir = com.atakmap.android.atmosphere.compat.GeneratedFiles.root();
+                if (dir == null)
+                    return;
+                if (!dir.isDirectory())
                     //noinspection ResultOfMethodCallIgnored
                     dir.mkdirs();
                 final File out = new File(dir, "swatch_v1.png");
