@@ -98,12 +98,16 @@ takes any ArcGIS Online organization you sign in to.
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   #image("7.png", height: 270pt)
 ][
-  Each layer has a row: *ON/OFF*, *Features*, *Go to*, then *Auto* (how often
-  it refreshes), *Refresh* and *Remove*. The line under the name says how many
-  features it holds, when it last refreshed, and the refresh interval.
+  Each layer is one line: its name and *ON* or *OFF*. Tap it to turn the layer
+  on or off. The arrow at the right opens its controls: how many features it
+  holds, when it last refreshed, then *Features*, *Go to*, *Auto* (how often it
+  refreshes), *Refresh* and *Remove*. The arrow works while a layer is off.
 
-  *All ON / All OFF* beside the heading works every layer at once. The row says
-  *Loading…* while a layer fetches.
+  When a layer is not showing everything, that line stays under its row even
+  when the row is closed.
+
+  *All ON / All OFF* beside the heading works every layer at once. A row says
+  *Loading...* while its layer fetches.
 
   *Go to* frames the whole incident.
 ]
@@ -255,7 +259,7 @@ takes any ArcGIS Online organization you sign in to.
 ][
   #image("7-2.png", width: 100%)
 
-  A DART row carries the usual controls plus a scope: what the layer fetches.
+  A DART row's controls also carry a scope: what the layer fetches.
   The default is *What is in view*; the next page says how that works.
 ]
 ]

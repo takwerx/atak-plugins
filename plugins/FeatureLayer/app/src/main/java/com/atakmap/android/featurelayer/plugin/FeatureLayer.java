@@ -7,6 +7,7 @@ import android.graphics.Color;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -1255,18 +1256,38 @@ public class FeatureLayer implements IPlugin {
         });
         for (final LoadedLayer l : layers) {
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.layer_row, null);
-            ((TextView) row.findViewById(R.id.row_title)).setText(l.displayName());
-            ((TextView) row.findViewById(R.id.row_status)).setText(statusLine(l));
+            final TextView status = row.findViewById(R.id.row_status);
+            status.setText(statusLine(l));
             final Button toggle = row.findViewById(R.id.row_toggle);
             if (l.refreshing || l.busy) {
-                toggle.setText("Loading\u2026");
+                toggle.setText(l.displayName() + " Loading\u2026");
                 toggle.setTextColor(Color.parseColor("#FFC107"));
                 toggle.setEnabled(false);
             } else {
-                toggle.setText(l.isVisible() ? "ON" : "OFF");
+                toggle.setText(l.displayName() + (l.isVisible() ? " ON" : " OFF"));
                 toggle.setTextColor(l.isVisible() ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
                 toggle.setEnabled(true);
             }
+            // One line per layer, its controls under the arrow (Atmosphere's layers page,
+            // operator 2026-10-05). Closed until opened, and remembered per layer: the
+            // list is rebuilt on every refresh, so the state cannot live in the views.
+            final ImageButton expand = row.findViewById(R.id.row_expand);
+            final View body = row.findViewById(R.id.row_body);
+            final String foldKey = foldPref(l);
+            final boolean open = uiPrefs().getBoolean(foldKey, false);
+            expand.setRotation(open ? 180f : 0f);
+            body.setVisibility(open ? View.VISIBLE : View.GONE);
+            status.setVisibility(open || statusWarns(l) ? View.VISIBLE : View.GONE);
+            expand.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final boolean nowOpen = body.getVisibility() != View.VISIBLE;
+                    uiPrefs().edit().putBoolean(foldKey, nowOpen).apply();
+                    expand.setRotation(nowOpen ? 180f : 0f);
+                    body.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
+                    status.setVisibility(nowOpen || statusWarns(l) ? View.VISIBLE : View.GONE);
+                }
+            });
             toggle.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -1309,6 +1330,7 @@ public class FeatureLayer implements IPlugin {
             row.findViewById(R.id.row_remove).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    uiPrefs().edit().remove(foldKey).apply();
                     manager.remove(l);
                 }
             });
@@ -1890,6 +1912,21 @@ public class FeatureLayer implements IPlugin {
         final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(line);
         b.append("\nReported ").append(ageLegend(only.spec.id.contains("personnel")));
         return b;
+    }
+
+    /** Where a layer row's open/closed state is kept, by layer id. */
+    private static String foldPref(LoadedLayer l) {
+        return "fold." + l.spec.id;
+    }
+
+    /**
+     * Whether the status line says something is not being shown, so a closed row still
+     * carries it: a stale or partial layer, or one capped below what exists.
+     */
+    private static boolean statusWarns(LoadedLayer l) {
+        if (l.refreshing || l.busy)
+            return false;
+        return l.stale || l.capped || l.status.startsWith("partial");
     }
 
     private static String statusLine(LoadedLayer l) {

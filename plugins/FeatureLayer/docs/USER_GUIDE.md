@@ -72,12 +72,19 @@ search: **Add perimeters**.
 
 ![Two layer rows](screenshots/7_layer_rows.png)
 
-Each layer has a row: **ON/OFF**, **Features**, **Go to**, then **Auto** (how often
-it refreshes), **Refresh** and **Remove**. The line under the name says how many
-features it holds, when it last refreshed, and the refresh interval.
+Each layer is one line: its name and **ON** or **OFF**. Tap it to turn the layer
+on or off. The arrow at the right opens its controls: a line saying how many
+features it holds, when it last refreshed and the refresh interval, then
+**Features**, **Go to**, **Auto** (how often it refreshes), **Refresh** and
+**Remove**. The arrow works while a layer is off, and each row stays open or
+closed the way you left it.
 
-**All ON / All OFF** beside the heading works every layer at once. The row says
-**Loading…** while a layer fetches. **Go to** frames the whole incident.
+When a layer is not showing everything (it could not refresh, only part of it came
+in, or there is more than it draws), that line stays under its row even when the
+row is closed.
+
+**All ON / All OFF** beside the heading works every layer at once. A row says
+**Loading…** while its layer fetches. **Go to** frames the whole incident.
 
 ## On the map
 
@@ -184,7 +191,7 @@ minute, and both sit at the top of the layer list whatever else is loaded.
 
 ![The Vehicles row](screenshots/07b_layer_row_dart.png)
 
-A DART row carries the usual controls plus a scope: what the layer fetches.
+A DART row's controls also carry a scope: what the layer fetches.
 
 ### On the map
 
