@@ -150,7 +150,8 @@ layer holds with a count. Tap one to list its features.
 ![Search results](screenshots/16_search_results.png)
 
 Type a name, a number or a type for a free search across names and every
-attribute. Each row shows what it is, when it was collected, and how far away, in
+attribute. Features named for what you typed come first; under them, features that
+only mention it in another field, each saying which field and what it says. Each row shows what it is, when it was collected, and how far away, in
 your ATAK units, with **tap to go there**. **From: Me** or **From: Map center**
 says where distances are measured from, and the list follows it: pan the map on
 **Map center**, or walk on **Me**, and the distances keep up.

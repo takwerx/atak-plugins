@@ -208,7 +208,7 @@ takes any ArcGIS Online organization you sign in to.
   #image("16.png", width: 100%)
 
   Type a name, a number or a type for a free search across names and every
-  attribute. Each row shows what it is, when it was collected, and how far away,
+  attribute; what is named for it comes first, then what only mentions it. Each row shows what it is, when it was collected, and how far away,
   in your ATAK units, with *tap to go there*.
 ][
   #image("17.png", width: 100%)

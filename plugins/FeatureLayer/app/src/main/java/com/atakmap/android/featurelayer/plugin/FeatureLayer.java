@@ -889,6 +889,18 @@ public class FeatureLayer implements IPlugin {
         return hits;
     }
 
+    /**
+     * Where a row that only mentions the text says it: the field and a few words around
+     * the match, "Comments: ...Primarily replace rails on fence...".
+     */
+    private static String mentionOf(LoadedLayer.Hit h, String text) {
+        final String v = h.matchedText == null ? "" : h.matchedText.replace('\n', ' ').trim();
+        final int at = v.toLowerCase(java.util.Locale.US).indexOf(text.toLowerCase(java.util.Locale.US));
+        final int from = Math.max(0, at - 15), to = Math.min(v.length(), Math.max(at, 0) + text.length() + 30);
+        final String cut = (from > 0 ? "\u2026" : "") + v.substring(from, to) + (to < v.length() ? "\u2026" : "");
+        return h.matchedIn + ": \"" + cut + "\"";
+    }
+
     /** Where the map is looking right now. */
     private com.atakmap.coremap.maps.coords.GeoPoint mapCenter() {
         try {
@@ -1009,6 +1021,12 @@ public class FeatureLayer implements IPlugin {
             @Override
             public int compare(Object[] a, Object[] b) {
                 final LoadedLayer.Hit x = (LoadedLayer.Hit) a[1], y = (LoadedLayer.Hit) b[1];
+                // What is named for the text first, then what only mentions it, each in
+                // the chosen order: "Prima" listed a DOME repair point whose comment says
+                // "Primarily" above the PRIMA fire, because it was nearer (2026-10-05).
+                final int byName = Boolean.compare(x.matchedIn != null, y.matchedIn != null);
+                if (byName != 0)
+                    return byName;
                 switch (mode) {
                     case 0:
                         return Double.compare(dist.get(a), dist.get(b));
@@ -1031,9 +1049,19 @@ public class FeatureLayer implements IPlugin {
             st.append(hits.isEmpty() ? "" : hits.size() + " in view \u00b7 ").append("asking the feed for \"").append(text).append("\"\u2026");
         } else if (hits.isEmpty())
             st.append(emptyOrScanning(text, scope));
-        else
-            st.append(hits.size()).append(hits.size() == 1 ? " feature" : " features")
-                    .append(scanning(scope) ? " \u00b7 updating\u2026" : "");
+        else {
+            int mention = 0;
+            for (Object[] o : hits)
+                if (((LoadedLayer.Hit) o[1]).matchedIn != null)
+                    mention++;
+            final int named = hits.size() - mention;
+            if (text.isEmpty() || mention == 0)
+                st.append(hits.size()).append(hits.size() == 1 ? " feature" : " features");
+            else
+                st.append(named).append(" named \"").append(text).append("\", ").append(mention)
+                        .append(mention == 1 ? " more mentions it" : " more mention it");
+            st.append(scanning(scope) ? " \u00b7 updating\u2026" : "");
+        }
         if (hits.size() > RESULT_CAP)
             st.append(", showing ").append(SORT_LABELS[mode].toLowerCase(java.util.Locale.US)).append(" ").append(RESULT_CAP);
         if (noFix && from != null)
@@ -1062,6 +1090,8 @@ public class FeatureLayer implements IPlugin {
                 sub.append(h.type);
             if (scope == null)
                 sub.append(sub.length() > 0 ? " \u00b7 " : "").append(h.layer);
+            if (h.matchedIn != null)
+                sub.append(sub.length() > 0 ? " \u00b7 " : "").append(mentionOf(h, text));
             // A DART row says how old its report is, in the bucket's color -- the same
             // green / yellow / red as the ring on its marker. Other layers keep the date.
             final boolean dart = com.atakmap.android.featurelayer.DartStyles.handles(l.spec);

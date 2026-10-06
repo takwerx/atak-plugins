@@ -840,9 +840,22 @@ public class LoadedLayer {
         public final long time;
         /** The feature's attributes, for a details view straight from the list; may be null. */
         public final AttributeSet attrs;
+        /**
+         * The field the typed text was found in, and that field's value, when it was not
+         * the name, title or type: a DOME repair point turned up for "Prima" because its
+         * comment reads "Primarily replace rails..." (2026-10-05). Null for a name match.
+         */
+        public final String matchedIn, matchedText;
 
         Hit(String title, String layer, String layerId, String type, long time, double lat, double lon, double spanDeg,
                 AttributeSet attrs) {
+            this(title, layer, layerId, type, time, lat, lon, spanDeg, attrs, null, null);
+        }
+
+        Hit(String title, String layer, String layerId, String type, long time, double lat, double lon, double spanDeg,
+                AttributeSet attrs, String matchedIn, String matchedText) {
+            this.matchedIn = matchedIn;
+            this.matchedText = matchedText;
             this.attrs = attrs;
             this.title = title;
             this.layer = layer;
@@ -865,8 +878,8 @@ public class LoadedLayer {
             if (pf.setName.endsWith(" marks"))
                 continue;
             String title = pf.name, type = pf.setName;
+            String inKey = null, inValue = null;
             long time = 0;
-            boolean match = needle.isEmpty() || (pf.name != null && pf.name.toLowerCase(Locale.US).contains(needle));
             if (pf.attrs != null) {
                 try {
                     time = pf.attrs.getLongAttribute("_time");
@@ -885,19 +898,30 @@ public class LoadedLayer {
                         title = v;
                     else if ("_type".equals(k))
                         type = v;
-                    else if (!match && !k.startsWith("_") && v.toLowerCase(Locale.US).contains(needle))
-                        match = true;
+                    else if (inKey == null && !needle.isEmpty() && !k.startsWith("_")
+                            && v.toLowerCase(Locale.US).contains(needle)) {
+                        inKey = k;
+                        inValue = v;
+                    }
                 }
             }
-            if (!match && title != null && title.toLowerCase(Locale.US).contains(needle))
-                match = true;
-            if (!match || pf.geometry == null)
+            // A name, title or type match is the thing asked for; a match in any other
+            // field is kept, and says where it was found.
+            final boolean named = needle.isEmpty()
+                    || (pf.name != null && pf.name.toLowerCase(Locale.US).contains(needle))
+                    || (title != null && title.toLowerCase(Locale.US).contains(needle))
+                    || (type != null && type.toLowerCase(Locale.US).contains(needle));
+            if ((!named && inKey == null) || pf.geometry == null)
                 continue;
+            if (named) {
+                inKey = null;
+                inValue = null;
+            }
             final com.atakmap.map.layer.feature.geometry.Envelope e = pf.geometry.getEnvelope();
             if (e == null || Double.isNaN(e.minX))
                 continue;
             out.add(new Hit(title, spec.title, spec.id, type, time, (e.minY + e.maxY) / 2, (e.minX + e.maxX) / 2,
-                    Math.max(e.maxX - e.minX, e.maxY - e.minY), pf.attrs));
+                    Math.max(e.maxX - e.minX, e.maxY - e.minY), pf.attrs, inKey, inValue));
             if (out.size() >= max)
                 break;
         }
