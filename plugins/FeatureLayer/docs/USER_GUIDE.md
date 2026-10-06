@@ -439,7 +439,7 @@ history** puts it in the list.
 Each band and each decade is its own type in the Features list, each ON/OFF, so
 the 1990s can be shown alone, or only the last three years. The arrow on its row
 opens a map key with the colors. A burn over 20 acres is labeled with its name and
-year, "Carr Fire (2018)"; tap one and its details open, with its acres, agency and
+year, "Carr Fire (2018)", from 2 miles on the scale bar in (Label zoom changes it); tap one and its details open, with its acres, agency and
 the rest. Where
 several agencies mapped one fire, it shows once.
 
@@ -448,7 +448,7 @@ to the zoom; zoom in and they load again in finer detail.
 
 **Find** on the main screen searches all of Fire History by name, not only what is
 in view. Add a year to pick one fire out of many with the same name: "Ranch 2007".
-**Go** frames it on the map.
+**Go** takes the map to it, close enough to read its name.
 
 ## Your own organization
 

@@ -272,6 +272,7 @@ public final class Sources {
     static final String FIRE_PERIMETERS = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters/FeatureServer";
     static final String FIRE_HISTORY = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/InterAgencyFirePerimeterHistory_All_Years_View/FeatureServer";
     public static final String FIRE_HISTORY_ID = "nifc-fire-history";
+    static final double FIRE_HISTORY_LABEL_GSD = 2 * 1609.344 / ScaleBar.FALLBACK_BAR_PIXELS;
 
     /**
      * Fire History: where fires have burned, 1900 to today, as EGP draws it
@@ -298,8 +299,11 @@ public final class Sources {
         s.refreshMinutes = 0; // history: fetched as the map moves, not on a clock
         s.iconSet = "firehistory";
         s.fillAlpha = 0x80; // EGP draws it half see-through
-        // EGP labels from 1:320,000 in: about 85 m/px.
-        s.labelGsd = 85;
+        // Names from 2 mi on the scale bar in. EGP's 1:320,000 (about 85 m/px, 10 mi on
+        // the bar) is a desktop screen's level; on a phone the names covered each other,
+        // and Go there, which stops at the label level, landed too far out (operator,
+        // 2026-10-06).
+        s.labelGsd = FIRE_HISTORY_LABEL_GSD;
         s.scopeKind = "view";
         s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
         s.maxFeatures = 2500;
@@ -369,6 +373,10 @@ public final class Sources {
         }
         // The first New Fire Starts build defaulted to what is in view, which this layer
         // no longer offers: its zero is everywhere.
+        // The first Fire History build labeled from EGP's desktop level; a layer still on it
+        // takes the phone's.
+        if (FIRE_HISTORY_ID.equals(s.id) && s.labelGsd == 85)
+            s.labelGsd = FIRE_HISTORY_LABEL_GSD;
         if ((NEW_STARTS_ID.equals(s.id) || ONGOING_ID.equals(s.id)) && "view".equals(s.scopeKind))
             s.scopeKind = "all";
     }

@@ -1085,10 +1085,20 @@ public class LoadedLayer {
     /** Zooms onto a hit: the feature's own extent, or a few hundred meters around a point. */
     public void zoomTo(Hit h) {
         try {
-            final double half = Math.max(0.0025, h.spanDeg * 0.75);
+            double half = Math.max(0.0025, h.spanDeg * 0.75);
+            // No further out than where the layer's labels draw, so Go there lands on the
+            // fire's name (operator, 2026-10-06: "take me to the label level, it's zoomed
+            // too far out"). A large fire then fills the screen rather than all of it
+            // fitting, which is what reading its name needs.
+            if (spec.labels && spec.labelGsd > 0 && spec.labelGsd != Double.MAX_VALUE) {
+                final int px = Math.max(1, Math.min(mapView.getWidth(), mapView.getHeight()));
+                final double labelHalf = spec.labelGsd * 0.8 * px / 2 / 111_320d;
+                half = Math.min(half, Math.max(0.0025, labelHalf));
+            }
+            final double halfLon = half / Math.max(0.2, Math.cos(Math.toRadians(h.lat)));
             final com.atakmap.coremap.maps.coords.GeoPoint[] corners = {
-                    new com.atakmap.coremap.maps.coords.GeoPoint(h.lat - half, h.lon - half),
-                    new com.atakmap.coremap.maps.coords.GeoPoint(h.lat + half, h.lon + half) };
+                    new com.atakmap.coremap.maps.coords.GeoPoint(h.lat - half, h.lon - halfLon),
+                    new com.atakmap.coremap.maps.coords.GeoPoint(h.lat + half, h.lon + halfLon) };
             com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, corners, 0d, mapView.getWidth(), mapView.getHeight());
         } catch (Exception e) {
             Log.w(TAG, "zoom to hit failed", e);
