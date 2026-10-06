@@ -415,6 +415,11 @@ one after 14.
 Tap a fire on the map, from either layer, and its details open straight away, with
 no radial menu.
 
+**CAL FIRE** sits beside **Go there** in a fire's details when CAL FIRE runs or
+posts the fire; it opens CAL FIRE's incident page, with the engines, crews and
+dozers assigned. CAL FIRE's own acres, containment, location and update time are
+the first lines of the details, and a fire CAL FIRE has closed says "final".
+
 **InciWeb** sits beside **Go there** in a fire's details when the fire has an
 InciWeb page, most often a Forest Service or other federal fire; it opens the page
 in the phone's browser. The plugin learns which fires have a page from InciWeb's

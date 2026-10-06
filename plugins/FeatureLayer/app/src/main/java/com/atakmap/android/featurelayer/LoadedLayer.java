@@ -47,9 +47,9 @@ public class LoadedLayer {
      * style travels with the feature into the store. 53: every icon and pill level when
      * the map is spun, and drawn from ATAK's private storage instead of the card. 54: New
      * Fire Starts as flame and RX markers. 55: fire labels carry % contained. 56: unnamed fires leave after four hours. 57: after an hour, so the
-     * stored expiry times are written again.
+     * stored expiry times are written again. 58: CAL FIRE's record on its fires.
      */
-    private static final int STYLE_VERSION = 57;
+    private static final int STYLE_VERSION = 58;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -1508,8 +1508,10 @@ public class LoadedLayer {
 
         // Which fires have an InciWeb page: read at most every 30 minutes, before the rows
         // are written so each fire carries its page.
-        if (NewStartsStyles.handles(spec) && isPointLayer)
+        if (NewStartsStyles.handles(spec) && isPointLayer) {
             InciWeb.refresh();
+            CalFire.refresh();
+        }
         Log.d(TAG, spec.id + ": layer " + layerId + " iconSet=" + spec.iconSet + " dart=" + DartStyles.handles(spec)
                 + " point=" + isPointLayer + " profile=" + spec.profile + " nwcg=" + nwcg);
         final int firstOfLayer = out.size();
@@ -1707,6 +1709,7 @@ public class LoadedLayer {
                             final String page = InciWeb.pageFor(props.optString("IncidentName", null), pt.getY(), pt.getX());
                             if (page != null)
                                 attrs.setAttribute(ATTR_INCIWEB, page);
+                            calFireInto(attrs, props.optString("IncidentName", null), pt.getY(), pt.getX());
                         }
                         if (bare != null)
                             attrs.setAttribute(ATTR_BARE, bare);
@@ -1832,6 +1835,32 @@ public class LoadedLayer {
     static final String ATTR_BARE = "_bare", ATTR_BARE_ALT = "_bare_alt";
     /** A fire's InciWeb page (InciWeb.pageFor); "_" keeps it out of the attribute list. */
     public static final String ATTR_INCIWEB = "_inciweb";
+    /** A fire's CAL FIRE incident page (CalFire.find). */
+    public static final String ATTR_CALFIRE = "_calfire";
+    /** The details lines CAL FIRE's record adds; the details pane lists keys with this prefix first. */
+    public static final String CALFIRE_PREFIX = "CAL FIRE ";
+
+    /**
+     * CAL FIRE's record of the fire, when it has one: its page for the button, and its
+     * acres, containment, location, update time and, for a fire it has closed, that it
+     * is final, as lines at the top of the details.
+     */
+    private static void calFireInto(AttributeSet attrs, String name, double lat, double lon) {
+        final CalFire.Incident c = CalFire.find(name, lat, lon);
+        if (c == null)
+            return;
+        attrs.setAttribute(ATTR_CALFIRE, c.url);
+        if (c.acres >= 0)
+            attrs.setAttribute(CALFIRE_PREFIX + "acres", NewStartsStyles.formatAcres(c.acres));
+        if (c.percent >= 0)
+            attrs.setAttribute(CALFIRE_PREFIX + "contained", Math.round(c.percent) + "%");
+        if (!c.location.isEmpty())
+            attrs.setAttribute(CALFIRE_PREFIX + "location", c.location + (c.county.isEmpty() ? "" : ", " + c.county + " County"));
+        if (!c.updated.isEmpty())
+            attrs.setAttribute(CALFIRE_PREFIX + "updated", CalFire.when(c.updated));
+        if (!c.active)
+            attrs.setAttribute(CALFIRE_PREFIX + "status", "final" + (c.extinguished.isEmpty() ? "" : ", out " + CalFire.when(c.extinguished)));
+    }
     /** When an unnamed fire leaves the map, epoch ms (NewStartsStyles.UNNAMED_KEEP_MS after it was found). */
     static final String ATTR_DROP_AT = "_drop_at";
 

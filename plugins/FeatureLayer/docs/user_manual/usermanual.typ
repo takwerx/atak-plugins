@@ -527,8 +527,10 @@ takes any ArcGIS Online organization you sign in to.
   declared contained, so one at 100% can still show.
 
   Tap a fire on the map, from either layer, and its details open at once, with
-  no radial menu. *InciWeb* sits beside *Go there* when the fire has an InciWeb
-  page, most often a federal fire; it opens the page in the browser.
+  no radial menu. *CAL FIRE* sits beside *Go there* when CAL FIRE runs or posts
+  the fire; it opens CAL FIRE's incident page, and CAL FIRE's acres and
+  containment are the first lines of the details. *InciWeb* is there when the
+  fire has an InciWeb page, most often a federal fire.
 ]
 
 #tak-slide[

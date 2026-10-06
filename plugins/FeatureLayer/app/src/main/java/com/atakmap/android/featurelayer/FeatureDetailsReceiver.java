@@ -52,7 +52,17 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         final List<String> keys = new ArrayList<>();
         if (attrs != null)
             keys.addAll(attrs.getAttributeNames());
-        Collections.sort(keys, String.CASE_INSENSITIVE_ORDER);
+        // CAL FIRE's own lines first, together: on a fire it runs they are the current
+        // acres and containment, and the IRWIN record's sixty fields follow.
+        Collections.sort(keys, new java.util.Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                final boolean ca = a.startsWith(LoadedLayer.CALFIRE_PREFIX), cb = b.startsWith(LoadedLayer.CALFIRE_PREFIX);
+                if (ca != cb)
+                    return ca ? -1 : 1;
+                return String.CASE_INSENSITIVE_ORDER.compare(a, b);
+            }
+        });
         final StringBuilder sb = new StringBuilder();
         for (String k : keys) {
             String v;
@@ -81,21 +91,35 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
      * browser. The address is checked again here, not only when it was attached: the
      * store it was read back from sits on the shared card.
      */
-    public static void bindInciWeb(View button, AttributeSet attrs, final MapView mapView) {
-        if (button == null)
-            return;
-        String url = null;
+    public static void bindInciWeb(View button, AttributeSet attrs, MapView mapView) {
+        final String url = read(attrs, LoadedLayer.ATTR_INCIWEB);
+        bindLink(button, InciWeb.isPage(url) ? url : null, mapView);
+    }
+
+    /** The same for the fire's CAL FIRE incident page. */
+    public static void bindCalFire(View button, AttributeSet attrs, MapView mapView) {
+        final String url = read(attrs, LoadedLayer.ATTR_CALFIRE);
+        bindLink(button, CalFire.isPage(url) ? url : null, mapView);
+    }
+
+    private static String read(AttributeSet attrs, String key) {
         try {
-            if (attrs != null && attrs.containsAttribute(LoadedLayer.ATTR_INCIWEB))
-                url = attrs.getStringAttribute(LoadedLayer.ATTR_INCIWEB);
+            if (attrs != null && attrs.containsAttribute(key))
+                return attrs.getStringAttribute(key);
         } catch (Exception ignored) {
         }
-        if (!InciWeb.isPage(url)) {
+        return null;
+    }
+
+    /** Shows the button for a checked page and opens exactly that page; hides it for null. */
+    private static void bindLink(View button, final String page, final MapView mapView) {
+        if (button == null)
+            return;
+        if (page == null) {
             button.setVisibility(View.GONE);
             button.setOnClickListener(null);
             return;
         }
-        final String page = url;
         button.setVisibility(View.VISIBLE);
         button.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -105,8 +129,8 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
                     i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     mapView.getContext().startActivity(i);
                 } catch (Exception e) {
-                    Log.w(TAG, "could not open InciWeb", e);
-                    android.widget.Toast.makeText(mapView.getContext(), "No browser to open InciWeb",
+                    Log.w(TAG, "could not open " + page, e);
+                    android.widget.Toast.makeText(mapView.getContext(), "No browser to open the page",
                             android.widget.Toast.LENGTH_LONG).show();
                 }
             }
@@ -148,6 +172,7 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
                 .setText(layer == null ? "" : layer.displayName());
         ((TextView) view.findViewById(R.id.details_attributes)).setText(body);
         bindInciWeb(view.findViewById(R.id.btn_inciweb), f.getAttributes(), getMapView());
+        bindCalFire(view.findViewById(R.id.btn_calfire), f.getAttributes(), getMapView());
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
     }
 

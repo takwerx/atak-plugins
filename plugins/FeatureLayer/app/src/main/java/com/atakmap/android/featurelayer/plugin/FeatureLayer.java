@@ -1171,6 +1171,8 @@ public class FeatureLayer implements IPlugin {
         });
         com.atakmap.android.featurelayer.FeatureDetailsReceiver.bindInciWeb(
                 paneView.findViewById(R.id.btn_details_inciweb), h.attrs, mapView);
+        com.atakmap.android.featurelayer.FeatureDetailsReceiver.bindCalFire(
+                paneView.findViewById(R.id.btn_details_calfire), h.attrs, mapView);
         searchPanel.setVisibility(View.GONE);
         paneView.findViewById(R.id.features_header).setVisibility(View.GONE); // one Back, the details' own
         panel.setVisibility(View.VISIBLE);

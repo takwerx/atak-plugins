@@ -26,6 +26,15 @@
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF" />
+        <!-- A fire CAL FIRE runs or posts: its incident page. Gone otherwise. -->
+        <Button
+            android:id="@+id/btn_calfire"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="4dp"
+            android:text="CAL FIRE"
+            android:visibility="gone" />
         <!-- A fire with an InciWeb page: opens it in the browser. Gone otherwise. -->
         <Button
             android:id="@+id/btn_inciweb"
