@@ -176,7 +176,10 @@ public final class SawtiOverlay extends OutlookOverlay {
                 if (!issued.isEmpty())
                     t.append("\n\nIssued: ").append(issued);
                 t.append("\nFrom: USDA Forest Service Predictive Services, Santa Ana Wildfire Threat Index (SAWTI)");
-                out.add(new Area(n, Sawti.zoneName(zone) + ": " + Sawti.level(d.value),
+                // Named as SAWTI on the map, so its zones are not taken for another
+                // layer's areas beside them (operator, 2026-10-05).
+                out.add(new Area(n, "SAWTI-" + Sawti.zoneName(zone) + ": "
+                        + Sawti.level(d.value),
                         Sawti.level(d.value), Sawti.color(d.value), shape, t.toString(),
                         zone + "|" + date));
             }
