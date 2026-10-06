@@ -320,7 +320,7 @@ it is a direction.
 = Fire Weather Zones
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("71.png", width: 100%)
+  #image("71.jpg", width: 100%)
 ][
   #image("72.png", width: 100%)
   #image("73.png", width: 100%)
@@ -454,9 +454,9 @@ the gauges say *Not available* and the page asks again the next time you look.
 = An area's ERC chart
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  #image("94.png", width: 100%)
+  #image("94.jpg", width: 100%)
 ][
-  #image("95.png", width: 100%)
+  #image("95.jpg", width: 100%)
 ]
 
 #v(4pt)
