@@ -45,8 +45,8 @@ Built-in sources:
   - Fire History: where fires have burned since 1900, from NIFC's
     interagency fire perimeter history, drawn as EGP draws it: the last ten
     years colored by years since (under six months, to one, two, three and
-    ten years), the 2010s, 2000s and 1990s in rust, brown and tan, older
-    decades in grey, each band and decade switched on its
+    ten years), then each decade in a color of its own back to 1979 and
+    earlier, each band and decade switched on its
     own, labeled "Carr Fire (2018)". Search it by name and year, and keep
     the fires that matter to an incident as My Fires, shown alone until
     cleared.

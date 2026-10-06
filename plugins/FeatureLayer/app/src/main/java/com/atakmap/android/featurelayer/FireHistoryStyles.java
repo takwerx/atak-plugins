@@ -22,17 +22,20 @@ import java.util.Locale;
  * (which takes unknown years too). 2020 on is the current decade's.
  * </ul>
  *
- * One departure from EGP: EGP greys every decade, and the 2010s, 2000s and 1990s have
- * their own colors here, rust, brown and tan, older reading duller (operator,
- * 2026-10-06: "a 20 year old burn scar is not that old and still relevant"). 1980s and
- * earlier stay grey. No red, which on this map means a fire burning now.
+ * One departure from EGP: EGP greys every decade, and here each decade has a color of
+ * its own (operator, 2026-10-06: "a 20 year old burn scar is not that old and still
+ * relevant", then "everything to have its own theme"): 2010s rust, 2000s dark brown,
+ * 1990s tan, 1980s teal, 1979 and earlier mauve. Muted, so they read older than the
+ * five age bands, and chosen so every pair of the ten stays apart at half alpha over
+ * terrain (CIELAB distance 14 or more). No red, which on this map means a fire
+ * burning now.
  *
  * Each band and each decade is its own type, so the Features list is the decade picker.
  * Labels are EGP's: "Carr Fire (2018)", only for fires over 20 acres.
  */
 public final class FireHistoryStyles {
 
-    /** EGP's grey, for the decades too old to tell apart by color. */
+    /** EGP's grey: only for a type this table does not know. */
     private static final int GREY = 0x767676;
 
     public static final String UNDER_HALF = "Under 6 Months", HALF_TO_ONE = "6 Months to 1 Year",
@@ -47,10 +50,10 @@ public final class FireHistoryStyles {
             { TWO_TO_THREE, 0xFFDE3E, "Burned two to three years ago" },
             { THREE_TO_TEN, 0xFC921F, "Burned three to ten years ago" },
             { D2010, 0xB8603E, "Fires of 2010 to 2019" },
-            { D2000, 0x8C6A4A, "Fires of 2000 to 2009" },
+            { D2000, 0x6E4B33, "Fires of 2000 to 2009" },
             { D1990, 0xC2A679, "Fires of 1990 to 1999" },
-            { D1980, GREY, "Fires of 1980 to 1989" },
-            { EARLIER, GREY, "Fires before 1980, and fires of unknown year" },
+            { D1980, 0x4E8A80, "Fires of 1980 to 1989" },
+            { EARLIER, 0x9A7389, "Fires before 1980, and fires of unknown year" },
     };
 
     private static final int AGE_EDGE = 0xCC999999, GREY_EDGE = 0xFF000000;

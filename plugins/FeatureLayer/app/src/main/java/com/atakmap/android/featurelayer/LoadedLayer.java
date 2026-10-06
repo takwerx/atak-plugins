@@ -48,9 +48,9 @@ public class LoadedLayer {
      * the map is spun, and drawn from ATAK's private storage instead of the card. 54: New
      * Fire Starts as flame and RX markers. 55: fire labels carry % contained. 56: unnamed fires leave after four hours. 57: after an hour, so the
      * stored expiry times are written again. 58: CAL FIRE's record on its fires. 59: Fire History's
-     * 2010s, 2000s and 1990s in color.
+     * 2010s, 2000s and 1990s in color. 60: every decade in a color of its own.
      */
-    private static final int STYLE_VERSION = 59;
+    private static final int STYLE_VERSION = 60;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
