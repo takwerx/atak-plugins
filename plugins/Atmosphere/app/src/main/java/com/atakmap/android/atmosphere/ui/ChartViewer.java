@@ -14,7 +14,7 @@ import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -43,24 +43,33 @@ final class ChartViewer {
         if (ctx == null || chart == null || chart.isRecycled())
             return;
         final Dialog d = new Dialog(ctx, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        final FrameLayout frame = new FrameLayout(ctx);
-        frame.setBackgroundColor(0xFF000000);
-
-        final ZoomImageView image = new ZoomImageView(ctx);
-        image.setImageBitmap(chart);
-        frame.addView(image, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // A bar over the chart, never on it: the caption laid over the picture hid the
+        // chart's own title (operator, 2026-10-05).
+        final LinearLayout page = new LinearLayout(ctx);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(0xFF000000);
 
         final int pad = dp(ctx, 8);
+        final LinearLayout bar = new LinearLayout(ctx);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(pad, pad / 2, pad, pad / 2);
+        bar.setBackgroundColor(0xFF1A1A1A);
+
+        final LinearLayout words = new LinearLayout(ctx);
+        words.setOrientation(LinearLayout.VERTICAL);
         final TextView title = new TextView(ctx);
         title.setText(caption);
         title.setTextColor(0xFFFFFFFF);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        title.setBackgroundColor(0x99000000);
-        title.setPadding(pad, pad / 2, pad, pad / 2);
-        frame.addView(title, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.LEFT));
+        words.addView(title);
+        final TextView hint = new TextView(ctx);
+        hint.setText("Pinch to zoom, drag to move, double-tap to zoom in or back out");
+        hint.setTextColor(0xB3FFFFFF);
+        hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        words.addView(hint);
+        bar.addView(words, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         final Button close = new Button(ctx);
         close.setText("Close");
@@ -71,37 +80,23 @@ final class ChartViewer {
             close.setBackground(button);
         close.setMinHeight(dp(ctx, 44));
         close.setPadding(dp(ctx, 16), 0, dp(ctx, 16), 0);
-        final FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.RIGHT);
-        lp.setMargins(pad, pad, pad, pad);
-        frame.addView(close, lp);
+        bar.addView(close, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         close.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 d.dismiss();
             }
         });
+        page.addView(bar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        final TextView hint = new TextView(ctx);
-        hint.setText("Pinch to zoom, drag to move, double-tap to zoom in or back out");
-        hint.setTextColor(0xCCFFFFFF);
-        hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        hint.setBackgroundColor(0x99000000);
-        hint.setPadding(pad, pad / 2, pad, pad / 2);
-        frame.addView(hint, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
+        final ZoomImageView image = new ZoomImageView(ctx);
+        image.setImageBitmap(chart);
+        page.addView(image, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        // Read once, then out of the way of the chart's date axis.
-        hint.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                hint.animate().alpha(0f).setDuration(600).start();
-            }
-        }, 4000);
-
-        d.setContentView(frame);
+        d.setContentView(page);
         d.show();
     }
 
