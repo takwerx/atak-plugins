@@ -115,10 +115,16 @@ public final class ErcOverlay extends OutlookOverlay {
         return true;
     }
 
-    /** A PSA is a hundred miles across; its label draws from a regional view in. */
+    /**
+     * Labels from a scale bar of about 75 miles in. They are pills now, which ATAK
+     * does not move out of each other's way as it did the text labels, and at 1,000 m
+     * per pixel the western areas' pills piled on one another (XCover, 2026-10-05).
+     * ATAK gates a set by whole tile level, (int) log2(156543 / resolution): 400
+     * still fell in level 8 with the crowded view, 300 is level 9.
+     */
     @Override
     protected double labelMaxResolution() {
-        return 1000d;
+        return 300d;
     }
 
     @Override
@@ -198,7 +204,8 @@ public final class ErcOverlay extends OutlookOverlay {
         return dayLabel(shown == 2 ? 2 : 1) + ": " + high + " of " + all.size()
                 + " areas at the 90th percentile or higher, " + extreme + " at the 97th."
                 + (none == 0 ? "" : " " + none + " with no station reporting.")
-                + " Alaska is not rated this way.";
+                + " Alaska is not rated this way."
+                + " Zoom in for each area's name; tap a name for its chart.";
     }
 
     @Override
