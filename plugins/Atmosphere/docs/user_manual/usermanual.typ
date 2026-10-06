@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.10",
+   plugin-version: "0.11",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -319,21 +319,20 @@ it is a direction.
 #tak-slide[
 = Fire Weather Zones
 
-#toolbox.side-by-side(columns: (6fr, 3fr, 3fr))[
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
   #image("71.png", width: 100%)
 ][
   #image("72.png", width: 100%)
-][
   #image("73.png", width: 100%)
-]
+][
+  *Fire Weather Zones* draws the National Weather Service's fire weather zones
+  in the map view: purple outlines, each with its zone number, a starred zone
+  in yellow, a zone under a Red Flag Warning filled pink and one under a Fire
+  Weather Watch beige. Tap a zone for its forecast.
 
-#v(4pt)
-*Fire Weather Zones* draws the National Weather Service's fire weather zones in
-the map view: purple outlines, each with its zone number, a starred zone in
-yellow, a zone under a Red Flag Warning filled pink and one under a Fire Weather
-Watch beige. Tap a zone for its forecast. The two zoom settings under the
-layer's arrow decide when the zones and their numbers draw; a view wider than a
-few states says to zoom in.
+  The two zoom settings under the layer's arrow decide when the zones and their
+  numbers draw; a view wider than a few states says to zoom in.
+]
 ]
 
 #tak-slide[
