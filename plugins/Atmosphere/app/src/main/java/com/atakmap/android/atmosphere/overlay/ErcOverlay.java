@@ -109,6 +109,12 @@ public final class ErcOverlay extends OutlookOverlay {
         return new int[] { dark ? 0xFFFFFFFF : 0xFF000000, c };
     }
 
+    /** The areas tile the country: only a tap on an area's label opens it. */
+    @Override
+    protected boolean tapsAtLabelOnly() {
+        return true;
+    }
+
     /** A PSA is a hundred miles across; its label draws from a regional view in. */
     @Override
     protected double labelMaxResolution() {

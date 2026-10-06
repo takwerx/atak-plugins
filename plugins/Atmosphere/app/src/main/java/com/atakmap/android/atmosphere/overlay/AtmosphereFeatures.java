@@ -379,6 +379,52 @@ final class AtmosphereFeatures {
         hitFilter = f;
     }
 
+    /**
+     * The coarsest map resolution, meters per pixel, at which an area of this layer
+     * answers a tap, and then only on its label; 0 for anywhere in the area, the
+     * default.
+     */
+    private volatile double labelTapMaxResolution;
+
+    /**
+     * Areas that cover the whole map answer a tap on their label only. The Fire
+     * Danger areas tile the lower 48, so with the layer on nearly every tap on the map
+     * opened one (operator, 2026-10-05); a tap that misses every label now falls
+     * through to the map as if the layer were not there. Past the resolution the
+     * labels stop drawing at, nothing answers: there is no label to tap.
+     */
+    void tapAtLabelOnly(double maxResolution) {
+        labelTapMaxResolution = maxResolution;
+    }
+
+    /** Drop the areas whose label is not under the tap; see {@link #tapAtLabelOnly}. */
+    private void atLabelOnly(java.util.SortedSet<MapItem> hits, MapView view,
+            com.atakmap.coremap.maps.coords.GeoPoint tap) {
+        final double max = labelTapMaxResolution;
+        if (max <= 0 || hits == null || hits.isEmpty() || view == null || tap == null)
+            return;
+        final boolean labelsDrawn = view.getMapResolution() <= max;
+        final float density = view.getResources().getDisplayMetrics().density;
+        final android.graphics.PointF at = view.forward(tap);
+        final java.util.Iterator<MapItem> it = hits.iterator();
+        while (it.hasNext()) {
+            final MapItem m = it.next();
+            if (!m.hasMetaValue("_labelLat") || !labelsDrawn) {
+                it.remove();
+                continue;
+            }
+            final android.graphics.PointF p = view.forward(
+                    new com.atakmap.coremap.maps.coords.GeoPoint(
+                            m.getMetaDouble("_labelLat", 0), m.getMetaDouble("_labelLon", 0)));
+            // The label's box, from its length at the default label size, padded a
+            // little for a gloved finger.
+            final float halfWidth = (m.getMetaInteger("_labelChars", 12) * 3.9f + 10f) * density;
+            final float halfHeight = 18f * density;
+            if (Math.abs(at.x - p.x) > halfWidth || Math.abs(at.y - p.y) > halfHeight)
+                it.remove();
+        }
+    }
+
     /** Drop the hits the layer says are not under the tap, but never all of them. */
     private void narrow(java.util.SortedSet<MapItem> hits,
             com.atakmap.coremap.maps.coords.GeoPoint tap) {
@@ -596,6 +642,25 @@ final class AtmosphereFeatures {
     }
 
     /** The stroke color of a style, the fill's if it has no stroke, white otherwise. */
+    /**
+     * The color a Select Item row shows for an area: its fill's, when the fill is
+     * what the area says (a Fire Danger class, a SAWTI level, a Red Flag Warning),
+     * its edge's otherwise. Every Fire Danger row was the same gray, its edge
+     * (operator, 2026-10-05).
+     */
+    private static int swatchColorOf(Style s) {
+        if (s instanceof CompositeStyle) {
+            final CompositeStyle c = (CompositeStyle) s;
+            for (int i = 0; i < c.getNumStyles(); i++)
+                if (c.getStyle(i) instanceof BasicFillStyle) {
+                    final int fill = ((BasicFillStyle) c.getStyle(i)).getColor();
+                    if ((fill >>> 24) >= 0x20)
+                        return fill | 0xFF000000;
+                }
+        }
+        return strokeColorOf(s);
+    }
+
     private static int strokeColorOf(Style s) {
         if (s instanceof BasicStrokeStyle)
             return ((BasicStrokeStyle) s).getColor();
@@ -802,6 +867,7 @@ final class AtmosphereFeatures {
                             final int raw = hits == null ? -1 : hits.size();
                             onePerPlace(hits, params == null ? null : params.geo);
                             narrow(hits, params == null ? null : params.geo);
+                            atLabelOnly(hits, view, params == null ? null : params.geo);
                             Log.d(tag, "deepHitTest: " + (controls == null ? -1 : controls.size())
                                     + " controls, " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
@@ -816,6 +882,7 @@ final class AtmosphereFeatures {
                             final int raw = hits == null ? -1 : hits.size();
                             onePerPlace(hits, point);
                             narrow(hits, point);
+                            atLabelOnly(hits, view, point);
                             Log.d(tag, "deepHitTestItems: " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
                             return hits;
@@ -911,12 +978,17 @@ final class AtmosphereFeatures {
                             // stroke color is its swatch.
                             if (a != null && a.containsAttribute("_labelOnly"))
                                 item.setMetaBoolean("_labelOnly", true);
+                            if (a != null && a.containsAttribute("_labelLat")) {
+                                item.setMetaDouble("_labelLat", a.getDoubleAttribute("_labelLat"));
+                                item.setMetaDouble("_labelLon", a.getDoubleAttribute("_labelLon"));
+                                item.setMetaInteger("_labelChars", a.getIntAttribute("_labelChars"));
+                            }
                             if (a != null && a.containsAttribute("_oneRowPerName"))
                                 item.setMetaBoolean("_oneRowPerName", true);
                             if (!(item instanceof com.atakmap.android.maps.Marker)) {
                                 final String sw = swatchUri;
                                 if (sw != null) {
-                                    final int c = strokeColorOf(feature.getStyle());
+                                    final int c = swatchColorOf(feature.getStyle());
                                     item.setMetaString("iconUri", sw);
                                     item.setMetaInteger("iconColor", c);
                                     item.setMetaInteger("color", c);
@@ -1314,6 +1386,13 @@ final class AtmosphereFeatures {
                         Log.d(tag, "label '" + centered + "' at " + (c == null ? "nowhere"
                                 : String.format(java.util.Locale.US, "%.3f,%.3f", c[0], c[1])));
                         if (c != null) {
+                            // Where the label is, on the area itself, for a layer whose
+                            // areas answer a tap on their label only.
+                            if (d.attrs != null) {
+                                d.attrs.setAttribute("_labelLat", c[0]);
+                                d.attrs.setAttribute("_labelLon", c[1]);
+                                d.attrs.setAttribute("_labelChars", centered.length());
+                            }
                             final AttributeSet la = new AttributeSet();
                             la.setAttribute("_labelOnly", 1);
                             // In the shape's own color, so a label met in the middle of a

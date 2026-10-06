@@ -109,22 +109,35 @@ public class Atmosphere implements IPlugin {
     private final com.atakmap.android.menu.MapMenuEventListener tapOpensPage =
             new com.atakmap.android.menu.MapMenuEventListener() {
                 @Override
-                public boolean onShowMenu(com.atakmap.android.maps.MapItem item) {
+                public boolean onShowMenu(final com.atakmap.android.maps.MapItem item) {
                     if (item == null || !item.getMetaBoolean("atmosphere", false))
                         return false;
-                    try {
-                        if (com.atakmap.android.atmosphere.ui.StormDetailsReceiver
-                                .openPage(item))
-                            return true;
-                        final android.content.Intent details = new android.content.Intent(
-                                com.atakmap.android.atmosphere.ui.StormDetailsReceiver.ACTION);
-                        details.putExtra("targetUID", item.getUID());
-                        AtakBroadcast.getInstance().sendBroadcast(details);
-                        return true;
-                    } catch (RuntimeException e) {
-                        Log.w(TAG, "tap to page", e);
+                    final MapView mv = MapView.getMapView();
+                    if (mv == null)
                         return false;
-                    }
+                    // A moment later, not now. A pick from ATAK's Select Item list
+                    // closes the list and then posts its own "show details", and
+                    // either one closed the page opened here: the map centered on the
+                    // area and nothing opened (2026-10-05). After both, the page
+                    // stays. A plain tap waits a quarter second it does not notice.
+                    mv.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                if (com.atakmap.android.atmosphere.ui.StormDetailsReceiver
+                                        .openPage(item))
+                                    return;
+                                final android.content.Intent details =
+                                        new android.content.Intent(com.atakmap.android
+                                                .atmosphere.ui.StormDetailsReceiver.ACTION);
+                                details.putExtra("targetUID", item.getUID());
+                                AtakBroadcast.getInstance().sendBroadcast(details);
+                            } catch (RuntimeException e) {
+                                Log.w(TAG, "tap to page", e);
+                            }
+                        }
+                    }, 250);
+                    return true;
                 }
 
                 @Override

@@ -4348,7 +4348,7 @@ public final class AtmospherePane {
             }
         if (host != null)
             host.showWide();
-        ercPage.show(psa, true);
+        ercPage.show(psa, false);
     }
 
     /** A SAWTI zone tapped on the map ("3|2026-09-30"): the SAWTI page on that zone and day. */

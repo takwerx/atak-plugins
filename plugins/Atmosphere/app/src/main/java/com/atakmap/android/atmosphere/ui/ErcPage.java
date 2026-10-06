@@ -31,7 +31,7 @@ public final class ErcPage {
     private final Context pluginContext;
     private final EgressPolicy egress;
     private final ScrollView root;
-    private final TextView title, note, numbers;
+    private final TextView title, note, numbers, enlarge;
     private final ImageView chart;
     private int generation;
     /** The chart showing, for the full-screen viewer, and what to call it there. */
@@ -49,6 +49,23 @@ public final class ErcPage {
 
         title = text(17, true);
         body.addView(title);
+        // Says the chart opens bigger, where the eye already is (operator, 2026-10-05:
+        // "on the first page like a tap to enlarge helper").
+        enlarge = text(14, true);
+        enlarge.setText("Tap the chart to enlarge");
+        enlarge.setTextColor(0xFF3DDC61);   // the plugin's own "on" green
+        enlarge.setPadding(0, dp(4), 0, 0);
+        // Invisible rather than gone until there is a chart: the chart is sized to the
+        // room under this line, and a line that appeared later pushed its foot off
+        // the screen (XCover, 2026-10-05).
+        enlarge.setVisibility(View.INVISIBLE);
+        enlarge.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openFullScreen();
+            }
+        });
+        body.addView(enlarge);
         chart = new ImageView(pluginContext);
         chart.setAdjustViewBounds(true);
         chart.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -75,7 +92,7 @@ public final class ErcPage {
             @Override
             public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot,
                     int or, int ob) {
-                final int h = b - t - title.getHeight() - dp(12);
+                final int h = b - t - title.getHeight() - enlarge.getHeight() - dp(16);
                 if (h > 0 && h != chart.getMaxHeight())
                     chart.setMaxHeight(h);
             }
@@ -113,6 +130,7 @@ public final class ErcPage {
         numbers.setText(ErcOverlay.details(p));
         chart.setImageDrawable(null);
         chartBitmap = null;
+        enlarge.setVisibility(View.INVISIBLE);
         caption = p.name + " (" + p.code + ")"
                 + (p.ercObserved.known() ? ":  ERC " + Math.round(p.ercObserved.value) + ", "
                         + Erc.ordinal(p.ercObserved.percentile) + " percentile on "
@@ -132,8 +150,9 @@ public final class ErcPage {
                     return;
                 chartBitmap = bitmap;
                 chart.setImageBitmap(bitmap);
-                note.setText(gaccShort(p) + "'s chart; tap it to fill the screen. Its "
-                        + "percentile bands may cover a fire season rather than the whole year.");
+                enlarge.setVisibility(View.VISIBLE);
+                note.setText(gaccShort(p) + "'s chart. Its percentile bands may cover a "
+                        + "fire season rather than the whole year.");
                 if (fullScreen)
                     openFullScreen();
             }

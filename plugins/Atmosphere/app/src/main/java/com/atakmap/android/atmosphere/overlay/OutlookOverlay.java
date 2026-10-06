@@ -114,6 +114,16 @@ public abstract class OutlookOverlay {
         day = p0 == null ? 1 : clampDay(p0.getInt(prefDay, 1));
         this.features = new AtmosphereFeatures(mapView, pluginContext, tag, name,
                 layerId + ".sqlite", layerId, false);
+        if (tapsAtLabelOnly())
+            features.tapAtLabelOnly(labelMaxResolution());
+    }
+
+    /**
+     * Whether an area answers a tap on its label only, for areas that cover the whole
+     * map. Called from the constructor: a constant.
+     */
+    protected boolean tapsAtLabelOnly() {
+        return false;
     }
 
     /** The requests, in order; each answer goes to {@link #parse(int, String)} with its index. */
