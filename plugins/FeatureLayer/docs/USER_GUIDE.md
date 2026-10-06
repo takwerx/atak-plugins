@@ -450,10 +450,22 @@ to the zoom; zoom in and they load again in finer detail.
 in view. Add a year to pick one fire out of many with the same name: "Ranch 2007".
 **Go** takes the map to it, close enough to read its name.
 
-**Only This Fire**, in a burn's details, hides every other burn and keeps that one
-fire on the map wherever you pan. The layer's row then reads "Fire History: Ridge
-Fire #98 (1928)", and **Show All Fires** in its controls (or the same button in the
-details) brings the rest back.
+### My Fires
+
+Pick out the burns that matter to the incident you are working, and keep only
+those on the map:
+
+1. Open a burn's details: tap it on the map, or find it with **Find**.
+2. Tap **Add to My Fires**. Fire History now shows only the fires on your list,
+   wherever you pan and whichever decades are ticked, and its row reads
+   "Fire History: My Fires (1)".
+3. Add the next one the same way. **Remove from My Fires**, in a burn's details,
+   takes one off.
+
+The arrow on the row opens two buttons. **Only My Fires ON** turns to OFF and
+shows every fire again without losing your list; tap it again to go back to your
+fires. **Clear My Fires** empties the list when the incident is over. The list is
+kept when ATAK restarts.
 
 ## Your own organization
 

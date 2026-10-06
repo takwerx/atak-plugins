@@ -46,7 +46,9 @@ Built-in sources:
     interagency fire perimeter history, drawn as EGP draws it: the last ten
     years colored by years since (under six months, to one, two, three and
     ten years), earlier decades in grey, each band and decade switched on its
-    own, labeled "Carr Fire (2018)".
+    own, labeled "Carr Fire (2018)". Search it by name and year, and keep
+    the fires that matter to an incident as My Fires, shown alone until
+    cleared.
   - Add your own org: any ArcGIS Online organization. Sign in, search its
     content, add a layer; it draws with the service's own renderer.
 

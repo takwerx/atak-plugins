@@ -548,8 +548,24 @@ takes any ArcGIS Online organization you sign in to.
   arrow on its row opens the map key. Burns over 20 acres are labeled "Carr Fire
   (2018)"; a tap opens a burn's details. It loads what is in view, up to about
   155 miles across, simplified to the zoom. *Find* searches all of it by name;
-  add a year to pick one fire: "Ranch 2007". *Only This Fire* in a burn's details
-  hides the others until *Show All Fires*.
+  add a year to pick one fire: "Ranch 2007".
+]
+
+#tak-slide[
+= My Fires
+
+  Keep only the burns that matter to your incident on the map.
+
+  + Open a burn's details: tap it on the map, or find it with *Find*.
+  + Tap *Add to My Fires*. Fire History shows only the fires on your list,
+    wherever you pan and whichever decades are ticked. Its row reads
+    "Fire History: My Fires (1)".
+  + Add the next one the same way. *Remove from My Fires* in a burn's details
+    takes one off.
+
+  The arrow on the row opens *Only My Fires ON*: tap it to OFF to see every fire
+  again and keep the list, and back to ON for your fires. *Clear My Fires* empties
+  the list when the incident is over. The list is kept when ATAK restarts.
 ]
 
 #tak-slide[
