@@ -374,6 +374,8 @@ final class AtmosphereFeatures {
     }
 
     private volatile HitFilter hitFilter;
+    /** A rating's label as an exact-color pill; see {@link ZonePills#pill(String, int, int)}. */
+    private ZonePills ratingPills;
 
     void setHitFilter(HitFilter f) {
         hitFilter = f;
@@ -397,6 +399,13 @@ final class AtmosphereFeatures {
         labelTapMaxResolution = maxResolution;
     }
 
+    /** A rating's pill, composer made on first use; null when it cannot be written. */
+    private ZonePills.Pill ratingPill(String text, int textColor, int fillColor) {
+        if (ratingPills == null)
+            ratingPills = new ZonePills();
+        return ratingPills.pill(text, textColor, fillColor);
+    }
+
     /** Drop the areas whose label is not under the tap; see {@link #tapAtLabelOnly}. */
     private void atLabelOnly(java.util.SortedSet<MapItem> hits, MapView view,
             com.atakmap.coremap.maps.coords.GeoPoint tap) {
@@ -416,10 +425,14 @@ final class AtmosphereFeatures {
             final android.graphics.PointF p = view.forward(
                     new com.atakmap.coremap.maps.coords.GeoPoint(
                             m.getMetaDouble("_labelLat", 0), m.getMetaDouble("_labelLon", 0)));
-            // The label's box, from its length at the default label size, padded a
-            // little for a gloved finger.
-            final float halfWidth = (m.getMetaInteger("_labelChars", 12) * 3.9f + 10f) * density;
-            final float halfHeight = 18f * density;
+            // The label's box: a pill's own pixels, or from a text label's length at
+            // the default size; padded a little for a gloved finger.
+            final float pad = 8f * density;
+            final float halfWidth = m.hasMetaValue("_labelHalfW")
+                    ? (float) m.getMetaDouble("_labelHalfW", 0) + pad
+                    : (m.getMetaInteger("_labelChars", 12) * 3.9f + 10f) * density;
+            final float halfHeight = m.hasMetaValue("_labelHalfH")
+                    ? (float) m.getMetaDouble("_labelHalfH", 0) + pad : 18f * density;
             if (Math.abs(at.x - p.x) > halfWidth || Math.abs(at.y - p.y) > halfHeight)
                 it.remove();
         }
@@ -982,6 +995,12 @@ final class AtmosphereFeatures {
                                 item.setMetaDouble("_labelLat", a.getDoubleAttribute("_labelLat"));
                                 item.setMetaDouble("_labelLon", a.getDoubleAttribute("_labelLon"));
                                 item.setMetaInteger("_labelChars", a.getIntAttribute("_labelChars"));
+                                if (a.containsAttribute("_labelHalfW")) {
+                                    item.setMetaDouble("_labelHalfW",
+                                            a.getDoubleAttribute("_labelHalfW"));
+                                    item.setMetaDouble("_labelHalfH",
+                                            a.getDoubleAttribute("_labelHalfH"));
+                                }
                             }
                             if (a != null && a.containsAttribute("_oneRowPerName"))
                                 item.setMetaBoolean("_oneRowPerName", true);
@@ -1402,18 +1421,51 @@ final class AtmosphereFeatures {
                             final LabelPointStyle own = labelStyleOf(d.style);
                             final boolean colored = own != null
                                     && (own.getBackgroundColor() >>> 24) == 0xFF;
+                            // A rating's tile is drawn solid: through ATAK's label blend a
+                            // see-through orange came out yellow over the map, a class
+                            // the key does not have (Fire Danger 92nd percentile drew
+                            // #EFD708 for #FFAA00, operator, 2026-10-05).
                             final int bg = ((colored ? own.getBackgroundColor() : edge)
-                                    & 0x00FFFFFF) | 0xD9000000;
+                                    & 0x00FFFFFF) | (colored ? 0xFF000000 : 0xD9000000);
                             final int text = colored ? own.getTextColor()
                                     : luminance(edge) > 150 ? 0xFF000000 : 0xFFFFFFFF;
-                            store.insertFeature(new Feature(fsid, d.name, new Point(c[1], c[0]),
-                                    colored
-                                            ? new LabelPointStyle(centered, text, bg,
-                                                    LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f,
-                                                    false, own.getLabelMinRenderResolution())
-                                            : new LabelPointStyle(centered, text, bg,
-                                                    LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f, false),
-                                    la, Feature.AltitudeMode.ClampToGround, 0d));
+                            // A rating's tile is a composed pill, in a set of its own that
+                            // draws from the label's resolution in, the way the text label
+                            // was gated: exact pixels, where ATAK's label renderer turned
+                            // an orange yellow.
+                            final ZonePills.Pill pill = colored ? ratingPill(centered, text,
+                                    own.getBackgroundColor()) : null;
+                            if (pill != null) {
+                                final String labelSet = d.setName + " labels";
+                                Long lsid = fresh.get(labelSet);
+                                if (lsid == null) {
+                                    lsid = store.insertFeatureSet(new FeatureSet(PROVIDER, type,
+                                            labelSet, Math.min(d.minGsd,
+                                                    own.getLabelMinRenderResolution()),
+                                            d.maxGsd));
+                                    store.setFeatureSetVisible(lsid, true);
+                                    fresh.put(labelSet, lsid);
+                                }
+                                if (d.attrs != null) {
+                                    d.attrs.setAttribute("_labelHalfW", pill.pxWidth / 2.0);
+                                    d.attrs.setAttribute("_labelHalfH", pill.pxHeight / 2.0);
+                                }
+                                store.insertFeature(new Feature(lsid, d.name,
+                                        new Point(c[1], c[0]),
+                                        icon(pill.uri, pill.width, pill.height), la,
+                                        Feature.AltitudeMode.ClampToGround, 0d));
+                            } else {
+                                store.insertFeature(new Feature(fsid, d.name,
+                                        new Point(c[1], c[0]), colored
+                                                ? new LabelPointStyle(centered, text, bg,
+                                                        LabelPointStyle.ScrollMode.OFF, 0f, 0, 0,
+                                                        0f, false,
+                                                        own.getLabelMinRenderResolution())
+                                                : new LabelPointStyle(centered, text, bg,
+                                                        LabelPointStyle.ScrollMode.OFF, 0f, 0, 0,
+                                                        0f, false),
+                                        la, Feature.AltitudeMode.ClampToGround, 0d));
+                            }
                         }
                     }
                     store.insertFeature(new Feature(fsid, d.name, d.geometry,

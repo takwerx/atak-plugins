@@ -43,11 +43,15 @@ final class ZonePills {
     static final class Pill {
         final String uri;
         final int width, height;
+        /** The bitmap's own pixels, which is what it covers on screen. */
+        final int pxWidth, pxHeight;
 
-        Pill(String uri, int width, int height) {
+        Pill(String uri, int width, int height, int pxWidth, int pxHeight) {
             this.uri = uri;
             this.width = width;
             this.height = height;
+            this.pxWidth = pxWidth;
+            this.pxHeight = pxHeight;
         }
     }
 
@@ -63,6 +67,20 @@ final class ZonePills {
 
     /** The pill for this text, composed once and kept; null when it cannot be written. */
     synchronized Pill pill(String text) {
+        return pill(text, TEXT, FILL, EDGE);
+    }
+
+    /**
+     * A pill in a rating's own colors, the exact pixels of the key: through ATAK's
+     * label renderer a Fire Danger orange (#FFAA00) drew as yellow (#FFEB00) on the
+     * phone, a class the key does not have (operator, 2026-10-05: "the label is
+     * yellow instead of orange ... doesnt match legend").
+     */
+    synchronized Pill pill(String text, int textColor, int fillColor) {
+        return pill(text, textColor, fillColor | 0xFF000000, 0x80000000);
+    }
+
+    private Pill pill(String text, int textColor, int fillColor, int edgeColor) {
         if (text == null || text.isEmpty() || dir == null)
             return null;
         final float scale = Math.max(1f,
@@ -72,7 +90,9 @@ final class ZonePills {
         float textPx = tf == null ? 0f : tf.getDensityAdjustedFontSize();
         if (textPx <= 0f)
             textPx = 14f * scale;
-        final String key = text + "_v" + VERSION + "_f" + Math.round(textPx * 10);
+        final String key = text + "_v" + VERSION + "_f" + Math.round(textPx * 10)
+                + (fillColor == FILL ? "" : "_" + Integer.toHexString(fillColor)
+                        + Integer.toHexString(textColor));
         final Pill hit = cache.get(key);
         if (hit != null)
             return hit;
@@ -81,7 +101,7 @@ final class ZonePills {
         tp.setTypeface(tf == null ? null : tf.getTypeface());
         tp.setTextSize(textPx);
         tp.setFakeBoldText(true);
-        tp.setColor(TEXT);
+        tp.setColor(textColor);
         final int textW = (int) Math.ceil(tp.measureText(text));
         // Sized and centered on the glyphs' own bounds, not the font's ascent and
         // descent: zone numbers are capitals and digits, with no descender, and on
@@ -93,16 +113,20 @@ final class ZonePills {
         // The ends are half circles, so the text starts half a height in.
         final int w = textW + h;
         final float baseline = h / 2f - (b.top + b.bottom) / 2f;
-        final File out = new File(dir, "zone_" + key.replaceAll("[^A-Za-z0-9_]", "") + ".png");
-        if (!out.isFile() && !compose(out, text, tp, baseline, w, h))
+        // Named by a hash as well: two labels that differ only in punctuation must not
+        // share a file once the punctuation is stripped from the name.
+        final File out = new File(dir, "zone_" + key.replaceAll("[^A-Za-z0-9_]", "")
+                + "_" + Integer.toHexString(key.hashCode()) + ".png");
+        if (!out.isFile() && !compose(out, text, tp, baseline, w, h, fillColor, edgeColor))
             return null;
         final Pill p = new Pill("file://" + out.getAbsolutePath(), Math.round(w / scale),
-                Math.round(h / scale));
+                Math.round(h / scale), w, h);
         cache.put(key, p);
         return p;
     }
 
-    private boolean compose(File out, String text, Paint tp, float baseline, int w, int h) {
+    private boolean compose(File out, String text, Paint tp, float baseline, int w, int h,
+            int fillColor, int edgeColor) {
         Bitmap bmp = null;
         try {
             bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
@@ -110,12 +134,12 @@ final class ZonePills {
             final float r = h / 2f;
             final RectF body = new RectF(0.5f, 0.5f, w - 0.5f, h - 0.5f);
             final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-            fill.setColor(FILL);
+            fill.setColor(fillColor);
             c.drawRoundRect(body, r, r, fill);
             final Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
             edge.setStyle(Paint.Style.STROKE);
             edge.setStrokeWidth(1f);
-            edge.setColor(EDGE);
+            edge.setColor(edgeColor);
             c.drawRoundRect(body, r - 0.5f, r - 0.5f, edge);
             c.drawText(text, r, baseline, tp);
 
