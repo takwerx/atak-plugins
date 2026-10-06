@@ -999,14 +999,26 @@ public class FeatureLayer implements IPlugin {
         // A typed name in a scoped layer: the feed's own answer, anywhere, once it is in;
         // the cached view's matches until then.
         final List<LoadedLayer.Hit> fromFeed = text.isEmpty() ? null : feedHitsFor(text, scope);
+        // Find from the main screen with a name typed: Fire History answers from all of
+        // its history, not only what is loaded in view (operator, 2026-10-06: "can i do
+        // a search for a feature?"). Its view's matches stand until the answer is in.
+        final LoadedLayer history = scope == null && !text.isEmpty() ? historyLayer() : null;
+        final List<LoadedLayer.Hit> fromHistory = history == null ? null : feedHitsFor(text, history);
         if (fromFeed != null) {
             for (LoadedLayer.Hit h : fromFeed)
                 if (filterType == null || filterType.equalsIgnoreCase(h.type))
                     hits.add(new Object[] { scope, h });
         } else {
-            for (Object[] o : all)
+            for (Object[] o : all) {
+                if (fromHistory != null && o[0] == history)
+                    continue; // the history's own answer replaces its in-view matches
                 if (filterType == null || filterType.equalsIgnoreCase(((LoadedLayer.Hit) o[1]).type))
                     hits.add(o);
+            }
+            if (fromHistory != null)
+                for (LoadedLayer.Hit h : fromHistory)
+                    if (filterType == null || filterType.equalsIgnoreCase(h.type))
+                        hits.add(new Object[] { history, h });
         }
         // From the device, or from the map's center; without a fix, the map center stands in.
         final com.atakmap.coremap.maps.coords.GeoPoint me = fromMapCenter ? null : selfPoint();
@@ -1113,7 +1125,9 @@ public class FeatureLayer implements IPlugin {
                 agoText = min < 1 ? "just now" : min < 60 ? min + " min ago"
                         : min < 1440 ? (min / 60) + " h " + (min % 60) + " min ago" : (min / 1440) + " d ago";
             }
-            if (h.time > 0 && !dart)
+            // A burn's title carries its year; the time behind it is only for sorting, and
+            // for the older records it is a made-up 1 July.
+            if (h.time > 0 && !dart && !com.atakmap.android.featurelayer.FireHistoryStyles.handles(l.spec))
                 sub.append(sub.length() > 0 ? " \u00b7 " : "").append(when.format(new java.util.Date(h.time)));
             final TextView subView = row.findViewById(R.id.result_sub);
             if (agoText != null) {
@@ -2028,6 +2042,15 @@ public class FeatureLayer implements IPlugin {
                     refreshResultsInPlace();
             }
         });
+        return null;
+    }
+
+    /** The loaded Fire History layer, or null. */
+    private LoadedLayer historyLayer() {
+        if (manager != null)
+            for (LoadedLayer l : manager.snapshot())
+                if (com.atakmap.android.featurelayer.FireHistoryStyles.handles(l.spec))
+                    return l;
         return null;
     }
 

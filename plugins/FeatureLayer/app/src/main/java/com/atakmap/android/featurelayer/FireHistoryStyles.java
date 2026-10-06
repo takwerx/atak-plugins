@@ -185,11 +185,37 @@ public final class FireHistoryStyles {
     }
 
     /**
-     * The key that makes two copies of one fire the same: name, year and a 0.2 degree
-     * cell of where it is. The all-years history holds one perimeter per agency that
-     * mapped a fire (Carr 2018 four times: BLM, CAL FIRE, USFS, NPS, all ~229,650 ac).
+     * What two copies of one fire share: name and year. The all-years history holds one
+     * perimeter per agency that mapped a fire (Carr 2018 four times: BLM, CAL FIRE, USFS,
+     * NPS). Copies are then told apart by place: their extents overlap. A grid cell of
+     * the center was the first rule, and the two Ranch 2007 copies (USFS 58,410 ac, FWS
+     * 57,573 ac) sat 800 m apart either side of a cell line (operator, 2026-10-06).
      */
-    static String sameFire(JSONObject p, double lat, double lon) {
-        return rawName(p).toUpperCase(Locale.US) + "|" + year(p) + "|" + Math.round(lat * 5) + "|" + Math.round(lon * 5);
+    static String nameYear(JSONObject p) {
+        return rawName(p).toUpperCase(Locale.US) + "|" + year(p);
+    }
+
+    /** Whether two extents (minX, minY, maxX, maxY) overlap: the test for two copies of one fire. */
+    static boolean overlap(double[] a, double[] b) {
+        return a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
+    }
+
+    /** The field a source names its fires in: the current decade's, or the all-years history's. */
+    static String nameField(boolean currentDecade) {
+        return currentDecade ? "poly_IncidentName" : "INCIDENT";
+    }
+
+    /** When the fire burned, epoch ms, for sorting by Newest and Oldest: discovery, else 1 July of its year. */
+    static long when(JSONObject p) {
+        final Object v = p.opt("attr_FireDiscoveryDateTime");
+        if (v instanceof Number)
+            return ((Number) v).longValue();
+        final int y = year(p);
+        if (y <= 0)
+            return 0;
+        final java.util.Calendar c = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+        c.clear();
+        c.set(y, java.util.Calendar.JULY, 1);
+        return c.getTimeInMillis();
     }
 }

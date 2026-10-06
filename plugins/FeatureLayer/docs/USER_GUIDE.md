@@ -446,6 +446,10 @@ several agencies mapped one fire, it shows once.
 It loads what is in view, up to about 155 miles across, with the shapes simplified
 to the zoom; zoom in and they load again in finer detail.
 
+**Find** on the main screen searches all of Fire History by name, not only what is
+in view. Add a year to pick one fire out of many with the same name: "Ranch 2007".
+**Go** frames it on the map.
+
 ## Your own organization
 
 ![Add your own org](screenshots/26_add_org.png)

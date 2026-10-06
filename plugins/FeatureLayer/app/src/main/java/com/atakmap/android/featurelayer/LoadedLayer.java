@@ -978,6 +978,8 @@ public class LoadedLayer {
         final String needle = text.trim().toUpperCase(Locale.US).replace("'", "''");
         if (needle.isEmpty() || spec.layerIds == null || spec.layerIds.length == 0)
             return out;
+        if (FireHistoryStyles.handles(spec))
+            return searchHistory(needle, max);
         final StringBuilder like = new StringBuilder();
         for (String f : new String[] { spec.labelField, spec.setField })
             if (f != null && !f.isEmpty())
@@ -1008,6 +1010,73 @@ public class LoadedLayer {
                         (e.minY + e.maxY) / 2, (e.minX + e.maxX) / 2, Math.max(e.maxX - e.minX, e.maxY - e.minY), attrs));
             }
         });
+        return out;
+    }
+
+    /**
+     * Fire History by name, anywhere: both services asked by their own name field, the
+     * shapes simplified to about 500 m (only their extents are used, for Go there), and
+     * one hit per fire as on the map. {@code needle} is upper case with quotes doubled.
+     */
+    private List<Hit> searchHistory(String needle, int max) throws Exception {
+        final List<Hit> out = new ArrayList<>();
+        final Map<String, List<double[]>> seen = new HashMap<>();
+        final Esri.Scope world = Esri.Scope.box(-90, -180, 90, 180).simplified(0.005);
+        // "Ranch 2007": a year at the end narrows the name to that year, which is how one
+        // fire is picked out of the hundreds named Ranch.
+        final java.util.regex.Matcher ym = java.util.regex.Pattern.compile("^(.*?)\\s*\\b(1[89]\\d\\d|20\\d\\d)$").matcher(needle);
+        final String name = ym.matches() ? ym.group(1).trim() : needle;
+        final int year = ym.matches() ? Integer.parseInt(ym.group(2)) : 0;
+        for (int i = 0; i < spec.layerIds.length; i++) {
+            final boolean current = i == 0;
+            final StringBuilder w = new StringBuilder();
+            if (!name.isEmpty())
+                w.append("UPPER(").append(FireHistoryStyles.nameField(current)).append(") LIKE '%").append(name).append("%'");
+            if (year > 0) {
+                if (w.length() > 0)
+                    w.append(" AND ");
+                w.append(current
+                        ? "attr_FireDiscoveryDateTime >= TIMESTAMP '" + year + "-01-01 00:00:00' AND attr_FireDiscoveryDateTime < TIMESTAMP '" + (year + 1) + "-01-01 00:00:00'"
+                        : "FIRE_YEAR_INT = " + year);
+            }
+            if (w.length() == 0)
+                continue;
+            final String where = w.toString();
+            Esri.query(spec.baseFor(i), spec.layerIds[i], where, world, null, false, 200, max,
+                    new Esri.FeatureSink() {
+                        @Override
+                        public void feature(JSONObject props, Geometry g) {
+                            if (g == null)
+                                return;
+                            final String type = FireHistoryStyles.type(props, System.currentTimeMillis());
+                            if (type == null)
+                                return;
+                            final com.atakmap.map.layer.feature.geometry.Envelope e = g.getEnvelope();
+                            if (e == null || Double.isNaN(e.minX))
+                                return;
+                            final double[] box = { e.minX, e.minY, e.maxX, e.maxY };
+                            final String key = FireHistoryStyles.nameYear(props);
+                            List<double[]> same = seen.get(key);
+                            if (same == null) {
+                                same = new ArrayList<>();
+                                seen.put(key, same);
+                            }
+                            for (double[] b : same)
+                                if (FireHistoryStyles.overlap(b, box))
+                                    return; // another copy of a fire already listed
+                            same.add(box);
+                            final String title = FireHistoryStyles.title(props, spec.layerTitle);
+                            final long when = FireHistoryStyles.when(props);
+                            final AttributeSet attrs = Esri.toAttributes(props, lastDateFields);
+                            attrs.setAttribute("_title", title);
+                            attrs.setAttribute("_type", type);
+                            if (when > 0)
+                                attrs.setAttribute("_time", when);
+                            out.add(new Hit(title, spec.title, spec.id, type, when, (e.minY + e.maxY) / 2,
+                                    (e.minX + e.maxX) / 2, Math.max(e.maxX - e.minX, e.maxY - e.minY), attrs));
+                        }
+                    });
+        }
         return out;
     }
 
@@ -1163,6 +1232,9 @@ public class LoadedLayer {
         return FireHistoryStyles.handles(spec) ? 250_000 : MAX_VIEW_M;
     }
 
+    /** Fire History's copies seen this refresh, by name and year: {index in pending, extent, acres, first source}. */
+    private final Map<String, List<Object[]>> fireCopies = new HashMap<>();
+
     /** The map resolution a simplified fetch was sized for (m/px), 0 when none was. */
     private volatile double fetchedRes;
 
@@ -1267,6 +1339,7 @@ public class LoadedLayer {
         final List<Pending> pending = new ArrayList<>();
         final List<String> problems = new ArrayList<>();
         unnamedThisFetch = 0;
+        fireCopies.clear();
         try {
             // An unnamed fire reaches its hour whether or not the feed changed, and
             // the change check below skips the fetch when it has not: let it go first.
@@ -1496,9 +1569,9 @@ public class LoadedLayer {
     private void fetchSourceLayer(final String base, final int layerId, String token, final List<Pending> out) throws Exception {
         final Esri.LayerInfo info = Esri.layerInfo(base, layerId, token);
         final boolean history = FireHistoryStyles.handles(spec);
-        // One perimeter per fire: the all-years history holds a copy per agency that mapped it.
-        final Map<String, Integer> seenFire = new HashMap<>();
-        final Map<String, Double> seenAcres = new HashMap<>();
+        // One perimeter per fire, across both services: the first source (the current
+        // decade, with its age color) wins; within a source the larger copy does.
+        final boolean firstSource = base.equals(spec.baseFor(0));
         final boolean nwcg = spec.profile == LayerSpec.Profile.NWCG;
         final boolean isPointLayer = info.geometryType.contains("Point");
         final boolean isLineLayer = info.geometryType.contains("Polyline");
@@ -1573,7 +1646,7 @@ public class LoadedLayer {
                             spec.setKind.put(target, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
                         }
                         int dupAt = -1;
-                        String fireKey = null;
+                        Object[] copy = null;
                         if (history) {
                             // EGP's band or decade; a perimeter EGP draws in neither is left out.
                             final String t = FireHistoryStyles.type(props, System.currentTimeMillis());
@@ -1583,12 +1656,31 @@ public class LoadedLayer {
                             spec.setKind.put(target, "polygon");
                             final com.atakmap.map.layer.feature.geometry.Envelope e = g.getEnvelope();
                             if (e != null && !Double.isNaN(e.minX)) {
-                                fireKey = FireHistoryStyles.sameFire(props, (e.minY + e.maxY) / 2, (e.minX + e.maxX) / 2);
-                                final Integer at = seenFire.get(fireKey);
-                                if (at != null) {
-                                    if (FireHistoryStyles.acres(props) <= seenAcres.get(fireKey))
-                                        return; // a smaller copy of a fire already kept
-                                    dupAt = at;
+                                final double[] box = { e.minX, e.minY, e.maxX, e.maxY };
+                                final double acres = FireHistoryStyles.acres(props);
+                                final String key = FireHistoryStyles.nameYear(props);
+                                List<Object[]> same = fireCopies.get(key);
+                                if (same == null) {
+                                    same = new ArrayList<>();
+                                    fireCopies.put(key, same);
+                                }
+                                for (Object[] c : same) {
+                                    if (!FireHistoryStyles.overlap((double[]) c[1], box))
+                                        continue;
+                                    // Another copy of this fire: keep this one only if it is
+                                    // the larger copy from the same source.
+                                    if ((Boolean) c[3] != firstSource || acres <= (Double) c[2])
+                                        return;
+                                    dupAt = (Integer) c[0];
+                                    copy = c;
+                                    break;
+                                }
+                                if (copy == null) {
+                                    copy = new Object[] { -1, box, acres, firstSource };
+                                    same.add(copy);
+                                } else {
+                                    copy[1] = box;
+                                    copy[2] = acres;
                                 }
                             }
                         }
@@ -1872,12 +1964,9 @@ public class LoadedLayer {
                         p.alt = alt;
                         if (dupAt >= 0) {
                             out.set(dupAt, p); // the larger copy of a fire seen before
-                            seenAcres.put(fireKey, FireHistoryStyles.acres(props));
                         } else {
-                            if (fireKey != null) {
-                                seenFire.put(fireKey, out.size());
-                                seenAcres.put(fireKey, FireHistoryStyles.acres(props));
-                            }
+                            if (copy != null)
+                                copy[0] = out.size();
                             out.add(p);
                         }
 
