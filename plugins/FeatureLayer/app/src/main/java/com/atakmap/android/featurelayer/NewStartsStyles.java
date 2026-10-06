@@ -60,12 +60,15 @@ public final class NewStartsStyles {
 
     /**
      * How long a fire with no name stays (operator, 2026-10-05: "anything after 4 hours
-     * without a name you dump"). A dispatch system that files every brush-fire call and
-     * never comes back leaves a dispatch number where the name goes: LA County's CAD
-     * filed 49 of the 62 unnamed fires among 401 current ones that evening (LAC-357251,
-     * 0.01 ac, never touched again), and NIFC itself only lets them go after 3 days.
+     * without a name you dump", then "lets do 1 hour"). A dispatch system that files
+     * every brush-fire call and never comes back leaves a dispatch number where the name
+     * goes: LA County's CAD filed 49 of the 62 unnamed fires among 401 current ones that
+     * evening (LAC-357251, 0.01 ac, never touched again), and NIFC itself only lets them
+     * go after 3 days. When LA County does name a fire it does so within minutes: 7 of
+     * its 8 named records had their last edit 1 to 30 minutes after they were made. An
+     * hour keeps a new call on the map for initial attack and catches every name given.
      */
-    public static final long UNNAMED_KEEP_MS = 4 * 3600_000L;
+    public static final long UNNAMED_KEEP_MS = 3600_000L;
     private static final java.util.regex.Pattern NUMBER_ONLY =
             java.util.regex.Pattern.compile("^\\s*[A-Za-z]{0,3}\\s*[-#]?\\s*\\d+\\s*$");
 

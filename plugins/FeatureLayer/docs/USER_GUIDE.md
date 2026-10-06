@@ -382,7 +382,7 @@ and were never updated: some centers enter every fire call this way, with a
 dispatch number for a name, and never touch it again. Turn it off to see only the
 fires someone has sized.
 
-A fire with only a number for a name, such as LAC-357251, leaves the map 4 hours
+A fire with only a number for a name, such as LAC-357251, leaves the map an hour
 after it was found unless someone has named it by then. Some dispatch centers file
 every brush-fire call this way and never come back to it; LA County's filed most of
 the 62 such fires listed one October evening. The row's status line says how many

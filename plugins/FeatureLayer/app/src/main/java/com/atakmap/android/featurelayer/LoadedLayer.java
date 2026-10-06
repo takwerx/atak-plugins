@@ -46,9 +46,10 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store. 53: every icon and pill level when
      * the map is spun, and drawn from ATAK's private storage instead of the card. 54: New
-     * Fire Starts as flame and RX markers. 55: fire labels carry % contained. 56: unnamed fires leave after four hours.
+     * Fire Starts as flame and RX markers. 55: fire labels carry % contained. 56: unnamed fires leave after four hours. 57: after an hour, so the
+     * stored expiry times are written again.
      */
-    private static final int STYLE_VERSION = 56;
+    private static final int STYLE_VERSION = 57;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -397,7 +398,7 @@ public class LoadedLayer {
                 || "ca-air-intel".equals(spec.id);
     }
 
-    /** Removes unnamed fires whose four hours are up from the memory copy and the store. Worker thread. */
+    /** Removes unnamed fires whose hour is up from the memory copy and the store. Worker thread. */
     private void pruneUnnamed() {
         synchronized (lock) {
             if (store == null || closed)
@@ -423,7 +424,7 @@ public class LoadedLayer {
             cache = keep;
             unnamedHidden += gone;
             rewriteStore(true);
-            Log.d(TAG, spec.id + ": " + gone + " unnamed fires past four hours removed");
+            Log.d(TAG, spec.id + ": " + gone + " unnamed fires past their hour removed");
         }
     }
 
@@ -1250,7 +1251,7 @@ public class LoadedLayer {
         final List<String> problems = new ArrayList<>();
         unnamedThisFetch = 0;
         try {
-            // An unnamed fire reaches its four hours whether or not the feed changed, and
+            // An unnamed fire reaches its hour whether or not the feed changed, and
             // the change check below skips the fetch when it has not: let it go first.
             if (NewStartsStyles.handles(spec))
                 pruneUnnamed();
@@ -1511,7 +1512,7 @@ public class LoadedLayer {
                 Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
-                        // A fire with no name, past four hours: a dispatch call nobody came
+                        // A fire with no name, past its hour: a dispatch call nobody came
                         // back to. Left out, and counted on the row's status line.
                         long dropAt = 0;
                         if (NewStartsStyles.handles(spec) && NewStartsStyles.unnamed(props)) {

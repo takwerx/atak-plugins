@@ -2080,7 +2080,7 @@ public class FeatureLayer implements IPlugin {
             sb.append(" \u00b7 ").append(l.spec.maxFeatures).append(" shown, more exist: zoom in or shrink the radius");
         if (l.unnamedHidden > 0)
             sb.append(" \u00b7 ").append(l.unnamedHidden).append(l.unnamedHidden == 1 ? " fire" : " fires")
-                    .append(" with no name, over 4 h, left out");
+                    .append(" with no name, over 1 h, left out");
         return sb.toString();
     }
 
