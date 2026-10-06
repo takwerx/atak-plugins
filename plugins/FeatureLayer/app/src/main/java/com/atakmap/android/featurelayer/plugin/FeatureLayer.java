@@ -1406,8 +1406,8 @@ public class FeatureLayer implements IPlugin {
                 toggle.setTextColor(Color.parseColor("#FFC107"));
                 toggle.setEnabled(false);
             } else {
-                final String only = l.isolatedTitle();
-                toggle.setText(only != null && l.isVisible() ? l.spec.title + ": " + only
+                toggle.setText(l.myFiresShown() && l.isVisible()
+                        ? l.spec.title + ": My Fires (" + l.myFiresCount() + ")"
                         : l.displayName() + (l.isVisible() ? " ON" : " OFF"));
                 toggle.setTextColor(l.isVisible() ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
                 toggle.setEnabled(true);
@@ -1482,14 +1482,7 @@ public class FeatureLayer implements IPlugin {
                 }
             });
             bindKey((LinearLayout) row.findViewById(R.id.row_key), l);
-            final Button showAll = row.findViewById(R.id.row_show_all);
-            showAll.setVisibility(l.isolatedTitle() != null ? View.VISIBLE : View.GONE);
-            showAll.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    manager.showAllFires(l);
-                }
-            });
+            bindMyFires(row, l);
             final View scopeBlock = row.findViewById(R.id.row_scope);
             if (l.hasScopeControl()) {
                 scopeBlock.setVisibility(View.VISIBLE);
@@ -2171,6 +2164,47 @@ public class FeatureLayer implements IPlugin {
             key.addView(line);
         }
         key.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * My Fires on a Fire History row, once the list has a fire: Only My Fires ON (green)
+     * or OFF (red) with the count, and Clear My Fires behind a confirmation, since the
+     * list is the operator's own work for an incident.
+     */
+    private void bindMyFires(View row, final LoadedLayer l) {
+        final View block = row.findViewById(R.id.row_myfires);
+        final int n = l.myFiresCount();
+        if (!com.atakmap.android.featurelayer.FireHistoryStyles.handles(l.spec) || n == 0) {
+            block.setVisibility(View.GONE);
+            return;
+        }
+        block.setVisibility(View.VISIBLE);
+        final Button only = row.findViewById(R.id.row_myfires_only);
+        final boolean on = l.myFiresShown();
+        only.setText("Only My Fires " + (on ? "ON" : "OFF") + " (" + n + ")");
+        only.setTextColor(on ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+        only.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.myFires(l, on ? com.atakmap.android.featurelayer.LayerManager.MY_ONLY_OFF
+                        : com.atakmap.android.featurelayer.LayerManager.MY_ONLY_ON, null);
+            }
+        });
+        row.findViewById(R.id.row_myfires_clear).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new AlertDialog.Builder(mapView.getContext())
+                        .setTitle("Clear My Fires")
+                        .setMessage("Take " + (n == 1 ? "the fire" : n == 2 ? "both fires" : "all " + n + " fires")
+                                + " out of My Fires and show every fire again?")
+                        .setPositiveButton("Clear", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int w) {
+                                manager.myFires(l, com.atakmap.android.featurelayer.LayerManager.MY_CLEAR, null);
+                            }
+                        }).setNegativeButton("Cancel", null).show();
+            }
+        });
     }
 
     /** Where a layer row's open/closed state is kept, by layer id. */

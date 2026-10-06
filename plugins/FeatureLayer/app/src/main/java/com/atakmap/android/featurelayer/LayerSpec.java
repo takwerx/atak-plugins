@@ -142,6 +142,37 @@ public class LayerSpec {
      */
     public final java.util.LinkedHashMap<String, String> setNotes = new java.util.LinkedHashMap<>();
 
+    /** One fire in My Fires: its identity as copies share it (normName|year), its extent and title. */
+    public static final class MyFire {
+        public final String key, title;
+        public final double[] box;
+
+        public MyFire(String key, double[] box, String title) {
+            this.key = key;
+            this.box = box;
+            this.title = title;
+        }
+    }
+
+    /**
+     * My Fires: the burns an operator picked out for the incident they are working, kept
+     * across restarts until cleared (operator, 2026-10-06: "a sort of favorites ... while
+     * im working this incident then get rid of them when im done").
+     */
+    public final java.util.List<MyFire> myFires = new java.util.concurrent.CopyOnWriteArrayList<>();
+    /** Whether only My Fires are drawn. */
+    public boolean myFiresOnly;
+
+    /** Whether minX, minY, maxX, maxY is a real extent in degrees: finite, on the globe, min before max. */
+    static boolean lonLatBox(double[] b) {
+        if (b == null || b.length != 4)
+            return false;
+        for (double d : b)
+            if (Double.isNaN(d) || Double.isInfinite(d))
+                return false;
+        return b[0] >= -180 && b[2] <= 180 && b[1] >= -90 && b[3] <= 90 && b[0] <= b[2] && b[1] <= b[3];
+    }
+
     public boolean isOn(String setName) {
         final Boolean v = setOn.get(setName);
         return v == null || v;
@@ -183,6 +214,14 @@ public class LayerSpec {
         o.put("setOn", new JSONObject(setOn));
         if (bounds != null)
             o.put("bounds", new JSONArray(java.util.Arrays.asList(bounds[0], bounds[1], bounds[2], bounds[3])));
+        if (!myFires.isEmpty()) {
+            final JSONArray mf = new JSONArray();
+            for (MyFire f : myFires)
+                mf.put(new JSONObject().put("key", f.key).put("title", f.title)
+                        .put("box", new JSONArray().put(f.box[0]).put(f.box[1]).put(f.box[2]).put(f.box[3])));
+            o.put("myFires", mf);
+        }
+        o.put("myFiresOnly", myFiresOnly);
         return o;
     }
 
@@ -232,6 +271,19 @@ public class LayerSpec {
             s.layerIds[i] = ids.getInt(i);
         s.layerTitle = o.isNull("layerTitle") ? null : o.optString("layerTitle", null);
         s.styleVersion = o.optInt("styleVersion", 0);
+        final JSONArray mf = o.optJSONArray("myFires");
+        if (mf != null)
+            for (int i = 0; i < mf.length(); i++) {
+                final JSONObject f = mf.optJSONObject(i);
+                final JSONArray b = f == null ? null : f.optJSONArray("box");
+                if (f == null || b == null || b.length() != 4 || f.optString("key", "").isEmpty())
+                    continue;
+                final double[] box = { b.optDouble(0), b.optDouble(1), b.optDouble(2), b.optDouble(3) };
+                if (!lonLatBox(box))
+                    continue; // a damaged entry would put NaN into every fetch's query
+                s.myFires.add(new MyFire(f.optString("key"), box, f.optString("title", f.optString("key"))));
+            }
+        s.myFiresOnly = o.optBoolean("myFiresOnly", false) && !s.myFires.isEmpty();
         s.scopeKind = o.isNull("scopeKind") ? null : o.optString("scopeKind", null);
         s.scopeRadiusM = o.optDouble("scopeRadiusM", 40000);
         s.scopeRings = o.isNull("scopeRings") ? null : o.optString("scopeRings", null);

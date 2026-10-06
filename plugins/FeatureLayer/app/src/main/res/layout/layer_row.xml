@@ -48,15 +48,28 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:visibility="gone">
-        <!-- Only This Fire is on: back to every fire. -->
-        <Button
-            android:id="@+id/row_show_all"
-            style="@style/TakwerxButton"
+        <!-- My Fires, when the list has any: only them or every fire, and clear the list. -->
+        <LinearLayout
+            android:id="@+id/row_myfires"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:orientation="horizontal"
             android:layout_marginBottom="4dp"
-            android:text="Show All Fires"
-            android:visibility="gone" />
+            android:visibility="gone">
+            <Button
+                android:id="@+id/row_myfires_only"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content" />
+            <Button
+                android:id="@+id/row_myfires_clear"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="4dp"
+                android:text="Clear My Fires" />
+        </LinearLayout>
         <!-- The fire layers' map key: each marker beside what it means, built in code
              from the images the map draws. Gone on every other layer. -->
         <LinearLayout

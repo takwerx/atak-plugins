@@ -502,6 +502,15 @@ public class LoadedLayer {
 
     private boolean layerOn = true;
 
+    /**
+     * Whether a type's features are drawn. My Fires are drawn whatever decades are on:
+     * the operator picked them one by one, and a Ranch 2007 hidden because only "1979 and
+     * Earlier" was ticked read as a list that had lost a fire (dev 1, 2026-10-06).
+     */
+    private boolean shows(String setName) {
+        return layerOn && (myFiresShown() || spec.isOn(setName));
+    }
+
     /** Everything fetched last time, shown or not; the store holds only the shown part. */
     private List<Pending> cache = new ArrayList<>();
     /** Rings of the fire perimeter polygons seen in the current fetch, lon/lat pairs. */
@@ -636,7 +645,7 @@ public class LoadedLayer {
             store.acquireModifyLock(true);
             bulk = true;
             for (SetInfo si : rawSetsLocked()) {
-                if (layerOn && spec.isOn(twinBase(si.name)))
+                if (shows(twinBase(si.name)))
                     continue;
                 try {
                     store.deleteFeatureSet(si.id);
@@ -689,10 +698,10 @@ public class LoadedLayer {
             final Map<String, Long> twins = new HashMap<>();
             int written = 0;
             for (Pending pf : cache) {
-                if (!layerOn || !spec.isOn(pf.setName))
+                if (!shows(pf.setName))
                     continue;
-                if (isoKey != null && !isolatedOne(pf))
-                    continue; // Only This Fire
+                if (myFiresShown() && !inMyFires(pf))
+                    continue; // only My Fires
                 // A named point with a label level is written twice: the bare symbol in the
                 // type's own set, which stops drawing at that level, and the named icon in a
                 // twin set that starts there. ATAK switches between them by resolution, so
@@ -1192,8 +1201,8 @@ public class LoadedLayer {
     boolean movedOutOfScope() {
         if (!hasScopeControl() || refreshing || busy || "all".equals(spec.scopeKind))
             return false;
-        if (isoKey != null)
-            return false; // one fire, fetched by its own extent: the map moving changes nothing
+        if (myFiresShown())
+            return false; // My Fires are fetched by their own extents: the map moving changes nothing
         try {
             if ("view".equals(spec.scopeKind)) {
                 if (viewTooWide)
@@ -1276,12 +1285,10 @@ public class LoadedLayer {
     }
 
     private Esri.Scope scope() {
-        // Only This Fire: that fire's extent, wherever the map is.
-        final double[] ib = isoBox;
-        if (ib != null && isoKey != null) {
-            final double padX = Math.max(0.01, (ib[2] - ib[0]) * 0.05), padY = Math.max(0.01, (ib[3] - ib[1]) * 0.05);
-            return Esri.Scope.box(ib[1] - padY, ib[0] - padX, ib[3] + padY, ib[2] + padX);
-        }
+        // My Fires: one fire's extent at a time, wherever the map is (refresh walks them).
+        final Esri.Scope over = scopeOverride;
+        if (over != null)
+            return over;
         // "all": the scope control's zero on a layer small enough to hold the country
         // (New Fire Starts), so a typed Find reaches a fire anywhere, not only in view.
         if (spec.scopeKind == null || "all".equals(spec.scopeKind))
@@ -1400,22 +1407,38 @@ public class LoadedLayer {
                 Log.d(TAG, spec.id + ": fetching " + scopeLabel());
             perimeterRings.clear();
             perimeterHoles.clear();
-            for (int li = 0; li < spec.layerIds.length; li++) {
-                final int layerId = spec.layerIds[li];
-                if (closed)
-                    throw new IllegalStateException("layer closed");
-                try {
-                    fetchSourceLayer(spec.baseFor(li), layerId, token, pending);
-                } catch (Exception e) {
-                    Log.w(TAG, spec.id + " layer " + layerId + " failed", e);
-                    problems.add("layer " + layerId + ": " + e.getMessage());
+            // Only My Fires: each fire fetched by its own extent, wherever it is.
+            final List<Esri.Scope> scopes = new ArrayList<>();
+            if (myFiresShown())
+                for (LayerSpec.MyFire f : new ArrayList<>(spec.myFires))
+                    scopes.add(boxScope(f.box));
+            else
+                scopes.add(null);
+            int tries = 0;
+            try {
+                for (Esri.Scope sc : scopes) {
+                    scopeOverride = sc;
+                    for (int li = 0; li < spec.layerIds.length; li++) {
+                        final int layerId = spec.layerIds[li];
+                        if (closed)
+                            throw new IllegalStateException("layer closed");
+                        tries++;
+                        try {
+                            fetchSourceLayer(spec.baseFor(li), layerId, token, pending);
+                        } catch (Exception e) {
+                            Log.w(TAG, spec.id + " layer " + layerId + " failed", e);
+                            problems.add("layer " + layerId + ": " + e.getMessage());
+                        }
+                        this.progress = pending.size();
+                        status = "refreshing: " + pending.size();
+                        if (progress != null)
+                            progress.run();
+                    }
                 }
-                this.progress = pending.size();
-                status = "refreshing: " + pending.size();
-                if (progress != null)
-                    progress.run();
+            } finally {
+                scopeOverride = null;
             }
-            if (problems.size() == spec.layerIds.length)
+            if (problems.size() == tries)
                 throw new IllegalStateException(problems.get(0));
             synchronized (lock) {
                 if (store == null || closed)
@@ -1876,7 +1899,7 @@ public class LoadedLayer {
                         }
                         final AttributeSet attrs = Esri.toAttributes(props, dates);
                         if (history && copy != null) {
-                            // Which fire this is, so Only This Fire can pick it out later.
+                            // Which fire this is, so My Fires can pick it out later.
                             final double[] bx = (double[]) copy[1];
                             attrs.setAttribute(ATTR_FIRE, FireHistoryStyles.normName(props) + "|" + FireHistoryStyles.year(props));
                             attrs.setAttribute(ATTR_FIRE_BOX, bx[0] + "," + bx[1] + "," + bx[2] + "," + bx[3]);
@@ -2047,22 +2070,31 @@ public class LoadedLayer {
         if (!c.active)
             attrs.setAttribute(CALFIRE_PREFIX + "status", "final" + (c.extinguished.isEmpty() ? "" : ", out " + CalFire.when(c.extinguished)));
     }
-    /** A burn's identity for Only This Fire: normName|year, its extent, and its title. */
+    /** A burn's identity for My Fires: normName|year, its extent, and its title. */
     public static final String ATTR_FIRE = "_fire", ATTR_FIRE_BOX = "_firebox", ATTR_FIRE_TITLE = "_firetitle";
 
-    /** The one fire shown when Only This Fire is on: its normName|year, its extent and title; all null when off. */
-    private volatile String isoKey, isoTitle;
-    private volatile double[] isoBox;
-
-    /** The title of the one fire shown, or null when every fire is. */
-    public String isolatedTitle() {
-        return isoKey == null ? null : isoTitle;
+    /** Whether only My Fires are drawn right now: the switch is on and the list has a fire in it. */
+    public boolean myFiresShown() {
+        return spec.myFiresOnly && !spec.myFires.isEmpty();
     }
 
-    /** Whether Only This Fire is on for the burn with these attributes. */
-    public boolean isIsolated(AttributeSet a) {
-        final String k = attr(a, ATTR_FIRE);
-        return isoKey != null && isoKey.equals(k);
+    public int myFiresCount() {
+        return spec.myFires.size();
+    }
+
+    /** The My Fires entry the burn with these attributes is, or null. */
+    private LayerSpec.MyFire myFireOf(String key, double[] b) {
+        if (key == null || b == null)
+            return null;
+        for (LayerSpec.MyFire f : spec.myFires)
+            if (f.key.equals(key) && FireHistoryStyles.overlap(f.box, b))
+                return f;
+        return null;
+    }
+
+    /** Whether the burn with these attributes is in My Fires. */
+    public boolean isMyFire(AttributeSet a) {
+        return myFireOf(attr(a, ATTR_FIRE), box(attr(a, ATTR_FIRE_BOX))) != null;
     }
 
     private static String attr(AttributeSet a, String k) {
@@ -2080,47 +2112,61 @@ public class LoadedLayer {
         if (p.length != 4)
             return null;
         try {
-            return new double[] { Double.parseDouble(p[0]), Double.parseDouble(p[1]), Double.parseDouble(p[2]),
+            final double[] b = { Double.parseDouble(p[0]), Double.parseDouble(p[1]), Double.parseDouble(p[2]),
                     Double.parseDouble(p[3]) };
+            return LayerSpec.lonLatBox(b) ? b : null;
         } catch (NumberFormatException e) {
             return null;
         }
     }
 
-    /** Whether a cached burn is the one fire shown. */
-    private boolean isolatedOne(Pending pf) {
-        final double[] b = box(attr(pf.attrs, ATTR_FIRE_BOX));
-        return isoKey.equals(attr(pf.attrs, ATTR_FIRE)) && b != null && FireHistoryStyles.overlap(b, isoBox);
+    /** Whether a cached burn is one of My Fires. */
+    private boolean inMyFires(Pending pf) {
+        return myFireOf(attr(pf.attrs, ATTR_FIRE), box(attr(pf.attrs, ATTR_FIRE_BOX))) != null;
     }
 
     /**
-     * Only This Fire (operator, 2026-10-06: "yeah a show only"): every other burn hidden
-     * and, while it is on, only that fire's extent fetched, so panning away keeps it.
-     * Returns false when the attributes name no burn. Worker thread.
+     * Adds a burn to My Fires and shows only My Fires; false when the attributes name no
+     * burn. The caller saves and fetches. Worker thread.
      */
-    public boolean isolate(AttributeSet a) {
+    public boolean addMyFire(AttributeSet a) {
         final String k = attr(a, ATTR_FIRE);
         final double[] b = box(attr(a, ATTR_FIRE_BOX));
         if (k == null || b == null)
             return false;
-        isoKey = k;
-        isoBox = b;
-        final String t = attr(a, ATTR_FIRE_TITLE);
-        isoTitle = t != null ? t : k;
-        synchronized (lock) {
-            if (store != null && !closed) {
-                loadCacheLocked();
-                rewriteStore(true);
-            }
+        if (myFireOf(k, b) == null) {
+            final String t = attr(a, ATTR_FIRE_TITLE);
+            spec.myFires.add(new LayerSpec.MyFire(k, b, t != null ? t : k));
         }
+        spec.myFiresOnly = true;
+        redraw();
         return true;
     }
 
-    /** Every fire again; the caller fetches the view. Worker thread. */
-    public void showAllFires() {
-        isoKey = null;
-        isoBox = null;
-        isoTitle = null;
+    /** Takes a burn out of My Fires; with none left, every fire shows again. Worker thread. */
+    public void removeMyFire(AttributeSet a) {
+        final LayerSpec.MyFire f = myFireOf(attr(a, ATTR_FIRE), box(attr(a, ATTR_FIRE_BOX)));
+        if (f != null)
+            spec.myFires.remove(f);
+        if (spec.myFires.isEmpty())
+            spec.myFiresOnly = false;
+        redraw();
+    }
+
+    /** Only My Fires on or off; the list is kept. Worker thread. */
+    public void setMyFiresOnly(boolean on) {
+        spec.myFiresOnly = on && !spec.myFires.isEmpty();
+        redraw();
+    }
+
+    /** Empties My Fires and shows every fire. Worker thread. */
+    public void clearMyFires() {
+        spec.myFires.clear();
+        spec.myFiresOnly = false;
+        redraw();
+    }
+
+    private void redraw() {
         synchronized (lock) {
             if (store != null && !closed) {
                 loadCacheLocked();
@@ -2128,6 +2174,15 @@ public class LoadedLayer {
             }
         }
     }
+
+    /** One fire's extent, a little wider, as a query scope. */
+    private static Esri.Scope boxScope(double[] ib) {
+        final double padX = Math.max(0.01, (ib[2] - ib[0]) * 0.05), padY = Math.max(0.01, (ib[3] - ib[1]) * 0.05);
+        return Esri.Scope.box(ib[1] - padY, ib[0] - padX, ib[3] + padY, ib[2] + padX);
+    }
+
+    /** While set, the scope every fetch uses: one of My Fires' extents. */
+    private volatile Esri.Scope scopeOverride;
 
     /** When an unnamed fire leaves the map, epoch ms (NewStartsStyles.UNNAMED_KEEP_MS after it was found). */
     static final String ATTR_DROP_AT = "_drop_at";
@@ -2401,7 +2456,7 @@ public class LoadedLayer {
             final FeatureSetCursor c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
             try {
                 while (c.moveToNext())
-                    out.add(new SetInfo(c.getId(), c.getName(), spec.isOn(twinBase(c.getName()))));
+                    out.add(new SetInfo(c.getId(), c.getName(), shows(twinBase(c.getName()))));
             } finally {
                 c.close();
             }

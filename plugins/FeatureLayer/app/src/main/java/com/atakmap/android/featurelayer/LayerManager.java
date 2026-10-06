@@ -638,41 +638,41 @@ public class LayerManager {
         });
     }
 
-    /** Only This Fire on a burn, by its attributes; the layer is redrawn on the worker. */
-    public void isolate(final LoadedLayer l, final com.atakmap.map.layer.feature.AttributeSet a) {
-        l.busy = true;
-        changed();
-        worker.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    l.isolate(a);
-                } finally {
-                    l.busy = false;
-                    changed();
-                }
-            }
-        });
-        // Fetch that fire by its own extent: a fire found by name may be nowhere near the
-        // burns already loaded.
-        refresh(l);
-    }
+    /** The My Fires operations: each redraws on the worker, saves, and fetches. */
+    public static final int MY_ADD = 0, MY_REMOVE = 1, MY_ONLY_ON = 2, MY_ONLY_OFF = 3, MY_CLEAR = 4;
 
-    /** Every fire again, and the view fetched. */
-    public void showAllFires(final LoadedLayer l) {
+    public void myFires(final LoadedLayer l, final int op, final com.atakmap.map.layer.feature.AttributeSet a) {
         l.busy = true;
         changed();
         worker.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    l.showAllFires();
+                    switch (op) {
+                        case MY_ADD:
+                            l.addMyFire(a);
+                            break;
+                        case MY_REMOVE:
+                            l.removeMyFire(a);
+                            break;
+                        case MY_ONLY_ON:
+                            l.setMyFiresOnly(true);
+                            break;
+                        case MY_ONLY_OFF:
+                            l.setMyFiresOnly(false);
+                            break;
+                        default:
+                            l.clearMyFires();
+                            break;
+                    }
                 } finally {
                     l.busy = false;
+                    save();
                     changed();
                 }
             }
         });
+        // Fetch what is now to be shown: My Fires by their extents, or the view again.
         refresh(l);
     }
 

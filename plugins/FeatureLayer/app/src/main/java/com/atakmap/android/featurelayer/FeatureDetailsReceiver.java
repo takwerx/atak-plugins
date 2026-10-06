@@ -102,10 +102,7 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         bindLink(button, CalFire.isPage(url) ? url : null, mapView);
     }
 
-    /**
-     * Only This Fire / Show All Fires on a burn's details: shown for Fire History burns,
-     * reading what a tap will do now.
-     */
+    /** Add to My Fires / Remove from My Fires on a Fire History burn's details; gone for anything else. */
     public static void bindOnly(View v, final LoadedLayer layer, final AttributeSet attrs, final LayerManager manager) {
         if (!(v instanceof android.widget.Button))
             return;
@@ -115,18 +112,13 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
             return;
         }
         b.setVisibility(View.VISIBLE);
-        final boolean on = layer.isIsolated(attrs);
-        b.setText(on ? "Show All Fires" : "Only This Fire");
+        b.setText(layer.isMyFire(attrs) ? "Remove from My Fires" : "Add to My Fires");
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View x) {
-                if (layer.isIsolated(attrs)) {
-                    manager.showAllFires(layer);
-                    b.setText("Only This Fire");
-                } else {
-                    manager.isolate(layer, attrs);
-                    b.setText("Show All Fires");
-                }
+                final boolean in = layer.isMyFire(attrs);
+                manager.myFires(layer, in ? LayerManager.MY_REMOVE : LayerManager.MY_ADD, attrs);
+                b.setText(in ? "Add to My Fires" : "Remove from My Fires");
             }
         });
     }
