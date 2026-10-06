@@ -450,6 +450,11 @@ to the zoom; zoom in and they load again in finer detail.
 in view. Add a year to pick one fire out of many with the same name: "Ranch 2007".
 **Go** takes the map to it, close enough to read its name.
 
+**Only This Fire**, in a burn's details, hides every other burn and keeps that one
+fire on the map wherever you pan. The layer's row then reads "Fire History: Ridge
+Fire #98 (1928)", and **Show All Fires** in its controls (or the same button in the
+details) brings the rest back.
+
 ## Your own organization
 
 ![Add your own org](screenshots/26_add_org.png)

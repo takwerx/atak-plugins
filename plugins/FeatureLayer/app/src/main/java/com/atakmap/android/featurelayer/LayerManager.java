@@ -638,6 +638,44 @@ public class LayerManager {
         });
     }
 
+    /** Only This Fire on a burn, by its attributes; the layer is redrawn on the worker. */
+    public void isolate(final LoadedLayer l, final com.atakmap.map.layer.feature.AttributeSet a) {
+        l.busy = true;
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    l.isolate(a);
+                } finally {
+                    l.busy = false;
+                    changed();
+                }
+            }
+        });
+        // Fetch that fire by its own extent: a fire found by name may be nowhere near the
+        // burns already loaded.
+        refresh(l);
+    }
+
+    /** Every fire again, and the view fetched. */
+    public void showAllFires(final LoadedLayer l) {
+        l.busy = true;
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    l.showAllFires();
+                } finally {
+                    l.busy = false;
+                    changed();
+                }
+            }
+        });
+        refresh(l);
+    }
+
     public void refresh(final LoadedLayer l) {
         if (l.refreshing)
             return;

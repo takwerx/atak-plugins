@@ -691,6 +691,8 @@ public class LoadedLayer {
             for (Pending pf : cache) {
                 if (!layerOn || !spec.isOn(pf.setName))
                     continue;
+                if (isoKey != null && !isolatedOne(pf))
+                    continue; // Only This Fire
                 // A named point with a label level is written twice: the bare symbol in the
                 // type's own set, which stops drawing at that level, and the named icon in a
                 // twin set that starts there. ATAK switches between them by resolution, so
@@ -1072,6 +1074,9 @@ public class LoadedLayer {
                             final AttributeSet attrs = Esri.toAttributes(props, lastDateFields);
                             attrs.setAttribute("_title", title);
                             attrs.setAttribute("_type", type);
+                            attrs.setAttribute(ATTR_FIRE, norm + "|" + FireHistoryStyles.year(props));
+                            attrs.setAttribute(ATTR_FIRE_BOX, box[0] + "," + box[1] + "," + box[2] + "," + box[3]);
+                            attrs.setAttribute(ATTR_FIRE_TITLE, title);
                             if (when > 0)
                                 attrs.setAttribute("_time", when);
                             out.add(new Hit(title, spec.title, spec.id, type, when, (e.minY + e.maxY) / 2,
@@ -1187,6 +1192,8 @@ public class LoadedLayer {
     boolean movedOutOfScope() {
         if (!hasScopeControl() || refreshing || busy || "all".equals(spec.scopeKind))
             return false;
+        if (isoKey != null)
+            return false; // one fire, fetched by its own extent: the map moving changes nothing
         try {
             if ("view".equals(spec.scopeKind)) {
                 if (viewTooWide)
@@ -1269,6 +1276,12 @@ public class LoadedLayer {
     }
 
     private Esri.Scope scope() {
+        // Only This Fire: that fire's extent, wherever the map is.
+        final double[] ib = isoBox;
+        if (ib != null && isoKey != null) {
+            final double padX = Math.max(0.01, (ib[2] - ib[0]) * 0.05), padY = Math.max(0.01, (ib[3] - ib[1]) * 0.05);
+            return Esri.Scope.box(ib[1] - padY, ib[0] - padX, ib[3] + padY, ib[2] + padX);
+        }
         // "all": the scope control's zero on a layer small enough to hold the country
         // (New Fire Starts), so a typed Find reaches a fire anywhere, not only in view.
         if (spec.scopeKind == null || "all".equals(spec.scopeKind))
@@ -1862,6 +1875,13 @@ public class LoadedLayer {
                             }
                         }
                         final AttributeSet attrs = Esri.toAttributes(props, dates);
+                        if (history && copy != null) {
+                            // Which fire this is, so Only This Fire can pick it out later.
+                            final double[] bx = (double[]) copy[1];
+                            attrs.setAttribute(ATTR_FIRE, FireHistoryStyles.normName(props) + "|" + FireHistoryStyles.year(props));
+                            attrs.setAttribute(ATTR_FIRE_BOX, bx[0] + "," + bx[1] + "," + bx[2] + "," + bx[3]);
+                            attrs.setAttribute(ATTR_FIRE_TITLE, FireHistoryStyles.title(props, layerName));
+                        }
                         if (dropAt > 0)
                             attrs.setAttribute(ATTR_DROP_AT, dropAt);
                         if (NewStartsStyles.handles(spec) && g instanceof com.atakmap.map.layer.feature.geometry.Point) {
@@ -2027,6 +2047,88 @@ public class LoadedLayer {
         if (!c.active)
             attrs.setAttribute(CALFIRE_PREFIX + "status", "final" + (c.extinguished.isEmpty() ? "" : ", out " + CalFire.when(c.extinguished)));
     }
+    /** A burn's identity for Only This Fire: normName|year, its extent, and its title. */
+    public static final String ATTR_FIRE = "_fire", ATTR_FIRE_BOX = "_firebox", ATTR_FIRE_TITLE = "_firetitle";
+
+    /** The one fire shown when Only This Fire is on: its normName|year, its extent and title; all null when off. */
+    private volatile String isoKey, isoTitle;
+    private volatile double[] isoBox;
+
+    /** The title of the one fire shown, or null when every fire is. */
+    public String isolatedTitle() {
+        return isoKey == null ? null : isoTitle;
+    }
+
+    /** Whether Only This Fire is on for the burn with these attributes. */
+    public boolean isIsolated(AttributeSet a) {
+        final String k = attr(a, ATTR_FIRE);
+        return isoKey != null && isoKey.equals(k);
+    }
+
+    private static String attr(AttributeSet a, String k) {
+        try {
+            return a != null && a.containsAttribute(k) ? a.getStringAttribute(k) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static double[] box(String s) {
+        if (s == null)
+            return null;
+        final String[] p = s.split(",");
+        if (p.length != 4)
+            return null;
+        try {
+            return new double[] { Double.parseDouble(p[0]), Double.parseDouble(p[1]), Double.parseDouble(p[2]),
+                    Double.parseDouble(p[3]) };
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** Whether a cached burn is the one fire shown. */
+    private boolean isolatedOne(Pending pf) {
+        final double[] b = box(attr(pf.attrs, ATTR_FIRE_BOX));
+        return isoKey.equals(attr(pf.attrs, ATTR_FIRE)) && b != null && FireHistoryStyles.overlap(b, isoBox);
+    }
+
+    /**
+     * Only This Fire (operator, 2026-10-06: "yeah a show only"): every other burn hidden
+     * and, while it is on, only that fire's extent fetched, so panning away keeps it.
+     * Returns false when the attributes name no burn. Worker thread.
+     */
+    public boolean isolate(AttributeSet a) {
+        final String k = attr(a, ATTR_FIRE);
+        final double[] b = box(attr(a, ATTR_FIRE_BOX));
+        if (k == null || b == null)
+            return false;
+        isoKey = k;
+        isoBox = b;
+        final String t = attr(a, ATTR_FIRE_TITLE);
+        isoTitle = t != null ? t : k;
+        synchronized (lock) {
+            if (store != null && !closed) {
+                loadCacheLocked();
+                rewriteStore(true);
+            }
+        }
+        return true;
+    }
+
+    /** Every fire again; the caller fetches the view. Worker thread. */
+    public void showAllFires() {
+        isoKey = null;
+        isoBox = null;
+        isoTitle = null;
+        synchronized (lock) {
+            if (store != null && !closed) {
+                loadCacheLocked();
+                rewriteStore(true);
+            }
+        }
+    }
+
     /** When an unnamed fire leaves the map, epoch ms (NewStartsStyles.UNNAMED_KEEP_MS after it was found). */
     static final String ATTR_DROP_AT = "_drop_at";
 

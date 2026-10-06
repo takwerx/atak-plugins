@@ -48,6 +48,15 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:visibility="gone">
+        <!-- Only This Fire is on: back to every fire. -->
+        <Button
+            android:id="@+id/row_show_all"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="Show All Fires"
+            android:visibility="gone" />
         <!-- The fire layers' map key: each marker beside what it means, built in code
              from the images the map draws. Gone on every other layer. -->
         <LinearLayout

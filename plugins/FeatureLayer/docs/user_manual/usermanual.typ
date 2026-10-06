@@ -548,7 +548,8 @@ takes any ArcGIS Online organization you sign in to.
   arrow on its row opens the map key. Burns over 20 acres are labeled "Carr Fire
   (2018)"; a tap opens a burn's details. It loads what is in view, up to about
   155 miles across, simplified to the zoom. *Find* searches all of it by name;
-  add a year to pick one fire: "Ranch 2007".
+  add a year to pick one fire: "Ranch 2007". *Only This Fire* in a burn's details
+  hides the others until *Show All Fires*.
 ]
 
 #tak-slide[

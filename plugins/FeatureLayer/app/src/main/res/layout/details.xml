@@ -26,6 +26,15 @@
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF" />
+        <!-- A Fire History burn: Only This Fire / Show All Fires. Gone otherwise. -->
+        <Button
+            android:id="@+id/btn_only"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="4dp"
+            android:text="Only This Fire"
+            android:visibility="gone" />
         <!-- A fire CAL FIRE runs or posts: its incident page. Gone otherwise. -->
         <Button
             android:id="@+id/btn_calfire"

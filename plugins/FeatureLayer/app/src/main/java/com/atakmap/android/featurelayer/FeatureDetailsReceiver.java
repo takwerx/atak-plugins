@@ -102,6 +102,35 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         bindLink(button, CalFire.isPage(url) ? url : null, mapView);
     }
 
+    /**
+     * Only This Fire / Show All Fires on a burn's details: shown for Fire History burns,
+     * reading what a tap will do now.
+     */
+    public static void bindOnly(View v, final LoadedLayer layer, final AttributeSet attrs, final LayerManager manager) {
+        if (!(v instanceof android.widget.Button))
+            return;
+        final android.widget.Button b = (android.widget.Button) v;
+        if (layer == null || manager == null || read(attrs, LoadedLayer.ATTR_FIRE) == null) {
+            b.setVisibility(View.GONE);
+            return;
+        }
+        b.setVisibility(View.VISIBLE);
+        final boolean on = layer.isIsolated(attrs);
+        b.setText(on ? "Show All Fires" : "Only This Fire");
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View x) {
+                if (layer.isIsolated(attrs)) {
+                    manager.showAllFires(layer);
+                    b.setText("Only This Fire");
+                } else {
+                    manager.isolate(layer, attrs);
+                    b.setText("Show All Fires");
+                }
+            }
+        });
+    }
+
     private static String read(AttributeSet attrs, String key) {
         try {
             if (attrs != null && attrs.containsAttribute(key))
@@ -173,6 +202,7 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         ((TextView) view.findViewById(R.id.details_attributes)).setText(body);
         bindInciWeb(view.findViewById(R.id.btn_inciweb), f.getAttributes(), getMapView());
         bindCalFire(view.findViewById(R.id.btn_calfire), f.getAttributes(), getMapView());
+        bindOnly(view.findViewById(R.id.btn_only), layer, f.getAttributes(), manager);
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
     }
 

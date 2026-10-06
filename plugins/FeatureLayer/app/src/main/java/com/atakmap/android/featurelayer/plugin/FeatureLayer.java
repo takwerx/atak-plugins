@@ -1189,6 +1189,8 @@ public class FeatureLayer implements IPlugin {
                 paneView.findViewById(R.id.btn_details_inciweb), h.attrs, mapView);
         com.atakmap.android.featurelayer.FeatureDetailsReceiver.bindCalFire(
                 paneView.findViewById(R.id.btn_details_calfire), h.attrs, mapView);
+        com.atakmap.android.featurelayer.FeatureDetailsReceiver.bindOnly(
+                paneView.findViewById(R.id.btn_details_only), l, h.attrs, manager);
         searchPanel.setVisibility(View.GONE);
         paneView.findViewById(R.id.features_header).setVisibility(View.GONE); // one Back, the details' own
         panel.setVisibility(View.VISIBLE);
@@ -1404,7 +1406,9 @@ public class FeatureLayer implements IPlugin {
                 toggle.setTextColor(Color.parseColor("#FFC107"));
                 toggle.setEnabled(false);
             } else {
-                toggle.setText(l.displayName() + (l.isVisible() ? " ON" : " OFF"));
+                final String only = l.isolatedTitle();
+                toggle.setText(only != null && l.isVisible() ? l.spec.title + ": " + only
+                        : l.displayName() + (l.isVisible() ? " ON" : " OFF"));
                 toggle.setTextColor(l.isVisible() ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
                 toggle.setEnabled(true);
             }
@@ -1478,6 +1482,14 @@ public class FeatureLayer implements IPlugin {
                 }
             });
             bindKey((LinearLayout) row.findViewById(R.id.row_key), l);
+            final Button showAll = row.findViewById(R.id.row_show_all);
+            showAll.setVisibility(l.isolatedTitle() != null ? View.VISIBLE : View.GONE);
+            showAll.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    manager.showAllFires(l);
+                }
+            });
             final View scopeBlock = row.findViewById(R.id.row_scope);
             if (l.hasScopeControl()) {
                 scopeBlock.setVisibility(View.VISIBLE);
@@ -2172,7 +2184,7 @@ public class FeatureLayer implements IPlugin {
             return "Loading features\u2026 " + l.progress + " so far";
         if (l.busy)
             return "Loading features\u2026";
-        sb.append(l.count).append(" features");
+        sb.append(l.count).append(l.count == 1 ? " feature" : " features");
         if (l.lastRefresh > 0)
             sb.append(" · refreshed ").append(age(l.lastRefresh)).append(" ago");
         else
