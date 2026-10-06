@@ -121,6 +121,11 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
             Log.d(TAG, "details: no map item for " + uid);
             return;
         }
+        show(item);
+    }
+
+    /** Opens the details of a tapped feature's map item; the radial's Details and a fire's tap both land here. */
+    public void show(MapItem item) {
         final long fid = item.getMetaLong("featureid", -1);
         final String layerId = item.getMetaString("nifs_layer", null);
         final FeatureDataStore2 store = layerId == null ? null : manager.storeFor(layerId);

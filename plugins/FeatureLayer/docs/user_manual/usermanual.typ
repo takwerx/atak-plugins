@@ -521,8 +521,9 @@ takes any ArcGIS Online organization you sign in to.
   how much is contained: "DOME - 6,760 ac - 40%". A fire stays listed until it is
   declared contained, so one at 100% can still show.
 
-  *InciWeb* sits beside *Go there* in a fire's details when the fire has an
-  InciWeb page, most often a federal fire; it opens the page in the browser.
+  Tap a fire on the map, from either layer, and its details open at once, with
+  no radial menu. *InciWeb* sits beside *Go there* when the fire has an InciWeb
+  page, most often a federal fire; it opens the page in the browser.
 ]
 
 #tak-slide[

@@ -201,6 +201,11 @@ public class LayerManager {
         final DocumentedIntentFilter filter = new DocumentedIntentFilter();
         filter.addAction(ACTION_DETAILS, "show the attributes of a loaded feature");
         AtakBroadcast.getInstance().registerReceiver(details, filter);
+        // A fire is tapped to be read: its details open at once, no radial (operator,
+        // 2026-10-05: "if you tap an incident it should just open up its details pane,
+        // no radial"). ATAK asks these listeners before it opens a radial; every other
+        // layer still gets its radial with Bloodhound, range and bearing, Marker here.
+        com.atakmap.android.menu.MapMenuReceiver.getInstance().addEventListener(fireTap);
         markerHere = new MarkerHereReceiver(mapView, this);
         final DocumentedIntentFilter mh = new DocumentedIntentFilter();
         mh.addAction(MarkerHereReceiver.ACTION, "drop a marker at a loaded feature");
@@ -247,8 +252,30 @@ public class LayerManager {
         startLog("old icon folder on the card removed, " + gone + " files");
     }
 
+    private final com.atakmap.android.menu.MapMenuEventListener fireTap =
+            new com.atakmap.android.menu.MapMenuEventListener() {
+                @Override
+                public boolean onShowMenu(com.atakmap.android.maps.MapItem item) {
+                    if (item == null || details == null)
+                        return false;
+                    final LoadedLayer l = find(item.getMetaString("nifs_layer", ""));
+                    if (l == null || !NewStartsStyles.handles(l.spec))
+                        return false;
+                    details.show(item);
+                    return true;
+                }
+
+                @Override
+                public void onHideMenu(com.atakmap.android.maps.MapItem item) {
+                }
+            };
+
     public void stop() {
         started = false;
+        try {
+            com.atakmap.android.menu.MapMenuReceiver.getInstance().removeEventListener(fireTap);
+        } catch (Exception ignored) {
+        }
         detachFollow();
         main.removeCallbacks(timer);
         try {

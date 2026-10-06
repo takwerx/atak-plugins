@@ -405,6 +405,9 @@ declares it contained, so a fire at 100% can still be on the map. NIFC drops a f
 under 10 acres after 3 days with no update, under 100 acres after 8, and a larger
 one after 14.
 
+Tap a fire on the map, from either layer, and its details open straight away, with
+no radial menu.
+
 **InciWeb** sits beside **Go there** in a fire's details when the fire has an
 InciWeb page, most often a Forest Service or other federal fire; it opens the page
 in the phone's browser. The plugin learns which fires have a page from InciWeb's
