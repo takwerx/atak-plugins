@@ -1328,7 +1328,7 @@ public class FeatureLayer implements IPlugin {
             final boolean open = uiPrefs().getBoolean(foldKey, false);
             expand.setRotation(open ? 180f : 0f);
             body.setVisibility(open ? View.VISIBLE : View.GONE);
-            status.setVisibility(open || statusWarns(l) ? View.VISIBLE : View.GONE);
+            status.setVisibility(open ? View.VISIBLE : View.GONE);
             expand.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -1336,7 +1336,7 @@ public class FeatureLayer implements IPlugin {
                     uiPrefs().edit().putBoolean(foldKey, nowOpen).apply();
                     expand.setRotation(nowOpen ? 180f : 0f);
                     body.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
-                    status.setVisibility(nowOpen || statusWarns(l) ? View.VISIBLE : View.GONE);
+                    status.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
                 }
             });
             toggle.setOnClickListener(new View.OnClickListener() {
@@ -1439,8 +1439,22 @@ public class FeatureLayer implements IPlugin {
     /** Radius choices, in the operator's own big unit. 0 is "what is in view". */
     private static final int[] SCOPE_PRESETS = { 0, 2, 5, 10, 25, 50 };
 
-    private static String scopePresetLabel(int r) {
-        return r == 0 ? "What is in view" : r + " " + Units.bigLabel();
+    private static String scopePresetLabel(LoadedLayer l, int r) {
+        return r == 0 ? zeroLabel(l) : r + " " + Units.bigLabel();
+    }
+
+    /**
+     * What the radius control's zero means for a layer. Most scoped layers hold too much
+     * to fetch nationally, so zero is what is in view. New Fire Starts is a hundred or so
+     * starts across the country: zero is everywhere, and Find reaches a fire wherever the
+     * map is (operator, 2026-10-05, looking for FORK in Shasta with the map in Texas).
+     */
+    private static String zeroKind(LoadedLayer l) {
+        return com.atakmap.android.featurelayer.NewStartsStyles.handles(l.spec) ? "all" : "view";
+    }
+
+    private static String zeroLabel(LoadedLayer l) {
+        return "all".equals(zeroKind(l)) ? "Everywhere" : "What is in view";
     }
 
     /**
@@ -1454,7 +1468,7 @@ public class FeatureLayer implements IPlugin {
         final android.widget.SeekBar seek = row.findViewById(R.id.row_scope_seek);
         final Button from = row.findViewById(R.id.row_scope_from);
         final boolean center = "center".equals(l.spec.scopeKind);
-        final boolean inView = "view".equals(l.spec.scopeKind);
+        final boolean inView = "view".equals(l.spec.scopeKind) || "all".equals(l.spec.scopeKind);
         final String fromName = center ? "Map Center" : "My Location";
         final int big = inView ? 0
                 : (int) Math.max(0, Math.min(seek.getMax(), Math.round(l.spec.scopeRadiusM / Units.bigToMeters(1))));
@@ -1465,7 +1479,7 @@ public class FeatureLayer implements IPlugin {
             @Override
             public void onProgressChanged(android.widget.SeekBar sb, int p, boolean fromUser) {
                 if (fromUser)
-                    label.setText(p == 0 ? "What is in view"
+                    label.setText(p == 0 ? zeroLabel(l)
                             : "Within " + p + " " + Units.bigLabel() + " of " + fromName);
             }
 
@@ -1512,7 +1526,7 @@ public class FeatureLayer implements IPlugin {
                 final String[] items = new String[SCOPE_PRESETS.length];
                 int checked = -1;
                 for (int i = 0; i < SCOPE_PRESETS.length; i++) {
-                    items[i] = scopePresetLabel(SCOPE_PRESETS[i]);
+                    items[i] = scopePresetLabel(l, SCOPE_PRESETS[i]);
                     if (SCOPE_PRESETS[i] == (inView ? 0 : big))
                         checked = i;
                 }
@@ -1535,7 +1549,7 @@ public class FeatureLayer implements IPlugin {
 
     private void applyScope(LoadedLayer l, int big, String kind) {
         if (big <= 0)
-            manager.setScope(l, "view", 0);
+            manager.setScope(l, zeroKind(l), 0);
         else
             manager.setScope(l, kind, Units.bigToMeters(big));
     }
@@ -1895,7 +1909,7 @@ public class FeatureLayer implements IPlugin {
         }
         if (manager != null)
             for (LoadedLayer l : manager.snapshot())
-                if (l.hasScopeControl())
+                if (l.hasScopeControl() && !l.holdsEverything())
                     return " \u00b7 scoped layers search only their own area";
         return "";
     }
@@ -1913,7 +1927,7 @@ public class FeatureLayer implements IPlugin {
      * its way, so the cached matches show meanwhile.
      */
     private List<LoadedLayer.Hit> feedHitsFor(final String text, final LoadedLayer only) {
-        if (only == null || !only.hasScopeControl() || text == null || text.isEmpty())
+        if (only == null || !only.hasScopeControl() || only.holdsEverything() || text == null || text.isEmpty())
             return null;
         final boolean fresh = text.equals(feedText) && feedHits != null && System.currentTimeMillis() - feedAt < 120_000;
         if (fresh)
@@ -1976,16 +1990,6 @@ public class FeatureLayer implements IPlugin {
     /** Where a layer row's open/closed state is kept, by layer id. */
     private static String foldPref(LoadedLayer l) {
         return "fold." + l.spec.id;
-    }
-
-    /**
-     * Whether the status line says something is not being shown, so a closed row still
-     * carries it: a stale or partial layer, or one capped below what exists.
-     */
-    private static boolean statusWarns(LoadedLayer l) {
-        if (l.refreshing || l.busy)
-            return false;
-        return l.stale || l.capped || l.status.startsWith("partial");
     }
 
     private static String statusLine(LoadedLayer l) {

@@ -32,9 +32,8 @@
             android:contentDescription="Show or hide the controls for this layer"
             android:src="@drawable/ic_expand" />
     </LinearLayout>
-    <!-- Shown with the controls, and on its own under a closed row when something is
-         not being shown (stale, partial, capped), so a trimmed map never reads as the
-         whole picture. -->
+    <!-- Shown with the controls only: a closed row is one line (operator, 2026-10-05:
+         "i want it compact, i can see that when i expand it"). -->
     <TextView
         android:id="@+id/row_status"
         android:layout_width="match_parent"

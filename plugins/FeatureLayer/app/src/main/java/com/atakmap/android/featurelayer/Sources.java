@@ -239,7 +239,7 @@ public final class Sources {
         s.refreshMinutes = 5; // the service is refreshed from IRWIN every 5 minutes
         s.iconSet = "newstarts";
         s.labelGsd = LayerSpec.DEFAULT_LABEL_GSD_WIDE;
-        s.scopeKind = "view";
+        s.scopeKind = "all"; // everywhere: the control's zero for this layer; a radius narrows it
         s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
         s.maxFeatures = 2000; // the service's own page; a national fetch is a few hundred
         NewStartsStyles.notes(s);
@@ -301,6 +301,10 @@ public final class Sources {
             s.scopeKind = now.scopeKind;
             s.scopeRadiusM = now.scopeRadiusM;
         }
+        // The first New Fire Starts build defaulted to what is in view, which this layer
+        // no longer offers: its zero is everywhere.
+        if (NEW_STARTS_ID.equals(s.id) && "view".equals(s.scopeKind))
+            s.scopeKind = "all";
     }
 
     /** A whole feature service from a user's own org: every layer, generic symbology, capped. */

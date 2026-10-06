@@ -86,10 +86,6 @@ features it holds, when it last refreshed and the refresh interval, then
 **Remove**. The arrow works while a layer is off, and each row stays open or
 closed the way you left it.
 
-When a layer is not showing everything (it could not refresh, only part of it came
-in, or there is more than it draws), that line stays under its row even when the
-row is closed.
-
 **All ON / All OFF** beside the heading works every layer at once. A row says
 **Loading…** while its layer fetches. **Go to** frames the whole incident; layers
 spread across a state or the country (DART, FireGuard, New Fire Starts, CA Air
@@ -383,9 +379,9 @@ and were never updated: some centers enter every fire call this way, with a
 dispatch number for a name, and never touch it again. Turn it off to see only the
 fires someone has sized.
 
-**Where** works like DART's: what is in view (the default, at any width, so a
-zoomed-out map shows the whole country), or within a distance of My Location or
-the map center. **Time window** picks the last hour, 3, 6, 12 or 24 hours. The
+**Where** is **Everywhere** at first: every start in the country is loaded, so
+**Find** reaches a fire wherever the map is. Slide it to load only the starts within
+a distance of My Location or the map center. **Time window** picks the last hour, 3, 6, 12 or 24 hours. The
 **Zoom gate** is off at first, so starts draw at every zoom. The layer refreshes
 every 5 minutes, as often as NIFC's view does.
 

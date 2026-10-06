@@ -107,9 +107,6 @@ takes any ArcGIS Online organization you sign in to.
   holds, when it last refreshed, then *Features*, *Go to*, *Auto* (how often it
   refreshes), *Refresh* and *Remove*. The arrow works while a layer is off.
 
-  When a layer is not showing everything, that line stays under its row even
-  when the row is closed.
-
   *All ON / All OFF* beside the heading works every layer at once. A row says
   *Loading...* while its layer fetches.
 
@@ -503,8 +500,9 @@ takes any ArcGIS Online organization you sign in to.
   entered and never updated; turn it off to see only the fires someone has
   sized.
 
-  *Where* works like DART's: what is in view, at any width, or within a distance
-  of My Location or the map center. *Time window* picks the last hour, 3, 6, 12
+  *Where* is *Everywhere* at first, so *Find* reaches a fire wherever the map
+  is; slide it to keep only the starts within a distance of My Location or the
+  map center. *Time window* picks the last hour, 3, 6, 12
   or 24 hours. The layer refreshes every 5 minutes.
 ]
 

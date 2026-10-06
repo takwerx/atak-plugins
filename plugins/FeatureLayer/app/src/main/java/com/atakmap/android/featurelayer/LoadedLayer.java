@@ -1002,6 +1002,8 @@ public class LoadedLayer {
     public String scopeLabel() {
         if (spec.scopeKind == null)
             return "Everything";
+        if ("all".equals(spec.scopeKind))
+            return "Everywhere";
         if ("view".equals(spec.scopeKind))
             return "What is in view";
         if ("box".equals(spec.scopeKind))
@@ -1013,9 +1015,15 @@ public class LoadedLayer {
         return "Within " + Units.formatBig(spec.scopeRadiusM) + " of " + from + (note == null ? "" : " (" + note + ")");
     }
 
+    /** Whether the layer is fetched everywhere, so what it holds is the whole feed and a Find needs no feed query. */
+    public boolean holdsEverything() {
+        return "all".equals(spec.scopeKind);
+    }
+
     /** Whether this layer's scope is one the pane offers a control for. */
     public boolean hasScopeControl() {
-        return "me".equals(spec.scopeKind) || "center".equals(spec.scopeKind) || "view".equals(spec.scopeKind);
+        return "me".equals(spec.scopeKind) || "center".equals(spec.scopeKind) || "view".equals(spec.scopeKind)
+                || "all".equals(spec.scopeKind);
     }
 
     /** A usable own position, or null: the self marker before a fix reads 0,0 and calls itself valid. */
@@ -1033,7 +1041,7 @@ public class LoadedLayer {
      * {@link LayerManager} after a debounced map move.
      */
     boolean movedOutOfScope() {
-        if (!hasScopeControl() || refreshing || busy)
+        if (!hasScopeControl() || refreshing || busy || "all".equals(spec.scopeKind))
             return false;
         try {
             if ("view".equals(spec.scopeKind)) {
@@ -1102,7 +1110,9 @@ public class LoadedLayer {
     }
 
     private Esri.Scope scope() {
-        if (spec.scopeKind == null)
+        // "all": the scope control's zero on a layer small enough to hold the country
+        // (New Fire Starts), so a typed Find reaches a fire anywhere, not only in view.
+        if (spec.scopeKind == null || "all".equals(spec.scopeKind))
             return null;
         if ("view".equals(spec.scopeKind)) {
             // What the operator is looking at, which is what they are asking about. The map
