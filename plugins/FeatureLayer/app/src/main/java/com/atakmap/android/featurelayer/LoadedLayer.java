@@ -172,6 +172,13 @@ public class LoadedLayer {
         // labels of hidden sets on the XCover.
         final FeatureDataStore2.FeatureQueryParameters visibleOnly = new FeatureDataStore2.FeatureQueryParameters();
         visibleOnly.visibleOnly = true;
+        if (FireHistoryStyles.handles(spec)) {
+            // Drawn in the order written, so the newest burn is on top. Without an order
+            // the store walks its sets in hash-table order, which moves with every refresh's
+            // new set ids: the 1920s drew over the 2010s on dev 1 (2026-10-06).
+            visibleOnly.order = java.util.Collections.<FeatureDataStore2.FeatureQueryParameters.Order>singletonList(
+                    new FeatureDataStore2.FeatureQueryParameters.Order.ID());
+        }
         layer = new FeatureLayer3(displayName(), store, visibleOnly);
         if (DartStyles.handles(spec)) {
             dartLabels = new DartMarkers(mapView, pluginContext, spec.id,
@@ -638,6 +645,42 @@ public class LoadedLayer {
         return false;
     }
 
+    /**
+     * The order features are written, which is the order they draw (the last on top).
+     * Fire History goes oldest first, so a reburn shows over the fire before it: by type,
+     * 1979 and Earlier up to Under 6 Months, then by year within a type. Every other
+     * layer keeps the source's order.
+     */
+    private List<Pending> drawOrder(List<Pending> in) {
+        if (!FireHistoryStyles.handles(spec))
+            return in;
+        final List<Pending> out = new ArrayList<>(in);
+        java.util.Collections.sort(out, new java.util.Comparator<Pending>() {
+            @Override
+            public int compare(Pending a, Pending b) {
+                final int ra = FireHistoryStyles.age(a.setName), rb = FireHistoryStyles.age(b.setName);
+                if (ra != rb)
+                    return ra > rb ? -1 : 1;
+                final int ya = burnYear(a), yb = burnYear(b);
+                return ya < yb ? -1 : ya > yb ? 1 : 0;
+            }
+        });
+        return out;
+    }
+
+    /** The year a burn's My Fires key carries ("RANCH|2007"), 0 when it has none. */
+    private static int burnYear(Pending p) {
+        final String k = attr(p.attrs, ATTR_FIRE);
+        final int bar = k == null ? -1 : k.lastIndexOf('|');
+        if (bar < 0)
+            return 0;
+        try {
+            return Integer.parseInt(k.substring(bar + 1));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     /** Removes from the store what should not be shown right now. Lock held. */
     private void pruneHidden() {
         boolean bulk = false;
@@ -697,7 +740,7 @@ public class LoadedLayer {
                     : new ArrayList<DartMarkers.Row>();
             final Map<String, Long> twins = new HashMap<>();
             int written = 0;
-            for (Pending pf : cache) {
+            for (Pending pf : drawOrder(cache)) {
                 if (!shows(pf.setName))
                     continue;
                 if (myFiresShown() && !inMyFires(pf))

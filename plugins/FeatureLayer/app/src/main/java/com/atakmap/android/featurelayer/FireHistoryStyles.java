@@ -100,6 +100,14 @@ public final class FireHistoryStyles {
         return EARLIER;
     }
 
+    /** How far back a type is: 0 for Under 6 Months up to 9 for 1979 and Earlier; past them all when unknown. */
+    static int age(String type) {
+        for (int i = 0; i < KEY.length; i++)
+            if (KEY[i][0].equals(type))
+                return i;
+        return KEY.length;
+    }
+
     /** The fill a type gets, opaque RGB; grey for anything unknown. */
     public static int hue(String type) {
         for (Object[] k : KEY)
