@@ -434,22 +434,21 @@ the gauges say *Not available* and the page asks again the next time you look.
 #tak-slide[
 = Fire Danger
 
-#toolbox.side-by-side(columns: (7fr, 5fr))[
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
   #image("93.jpg", width: 100%)
 ][
   #image("92.png", width: 100%)
-]
+][
+  *Fire Danger* shades every Predictive Service Area in the lower 48 by its
+  Energy Release Component (ERC), the index each GACC charts on its fuels
+  page: green below the 60th percentile, up to orange from the 90th, red from
+  the 97th and dark red above the 99.5th.
 
-#v(4pt)
-*Fire Danger* shades every Predictive Service Area in the lower 48 by its
-Energy Release Component (ERC), the index each GACC charts on its fuels page:
-green below the 60th percentile, then light green, cream, orange from the 90th,
-red from the 97th and dark red above the 99.5th. *Observed* is yesterday's
-value, *Forecast* today's, rebuilt by the Forest Service from FEMS every
-morning; an area's value is the average of its key fire weather stations, and
-its percentile is of every day of the year, 2005 to 2022. The names show from a
-scale bar of about 75 miles in; tap a name for the area. Alaska is not rated
-this way.
+  *Observed* is yesterday's value, *Forecast* today's; an area's value is the
+  average of its key fire weather stations, its percentile of every day of the
+  year, 2005 to 2022. Names show from a scale bar of about 75 miles in; tap a
+  name for the area. Alaska is not rated this way.
+]
 ]
 
 #tak-slide[
@@ -760,18 +759,19 @@ classes, lower 48 only.
 #tak-slide[
 = A utility station
 
-#toolbox.side-by-side(columns: (7fr, 5fr))[
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
   #image("90.png", width: 100%)
 ][
   #image("87.png", width: 100%)
-]
+][
+  A utility averages its wind over a minute or two, not ten as a fire weather
+  station does, so it reads higher than one beside it, and it has no fuel
+  moisture; its record says so at the top.
 
-#v(4pt)
-A utility averages its wind over a minute or two, not ten as a fire weather
-station does, so it reads higher than one beside it, and it has no fuel
-moisture; its record says so at the top. They are counted on their own line
-under the switch, with how many are at criteria. A station that is also a fire
-weather station is drawn once, as the fire weather station.
+  They are counted on their own line under the switch, with how many are at
+  criteria. A station that is also a fire weather station is drawn once, as
+  the fire weather station.
+]
 ]
 
 #tak-slide[
