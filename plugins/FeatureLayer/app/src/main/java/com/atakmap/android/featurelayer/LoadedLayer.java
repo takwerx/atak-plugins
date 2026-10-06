@@ -1020,7 +1020,7 @@ public class LoadedLayer {
      */
     private List<Hit> searchHistory(String needle, int max) throws Exception {
         final List<Hit> out = new ArrayList<>();
-        final Map<String, List<double[]>> seen = new HashMap<>();
+        final Map<String, List<Object[]>> seen = new HashMap<>();
         final Esri.Scope world = Esri.Scope.box(-90, -180, 90, 180).simplified(0.005);
         // "Ranch 2007": a year at the end narrows the name to that year, which is how one
         // fire is picked out of the hundreds named Ranch.
@@ -1055,16 +1055,18 @@ public class LoadedLayer {
                             if (e == null || Double.isNaN(e.minX))
                                 return;
                             final double[] box = { e.minX, e.minY, e.maxX, e.maxY };
+                            final double acres = FireHistoryStyles.acres(props);
+                            final String norm = FireHistoryStyles.normName(props);
                             final String key = FireHistoryStyles.nameYear(props);
-                            List<double[]> same = seen.get(key);
+                            List<Object[]> same = seen.get(key);
                             if (same == null) {
                                 same = new ArrayList<>();
                                 seen.put(key, same);
                             }
-                            for (double[] b : same)
-                                if (FireHistoryStyles.overlap(b, box))
+                            for (Object[] c : same)
+                                if (FireHistoryStyles.sameFire((String) c[0], (Double) c[1], (double[]) c[2], norm, acres, box))
                                     return; // another copy of a fire already listed
-                            same.add(box);
+                            same.add(new Object[] { norm, acres, box });
                             final String title = FireHistoryStyles.title(props, spec.layerTitle);
                             final long when = FireHistoryStyles.when(props);
                             final AttributeSet attrs = Esri.toAttributes(props, lastDateFields);
@@ -1232,7 +1234,7 @@ public class LoadedLayer {
         return FireHistoryStyles.handles(spec) ? 250_000 : MAX_VIEW_M;
     }
 
-    /** Fire History's copies seen this refresh, by name and year: {index in pending, extent, acres, first source}. */
+    /** Fire History's copies seen this refresh, by year: {index in pending, extent, acres, first source, normName}. */
     private final Map<String, List<Object[]>> fireCopies = new HashMap<>();
 
     /** The map resolution a simplified fetch was sized for (m/px), 0 when none was. */
@@ -1658,6 +1660,7 @@ public class LoadedLayer {
                             if (e != null && !Double.isNaN(e.minX)) {
                                 final double[] box = { e.minX, e.minY, e.maxX, e.maxY };
                                 final double acres = FireHistoryStyles.acres(props);
+                                final String norm = FireHistoryStyles.normName(props);
                                 final String key = FireHistoryStyles.nameYear(props);
                                 List<Object[]> same = fireCopies.get(key);
                                 if (same == null) {
@@ -1665,7 +1668,8 @@ public class LoadedLayer {
                                     fireCopies.put(key, same);
                                 }
                                 for (Object[] c : same) {
-                                    if (!FireHistoryStyles.overlap((double[]) c[1], box))
+                                    if (!FireHistoryStyles.sameFire((String) c[4], (Double) c[2], (double[]) c[1],
+                                            norm, acres, box))
                                         continue;
                                     // Another copy of this fire: keep this one only if it is
                                     // the larger copy from the same source.
@@ -1676,11 +1680,12 @@ public class LoadedLayer {
                                     break;
                                 }
                                 if (copy == null) {
-                                    copy = new Object[] { -1, box, acres, firstSource };
+                                    copy = new Object[] { -1, box, acres, firstSource, norm };
                                     same.add(copy);
                                 } else {
                                     copy[1] = box;
                                     copy[2] = acres;
+                                    copy[4] = norm;
                                 }
                             }
                         }

@@ -181,7 +181,9 @@ public final class FireHistoryStyles {
             b.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
         }
         final String s = b.toString();
-        return s.endsWith("Fire") ? s : s + " Fire";
+        // EGP adds "Fire" unless the name ends in it; a name with Fire inside it, "Ridge
+        // Fire #98", read as "Ridge Fire #98 Fire".
+        return (" " + s + " ").contains(" Fire ") ? s : s + " Fire";
     }
 
     /**
@@ -192,7 +194,38 @@ public final class FireHistoryStyles {
      * 57,573 ac) sat 800 m apart either side of a cell line (operator, 2026-10-06).
      */
     static String nameYear(JSONObject p) {
-        return rawName(p).toUpperCase(Locale.US) + "|" + year(p);
+        return String.valueOf(year(p));
+    }
+
+    /**
+     * A name as copies of one fire share it: upper case, the word Fire (and Fires,
+     * Wildfire) dropped, spaces and punctuation gone. The agencies write one fire many
+     * ways: "RIDGE FIRE #98" and "RIDGE #98", "GORMAN FIRE" and "GORMAN", "TOWERHOUSE"
+     * and "TOWER HOUSE", "CARR " with a trailing space (287 such pairs around Castaic
+     * alone, 2026-10-06). A number stays: "BACKBONE" and "BACKBONE #2" are two fires.
+     */
+    static String normName(JSONObject p) {
+        final StringBuilder b = new StringBuilder();
+        for (String w : rawName(p).toUpperCase(Locale.US).replaceAll("[^A-Z0-9]+", " ").trim().split(" "))
+            if (!w.equals("FIRE") && !w.equals("FIRES") && !w.equals("WILDFIRE"))
+                b.append(w);
+        return b.toString();
+    }
+
+    /**
+     * Whether a burn is another copy of one already kept: the same year (the caller's
+     * key), overlapping extents, and the same name as normName writes it, or the same
+     * acres within half a percent ("SHU LIGHTNING-MOTION FIRE" and "Motion", both 28,330
+     * ac). Half a percent keeps neighbors apart: China and Saint Claire 1987 differ by
+     * 0.9%, Sugar and Jackass 1999 by 7%.
+     */
+    static boolean sameFire(String nameA, double acresA, double[] boxA, String nameB, double acresB, double[] boxB) {
+        if (!overlap(boxA, boxB))
+            return false;
+        if (!nameA.isEmpty() && nameA.equals(nameB))
+            return true;
+        final double big = Math.max(acresA, acresB);
+        return big > 0 && Math.abs(acresA - acresB) / big <= 0.005;
     }
 
     /** Whether two extents (minX, minY, maxX, maxY) overlap: the test for two copies of one fire. */
