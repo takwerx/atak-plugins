@@ -382,6 +382,12 @@ and were never updated: some centers enter every fire call this way, with a
 dispatch number for a name, and never touch it again. Turn it off to see only the
 fires someone has sized.
 
+A fire with only a number for a name, such as LAC-357251, leaves the map 4 hours
+after it was found unless someone has named it by then. Some dispatch centers file
+every brush-fire call this way and never come back to it; LA County's filed most of
+the 62 such fires listed one October evening. The row's status line says how many
+were left out.
+
 **Where** is **Everywhere** at first: every start in the country is loaded, so
 **Find** reaches a fire wherever the map is. Slide it to load only the starts within
 a distance of My Location or the map center. **Time window** picks the last hour, 3, 6, 12 or 24 hours. The

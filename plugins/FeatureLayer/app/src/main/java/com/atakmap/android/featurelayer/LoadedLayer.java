@@ -46,9 +46,9 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store. 53: every icon and pill level when
      * the map is spun, and drawn from ATAK's private storage instead of the card. 54: New
-     * Fire Starts as flame and RX markers. 55: fire labels carry % contained.
+     * Fire Starts as flame and RX markers. 55: fire labels carry % contained. 56: unnamed fires leave after four hours.
      */
-    private static final int STYLE_VERSION = 55;
+    private static final int STYLE_VERSION = 56;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -95,6 +95,9 @@ public class LoadedLayer {
     public volatile boolean stale;
     /** The last fetch returned the layer's cap, so there is more than is drawn. */
     public volatile boolean capped;
+    /** Fires left out for having no name past NewStartsStyles.UNNAMED_KEEP_MS, as of the last fetch and prune. */
+    public volatile int unnamedHidden;
+    private int unnamedThisFetch;
     /**
      * A word about how the scope was resolved this time, for the pane: "no GPS fix --
      * measured from Map Center", or null when there is nothing to say.
@@ -392,6 +395,36 @@ public class LoadedLayer {
     public boolean isWideFeed() {
         return DartStyles.handles(spec) || FireGuardStyles.handles(spec) || NewStartsStyles.handles(spec)
                 || "ca-air-intel".equals(spec.id);
+    }
+
+    /** Removes unnamed fires whose four hours are up from the memory copy and the store. Worker thread. */
+    private void pruneUnnamed() {
+        synchronized (lock) {
+            if (store == null || closed)
+                return;
+            loadCacheLocked();
+            final long now = System.currentTimeMillis();
+            final List<Pending> keep = new ArrayList<>(cache.size());
+            int gone = 0;
+            for (Pending p : cache) {
+                long at = 0;
+                try {
+                    if (p.attrs != null && p.attrs.containsAttribute(ATTR_DROP_AT))
+                        at = p.attrs.getLongAttribute(ATTR_DROP_AT);
+                } catch (Exception ignored) {
+                }
+                if (at > 0 && now >= at)
+                    gone++;
+                else
+                    keep.add(p);
+            }
+            if (gone == 0)
+                return;
+            cache = keep;
+            unnamedHidden += gone;
+            rewriteStore(true);
+            Log.d(TAG, spec.id + ": " + gone + " unnamed fires past four hours removed");
+        }
     }
 
     /** Whether the store was last written with this build's styles, so nothing in it points at older files. */
@@ -1215,7 +1248,12 @@ public class LoadedLayer {
             progress.run();
         final List<Pending> pending = new ArrayList<>();
         final List<String> problems = new ArrayList<>();
+        unnamedThisFetch = 0;
         try {
+            // An unnamed fire reaches its four hours whether or not the feed changed, and
+            // the change check below skips the fetch when it has not: let it go first.
+            if (NewStartsStyles.handles(spec))
+                pruneUnnamed();
             // A windowed live layer asks "anything new?" first: count and newest time per
             // source layer. Same answer as last time and something already drawn: done.
             // Styles are written into the store with the features, so a build that changes
@@ -1273,6 +1311,7 @@ public class LoadedLayer {
             }
             lastRefresh = System.currentTimeMillis();
             stale = false;
+            unnamedHidden = unnamedThisFetch;
             status = problems.isEmpty() ? "ok" : "partial: " + problems.get(0);
             capped = spec.maxFeatures > 0 && pending.size() >= spec.maxFeatures * spec.layerIds.length;
             if (capped)
@@ -1472,6 +1511,17 @@ public class LoadedLayer {
                 Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
+                        // A fire with no name, past four hours: a dispatch call nobody came
+                        // back to. Left out, and counted on the row's status line.
+                        long dropAt = 0;
+                        if (NewStartsStyles.handles(spec) && NewStartsStyles.unnamed(props)) {
+                            final long found = NewStartsStyles.discoveredMs(props);
+                            if (found <= 0 || System.currentTimeMillis() - found >= NewStartsStyles.UNNAMED_KEEP_MS) {
+                                unnamedThisFetch++;
+                                return;
+                            }
+                            dropAt = found + NewStartsStyles.UNNAMED_KEEP_MS;
+                        }
                         final String cat = props.isNull("FeatureCategory") ? null : props.optString("FeatureCategory", null);
                         final String repair = props.isNull("RepairStatus") ? null : props.optString("RepairStatus", null);
                         String name, title;
@@ -1644,6 +1694,8 @@ public class LoadedLayer {
                             }
                         }
                         final AttributeSet attrs = Esri.toAttributes(props, dates);
+                        if (dropAt > 0)
+                            attrs.setAttribute(ATTR_DROP_AT, dropAt);
                         if (NewStartsStyles.handles(spec) && g instanceof com.atakmap.map.layer.feature.geometry.Point) {
                             final com.atakmap.map.layer.feature.geometry.Point pt = (com.atakmap.map.layer.feature.geometry.Point) g;
                             final String page = InciWeb.pageFor(props.optString("IncidentName", null), pt.getY(), pt.getX());
@@ -1774,6 +1826,8 @@ public class LoadedLayer {
     static final String ATTR_BARE = "_bare", ATTR_BARE_ALT = "_bare_alt";
     /** A fire's InciWeb page (InciWeb.pageFor); "_" keeps it out of the attribute list. */
     public static final String ATTR_INCIWEB = "_inciweb";
+    /** When an unnamed fire leaves the map, epoch ms (NewStartsStyles.UNNAMED_KEEP_MS after it was found). */
+    static final String ATTR_DROP_AT = "_drop_at";
 
     private static String packStyle(Style s) {
         try {

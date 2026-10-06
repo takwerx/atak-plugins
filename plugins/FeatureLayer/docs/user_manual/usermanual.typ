@@ -503,6 +503,10 @@ takes any ArcGIS Online organization you sign in to.
   entered and never updated; turn it off to see only the fires someone has
   sized.
 
+  A fire with only a number for a name, such as LAC-357251, leaves the map 4
+  hours after it was found unless it has been named by then; the row's status
+  line says how many were left out.
+
   *Where* is *Everywhere* at first, so *Find* reaches a fire wherever the map
   is; slide it to keep only the starts within a distance of My Location or the
   map center. *Time window* picks the last hour, 3, 6, 12

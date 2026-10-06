@@ -58,6 +58,39 @@ public final class NewStartsStyles {
             s.setKind.put(n, "point");
     }
 
+    /**
+     * How long a fire with no name stays (operator, 2026-10-05: "anything after 4 hours
+     * without a name you dump"). A dispatch system that files every brush-fire call and
+     * never comes back leaves a dispatch number where the name goes: LA County's CAD
+     * filed 49 of the 62 unnamed fires among 401 current ones that evening (LAC-357251,
+     * 0.01 ac, never touched again), and NIFC itself only lets them go after 3 days.
+     */
+    public static final long UNNAMED_KEEP_MS = 4 * 3600_000L;
+    private static final java.util.regex.Pattern NUMBER_ONLY =
+            java.util.regex.Pattern.compile("^\\s*[A-Za-z]{0,3}\\s*[-#]?\\s*\\d+\\s*$");
+
+    /**
+     * Whether a fire has no name, only a number: blank, "LAC-359920", "0881", "FA #53",
+     * "RU 64", "H2". A county and a number ("Milam 9199") or a mile marker ("313 MM 13")
+     * is a name someone gave it.
+     */
+    static boolean unnamed(JSONObject props) {
+        final String n = props == null || props.isNull("IncidentName") ? "" : props.optString("IncidentName", "").trim();
+        return n.isEmpty() || "null".equalsIgnoreCase(n) || NUMBER_ONLY.matcher(n).matches();
+    }
+
+    /** When the fire was found, epoch ms: discovery time, else when its record was made; 0 when neither. */
+    static long discoveredMs(JSONObject props) {
+        if (props == null)
+            return 0;
+        for (String k : new String[] { "FireDiscoveryDateTime", "CreatedOnDateTime_dt" }) {
+            final Object v = props.opt(k);
+            if (v instanceof Number && ((Number) v).longValue() > 0)
+                return ((Number) v).longValue();
+        }
+        return 0;
+    }
+
     /** The acres the start is reported at, or -1 when it has none. */
     static double acres(JSONObject props) {
         if (props == null || props.isNull("IncidentSize"))
