@@ -41,6 +41,8 @@ once, whatever source it came from.
 - **SARCOP Training** is NAPSG's public search-and-rescue sandbox.
 - **New Fire Starts** is new wildfires and prescribed fires across the country,
   the last 24 hours, public.
+- **Ongoing Fires** is every fire not yet contained, from the day after it was
+  found, public.
 - **CA Air Intel** is statewide California fire perimeters, public.
 - **NIFS Archive (demo)** is last year's Dragon Bravo fire, public, for trying the
   symbology without a login.
@@ -388,6 +390,25 @@ every 5 minutes, as often as NIFC's view does.
 
 **Find** in its Features lists the starts by type, nearest first, from you or
 from the map center.
+
+## Ongoing Fires
+
+Every wildfire and prescribed fire NIFC lists as not yet contained, controlled or
+out: about 400 across the country in early October. It starts where New Fire
+Starts ends, a day after a fire was found, so with both on each fire shows once:
+today's starts in New Fire Starts, everything older here. Public, no login. **Add
+ongoing fires** puts it in the list.
+
+The markers, the three types and **Where** work as in New Fire Starts. Labels add
+how much is contained: "DOME · 6,760 ac · 40%". A fire stays listed until someone
+declares it contained, so a fire at 100% can still be on the map. NIFC drops a fire
+under 10 acres after 3 days with no update, under 100 acres after 8, and a larger
+one after 14.
+
+**InciWeb** sits beside **Go there** in a fire's details when the fire has an
+InciWeb page, most often a Forest Service or other federal fire; it opens the page
+in the phone's browser. The plugin learns which fires have a page from InciWeb's
+own feed, read every 30 minutes.
 
 ## Your own organization
 

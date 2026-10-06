@@ -48,6 +48,9 @@ takes any ArcGIS Online organization you sign in to.
   *New Fire Starts* is new wildfires and prescribed fires across the country,
   the last 24 hours, public.
 
+  *Ongoing Fires* is every fire not yet contained, from the day after it was
+  found, public.
+
   *CA Air Intel* is statewide California fire perimeters, public.
 
   *NIFS Archive (demo)* is last year's Dragon Bravo fire, public, for trying the
@@ -504,6 +507,22 @@ takes any ArcGIS Online organization you sign in to.
   is; slide it to keep only the starts within a distance of My Location or the
   map center. *Time window* picks the last hour, 3, 6, 12
   or 24 hours. The layer refreshes every 5 minutes.
+]
+
+#tak-slide[
+= Ongoing Fires
+
+  Every wildfire and prescribed fire NIFC lists as not yet contained, controlled
+  or out. It starts where New Fire Starts ends, a day after a fire was found, so
+  with both on each fire shows once. Public, no login. *Add ongoing fires* puts
+  it in the list.
+
+  The markers, the three types and *Where* work as in New Fire Starts. Labels add
+  how much is contained: "DOME - 6,760 ac - 40%". A fire stays listed until it is
+  declared contained, so one at 100% can still show.
+
+  *InciWeb* sits beside *Go there* in a fire's details when the fire has an
+  InciWeb page, most often a federal fire; it opens the page in the browser.
 ]
 
 #tak-slide[

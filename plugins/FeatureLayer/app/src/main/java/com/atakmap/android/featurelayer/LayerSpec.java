@@ -67,6 +67,12 @@ public class LayerSpec {
      * edit, so the check reads the edit time. Not saved; the source sets it on load.
      */
     public String stampField;
+    /**
+     * Only features at least this many hours old by {@link #timeField}; 0 = no lower
+     * bound. Ongoing Fires leaves the last day to New Fire Starts, so a fire is in one
+     * of the two, never both. Not saved; the source sets it.
+     */
+    public int minAgeHours;
     public int sinceHours;
     /** Split the layer's features into types by this field's value (FIRIS: "source"), instead of one type per source layer. */
     public String setField;
@@ -85,12 +91,19 @@ public class LayerSpec {
     /** The where clause to query with right now: the fixed one, plus the time window from the present. */
     public String whereNow() {
         final String fixed = where == null || where.trim().isEmpty() ? "1=1" : where;
-        if (timeField == null || sinceHours <= 0)
+        if (timeField == null || (sinceHours <= 0 && minAgeHours <= 0))
             return fixed;
-        final long since = System.currentTimeMillis() - sinceHours * 3600000L;
+        final long now = System.currentTimeMillis();
         final java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US);
         f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
-        return "(" + fixed + ") AND " + timeField + " >= TIMESTAMP '" + f.format(new java.util.Date(since)) + "'";
+        final StringBuilder w = new StringBuilder("(").append(fixed).append(")");
+        if (sinceHours > 0)
+            w.append(" AND ").append(timeField).append(" >= TIMESTAMP '")
+                    .append(f.format(new java.util.Date(now - sinceHours * 3600000L))).append("'");
+        if (minAgeHours > 0)
+            w.append(" AND ").append(timeField).append(" < TIMESTAMP '")
+                    .append(f.format(new java.util.Date(now - minAgeHours * 3600000L))).append("'");
+        return w.toString();
     }
 
     /** "Last 3 days", "All time". */

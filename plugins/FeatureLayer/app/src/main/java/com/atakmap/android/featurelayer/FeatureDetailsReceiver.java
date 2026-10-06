@@ -76,6 +76,43 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         return sb.toString().trim();
     }
 
+    /**
+     * Shows the InciWeb button when the feature carries a page and opens it in the
+     * browser. The address is checked again here, not only when it was attached: the
+     * store it was read back from sits on the shared card.
+     */
+    public static void bindInciWeb(View button, AttributeSet attrs, final MapView mapView) {
+        if (button == null)
+            return;
+        String url = null;
+        try {
+            if (attrs != null && attrs.containsAttribute(LoadedLayer.ATTR_INCIWEB))
+                url = attrs.getStringAttribute(LoadedLayer.ATTR_INCIWEB);
+        } catch (Exception ignored) {
+        }
+        if (!InciWeb.isPage(url)) {
+            button.setVisibility(View.GONE);
+            button.setOnClickListener(null);
+            return;
+        }
+        final String page = url;
+        button.setVisibility(View.VISIBLE);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try {
+                    final Intent i = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(page));
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    mapView.getContext().startActivity(i);
+                } catch (Exception e) {
+                    Log.w(TAG, "could not open InciWeb", e);
+                    android.widget.Toast.makeText(mapView.getContext(), "No browser to open InciWeb",
+                            android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         final String uid = intent.getStringExtra("targetUID");
@@ -105,6 +142,7 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         ((TextView) view.findViewById(R.id.details_subtitle))
                 .setText(layer == null ? "" : layer.displayName());
         ((TextView) view.findViewById(R.id.details_attributes)).setText(body);
+        bindInciWeb(view.findViewById(R.id.btn_inciweb), f.getAttributes(), getMapView());
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
     }
 

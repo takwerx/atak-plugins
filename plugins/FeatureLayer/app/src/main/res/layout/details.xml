@@ -26,6 +26,14 @@
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF" />
+        <!-- A fire with an InciWeb page: opens it in the browser. Gone otherwise. -->
+        <Button
+            android:id="@+id/btn_inciweb"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="InciWeb"
+            android:visibility="gone" />
     </LinearLayout>
     <TextView
         android:id="@+id/details_subtitle"

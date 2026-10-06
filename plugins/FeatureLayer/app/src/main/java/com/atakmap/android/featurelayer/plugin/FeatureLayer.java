@@ -169,6 +169,8 @@ public class FeatureLayer implements IPlugin {
             new Org("nifc", "NIFC", Sources.NIFC_PORTAL, "Find fire", "Search"),
             new Org("new-starts", "New Fire Starts", null, "Add new starts",
                     "Wildfires and prescribed fires reported in the last 24 hours, public"),
+            new Org("ongoing", "Ongoing Fires", null, "Add ongoing fires",
+                    "Fires found more than a day ago and not yet contained, public"),
             new Org("sarcop-live", "SARCOP Live", Sources.NAPSG_PORTAL, "Find incident", "Search"),
             new Org("sarcop-training", "SARCOP Training", null, "Find incident", "Search"),
             new Org("ca-air-intel", "CA Air Intel", null, "Add perimeters", "Statewide fire perimeters, public"),
@@ -1167,6 +1169,8 @@ public class FeatureLayer implements IPlugin {
                 l.zoomTo(h);
             }
         });
+        com.atakmap.android.featurelayer.FeatureDetailsReceiver.bindInciWeb(
+                paneView.findViewById(R.id.btn_details_inciweb), h.attrs, mapView);
         searchPanel.setVisibility(View.GONE);
         paneView.findViewById(R.id.features_header).setVisibility(View.GONE); // one Back, the details' own
         panel.setVisibility(View.VISIBLE);
@@ -1222,13 +1226,14 @@ public class FeatureLayer implements IPlugin {
         find.setText(org.findLabel);
         search.setHint(org.hint);
         search.setVisibility("nifs-archive".equals(org.id) || "ca-air-intel".equals(org.id)
-                || "new-starts".equals(org.id) ? View.GONE : View.VISIBLE);
+                || "new-starts".equals(org.id) || "ongoing".equals(org.id) ? View.GONE : View.VISIBLE);
         // A source that is one fixed layer has nothing to search: its button adds the
         // layer, and once the layer is in the list below the button goes away (the
         // operator read "Add perimeters" over an added layer as a second thing to add).
         final String fixedLayer = "ca-air-intel".equals(org.id) ? "ca-air-intel"
                 : "nifs-archive".equals(org.id) ? "nifs-archive:Dragon Bravo"
-                : "new-starts".equals(org.id) ? Sources.NEW_STARTS_ID : null;
+                : "new-starts".equals(org.id) ? Sources.NEW_STARTS_ID
+                : "ongoing".equals(org.id) ? Sources.ONGOING_ID : null;
         if (fixedLayer != null && manager != null) {
             boolean loaded = false;
             for (LoadedLayer l : manager.snapshot())
@@ -1264,6 +1269,9 @@ public class FeatureLayer implements IPlugin {
                 return;
             case "new-starts":
                 addLayer(Sources.newStarts());
+                return;
+            case "ongoing":
+                addLayer(Sources.ongoingFires());
                 return;
             case "sarcop-live":
                 toast("SARCOP Live is not wired up yet; SARCOP Training is");
@@ -1685,8 +1693,9 @@ public class FeatureLayer implements IPlugin {
             }
         });
         container.removeAllViews();
-        if (l.spec.timeField != null) {
-            // How far back: the where clause changes, so this one refetches.
+        if (l.spec.timeField != null && l.spec.minAgeHours <= 0) {
+            // How far back: the where clause changes, so this one refetches. Not on
+            // Ongoing Fires, which is everything older than a day by definition.
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.feature_row, null);
             ((TextView) row.findViewById(R.id.feature_name)).setText("Time window");
             final Button win = row.findViewById(R.id.feature_fill);

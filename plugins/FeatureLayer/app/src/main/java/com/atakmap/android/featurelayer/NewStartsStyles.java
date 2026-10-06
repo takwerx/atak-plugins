@@ -44,8 +44,9 @@ public final class NewStartsStyles {
     private NewStartsStyles() {
     }
 
+    /** New Fire Starts and Ongoing Fires: the same IRWIN incident records, drawn the same way. */
     public static boolean handles(LayerSpec spec) {
-        return spec != null && "newstarts".equals(spec.iconSet);
+        return spec != null && ("newstarts".equals(spec.iconSet) || "ongoing".equals(spec.iconSet));
     }
 
     /** The three types, in the order the Features list shows them, each with what it is. */
@@ -82,7 +83,17 @@ public final class NewStartsStyles {
         if (name.isEmpty() || "null".equalsIgnoreCase(name))
             name = fallback != null && !fallback.isEmpty() ? fallback : type(props);
         final double a = acres(props);
-        return a > 0 ? name + " · " + formatAcres(a) : name;
+        final StringBuilder b = new StringBuilder(name);
+        if (a > 0)
+            b.append(" \u00b7 ").append(formatAcres(a));
+        // How much is contained, the number an ongoing fire is followed by. A fire at 100%
+        // stays listed until someone declares it contained, so it says 100%.
+        if (props != null && !props.isNull("PercentContained")) {
+            final double pct = props.optDouble("PercentContained", -1);
+            if (pct >= 0 && pct <= 100)
+                b.append(" \u00b7 ").append(Math.round(pct)).append("%");
+        }
+        return b.toString();
     }
 
     /**

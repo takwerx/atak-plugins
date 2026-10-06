@@ -38,6 +38,10 @@ Built-in sources:
     Wildfires, wildfires with no size reported yet, and prescribed fires toggle
     on their own; a time window of 1 to 24 hours, and the same distance-from-me
     or map-center control DART has.
+  - Ongoing Fires: NIFC's public view of current wildfires and prescribed fires
+    not yet contained, from the day after each is found, so it and New Fire
+    Starts never show one fire twice. Labeled with acres and percent
+    contained; a fire with an InciWeb page opens it from its details.
   - Add your own org: any ArcGIS Online organization. Sign in, search its
     content, add a layer; it draws with the service's own renderer.
 

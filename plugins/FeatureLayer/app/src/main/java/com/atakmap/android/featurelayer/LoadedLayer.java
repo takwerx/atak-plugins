@@ -46,9 +46,9 @@ public class LoadedLayer {
      * written under an older number is fully rewritten on its next refresh, because the
      * style travels with the feature into the store. 53: every icon and pill level when
      * the map is spun, and drawn from ATAK's private storage instead of the card. 54: New
-     * Fire Starts as flame and RX markers.
+     * Fire Starts as flame and RX markers. 55: fire labels carry % contained.
      */
-    private static final int STYLE_VERSION = 54;
+    private static final int STYLE_VERSION = 55;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -1461,6 +1461,10 @@ public class LoadedLayer {
         final String layerName = spec.layerTitle != null && !spec.layerTitle.isEmpty()
                 ? spec.layerTitle : info.name;
 
+        // Which fires have an InciWeb page: read at most every 30 minutes, before the rows
+        // are written so each fire carries its page.
+        if (NewStartsStyles.handles(spec) && isPointLayer)
+            InciWeb.refresh();
         Log.d(TAG, spec.id + ": layer " + layerId + " iconSet=" + spec.iconSet + " dart=" + DartStyles.handles(spec)
                 + " point=" + isPointLayer + " profile=" + spec.profile + " nwcg=" + nwcg);
         final int firstOfLayer = out.size();
@@ -1640,6 +1644,12 @@ public class LoadedLayer {
                             }
                         }
                         final AttributeSet attrs = Esri.toAttributes(props, dates);
+                        if (NewStartsStyles.handles(spec) && g instanceof com.atakmap.map.layer.feature.geometry.Point) {
+                            final com.atakmap.map.layer.feature.geometry.Point pt = (com.atakmap.map.layer.feature.geometry.Point) g;
+                            final String page = InciWeb.pageFor(props.optString("IncidentName", null), pt.getY(), pt.getX());
+                            if (page != null)
+                                attrs.setAttribute(ATTR_INCIWEB, page);
+                        }
                         if (bare != null)
                             attrs.setAttribute(ATTR_BARE, bare);
                         if (bareAlt != null)
@@ -1762,6 +1772,8 @@ public class LoadedLayer {
      */
     /** A point's style before its name was drawn into the icon, packed as ATAK's OGR style text. */
     static final String ATTR_BARE = "_bare", ATTR_BARE_ALT = "_bare_alt";
+    /** A fire's InciWeb page (InciWeb.pageFor); "_" keeps it out of the attribute list. */
+    public static final String ATTR_INCIWEB = "_inciweb";
 
     private static String packStyle(Style s) {
         try {

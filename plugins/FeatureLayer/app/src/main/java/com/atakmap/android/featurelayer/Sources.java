@@ -246,6 +246,29 @@ public final class Sources {
         return s;
     }
 
+    static final String ONGOING = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer";
+    public static final String ONGOING_ID = "nifc-ongoing";
+
+    /**
+     * Ongoing fires: NIFC's public "Current Wildland Fire Incident Locations", every IRWIN
+     * wildfire, prescribed fire and complex not yet contained, controlled or out, with
+     * NIFC's fall-off rules (a fire under 10 acres goes after 3 days without an update,
+     * under 100 after 8, larger after 14). 408 on 2026-10-05. The last 24 hours are New
+     * Fire Starts' (operator: "split at 24 hours"), so with both on a fire shows once.
+     * Drawn and typed as New Fire Starts are; a fire with an InciWeb page carries it.
+     */
+    public static LayerSpec ongoingFires() {
+        final LayerSpec s = newStarts();
+        s.id = ONGOING_ID;
+        s.title = "Ongoing Fires";
+        s.layerTitle = "Fire";
+        s.base = ONGOING;
+        s.sinceHours = 0;
+        s.minAgeHours = 24;
+        s.iconSet = "ongoing";
+        return s;
+    }
+
     /** USFS and DOI fire vehicles, every row inside 24 hours and most inside the hour. */
     public static LayerSpec dartVehicles() {
         return dart("dart-vehicles", "Vehicles", "Vehicle", DART_VEHICLES, "ResourceName", "ResourceType",
@@ -268,7 +291,8 @@ public final class Sources {
         final LayerSpec now = "dart-personnel".equals(s.id) ? dartPersonnel()
                 : "dart-vehicles".equals(s.id) ? dartVehicles()
                 : "nifc-fireguard".equals(s.id) ? fireGuard()
-                : NEW_STARTS_ID.equals(s.id) ? newStarts() : null;
+                : NEW_STARTS_ID.equals(s.id) ? newStarts()
+                : ONGOING_ID.equals(s.id) ? ongoingFires() : null;
         if (now == null)
             return;
         s.base = now.base;
@@ -284,6 +308,7 @@ public final class Sources {
         s.setField = now.setField;
         s.timeField = now.timeField;
         s.stampField = now.stampField;
+        s.minAgeHours = now.minAgeHours;
         s.maxFeatures = now.maxFeatures;
         for (java.util.Map.Entry<String, String> n : now.setNotes.entrySet()) {
             s.setNotes.put(n.getKey(), n.getValue());
@@ -303,7 +328,7 @@ public final class Sources {
         }
         // The first New Fire Starts build defaulted to what is in view, which this layer
         // no longer offers: its zero is everywhere.
-        if (NEW_STARTS_ID.equals(s.id) && "view".equals(s.scopeKind))
+        if ((NEW_STARTS_ID.equals(s.id) || ONGOING_ID.equals(s.id)) && "view".equals(s.scopeKind))
             s.scopeKind = "all";
     }
 
