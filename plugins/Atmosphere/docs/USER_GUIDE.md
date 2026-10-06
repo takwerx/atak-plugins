@@ -60,16 +60,17 @@ The pane opens at half width. The top row is the same on every page:
 - The stacked sheets are **Layers**: straight to the Layers page from any page.
   It is green while Layers is showing.
 - The arrows step through the pages; the page name between them opens a list of
-  all eight.
+  all nine.
 
 <img src="screenshots/3_pane_half.png" width="420"> <img src="screenshots/5_page_list.png" width="420">
 
-The eight pages are **Forecast**, the readout for a point; **Layers**, every map
+The nine pages are **Forecast**, the readout for a point; **Layers**, every map
 layer with its switch and settings; **Spot Weather Forecast**, the open spot
 forecast requests; **Fire Weather Zones**, the planning forecast for a zone;
-**SAWTI**, the Santa Ana Wildfire Threat Index; and **Weather Stations**, **River Gauges** and **Buoys**, the ones around you as
-lists. Back
-closes the pane, or narrows a full-size one first.
+**SAWTI**, the Santa Ana Wildfire Threat Index; **Fire Danger**, an area's
+Energy Release Component and its GACC's chart; and **Weather Stations**,
+**River Gauges** and **Buoys**, the ones around you as lists. Back closes the
+pane, or narrows a full-size one first.
 
 <img src="screenshots/4_pane_wide.png" width="860">
 
@@ -118,9 +119,13 @@ talk to and what is sent: the area of the map, never your position, unless the
 layer says so. **Allow** remembers the answer.
 
 Tap anything Atmosphere draws and it opens straight away: a fire weather zone,
-spot request, gauge or buoy opens its page, anything else its details. There is
-no radial menu on Atmosphere's items; bloodhound and the rest are ATAK's own
+spot request, gauge or buoy opens its page, anything else its details. A Fire
+Danger area opens from its name, because the areas cover the whole map. There
+is no radial menu on Atmosphere's items; bloodhound and the rest are ATAK's own
 tools.
+
+Labels stay level when you turn the map, so they read the right way up at any
+heading; a station's wind barb turns with the map, because it is a direction.
 
 Every layer that draws on the map is a row inside one **Atmosphere** row in
 ATAK's Overlay Manager, each with its own icon, where it can be hidden without
@@ -131,7 +136,7 @@ opening the plugin.
 | Group | Layer | What it draws |
 |---|---|---|
 | | Spot Weather Forecast | Every open spot forecast request, with the office's forecast behind a tap |
-| | Weather Stations | The stations around you, wind barb and readings, colored against the Red Flag criteria for their zone |
+| | Weather Stations | The stations around you, wind barb and readings, colored against the Red Flag criteria for their zone; in California, the utilities' stations too |
 | Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber |
 | Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches the open ocean where no radar does |
 | Wind | Rain | The model's rain rate, light to violent, hour by hour for five days with the rate "Here"; a forecast, not radar |
@@ -139,9 +144,10 @@ opening the plugin.
 | Fire | Fire Weather Outlook | Elevated, critical and extreme areas and dry thunderstorms, Day 1, 2, 3 or all; from Day 3 as a chance of critical |
 | Fire | Fire Weather Zones | The NWS fire weather zones with their numbers, shaded under a Red Flag Warning or a Fire Weather Watch; the zone's planning forecast behind a tap |
 | Fire | SAWTI | The Forest Service's Santa Ana Wildfire Threat Index for four Southern California zones, colored by level for each of four days; the SAWTI page behind a tap |
+| Fire | Fire Danger | Every Predictive Service Area in the lower 48 shaded by its Energy Release Component, observed yesterday or forecast today; the GACC's ERC chart behind a tap on an area's name |
 | Fire | Lightning | NOAA's lightning strike density, the newest 15 minutes, in five bands from under 1 to over 150 strikes in a 5-mile square |
 | Fire | PSPS | California's Public Safety Power Shutoffs from Cal OES: counties warned, power off, power back on |
-| Fire | Smoke | Forecast smoke at the ground or through the whole sky, with the amount "Here" |
+| Fire | Smoke | Forecast smoke at the ground or through the whole sky, with the amount "Here"; the same forecast at every zoom, so the smoke keeps its shape as you zoom |
 | Fire | Air Quality | The EPA's air quality areas and the index "Here" |
 | Rain and rivers | Flash Flood Outlook | Excessive rainfall areas for three days, marginal to high |
 | Rain and rivers | River Gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
@@ -202,6 +208,21 @@ Two settings per layer decide when things draw: at this zoom or closer for the
 markers, and for their readings. **Use this zoom** takes what the scale bar
 reads now; **Always** never hides them.
 
+**Utility stations.** In California, **Utility Stations ON** under the Weather
+Stations arrow adds the stations SCE, SDG&E, PG&E and HPWREN run, from Cal OES.
+They draw on a slate disc beside the blue fire weather stations, their names
+start with the utility's, and they come in at their own zoom, 5 miles on the
+scale bar by default, because there are hundreds of them: 472 within 50 miles
+of Vista. A utility averages its wind over a minute or two, not ten as a fire
+weather station does, so it reads higher than one beside it, and it has no fuel
+moisture; its record says so at the top. They are counted on their own line
+under the switch, with how many are at criteria. A station that is also a fire
+weather station is drawn once, as the fire weather station.
+
+<img src="screenshots/88_utility_settings.png" width="420"> <img src="screenshots/89_utility_map.jpg" width="420">
+
+<img src="screenshots/87_utility_allow.png" width="420"> <img src="screenshots/90_utility_record.png" width="420">
+
 ## 7. Fire weather zones
 
 **Fire Weather Zones** draws the National Weather Service's fire weather zones
@@ -227,15 +248,26 @@ forecast more than a day old says so.
 
 <img src="screenshots/68_zones_find.png" width="280"> <img src="screenshots/69_zone_forecast.png" width="280"> <img src="screenshots/70_zone_forecast_body.png" width="280">
 
-## 8. SAWTI, Lightning and PSPS
+Under the office and issue time, **Fire danger (ERC)** gives the Energy
+Release Component for the area the zone is in: its name, yesterday's observed
+value and today's forecast with their percentiles and which way they are going,
+and the Burning Index. ERC is published for these larger areas, Predictive
+Service Areas, not for each zone. **ERC chart and details** opens the area on
+the Fire Danger page.
+
+<img src="screenshots/96_zone_erc_block.png" width="420">
+
+## 8. SAWTI, Fire Danger, Lightning and PSPS
 
 **SAWTI** draws the US Forest Service's Santa Ana Wildfire Threat Index for its
 four Southern California zones: LA-Ventura, Orange-Inland Empire, San Diego and
 Santa Barbara, where it rates Sundowner winds. It rates how hard a fire would be
 to fight if one started during an offshore wind: No Rating, Marginal, Moderate,
 High or Extreme. A rated zone is filled in its level's color, with its label in
-the same color; a No Rating zone is a blue outline. The date buttons pick one of
-the four days the Forest Service shows. Tap a zone to open its page.
+the same color; a No Rating zone is a blue outline. Each label starts with
+SAWTI, "SAWTI-San Diego: No Rating", so it is not taken for another layer's
+area. The date buttons pick one of the four days the Forest Service shows. Tap
+a zone to open its page.
 
 <img src="screenshots/80_sawti_map.jpg" width="560"> <img src="screenshots/81_sawti_layer_block.png" width="300">
 
@@ -253,6 +285,30 @@ again the next time you look.
 <img src="screenshots/76_sawti_page_top.png" width="420"> <img src="screenshots/77_sawti_page_middle.png" width="420">
 
 <img src="screenshots/78_sawti_page_table.png" width="420"> <img src="screenshots/79_sawti_zone_picker.png" width="420">
+
+**Fire Danger** shades every Predictive Service Area in the lower 48 by its
+Energy Release Component (ERC), the fire danger index each GACC charts on its
+fuels page: green below the 60th percentile, then light green, cream, orange
+from the 90th, red from the 97th and dark red above the 99.5th. **Observed**
+is yesterday's value, **Forecast** today's; the Forest Service rebuilds them
+from FEMS every morning, and an area's value is the average of its key fire
+weather stations. Percentiles are of every day of the year, 2005 to 2022. Each
+area's name and number show from a scale bar of about 75 miles in; tap the name
+for the area. Alaska rates fire danger on the Canadian system and is not
+shaded.
+
+<img src="screenshots/93_erc_map.jpg" width="560"> <img src="screenshots/92_erc_layer_block.png" width="300">
+
+The area opens on the **Fire Danger** page at full size: its ERC and Burning
+Index, observed and forecast, and its GACC's own ERC chart, with this year's
+line, the average, the record and the forecast tail. **Tap the chart to
+enlarge** puts it on the whole screen: pinch to zoom, drag to move, double-tap
+to zoom in or back out. Some GACCs draw their chart's percentile bands for the
+fire season rather than the whole year, so a band there need not match the
+percentile above it. The Southern and Eastern Areas no longer publish ERC
+charts; their areas show the numbers only.
+
+<img src="screenshots/94_erc_page.png" width="420"> <img src="screenshots/95_erc_chart_full.png" width="420">
 
 **Lightning** draws NOAA's lightning strike density: how many strikes the
 ground networks counted in each 5-mile square in 15 minutes, from yellow (under

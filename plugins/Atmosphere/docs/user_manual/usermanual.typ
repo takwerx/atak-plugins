@@ -68,7 +68,7 @@ shaded, and the zones page lists them.
   - The stacked sheets are *Layers*: straight to the Layers page from any page.
     It is green while Layers is showing.
   - The arrows step through the pages; the name between them opens a list of
-    all eight.
+    all nine.
 
   Back closes the pane, or narrows a full-size one first.
 ]
@@ -86,12 +86,13 @@ shaded, and the zones page lists them.
 ]
 
 #v(4pt)
-There are eight pages: *Forecast*, the readout for a point; *Layers*, every
+There are nine pages: *Forecast*, the readout for a point; *Layers*, every
 map layer with its switch and settings; *Spot Weather Forecast*, the open spot
 forecast requests; *Fire Weather Zones*, the planning forecast for a zone;
-*SAWTI*, the Santa Ana Wildfire Threat Index;
-*Weather Stations*, *River Gauges* and *Buoys*, the ones around you as lists. Swipe, use the
-arrows, or pick from the list.
+*SAWTI*, the Santa Ana Wildfire Threat Index; *Fire Danger*, an area's Energy
+Release Component and its GACC's chart; *Weather Stations*, *River Gauges* and
+*Buoys*, the ones around you as lists. Swipe, use the arrows, or pick from the
+list.
 ]
 
 #tak-slide[
@@ -186,8 +187,10 @@ and what is not. The first time a layer is switched on it asks once, naming
 the server and what is sent: the area of the map, never your position.
 
 Tap anything Atmosphere draws and it opens straight away: a zone, spot
-request, gauge or buoy opens its page, anything else its details. There is no
-radial menu on Atmosphere's items; bloodhound and the rest are ATAK's own tools.
+request, gauge or buoy opens its page, anything else its details; a Fire Danger
+area opens from its name. There is no radial menu on Atmosphere's items. Labels
+stay level when you turn the map; a station's wind barb turns with it, because
+it is a direction.
 ]
 
 #tak-slide[
@@ -356,6 +359,22 @@ day under it. A forecast more than a day old says so.
 ]
 
 #tak-slide[
+= A zone's fire danger
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("96.png", width: 100%)
+][
+  Under the office and issue time, *Fire danger (ERC)* gives the Energy
+  Release Component for the area the zone is in: its name, yesterday's
+  observed value and today's forecast with their percentiles and which way
+  they are going, and the Burning Index.
+
+  ERC is published for these larger areas, Predictive Service Areas, not for
+  each zone. *ERC chart and details* opens the area on the Fire Danger page.
+]
+]
+
+#tak-slide[
 = SAWTI
 
 #toolbox.side-by-side(columns: (7fr, 5fr))[
@@ -370,8 +389,9 @@ four Southern California zones: LA-Ventura, Orange-Inland Empire, San Diego and
 Santa Barbara, where it rates Sundowner winds. It rates how hard a fire would be
 to fight if one started during an offshore wind: No Rating, Marginal, Moderate,
 High or Extreme. A rated zone is filled in its level's color, with its label in
-the same color; a No Rating zone is a blue outline. The date buttons pick one of
-the four days the Forest Service shows. Tap a zone to open its page.
+the same color; a No Rating zone is a blue outline. Each label starts with
+SAWTI, so it is not taken for another layer's area. The date buttons pick one
+of the four days the Forest Service shows. Tap a zone to open its page.
 ]
 
 #tak-slide[
@@ -409,6 +429,46 @@ square for that zone and day. The issue time is under it: the Forest Service
 posts a new index every morning and again when a forecaster updates it, and an
 issue more than a day old says so. When the wind and fuel numbers cannot be had,
 the gauges say *Not available* and the page asks again the next time you look.
+]
+
+#tak-slide[
+= Fire Danger
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("93.jpg", width: 100%)
+][
+  #image("92.png", width: 100%)
+]
+
+#v(4pt)
+*Fire Danger* shades every Predictive Service Area in the lower 48 by its
+Energy Release Component (ERC), the index each GACC charts on its fuels page:
+green below the 60th percentile, then light green, cream, orange from the 90th,
+red from the 97th and dark red above the 99.5th. *Observed* is yesterday's
+value, *Forecast* today's, rebuilt by the Forest Service from FEMS every
+morning; an area's value is the average of its key fire weather stations, and
+its percentile is of every day of the year, 2005 to 2022. The names show from a
+scale bar of about 75 miles in; tap a name for the area. Alaska is not rated
+this way.
+]
+
+#tak-slide[
+= An area's ERC chart
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("94.png", width: 100%)
+][
+  #image("95.png", width: 100%)
+]
+
+#v(4pt)
+The area opens on the *Fire Danger* page at full size: its ERC and Burning
+Index, observed and forecast, and its GACC's own ERC chart. *Tap the chart to
+enlarge* puts it on the whole screen: pinch to zoom, drag to move, double-tap
+to zoom in or back out. Some GACCs draw the chart's percentile bands for the
+fire season only, so a band there need not match the percentile above it. The
+Southern and Eastern Areas no longer publish ERC charts; their areas show the
+numbers only.
 ]
 
 #tak-slide[
@@ -462,7 +522,9 @@ the gauges say *Not available* and the page asks again the next time you look.
 ][
   *Smoke* draws the forecast smoke hour by hour, at *Ground* level or through
   the *Whole sky*, in the air quality colors, with the amount *Here* in
-  micrograms per cubic meter and what that means for breathing.
+  micrograms per cubic meter and what that means for breathing. It is the same
+  forecast at every zoom, so the smoke keeps its shape as you zoom; a view wider
+  than a few states is drawn for its middle.
 ]
 ]
 
@@ -677,6 +739,39 @@ classes, lower 48 only.
   when the stations and their readings appear: *Use this zoom* takes what the
   scale bar reads now, *Always* never hides them.
 ]
+]
+
+#tak-slide[
+= Utility stations
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("89.jpg", width: 100%)
+][
+  #image("88.png", width: 100%)
+][
+  In California, *Utility Stations ON* under the Weather Stations arrow adds
+  the stations SCE, SDG&E, PG&E and HPWREN run, from Cal OES. They draw on a
+  slate disc beside the blue fire weather stations, their names start with the
+  utility's, and they come in at their own zoom, 5 miles on the scale bar by
+  default: there are hundreds of them.
+]
+]
+
+#tak-slide[
+= A utility station
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("90.png", width: 100%)
+][
+  #image("87.png", width: 100%)
+]
+
+#v(4pt)
+A utility averages its wind over a minute or two, not ten as a fire weather
+station does, so it reads higher than one beside it, and it has no fuel
+moisture; its record says so at the top. They are counted on their own line
+under the switch, with how many are at criteria. A station that is also a fire
+weather station is drawn once, as the fire weather station.
 ]
 
 #tak-slide[
