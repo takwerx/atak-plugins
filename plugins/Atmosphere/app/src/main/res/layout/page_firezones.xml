@@ -278,6 +278,35 @@
                 android:lineSpacingExtra="2dp"
                 android:text="" />
 
+            <!-- Fire danger: the ERC of the Predictive Service Area the zone sits in.
+                 ERC is published per area, not per zone, so it names the area. -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/heading_zones_erc"
+                android:textSize="10sp"
+                android:textAllCaps="true"
+                android:alpha="0.6" />
+
+            <TextView
+                android:id="@+id/zones_erc_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:lineSpacingExtra="2dp"
+                android:text="" />
+
+            <Button
+                android:id="@+id/zones_erc_button"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:visibility="gone" />
+
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

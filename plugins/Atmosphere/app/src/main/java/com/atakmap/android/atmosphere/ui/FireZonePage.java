@@ -17,12 +17,14 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.data.Erc;
 import com.atakmap.android.atmosphere.data.FireAlerts;
 import com.atakmap.android.atmosphere.data.FireZones;
 import com.atakmap.android.atmosphere.data.Fwf;
 import com.atakmap.android.atmosphere.data.ZoneFavorites;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
+import com.atakmap.android.atmosphere.overlay.ErcOverlay;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
@@ -111,6 +113,10 @@ public final class FireZonePage {
     private final Button star, discussionToggle;
     private final View discussionScroll;
     private final TextView detailTitle, detailFacts, detailText, discussionText;
+    /** The fire danger of the area the zone is in, and the button to its GACC chart. */
+    private final TextView ercText;
+    private final Button ercButton;
+    private int ercGeneration;
     private final Button redTile, watchTile;
     private final TextView warnedStatus;
     private final LinearLayout warnedList;
@@ -167,6 +173,8 @@ public final class FireZonePage {
         star = root.findViewById(R.id.zones_star);
         detailTitle = root.findViewById(R.id.zones_detail_title);
         detailFacts = root.findViewById(R.id.zones_detail_facts);
+        ercText = root.findViewById(R.id.zones_erc_text);
+        ercButton = root.findViewById(R.id.zones_erc_button);
         detailText = root.findViewById(R.id.zones_detail_text);
         discussionToggle = root.findViewById(R.id.zones_discussion_toggle);
         discussionScroll = root.findViewById(R.id.zones_discussion_scroll);
@@ -680,6 +688,7 @@ public final class FireZonePage {
         discussionText.setText("");
         paintStar();
         paintDiscussion();
+        showFireDanger(z);
         if (z.cwa.isEmpty()) {
             detailText.setText("The Weather Service did not say which office forecasts "
                     + z.ugc() + ".");
@@ -708,6 +717,130 @@ public final class FireZonePage {
                 detailText.setText("Could not reach the Weather Service: " + error);
             }
         });
+    }
+
+    // ---- fire danger --------------------------------------------------------------------
+
+    /**
+     * The ERC of the Predictive Service Area the zone sits in, read at the zone's
+     * middle (operator, 2026-10-05: "can we make the ERCs part of fire weather zones?").
+     * A PSA covers many zones, so the block names it.
+     *
+     * <p>Behind the Fire Danger allow, not this page's: the numbers come from another
+     * server than the Weather Service's, and the chart from a third.
+     */
+    private void showFireDanger(final Pick z) {
+        final int mine = ++ercGeneration;
+        ercButton.setVisibility(View.GONE);
+        if (!egress.isLayerEnabled(ErcOverlay.LAYER_ID)) {
+            ercText.setText("The Energy Release Component for the area this zone is in.");
+            ercButton.setText("Show fire danger");
+            ercButton.setVisibility(View.VISIBLE);
+            ercButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    askToAllowErc(z);
+                }
+            });
+            return;
+        }
+        ercText.setText("Getting the fire danger…");
+        if (z.bbox != null) {
+            lookUpErc(z.bbox, mine);
+            return;
+        }
+        // Opened from a tap or a star: the zone's outline is not held, so ask for it.
+        Http.get(FireZones.byIdUrl(z.id), egress.userAgent(), null, new Http.Callback() {
+            @Override
+            public void onSuccess(final String body) {
+                offMain(new Runnable() {
+                    @Override
+                    public void run() {
+                        final List<FireZones.Zone> found = FireZones.parse(body);
+                        mapView.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (mine != ercGeneration)
+                                    return;
+                                if (found.isEmpty()) {
+                                    ercText.setText("Could not find where " + z.ugc()
+                                            + " is to look up its fire danger.");
+                                    return;
+                                }
+                                z.bbox = found.get(0).bbox();
+                                lookUpErc(z.bbox, mine);
+                            }
+                        });
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(String error) {
+                if (mine == ercGeneration)
+                    ercText.setText("Could not reach the Weather Service: " + error);
+            }
+        });
+    }
+
+    private void lookUpErc(double[] bbox, final int mine) {
+        final double lat = (bbox[1] + bbox[3]) / 2, lon = (bbox[0] + bbox[2]) / 2;
+        Http.get(Erc.atUrl(lat, lon), egress.userAgent(), null, new Http.Callback() {
+            @Override
+            public void onSuccess(String body) {
+                if (mine != ercGeneration)
+                    return;
+                final Erc.Psa p = Erc.parseAt(body);
+                if (p == null) {
+                    ercText.setText("No fire danger rating here: Energy Release Component "
+                            + "is rated by area in the lower 48 only.");
+                    return;
+                }
+                ercText.setText(p.name + " area (" + p.code + ")\n"
+                        + ErcOverlay.line("ERC observed " + Erc.observedDay(p.updated),
+                                p.ercObserved) + "\n"
+                        + ErcOverlay.line("ERC forecast " + Erc.forecastDay(p.updated),
+                                p.ercForecast) + "\n"
+                        + ErcOverlay.line("Burning Index " + Erc.observedDay(p.updated),
+                                p.biObserved));
+                ercButton.setText(p.chartUrl() == null ? "Fire danger details"
+                        : "ERC chart and details");
+                ercButton.setVisibility(View.VISIBLE);
+                ercButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        ErcDialog.show(p, egress.userAgent());
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(String error) {
+                if (mine == ercGeneration)
+                    ercText.setText("Could not reach the Forest Service: " + error);
+            }
+        });
+    }
+
+    /** The Fire Danger allow, asked here too; the map layer stays as it was. */
+    private void askToAllowErc(final Pick z) {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.erc_allow_title))
+                .setMessage(pluginContext.getString(R.string.erc_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(ErcOverlay.LAYER_ID, true);
+                                if (showing == z)
+                                    showFireDanger(z);
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
     }
 
     /** Read issuances newest first until one has a section for the zone. */

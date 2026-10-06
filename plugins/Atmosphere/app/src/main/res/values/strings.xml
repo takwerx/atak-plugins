@@ -105,6 +105,11 @@
     <string name="firezones_label_gate_heading">Draw zone numbers at this zoom or closer</string>
     <string name="firezones_allow_title">Show the fire weather zones?</string>
     <string name="firezones_allow_text">Atmosphere will ask the National Weather Service for the fire weather zones in the map view, and which of them are under a Red Flag Warning or Fire Weather Watch, and draw them on the map. The map view is sent, not your position.\n\nServers: mapservices.weather.noaa.gov and api.weather.gov</string>
+    <string name="erc_on">Fire Danger ON</string>
+    <string name="erc_off">Fire Danger OFF</string>
+    <string name="erc_allow_title">Show fire danger?</string>
+    <string name="erc_allow_text">Atmosphere will ask the US Forest Service for the Energy Release Component (ERC) and Burning Index of every Predictive Service Area in the lower 48, once every few hours, and shade the map by how dry each area is. Tapping an area also asks its GACC for that area\'s ERC chart. Your position is not sent.\n\nServers: services3.arcgis.com, gacc.nifc.gov</string>
+    <string name="credit_erc">Fire danger (ERC and BI by Predictive Service Area) from the USDA Forest Service, from FEMS (%1$s); charts from each GACC (%2$s)</string>
     <string name="sawti_on">SAWTI ON</string>
     <string name="sawti_off">SAWTI OFF</string>
     <string name="sawti_allow_title">Show SAWTI?</string>
@@ -286,6 +291,7 @@
     <string name="heading_zones_find">Find a zone</string>
     <string name="heading_zones_starred">Starred zones</string>
     <string name="heading_zones_forecast">Fire weather planning forecast</string>
+    <string name="heading_zones_erc">Fire danger (ERC)</string>
     <string name="zones_gate_text">The National Weather Service\'s fire weather planning forecast for a zone, the way the office wrote it. See the zone you are reading, look one up by number or name, and star the ones you work.</string>
     <string name="zones_load">Show fire zone forecasts</string>
     <string name="zones_allow_title">Show fire zone forecasts?</string>

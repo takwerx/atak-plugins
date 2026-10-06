@@ -16,6 +16,7 @@ import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
+import com.atakmap.android.atmosphere.overlay.ErcOverlay;
 import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
@@ -132,6 +133,7 @@ public class Atmosphere implements IPlugin {
             };
     private FireWxOutlookOverlay firewx;
     private SawtiOverlay sawti;
+    private ErcOverlay erc;
     private LightningOverlay lightning;
     private PspsOverlay psps;
     private FloodOutlookOverlay flood;
@@ -308,6 +310,8 @@ public class Atmosphere implements IPlugin {
         firewx.start();
         sawti = new SawtiOverlay(mapView, pluginContext, egress);
         sawti.start();
+        erc = new ErcOverlay(mapView, pluginContext, egress);
+        erc.start();
         lightning = new LightningOverlay(mapView, egress);
         lightning.start();
         psps = new PspsOverlay(mapView, pluginContext, egress);
@@ -380,6 +384,14 @@ public class Atmosphere implements IPlugin {
                     }
 
                     @Override
+                    public void openErc(String code) {
+                        if (atmospherePane == null)
+                            showPane();
+                        if (atmospherePane != null)
+                            atmospherePane.openErc(code);
+                    }
+
+                    @Override
                     public void openBuoy(String id) {
                         if (atmospherePane == null)
                             showPane();
@@ -404,6 +416,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFireWx(firewx);
             if (sawti != null)
                 atmospherePane.setSawti(sawti);
+            if (erc != null)
+                atmospherePane.setErc(erc);
             if (lightning != null)
                 atmospherePane.setLightning(lightning);
             if (psps != null)
@@ -517,6 +531,10 @@ public class Atmosphere implements IPlugin {
             sawti.stop();
             sawti = null;
         }
+        if (erc != null) {
+            erc.stop();
+            erc = null;
+        }
         if (firewx != null) {
             firewx.stop();
             firewx = null;
@@ -603,6 +621,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFireWx(firewx);
             if (sawti != null)
                 atmospherePane.setSawti(sawti);
+            if (erc != null)
+                atmospherePane.setErc(erc);
             if (lightning != null)
                 atmospherePane.setLightning(lightning);
             if (psps != null)

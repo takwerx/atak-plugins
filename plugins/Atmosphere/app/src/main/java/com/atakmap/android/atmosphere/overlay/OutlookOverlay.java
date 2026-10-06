@@ -282,9 +282,33 @@ public abstract class OutlookOverlay {
         }
         Http.get(urls[index], egress.userAgent(), new HashMap<String, String>(), new Http.Callback() {
             @Override
-            public void onSuccess(String body) {
-                got.addAll(parse(index, body));
-                fetch(index + 1, got, mine);
+            public void onSuccess(final String body) {
+                if (mine != generation || !on) {
+                    inFlight = false;
+                    return;
+                }
+                // Parsed on the worker, then back to main for the next request: the
+                // answer comes back on main, and the national PSA map is 470 KB of
+                // JSON, which is not work for the thread the pane answers on. A stop
+                // shuts the worker down, and an answer that lands after it must not
+                // take ATAK with it (security review, 2026-10-05).
+                try {
+                    worker.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            final List<Area> parsed = parse(index, body);
+                            mapView.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    got.addAll(parsed);
+                                    fetch(index + 1, got, mine);
+                                }
+                            });
+                        }
+                    });
+                } catch (java.util.concurrent.RejectedExecutionException stopped) {
+                    inFlight = false;
+                }
             }
 
             @Override

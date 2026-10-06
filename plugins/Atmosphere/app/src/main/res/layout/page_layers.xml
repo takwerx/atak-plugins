@@ -886,6 +886,75 @@
                     android:orientation="vertical" />
             </LinearLayout>
 
+            <!-- Fire danger: every Predictive Service Area shaded by its ERC percentile,
+                 observed yesterday or forecast today; a tap shows the GACC's chart. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/erc_icon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="2dp"
+                    android:layout_marginRight="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_layer_erc" />
+
+                <Button
+                    android:id="@+id/erc_toggle"
+                    android:gravity="left|center_vertical"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/erc_off" />
+
+                <ImageButton
+                    android:id="@+id/erc_expand"
+                    style="@style/TakwerxIconButton"
+                    android:layout_width="44dp"
+                    android:layout_weight="0"
+                    android:contentDescription="@string/show_settings"
+                    android:src="@drawable/ic_expand"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/erc_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/erc_day_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/erc_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:text="" />
+
+                <LinearLayout
+                    android:id="@+id/erc_legend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+
             <!-- Lightning: NOAA's 15-minute strike density, the newest frame, in five
                  bands that never use green. -->
             <LinearLayout

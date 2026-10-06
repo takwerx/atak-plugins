@@ -58,6 +58,7 @@ import com.atakmap.android.atmosphere.overlay.SnowOverlay;
 import com.atakmap.android.atmosphere.overlay.SstOverlay;
 import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
+import com.atakmap.android.atmosphere.overlay.ErcOverlay;
 import com.atakmap.android.atmosphere.overlay.LightningOverlay;
 import com.atakmap.android.atmosphere.overlay.PspsOverlay;
 import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
@@ -235,6 +236,13 @@ public final class AtmospherePane {
     private FireWxOutlookOverlay firewx;
     private boolean firewxOpen = true;
     private static final String PREF_SAWTI_OPEN = "weather.sawti.open";
+    private static final String PREF_ERC_OPEN = "weather.erc.open";
+    private LinearLayout ercSettings, ercLegend, ercDayRow;
+    private ImageButton ercExpand;
+    private Button ercToggle;
+    private TextView ercStatus;
+    private ErcOverlay erc;
+    private boolean ercOpen = true;
     private final LinearLayout sawtiSettings;
     private final ImageButton sawtiExpand;
     private final Button sawtiToggle;
@@ -653,6 +661,12 @@ public final class AtmospherePane {
         sawtiStatus = find(R.id.sawti_status);
         sawtiLegend = find(R.id.sawti_legend);
         sawtiDayRow = find(R.id.sawti_day_row);
+        ercSettings = find(R.id.erc_settings);
+        ercExpand = find(R.id.erc_expand);
+        ercToggle = find(R.id.erc_toggle);
+        ercStatus = find(R.id.erc_status);
+        ercLegend = find(R.id.erc_legend);
+        ercDayRow = find(R.id.erc_day_row);
         lightningSettings = find(R.id.lightning_settings);
         lightningExpand = find(R.id.lightning_expand);
         lightningToggle = find(R.id.lightning_toggle);
@@ -952,6 +966,15 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        ercOpen = prefs == null || prefs.getBoolean(PREF_ERC_OPEN, true);
+        ercExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ercOpen = !ercOpen;
+                rememberFold(PREF_ERC_OPEN, ercOpen);
+                updateLayerControls();
+            }
+        });
         lightningOpen = prefs == null || prefs.getBoolean(PREF_LIGHTNING_OPEN, true);
         lightningExpand.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1240,6 +1263,8 @@ public final class AtmospherePane {
             firewx.refresh(false);
         if (sawti != null && sawti.isOn())
             sawti.refresh(false);
+        if (erc != null && erc.isOn())
+            erc.refresh(false);
         if (lightning != null && lightning.isOn())
             lightning.refresh(false);
         if (psps != null && psps.isOn())
@@ -1922,6 +1947,26 @@ public final class AtmospherePane {
      * The Santa Ana Wildfire Threat Index. Its day row is rebuilt with each answer,
      * because the buttons name the dates the forecast covers.
      */
+    /** Fire danger by Predictive Service Area; the day row reads Observed and Forecast with their dates. */
+    public void setErc(ErcOverlay overlay) {
+        erc = overlay;
+        if (erc == null)
+            return;
+        erc.setListener(new ErcOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                ercStatus.setText(status);
+                ercStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+                buildDayRow(ercDayRow, erc);
+            }
+        });
+        ercLegend.removeAllViews();
+        for (String[] row : ErcOverlay.LEGEND)
+            ercLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(ercDayRow, erc);
+        updateLayerControls();
+    }
+
     public void setSawti(SawtiOverlay overlay) {
         sawti = overlay;
         if (sawti == null)
@@ -2251,6 +2296,22 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowFireWx();
+                }
+            }
+        });
+        ercToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (erc == null)
+                    return;
+                if (erc.isOn()) {
+                    erc.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(ErcOverlay.LAYER_ID)) {
+                    erc.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowErc();
                 }
             }
         });
@@ -3603,6 +3664,10 @@ public final class AtmospherePane {
             sawti.setOn(on);
         else if (sawti != null && on)
             blocked++;
+        if (erc != null && (!on || allowed(ErcOverlay.LAYER_ID)))
+            erc.setOn(on);
+        else if (erc != null && on)
+            blocked++;
         if (lightning != null && (!on || allowed(LightningOverlay.LAYER_ID)))
             lightning.setOn(on);
         else if (lightning != null && on)
@@ -4255,6 +4320,13 @@ public final class AtmospherePane {
         zonePage.showZone(id, name, cwa);
     }
 
+    /** A Predictive Service Area tapped on the map ("SC08"): its fire danger and its GACC's chart. */
+    public void openErc(String code) {
+        if (erc == null || code == null)
+            return;
+        ErcDialog.show(erc.find(code), egress.userAgent());
+    }
+
     /** A SAWTI zone tapped on the map ("3|2026-09-30"): the SAWTI page on that zone and day. */
     public void openSawti(String ref) {
         if (ref == null)
@@ -4577,6 +4649,27 @@ public final class AtmospherePane {
                                 egress.setLayerEnabled(FireWxOutlookOverlay.LAYER_ID, true);
                                 if (firewx != null)
                                     firewx.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowErc() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.erc_allow_title))
+                .setMessage(pluginContext.getString(R.string.erc_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(ErcOverlay.LAYER_ID, true);
+                                if (erc != null)
+                                    erc.setOn(true);
                                 updateLayerControls();
                             }
                         })
@@ -4996,6 +5089,13 @@ public final class AtmospherePane {
         firewxExpand.setVisibility(firewxOn ? View.VISIBLE : View.GONE);
         firewxExpand.setRotation(firewxOpen ? 180f : 0f);
         firewxSettings.setVisibility(firewxOn && firewxOpen ? View.VISIBLE : View.GONE);
+        final boolean ercOn = erc != null && erc.isOn();
+        ercToggle.setText(ercOn ? R.string.erc_on : R.string.erc_off);
+        ercToggle.setTextColor(pluginContext.getResources().getColor(
+                ercOn ? R.color.state_on : R.color.state_off));
+        ercExpand.setVisibility(ercOn ? View.VISIBLE : View.GONE);
+        ercExpand.setRotation(ercOpen ? 180f : 0f);
+        ercSettings.setVisibility(ercOn && ercOpen ? View.VISIBLE : View.GONE);
         final boolean sawtiOn = sawti != null && sawti.isOn();
         sawtiToggle.setText(sawtiOn ? R.string.sawti_on : R.string.sawti_off);
         sawtiToggle.setTextColor(pluginContext.getResources().getColor(
@@ -5138,6 +5238,12 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_sawti, SawtiOverlay.HOST));
+        }
+        if (erc != null && erc.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_erc, ErcOverlay.HOST,
+                    ErcOverlay.CHART_HOST));
         }
         if (lightning != null && lightning.isOn()) {
             if (out.length() > 0)
