@@ -160,6 +160,12 @@ public class LayerSpec {
      * im working this incident then get rid of them when im done").
      */
     public final java.util.List<MyFire> myFires = new java.util.concurrent.CopyOnWriteArrayList<>();
+    /**
+     * The most My Fires a layer holds. Each is a fetch of its own on every refresh, so a
+     * list without an end -- a layers.json written by something else -- would be
+     * thousands of requests a refresh. An incident wants a handful.
+     */
+    public static final int MY_FIRES_MAX = 50;
     /** Whether only My Fires are drawn. */
     public boolean myFiresOnly;
 
@@ -273,7 +279,7 @@ public class LayerSpec {
         s.styleVersion = o.optInt("styleVersion", 0);
         final JSONArray mf = o.optJSONArray("myFires");
         if (mf != null)
-            for (int i = 0; i < mf.length(); i++) {
+            for (int i = 0; i < mf.length() && s.myFires.size() < MY_FIRES_MAX; i++) {
                 final JSONObject f = mf.optJSONObject(i);
                 final JSONArray b = f == null ? null : f.optJSONArray("box");
                 if (f == null || b == null || b.length() != 4 || f.optString("key", "").isEmpty())

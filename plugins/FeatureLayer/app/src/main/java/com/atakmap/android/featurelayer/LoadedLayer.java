@@ -2082,6 +2082,11 @@ public class LoadedLayer {
         return spec.myFires.size();
     }
 
+    /** Whether My Fires has no room for another fire. */
+    public boolean myFiresFull() {
+        return spec.myFires.size() >= LayerSpec.MY_FIRES_MAX;
+    }
+
     /** The My Fires entry the burn with these attributes is, or null. */
     private LayerSpec.MyFire myFireOf(String key, double[] b) {
         if (key == null || b == null)
@@ -2127,7 +2132,7 @@ public class LoadedLayer {
 
     /**
      * Adds a burn to My Fires and shows only My Fires; false when the attributes name no
-     * burn. The caller saves and fetches. Worker thread.
+     * burn or the list is full. The caller saves and fetches. Worker thread.
      */
     public boolean addMyFire(AttributeSet a) {
         final String k = attr(a, ATTR_FIRE);
@@ -2135,6 +2140,8 @@ public class LoadedLayer {
         if (k == null || b == null)
             return false;
         if (myFireOf(k, b) == null) {
+            if (spec.myFires.size() >= LayerSpec.MY_FIRES_MAX)
+                return false;
             final String t = attr(a, ATTR_FIRE_TITLE);
             spec.myFires.add(new LayerSpec.MyFire(k, b, t != null ? t : k));
         }

@@ -112,7 +112,10 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
             return;
         }
         b.setVisibility(View.VISIBLE);
-        b.setText(layer.isMyFire(attrs) ? "Remove from My Fires" : "Add to My Fires");
+        final boolean full = !layer.isMyFire(attrs) && layer.myFiresFull();
+        b.setEnabled(!full);
+        b.setText(full ? "My Fires is full (" + LayerSpec.MY_FIRES_MAX + ")"
+                : layer.isMyFire(attrs) ? "Remove from My Fires" : "Add to My Fires");
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View x) {
