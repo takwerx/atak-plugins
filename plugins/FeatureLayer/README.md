@@ -42,6 +42,11 @@ Built-in sources:
     not yet contained, from the day after each is found, so it and New Fire
     Starts never show one fire twice. Labeled with acres and percent
     contained; a fire with an InciWeb page opens it from its details.
+  - Fire History: where fires have burned since 1900, from NIFC's
+    interagency fire perimeter history, drawn as EGP draws it: the last ten
+    years colored by years since (under six months, to one, two, three and
+    ten years), earlier decades in grey, each band and decade switched on its
+    own, labeled "Carr Fire (2018)".
   - Add your own org: any ArcGIS Online organization. Sign in, search its
     content, add a layer; it draws with the service's own renderer.
 

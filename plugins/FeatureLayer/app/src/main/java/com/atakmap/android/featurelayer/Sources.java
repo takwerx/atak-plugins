@@ -269,6 +269,44 @@ public final class Sources {
         return s;
     }
 
+    static final String FIRE_PERIMETERS = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters/FeatureServer";
+    static final String FIRE_HISTORY = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/InterAgencyFirePerimeterHistory_All_Years_View/FeatureServer";
+    public static final String FIRE_HISTORY_ID = "nifc-fire-history";
+
+    /**
+     * Fire History: where fires have burned, 1900 to today, as EGP draws it
+     * (FireHistoryStyles). Two public NIFC services as one layer: WFIGS Interagency
+     * Perimeters for the current decade (42,481 on 2026-10-06) and the InterAgency Fire
+     * Perimeter History for every year before (98,168). What is in view, simplified to
+     * the zoom, up to 250 km across.
+     */
+    public static LayerSpec fireHistory() {
+        final LayerSpec s = new LayerSpec();
+        s.id = FIRE_HISTORY_ID;
+        s.title = "Fire History";
+        s.subtitle = "NIFC";
+        s.layerTitle = "Burn";
+        s.portal = null;
+        s.base = FIRE_PERIMETERS;
+        s.layerIds = new int[] { 0, 0 };
+        s.sourceBases = new String[] { FIRE_PERIMETERS, FIRE_HISTORY };
+        s.generalize = true;
+        s.where = "1=1";
+        s.geojson = false;
+        s.profile = LayerSpec.Profile.GENERIC;
+        s.live = false;
+        s.refreshMinutes = 0; // history: fetched as the map moves, not on a clock
+        s.iconSet = "firehistory";
+        s.fillAlpha = 0x80; // EGP draws it half see-through
+        // EGP labels from 1:320,000 in: about 85 m/px.
+        s.labelGsd = 85;
+        s.scopeKind = "view";
+        s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
+        s.maxFeatures = 2500;
+        FireHistoryStyles.notes(s);
+        return s;
+    }
+
     /** USFS and DOI fire vehicles, every row inside 24 hours and most inside the hour. */
     public static LayerSpec dartVehicles() {
         return dart("dart-vehicles", "Vehicles", "Vehicle", DART_VEHICLES, "ResourceName", "ResourceType",
@@ -292,7 +330,8 @@ public final class Sources {
                 : "dart-vehicles".equals(s.id) ? dartVehicles()
                 : "nifc-fireguard".equals(s.id) ? fireGuard()
                 : NEW_STARTS_ID.equals(s.id) ? newStarts()
-                : ONGOING_ID.equals(s.id) ? ongoingFires() : null;
+                : ONGOING_ID.equals(s.id) ? ongoingFires()
+                : FIRE_HISTORY_ID.equals(s.id) ? fireHistory() : null;
         if (now == null)
             return;
         s.base = now.base;
@@ -309,6 +348,8 @@ public final class Sources {
         s.timeField = now.timeField;
         s.stampField = now.stampField;
         s.minAgeHours = now.minAgeHours;
+        s.sourceBases = now.sourceBases;
+        s.generalize = now.generalize;
         s.maxFeatures = now.maxFeatures;
         for (java.util.Map.Entry<String, String> n : now.setNotes.entrySet()) {
             s.setNotes.put(n.getKey(), n.getValue());

@@ -51,6 +51,8 @@ takes any ArcGIS Online organization you sign in to.
   *Ongoing Fires* is every fire not yet contained, from the day after it was
   found, public.
 
+  *Fire History* is where fires have burned since 1900, public.
+
   *CA Air Intel* is statewide California fire perimeters, public.
 
   *NIFS Archive (demo)* is last year's Dragon Bravo fire, public, for trying the
@@ -531,6 +533,21 @@ takes any ArcGIS Online organization you sign in to.
   the fire; it opens CAL FIRE's incident page, and CAL FIRE's acres and
   containment are the first lines of the details. *InciWeb* is there when the
   fire has an InciWeb page, most often a federal fire.
+]
+
+#tak-slide[
+= Fire History
+
+  Where fires have burned, 1900 to today, from NIFC's interagency fire perimeter
+  history, drawn as EGP draws it. The last ten years are colored by how long ago:
+  purple under six months, blue to a year, green to two, yellow to three, orange
+  to ten. Earlier burns are grey, one type per decade: 2010s, 2000s, 1990s, 1980s,
+  1979 and earlier.
+
+  Each band and decade is its own type in the Features list, each ON/OFF; the
+  arrow on its row opens the map key. Burns over 20 acres are labeled "Carr Fire
+  (2018)". It loads what is in view, up to about 155 miles across, simplified to
+  the zoom.
 ]
 
 #tak-slide[

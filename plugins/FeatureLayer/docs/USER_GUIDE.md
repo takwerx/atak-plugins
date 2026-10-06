@@ -43,6 +43,7 @@ once, whatever source it came from.
   the last 24 hours, public.
 - **Ongoing Fires** is every fire not yet contained, from the day after it was
   found, public.
+- **Fire History** is where fires have burned since 1900, public.
 - **CA Air Intel** is statewide California fire perimeters, public.
 - **NIFS Archive (demo)** is last year's Dragon Bravo fire, public, for trying the
   symbology without a login.
@@ -424,6 +425,25 @@ the first lines of the details, and a fire CAL FIRE has closed says "final".
 InciWeb page, most often a Forest Service or other federal fire; it opens the page
 in the phone's browser. The plugin learns which fires have a page from InciWeb's
 own feed, read every 30 minutes.
+
+## Fire History
+
+Where fires have burned, from 1900 to today, from NIFC's interagency fire
+perimeter history: about 140,000 burns. It is drawn the way the Enterprise
+Geospatial Portal (EGP) draws it. Burns from the last ten years are colored by how
+long ago they burned: purple under six months, blue six months to a year, green one
+to two years, yellow two to three, orange three to ten. Earlier burns are grey, one
+type per decade: 2010s, 2000s, 1990s, 1980s, and 1979 and earlier. **Add fire
+history** puts it in the list.
+
+Each band and each decade is its own type in the Features list, each ON/OFF, so
+the 1990s can be shown alone, or only the last three years. The arrow on its row
+opens a map key with the colors. A burn over 20 acres is labeled with its name and
+year, "Carr Fire (2018)"; tap one for its acres, agency and the rest. Where
+several agencies mapped one fire, it shows once.
+
+It loads what is in view, up to about 155 miles across, with the shapes simplified
+to the zoom; zoom in and they load again in finer detail.
 
 ## Your own organization
 

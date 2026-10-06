@@ -73,6 +73,18 @@ public class LayerSpec {
      * of the two, never both. Not saved; the source sets it.
      */
     public int minAgeHours;
+    /**
+     * Per entry of {@link #layerIds}, the service it is on when it is not {@link #base}:
+     * Fire History reads two services as one layer. Not saved; the source sets it.
+     */
+    public String[] sourceBases;
+    /** Simplify shapes to the map's resolution when fetching; fire perimeters are megabytes at full detail. Not saved. */
+    public boolean generalize;
+
+    /** The service the i-th entry of {@link #layerIds} is read from. */
+    public String baseFor(int i) {
+        return sourceBases != null && i < sourceBases.length && sourceBases[i] != null ? sourceBases[i] : base;
+    }
     public int sinceHours;
     /** Split the layer's features into types by this field's value (FIRIS: "source"), instead of one type per source layer. */
     public String setField;

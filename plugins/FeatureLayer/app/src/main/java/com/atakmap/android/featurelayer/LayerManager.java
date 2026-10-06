@@ -753,11 +753,20 @@ public class LayerManager {
         if (!stateFile.isFile() && !bak.isFile())
             return;
         try {
-            JSONArray arr = stateFile.isFile() ? new JSONArray(readFile(stateFile)) : new JSONArray();
+            JSONArray arr = stateFile.isFile() ? readList(stateFile) : new JSONArray();
+            if (arr == null) {
+                // Half written: kept aside, never rotated into the backup, and the backup
+                // read instead.
+                final File aside = new File(stateFile.getPath() + ".unreadable-" + System.currentTimeMillis());
+                //noinspection ResultOfMethodCallIgnored
+                stateFile.renameTo(aside);
+                startLog("restore: main list unreadable, kept as " + aside.getName());
+                arr = new JSONArray();
+            }
             if (arr.length() == 0 && bak.isFile()) {
                 // An empty list where there was one is a lost list, not a choice.
-                final JSONArray prev = new JSONArray(readFile(bak));
-                if (prev.length() > 0) {
+                final JSONArray prev = readList(bak);
+                if (prev != null && prev.length() > 0) {
                     startLog("restore: main list empty, using the backup (" + prev.length() + " layers)");
                     arr = prev;
                 }
@@ -866,15 +875,24 @@ public class LayerManager {
                 for (JSONObject o : unrestored)
                     arr.put(o);
             }
-            // The previous list survives one save as a backup, and restore() falls back to
-            // it when the main file has nothing in it.
+            // Written whole to a new file and swapped in, so a kill at any moment leaves a
+            // whole list. It used to be the old list renamed to the backup and the new one
+            // written over layers.json in place: ATAK stopped mid-write on dev 1
+            // (2026-10-06 11:50) left a half file, restore could not read it and gave up,
+            // and the next save rotated the half file into the backup -- seven layers gone.
             final File bak = new File(stateFile.getPath() + ".bak");
-            if (stateFile.isFile() && stateFile.length() > 2)
+            final File tmp = new File(stateFile.getPath() + ".tmp");
+            try (FileOutputStream out = new FileOutputStream(tmp)) {
+                out.write(arr.toString(1).getBytes("UTF-8"));
+                out.getFD().sync();
+            }
+            // The previous list survives one save as the backup, but only a list that reads:
+            // a broken main file never replaces a good backup.
+            if (stateFile.isFile() && readList(stateFile) != null)
                 //noinspection ResultOfMethodCallIgnored
                 stateFile.renameTo(bak);
-            try (OutputStream out = new FileOutputStream(stateFile)) {
-                out.write(arr.toString(1).getBytes("UTF-8"));
-            }
+            if (!tmp.renameTo(stateFile))
+                Log.w(TAG, "state save: could not move the new list into place");
         } catch (Exception e) {
             Log.w(TAG, "state save failed", e);
         }
@@ -954,6 +972,15 @@ public class LayerManager {
         }
     }
 
+    /** A saved layer list, or null when the file does not read as one. */
+    private static JSONArray readList(File f) {
+        try {
+            return new JSONArray(readFile(f));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private static String readFile(File f) throws Exception {
         try (InputStream in = new java.io.FileInputStream(f)) {
             return new String(readAll(in), "UTF-8");
@@ -972,14 +999,28 @@ public class LayerManager {
     /** Once per service address per session: may this portal's token go there? */
     private final Map<String, Boolean> trustedBases = new HashMap<>();
 
+    /**
+     * Whether the portal's token may go to every service the layer reads: its base and,
+     * for a layer that reads more than one (Fire History), each of the others too.
+     */
     private boolean trusted(LayerSpec spec) {
-        final String key = spec.portal + " -> " + spec.base;
+        if (!trustedBase(spec.portal, spec.base))
+            return false;
+        if (spec.sourceBases != null)
+            for (String b : spec.sourceBases)
+                if (b != null && !trustedBase(spec.portal, b))
+                    return false;
+        return true;
+    }
+
+    private boolean trustedBase(String portal, String base) {
+        final String key = portal + " -> " + base;
         synchronized (trustedBases) {
             final Boolean t = trustedBases.get(key);
             if (t != null)
                 return t;
         }
-        final boolean ok = Esri.trustsServer(spec.portal, spec.base);
+        final boolean ok = Esri.trustsServer(portal, base);
         synchronized (trustedBases) {
             trustedBases.put(key, ok);
         }

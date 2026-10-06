@@ -395,7 +395,7 @@ public class LoadedLayer {
      */
     public boolean isWideFeed() {
         return DartStyles.handles(spec) || FireGuardStyles.handles(spec) || NewStartsStyles.handles(spec)
-                || "ca-air-intel".equals(spec.id);
+                || FireHistoryStyles.handles(spec) || "ca-air-intel".equals(spec.id);
     }
 
     /** Removes unnamed fires whose hour is up from the memory copy and the store. Worker thread. */
@@ -1110,6 +1110,12 @@ public class LoadedLayer {
             if ("view".equals(spec.scopeKind)) {
                 if (viewTooWide)
                     return viewWidthM() <= viewCeilingM(); // refused for width: fetch once it is narrower
+                // Zoomed well past what the simplified shapes were drawn for: fetch them finer.
+                if (spec.generalize && fetchedRes > 0) {
+                    final double r = mapView.getMapResolution();
+                    if (r > 0 && r < fetchedRes / 3)
+                        return true;
+                }
                 final double[] fb = fetchedBox;
                 final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
                 if (fb == null || b == null)
@@ -1151,8 +1157,14 @@ public class LoadedLayer {
      * so it has none and a national view shows the nation.
      */
     private double viewCeilingM() {
-        return NewStartsStyles.handles(spec) ? Double.MAX_VALUE : MAX_VIEW_M;
+        if (NewStartsStyles.handles(spec))
+            return Double.MAX_VALUE;
+        // Fire History: a century of perimeters; 250 km keeps a view to a few thousand.
+        return FireHistoryStyles.handles(spec) ? 250_000 : MAX_VIEW_M;
     }
+
+    /** The map resolution a simplified fetch was sized for (m/px), 0 when none was. */
+    private volatile double fetchedRes;
 
     /** Whether the last view-scoped fetch was refused for width; a narrower view fetches again. */
     private volatile boolean viewTooWide;
@@ -1290,11 +1302,12 @@ public class LoadedLayer {
                 Log.d(TAG, spec.id + ": fetching " + scopeLabel());
             perimeterRings.clear();
             perimeterHoles.clear();
-            for (int layerId : spec.layerIds) {
+            for (int li = 0; li < spec.layerIds.length; li++) {
+                final int layerId = spec.layerIds[li];
                 if (closed)
                     throw new IllegalStateException("layer closed");
                 try {
-                    fetchSourceLayer(layerId, token, pending);
+                    fetchSourceLayer(spec.baseFor(li), layerId, token, pending);
                 } catch (Exception e) {
                     Log.w(TAG, spec.id + " layer " + layerId + " failed", e);
                     problems.add("layer " + layerId + ": " + e.getMessage());
@@ -1480,15 +1493,19 @@ public class LoadedLayer {
         return nwcgIcons.get("Other");
     }
 
-    private void fetchSourceLayer(final int layerId, String token, final List<Pending> out) throws Exception {
-        final Esri.LayerInfo info = Esri.layerInfo(spec.base, layerId, token);
+    private void fetchSourceLayer(final String base, final int layerId, String token, final List<Pending> out) throws Exception {
+        final Esri.LayerInfo info = Esri.layerInfo(base, layerId, token);
+        final boolean history = FireHistoryStyles.handles(spec);
+        // One perimeter per fire: the all-years history holds a copy per agency that mapped it.
+        final Map<String, Integer> seenFire = new HashMap<>();
+        final Map<String, Double> seenAcres = new HashMap<>();
         final boolean nwcg = spec.profile == LayerSpec.Profile.NWCG;
         final boolean isPointLayer = info.geometryType.contains("Point");
         final boolean isLineLayer = info.geometryType.contains("Polyline");
         // Only when the source layer is itself the type. A layer that splits by a field
         // (CA Air Intel by source) names its types from the data, and the layer's own name
         // listed a seventh type nothing was ever in.
-        if (spec.setField == null)
+        if (spec.setField == null && !history)
             spec.setKind.put(info.name, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
         else
             spec.setKind.remove(info.name);
@@ -1515,7 +1532,17 @@ public class LoadedLayer {
         Log.d(TAG, spec.id + ": layer " + layerId + " iconSet=" + spec.iconSet + " dart=" + DartStyles.handles(spec)
                 + " point=" + isPointLayer + " profile=" + spec.profile + " nwcg=" + nwcg);
         final int firstOfLayer = out.size();
-        Esri.query(spec.base, layerId, spec.whereNow(), scope(), token, spec.geojson,
+        Esri.Scope sc = scope();
+        if (spec.generalize && sc != null) {
+            // Shapes simplified to about a pixel at the zoom they were fetched for; a
+            // zoom well past it fetches again, finer (movedOutOfScope).
+            final double res = mapView.getMapResolution();
+            if (res > 0 && !Double.isNaN(res)) {
+                sc = sc.simplified(Math.max(0.00001, Math.min(0.05, res / 111320d)));
+                fetchedRes = res;
+            }
+        }
+        Esri.query(base, layerId, spec.whereNow(), sc, token, spec.geojson,
                 Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
@@ -1544,6 +1571,26 @@ public class LoadedLayer {
                             if (NewStartsStyles.handles(spec))
                                 target = NewStartsStyles.type(props);
                             spec.setKind.put(target, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
+                        }
+                        int dupAt = -1;
+                        String fireKey = null;
+                        if (history) {
+                            // EGP's band or decade; a perimeter EGP draws in neither is left out.
+                            final String t = FireHistoryStyles.type(props, System.currentTimeMillis());
+                            if (t == null)
+                                return;
+                            target = t;
+                            spec.setKind.put(target, "polygon");
+                            final com.atakmap.map.layer.feature.geometry.Envelope e = g.getEnvelope();
+                            if (e != null && !Double.isNaN(e.minX)) {
+                                fireKey = FireHistoryStyles.sameFire(props, (e.minY + e.maxY) / 2, (e.minX + e.maxX) / 2);
+                                final Integer at = seenFire.get(fireKey);
+                                if (at != null) {
+                                    if (FireHistoryStyles.acres(props) <= seenAcres.get(fireKey))
+                                        return; // a smaller copy of a fire already kept
+                                    dupAt = at;
+                                }
+                            }
                         }
                         double targetGsd = gsd;
                         if (nwcg) {
@@ -1615,12 +1662,18 @@ public class LoadedLayer {
                                 name = FireGuardStyles.title(props, name);
                                 title = name + " (" + layerName + ")";
                             }
+                            if (history) {
+                                // EGP's label, "Carr Fire (2018)", only over 20 acres; the title
+                                // carries the acres for every one.
+                                name = FireHistoryStyles.label(props);
+                                title = FireHistoryStyles.title(props, layerName) + " (" + target + ")";
+                            }
                             if (NewStartsStyles.handles(spec)) {
                                 // "Ridge · 12 ac"; the type's own name when the start has none.
                                 name = NewStartsStyles.title(props, NewStartsStyles.type(props));
                                 title = name + " (" + layerName + ")";
                             }
-                            style = generic.styleFor(props);
+                            style = history ? FireHistoryStyles.style(target, spec.fillFor(target)) : generic.styleFor(props);
                             if (NewStartsStyles.handles(spec) && isPointLayer) {
                                 // NIFC's colors and size rule on a composed circle, so the
                                 // name pill is drawn whole (a renderer dot has no icon to
@@ -1721,7 +1774,7 @@ public class LoadedLayer {
                         // "Pickup", "IHC"), so the picker lists kinds and a row says what it
                         // is; the layer's name was standing in (operator, 2026-09-18: "when i
                         // click on vehicle how come i dont get a sub type?").
-                        final String dartType = NewStartsStyles.handles(spec) ? NewStartsStyles.type(props)
+                        final String dartType = history ? target : NewStartsStyles.handles(spec) ? NewStartsStyles.type(props)
                                 : (DartStyles.handles(spec) || FireGuardStyles.handles(spec)) && spec.setField != null
                                 ? props.optString(spec.setField, "").trim() : "";
                         attrs.setAttribute("_type", !dartType.isEmpty() && !"null".equalsIgnoreCase(dartType) ? dartType
@@ -1740,9 +1793,9 @@ public class LoadedLayer {
                                 if (h != 0)
                                     hue = h;
                             }
-                            final boolean fireguard = !nwcg && FireGuardStyles.handles(spec);
+                            final boolean fireguard = !nwcg && (FireGuardStyles.handles(spec) || history);
                             if (fireguard) {
-                                final int h = FireGuardStyles.fillHue(props);
+                                final int h = history ? FireHistoryStyles.hue(target) : FireGuardStyles.fillHue(props);
                                 if (h != 0)
                                     hue = h;
                             }
@@ -1817,7 +1870,16 @@ public class LoadedLayer {
                         }
                         final Pending p = new Pending(target, targetGsd, name, shown, style, attrs);
                         p.alt = alt;
-                        out.add(p);
+                        if (dupAt >= 0) {
+                            out.set(dupAt, p); // the larger copy of a fire seen before
+                            seenAcres.put(fireKey, FireHistoryStyles.acres(props));
+                        } else {
+                            if (fireKey != null) {
+                                seenFire.put(fireKey, out.size());
+                                seenAcres.put(fireKey, FireHistoryStyles.acres(props));
+                            }
+                            out.add(p);
+                        }
 
                     }
                 });

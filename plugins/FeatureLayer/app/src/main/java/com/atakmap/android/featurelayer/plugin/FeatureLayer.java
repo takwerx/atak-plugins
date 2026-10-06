@@ -171,6 +171,8 @@ public class FeatureLayer implements IPlugin {
                     "Wildfires and prescribed fires reported in the last 24 hours, public"),
             new Org("ongoing", "Ongoing Fires", null, "Add ongoing fires",
                     "Fires found more than a day ago and not yet contained, public"),
+            new Org("fire-history", "Fire History", null, "Add fire history",
+                    "Where fires have burned since 1900, by years since and by decade, public"),
             new Org("sarcop-live", "SARCOP Live", Sources.NAPSG_PORTAL, "Find incident", "Search"),
             new Org("sarcop-training", "SARCOP Training", null, "Find incident", "Search"),
             new Org("ca-air-intel", "CA Air Intel", null, "Add perimeters", "Statewide fire perimeters, public"),
@@ -1228,14 +1230,16 @@ public class FeatureLayer implements IPlugin {
         find.setText(org.findLabel);
         search.setHint(org.hint);
         search.setVisibility("nifs-archive".equals(org.id) || "ca-air-intel".equals(org.id)
-                || "new-starts".equals(org.id) || "ongoing".equals(org.id) ? View.GONE : View.VISIBLE);
+                || "new-starts".equals(org.id) || "ongoing".equals(org.id)
+                || "fire-history".equals(org.id) ? View.GONE : View.VISIBLE);
         // A source that is one fixed layer has nothing to search: its button adds the
         // layer, and once the layer is in the list below the button goes away (the
         // operator read "Add perimeters" over an added layer as a second thing to add).
         final String fixedLayer = "ca-air-intel".equals(org.id) ? "ca-air-intel"
                 : "nifs-archive".equals(org.id) ? "nifs-archive:Dragon Bravo"
                 : "new-starts".equals(org.id) ? Sources.NEW_STARTS_ID
-                : "ongoing".equals(org.id) ? Sources.ONGOING_ID : null;
+                : "ongoing".equals(org.id) ? Sources.ONGOING_ID
+                : "fire-history".equals(org.id) ? Sources.FIRE_HISTORY_ID : null;
         if (fixedLayer != null && manager != null) {
             boolean loaded = false;
             for (LoadedLayer l : manager.snapshot())
@@ -1274,6 +1278,9 @@ public class FeatureLayer implements IPlugin {
                 return;
             case "ongoing":
                 addLayer(Sources.ongoingFires());
+                return;
+            case "fire-history":
+                addLayer(Sources.fireHistory());
                 return;
             case "sarcop-live":
                 toast("SARCOP Live is not wired up yet; SARCOP Training is");
@@ -2064,6 +2071,10 @@ public class FeatureLayer implements IPlugin {
     private void bindKey(LinearLayout key, LoadedLayer l) {
         if (key == null)
             return;
+        if (com.atakmap.android.featurelayer.FireHistoryStyles.handles(l.spec)) {
+            bindHistoryKey(key);
+            return;
+        }
         if (!com.atakmap.android.featurelayer.NewStartsStyles.handles(l.spec)) {
             key.setVisibility(View.GONE);
             return;
@@ -2086,6 +2097,38 @@ public class FeatureLayer implements IPlugin {
             line.addView(icon, new LinearLayout.LayoutParams(side, side));
             final TextView name = new TextView(key.getContext());
             name.setText(k[1]);
+            name.setTextColor(Color.WHITE);
+            name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+            name.setPadding(Math.round(10 * dp), 0, 0, 0);
+            line.addView(name);
+            key.addView(line);
+        }
+        key.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Fire History's key: each band and decade as a swatch in EGP's fill, from the same
+     * table the map is drawn with.
+     */
+    private void bindHistoryKey(LinearLayout key) {
+        while (key.getChildCount() > 1)
+            key.removeViewAt(1);
+        final float dp = paneView.getResources().getDisplayMetrics().density;
+        for (Object[] k : com.atakmap.android.featurelayer.FireHistoryStyles.KEY) {
+            final LinearLayout line = new LinearLayout(key.getContext());
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            line.setPadding(0, Math.round(2 * dp), 0, Math.round(2 * dp));
+            final View swatch = new View(key.getContext());
+            final android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+            d.setColor(0xFF000000 | (Integer) k[1]);
+            d.setStroke(Math.max(1, Math.round(dp)), 0xFF999999);
+            d.setCornerRadius(3 * dp);
+            swatch.setBackground(d);
+            final int side = Math.round(22 * dp);
+            line.addView(swatch, new LinearLayout.LayoutParams(side, side));
+            final TextView name = new TextView(key.getContext());
+            name.setText((String) k[0]);
             name.setTextColor(Color.WHITE);
             name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
             name.setPadding(Math.round(10 * dp), 0, 0, 0);
