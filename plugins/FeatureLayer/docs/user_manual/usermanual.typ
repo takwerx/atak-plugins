@@ -37,7 +37,8 @@ takes any ArcGIS Online organization you sign in to.
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("2.png", height: 270pt)
 ][
-  *Pick a source* lists where layers come from.
+  *Add Layer*, on the main screen, opens the sources; *Back*, or adding a
+  layer, returns to the list. *Pick a source* lists where layers come from.
 
   *NIFC* is the live National Incident Feature Service. It needs your own NIFC
   ArcGIS login.
@@ -112,7 +113,8 @@ takes any ArcGIS Online organization you sign in to.
   *All ON / All OFF* beside the heading works every layer at once. A row says
   *Loading...* while its layer fetches.
 
-  *Go to* frames the whole incident.
+  *Go to* frames the whole incident. DART, FireGuard, New Fire Starts and CA Air
+  Intel cover a state or the country and have none.
 ]
 ]
 
@@ -202,8 +204,8 @@ takes any ArcGIS Online organization you sign in to.
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
   #image("15.png", width: 100%)
 
-  *Feature* on the main pane, or *Find* inside a layer's Features, opens a
-  search inside that layer. With nothing typed, *Find* lists every kind of
+  *Find* on the main screen searches every loaded layer at once; *Find* inside
+  a layer's Features searches only that layer. With nothing typed, *Find* lists every kind of
   thing the layer holds with a count. Tap one to list its features.
 ][
   #image("16.png", width: 100%)

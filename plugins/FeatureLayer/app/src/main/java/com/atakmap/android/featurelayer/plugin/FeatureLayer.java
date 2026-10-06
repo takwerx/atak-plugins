@@ -410,13 +410,26 @@ public class FeatureLayer implements IPlugin {
                     onFind(find, search.getText().toString().trim());
                 }
             });
-            paneView.findViewById(R.id.btn_find_feature).setOnClickListener(new View.OnClickListener() {
+            // The main screen's row: Add Layer opens the sources, Find searches every
+            // loaded layer whatever it came from (operator, 2026-10-05: the source row
+            // made a feature search something only NIFC had).
+            paneView.findViewById(R.id.btn_add_layer).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    findFeature(search.getText().toString().trim());
+                    showAddPanel();
                 }
             });
-            // Clears the source search box, beside All ON/OFF where the operator asked for it.
+            paneView.findViewById(R.id.btn_find_all).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (manager == null || manager.snapshot().isEmpty()) {
+                        toast("Nothing loaded yet: Add Layer first");
+                        return;
+                    }
+                    findFeature("", null);
+                }
+            });
+            // Clears the source search box, beside its Find.
             paneView.findViewById(R.id.btn_clear_search).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -462,6 +475,10 @@ public class FeatureLayer implements IPlugin {
                                 refreshResultsInPlace();
                             else
                                 pickSets(showing, true);
+                        } else if (showing == null && finding && !reading && scope == null && !scanning(null)) {
+                            // Find over every layer, opened from the main screen: its rows
+                            // follow the fetches once they have all landed, not per tick.
+                            refreshResultsInPlace();
                         }
                     }
                 });
@@ -511,28 +528,46 @@ public class FeatureLayer implements IPlugin {
      * The main pane's Feature button: a search is always inside one layer, so with one
      * loaded it opens there, and with more it asks which first.
      */
-    private void findFeature(final String text) {
+    /** The Add Layer page: the sources, sign-in and fire search, with Back to the list. */
+    private void showAddPanel() {
+        if (paneView == null)
+            return;
+        paneView.findViewById(R.id.main_panel).setVisibility(View.GONE);
+        paneView.findViewById(R.id.add_panel).setVisibility(View.VISIBLE);
+        ((TextView) paneView.findViewById(R.id.features_title)).setText("Add a layer");
+        paneView.findViewById(R.id.features_header).setVisibility(View.VISIBLE);
+        paneView.findViewById(R.id.btn_features_back).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                backToMain();
+            }
+        });
+        refreshOrgUi();
+        scrollPaneToTop();
+    }
+
+    /** The main screen again, from the Add page or after a layer was added there. */
+    private void backToMain() {
+        if (paneView == null)
+            return;
+        // The search box on the Add page may hold focus; hidden with it, focus lands on
+        // a list row and the scroller follows it down.
+        final View focused = paneView.findFocus();
+        if (focused != null)
+            focused.clearFocus();
+        paneView.findViewById(R.id.add_panel).setVisibility(View.GONE);
+        paneView.findViewById(R.id.features_header).setVisibility(View.GONE);
+        paneView.findViewById(R.id.main_panel).setVisibility(View.VISIBLE);
+        renderRows();
+        scrollPaneToTop();
+    }
+
+    /** Adds a layer and goes back to the list, where its row now is: the Add page has done its job. */
+    private void addLayer(com.atakmap.android.featurelayer.LayerSpec spec) {
         if (manager == null)
             return;
-        final List<LoadedLayer> layers = manager.snapshot();
-        if (layers.isEmpty()) {
-            toast("Nothing loaded yet");
-            return;
-        }
-        if (layers.size() == 1) {
-            findFeature(text, layers.get(0));
-            return;
-        }
-        final String[] labels = new String[layers.size()];
-        for (int i = 0; i < layers.size(); i++)
-            labels[i] = layers.get(i).spec.title;
-        new AlertDialog.Builder(mapView.getContext()).setTitle("Search in")
-                .setItems(labels, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        findFeature(text, layers.get(which));
-                    }
-                }).setNegativeButton("Cancel", null).show();
+        manager.add(spec);
+        backToMain();
     }
 
     // ---- the search pane: every loaded feature, filtered and sorted, with Back ----------
@@ -693,9 +728,9 @@ public class FeatureLayer implements IPlugin {
 
     /** Opens the search pane with the text inside one layer: a fire, an incident, a source. */
     private void findFeature(String text, LoadedLayer only) {
-        if (manager == null || paneView == null || only == null)
+        if (manager == null || paneView == null)
             return;
-        scope = only;
+        scope = only; // null: every loaded layer, from the main screen's Find
         filterType = null;
         // The sort and the measuring point come back the way they were left.
         sortMode = uiPrefs().getInt("sortMode", 0);
@@ -1113,7 +1148,7 @@ public class FeatureLayer implements IPlugin {
             @Override
             public void onClick(View v) {
                 if (manager != null)
-                    manager.add(Sources.fireGuard());
+                    addLayer(Sources.fireGuard());
             }
         });
         if (org == null) {
@@ -1164,13 +1199,13 @@ public class FeatureLayer implements IPlugin {
         Log.d(TAG, org.id + " find: \"" + text + "\"");
         switch (org.id) {
             case "nifs-archive":
-                manager.add(Sources.nifsArchiveDemo());
+                addLayer(Sources.nifsArchiveDemo());
                 return;
             case "ca-air-intel":
-                manager.add(Sources.caAirIntel());
+                addLayer(Sources.caAirIntel());
                 return;
             case "new-starts":
-                manager.add(Sources.newStarts());
+                addLayer(Sources.newStarts());
                 return;
             case "sarcop-live":
                 toast("SARCOP Live is not wired up yet; SARCOP Training is");
@@ -1316,6 +1351,9 @@ public class FeatureLayer implements IPlugin {
                     pickSets(l);
                 }
             });
+            // Go to frames one incident; a feed spread over a state or the country has no
+            // one place to go, and Features takes the row.
+            row.findViewById(R.id.row_goto).setVisibility(l.isWideFeed() ? View.GONE : View.VISIBLE);
             row.findViewById(R.id.row_goto).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -1382,7 +1420,7 @@ public class FeatureLayer implements IPlugin {
      * not jump and does not revert to the type list.
      */
     private void refreshResultsInPlace() {
-        if (paneView == null || scope == null)
+        if (paneView == null)
             return;
         final android.widget.ScrollView sv = paneView.findViewById(R.id.pane_scroll);
         final int keepY = sv == null ? 0 : sv.getScrollY();
@@ -1999,9 +2037,9 @@ public class FeatureLayer implements IPlugin {
                     @Override
                     public void onClick(DialogInterface d, int which) {
                         if (which != 1)
-                            manager.add(Sources.dartVehicles());
+                            addLayer(Sources.dartVehicles());
                         if (which != 2)
-                            manager.add(Sources.dartPersonnel());
+                            addLayer(Sources.dartPersonnel());
                         d.dismiss();
                     }
                 })
@@ -2021,7 +2059,7 @@ public class FeatureLayer implements IPlugin {
                         final Sources.Fire fire = fires.get(which);
                         if (!manager.auth(Sources.NIFC_PORTAL).isSignedIn())
                             toast("Sign in to NIFC to load " + fire.name);
-                        manager.add(Sources.nifsLive(fire));
+                        addLayer(Sources.nifsLive(fire));
                     }
                 })
                 .setNegativeButton("Cancel", null)
@@ -2070,7 +2108,7 @@ public class FeatureLayer implements IPlugin {
                                 if (error != null)
                                     toast("Could not read " + item.title + ": " + error);
                                 else
-                                    manager.add(spec);
+                                    addLayer(spec);
                             }
                         });
                     }
@@ -2088,7 +2126,7 @@ public class FeatureLayer implements IPlugin {
                 .setItems(labels, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {
-                        manager.add(Sources.sarcopTraining(events.get(which)));
+                        addLayer(Sources.sarcopTraining(events.get(which)));
                     }
                 })
                 .setNegativeButton("Cancel", null)

@@ -27,6 +27,11 @@ there is signal.
 Open it from the ATAK toolbar: the globe with the layer stack. Tapping it again
 closes the pane.
 
+The pane opens on one row of buttons and your layers under it: **Add Layer**,
+**Find** and **All ON / All OFF**. **Add Layer** opens a page of sources; **Back**,
+or adding a layer, returns to the list. **Find** searches every loaded layer at
+once, whatever source it came from.
+
 ## Pick a source
 
 ![Pick a source](screenshots/2_pick_a_source.png)
@@ -46,7 +51,7 @@ closes the pane.
 
 ![The main pane with NIFC picked](screenshots/3_main_pane_signed_in.png)
 
-With NIFC picked, tap **Sign in**. The organization's own login page opens inside
+In **Add Layer**, with NIFC picked, tap **Sign in**. The organization's own login page opens inside
 the pane, with multi-factor sign-in if the org uses it. The plugin never sees your
 password.
 
@@ -86,7 +91,9 @@ in, or there is more than it draws), that line stays under its row even when the
 row is closed.
 
 **All ON / All OFF** beside the heading works every layer at once. A row says
-**Loading…** while its layer fetches. **Go to** frames the whole incident.
+**Loading…** while its layer fetches. **Go to** frames the whole incident; layers
+spread across a state or the country (DART, FireGuard, New Fire Starts, CA Air
+Intel) have no Go to.
 
 ## On the map
 
@@ -140,8 +147,8 @@ limit nothing in the layer draws; zoom in and it all comes back.
 
 ![Blank Find lists the types](screenshots/15_find_types.png)
 
-**Feature** on the main pane, or **Find** inside a layer's Features, opens a search
-inside that layer. With nothing typed, **Find** lists every kind of thing the
+**Find** on the main screen searches every loaded layer at once; **Find** inside a
+layer's Features searches only that layer. With nothing typed, **Find** lists every kind of thing the
 layer holds with a count. Tap one to list its features.
 
 ![Search results](screenshots/16_search_results.png)

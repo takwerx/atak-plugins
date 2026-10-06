@@ -383,6 +383,17 @@ public class LoadedLayer {
         return layerOn;
     }
 
+    /**
+     * Whether the layer is a feed of things spread across a state or the country, not one
+     * incident: DART, FireGuard, New Fire Starts, CA Air Intel. Its row has no Go to,
+     * because there is no one place to go (operator, 2026-10-05: "the dome fire centers
+     * you on it, dart no reason for a go to").
+     */
+    public boolean isWideFeed() {
+        return DartStyles.handles(spec) || FireGuardStyles.handles(spec) || NewStartsStyles.handles(spec)
+                || "ca-air-intel".equals(spec.id);
+    }
+
     /** Whether the store was last written with this build's styles, so nothing in it points at older files. */
     boolean drawnByThisBuild() {
         return spec.styleVersion == STYLE_VERSION;
