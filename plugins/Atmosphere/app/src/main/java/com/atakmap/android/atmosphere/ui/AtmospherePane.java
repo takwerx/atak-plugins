@@ -6415,6 +6415,9 @@ public final class AtmospherePane {
         v.setTextColor(Color.WHITE);
         v.setGravity(Gravity.CENTER);
         v.setSingleLine(true);
+        v.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        shrinkToFit(v);
         final TextView l = new TextView(pluginContext);
         l.setText(label);
         l.setTextSize(11);
@@ -6424,6 +6427,38 @@ public final class AtmospherePane {
         t.addView(v);
         t.addView(l);
         return t;
+    }
+
+    /**
+     * A reading too wide for its third of the pane is drawn smaller rather than cut
+     * off: "290\u00b0 WNW" read "290\u00b0 WNV" at half width (S22 Ultra, 2026-10-05).
+     * Decided on each layout from the width it actually has, so it is full size again
+     * when the pane is wide; never below 14 sp.
+     */
+    private void shrinkToFit(final TextView v) {
+        final float full = v.getTextSize();
+        final float floor = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 14f,
+                pluginContext.getResources().getDisplayMetrics());
+        v.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View view, int l, int t, int r, int b, int ol, int ot,
+                    int or, int ob) {
+                final int room = r - l - v.getPaddingLeft() - v.getPaddingRight();
+                if (room <= 0 || r - l == or - ol)
+                    return;
+                final android.graphics.Paint p = new android.graphics.Paint(v.getPaint());
+                p.setTextSize(full);
+                final float wide = p.measureText(v.getText().toString());
+                final float size = wide <= room ? full : Math.max(floor, full * room / wide);
+                if (Math.abs(size - v.getTextSize()) > 0.5f)
+                    v.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            v.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, size);
+                        }
+                    });
+            }
+        });
     }
 
     /** Hours are shown as columns; more than this is the days strip's job. */
