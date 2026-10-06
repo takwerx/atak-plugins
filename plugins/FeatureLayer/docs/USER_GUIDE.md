@@ -439,7 +439,8 @@ history** puts it in the list.
 Each band and each decade is its own type in the Features list, each ON/OFF, so
 the 1990s can be shown alone, or only the last three years. The arrow on its row
 opens a map key with the colors. A burn over 20 acres is labeled with its name and
-year, "Carr Fire (2018)"; tap one for its acres, agency and the rest. Where
+year, "Carr Fire (2018)"; tap one and its details open, with its acres, agency and
+the rest. Where
 several agencies mapped one fire, it shows once.
 
 It loads what is in view, up to about 155 miles across, with the shapes simplified

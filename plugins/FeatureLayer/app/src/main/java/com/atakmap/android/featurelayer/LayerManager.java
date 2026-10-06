@@ -259,7 +259,10 @@ public class LayerManager {
                     if (item == null || details == null)
                         return false;
                     final LoadedLayer l = find(item.getMetaString("nifs_layer", ""));
-                    if (l == null || !NewStartsStyles.handles(l.spec))
+                    // Fires and burns are tapped to be read: New Fire Starts, Ongoing Fires,
+                    // and Fire History (operator, 2026-10-06: "clicking on these should go
+                    // to the details pane automatically").
+                    if (l == null || !(NewStartsStyles.handles(l.spec) || FireHistoryStyles.handles(l.spec)))
                         return false;
                     details.show(item);
                     return true;
