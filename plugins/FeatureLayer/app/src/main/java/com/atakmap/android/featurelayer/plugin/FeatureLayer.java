@@ -1454,6 +1454,7 @@ public class FeatureLayer implements IPlugin {
                     manager.remove(l);
                 }
             });
+            bindKey((LinearLayout) row.findViewById(R.id.row_key), l);
             final View scopeBlock = row.findViewById(R.id.row_scope);
             if (l.hasScopeControl()) {
                 scopeBlock.setVisibility(View.VISIBLE);
@@ -2052,6 +2053,44 @@ public class FeatureLayer implements IPlugin {
         final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(line);
         b.append("\nReported ").append(ageLegend(only.spec.id.contains("personnel")));
         return b;
+    }
+
+    /**
+     * The map key under a fire layer's arrow: each type's marker beside its name, from
+     * the images the map draws with. Other layers have none, and the block stays gone.
+     */
+    private void bindKey(LinearLayout key, LoadedLayer l) {
+        if (key == null)
+            return;
+        if (!com.atakmap.android.featurelayer.NewStartsStyles.handles(l.spec)) {
+            key.setVisibility(View.GONE);
+            return;
+        }
+        while (key.getChildCount() > 1)
+            key.removeViewAt(1); // keep the heading
+        final float dp = paneView.getResources().getDisplayMetrics().density;
+        for (String[] k : com.atakmap.android.featurelayer.NewStartsStyles.KEY) {
+            final java.io.File f = l.keyIcon(k[0]);
+            final android.graphics.Bitmap bmp = f == null ? null
+                    : android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath());
+            final LinearLayout line = new LinearLayout(key.getContext());
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            line.setPadding(0, Math.round(3 * dp), 0, Math.round(3 * dp));
+            final android.widget.ImageView icon = new android.widget.ImageView(key.getContext());
+            if (bmp != null)
+                icon.setImageBitmap(bmp);
+            final int side = Math.round(32 * dp);
+            line.addView(icon, new LinearLayout.LayoutParams(side, side));
+            final TextView name = new TextView(key.getContext());
+            name.setText(k[1]);
+            name.setTextColor(Color.WHITE);
+            name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+            name.setPadding(Math.round(10 * dp), 0, 0, 0);
+            line.addView(name);
+            key.addView(line);
+        }
+        key.setVisibility(View.VISIBLE);
     }
 
     /** Where a layer row's open/closed state is kept, by layer id. */

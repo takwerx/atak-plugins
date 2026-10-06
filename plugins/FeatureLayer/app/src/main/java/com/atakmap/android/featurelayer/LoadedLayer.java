@@ -428,6 +428,11 @@ public class LoadedLayer {
         }
     }
 
+    /** The marker image a map key row shows for a fire kind (NewStartsStyles.KEY), or null. */
+    public File keyIcon(String kind) {
+        return NewStartsStyles.handles(spec) ? NewStartsStyles.marker(kind, iconDir) : null;
+    }
+
     /** Whether the store was last written with this build's styles, so nothing in it points at older files. */
     boolean drawnByThisBuild() {
         return spec.styleVersion == STYLE_VERSION;

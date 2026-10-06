@@ -189,7 +189,19 @@ public final class NewStartsStyles {
         return p;
     }
 
-    private static synchronized File marker(String kind, File iconDir) {
+    /**
+     * The map key, in the order the Features list shows the types: each type's own
+     * marker kind and name. Drawn from {@link #marker}, the same images the map uses,
+     * so the key cannot drift from the map (operator, 2026-10-05: "we need a legend in
+     * the layer when you expand it with the icon so people know the difference").
+     */
+    public static final String[][] KEY = {
+            { "wf", WILDFIRE },
+            { "wf_nosize", NO_SIZE },
+            { "rx", PRESCRIBED },
+    };
+
+    static synchronized File marker(String kind, File iconDir) {
         if (iconDir == null)
             return null;
         final File out = new File(iconDir, "ns" + V + "_" + kind + ".png");

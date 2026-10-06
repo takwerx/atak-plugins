@@ -1,10 +1,10 @@
 # Feature Layer — User Guide
 
-**Download Feature Layer 0.11** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.11/ATAK-Plugin-FeatureLayer-0.11--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.11/ATAK-Plugin-FeatureLayer-0.11--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.11/ATAK-Plugin-FeatureLayer-0.11--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.12/ATAK-Plugin-FeatureLayer-0.12--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.12/ATAK-Plugin-FeatureLayer-0.12--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.12/ATAK-Plugin-FeatureLayer-0.12--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -373,7 +373,8 @@ login. **Add new starts** puts it in the list.
 
 Each start is a marker the size of a DART one: a red flame for a wildfire, a green
 **RX** for a prescribed fire. A flame drawn in outline is a wildfire reported with
-no size and nothing added since. Names and acres show from five miles in.
+no size and nothing added since. The arrow on the layer's row opens a map key with
+all three. Names and acres show from five miles in.
 
 Its Features list has three types, each **ON/OFF**: **Wildfire**, **Wildfire, No
 Size Yet** and **Prescribed Fire**. Turn off Prescribed Fire to see only

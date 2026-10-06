@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Feature Layer",
-   plugin-version: "0.11",
+   plugin-version: "0.12",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -56,7 +56,7 @@ takes any ArcGIS Online organization you sign in to.
   *NIFS Archive (demo)* is last year's Dragon Bravo fire, public, for trying the
   symbology without a login.
 
-  *Add your own org…* takes any ArcGIS Online organization.
+  *Add your own org...* takes any ArcGIS Online organization.
 ]
 ]
 
@@ -496,7 +496,8 @@ takes any ArcGIS Online organization you sign in to.
 
   Each start is a marker the size of a DART one: a red flame for a wildfire, a
   green *RX* for a prescribed fire. A flame drawn in outline is a wildfire
-  reported with no size and nothing added since.
+  reported with no size and nothing added since. The arrow on the layer's row
+  opens a map key with all three.
 
   Its Features list has three types, each *ON/OFF*: *Wildfire*, *Wildfire, No
   Size Yet* and *Prescribed Fire*. No Size Yet holds starts a dispatch center
@@ -536,7 +537,7 @@ takes any ArcGIS Online organization you sign in to.
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   #image("26.png", width: 100%)
 
-  *Add your own org…* asks for your organization's ArcGIS address once, the one
+  *Add your own org...* asks for your organization's ArcGIS address once, the one
   you sign in with. Any ArcGIS Online organization or ArcGIS Enterprise portal
   works.
 ][

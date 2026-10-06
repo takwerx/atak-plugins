@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.11** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.11/ATAK-Plugin-FeatureLayer-0.11--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.11/ATAK-Plugin-FeatureLayer-0.11--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.11/ATAK-Plugin-FeatureLayer-0.11--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.12/ATAK-Plugin-FeatureLayer-0.12--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.12/ATAK-Plugin-FeatureLayer-0.12--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.12/ATAK-Plugin-FeatureLayer-0.12--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -53,6 +53,19 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 
 _________________________________________________________________
 STATUS
+
+0.12, fires and a simpler pane. Two new public sources from NIFC: New Fire
+Starts, every wildfire and prescribed fire found in the last 24 hours, and
+Ongoing Fires, every fire not yet contained from the day after it was found,
+so with both on each fire shows once. A red flame marks a wildfire, a green RX
+a prescribed fire; labels carry acres and percent contained; a fire with only
+a dispatch number for a name leaves the map an hour after it was found; a tap
+on a fire opens its details, and a fire with an InciWeb page links to it. The
+main screen is now Add Layer, Find and All ON/OFF over a list of one-line
+layers, each opening its controls under an arrow; Find searches every loaded
+layer, names before other fields. Every icon and label stays level when the
+map turns, generated icons live in ATAK's private storage instead of the
+shared card, and the pane comes back after a sign-in.
 
 0.11, saved layers restore without holding up ATAK: at start, the cached
 store of each saved layer is re-styled on the plugin's own thread instead of
