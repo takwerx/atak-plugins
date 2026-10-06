@@ -76,6 +76,9 @@ public final class FireZonePage {
 
         /** A zone was starred or unstarred, so the map can draw it the new way. */
         void starsChanged();
+
+        /** Open the Fire Danger page on the area a zone is in. */
+        void showErc(Erc.Psa psa);
     }
 
     /** A zone as a row and a detail: from the cell, a search, or the stars. */
@@ -809,7 +812,7 @@ public final class FireZonePage {
                 ercButton.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        ErcDialog.show(p, egress.userAgent());
+                        host.showErc(p);
                     }
                 });
             }

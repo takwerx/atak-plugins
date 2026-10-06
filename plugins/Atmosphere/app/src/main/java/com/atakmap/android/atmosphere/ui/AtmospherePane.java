@@ -173,7 +173,8 @@ public final class AtmospherePane {
     private final ImageButton layersButton;
     private final Button pagePick;
     private static final int[] TAB_NAMES = { R.string.tab_forecast, R.string.tab_layers,
-            R.string.tab_spots, R.string.tab_zones, R.string.tab_sawti, R.string.tab_stations,
+            R.string.tab_spots, R.string.tab_zones, R.string.tab_sawti, R.string.tab_erc,
+            R.string.tab_stations,
             R.string.tab_gauges, R.string.tab_buoys };
     /** Where the Layers page sits in {@link #TAB_NAMES} and the pager. */
     private static final int LAYERS_PAGE = 1;
@@ -184,6 +185,8 @@ public final class AtmospherePane {
     private final FireZonePage zonePage;
     /** SAWTI, the Forest Service site's forecast page, beside the fire weather zones. */
     private final SawtiPage sawtiPage;
+    /** One area's fire danger with its GACC chart, opened wide from a tap on the map. */
+    private final ErcPage ercPage;
     private final Button refreshButton;
     private final Button settingsButton;
     private final TextView positionText;
@@ -533,7 +536,13 @@ public final class AtmospherePane {
                 if (fireZones != null)
                     fireZones.restyle();
             }
+
+            @Override
+            public void showErc(com.atakmap.android.atmosphere.data.Erc.Psa psa) {
+                AtmospherePane.this.showErc(psa);
+            }
         });
+        ercPage = new ErcPage(pluginContext, egress);
         sawtiPage = new SawtiPage(pluginContext, mapView(), egress, new SawtiPage.Host() {
             @Override
             public GeoPoint point() {
@@ -574,6 +583,7 @@ public final class AtmospherePane {
                 spotPage.view(),
                 zonePage.view(),
                 sawtiPage.view(),
+                ercPage.view(),
                 stationPage.view(),
                 gaugePage.view(),
                 buoyPage.view()
@@ -4324,7 +4334,21 @@ public final class AtmospherePane {
     public void openErc(String code) {
         if (erc == null || code == null)
             return;
-        ErcDialog.show(erc.find(code), egress.userAgent());
+        showErc(erc.find(code));
+    }
+
+    /** The Fire Danger page on one area, the pane opened wide so the chart is large. */
+    public void showErc(com.atakmap.android.atmosphere.data.Erc.Psa psa) {
+        if (psa == null)
+            return;
+        for (int i = 0; i < pages.length; i++)
+            if (pages[i] == ercPage.view()) {
+                pager.setCurrentItem(i, false);
+                break;
+            }
+        if (host != null)
+            host.showWide();
+        ercPage.show(psa, true);
     }
 
     /** A SAWTI zone tapped on the map ("3|2026-09-30"): the SAWTI page on that zone and day. */

@@ -77,6 +77,23 @@ public class AtmosphereDropDown extends DropDownReceiver implements OnStateListe
             goWide();
     }
 
+    /**
+     * Open wide, for a page whose picture wants the room: a tapped area's ERC chart.
+     * A closed pane is opened at that size; a resize before it is showing is lost, and
+     * the chart came up at half width (XCover, 2026-10-05).
+     */
+    public void showWide() {
+        if (isVisible()) {
+            if (!isWide())
+                goWide();
+            return;
+        }
+        setRetain(true);
+        showDropDown(root, FULL_WIDTH - HANDLE_THICKNESS_LANDSCAPE, FULL_HEIGHT, FULL_WIDTH,
+                FULL_HEIGHT - HANDLE_THICKNESS_PORTRAIT, false, this);
+        pane.onShown();
+    }
+
     private void goWide() {
         if (!isPortrait())
             resize(FULL_WIDTH - HANDLE_THICKNESS_LANDSCAPE, FULL_HEIGHT);

@@ -336,6 +336,7 @@
     <string name="tab_spots">Spot Weather Forecast</string>
     <string name="tab_zones">Fire Weather Zones</string>
     <string name="tab_sawti">SAWTI</string>
+    <string name="tab_erc">Fire Danger</string>
     <string name="tab_stations">Weather Stations</string>
     <string name="tab_gauges">River Gauges</string>
     <string name="tab_buoys">Buoys</string>
