@@ -355,6 +355,18 @@ public class FeatureLayer implements IPlugin {
     private void showPane() {
         if (pane == null) {
             paneView = PluginLayoutInflater.inflate(pluginContext, R.layout.main_layout, null);
+            // Starting to scroll means done typing. A text box at the top of the scroller
+            // that still holds focus pulls it back up to itself on every redraw, and the
+            // Find list redraws as the layers refresh: scrolled down a list of fires, it
+            // kept jumping back to the box (operator, 2026-10-05).
+            paneView.findViewById(R.id.pane_scroll).setOnTouchListener(new View.OnTouchListener() {
+                @Override
+                public boolean onTouch(View v, android.view.MotionEvent e) {
+                    if (e.getActionMasked() == android.view.MotionEvent.ACTION_MOVE)
+                        doneTyping();
+                    return false;
+                }
+            });
             final Button orgButton = paneView.findViewById(R.id.btn_org);
             final Button signin = paneView.findViewById(R.id.btn_signin);
             final Button find = paneView.findViewById(R.id.btn_find);
@@ -726,6 +738,20 @@ public class FeatureLayer implements IPlugin {
         return com.atakmap.android.featurelayer.ScaleBar.describe(l.spec.gateGsd * com.atakmap.android.featurelayer.ScaleBar.FALLBACK_BAR_PIXELS) + " or closer";
     }
 
+    /** Keyboard away and no text box focused, so the scroller stays where the operator puts it. */
+    private void doneTyping() {
+        if (paneView == null)
+            return;
+        final View f = paneView.findFocus();
+        if (!(f instanceof EditText))
+            return;
+        final android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                mapView.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null)
+            imm.hideSoftInputFromWindow(f.getWindowToken(), 0);
+        f.clearFocus();
+    }
+
     /** Opens the search pane with the text inside one layer: a fire, an incident, a source. */
     private void findFeature(String text, LoadedLayer only) {
         if (manager == null || paneView == null)
@@ -745,6 +771,7 @@ public class FeatureLayer implements IPlugin {
         final View.OnClickListener doFind = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                doneTyping();
                 renderResults();
             }
         };
@@ -762,6 +789,7 @@ public class FeatureLayer implements IPlugin {
             @Override
             public boolean onEditorAction(TextView v, int actionId, android.view.KeyEvent event) {
                 if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                    doneTyping();
                     renderResults();
                     return true;
                 }
