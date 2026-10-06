@@ -432,9 +432,10 @@ Where fires have burned, from 1900 to today, from NIFC's interagency fire
 perimeter history: about 140,000 burns. It is drawn the way the Enterprise
 Geospatial Portal (EGP) draws it. Burns from the last ten years are colored by how
 long ago they burned: purple under six months, blue six months to a year, green one
-to two years, yellow two to three, orange three to ten. Earlier burns are grey, one
-type per decade: 2010s, 2000s, 1990s, 1980s, and 1979 and earlier. **Add fire
-history** puts it in the list.
+to two years, yellow two to three, orange three to ten. Earlier burns are one type
+per decade: the 2010s rust, the 2000s brown, the 1990s tan, and the 1980s and 1979
+and earlier grey. (EGP greys every decade; a 20-year-old burn scar still matters,
+so these three keep a color.) **Add fire history** puts it in the list.
 
 Each band and each decade is its own type in the Features list, each ON/OFF, so
 the 1990s can be shown alone, or only the last three years. The arrow on its row

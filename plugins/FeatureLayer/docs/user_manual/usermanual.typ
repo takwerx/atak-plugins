@@ -541,8 +541,8 @@ takes any ArcGIS Online organization you sign in to.
   Where fires have burned, 1900 to today, from NIFC's interagency fire perimeter
   history, drawn as EGP draws it. The last ten years are colored by how long ago:
   purple under six months, blue to a year, green to two, yellow to three, orange
-  to ten. Earlier burns are grey, one type per decade: 2010s, 2000s, 1990s, 1980s,
-  1979 and earlier.
+  to ten. Earlier burns are one type per decade: the 2010s rust, the 2000s brown,
+  the 1990s tan, the 1980s and 1979 and earlier grey.
 
   Each band and decade is its own type in the Features list, each ON/OFF; the
   arrow on its row opens the map key. Burns over 20 acres are labeled "Carr Fire

@@ -17,15 +17,23 @@ import java.util.Locale;
  * cd338a45163744009ee2d91bd9679b9f: under half a year purple, half to one year blue,
  * one to two green, two to three yellow, three to ten orange; nothing older than ten;
  * grey edge; half see-through.
- * <li>Every earlier year, InterAgency Fire Perimeter History (all years, 1900 on), grey,
- * one layer per decade as EGP splits it: 2010s, 2000s, 1990s, 1980s, 1979 and earlier
+ * <li>Every earlier year, InterAgency Fire Perimeter History (all years, 1900 on), one
+ * layer per decade as EGP splits it: 2010s, 2000s, 1990s, 1980s, 1979 and earlier
  * (which takes unknown years too). 2020 on is the current decade's.
  * </ul>
+ *
+ * One departure from EGP: EGP greys every decade, and the 2010s, 2000s and 1990s have
+ * their own colors here, rust, brown and tan, older reading duller (operator,
+ * 2026-10-06: "a 20 year old burn scar is not that old and still relevant"). 1980s and
+ * earlier stay grey. No red, which on this map means a fire burning now.
  *
  * Each band and each decade is its own type, so the Features list is the decade picker.
  * Labels are EGP's: "Carr Fire (2018)", only for fires over 20 acres.
  */
 public final class FireHistoryStyles {
+
+    /** EGP's grey, for the decades too old to tell apart by color. */
+    private static final int GREY = 0x767676;
 
     public static final String UNDER_HALF = "Under 6 Months", HALF_TO_ONE = "6 Months to 1 Year",
             ONE_TO_TWO = "1 to 2 Years", TWO_TO_THREE = "2 to 3 Years", THREE_TO_TEN = "3 to 10 Years",
@@ -38,11 +46,11 @@ public final class FireHistoryStyles {
             { ONE_TO_TWO, 0xA7C636, "Burned one to two years ago" },
             { TWO_TO_THREE, 0xFFDE3E, "Burned two to three years ago" },
             { THREE_TO_TEN, 0xFC921F, "Burned three to ten years ago" },
-            { D2010, 0x767676, "Fires of 2010 to 2019" },
-            { D2000, 0x767676, "Fires of 2000 to 2009" },
-            { D1990, 0x767676, "Fires of 1990 to 1999" },
-            { D1980, 0x767676, "Fires of 1980 to 1989" },
-            { EARLIER, 0x767676, "Fires before 1980, and fires of unknown year" },
+            { D2010, 0xB8603E, "Fires of 2010 to 2019" },
+            { D2000, 0x8C6A4A, "Fires of 2000 to 2009" },
+            { D1990, 0xC2A679, "Fires of 1990 to 1999" },
+            { D1980, GREY, "Fires of 1980 to 1989" },
+            { EARLIER, GREY, "Fires before 1980, and fires of unknown year" },
     };
 
     private static final int AGE_EDGE = 0xCC999999, GREY_EDGE = 0xFF000000;
@@ -113,12 +121,12 @@ public final class FireHistoryStyles {
         for (Object[] k : KEY)
             if (k[0].equals(type))
                 return (Integer) k[1];
-        return 0x767676;
+        return GREY;
     }
 
     /** EGP's fill and edge for a type, at the given fill alpha (0-255). */
     static Style style(String type, int alpha) {
-        final boolean grey = hue(type) == 0x767676;
+        final boolean grey = hue(type) == GREY;
         final Style edge = NwcgStyles.solid(grey ? GREY_EDGE : AGE_EDGE, grey ? 1f : 1.5f);
         if (alpha <= 0)
             return edge;
