@@ -102,6 +102,23 @@ public final class ScaleBar {
     }
 
     /** Format a bar-width distance the way ATAK would, in the operator's units. */
+    /**
+     * A gate's distance the way the picker wrote it: "10 mi", not "10.00 mi".
+     *
+     * <p>{@link #describe} goes through ATAK's generic span formatter, which is right for
+     * reporting what the bar reads now and wrong for reading back a value the operator
+     * chose from a list of round numbers.
+     */
+    public static String gate(long meters) {
+        if (meters <= 0)
+            return "Always";
+        final double big = meters / Units.bigToMeters(1);
+        final double rounded = Math.rint(big * 100) / 100;
+        final String n = rounded == Math.rint(rounded)
+                ? Integer.toString((int) rounded) : Double.toString(rounded);
+        return n + " " + Units.bigLabel();
+    }
+
     public static String describe(double barMeters) {
         try {
             return SpanUtilities.formatType(Units.type(), barMeters, Span.METER);

@@ -608,9 +608,9 @@ public class TfrManager {
             b.append("Updated ").append(ago(System.currentTimeMillis() - lastSuccessMs)).append('.');
         if (gateHiding)
             b.append(" Zoom in to see restrictions on the map. Shown at ")
-                    .append(ScaleBar.describe(gateBarM)).append(" or closer.");
+                    .append(ScaleBar.gate(gateBarM)).append(" or closer.");
         else if (labelsHidden)
-            b.append(" Names appear at ").append(ScaleBar.describe(labelBarM))
+            b.append(" Names appear at ").append(ScaleBar.gate(labelBarM))
                     .append(" or closer.");
         // A fence guarding airspace that was lifted is worse than no fence, so this is
         // said on the pinned line rather than left to be discovered.

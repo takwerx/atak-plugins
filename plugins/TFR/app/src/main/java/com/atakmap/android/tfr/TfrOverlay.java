@@ -54,6 +54,8 @@ public class TfrOverlay {
 
     private static final String TAG = "TfrOverlay";
     private static final String PROVIDER = "TFR";
+    /** Appended to a type's key for the set holding that type's labels. */
+    private static final String LABEL_SUFFIX = " \u0000labels";
     private static final String TYPE = "tfr";
 
     private final MapView mapView;
@@ -315,6 +317,10 @@ public class TfrOverlay {
         applyVisibility();
     }
 
+    public boolean labelsVisible() {
+        return labelsOn;
+    }
+
     /**
      * Push the switches into the store.
      *
@@ -368,9 +374,14 @@ public class TfrOverlay {
         final Set<Long> show = new HashSet<>();
         final Set<Long> hide = new HashSet<>();
         for (Map.Entry<String, Long> e : setIds.entrySet()) {
+            final String key = e.getKey();
+            final boolean isLabelSet = key.endsWith(LABEL_SUFFIX);
+            final String type = isLabelSet
+                    ? key.substring(0, key.length() - LABEL_SUFFIX.length()) : key;
             // The latest wish, not the one this task was queued with: two quick taps must
-            // end where the button says.
-            if (visible && !typesOff.contains(e.getKey()))
+            // end where the button says. A label set answers to the label gate as well as
+            // to its own type.
+            if (visible && !typesOff.contains(type) && (!isLabelSet || labelsOn))
                 show.add(e.getValue());
             else
                 hide.add(e.getValue());
@@ -410,7 +421,8 @@ public class TfrOverlay {
             for (Long fid : e.getValue()) {
                 // One answer per feature from both gates, computed together: two passes
                 // each writing features.visible would undo one another.
-                final boolean on = placeAllows && (labelsOn || !labelFids.contains(fid));
+                // The label gate is a set-level thing now; this is the place filter only.
+                final boolean on = placeAllows;
                 (on ? show : hide).add(fid);
             }
         }
@@ -456,10 +468,17 @@ public class TfrOverlay {
                 fidsByNotam.clear();
                 labelFids.clear();
                 for (Drawn d : drawn) {
-                    Long fsid = fresh.get(d.setKey);
+                    // Labels live in a set of their own, per type. Hiding a feature does
+                    // not stop ATAK drawing its label -- measured: the label points read
+                    // visible=0 in the store and the names stayed on the map a minute
+                    // later, through the hide-layer-and-show-it-again dance that works for
+                    // sets. Set visibility is the only lever that takes labels with it.
+                    final String key = d.isLabel ? d.setKey + LABEL_SUFFIX : d.setKey;
+                    final String name = d.isLabel ? d.setName + " labels" : d.setName;
+                    Long fsid = fresh.get(key);
                     if (fsid == null) {
-                        fsid = newSet(d.setKey, d.setName);
-                        fresh.put(d.setKey, fsid);
+                        fsid = newSet(key, name);
+                        fresh.put(key, fsid);
                     }
                     final long fid = store.insertFeature(new Feature(fsid, d.name,
                             d.geometry, d.style, d.attrs, d.altitudeMode, d.extrude));

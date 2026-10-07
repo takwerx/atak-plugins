@@ -152,6 +152,16 @@ public final class TfrFeatures {
      * one edge would drag a vertex average off into the side of the shape. Falls back to
      * the average when the ring is degenerate enough to have no area.
      */
+    /** The middle of a restriction's first drawable area, for Go to. {lat, lon} or null. */
+    public static double[] center(Tfr t) {
+        for (TfrArea a : t.drawable()) {
+            final double[] c = centroid(a);
+            if (c != null)
+                return c;
+        }
+        return null;
+    }
+
     private static double[] centroid(TfrArea a) {
         final List<double[]> r = a.ring;
         if (r.size() < 3)

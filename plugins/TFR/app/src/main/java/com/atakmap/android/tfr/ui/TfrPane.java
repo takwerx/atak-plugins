@@ -249,14 +249,9 @@ public class TfrPane implements TfrManager.Listener {
                 render();
             }
         });
-        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
-                final int index = position - list.getHeaderViewsCount();
-                if (index >= 0 && index < rows.size())
-                    showDetails(rows.get(index));
-            }
-        });
+        // The row's own listener, not the list's: a row holding a focusable Button stops
+        // firing OnItemClickListener altogether, so the tap would simply die.
+        list.setOnItemClickListener(null);
     }
 
     private void showSettings(boolean on) {
@@ -766,11 +761,7 @@ public class TfrPane implements TfrManager.Listener {
      * what was chosen from the list.
      */
     private static String gateLabel(long meters) {
-        if (meters <= 0)
-            return "Always";
-        final double big = meters / Units.bigToMeters(1);
-        final double rounded = Math.rint(big * 100) / 100;
-        return trim(rounded) + " " + Units.bigLabel();
+        return ScaleBar.gate(meters);
     }
 
     // ---- details ----
@@ -937,6 +928,26 @@ public class TfrPane implements TfrManager.Listener {
         return b.length() == 0 ? null : b.toString();
     }
 
+    /**
+     * Put a restriction in the middle of the map.
+     *
+     * <p>Pans and never zooms: the operator chose that zoom, and a Go to that also
+     * rescaled the map would throw away the view they were working in.
+     */
+    private void goTo(Tfr t) {
+        final double[] c = TfrFeatures.center(t);
+        if (c == null) {
+            new AlertDialog.Builder(mapView.getContext())
+                    .setTitle(t.place())
+                    .setMessage("This one has no mapped area, so there is nowhere to go."
+                            + " Open Details to read the notice.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        mapView.getMapController().panTo(new GeoPoint(c[0], c[1]), true);
+    }
+
     private void open(String url) {
         try {
             final Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
@@ -1042,6 +1053,22 @@ public class TfrPane implements TfrManager.Listener {
             final Tfr t = rows.get(position);
             final long now = System.currentTimeMillis();
             final Resources res = pluginContext.getResources();
+
+            // Tap the row to go there, Details to read it. The operator asked for a go to
+            // on the list, and going somewhere is what a row tap means everywhere else.
+            v.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View x) {
+                    goTo(t);
+                }
+            });
+            final Button details = v.findViewById(R.id.row_details);
+            details.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View x) {
+                    showDetails(t);
+                }
+            });
 
             ((TextView) v.findViewById(R.id.row_place)).setText(t.place());
             final TextView state = v.findViewById(R.id.row_state);
