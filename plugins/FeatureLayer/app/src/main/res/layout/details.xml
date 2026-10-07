@@ -26,6 +26,23 @@
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF" />
+        <!-- A fire CAL FIRE runs or posts: its incident page. Gone otherwise. -->
+        <Button
+            android:id="@+id/btn_calfire"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="4dp"
+            android:text="CAL FIRE"
+            android:visibility="gone" />
+        <!-- A fire with an InciWeb page: opens it in the browser. Gone otherwise. -->
+        <Button
+            android:id="@+id/btn_inciweb"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="InciWeb"
+            android:visibility="gone" />
     </LinearLayout>
     <TextView
         android:id="@+id/details_subtitle"
@@ -34,6 +51,25 @@
         android:textSize="13sp"
         android:textColor="#BBBBBB"
         android:paddingBottom="6dp" />
+    <!-- A Fire History burn: Add to My Fires / Remove from My Fires, on its own line:
+         in the header it squeezed the title to one word a line. Gone otherwise. -->
+    <Button
+        android:id="@+id/btn_only"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:text="Add to My Fires"
+        android:visibility="gone" />
+    <!-- Only My Fires ON/OFF with the count, once My Fires has a fire. Gone otherwise. -->
+    <Button
+        android:id="@+id/btn_only_show"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:text="Only My Fires OFF"
+        android:visibility="gone" />
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

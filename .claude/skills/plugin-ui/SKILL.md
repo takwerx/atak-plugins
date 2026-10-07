@@ -389,6 +389,7 @@ its own words, and each empty state says what to do about it:
 | No GPS fix | `No GPS fix, measuring from the map center.` |
 | Age | `Updated 3 min ago.` |
 | Server down | `Server out of reach since 14:02. Showing what it last sent.` |
+| No network | `No network, showing what this phone saved 2 h ago.` |
 | Nothing here | `No zones on screen. Pan to them, or turn off On screen only.` |
 
 Two different reasons never share one message: "zoom in" for the gate and "zoom
@@ -517,6 +518,10 @@ switches and gates above to behave. Full machinery:
 - Flatten nested geometry collections before inserting them.
 - A tap: `FeatureDataStoreDeepMapItemQuery` that fetches attributes by id (the
   hit-test drops them), dedupes hits, and sets the radial menu.
+- **Off hides, never deletes.** Every fetched feature is written; a switched-off
+  layer or kind is a hidden set (`setFeatureSetVisible` on the `visibleOnly`
+  layer), so it comes back after a restart with no network, the list and details
+  with it. CLAUDE.md, "Downloaded data survives a restart with no network".
 
 ---
 
