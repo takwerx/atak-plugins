@@ -205,7 +205,9 @@ final class CalFire {
         if (f != null)
             return f;
         final java.security.KeyStore ks = java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType());
-        ks.load(null, null);
+        // An empty in-memory store, opened with the one-argument load: tak.gov's Fortify
+        // reported the two-argument load(null, null) on 0.13.
+        ks.load((java.security.KeyStore.LoadStoreParameter) null);
         final javax.net.ssl.TrustManagerFactory system = javax.net.ssl.TrustManagerFactory
                 .getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());
         system.init((java.security.KeyStore) null);
@@ -220,7 +222,14 @@ final class CalFire {
         final javax.net.ssl.TrustManagerFactory tmf = javax.net.ssl.TrustManagerFactory
                 .getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());
         tmf.init(ks);
-        final javax.net.ssl.SSLContext ctx = javax.net.ssl.SSLContext.getInstance("TLS");
+        // A named version, never the generic "TLS" (Fortify, "Weak SSL Protocol", 0.13):
+        // 1.3 where Android has it (10 and later), else 1.2. CAL FIRE speaks both.
+        javax.net.ssl.SSLContext ctx;
+        try {
+            ctx = javax.net.ssl.SSLContext.getInstance("TLSv1.3");
+        } catch (java.security.NoSuchAlgorithmException e) {
+            ctx = javax.net.ssl.SSLContext.getInstance("TLSv1.2");
+        }
         ctx.init(null, tmf.getTrustManagers(), null);
         f = ctx.getSocketFactory();
         tls = f;
