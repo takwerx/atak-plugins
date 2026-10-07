@@ -91,6 +91,41 @@ public final class Units {
         return SpanUtilities.convert(meters, Span.METER, Span.FOOT);
     }
 
+    /**
+     * A preset distance in the operator's large unit, pinned: "0.5 mi", never
+     * "2640 ft". ATAK's own formatter switches to the small unit below a threshold,
+     * which puts one preset in feet beside the others in miles.
+     */
+    public static String largeUnit(double meters) {
+        final int t = rangeType();
+        final double v;
+        final String unit;
+        if (t == Span.METRIC) {
+            v = meters / 1000d;
+            unit = "km";
+        } else if (t == Span.NM) {
+            v = meters / 1852d;
+            unit = "NM";
+        } else {
+            v = meters / 1609.344d;
+            unit = "mi";
+        }
+        final String n = Math.abs(v - Math.rint(v)) < 0.01d
+                ? String.format(Locale.US, "%.0f", v)
+                : String.format(Locale.US, "%.1f", v);
+        return n + " " + unit;
+    }
+
+    /** The presets for the circle, in the operator's large unit, as meters. */
+    public static double[] circlePresetsM() {
+        final int t = rangeType();
+        if (t == Span.METRIC)
+            return new double[] { 1000d, 2000d, 3000d, 5000d };
+        if (t == Span.NM)
+            return new double[] { 0.5d * 1852d, 1852d, 2d * 1852d, 3d * 1852d };
+        return new double[] { 0.5d * 1609.344d, 1609.344d, 2d * 1609.344d, 3d * 1609.344d };
+    }
+
     /** An altitude: "1,043 ft MSL". The reference is part of the number. */
     public static String altitudeMsl(double meters) {
         return String.format(Locale.US, "%,.0f %s MSL", toAltitudeUnit(meters),

@@ -5,18 +5,32 @@
     <!-- description -->
     <string name="app_desc">Launch point ground elevation and the terrain above your MSL ceiling, painted as islands</string>
 
-    <!-- Sections -->
-    <string name="section_launch">Launch point</string>
-    <string name="section_ceiling">Ceiling</string>
-    <string name="section_islands">Islands</string>
+    <!-- Main row -->
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="show_settings">Show settings</string>
+    <string name="launch_point">Launch point</string>
+    <string name="app_islands">Islands</string>
+    <string name="loading">Loading…</string>
+    <string name="heading_obstacles">Obstacles in the circle</string>
 
-    <!-- Controls -->
+    <!-- Launch point picker -->
     <string name="tap_map">Tap the map</string>
     <string name="use_position">My position</string>
+    <string name="clear_launch">Clear the launch point</string>
     <string name="cancel">Cancel</string>
-    <string name="clear">Clear</string>
-    <string name="islands_on">Islands ON</string>
-    <string name="islands_off">Islands OFF</string>
+    <string name="ok">OK</string>
+
+    <!-- Settings rows -->
+    <string name="ceiling">Ceiling</string>
+    <string name="circle">Circle</string>
+    <string name="map_key">Map key</string>
+    <string name="type_the_ceiling">Type the ceiling</string>
+    <string name="ceiling_above_launch">Ground + %1$s</string>
+    <string name="ceiling_prompt">Ceiling, %1$s MSL</string>
+    <string name="key_island">Ground at or above the ceiling: cannot fly here at this ceiling</string>
+    <string name="key_water">Ground under the ceiling</string>
+    <string name="key_edge">Edge of the circle that was checked</string>
 
     <!-- On the map -->
     <string name="launch_marker">Launch</string>
@@ -24,18 +38,19 @@
 
     <!-- Readouts. %1$s is an altitude with its unit and MSL already on it. -->
     <string name="ground_here">Ground here: %1$s (0 AGL)</string>
-    <string name="ceiling_line">%1$s is %2$s above your launch point.</string>
+    <string name="ground_none">No launch point yet.</string>
+    <string name="ceiling_line">Ceiling %1$s is %2$s above your launch point.</string>
 
     <!-- Status line. Says what is happening, what was painted, or why nothing is drawn. -->
-    <string name="status_idle">Tap the map to place the launch point. The islands are painted inside a circle around it.</string>
+    <string name="status_idle">Tap Launch point to start. The islands are painted inside a circle around it.</string>
     <string name="status_picking">Tap the map where you will launch. Back cancels.</string>
-    <string name="status_working">Reading the ground…</string>
     <string name="status_reading">Reading the terrain within %1$s…</string>
     <string name="status_no_gps">No GPS fix, so there is no position to use. Tap the map instead.</string>
+    <string name="status_map_off">Map off.</string>
     <string name="all_under_water">Everything in the circle is under the ceiling.</string>
     <string name="islands_share">Islands cover %.0f%% of the circle.</string>
     <string name="highest_ground">Highest ground in the circle: %1$s.</string>
-    <string name="terrain_detail">Circle %1$s. Terrain from %2$s in %3$s cells.</string>
+    <string name="terrain_detail">Circle %1$s, terrain checked every %2$s.</string>
     <string name="missing_share">%.0f%% of the circle has no terrain data and is not painted.</string>
-    <string name="fixed_note">Ceiling is fixed at the launch ground plus 1,000 ft, rounded up to 100, and the circle at 1 mi, until the pickers exist.</string>
+    <string name="ceiling_proposed">Ceiling set to %1$s above the launch ground. Change it under Settings.</string>
 </resources>

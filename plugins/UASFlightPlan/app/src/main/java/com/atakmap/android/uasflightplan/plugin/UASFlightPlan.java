@@ -171,6 +171,8 @@ public class UASFlightPlan implements IPlugin {
             uiService.showPane(templatePane, new IHostUIService.IPaneLifecycleListener() {
                 @Override
                 public void onPaneVisible(boolean visible) {
+                    if (visible && pane != null)
+                        pane.onPaneShown();
                 }
 
                 @Override

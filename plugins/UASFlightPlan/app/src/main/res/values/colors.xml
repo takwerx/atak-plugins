@@ -5,4 +5,8 @@
     <color name="darker_gray">#121212</color>
     <color name="heading_yellow">#dfb228</color>
 
+    <!-- Switch text: ON green, OFF red, on a plain button face. -->
+    <color name="state_on">#3ddc61</color>
+    <color name="state_off">#ff5b52</color>
+    <color name="working">#FFC107</color>
 </resources>
