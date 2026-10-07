@@ -42,6 +42,85 @@ public final class Obstacle {
         this.distanceM = distanceM;
     }
 
+    /**
+     * The group a type code belongs to, for the Types setting. FAA has about 30
+     * codes; a pilot picks from a handful of kinds. The key is what the setting
+     * stores, so it never changes once shipped.
+     */
+    public String group() {
+        switch (typeCode) {
+            case "T-L TWR":
+                return "transmission";
+            case "CATENARY":
+                return "wires";
+            case "WINDMILL":
+                return "turbines";
+            case "TOWER":
+            case "CTRL TWR":
+            case "BLDG-TWR":
+            case "NAVAID":
+            case "SPIRE":
+            case "MONUMENT":
+                return "towers";
+            case "STACK":
+            case "TANK":
+            case "REFINERY":
+            case "POWER PLANT":
+            case "RIG":
+            case "CRANE":
+            case "DOME":
+            case "ELEC SYS":
+            case "GEN UTIL":
+            case "DAM":
+            case "BRIDGE":
+                return "structures";
+            case "BLDG":
+                return "buildings";
+            case "POLE":
+            case "UTILITY POLE":
+                return "poles";
+            case "SOLAR PANELS":
+            case "FENCE":
+            case "SIGN":
+                return "low";
+            default:
+                return "other";
+        }
+    }
+
+    /** Every group, in the order the tiles show them. */
+    public static final String[] GROUPS = {
+            "transmission", "wires", "towers", "turbines", "structures",
+            "buildings", "poles", "low", "other" };
+
+    /** On by default: what an aircraft can hit. Buildings, poles and solar panels are not. */
+    public static final java.util.Set<String> DEFAULT_ON = new java.util.HashSet<>(
+            java.util.Arrays.asList("transmission", "wires", "towers", "turbines",
+                    "structures", "other"));
+
+    public static String groupName(String group) {
+        switch (group) {
+            case "transmission":
+                return "Transmission towers";
+            case "wires":
+                return "Wire spans";
+            case "towers":
+                return "Towers";
+            case "turbines":
+                return "Wind turbines";
+            case "structures":
+                return "Stacks and tanks";
+            case "buildings":
+                return "Buildings";
+            case "poles":
+                return "Poles";
+            case "low":
+                return "Solar, fences, signs";
+            default:
+                return "Other";
+        }
+    }
+
     /** True when the top is at or above the ceiling: it sticks up through it. */
     public boolean aboveCeiling(double ceilingMslFt) {
         return amslFt >= ceilingMslFt;

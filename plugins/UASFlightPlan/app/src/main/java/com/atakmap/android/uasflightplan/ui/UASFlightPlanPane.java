@@ -68,6 +68,10 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     private final ObstacleAdapter adapter;
     private final TextView listHeading;
     private final Fold obstaclesFold;
+    private final Fold tallerFold;
+    private final Fold typesFold;
+    private final LinearLayout tallerTiles;
+    private final LinearLayout typeTiles;
     private final View detailsPage;
     private Obstacle showing;
 
@@ -208,6 +212,24 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             @Override
             public void onClick(View v) {
                 obstacles.setEnabled(!obstacles.isEnabled());
+            }
+        });
+        tallerFold = new Fold(settings, R.id.fold_taller_head, R.id.fold_taller_chev,
+                R.id.fold_taller_body, PREF_FOLD + "taller");
+        typesFold = new Fold(settings, R.id.fold_types_head, R.id.fold_types_chev,
+                R.id.fold_types_body, PREF_FOLD + "types");
+        tallerTiles = settings.findViewById(R.id.taller_tiles);
+        typeTiles = settings.findViewById(R.id.type_tiles);
+        settings.findViewById(R.id.btn_types_all_on).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                obstacles.setAllGroups(true);
+            }
+        });
+        settings.findViewById(R.id.btn_types_all_off).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                obstacles.setAllGroups(false);
             }
         });
         ceilingFold = new Fold(settings, R.id.fold_ceiling_head, R.id.fold_ceiling_chev,
@@ -594,6 +616,82 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         }
     }
 
+    /* ----- the obstacle filters ----- */
+
+    /** The height floor presets, the chosen one in green. */
+    private void buildTallerTiles() {
+        tallerTiles.removeAllViews();
+        final double current = obstacles.minAglFt();
+        final float dp = pluginContext.getResources().getDisplayMetrics().density;
+        for (final double ft : ObstacleManager.MIN_AGL_PRESETS_FT) {
+            final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+            b.setText(ft <= 0d ? pluginContext.getString(R.string.taller_any)
+                    : Units.height(Units.feetToMeters(ft)));
+            b.setTextColor(Math.abs(ft - current) < 0.5d
+                    ? pluginContext.getResources().getColor(R.color.state_on)
+                    : 0xFFFFFFFF);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = (int) (4 * dp);
+            b.setLayoutParams(lp);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    obstacles.setMinAglFt(ft);
+                }
+            });
+            tallerTiles.addView(b);
+        }
+    }
+
+    /**
+     * One tile per kind, two across: the name and the count the FAA sent on one
+     * line, ON or OFF in its color on the next.
+     */
+    private void buildTypeTiles() {
+        typeTiles.removeAllViews();
+        final float dp = pluginContext.getResources().getDisplayMetrics().density;
+        LinearLayout row = null;
+        for (int i = 0; i < Obstacle.GROUPS.length; i++) {
+            final String g = Obstacle.GROUPS[i];
+            if (i % 2 == 0) {
+                row = new LinearLayout(host);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                final LinearLayout.LayoutParams rl = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                rl.topMargin = (int) (4 * dp);
+                typeTiles.addView(row, rl);
+            }
+            final boolean on = obstacles.isGroupOn(g);
+            final int n = obstacles.countInGroup(g);
+            final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+            b.setSingleLine(false);
+            b.setMaxLines(2);
+            b.setText(Obstacle.groupName(g) + (n > 0 ? " (" + n + ")" : "")
+                    + "\n" + (on ? "ON" : "OFF"));
+            b.setTextColor(pluginContext.getResources().getColor(
+                    on ? R.color.state_on : R.color.state_off));
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = (int) (4 * dp);
+            b.setLayoutParams(lp);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    obstacles.setGroupOn(g, !obstacles.isGroupOn(g));
+                }
+            });
+            row.addView(b);
+        }
+        // An odd last row gets a spacer so its one tile is not full width.
+        if (row != null && row.getChildCount() == 1) {
+            final View spacer = new View(host);
+            row.addView(spacer, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        }
+    }
+
     /* ----- the map key ----- */
 
     /** Built from the overlay's own colors, so the key cannot drift from the map. */
@@ -738,6 +836,15 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         obstaclesFold.head.setText(thing + (on ? " ON" : " OFF"));
         obstaclesFold.head.setTextColor(pluginContext.getResources().getColor(
                 on ? R.color.state_on : R.color.state_off));
+        final double floor = obstacles.minAglFt();
+        tallerFold.label(pluginContext.getString(R.string.taller_than),
+                floor <= 0d ? pluginContext.getString(R.string.taller_any)
+                        : Units.height(Units.feetToMeters(floor)));
+        typesFold.label(pluginContext.getString(R.string.types),
+                pluginContext.getString(R.string.types_value, obstacles.groupsOn(),
+                        Obstacle.GROUPS.length));
+        buildTallerTiles();
+        buildTypeTiles();
 
         ceilingFold.label(pluginContext.getString(R.string.ceiling),
                 c == null ? null : Units.altitudeMsl(c));

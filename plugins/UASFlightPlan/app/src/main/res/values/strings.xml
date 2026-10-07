@@ -44,6 +44,14 @@
     <string name="status_obstacles_drawn">Nearest %1$d on the map; the list has all %2$d.</string>
     <string name="status_obstacles_loading">Asking the FAA for obstacles in the circle…</string>
     <string name="status_obstacles_off">Obstacles off.</string>
+    <string name="status_obstacles_all_filtered">Charted obstacles in the circle, none past the height and type filters.</string>
+    <string name="status_obstacles_hidden">%1$d more hidden by the filters.</string>
+    <string name="taller_than">Taller than</string>
+    <string name="taller_any">Any height</string>
+    <string name="types">Types</string>
+    <string name="types_value">%1$d of %2$d</string>
+    <string name="all_on">All on</string>
+    <string name="all_off">All off</string>
 
     <!-- Launch point picker -->
     <string name="tap_map">Tap the map</string>

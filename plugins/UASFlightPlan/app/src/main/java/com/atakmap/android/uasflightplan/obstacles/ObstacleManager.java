@@ -31,6 +31,18 @@ public final class ObstacleManager {
 
     private static final String TAG = "UASObstacles";
     private static final String PREF_ENABLED = "uasflightplan.obstacles";
+    private static final String PREF_MIN_AGL_FT = "uasflightplan.obstacles.minAglFt";
+    private static final String PREF_GROUP = "uasflightplan.obstacles.group.";
+
+    /**
+     * Nothing under this height above ground is shown, by default. The FAA file
+     * holds everything ever filed under an obstruction study, down to 20 ft solar
+     * arrays on a ballfield, and those are noise to a UAS pilot working a ceiling
+     * (operator, 2026-10-06: "remove the 20 ft shit").
+     */
+    public static final double DEFAULT_MIN_AGL_FT = 50d;
+    /** The floor presets, feet above ground; 0 is everything. */
+    public static final double[] MIN_AGL_PRESETS_FT = { 0d, 50d, 100d, 200d };
 
     public interface Listener {
         /** Something the pane shows changed. Main thread. */
@@ -56,7 +68,10 @@ public final class ObstacleManager {
     private Listener listener;
     private boolean started;
 
-    // Main-thread state.
+    // Main-thread state. 'fetched' is everything the FAA sent for the circle;
+    // 'obstacles' is what passes the filter, and it is the one list the map and
+    // the pane both show.
+    private List<Obstacle> fetched = Collections.emptyList();
     private List<Obstacle> obstacles = Collections.emptyList();
     private boolean capped;
     private boolean loading;
@@ -106,6 +121,70 @@ public final class ObstacleManager {
 
     public boolean isEnabled() {
         return prefs.getBoolean(PREF_ENABLED, true);
+    }
+
+    public double minAglFt() {
+        return prefs.getFloat(PREF_MIN_AGL_FT, (float) DEFAULT_MIN_AGL_FT);
+    }
+
+    public void setMinAglFt(double ft) {
+        prefs.edit().putFloat(PREF_MIN_AGL_FT, (float) ft).apply();
+        refilter();
+    }
+
+    public boolean isGroupOn(String group) {
+        return prefs.getBoolean(PREF_GROUP + group, Obstacle.DEFAULT_ON.contains(group));
+    }
+
+    public void setGroupOn(String group, boolean on) {
+        prefs.edit().putBoolean(PREF_GROUP + group, on).apply();
+        refilter();
+    }
+
+    public void setAllGroups(boolean on) {
+        final SharedPreferences.Editor e = prefs.edit();
+        for (String g : Obstacle.GROUPS)
+            e.putBoolean(PREF_GROUP + g, on);
+        e.apply();
+        refilter();
+    }
+
+    public int groupsOn() {
+        int n = 0;
+        for (String g : Obstacle.GROUPS)
+            if (isGroupOn(g))
+                n++;
+        return n;
+    }
+
+    /** How many of what the FAA sent are in a group, so a tile can say what it costs. */
+    public int countInGroup(String group) {
+        int n = 0;
+        for (Obstacle o : fetched)
+            if (group.equals(o.group()))
+                n++;
+        return n;
+    }
+
+    /** Everything the FAA sent for the circle, before the filter. */
+    public int fetchedCount() {
+        return fetched.size();
+    }
+
+    /** The filter: reads the settings each time, never a copy. */
+    public boolean passes(Obstacle o) {
+        return o.aglFt >= minAglFt() && isGroupOn(o.group());
+    }
+
+    /** Re-applies the filter to what was fetched, and redraws. */
+    private void refilter() {
+        final List<Obstacle> kept = new ArrayList<>();
+        for (Obstacle o : fetched)
+            if (passes(o))
+                kept.add(o);
+        obstacles = kept;
+        redraw(generation.get());
+        notifyChanged();
     }
 
     public boolean isLoading() {
@@ -165,11 +244,10 @@ public final class ObstacleManager {
             public void onLoaded(List<Obstacle> inCircle, boolean wasCapped) {
                 if (mine != generation.get())
                     return;
-                obstacles = inCircle;
+                fetched = inCircle;
                 capped = wasCapped;
                 loading = false;
-                redraw(mine);
-                notifyChanged();
+                refilter();
             }
 
             @Override
@@ -194,6 +272,7 @@ public final class ObstacleManager {
 
     public void clear() {
         generation.incrementAndGet();
+        fetched = Collections.emptyList();
         obstacles = Collections.emptyList();
         capped = false;
         loading = false;
@@ -258,7 +337,8 @@ public final class ObstacleManager {
             return failure;
         final StringBuilder sb = new StringBuilder();
         if (obstacles.isEmpty()) {
-            sb.append(pluginContext.getString(R.string.status_obstacles_none));
+            sb.append(pluginContext.getString(fetched.isEmpty()
+                    ? R.string.status_obstacles_none : R.string.status_obstacles_all_filtered));
         } else {
             sb.append(pluginContext.getString(R.string.status_obstacles_count,
                     obstacles.size(), aboveCeiling()));
@@ -269,6 +349,10 @@ public final class ObstacleManager {
                 sb.append(' ').append(pluginContext.getString(
                         R.string.status_obstacles_drawn, drawn, obstacles.size()));
         }
+        final int hidden = fetched.size() - obstacles.size();
+        if (hidden > 0)
+            sb.append(' ').append(pluginContext.getString(R.string.status_obstacles_hidden,
+                    hidden));
         if (!isEnabled())
             sb.append(' ').append(pluginContext.getString(R.string.status_obstacles_off));
         return sb.toString();
