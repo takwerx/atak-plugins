@@ -46,6 +46,7 @@ public class TFR implements IPlugin {
     private TfrPane paneUi;
     private BroadcastReceiver receiver;
     private BroadcastReceiver showReceiver;
+    private com.atakmap.android.maps.MapEventDispatcher.MapEventDispatchListener tapListener;
 
     public TFR(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -83,6 +84,7 @@ public class TFR implements IPlugin {
             manager.setListener(paneUi);
             manager.start();
             registerReceiver();
+            registerTap();
         }
         uiService.addToolbarItem(toolbarItem);
     }
@@ -104,6 +106,11 @@ public class TFR implements IPlugin {
                 Log.w(TAG, "unregistering the show receiver failed", e);
             }
             showReceiver = null;
+        }
+        if (tapListener != null && mapView != null) {
+            mapView.getMapEventDispatcher().removeMapEventListener(
+                    com.atakmap.android.maps.MapEvent.ITEM_CLICK, tapListener);
+            tapListener = null;
         }
         if (manager != null) {
             // Everything this plugin drew comes off with it, and nothing it downloaded is
@@ -161,6 +168,37 @@ public class TFR implements IPlugin {
         final DocumentedIntentFilter sf = new DocumentedIntentFilter();
         sf.addAction(ACTION_SHOW, "Open the TFR pane");
         AtakBroadcast.getInstance().registerSystemReceiver(showReceiver, sf);
+    }
+
+    /**
+     * A tap on a restriction opens its details in the pane.
+     *
+     * <p>A listener rather than a radial: the features carry a blank menu, so ATAK opens
+     * nothing of its own and the click arrives here. Only our own items are claimed --
+     * every other plugin's and ATAK's own still behave exactly as before, which is why
+     * this adds a listener rather than clearing ITEM_CLICK.
+     */
+    private void registerTap() {
+        tapListener = new com.atakmap.android.maps.MapEventDispatcher.MapEventDispatchListener() {
+            @Override
+            public void onMapEvent(com.atakmap.android.maps.MapEvent event) {
+                if (event == null || manager == null || paneUi == null)
+                    return;
+                final MapItem item = event.getItem();
+                if (item == null)
+                    return;
+                final String notam = item.getMetaString("tfr_notam_id", null);
+                if (notam == null)
+                    return;
+                final Tfr t = manager.byNotam(notam);
+                if (t == null)
+                    return;
+                showPane();
+                paneUi.showDetails(t);
+            }
+        };
+        mapView.getMapEventDispatcher().addMapEventListener(
+                com.atakmap.android.maps.MapEvent.ITEM_CLICK, tapListener);
     }
 
     private void showPane() {

@@ -64,7 +64,11 @@ public class TfrPane implements TfrManager.Listener {
 
     private View root;
     private ListView list;
-    private View header, settingsPage;
+    private View header, settingsPage, detailsPage;
+    private TextView detailsTitle, detailsBody;
+    private Button detailsBack, detailsGeofence, detailsFaa;
+    /** What the details page is showing, so its buttons know their subject. */
+    private Tfr showing;
     private Button switchButton, settingsButton, refreshButton, backButton;
     private TextView statusText, headingText;
     private LinearLayout settingsContainer, typesContainer, updatesContainer, keyBody;
@@ -93,6 +97,12 @@ public class TfrPane implements TfrManager.Listener {
         list = root.findViewById(R.id.tfr_list);
         settingsPage = root.findViewById(R.id.settings_page);
         settingsContainer = root.findViewById(R.id.settings_container);
+        detailsPage = root.findViewById(R.id.details_page);
+        detailsTitle = root.findViewById(R.id.details_title);
+        detailsBody = root.findViewById(R.id.details_body);
+        detailsBack = root.findViewById(R.id.btn_details_back);
+        detailsGeofence = root.findViewById(R.id.btn_details_geofence);
+        detailsFaa = root.findViewById(R.id.btn_details_faa);
 
         header = PluginLayoutInflater.inflate(pluginContext, R.layout.controls_header, null);
         list.addHeaderView(header, null, false);
@@ -140,8 +150,8 @@ public class TfrPane implements TfrManager.Listener {
 
     /** The pane opens on the main screen every time; a reused one would reopen on Settings. */
     public void onShown() {
-        showSettings(false);
-        render();
+        if (!isShowingDetails())
+            showList();
     }
 
     private void wire() {
@@ -162,6 +172,26 @@ public class TfrPane implements TfrManager.Listener {
             @Override
             public void onClick(View v) {
                 showSettings(false);
+            }
+        });
+        detailsBack.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showList();
+            }
+        });
+        detailsGeofence.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (showing != null)
+                    geofence(showing);
+            }
+        });
+        detailsFaa.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (showing != null)
+                    open(showing.faaPageUrl());
             }
         });
         refreshButton.setOnClickListener(new View.OnClickListener() {
@@ -212,9 +242,23 @@ public class TfrPane implements TfrManager.Listener {
 
     private void showSettings(boolean on) {
         settingsPage.setVisibility(on ? View.VISIBLE : View.GONE);
+        detailsPage.setVisibility(View.GONE);
         list.setVisibility(on ? View.GONE : View.VISIBLE);
         if (on)
             render();
+    }
+
+    /** Back to the list from wherever. */
+    public void showList() {
+        showing = null;
+        settingsPage.setVisibility(View.GONE);
+        detailsPage.setVisibility(View.GONE);
+        list.setVisibility(View.VISIBLE);
+        render();
+    }
+
+    public boolean isShowingDetails() {
+        return detailsPage != null && detailsPage.getVisibility() == View.VISIBLE;
     }
 
     @Override
@@ -597,6 +641,18 @@ public class TfrPane implements TfrManager.Listener {
     // ---- details ----
 
     public void showDetails(final Tfr t) {
+        if (root == null)
+            return;
+        showing = t;
+        detailsTitle.setText(t.place());
+        detailsBody.setText(detailsText(t));
+        detailsGeofence.setEnabled(!t.drawable().isEmpty());
+        settingsPage.setVisibility(View.GONE);
+        list.setVisibility(View.GONE);
+        detailsPage.setVisibility(View.VISIBLE);
+    }
+
+    private String detailsText(final Tfr t) {
         final StringBuilder b = new StringBuilder();
         if (!t.stateName.isEmpty())
             b.append(t.stateName).append('\n');
@@ -624,23 +680,7 @@ public class TfrPane implements TfrManager.Listener {
         if (!t.notamText.isEmpty())
             b.append('\n').append(t.notamText);
 
-        new AlertDialog.Builder(mapView.getContext())
-                .setTitle(t.place())
-                .setMessage(b.toString())
-                .setPositiveButton("Geofence", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        geofence(t);
-                    }
-                })
-                .setNeutralButton("FAA page", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        open(t.faaPageUrl());
-                    }
-                })
-                .setNegativeButton("Close", null)
-                .show();
+        return b.toString();
     }
 
     /**

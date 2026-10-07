@@ -6,7 +6,6 @@ import com.atakmap.android.features.FeatureDataStoreDeepMapItemQuery;
 import com.atakmap.android.features.FeatureDataStoreMapOverlay;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.android.menu.PluginMenuParser;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.map.layer.feature.AttributeSet;
 import com.atakmap.map.layer.feature.Feature;
@@ -162,11 +161,13 @@ public class TfrOverlay {
                         protected MapItem featureToMapItem(Feature feature) {
                             final MapItem item = super.featureToMapItem(feature);
                             item.setMetaLong("featureid", feature.getId());
-                            // Our own radial. Blanking the menu would remove the only
-                            // route to the details pane; leaving ATAK's shows its own
-                            // feature metadata screen instead of ours.
-                            item.setMetaString("menu", PluginMenuParser.getMenu(
-                                    pluginContext, "menu/tfr_shape.xml"));
+                            // No radial at all. The operator, 2026-10-07: "no radial menu
+                            // when i click on it it opens up in the side pane like my
+                            // other plugins are starting to do". A blank menu is what
+                            // stops ATAK opening one -- on its own that makes a tap do
+                            // nothing, so the plugin listens for the click itself and
+                            // opens the details page.
+                            item.setMetaString("menu", "");
                             AttributeSet a = feature.getAttributes();
                             // Null on a tap: the hit-test query asks the store to skip
                             // attributes, so they have to be fetched by id.
