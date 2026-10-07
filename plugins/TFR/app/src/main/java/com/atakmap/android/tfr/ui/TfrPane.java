@@ -26,6 +26,7 @@ import com.atakmap.android.tfr.TfrGeofence;
 import com.atakmap.android.tfr.Places;
 import com.atakmap.android.tfr.TfrManager;
 import com.atakmap.android.tfr.TfrTypes;
+import com.atakmap.android.tfr.TfrVertical;
 import com.atakmap.android.tfr.plugin.R;
 import com.atakmap.coremap.conversions.Span;
 import com.atakmap.coremap.conversions.SpanUtilities;
@@ -616,6 +617,10 @@ public class TfrPane implements TfrManager.Listener {
             }
             b.append('\n');
         }
+        final String vertical = verticalFromHere(t);
+        if (vertical != null)
+            b.append('\n').append(vertical).append('\n');
+
         if (!t.notamText.isEmpty())
             b.append('\n').append(t.notamText);
 
@@ -720,6 +725,41 @@ public class TfrPane implements TfrManager.Listener {
             return;
         }
         TfrGeofence.edit(shape);
+    }
+
+    /**
+     * The restriction said from where the operator is standing, which is the one form of
+     * it they do not have to do arithmetic on.
+     */
+    private String verticalFromHere(Tfr t) {
+        final double mine = myFeetMsl();
+        final List<TfrArea> areas = t.drawable();
+        if (areas.isEmpty())
+            return null;
+        final StringBuilder b = new StringBuilder();
+        if (!Double.isNaN(mine))
+            b.append("You are at ").append(TfrVertical.feet(mine)).append(" MSL.");
+        final TfrArea here = TfrVertical.areaContaining(t, manager.self());
+        final TfrArea subject = here != null ? here : tallest(areas);
+        if (here != null) {
+            if (b.length() > 0)
+                b.append(' ');
+            b.append("You are inside this area.");
+        }
+        final String head = TfrVertical.headroom(subject, mine);
+        if (head != null) {
+            if (b.length() > 0)
+                b.append(' ');
+            b.append("Its ceiling is ").append(head).append('.');
+        }
+        final String floor = TfrVertical.floorFromHere(subject, mine);
+        if (floor != null) {
+            if (b.length() > 0)
+                b.append(' ');
+            b.append(Character.toUpperCase(floor.charAt(0))).append(floor.substring(1))
+                    .append('.');
+        }
+        return b.length() == 0 ? null : b.toString();
     }
 
     private void open(String url) {
@@ -841,7 +881,7 @@ public class TfrPane implements TfrManager.Listener {
                 state.setTextColor(manager.upcomingColor());
             }
 
-            ((TextView) v.findViewById(R.id.row_limits)).setText(limits(t));
+            ((TextView) v.findViewById(R.id.row_limits)).setText(limits(t, myFeetMsl()));
             final double d = distance(mapView.getPoint().get(), t);
             ((TextView) v.findViewById(R.id.row_window)).setText(TfrTypes.label(t.type)
                     + (d < Double.MAX_VALUE
@@ -851,20 +891,39 @@ public class TfrPane implements TfrManager.Listener {
         }
     }
 
-    /** The ceiling is the question a TFR is usually being asked, so the row leads with it. */
-    private static String limits(Tfr t) {
+    /**
+     * The ceiling is the question a TFR is usually being asked, so the row leads with it,
+     * and then says it again from where the operator is standing.
+     */
+    private static String limits(Tfr t, double myFeetMsl) {
         final List<TfrArea> areas = t.drawable();
         if (areas.isEmpty())
             return "no mapped area published";
+        final TfrArea top = tallest(areas);
+        final StringBuilder b = new StringBuilder();
         if (areas.size() == 1)
-            return areas.get(0).floor.label() + " to " + areas.get(0).ceiling.label();
-        int highest = 0;
+            b.append(top.floor.label()).append(" to ").append(top.ceiling.label());
+        else
+            b.append(areas.size()).append(" areas, up to ").append(top.ceiling.label());
+        final String head = TfrVertical.headroom(top, myFeetMsl);
+        if (head != null)
+            b.append("   ").append(head);
+        return b.toString();
+    }
+
+    private static TfrArea tallest(List<TfrArea> areas) {
+        int highest = -1;
         TfrArea top = areas.get(0);
         for (TfrArea a : areas)
             if (a.ceiling.present && a.ceiling.feet > highest) {
                 highest = a.ceiling.feet;
                 top = a;
             }
-        return areas.size() + " areas, up to " + top.ceiling.label();
+        return top;
+    }
+
+    /** Where the operator is, vertically. Read once per render rather than per row. */
+    private double myFeetMsl() {
+        return TfrVertical.myFeetMsl(manager.self());
     }
 }
