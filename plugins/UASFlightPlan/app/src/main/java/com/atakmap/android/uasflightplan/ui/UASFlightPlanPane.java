@@ -291,7 +291,8 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             if (!o.city.isEmpty())
                 d.append(", ").append(o.city);
             ((TextView) row.findViewById(R.id.detail)).setText(d.toString());
-            ((TextView) row.findViewById(R.id.distance)).setText(Units.distance(o.distanceM));
+            ((TextView) row.findViewById(R.id.distance)).setText(
+                    o.distanceAndPoint(Units.distance(o.distanceM)));
             // A row holding a Button swallows the list's own item click, so the row
             // and the button each get their own: the row goes there, Details opens it.
             row.setOnClickListener(new View.OnClickListener() {
@@ -350,6 +351,9 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         sb.append(pluginContext.getString(obstacles.measuringFromSelf()
                 ? R.string.d_distance_you : R.string.d_distance, Units.distance(o.distanceM)))
                 .append('\n');
+        if (!Double.isNaN(o.bearingDeg))
+            sb.append(pluginContext.getString(R.string.d_bearing, o.compassPoint(),
+                    Math.round(o.bearingDeg))).append('\n');
         if (!o.oas.isEmpty())
             sb.append(pluginContext.getString(R.string.d_faa, o.oas)).append('\n');
         ((TextView) root.findViewById(R.id.details_fields)).setText(sb.toString().trim());

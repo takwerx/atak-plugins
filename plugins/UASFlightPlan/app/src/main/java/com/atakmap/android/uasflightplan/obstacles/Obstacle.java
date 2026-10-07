@@ -24,6 +24,26 @@ public final class Obstacle {
     public final String state;
     /** Distance from the point the list measures from, meters; re-measured as that moves. */
     public double distanceM;
+    /** True bearing from that point to the obstacle, degrees 0 to 360; re-measured with it. */
+    public double bearingDeg = Double.NaN;
+
+    private static final String[] POINTS = {
+            "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
+
+    /** The bearing as a 16-point compass word: "SSW". Empty when there is none. */
+    public String compassPoint() {
+        if (Double.isNaN(bearingDeg))
+            return "";
+        final int i = (int) Math.floor(((bearingDeg % 360d + 360d) % 360d + 11.25d) / 22.5d) % 16;
+        return POINTS[i];
+    }
+
+    /** "1.5 mi SSW", the distance already formatted. */
+    public String distanceAndPoint(String distance) {
+        final String pt = compassPoint();
+        return pt.isEmpty() ? distance : distance + " " + pt;
+    }
 
     public Obstacle(String oas, String typeCode, double lat, double lon, double aglFt,
             double amslFt, String lighting, String verified, int quantity, String city,

@@ -201,8 +201,13 @@ public final class ObstacleManager {
         final GeoPoint from = measureFrom();
         if (from == null)
             return;
-        for (Obstacle o : fetched)
-            o.distanceM = GeoCalculations.distanceTo(from, new GeoPoint(o.lat, o.lon));
+        for (Obstacle o : fetched) {
+            final GeoPoint at = new GeoPoint(o.lat, o.lon);
+            o.distanceM = GeoCalculations.distanceTo(from, at);
+            // True north. Magnetic would need a declination for the spot and would
+            // disagree with the map's own compass, which reads true.
+            o.bearingDeg = (GeoCalculations.bearingTo(from, at) % 360d + 360d) % 360d;
+        }
         final java.util.Comparator<Obstacle> nearest = new java.util.Comparator<Obstacle>() {
             @Override
             public int compare(Obstacle a, Obstacle b) {

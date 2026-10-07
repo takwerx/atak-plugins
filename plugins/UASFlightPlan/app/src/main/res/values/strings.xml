@@ -16,6 +16,7 @@
     <string name="heading_obstacles_from_you">Obstacles in the circle, nearest to you first (%1$d)</string>
     <string name="heading_obstacles_from_launch">Obstacles in the circle, nearest the launch point first (%1$d)</string>
     <string name="d_distance_you">From you: %1$s</string>
+    <string name="d_bearing">Bearing: %1$s, %2$d\u00b0 true</string>
     <string name="obstacles_layer">UAS Flight Plan obstacles</string>
     <string name="app_obstacles">Obstacles</string>
     <string name="key_obstacle_above">Obstacle whose top is at or above the ceiling</string>
