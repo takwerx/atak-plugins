@@ -38,6 +38,8 @@ Tap the UAS Flight Plan icon in ATAK's toolbar (or find it under Tools). The
 pane opens at half width with three buttons: **Islands ON/OFF**, **Settings**
 and **Launch point**.
 
+![The icon in ATAK's toolbar](screenshots/1_toolbar.png)
+
 ![The main screen](screenshots/2_main_screen.png)
 
 The line at the top is the status line. It always says what the plugin is
@@ -69,6 +71,8 @@ Around the launch point the plugin paints a circle, 1 mi across by default
 (Settings, Area). Blue is ground you can work over. A white edge marks the
 limit of what was checked.
 
+![The launch point and its circle](screenshots/4_launch_point.png)
+
 ---
 
 ## 3. Drawing the area to cover
@@ -84,6 +88,8 @@ position** or **Tap the map**.
 
 Starting a new area removes the old one at once. The shape is one of your own
 ATAK drawings, so it comes back when ATAK restarts and the plugin picks it up.
+
+![A drawn area with the launch point inside it](screenshots/5_drawn_area.png)
 
 ---
 
@@ -125,6 +131,8 @@ as **red islands**: flying over them at that height would put the aircraft
 through the ceiling. The mission area has to be blue, or the ceiling is wrong
 for the mission.
 
+![Red islands under a given ceiling](screenshots/9_islands.png)
+
 ---
 
 ## 5. Obstacles
@@ -134,8 +142,12 @@ transmission towers, wire spans, wind turbines, stacks and tanks. Each stands
 on the map as a mast at its real height, with its name in a pill above an
 orange tower symbol. Tilt the map into 3D and they stand up.
 
+![The masts standing in 3D](screenshots/12_obstacles_3d.png)
+
 - **Orange**: the top is under the ceiling.
 - **Red**: the top is at or above the ceiling.
+
+![Charted towers inside the area](screenshots/12_obstacles.png)
 
 The list under the ceiling block shows the same obstacles nearest you first,
 with the height above ground, the top in MSL, lit or unlit, verified or not,
