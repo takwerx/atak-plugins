@@ -589,6 +589,24 @@ public class FeatureLayer implements IPlugin {
     // ---- the search pane: every loaded feature, filtered and sorted, with Back ----------
 
     private static final int RESULT_CAP = 200;
+    /**
+     * The typed name, its trailing year dropped ("Ranch 2007" is Ranch), as a pattern that
+     * matches only at the start of a word; null when nothing is typed.
+     */
+    static java.util.regex.Pattern wordStart(String text) {
+        if (text == null)
+            return null;
+        final String name = text.trim().replaceAll("\\s*\\b(1[89]\\d\\d|20\\d\\d)$", "").trim();
+        if (name.isEmpty())
+            return null;
+        return java.util.regex.Pattern.compile("(^|[^A-Za-z0-9])" + java.util.regex.Pattern.quote(name),
+                java.util.regex.Pattern.CASE_INSENSITIVE);
+    }
+
+    static boolean startsWord(java.util.regex.Pattern word, String title) {
+        return title != null && word.matcher(title).find();
+    }
+
     private static final String[] SORT_LABELS = { "Nearest", "Newest", "Oldest", "Name" };
     private String filterType;      // null = all
     private LoadedLayer scope;      // opened from a layer's Features: only that layer, Back returns there
@@ -1033,6 +1051,7 @@ public class FeatureLayer implements IPlugin {
                         new com.atakmap.coremap.maps.coords.GeoPoint(h.lat, h.lon)));
             }
         final int mode = sortMode == 0 && from == null ? 3 : sortMode;
+        final java.util.regex.Pattern word = wordStart(text);
         java.util.Collections.sort(hits, new java.util.Comparator<Object[]>() {
             @Override
             public int compare(Object[] a, Object[] b) {
@@ -1043,6 +1062,14 @@ public class FeatureLayer implements IPlugin {
                 final int byName = Boolean.compare(x.matchedIn != null, y.matchedIn != null);
                 if (byName != 0)
                     return byName;
+                // Among names, those with a word starting with the text first: "Ranch 2007"
+                // listed Rocky Branch and Maple Branch above Ranch Fire (2007), because
+                // "Branch" holds "ranch" and they were newer (2026-10-07).
+                if (word != null) {
+                    final int byWord = Boolean.compare(!startsWord(word, x.title), !startsWord(word, y.title));
+                    if (byWord != 0)
+                        return byWord;
+                }
                 switch (mode) {
                     case 0:
                         return Double.compare(dist.get(a), dist.get(b));
