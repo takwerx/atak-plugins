@@ -19,8 +19,8 @@
     <string name="d_bearing">Bearing: %1$s, %2$d\u00b0 true</string>
     <string name="obstacles_layer">UAS Flight Plan obstacles</string>
     <string name="app_obstacles">Obstacles</string>
-    <string name="key_obstacle_above">Obstacle whose top is at or above the ceiling</string>
-    <string name="key_obstacle_below">Obstacle under the ceiling</string>
+    <string name="key_obstacle_above">Obstacle whose top is at or above your ceiling</string>
+    <string name="key_obstacle_below">Obstacle under your ceiling</string>
     <string name="obstacles_note">Not every wire or tower is charted. FAA\'s file holds the obstacles that affect charting; distribution lines are never in it.</string>
     <string name="row_above_ceiling">above the ceiling</string>
     <string name="top_at">top at %1$s</string>
@@ -80,13 +80,29 @@
     <!-- Settings rows -->
     <string name="ceiling">Ceiling</string>
     <string name="section_request">Ceiling to request</string>
+    <string name="section_ceiling_area">Ceiling for this area</string>
+    <string name="req_highest_line">Highest ground in the area: %1$s</string>
+    <string name="req_flight_line">Fly above the terrain: + %1$s</string>
+    <string name="req_my_ceiling">Your ceiling: %1$s (rounded up to the next %2$s)</string>
+    <string name="req_sep_line">Separation: + %1$s</string>
+    <string name="req_ask">Ask Air Attack for a floor of %1$s</string>
+    <string name="req_granted">Floor from Air Attack: %1$s (you asked for %2$s)</string>
+    <string name="req_granted_ceiling">So your ceiling is %1$s</string>
+    <string name="above_launch_line">That is %1$s above your launch point: the number for the controller.</string>
+    <string name="ceiling_row">Floor from Air Attack</string>
+    <string name="ceiling_calculated">not yet, using the calculated one</string>
+    <string name="ceiling_granted_value">%1$s</string>
+    <string name="granted_note">The floor you ask for is calculated for the area from the settings above. If Air Attack gives you a different floor, type it here: your ceiling becomes that floor minus the separation, and the map shows what it does to your area.</string>
+    <string name="type_granted">Air Attack gave me</string>
+    <string name="use_calculated">Back to calculated</string>
+    <string name="granted_prompt">Floor from Air Attack, %1$s MSL</string>
     <string name="height_above_terrain">Height above terrain</string>
     <string name="separation">Separation</string>
     <string name="type_the_height">Type the height</string>
     <string name="type_the_separation">Type the separation</string>
     <string name="height_prompt">Height above terrain, %1$s</string>
     <string name="separation_prompt">Separation, %1$s</string>
-    <string name="flight_note">How high above the ground the aircraft flies. Part 107 allows 400 ft above the terrain under it.</string>
+    <string name="flight_note">How high above the terrain the aircraft flies. Part 107 allows 400 ft above the ground under it. Your ceiling is the highest terrain in the area plus this.</string>
     <string name="req_highest">Highest ground in the area: %1$s</string>
     <string name="req_flight">Height above terrain: %1$s</string>
     <string name="req_separation">Separation: %1$s</string>
@@ -99,7 +115,7 @@
     <string name="type_the_ceiling">Type the ceiling</string>
     <string name="ceiling_above_launch">Ground + %1$s</string>
     <string name="ceiling_prompt">Ceiling, %1$s MSL</string>
-    <string name="key_island">Ground at or above the ceiling: cannot fly here at this ceiling</string>
+    <string name="key_island">Ground at or above your ceiling: cannot fly here</string>
     <string name="key_water">Ground under the ceiling</string>
     <string name="key_edge">Edge of the area that was checked</string>
 

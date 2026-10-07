@@ -51,20 +51,14 @@ import java.util.Locale;
 public final class UASFlightPlanPane implements IslandOverlay.Listener,
         LaunchPoint.Callback, ObstacleManager.Listener, AreaPicker.Callback {
 
-    /** Proposed ceiling, feet above the launch ground, until the pilot sets one. */
-    static final double DEFAULT_ABOVE_LAUNCH_FT = 1000d;
     /** One statute mile. */
     static final double DEFAULT_RADIUS_M = 1609.344d;
 
-    private static final String PREF_CEILING_FT = "uasflightplan.ceilingFt";
     private static final String PREF_FLIGHT_AGL_FT = "uasflightplan.flightAglFt";
-    private static final String PREF_SEPARATION_FT = "uasflightplan.separationFt";
     /** What the operator's unit usually flies; Part 107's limit is the last preset. */
     private static final double DEFAULT_FLIGHT_AGL_FT = 200d;
     private static final double[] FLIGHT_PRESETS_FT = { 100d, 200d, 300d, 400d };
-    private static final double DEFAULT_SEPARATION_FT = 500d;
-    private static final double[] SEPARATION_PRESETS_FT = { 500d, 1000d, 1500d, 2000d };
-    /** The request is rounded up to this, feet: ceilings are asked for in hundreds. */
+    /** The ceiling is rounded up to this, feet: ceilings are given in hundreds. */
     private static final double REQUEST_STEP_FT = 100d;
     private static final String PREF_RADIUS_M = "uasflightplan.radiusM";
     private static final String PREF_FOLD = "uasflightplan.fold.";
@@ -97,27 +91,19 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     private final Button btnLaunch;
     private final TextView ground;
     private final TextView ceilingLine;
-    private final Fold ceilingFold;
     private final Fold flightFold;
-    private final Fold sepFold;
     private final LinearLayout flightTiles;
-    private final LinearLayout sepTiles;
     private final TextView requestHeading;
     private final TextView requestLines;
     private final TextView requestTotal;
-    private final Button btnUseRequest;
     private final Fold circleFold;
     private final Fold keyFold;
-    private final LinearLayout ceilingSteps;
-    private final Button btnCeilingAbove;
     private final LinearLayout circleTiles;
     private final LinearLayout keyBody;
 
     /** A sample or a paint is in flight. */
     private boolean working;
     private String lastFail;
-    /** Said once, after the plugin picked the ceiling for the pilot. */
-    private String proposedNote;
 
     /** One Settings row: a head naming the setting and its value, an arrow, a body. */
     private final class Fold {
@@ -199,15 +185,6 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         requestHeading = header.findViewById(R.id.request_heading);
         requestLines = header.findViewById(R.id.request_lines);
         requestTotal = header.findViewById(R.id.request_total);
-        btnUseRequest = header.findViewById(R.id.btn_use_request);
-        btnUseRequest.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                final Double r = requestedCeilingFt();
-                if (r != null)
-                    setCeilingFt(r);
-            }
-        });
 
         // Everything set once and left lives on the Settings page, which takes the
         // list's place while it is open.
@@ -270,10 +247,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         });
         flightFold = new Fold(settings, R.id.fold_flight_head, R.id.fold_flight_chev,
                 R.id.fold_flight_body, PREF_FOLD + "flight");
-        sepFold = new Fold(settings, R.id.fold_sep_head, R.id.fold_sep_chev,
-                R.id.fold_sep_body, PREF_FOLD + "sep");
         flightTiles = settings.findViewById(R.id.flight_tiles);
-        sepTiles = settings.findViewById(R.id.sep_tiles);
         settings.findViewById(R.id.btn_flight_type).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -281,47 +255,21 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                     @Override
                     public void accept(double ft) {
                         prefs.edit().putFloat(PREF_FLIGHT_AGL_FT, (float) ft).apply();
-                        syncAll();
+                        applyCeiling();
                     }
                 });
             }
         });
-        settings.findViewById(R.id.btn_sep_type).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                typeFeet(R.string.separation_prompt, separationFt(), new FeetSink() {
-                    @Override
-                    public void accept(double ft) {
-                        prefs.edit().putFloat(PREF_SEPARATION_FT, (float) ft).apply();
-                        syncAll();
-                    }
-                });
-            }
-        });
-        ceilingFold = new Fold(settings, R.id.fold_ceiling_head, R.id.fold_ceiling_chev,
-                R.id.fold_ceiling_body, PREF_FOLD + "ceiling");
         circleFold = new Fold(settings, R.id.fold_circle_head, R.id.fold_circle_chev,
                 R.id.fold_circle_body, PREF_FOLD + "circle");
         keyFold = new Fold(settings, R.id.fold_key_head, R.id.fold_key_chev,
                 R.id.fold_key_body, PREF_FOLD + "key");
-        ceilingSteps = settings.findViewById(R.id.ceiling_steps);
-        btnCeilingAbove = settings.findViewById(R.id.btn_ceiling_above);
         circleTiles = settings.findViewById(R.id.circle_tiles);
         keyBody = settings.findViewById(R.id.fold_key_body);
 
         wire(settings);
-        buildCeilingSteps();
         buildKey();
 
-        // The overlay keeps the ceiling it paints with; hand it the saved one so a
-        // launch point placed before Settings is ever opened paints at once.
-        final Double c = ceilingM();
-        if (c != null)
-            overlay.setCeiling(c);
-
-        final Double cft = ceilingFt();
-        if (cft != null)
-            obstacles.setCeiling(cft);
         overlay.setListener(this);
         obstacles.setListener(this);
         // An area left on the map by the last session or the last build is this
@@ -461,22 +409,6 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             }
         });
 
-        settings.findViewById(R.id.btn_ceiling_type).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                typeCeiling();
-            }
-        });
-
-        btnCeilingAbove.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                final double g = overlay.getGroundMslM();
-                if (Double.isNaN(g))
-                    return;
-                setCeilingFt(proposedCeilingFt(g));
-            }
-        });
     }
 
     /**
@@ -676,7 +608,6 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         drawnArea = null;
         launch.clear();
         lastFail = null;
-        proposedNote = null;
         working = false;
         overlay.clear();
         obstacles.clear();
@@ -684,10 +615,21 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
     /* ----- the ceiling ----- */
 
-    /** The ceiling in feet MSL, or null before one is set. */
+    /**
+     * The ceiling for the area, feet MSL: the highest ground in it plus the height
+     * the aircraft flies above the terrain, rounded up to the next hundred. The
+     * map is painted against it and it is what the pilot tells Air Attack. Null
+     * before the terrain is in.
+     */
     private Double ceilingFt() {
-        final float v = prefs.getFloat(PREF_CEILING_FT, Float.NaN);
-        return Float.isNaN(v) ? null : (double) v;
+        final TerrainGrid g = overlay.getGrid();
+        if (g == null)
+            return null;
+        final double hi = g.highestMsl();
+        if (Double.isNaN(hi))
+            return null;
+        final double raw = Units.metersToFeet(hi) + flightAglFt();
+        return Math.ceil(raw / REQUEST_STEP_FT) * REQUEST_STEP_FT;
     }
 
     private Double ceilingM() {
@@ -695,105 +637,20 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         return ft == null ? null : Units.feetToMeters(ft);
     }
 
-    private void setCeilingFt(double ft) {
-        prefs.edit().putFloat(PREF_CEILING_FT, (float) ft).apply();
-        proposedNote = null;
-        overlay.setCeiling(Units.feetToMeters(ft));
-        obstacles.setCeiling(ft);
+    /** Hands the ceiling to the overlay and the obstacles, and redraws the pane. */
+    private void applyCeiling() {
+        final Double ft = ceilingFt();
+        if (ft != null) {
+            overlay.setCeiling(Units.feetToMeters(ft));
+            obstacles.setCeiling(ft);
+        }
         syncAll();
     }
 
-    /** The launch ground plus the default, rounded up to the next hundred feet. */
-    private static double proposedCeilingFt(double groundMslM) {
-        final double groundFt = Units.metersToFeet(groundMslM);
-        return Math.ceil((groundFt + DEFAULT_ABOVE_LAUNCH_FT) / 100d) * 100d;
-    }
-
-    /**
-     * Step tiles in the unit ATAK shows altitudes in: hundreds and five hundreds of
-     * feet, or thirties and hundred-fifties of meters.
-     */
-    private void buildCeilingSteps() {
-        ceilingSteps.removeAllViews();
-        final boolean feet = Units.altitudeInFeet();
-        final double[] steps = feet
-                ? new double[] { -500d, -100d, 100d, 500d }
-                : new double[] { -150d, -30d, 30d, 150d };
-        final float dp = pluginContext.getResources().getDisplayMetrics().density;
-        for (final double step : steps) {
-            final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
-            b.setText(String.format(Locale.US, "%+,.0f", step));
-            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            lp.rightMargin = (int) (4 * dp);
-            b.setLayoutParams(lp);
-            b.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    final Double c = ceilingFt();
-                    if (c == null)
-                        return;
-                    final double stepFt = feet ? step : Units.metersToFeet(step);
-                    setCeilingFt(Math.max(0d, c + stepFt));
-                }
-            });
-            ceilingSteps.addView(b);
-        }
-    }
-
-    private void typeCeiling() {
-        final EditText input = new EditText(host);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setSingleLine(true);
-        final Double c = ceilingFt();
-        if (c != null)
-            input.setText(String.format(Locale.US, "%.0f",
-                    Units.toAltitudeUnit(Units.feetToMeters(c))));
-        new AlertDialog.Builder(host)
-                .setTitle(pluginContext.getString(R.string.ceiling_prompt, Units.altitudeUnit()))
-                .setView(input)
-                .setNegativeButton(pluginContext.getString(R.string.cancel), null)
-                .setPositiveButton(pluginContext.getString(R.string.ok),
-                        new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        try {
-                            final double v = Double.parseDouble(input.getText().toString().trim());
-                            final double ft = Units.altitudeInFeet() ? v : Units.metersToFeet(v);
-                            setCeilingFt(Math.max(0d, ft));
-                        } catch (NumberFormatException e) {
-                            // Nothing typed; the ceiling stays as it was.
-                        }
-                    }
-                })
-                .show();
-        input.requestFocus();
-    }
-
-    /* ----- the ceiling to request ----- */
+    /* ----- height above terrain ----- */
 
     private double flightAglFt() {
         return prefs.getFloat(PREF_FLIGHT_AGL_FT, (float) DEFAULT_FLIGHT_AGL_FT);
-    }
-
-    private double separationFt() {
-        return prefs.getFloat(PREF_SEPARATION_FT, (float) DEFAULT_SEPARATION_FT);
-    }
-
-    /**
-     * The ceiling to ask Air Attack for, feet MSL: the highest ground in the area,
-     * plus the height the aircraft flies above the terrain, plus the separation,
-     * rounded up to the next hundred. Null before the terrain is in.
-     */
-    private Double requestedCeilingFt() {
-        final TerrainGrid g = overlay.getGrid();
-        if (g == null)
-            return null;
-        final double hi = g.highestMsl();
-        if (Double.isNaN(hi))
-            return null;
-        final double raw = Units.metersToFeet(hi) + flightAglFt() + separationFt();
-        return Math.ceil(raw / REQUEST_STEP_FT) * REQUEST_STEP_FT;
     }
 
     private interface FeetSink {
@@ -853,34 +710,30 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         }
     }
 
-    /** The request block on the main screen, or nothing before the terrain is in. */
+    /** The ceiling block on the main screen, or nothing before the terrain is in. */
     private void syncRequest() {
         final TerrainGrid g = overlay.getGrid();
-        final Double r = requestedCeilingFt();
-        final boolean show = g != null && r != null;
+        final Double c = ceilingFt();
+        final boolean show = g != null && c != null;
         requestHeading.setVisibility(show ? View.VISIBLE : View.GONE);
         requestLines.setVisibility(show ? View.VISIBLE : View.GONE);
         requestTotal.setVisibility(show ? View.VISIBLE : View.GONE);
-        btnUseRequest.setVisibility(show ? View.VISIBLE : View.GONE);
+        ceilingLine.setVisibility(show ? View.VISIBLE : View.GONE);
         if (!show)
             return;
-        final String lines = pluginContext.getString(R.string.req_highest,
+        requestLines.setText(pluginContext.getString(R.string.req_highest_line,
                 Units.altitudeMsl(g.highestMsl()))
-                + "\n" + pluginContext.getString(R.string.req_flight,
-                        Units.height(Units.feetToMeters(flightAglFt())))
-                + "\n" + pluginContext.getString(R.string.req_separation,
-                        Units.height(Units.feetToMeters(separationFt())));
-        requestLines.setText(lines);
-        requestTotal.setText(pluginContext.getString(R.string.req_total,
-                Units.altitudeMsl(Units.feetToMeters(r)))
-                + " (" + pluginContext.getString(R.string.req_rounded,
-                        Units.height(Units.feetToMeters(REQUEST_STEP_FT))) + ")");
-        final Double c = ceilingFt();
-        final boolean inUse = c != null && Math.abs(c - r) < 0.5d;
-        btnUseRequest.setText(pluginContext.getString(
-                inUse ? R.string.req_in_use : R.string.use_as_ceiling));
-        btnUseRequest.setEnabled(!inUse);
-        btnUseRequest.setAlpha(inUse ? 0.6f : 1f);
+                + "\n" + pluginContext.getString(R.string.req_flight_line,
+                        Units.height(Units.feetToMeters(flightAglFt()))));
+        requestTotal.setText(pluginContext.getString(R.string.req_my_ceiling,
+                Units.altitudeMsl(Units.feetToMeters(c)),
+                Units.height(Units.feetToMeters(REQUEST_STEP_FT))));
+        final double ground = overlay.getGroundMslM();
+        if (!Double.isNaN(ground))
+            ceilingLine.setText(pluginContext.getString(R.string.above_launch_line,
+                    Units.height(Units.feetToMeters(c) - ground)));
+        else
+            ceilingLine.setVisibility(View.GONE);
     }
 
     /* ----- the circle ----- */
@@ -1060,17 +913,8 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
     @Override
     public void onSampled(TerrainGrid grid, double groundMslM) {
-        if (ceilingFt() == null) {
-            // No ceiling yet: propose one from the ground and say so once. The
-            // overlay paints as soon as it is set.
-            final double ft = proposedCeilingFt(groundMslM);
-            prefs.edit().putFloat(PREF_CEILING_FT, (float) ft).apply();
-            proposedNote = pluginContext.getString(R.string.ceiling_proposed,
-                    Units.height(Units.feetToMeters(DEFAULT_ABOVE_LAUNCH_FT)));
-            overlay.setCeiling(Units.feetToMeters(ft));
-            obstacles.setCeiling(ft);
-        }
-        syncAll();
+        // The terrain is in, so the ceiling for this area is known: paint against it.
+        applyCeiling();
     }
 
     /* ----- ObstacleManager.Listener ----- */
@@ -1111,14 +955,6 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                 ? pluginContext.getString(R.string.ground_none)
                 : pluginContext.getString(R.string.ground_here, Units.altitudeMsl(g)));
 
-        final Double c = ceilingM();
-        if (grid != null && c != null && !Double.isNaN(g)) {
-            ceilingLine.setText(pluginContext.getString(R.string.ceiling_line,
-                    Units.altitudeMsl(c), Units.height(c - g)));
-            ceilingLine.setVisibility(View.VISIBLE);
-        } else {
-            ceilingLine.setVisibility(View.GONE);
-        }
 
         syncIslandsSwitch();
         btnLaunch.setText(launch.isPicking() ? R.string.cancel : R.string.launch_point);
@@ -1150,33 +986,17 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         buildTallerTiles();
         buildTypeTiles();
 
-        ceilingFold.label(pluginContext.getString(R.string.ceiling),
-                c == null ? null : Units.altitudeMsl(c));
         flightFold.label(pluginContext.getString(R.string.height_above_terrain),
                 Units.height(Units.feetToMeters(flightAglFt())));
-        sepFold.label(pluginContext.getString(R.string.separation),
-                Units.height(Units.feetToMeters(separationFt())));
         buildFeetTiles(flightTiles, FLIGHT_PRESETS_FT, flightAglFt(), new FeetSink() {
             @Override
             public void accept(double ft) {
                 prefs.edit().putFloat(PREF_FLIGHT_AGL_FT, (float) ft).apply();
-                syncAll();
-            }
-        });
-        buildFeetTiles(sepTiles, SEPARATION_PRESETS_FT, separationFt(), new FeetSink() {
-            @Override
-            public void accept(double ft) {
-                prefs.edit().putFloat(PREF_SEPARATION_FT, (float) ft).apply();
-                syncAll();
+                applyCeiling();
             }
         });
         syncRequest();
         circleFold.label(pluginContext.getString(R.string.area), extentWords());
-        btnCeilingAbove.setText(pluginContext.getString(R.string.ceiling_above_launch,
-                Units.height(Units.feetToMeters(DEFAULT_ABOVE_LAUNCH_FT))));
-        final boolean haveGround = !Double.isNaN(g);
-        btnCeilingAbove.setEnabled(haveGround);
-        btnCeilingAbove.setAlpha(haveGround ? 1f : 0.5f);
         buildCircleTiles();
     }
 
@@ -1249,8 +1069,6 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         final String ob = obstacles.statusLine(launch.getPoint() != null);
         if (ob != null)
             sb.append('\n').append(ob);
-        if (proposedNote != null)
-            sb.append('\n').append(proposedNote);
         return sb.toString();
     }
 

@@ -50,19 +50,10 @@
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <!-- "4,100 ft MSL is 1,086 ft above your launch point": the number that goes
-         into the controller's altitude limit. -->
-    <TextView
-        android:id="@+id/ceiling"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingTop="4dp"
-        android:textColor="@color/white"
-        android:textSize="15sp" />
-
-    <!-- The ceiling to ask Air Attack for: the highest ground in the area, the
-         height the pilot flies above it, and the separation, added up and rounded
-         up. Shown once the terrain is in; one button sets it as the ceiling. -->
+    <!-- The ceiling for this area, added up from what the plugin knows and what the
+         pilot set: the highest ground in the area, how high above the terrain the
+         aircraft flies, the separation. One number; the map is painted against it.
+         A ceiling Air Attack handed back instead is typed under Settings. -->
     <TextView
         android:id="@+id/request_heading"
         style="@style/TakwerxSectionHeading"
@@ -70,7 +61,7 @@
         android:layout_height="wrap_content"
         android:paddingTop="10dp"
         android:visibility="gone"
-        android:text="@string/section_request" />
+        android:text="@string/section_ceiling_area" />
 
     <TextView
         android:id="@+id/request_lines"
@@ -91,14 +82,15 @@
         android:textStyle="bold"
         android:visibility="gone" />
 
-    <Button
-        android:id="@+id/btn_use_request"
-        style="@style/TakwerxButton"
+    <!-- The number for the controller: the ceiling minus the launch ground. -->
+    <TextView
+        android:id="@+id/ceiling"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:visibility="gone"
-        android:text="@string/use_as_ceiling" />
+        android:paddingTop="4dp"
+        android:textColor="@color/white"
+        android:textSize="15sp"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/list_heading"
