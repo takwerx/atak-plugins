@@ -1190,7 +1190,8 @@ public class FeatureLayer implements IPlugin {
         com.atakmap.android.featurelayer.FeatureDetailsReceiver.bindCalFire(
                 paneView.findViewById(R.id.btn_details_calfire), h.attrs, mapView);
         com.atakmap.android.featurelayer.FeatureDetailsReceiver.bindOnly(
-                paneView.findViewById(R.id.btn_details_only), l, h.attrs, manager);
+                paneView.findViewById(R.id.btn_details_only), paneView.findViewById(R.id.btn_details_only_show),
+                l, h.attrs, manager);
         searchPanel.setVisibility(View.GONE);
         paneView.findViewById(R.id.features_header).setVisibility(View.GONE); // one Back, the details' own
         panel.setVisibility(View.VISIBLE);
@@ -2100,7 +2101,7 @@ public class FeatureLayer implements IPlugin {
         if (key == null)
             return;
         if (com.atakmap.android.featurelayer.FireHistoryStyles.handles(l.spec)) {
-            bindHistoryKey(key);
+            bindHistoryKey(key, l);
             return;
         }
         if (!com.atakmap.android.featurelayer.NewStartsStyles.handles(l.spec)) {
@@ -2138,19 +2139,27 @@ public class FeatureLayer implements IPlugin {
      * Fire History's key: each band and decade as a swatch in EGP's fill, from the same
      * table the map is drawn with.
      */
-    private void bindHistoryKey(LinearLayout key) {
+    private void bindHistoryKey(LinearLayout key, LoadedLayer l) {
         while (key.getChildCount() > 1)
             key.removeViewAt(1);
         final float dp = paneView.getResources().getDisplayMetrics().density;
-        for (Object[] k : com.atakmap.android.featurelayer.FireHistoryStyles.KEY) {
+        final List<Object[]> rows = new java.util.ArrayList<>(java.util.Arrays.asList(com.atakmap.android.featurelayer.FireHistoryStyles.KEY));
+        if (l.myFiresCount() > 0)
+            rows.add(new Object[] { "My Fires", null }); // the white edge, no fill of its own
+        for (Object[] k : rows) {
             final LinearLayout line = new LinearLayout(key.getContext());
             line.setOrientation(LinearLayout.HORIZONTAL);
             line.setGravity(android.view.Gravity.CENTER_VERTICAL);
             line.setPadding(0, Math.round(2 * dp), 0, Math.round(2 * dp));
             final View swatch = new View(key.getContext());
             final android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
-            d.setColor(0xFF000000 | (Integer) k[1]);
-            d.setStroke(Math.max(1, Math.round(dp)), 0xFF999999);
+            if (k[1] == null) {
+                d.setColor(0x00000000);
+                d.setStroke(Math.max(2, Math.round(2.5f * dp)), 0xFFFFFFFF);
+            } else {
+                d.setColor(0xFF000000 | (Integer) k[1]);
+                d.setStroke(Math.max(1, Math.round(dp)), 0xFF999999);
+            }
             d.setCornerRadius(3 * dp);
             swatch.setBackground(d);
             final int side = Math.round(22 * dp);

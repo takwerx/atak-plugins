@@ -61,6 +61,15 @@
         android:layout_marginBottom="6dp"
         android:text="Add to My Fires"
         android:visibility="gone" />
+    <!-- Only My Fires ON/OFF with the count, once My Fires has a fire. Gone otherwise. -->
+    <Button
+        android:id="@+id/btn_only_show"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:text="Only My Fires OFF"
+        android:visibility="gone" />
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

@@ -762,8 +762,13 @@ public class LoadedLayer {
                     fsid = newSet(store, pf.setName, gate, split ? Math.min(spec.labelGsd, gate) : 0d);
                     sets.put(pf.setName, fsid);
                 }
+                // One of My Fires: its edge white, so the ones picked stand out among the rest.
+                final boolean mine = myFiresCount() > 0 && FireHistoryStyles.handles(spec) && inMyFires(pf);
+                Style drawn = drawnForm(pf, named, spec.labels && !split);
+                if (mine)
+                    drawn = FireHistoryStyles.mine(drawn);
                 final long fid = store.insertFeature(new Feature(fsid, pf.name, pf.geometry,
-                        drawnForm(pf, named, spec.labels && !split), pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                        drawn, pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
                 written++;
                 if (split) {
                     Long tid = twins.get(pf.setName);
@@ -771,7 +776,10 @@ public class LoadedLayer {
                         tid = newSet(store, pf.setName + LABEL_TWIN, Math.min(spec.labelGsd, gate), 0d);
                         twins.put(pf.setName, tid);
                     }
-                    store.insertFeature(new Feature(tid, pf.name, pf.geometry, drawnForm(pf, named, true),
+                    Style twin = drawnForm(pf, named, true);
+                    if (mine)
+                        twin = FireHistoryStyles.mine(twin);
+                    store.insertFeature(new Feature(tid, pf.name, pf.geometry, twin,
                             pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
                 }
                 if (labels != null && pf.name != null && !pf.name.isEmpty()
@@ -1091,9 +1099,7 @@ public class LoadedLayer {
             if (year > 0) {
                 if (w.length() > 0)
                     w.append(" AND ");
-                w.append(current
-                        ? "attr_FireDiscoveryDateTime >= TIMESTAMP '" + year + "-01-01 00:00:00' AND attr_FireDiscoveryDateTime < TIMESTAMP '" + (year + 1) + "-01-01 00:00:00'"
-                        : "FIRE_YEAR_INT = " + year);
+                w.append(FireHistoryStyles.yearWhere(current, year));
             }
             if (w.length() == 0)
                 continue;
@@ -1452,21 +1458,25 @@ public class LoadedLayer {
                 Log.d(TAG, spec.id + ": fetching " + scopeLabel());
             perimeterRings.clear();
             perimeterHoles.clear();
-            // Only My Fires: each fire fetched by its own extent, wherever it is.
-            final List<Esri.Scope> scopes = new ArrayList<>();
+            // Only My Fires: each fire fetched by its own extent and year, wherever it is.
+            final List<LayerSpec.MyFire> fires = new ArrayList<>();
             if (myFiresShown())
-                for (LayerSpec.MyFire f : new ArrayList<>(spec.myFires))
-                    scopes.add(boxScope(f.box));
+                fires.addAll(spec.myFires);
             else
-                scopes.add(null);
+                fires.add(null);
             int tries = 0;
             try {
-                for (Esri.Scope sc : scopes) {
-                    scopeOverride = sc;
+                for (LayerSpec.MyFire f : fires) {
+                    scopeOverride = f == null ? null : boxScope(f.box);
+                    yearOverride = f == null ? 0 : yearOf(f.key);
                     for (int li = 0; li < spec.layerIds.length; li++) {
                         final int layerId = spec.layerIds[li];
                         if (closed)
                             throw new IllegalStateException("layer closed");
+                        // A year the source cannot hold: no request at all.
+                        if (yearOverride > 0 && !FireHistoryStyles.mayHold(spec.baseFor(li).equals(spec.baseFor(0)),
+                                yearOverride, System.currentTimeMillis()))
+                            continue;
                         tries++;
                         try {
                             fetchSourceLayer(spec.baseFor(li), layerId, token, pending);
@@ -1482,8 +1492,9 @@ public class LoadedLayer {
                 }
             } finally {
                 scopeOverride = null;
+                yearOverride = 0;
             }
-            if (problems.size() == tries)
+            if (tries > 0 && problems.size() == tries)
                 throw new IllegalStateException(problems.get(0));
             synchronized (lock) {
                 if (store == null || closed)
@@ -1708,7 +1719,13 @@ public class LoadedLayer {
                 fetchedRes = res;
             }
         }
-        Esri.query(base, layerId, spec.whereNow(), sc, token, spec.geojson,
+        // One of My Fires: only its year inside its box, a handful of burns instead of
+        // every one around it.
+        final int year = history ? yearOverride : 0;
+        final String where = year > 0
+                ? "(" + spec.whereNow() + ") AND " + FireHistoryStyles.yearWhere(base.equals(spec.baseFor(0)), year)
+                : spec.whereNow();
+        Esri.query(base, layerId, where, sc, token, spec.geojson,
                 Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
@@ -2176,8 +2193,11 @@ public class LoadedLayer {
     }
 
     /**
-     * Adds a burn to My Fires and shows only My Fires; false when the attributes name no
-     * burn or the list is full. The caller saves and fetches. Worker thread.
+     * Adds a burn to My Fires; false when the attributes name no burn or the list is full.
+     * What shows does not change: the fire gets its white edge, and the fires around it
+     * stay so the next can be picked (operator, 2026-10-06: adding hid every other fire,
+     * and picking a second meant going back to turn Only My Fires off). The caller saves.
+     * Worker thread.
      */
     public boolean addMyFire(AttributeSet a) {
         final String k = attr(a, ATTR_FIRE);
@@ -2190,31 +2210,56 @@ public class LoadedLayer {
             final String t = attr(a, ATTR_FIRE_TITLE);
             spec.myFires.add(new LayerSpec.MyFire(k, b, t != null ? t : k));
         }
-        spec.myFiresOnly = true;
         redraw();
         return true;
     }
 
     /** Takes a burn out of My Fires; with none left, every fire shows again. Worker thread. */
     public void removeMyFire(AttributeSet a) {
+        final boolean was = myFiresShown();
         final LayerSpec.MyFire f = myFireOf(attr(a, ATTR_FIRE), box(attr(a, ATTR_FIRE_BOX)));
         if (f != null)
             spec.myFires.remove(f);
         if (spec.myFires.isEmpty())
             spec.myFiresOnly = false;
-        redraw();
+        myFiresChanged(was);
     }
 
-    /** Only My Fires on or off; the list is kept. Worker thread. */
+    /**
+     * Only My Fires on or off, the list kept. Only the switch, at once, on the thread the
+     * tap came in on, so the button answers even while a fetch holds the worker (operator,
+     * 2026-10-06: "I can't click only my fires"). {@link #myFiresChanged} redraws after.
+     */
     public void setMyFiresOnly(boolean on) {
         spec.myFiresOnly = on && !spec.myFires.isEmpty();
-        redraw();
     }
 
     /** Empties My Fires and shows every fire. Worker thread. */
     public void clearMyFires() {
+        final boolean was = myFiresShown();
         spec.myFires.clear();
         spec.myFiresOnly = false;
+        myFiresChanged(was);
+    }
+
+    /**
+     * What was drawn before Only My Fires went on: put back the moment it goes off, so
+     * every fire returns at once while the view is fetched again behind it, not ten
+     * seconds later (2026-10-06).
+     */
+    private List<Pending> viewCache;
+
+    /** Redraws after My Fires changed; {@code was} is whether only My Fires showed before. Worker thread. */
+    public void myFiresChanged(boolean was) {
+        synchronized (lock) {
+            final boolean now = myFiresShown();
+            if (!was && now) {
+                viewCache = cache;
+            } else if (was && !now && viewCache != null) {
+                cache = viewCache;
+                viewCache = null;
+            }
+        }
         redraw();
     }
 
@@ -2227,6 +2272,19 @@ public class LoadedLayer {
         }
     }
 
+    /** The year a My Fires key carries ("RANCH|2007"), 0 when none. */
+    private static int yearOf(String key) {
+        final int bar = key == null ? -1 : key.lastIndexOf('|');
+        if (bar < 0)
+            return 0;
+        try {
+            final int y = Integer.parseInt(key.substring(bar + 1));
+            return y > 1800 && y < 2100 ? y : 0;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     /** One fire's extent, a little wider, as a query scope. */
     private static Esri.Scope boxScope(double[] ib) {
         final double padX = Math.max(0.01, (ib[2] - ib[0]) * 0.05), padY = Math.max(0.01, (ib[3] - ib[1]) * 0.05);
@@ -2235,6 +2293,8 @@ public class LoadedLayer {
 
     /** While set, the scope every fetch uses: one of My Fires' extents. */
     private volatile Esri.Scope scopeOverride;
+    /** While set, the one year every Fire History fetch asks for: that My Fire's. */
+    private volatile int yearOverride;
 
     /** When an unnamed fire leaves the map, epoch ms (NewStartsStyles.UNNAMED_KEEP_MS after it was found). */
     static final String ATTR_DROP_AT = "_drop_at";

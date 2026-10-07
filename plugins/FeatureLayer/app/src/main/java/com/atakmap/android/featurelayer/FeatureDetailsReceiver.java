@@ -103,12 +103,21 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
     }
 
     /** Add to My Fires / Remove from My Fires on a Fire History burn's details; gone for anything else. */
-    public static void bindOnly(View v, final LoadedLayer layer, final AttributeSet attrs, final LayerManager manager) {
-        if (!(v instanceof android.widget.Button))
+    /**
+     * A Fire History burn's two My Fires buttons: Add to My Fires / Remove from My Fires,
+     * and under it Only My Fires ON/OFF with the count, once the list has a fire, so a
+     * few can be picked from the map and then shown alone without leaving the details.
+     * Both gone for anything that is not a burn.
+     */
+    public static void bindOnly(View addView, View onlyView, final LoadedLayer layer, final AttributeSet attrs,
+            final LayerManager manager) {
+        if (!(addView instanceof android.widget.Button) || !(onlyView instanceof android.widget.Button))
             return;
-        final android.widget.Button b = (android.widget.Button) v;
+        final android.widget.Button b = (android.widget.Button) addView;
+        final android.widget.Button only = (android.widget.Button) onlyView;
         if (layer == null || manager == null || read(attrs, LoadedLayer.ATTR_FIRE) == null) {
             b.setVisibility(View.GONE);
+            only.setVisibility(View.GONE);
             return;
         }
         b.setVisibility(View.VISIBLE);
@@ -116,14 +125,37 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         b.setEnabled(!full);
         b.setText(full ? "My Fires is full (" + LayerSpec.MY_FIRES_MAX + ")"
                 : layer.isMyFire(attrs) ? "Remove from My Fires" : "Add to My Fires");
+        showOnly(only, layer.myFiresCount(), layer.myFiresShown());
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View x) {
                 final boolean in = layer.isMyFire(attrs);
                 manager.myFires(layer, in ? LayerManager.MY_REMOVE : LayerManager.MY_ADD, attrs);
                 b.setText(in ? "Add to My Fires" : "Remove from My Fires");
+                // The worker has not run yet: the count and the switch as they will be.
+                final int n = layer.myFiresCount() + (in ? -1 : 1);
+                showOnly(only, n, n > 0 && layer.spec.myFiresOnly);
             }
         });
+        only.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View x) {
+                final boolean on = layer.myFiresShown();
+                manager.myFires(layer, on ? LayerManager.MY_ONLY_OFF : LayerManager.MY_ONLY_ON, null);
+                showOnly(only, layer.myFiresCount(), !on);
+            }
+        });
+    }
+
+    /** "Only My Fires ON (2)" in green or "OFF (2)" in red, as on the layer's row; gone with none. */
+    private static void showOnly(android.widget.Button only, int n, boolean on) {
+        if (n <= 0) {
+            only.setVisibility(View.GONE);
+            return;
+        }
+        only.setVisibility(View.VISIBLE);
+        only.setText("Only My Fires " + (on ? "ON" : "OFF") + " (" + n + ")");
+        only.setTextColor(on ? android.graphics.Color.parseColor("#4CAF50") : android.graphics.Color.parseColor("#F44336"));
     }
 
     private static String read(AttributeSet attrs, String key) {
@@ -197,7 +229,7 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         ((TextView) view.findViewById(R.id.details_attributes)).setText(body);
         bindInciWeb(view.findViewById(R.id.btn_inciweb), f.getAttributes(), getMapView());
         bindCalFire(view.findViewById(R.id.btn_calfire), f.getAttributes(), getMapView());
-        bindOnly(view.findViewById(R.id.btn_only), layer, f.getAttributes(), manager);
+        bindOnly(view.findViewById(R.id.btn_only), view.findViewById(R.id.btn_only_show), layer, f.getAttributes(), manager);
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
     }
 

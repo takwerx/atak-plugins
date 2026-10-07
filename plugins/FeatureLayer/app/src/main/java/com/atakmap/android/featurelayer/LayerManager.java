@@ -638,15 +638,24 @@ public class LayerManager {
         });
     }
 
-    /** The My Fires operations: each redraws on the worker, saves, and fetches. */
+    /**
+     * The My Fires operations: each redraws on the worker and saves. It fetches only
+     * when what shows changes: Only My Fires turned on or off, or a fire added while on.
+     */
     public static final int MY_ADD = 0, MY_REMOVE = 1, MY_ONLY_ON = 2, MY_ONLY_OFF = 3, MY_CLEAR = 4;
 
     public void myFires(final LoadedLayer l, final int op, final com.atakmap.map.layer.feature.AttributeSet a) {
+        // The switch flips now, on the tap, so its button answers even while a fetch holds
+        // the worker; the redraw and any fetch follow in turn.
+        final boolean switchWas = l.myFiresShown();
+        if (op == MY_ONLY_ON || op == MY_ONLY_OFF)
+            l.setMyFiresOnly(op == MY_ONLY_ON);
         l.busy = true;
         changed();
         worker.execute(new Runnable() {
             @Override
             public void run() {
+                final boolean wasShown = op == MY_ONLY_ON || op == MY_ONLY_OFF ? switchWas : l.myFiresShown();
                 try {
                     switch (op) {
                         case MY_ADD:
@@ -656,10 +665,8 @@ public class LayerManager {
                             l.removeMyFire(a);
                             break;
                         case MY_ONLY_ON:
-                            l.setMyFiresOnly(true);
-                            break;
                         case MY_ONLY_OFF:
-                            l.setMyFiresOnly(false);
+                            l.myFiresChanged(switchWas);
                             break;
                         default:
                             l.clearMyFires();
@@ -670,10 +677,12 @@ public class LayerManager {
                     save();
                     changed();
                 }
+                // Fetch what is now to be shown: My Fires by their extents, or the view again.
+                final boolean shown = l.myFiresShown();
+                if (shown != wasShown || (shown && op == MY_ADD))
+                    refreshNow(l);
             }
         });
-        // Fetch what is now to be shown: My Fires by their extents, or the view again.
-        refresh(l);
     }
 
     public void refresh(final LoadedLayer l) {

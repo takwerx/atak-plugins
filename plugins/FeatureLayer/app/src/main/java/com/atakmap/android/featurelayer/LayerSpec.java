@@ -167,7 +167,7 @@ public class LayerSpec {
      */
     public static final int MY_FIRES_MAX = 50;
     /** Whether only My Fires are drawn. */
-    public boolean myFiresOnly;
+    public volatile boolean myFiresOnly;
 
     /** Whether minX, minY, maxX, maxY is a real extent in degrees: finite, on the globe, min before max. */
     static boolean lonLatBox(double[] b) {

@@ -127,6 +127,24 @@ public final class FireHistoryStyles {
         return GREY;
     }
 
+    /** The edge a fire in My Fires is drawn with: white and wide, over every color here. */
+    static final int MINE_EDGE = 0xFFFFFFFF;
+    static final float MINE_WIDTH = 3f;
+
+    /** The same style with every edge in it white and wide: a fire in My Fires. */
+    static Style mine(Style s) {
+        if (s instanceof com.atakmap.map.layer.feature.style.BasicStrokeStyle)
+            return NwcgStyles.solid(MINE_EDGE, MINE_WIDTH);
+        if (s instanceof com.atakmap.map.layer.feature.style.CompositeStyle) {
+            final com.atakmap.map.layer.feature.style.CompositeStyle c = (com.atakmap.map.layer.feature.style.CompositeStyle) s;
+            final Style[] parts = new Style[c.getNumStyles()];
+            for (int i = 0; i < parts.length; i++)
+                parts[i] = mine(c.getStyle(i));
+            return new com.atakmap.map.layer.feature.style.CompositeStyle(parts);
+        }
+        return s;
+    }
+
     /** EGP's fill and edge for a type, at the given fill alpha (0-255). */
     static Style style(String type, int alpha) {
         final boolean grey = hue(type) == GREY;
@@ -250,6 +268,29 @@ public final class FireHistoryStyles {
     /** Whether two extents (minX, minY, maxX, maxY) overlap: the test for two copies of one fire. */
     static boolean overlap(double[] a, double[] b) {
         return a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
+    }
+
+    /**
+     * The where clause for one year: the current decade by discovery time, the all-years
+     * history by its year field. Around Castaic, 2007 alone is 5 burns of 630, 2022 is 2
+     * of 32 (2026-10-06).
+     */
+    static String yearWhere(boolean currentDecade, int year) {
+        return currentDecade
+                ? "attr_FireDiscoveryDateTime >= TIMESTAMP '" + year + "-01-01 00:00:00' AND attr_FireDiscoveryDateTime < TIMESTAMP '"
+                        + (year + 1) + "-01-01 00:00:00'"
+                : "FIRE_YEAR_INT = " + year;
+    }
+
+    /**
+     * Whether a source can hold a year's burns as this layer draws them: the current
+     * decade only its last ten years (type() drops older), the history only before 2020
+     * (from 2020 on the current decade's copy is drawn).
+     */
+    static boolean mayHold(boolean currentDecade, int year, long nowMs) {
+        final java.util.Calendar c = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+        c.setTimeInMillis(nowMs);
+        return currentDecade ? year >= c.get(java.util.Calendar.YEAR) - 10 : year < 2020;
     }
 
     /** The field a source names its fires in: the current decade's, or the all-years history's. */
