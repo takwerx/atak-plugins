@@ -44,9 +44,14 @@ public class LoadedLayer {
     /**
      * Bumped whenever this plugin changes how it draws anything. A layer whose store was
      * written under an older number is fully rewritten on its next refresh, because the
-     * style travels with the feature into the store.
+     * style travels with the feature into the store. 53: every icon and pill level when
+     * the map is spun, and drawn from ATAK's private storage instead of the card. 54: New
+     * Fire Starts as flame and RX markers. 55: fire labels carry % contained. 56: unnamed fires leave after four hours. 57: after an hour, so the
+     * stored expiry times are written again. 58: CAL FIRE's record on its fires. 59: Fire History's
+     * 2010s, 2000s and 1990s in color. 60: every decade in a color of its own.
+     * 61: 1979 and earlier grey again.
      */
-    private static final int STYLE_VERSION = 52;
+    private static final int STYLE_VERSION = 61;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -93,6 +98,9 @@ public class LoadedLayer {
     public volatile boolean stale;
     /** The last fetch returned the layer's cap, so there is more than is drawn. */
     public volatile boolean capped;
+    /** Fires left out for having no name past NewStartsStyles.UNNAMED_KEEP_MS, as of the last fetch and prune. */
+    public volatile int unnamedHidden;
+    private int unnamedThisFetch;
     /**
      * A word about how the scope was resolved this time, for the pane: "no GPS fix --
      * measured from Map Center", or null when there is nothing to say.
@@ -166,6 +174,13 @@ public class LoadedLayer {
         // labels of hidden sets on the XCover.
         final FeatureDataStore2.FeatureQueryParameters visibleOnly = new FeatureDataStore2.FeatureQueryParameters();
         visibleOnly.visibleOnly = true;
+        if (FireHistoryStyles.handles(spec)) {
+            // Drawn in the order written, so the newest burn is on top. Without an order
+            // the store walks its sets in hash-table order, which moves with every refresh's
+            // new set ids: the 1920s drew over the 2010s on dev 1 (2026-10-06).
+            visibleOnly.order = java.util.Collections.<FeatureDataStore2.FeatureQueryParameters.Order>singletonList(
+                    new FeatureDataStore2.FeatureQueryParameters.Order.ID());
+        }
         layer = new FeatureLayer3(displayName(), store, visibleOnly);
         if (DartStyles.handles(spec)) {
             dartLabels = new DartMarkers(mapView, pluginContext, spec.id,
@@ -289,10 +304,13 @@ public class LoadedLayer {
         };
         overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
                 displayName(), "file://asset/nothing", query, null, null);
-        // The renderer keeps labels of anything it has ever seen, hidden or not, so the
-        // store only ever holds what is shown: drop what should not be before the map sees it.
+        // Everything fetched stays in the store, hidden or shown, so a layer or a type
+        // switched off comes back after a restart with no network (operator, 2026-10-06:
+        // "layers once synced need to come back on if phone is restarted and have no
+        // internet"). Until then off deleted it and only the memory copy remained. The
+        // layer reads visible sets only, which also drops a hidden set's labels.
         dedupeSets();
-        pruneHidden();
+        applyVisibility();
         // A DART layer is drawn by its markers (see DartMarkers): neither its feature layer
         // nor its Overlay Manager entry is registered, because either one renders the
         // store's own discs under the markers. Gating the sets to 0 was supposed to do
@@ -305,7 +323,7 @@ public class LoadedLayer {
             mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
         }
         count = countFeatures();
-        status = count > 0 ? "cached" : "empty";
+        status = storedFeatures() > 0 ? "cached" : "empty";
     }
 
     /**
@@ -382,6 +400,57 @@ public class LoadedLayer {
     }
 
     /**
+     * Whether the layer is a feed of things spread across a state or the country, not one
+     * incident: DART, FireGuard, New Fire Starts, CA Air Intel. Its row has no Go to,
+     * because there is no one place to go (operator, 2026-10-05: "the dome fire centers
+     * you on it, dart no reason for a go to").
+     */
+    public boolean isWideFeed() {
+        return DartStyles.handles(spec) || FireGuardStyles.handles(spec) || NewStartsStyles.handles(spec)
+                || FireHistoryStyles.handles(spec) || "ca-air-intel".equals(spec.id);
+    }
+
+    /** Removes unnamed fires whose hour is up from the memory copy and the store. Worker thread. */
+    private void pruneUnnamed() {
+        synchronized (lock) {
+            if (store == null || closed)
+                return;
+            loadCacheLocked();
+            final long now = System.currentTimeMillis();
+            final List<Pending> keep = new ArrayList<>(cache.size());
+            int gone = 0;
+            for (Pending p : cache) {
+                long at = 0;
+                try {
+                    if (p.attrs != null && p.attrs.containsAttribute(ATTR_DROP_AT))
+                        at = p.attrs.getLongAttribute(ATTR_DROP_AT);
+                } catch (Exception ignored) {
+                }
+                if (at > 0 && now >= at)
+                    gone++;
+                else
+                    keep.add(p);
+            }
+            if (gone == 0)
+                return;
+            cache = keep;
+            unnamedHidden += gone;
+            rewriteStore(true);
+            Log.d(TAG, spec.id + ": " + gone + " unnamed fires past their hour removed");
+        }
+    }
+
+    /** The marker image a map key row shows for a fire kind (NewStartsStyles.KEY), or null. */
+    public File keyIcon(String kind) {
+        return NewStartsStyles.handles(spec) ? NewStartsStyles.marker(kind, iconDir) : null;
+    }
+
+    /** Whether the store was last written with this build's styles, so nothing in it points at older files. */
+    boolean drawnByThisBuild() {
+        return spec.styleVersion == STYLE_VERSION;
+    }
+
+    /**
      * Layer on/off. Returns true when a fetch is needed to show it (no memory copy, e.g.
      * after a restart); the manager then refreshes.
      */
@@ -392,8 +461,13 @@ public class LoadedLayer {
                 return false;
             loadCacheLocked();
             if (v && cache.isEmpty())
-                return countFeatures() == 0;
-            rewriteStore();
+                return storedFeatures() == 0;
+            // DART draws its markers from the rewrite; a store an older build emptied on
+            // off has nothing to show yet. Everything else is a visibility switch.
+            if (dartLabels != null || (storedFeatures() == 0 && !cache.isEmpty()))
+                rewriteStore();
+            else
+                applyVisibility();
         }
         return false;
     }
@@ -427,7 +501,7 @@ public class LoadedLayer {
                     // The kind's own zoom default, never the store's number: the store holds
                     // the gate-capped value, and rebuilding from it made the cap permanent
                     // (Plaskett gated at level 14 on every type, perimeter included, 2026-09-09).
-                    loaded.add(new Pending(setName, defaultGsd(setName, f.getGeometry()), f.getName(), f.getGeometry(),
+                    loaded.add(new Pending(setName, kindGsd(setName, f.getGeometry()), f.getName(), f.getGeometry(),
                             f.getStyle(), f.getAttributes()));
                 }
             } finally {
@@ -444,6 +518,15 @@ public class LoadedLayer {
     }
 
     private boolean layerOn = true;
+
+    /**
+     * Whether a type's features are drawn. My Fires are drawn whatever decades are on:
+     * the operator picked them one by one, and a Ranch 2007 hidden because only "1979 and
+     * Earlier" was ticked read as a list that had lost a fire (dev 1, 2026-10-06).
+     */
+    private boolean shows(String setName) {
+        return layerOn && (myFiresShown() || spec.isOn(setName));
+    }
 
     /** Everything fetched last time, shown or not; the store holds only the shown part. */
     private List<Pending> cache = new ArrayList<>();
@@ -504,6 +587,21 @@ public class LoadedLayer {
         }
     }
 
+    /**
+     * How far out this layer's points draw before the layer's own zoom gate: 120 m/px for
+     * most, every zoom for New Fire Starts, a national layer of a few hundred points that
+     * is looked at a state or a region at a time (at 120 m/px it vanished past a county).
+     */
+    private double pointGsd() {
+        return NewStartsStyles.handles(spec) ? GSD_ALWAYS : GSD_POINTS;
+    }
+
+    /** {@link #defaultGsd} for this layer: its points' own default where it has one. */
+    private double kindGsd(String setName, Geometry g) {
+        final double d = defaultGsd(setName, g);
+        return d == GSD_POINTS ? pointGsd() : d;
+    }
+
     /** The zoom default a set's kind gets at fetch time: repair points close in, points, lines, areas always. */
     private static double defaultGsd(String setName, Geometry g) {
         if (setName != null && setName.endsWith(" (repair)"))
@@ -541,8 +639,7 @@ public class LoadedLayer {
                 return false;
             loadCacheLocked();
             if (v) {
-                // A type that was off at the last fetch is not in the store, so the memory
-                // copy cannot show it either: that one needs a fetch.
+                // A type the last fetch did not bring is in neither copy: that one needs a fetch.
                 boolean have = false;
                 for (Pending pf : cache)
                     if (setName.equals(pf.setName)) {
@@ -552,28 +649,74 @@ public class LoadedLayer {
                 if (!have)
                     return true;
             }
-            rewriteStore();
+            boolean stored = false;
+            for (SetInfo si : rawSetsLocked())
+                if (twinBase(si.name).equals(setName)) {
+                    stored = true;
+                    break;
+                }
+            // In the store already: shown or hidden where it is. Not yet (a store an older
+            // build wrote, which held only what was shown), or DART: written again.
+            if (stored && dartLabels == null)
+                applyVisibility();
+            else
+                rewriteStore();
         }
         return false;
     }
 
-    /** Removes from the store what should not be shown right now. Lock held. */
-    private void pruneHidden() {
+    /**
+     * The order features are written, which is the order they draw (the last on top).
+     * Fire History goes oldest first, so a reburn shows over the fire before it: by type,
+     * 1979 and Earlier up to Under 6 Months, then by year within a type. Every other
+     * layer keeps the source's order.
+     */
+    private List<Pending> drawOrder(List<Pending> in) {
+        if (!FireHistoryStyles.handles(spec))
+            return in;
+        final List<Pending> out = new ArrayList<>(in);
+        java.util.Collections.sort(out, new java.util.Comparator<Pending>() {
+            @Override
+            public int compare(Pending a, Pending b) {
+                final int ra = FireHistoryStyles.age(a.setName), rb = FireHistoryStyles.age(b.setName);
+                if (ra != rb)
+                    return ra > rb ? -1 : 1;
+                final int ya = burnYear(a), yb = burnYear(b);
+                return ya < yb ? -1 : ya > yb ? 1 : 0;
+            }
+        });
+        return out;
+    }
+
+    /** The year a burn's My Fires key carries ("RANCH|2007"), 0 when it has none. */
+    private static int burnYear(Pending p) {
+        final String k = attr(p.attrs, ATTR_FIRE);
+        final int bar = k == null ? -1 : k.lastIndexOf('|');
+        if (bar < 0)
+            return 0;
+        try {
+            return Integer.parseInt(k.substring(bar + 1));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /** Shows each set in the store or hides it, by the layer and type switches; nothing is deleted. Lock held. */
+    private void applyVisibility() {
         boolean bulk = false;
         try {
             store.acquireModifyLock(true);
             bulk = true;
             for (SetInfo si : rawSetsLocked()) {
-                if (layerOn && spec.isOn(twinBase(si.name)))
-                    continue;
                 try {
-                    store.deleteFeatureSet(si.id);
+                    store.setFeatureSetVisible(si.id, si.visible);
                 } catch (Exception e) {
-                    Log.w(TAG, "prune " + si.name, e);
+                    Log.w(TAG, "visibility " + si.name, e);
                 }
             }
+            count = countFeatures();
         } catch (Exception e) {
-            Log.w(TAG, "prune failed", e);
+            Log.w(TAG, "visibility failed", e);
         } finally {
             if (bulk)
                 store.releaseModifyLock();
@@ -616,9 +759,12 @@ public class LoadedLayer {
                     : new ArrayList<DartMarkers.Row>();
             final Map<String, Long> twins = new HashMap<>();
             int written = 0;
-            for (Pending pf : cache) {
-                if (!layerOn || !spec.isOn(pf.setName))
-                    continue;
+            for (Pending pf : drawOrder(cache)) {
+                // Every type is written, a switched-off one into a hidden set, so it is on
+                // the phone when it is switched on again, network or not.
+                final boolean visible = shows(pf.setName);
+                if (myFiresShown() && !inMyFires(pf))
+                    continue; // only My Fires
                 // A named point with a label level is written twice: the bare symbol in the
                 // type's own set, which stops drawing at that level, and the named icon in a
                 // twin set that starts there. ATAK switches between them by resolution, so
@@ -631,22 +777,30 @@ public class LoadedLayer {
                 final double gate = Math.min(pf.minGsd, spec.gateGsd);
                 Long fsid = sets.get(pf.setName);
                 if (fsid == null) {
-                    fsid = newSet(store, pf.setName, gate, split ? Math.min(spec.labelGsd, gate) : 0d);
+                    fsid = newSet(store, pf.setName, gate, split ? Math.min(spec.labelGsd, gate) : 0d, visible);
                     sets.put(pf.setName, fsid);
                 }
+                // One of My Fires: its edge white, so the ones picked stand out among the rest.
+                final boolean mine = myFiresCount() > 0 && FireHistoryStyles.handles(spec) && inMyFires(pf);
+                Style drawn = drawnForm(pf, named, spec.labels && !split);
+                if (mine)
+                    drawn = FireHistoryStyles.mine(drawn);
                 final long fid = store.insertFeature(new Feature(fsid, pf.name, pf.geometry,
-                        drawnForm(pf, named, spec.labels && !split), pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                        drawn, pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
                 written++;
                 if (split) {
                     Long tid = twins.get(pf.setName);
                     if (tid == null) {
-                        tid = newSet(store, pf.setName + LABEL_TWIN, Math.min(spec.labelGsd, gate), 0d);
+                        tid = newSet(store, pf.setName + LABEL_TWIN, Math.min(spec.labelGsd, gate), 0d, visible);
                         twins.put(pf.setName, tid);
                     }
-                    store.insertFeature(new Feature(tid, pf.name, pf.geometry, drawnForm(pf, named, true),
+                    Style twin = drawnForm(pf, named, true);
+                    if (mine)
+                        twin = FireHistoryStyles.mine(twin);
+                    store.insertFeature(new Feature(tid, pf.name, pf.geometry, twin,
                             pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
                 }
-                if (labels != null && pf.name != null && !pf.name.isEmpty()
+                if (visible && labels != null && pf.name != null && !pf.name.isEmpty()
                         && pf.geometry instanceof com.atakmap.map.layer.feature.geometry.Point) {
                     final com.atakmap.map.layer.feature.geometry.Point pt =
                             (com.atakmap.map.layer.feature.geometry.Point) pf.geometry;
@@ -807,9 +961,22 @@ public class LoadedLayer {
         public final long time;
         /** The feature's attributes, for a details view straight from the list; may be null. */
         public final AttributeSet attrs;
+        /**
+         * The field the typed text was found in, and that field's value, when it was not
+         * the name, title or type: a DOME repair point turned up for "Prima" because its
+         * comment reads "Primarily replace rails..." (2026-10-05). Null for a name match.
+         */
+        public final String matchedIn, matchedText;
 
         Hit(String title, String layer, String layerId, String type, long time, double lat, double lon, double spanDeg,
                 AttributeSet attrs) {
+            this(title, layer, layerId, type, time, lat, lon, spanDeg, attrs, null, null);
+        }
+
+        Hit(String title, String layer, String layerId, String type, long time, double lat, double lon, double spanDeg,
+                AttributeSet attrs, String matchedIn, String matchedText) {
+            this.matchedIn = matchedIn;
+            this.matchedText = matchedText;
             this.attrs = attrs;
             this.title = title;
             this.layer = layer;
@@ -832,8 +999,8 @@ public class LoadedLayer {
             if (pf.setName.endsWith(" marks"))
                 continue;
             String title = pf.name, type = pf.setName;
+            String inKey = null, inValue = null;
             long time = 0;
-            boolean match = needle.isEmpty() || (pf.name != null && pf.name.toLowerCase(Locale.US).contains(needle));
             if (pf.attrs != null) {
                 try {
                     time = pf.attrs.getLongAttribute("_time");
@@ -852,19 +1019,30 @@ public class LoadedLayer {
                         title = v;
                     else if ("_type".equals(k))
                         type = v;
-                    else if (!match && !k.startsWith("_") && v.toLowerCase(Locale.US).contains(needle))
-                        match = true;
+                    else if (inKey == null && !needle.isEmpty() && !k.startsWith("_")
+                            && v.toLowerCase(Locale.US).contains(needle)) {
+                        inKey = k;
+                        inValue = v;
+                    }
                 }
             }
-            if (!match && title != null && title.toLowerCase(Locale.US).contains(needle))
-                match = true;
-            if (!match || pf.geometry == null)
+            // A name, title or type match is the thing asked for; a match in any other
+            // field is kept, and says where it was found.
+            final boolean named = needle.isEmpty()
+                    || (pf.name != null && pf.name.toLowerCase(Locale.US).contains(needle))
+                    || (title != null && title.toLowerCase(Locale.US).contains(needle))
+                    || (type != null && type.toLowerCase(Locale.US).contains(needle));
+            if ((!named && inKey == null) || pf.geometry == null)
                 continue;
+            if (named) {
+                inKey = null;
+                inValue = null;
+            }
             final com.atakmap.map.layer.feature.geometry.Envelope e = pf.geometry.getEnvelope();
             if (e == null || Double.isNaN(e.minX))
                 continue;
             out.add(new Hit(title, spec.title, spec.id, type, time, (e.minY + e.maxY) / 2, (e.minX + e.maxX) / 2,
-                    Math.max(e.maxX - e.minX, e.maxY - e.minY), pf.attrs));
+                    Math.max(e.maxX - e.minX, e.maxY - e.minY), pf.attrs, inKey, inValue));
             if (out.size() >= max)
                 break;
         }
@@ -882,6 +1060,8 @@ public class LoadedLayer {
         final String needle = text.trim().toUpperCase(Locale.US).replace("'", "''");
         if (needle.isEmpty() || spec.layerIds == null || spec.layerIds.length == 0)
             return out;
+        if (FireHistoryStyles.handles(spec))
+            return searchHistory(needle, max);
         final StringBuilder like = new StringBuilder();
         for (String f : new String[] { spec.labelField, spec.setField })
             if (f != null && !f.isEmpty())
@@ -915,13 +1095,93 @@ public class LoadedLayer {
         return out;
     }
 
+    /**
+     * Fire History by name, anywhere: both services asked by their own name field, the
+     * shapes simplified to about 500 m (only their extents are used, for Go there), and
+     * one hit per fire as on the map. {@code needle} is upper case with quotes doubled.
+     */
+    private List<Hit> searchHistory(String needle, int max) throws Exception {
+        final List<Hit> out = new ArrayList<>();
+        final Map<String, List<Object[]>> seen = new HashMap<>();
+        final Esri.Scope world = Esri.Scope.box(-90, -180, 90, 180).simplified(0.005);
+        // "Ranch 2007": a year at the end narrows the name to that year, which is how one
+        // fire is picked out of the hundreds named Ranch.
+        final java.util.regex.Matcher ym = java.util.regex.Pattern.compile("^(.*?)\\s*\\b(1[89]\\d\\d|20\\d\\d)$").matcher(needle);
+        final String name = ym.matches() ? ym.group(1).trim() : needle;
+        final int year = ym.matches() ? Integer.parseInt(ym.group(2)) : 0;
+        for (int i = 0; i < spec.layerIds.length; i++) {
+            final boolean current = i == 0;
+            final StringBuilder w = new StringBuilder();
+            if (!name.isEmpty())
+                w.append("UPPER(").append(FireHistoryStyles.nameField(current)).append(") LIKE '%").append(name).append("%'");
+            if (year > 0) {
+                if (w.length() > 0)
+                    w.append(" AND ");
+                w.append(FireHistoryStyles.yearWhere(current, year));
+            }
+            if (w.length() == 0)
+                continue;
+            final String where = w.toString();
+            Esri.query(spec.baseFor(i), spec.layerIds[i], where, world, null, false, 200, max,
+                    new Esri.FeatureSink() {
+                        @Override
+                        public void feature(JSONObject props, Geometry g) {
+                            if (g == null)
+                                return;
+                            final String type = FireHistoryStyles.type(props, System.currentTimeMillis());
+                            if (type == null)
+                                return;
+                            final com.atakmap.map.layer.feature.geometry.Envelope e = g.getEnvelope();
+                            if (e == null || Double.isNaN(e.minX))
+                                return;
+                            final double[] box = { e.minX, e.minY, e.maxX, e.maxY };
+                            final double acres = FireHistoryStyles.acres(props);
+                            final String norm = FireHistoryStyles.normName(props);
+                            final String key = FireHistoryStyles.nameYear(props);
+                            List<Object[]> same = seen.get(key);
+                            if (same == null) {
+                                same = new ArrayList<>();
+                                seen.put(key, same);
+                            }
+                            for (Object[] c : same)
+                                if (FireHistoryStyles.sameFire((String) c[0], (Double) c[1], (double[]) c[2], norm, acres, box))
+                                    return; // another copy of a fire already listed
+                            same.add(new Object[] { norm, acres, box });
+                            final String title = FireHistoryStyles.title(props, spec.layerTitle);
+                            final long when = FireHistoryStyles.when(props);
+                            final AttributeSet attrs = Esri.toAttributes(props, lastDateFields);
+                            attrs.setAttribute("_title", title);
+                            attrs.setAttribute("_type", type);
+                            attrs.setAttribute(ATTR_FIRE, norm + "|" + FireHistoryStyles.year(props));
+                            attrs.setAttribute(ATTR_FIRE_BOX, box[0] + "," + box[1] + "," + box[2] + "," + box[3]);
+                            attrs.setAttribute(ATTR_FIRE_TITLE, title);
+                            if (when > 0)
+                                attrs.setAttribute("_time", when);
+                            out.add(new Hit(title, spec.title, spec.id, type, when, (e.minY + e.maxY) / 2,
+                                    (e.minX + e.maxX) / 2, Math.max(e.maxX - e.minX, e.maxY - e.minY), attrs));
+                        }
+                    });
+        }
+        return out;
+    }
+
     /** Zooms onto a hit: the feature's own extent, or a few hundred meters around a point. */
     public void zoomTo(Hit h) {
         try {
-            final double half = Math.max(0.0025, h.spanDeg * 0.75);
+            double half = Math.max(0.0025, h.spanDeg * 0.75);
+            // No further out than where the layer's labels draw, so Go there lands on the
+            // fire's name (operator, 2026-10-06: "take me to the label level, it's zoomed
+            // too far out"). A large fire then fills the screen rather than all of it
+            // fitting, which is what reading its name needs.
+            if (spec.labels && spec.labelGsd > 0 && spec.labelGsd != Double.MAX_VALUE) {
+                final int px = Math.max(1, Math.min(mapView.getWidth(), mapView.getHeight()));
+                final double labelHalf = spec.labelGsd * 0.8 * px / 2 / 111_320d;
+                half = Math.min(half, Math.max(0.0025, labelHalf));
+            }
+            final double halfLon = half / Math.max(0.2, Math.cos(Math.toRadians(h.lat)));
             final com.atakmap.coremap.maps.coords.GeoPoint[] corners = {
-                    new com.atakmap.coremap.maps.coords.GeoPoint(h.lat - half, h.lon - half),
-                    new com.atakmap.coremap.maps.coords.GeoPoint(h.lat + half, h.lon + half) };
+                    new com.atakmap.coremap.maps.coords.GeoPoint(h.lat - half, h.lon - halfLon),
+                    new com.atakmap.coremap.maps.coords.GeoPoint(h.lat + half, h.lon + halfLon) };
             com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, corners, 0d, mapView.getWidth(), mapView.getHeight());
         } catch (Exception e) {
             Log.w(TAG, "zoom to hit failed", e);
@@ -969,6 +1229,8 @@ public class LoadedLayer {
     public String scopeLabel() {
         if (spec.scopeKind == null)
             return "Everything";
+        if ("all".equals(spec.scopeKind))
+            return "Everywhere";
         if ("view".equals(spec.scopeKind))
             return "What is in view";
         if ("box".equals(spec.scopeKind))
@@ -980,9 +1242,15 @@ public class LoadedLayer {
         return "Within " + Units.formatBig(spec.scopeRadiusM) + " of " + from + (note == null ? "" : " (" + note + ")");
     }
 
+    /** Whether the layer is fetched everywhere, so what it holds is the whole feed and a Find needs no feed query. */
+    public boolean holdsEverything() {
+        return "all".equals(spec.scopeKind);
+    }
+
     /** Whether this layer's scope is one the pane offers a control for. */
     public boolean hasScopeControl() {
-        return "me".equals(spec.scopeKind) || "center".equals(spec.scopeKind) || "view".equals(spec.scopeKind);
+        return "me".equals(spec.scopeKind) || "center".equals(spec.scopeKind) || "view".equals(spec.scopeKind)
+                || "all".equals(spec.scopeKind);
     }
 
     /** A usable own position, or null: the self marker before a fix reads 0,0 and calls itself valid. */
@@ -1000,12 +1268,20 @@ public class LoadedLayer {
      * {@link LayerManager} after a debounced map move.
      */
     boolean movedOutOfScope() {
-        if (!hasScopeControl() || refreshing || busy)
+        if (!hasScopeControl() || refreshing || busy || "all".equals(spec.scopeKind))
             return false;
+        if (myFiresShown())
+            return false; // My Fires are fetched by their own extents: the map moving changes nothing
         try {
             if ("view".equals(spec.scopeKind)) {
                 if (viewTooWide)
-                    return viewWidthM() <= MAX_VIEW_M; // refused for width: fetch once it is narrower
+                    return viewWidthM() <= viewCeilingM(); // refused for width: fetch once it is narrower
+                // Zoomed well past what the simplified shapes were drawn for: fetch them finer.
+                if (spec.generalize && fetchedRes > 0) {
+                    final double r = mapView.getMapResolution();
+                    if (r > 0 && r < fetchedRes / 3)
+                        return true;
+                }
                 final double[] fb = fetchedBox;
                 final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
                 if (fb == null || b == null)
@@ -1041,6 +1317,24 @@ public class LoadedLayer {
 
     /** The widest view a "What is in view" layer fetches for: 500 km, about 300 mi, across. */
     static final double MAX_VIEW_M = 500_000;
+    /**
+     * The widest view this layer fetches for. DART's ceiling is the 4,000 vehicles a
+     * national view asks for; New Fire Starts is a few hundred starts across the country,
+     * so it has none and a national view shows the nation.
+     */
+    private double viewCeilingM() {
+        if (NewStartsStyles.handles(spec))
+            return Double.MAX_VALUE;
+        // Fire History: a century of perimeters; 250 km keeps a view to a few thousand.
+        return FireHistoryStyles.handles(spec) ? 250_000 : MAX_VIEW_M;
+    }
+
+    /** Fire History's copies seen this refresh, by year: {index in pending, extent, acres, first source, normName}. */
+    private final Map<String, List<Object[]>> fireCopies = new HashMap<>();
+
+    /** The map resolution a simplified fetch was sized for (m/px), 0 when none was. */
+    private volatile double fetchedRes;
+
     /** Whether the last view-scoped fetch was refused for width; a narrower view fetches again. */
     private volatile boolean viewTooWide;
 
@@ -1060,7 +1354,13 @@ public class LoadedLayer {
     }
 
     private Esri.Scope scope() {
-        if (spec.scopeKind == null)
+        // My Fires: one fire's extent at a time, wherever the map is (refresh walks them).
+        final Esri.Scope over = scopeOverride;
+        if (over != null)
+            return over;
+        // "all": the scope control's zero on a layer small enough to hold the country
+        // (New Fire Starts), so a typed Find reaches a fire anywhere, not only in view.
+        if (spec.scopeKind == null || "all".equals(spec.scopeKind))
             return null;
         if ("view".equals(spec.scopeKind)) {
             // What the operator is looking at, which is what they are asking about. The map
@@ -1073,15 +1373,17 @@ public class LoadedLayer {
             // minute and composed a thousand callsigns (2026-09-18, "1000 so far"). Past
             // the ceiling the layer keeps what it has and says to zoom in.
             final double width = viewWidthM();
-            viewTooWide = width > MAX_VIEW_M;
+            viewTooWide = width > viewCeilingM();
             if (viewTooWide)
                 throw new IllegalStateException("zoom in to load: the view is " + Units.formatBig(width)
-                        + " across, the most is " + Units.formatBig(MAX_VIEW_M));
+                        + " across, the most is " + Units.formatBig(viewCeilingM()));
             // A margin, so a small pan still has features under it before the next fetch.
             final double padLat = Math.max(0.01, (b.getNorth() - b.getSouth()) * 0.2);
             final double padLon = Math.max(0.01, (b.getEast() - b.getWest()) * 0.2);
-            fetchedBox = new double[] { b.getSouth() - padLat, b.getWest() - padLon,
-                    b.getNorth() + padLat, b.getEast() + padLon };
+            // Kept on the globe: with no ceiling (New Fire Starts) a national view's margin
+            // reaches past the poles and the date line, which a query envelope cannot.
+            fetchedBox = new double[] { Math.max(-90, b.getSouth() - padLat), Math.max(-180, b.getWest() - padLon),
+                    Math.min(90, b.getNorth() + padLat), Math.min(180, b.getEast() + padLon) };
             scopeNote = null;
             return Esri.Scope.box(fetchedBox[0], fetchedBox[1], fetchedBox[2], fetchedBox[3]);
         }
@@ -1137,7 +1439,13 @@ public class LoadedLayer {
             progress.run();
         final List<Pending> pending = new ArrayList<>();
         final List<String> problems = new ArrayList<>();
+        unnamedThisFetch = 0;
+        fireCopies.clear();
         try {
+            // An unnamed fire reaches its hour whether or not the feed changed, and
+            // the change check below skips the fetch when it has not: let it go first.
+            if (NewStartsStyles.handles(spec))
+                pruneUnnamed();
             // A windowed live layer asks "anything new?" first: count and newest time per
             // source layer. Same answer as last time and something already drawn: done.
             // Styles are written into the store with the features, so a build that changes
@@ -1150,7 +1458,8 @@ public class LoadedLayer {
             if (!restyle && spec.timeField != null && spec.live && !cache.isEmpty()) {
                 final StringBuilder now = new StringBuilder();
                 for (int layerId : spec.layerIds)
-                    now.append(Esri.stamp(spec.base, layerId, spec.whereNow(), scope(), token, spec.timeField))
+                    now.append(Esri.stamp(spec.base, layerId, spec.whereNow(), scope(), token,
+                            spec.stampField != null ? spec.stampField : spec.timeField))
                             .append(';');
                 if (now.toString().equals(lastStamp) && !lastStampWhere.equals(spec.whereNow().replaceAll("'[^']*'", ""))) {
                     // the where changed shape (a new window), so fetch anyway
@@ -1167,21 +1476,43 @@ public class LoadedLayer {
                 Log.d(TAG, spec.id + ": fetching " + scopeLabel());
             perimeterRings.clear();
             perimeterHoles.clear();
-            for (int layerId : spec.layerIds) {
-                if (closed)
-                    throw new IllegalStateException("layer closed");
-                try {
-                    fetchSourceLayer(layerId, token, pending);
-                } catch (Exception e) {
-                    Log.w(TAG, spec.id + " layer " + layerId + " failed", e);
-                    problems.add("layer " + layerId + ": " + e.getMessage());
+            // Only My Fires: each fire fetched by its own extent and year, wherever it is.
+            final List<LayerSpec.MyFire> fires = new ArrayList<>();
+            if (myFiresShown())
+                fires.addAll(spec.myFires);
+            else
+                fires.add(null);
+            int tries = 0;
+            try {
+                for (LayerSpec.MyFire f : fires) {
+                    scopeOverride = f == null ? null : boxScope(f.box);
+                    yearOverride = f == null ? 0 : yearOf(f.key);
+                    for (int li = 0; li < spec.layerIds.length; li++) {
+                        final int layerId = spec.layerIds[li];
+                        if (closed)
+                            throw new IllegalStateException("layer closed");
+                        // A year the source cannot hold: no request at all.
+                        if (yearOverride > 0 && !FireHistoryStyles.mayHold(spec.baseFor(li).equals(spec.baseFor(0)),
+                                yearOverride, System.currentTimeMillis()))
+                            continue;
+                        tries++;
+                        try {
+                            fetchSourceLayer(spec.baseFor(li), layerId, token, pending);
+                        } catch (Exception e) {
+                            Log.w(TAG, spec.id + " layer " + layerId + " failed", e);
+                            problems.add("layer " + layerId + ": " + e.getMessage());
+                        }
+                        this.progress = pending.size();
+                        status = "refreshing: " + pending.size();
+                        if (progress != null)
+                            progress.run();
+                    }
                 }
-                this.progress = pending.size();
-                status = "refreshing: " + pending.size();
-                if (progress != null)
-                    progress.run();
+            } finally {
+                scopeOverride = null;
+                yearOverride = 0;
             }
-            if (problems.size() == spec.layerIds.length)
+            if (tries > 0 && problems.size() == tries)
                 throw new IllegalStateException(problems.get(0));
             synchronized (lock) {
                 if (store == null || closed)
@@ -1194,6 +1525,7 @@ public class LoadedLayer {
             }
             lastRefresh = System.currentTimeMillis();
             stale = false;
+            unnamedHidden = unnamedThisFetch;
             status = problems.isEmpty() ? "ok" : "partial: " + problems.get(0);
             capped = spec.maxFeatures > 0 && pending.size() >= spec.maxFeatures * spec.layerIds.length;
             if (capped)
@@ -1201,11 +1533,33 @@ public class LoadedLayer {
         } catch (Exception e) {
             Log.w(TAG, spec.id + " refresh failed", e);
             stale = true;
-            status = "no update: " + e.getMessage();
+            status = noNetwork(e) ? NO_NETWORK : "no update: " + e.getMessage();
         } finally {
             refreshing = false;
             if (progress != null)
                 progress.run();
+        }
+    }
+
+    /** The row's words when a fetch fails for want of a network: what is drawn is what the phone kept. */
+    public static final String NO_NETWORK = "no network, showing what this phone saved";
+
+    /**
+     * Whether a fetch failed because there is no network: none active, or a host that
+     * would not resolve. The row said "STALE: no update: layer 0: Unable to resolve host
+     * services3.arcgis.com" on dev 1 offline (2026-10-06).
+     */
+    private boolean noNetwork(Exception e) {
+        final String m = String.valueOf(e.getMessage());
+        if (m.contains("Unable to resolve host") || m.contains("Network is unreachable"))
+            return true;
+        try {
+            final android.net.ConnectivityManager cm = (android.net.ConnectivityManager) mapView.getContext()
+                    .getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+            final android.net.NetworkInfo ni = cm == null ? null : cm.getActiveNetworkInfo();
+            return ni == null || !ni.isConnected();
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
@@ -1356,21 +1710,25 @@ public class LoadedLayer {
         return nwcgIcons.get("Other");
     }
 
-    private void fetchSourceLayer(final int layerId, String token, final List<Pending> out) throws Exception {
-        final Esri.LayerInfo info = Esri.layerInfo(spec.base, layerId, token);
+    private void fetchSourceLayer(final String base, final int layerId, String token, final List<Pending> out) throws Exception {
+        final Esri.LayerInfo info = Esri.layerInfo(base, layerId, token);
+        final boolean history = FireHistoryStyles.handles(spec);
+        // One perimeter per fire, across both services: the first source (the current
+        // decade, with its age color) wins; within a source the larger copy does.
+        final boolean firstSource = base.equals(spec.baseFor(0));
         final boolean nwcg = spec.profile == LayerSpec.Profile.NWCG;
         final boolean isPointLayer = info.geometryType.contains("Point");
         final boolean isLineLayer = info.geometryType.contains("Polyline");
         // Only when the source layer is itself the type. A layer that splits by a field
         // (CA Air Intel by source) names its types from the data, and the layer's own name
         // listed a seventh type nothing was ever in.
-        if (spec.setField == null)
+        if (spec.setField == null && !history)
             spec.setKind.put(info.name, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
         else
             spec.setKind.remove(info.name);
         final int fill = spec.fillFor(info.name);
         final EsriRenderer generic = nwcg ? null : new EsriRenderer(info.drawingInfo, info.geometryType, iconDir, fill);
-        final double gsd = isPointLayer ? GSD_POINTS : isLineLayer ? GSD_LINES : GSD_ALWAYS;
+        final double gsd = isPointLayer ? pointGsd() : isLineLayer ? GSD_LINES : GSD_ALWAYS;
         final String setName = info.name;
         final String repairName = (nwcg && isPointLayer) ? info.name + " (repair)" : null;
         final Set<String> dates = info.dateFields;
@@ -1382,13 +1740,46 @@ public class LoadedLayer {
         final String layerName = spec.layerTitle != null && !spec.layerTitle.isEmpty()
                 ? spec.layerTitle : info.name;
 
+        // Which fires have an InciWeb page: read at most every 30 minutes, before the rows
+        // are written so each fire carries its page.
+        if (NewStartsStyles.handles(spec) && isPointLayer) {
+            InciWeb.refresh();
+            CalFire.refresh();
+        }
         Log.d(TAG, spec.id + ": layer " + layerId + " iconSet=" + spec.iconSet + " dart=" + DartStyles.handles(spec)
                 + " point=" + isPointLayer + " profile=" + spec.profile + " nwcg=" + nwcg);
         final int firstOfLayer = out.size();
-        Esri.query(spec.base, layerId, spec.whereNow(), scope(), token, spec.geojson,
+        Esri.Scope sc = scope();
+        if (spec.generalize && sc != null) {
+            // Shapes simplified to about a pixel at the zoom they were fetched for; a
+            // zoom well past it fetches again, finer (movedOutOfScope).
+            final double res = mapView.getMapResolution();
+            if (res > 0 && !Double.isNaN(res)) {
+                sc = sc.simplified(Math.max(0.00001, Math.min(0.05, res / 111320d)));
+                fetchedRes = res;
+            }
+        }
+        // One of My Fires: only its year inside its box, a handful of burns instead of
+        // every one around it.
+        final int year = history ? yearOverride : 0;
+        final String where = year > 0
+                ? "(" + spec.whereNow() + ") AND " + FireHistoryStyles.yearWhere(base.equals(spec.baseFor(0)), year)
+                : spec.whereNow();
+        Esri.query(base, layerId, where, sc, token, spec.geojson,
                 Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
+                        // A fire with no name, past its hour: a dispatch call nobody came
+                        // back to. Left out, and counted on the row's status line.
+                        long dropAt = 0;
+                        if (NewStartsStyles.handles(spec) && NewStartsStyles.unnamed(props)) {
+                            final long found = NewStartsStyles.discoveredMs(props);
+                            if (found <= 0 || System.currentTimeMillis() - found >= NewStartsStyles.UNNAMED_KEEP_MS) {
+                                unnamedThisFetch++;
+                                return;
+                            }
+                            dropAt = found + NewStartsStyles.UNNAMED_KEEP_MS;
+                        }
                         final String cat = props.isNull("FeatureCategory") ? null : props.optString("FeatureCategory", null);
                         final String repair = props.isNull("RepairStatus") ? null : props.optString("RepairStatus", null);
                         String name, title;
@@ -1398,7 +1789,53 @@ public class LoadedLayer {
                             // One type per value of the field (FIRIS: USFS, CAL FIRE, NIFC...), so each can be toggled.
                             final String v = props.isNull(spec.setField) ? null : props.optString(spec.setField, null);
                             target = v == null || v.isEmpty() ? "Other" : v;
+                            // "WF"/"RX" are codes; the types are named, and a wildfire with
+                            // no size reported is a type of its own (NewStartsStyles).
+                            if (NewStartsStyles.handles(spec))
+                                target = NewStartsStyles.type(props);
                             spec.setKind.put(target, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
+                        }
+                        int dupAt = -1;
+                        Object[] copy = null;
+                        if (history) {
+                            // EGP's band or decade; a perimeter EGP draws in neither is left out.
+                            final String t = FireHistoryStyles.type(props, System.currentTimeMillis());
+                            if (t == null)
+                                return;
+                            target = t;
+                            spec.setKind.put(target, "polygon");
+                            final com.atakmap.map.layer.feature.geometry.Envelope e = g.getEnvelope();
+                            if (e != null && !Double.isNaN(e.minX)) {
+                                final double[] box = { e.minX, e.minY, e.maxX, e.maxY };
+                                final double acres = FireHistoryStyles.acres(props);
+                                final String norm = FireHistoryStyles.normName(props);
+                                final String key = FireHistoryStyles.nameYear(props);
+                                List<Object[]> same = fireCopies.get(key);
+                                if (same == null) {
+                                    same = new ArrayList<>();
+                                    fireCopies.put(key, same);
+                                }
+                                for (Object[] c : same) {
+                                    if (!FireHistoryStyles.sameFire((String) c[4], (Double) c[2], (double[]) c[1],
+                                            norm, acres, box))
+                                        continue;
+                                    // Another copy of this fire: keep this one only if it is
+                                    // the larger copy from the same source.
+                                    if ((Boolean) c[3] != firstSource || acres <= (Double) c[2])
+                                        return;
+                                    dupAt = (Integer) c[0];
+                                    copy = c;
+                                    break;
+                                }
+                                if (copy == null) {
+                                    copy = new Object[] { -1, box, acres, firstSource, norm };
+                                    same.add(copy);
+                                } else {
+                                    copy[1] = box;
+                                    copy[2] = acres;
+                                    copy[4] = norm;
+                                }
+                            }
                         }
                         double targetGsd = gsd;
                         if (nwcg) {
@@ -1470,7 +1907,26 @@ public class LoadedLayer {
                                 name = FireGuardStyles.title(props, name);
                                 title = name + " (" + layerName + ")";
                             }
-                            style = generic.styleFor(props);
+                            if (history) {
+                                // EGP's label, "Carr Fire (2018)", only over 20 acres; the title
+                                // carries the acres for every one.
+                                name = FireHistoryStyles.label(props);
+                                title = FireHistoryStyles.title(props, layerName) + " (" + target + ")";
+                            }
+                            if (NewStartsStyles.handles(spec)) {
+                                // "Ridge · 12 ac"; the type's own name when the start has none.
+                                name = NewStartsStyles.title(props, NewStartsStyles.type(props));
+                                title = name + " (" + layerName + ")";
+                            }
+                            style = history ? FireHistoryStyles.style(target, spec.fillFor(target)) : generic.styleFor(props);
+                            if (NewStartsStyles.handles(spec) && isPointLayer) {
+                                // NIFC's colors and size rule on a composed circle, so the
+                                // name pill is drawn whole (a renderer dot has no icon to
+                                // compose it with, and the engine trims its label).
+                                final Style ns = NewStartsStyles.style(props, iconDir);
+                                if (ns != null)
+                                    style = ns;
+                            }
                             if (DartStyles.handles(spec) && isPointLayer) {
                                 // EGP's symbology, not the services' own: personnel declare a
                                 // 22.5 pt marker and vehicles an esriSMS dot of size 4, which
@@ -1544,6 +2000,22 @@ public class LoadedLayer {
                             }
                         }
                         final AttributeSet attrs = Esri.toAttributes(props, dates);
+                        if (history && copy != null) {
+                            // Which fire this is, so My Fires can pick it out later.
+                            final double[] bx = (double[]) copy[1];
+                            attrs.setAttribute(ATTR_FIRE, FireHistoryStyles.normName(props) + "|" + FireHistoryStyles.year(props));
+                            attrs.setAttribute(ATTR_FIRE_BOX, bx[0] + "," + bx[1] + "," + bx[2] + "," + bx[3]);
+                            attrs.setAttribute(ATTR_FIRE_TITLE, FireHistoryStyles.title(props, layerName));
+                        }
+                        if (dropAt > 0)
+                            attrs.setAttribute(ATTR_DROP_AT, dropAt);
+                        if (NewStartsStyles.handles(spec) && g instanceof com.atakmap.map.layer.feature.geometry.Point) {
+                            final com.atakmap.map.layer.feature.geometry.Point pt = (com.atakmap.map.layer.feature.geometry.Point) g;
+                            final String page = InciWeb.pageFor(props.optString("IncidentName", null), pt.getY(), pt.getX());
+                            if (page != null)
+                                attrs.setAttribute(ATTR_INCIWEB, page);
+                            calFireInto(attrs, props.optString("IncidentName", null), pt.getY(), pt.getX());
+                        }
                         if (bare != null)
                             attrs.setAttribute(ATTR_BARE, bare);
                         if (bareAlt != null)
@@ -1554,7 +2026,8 @@ public class LoadedLayer {
                         // "Pickup", "IHC"), so the picker lists kinds and a row says what it
                         // is; the layer's name was standing in (operator, 2026-09-18: "when i
                         // click on vehicle how come i dont get a sub type?").
-                        final String dartType = (DartStyles.handles(spec) || FireGuardStyles.handles(spec)) && spec.setField != null
+                        final String dartType = history ? target : NewStartsStyles.handles(spec) ? NewStartsStyles.type(props)
+                                : (DartStyles.handles(spec) || FireGuardStyles.handles(spec)) && spec.setField != null
                                 ? props.optString(spec.setField, "").trim() : "";
                         attrs.setAttribute("_type", !dartType.isEmpty() && !"null".equalsIgnoreCase(dartType) ? dartType
                                 : nwcg ? (cat != null ? cat : layerName)
@@ -1572,9 +2045,9 @@ public class LoadedLayer {
                                 if (h != 0)
                                     hue = h;
                             }
-                            final boolean fireguard = !nwcg && FireGuardStyles.handles(spec);
+                            final boolean fireguard = !nwcg && (FireGuardStyles.handles(spec) || history);
                             if (fireguard) {
-                                final int h = FireGuardStyles.fillHue(props);
+                                final int h = history ? FireHistoryStyles.hue(target) : FireGuardStyles.fillHue(props);
                                 if (h != 0)
                                     hue = h;
                             }
@@ -1649,7 +2122,13 @@ public class LoadedLayer {
                         }
                         final Pending p = new Pending(target, targetGsd, name, shown, style, attrs);
                         p.alt = alt;
-                        out.add(p);
+                        if (dupAt >= 0) {
+                            out.set(dupAt, p); // the larger copy of a fire seen before
+                        } else {
+                            if (copy != null)
+                                copy[0] = out.size();
+                            out.add(p);
+                        }
 
                     }
                 });
@@ -1665,6 +2144,200 @@ public class LoadedLayer {
      */
     /** A point's style before its name was drawn into the icon, packed as ATAK's OGR style text. */
     static final String ATTR_BARE = "_bare", ATTR_BARE_ALT = "_bare_alt";
+    /** A fire's InciWeb page (InciWeb.pageFor); "_" keeps it out of the attribute list. */
+    public static final String ATTR_INCIWEB = "_inciweb";
+    /** A fire's CAL FIRE incident page (CalFire.find). */
+    public static final String ATTR_CALFIRE = "_calfire";
+    /** The details lines CAL FIRE's record adds; the details pane lists keys with this prefix first. */
+    public static final String CALFIRE_PREFIX = "CAL FIRE ";
+
+    /**
+     * CAL FIRE's record of the fire, when it has one: its page for the button, and its
+     * acres, containment, location, update time and, for a fire it has closed, that it
+     * is final, as lines at the top of the details.
+     */
+    private static void calFireInto(AttributeSet attrs, String name, double lat, double lon) {
+        final CalFire.Incident c = CalFire.find(name, lat, lon);
+        if (c == null)
+            return;
+        attrs.setAttribute(ATTR_CALFIRE, c.url);
+        if (c.acres >= 0)
+            attrs.setAttribute(CALFIRE_PREFIX + "acres", NewStartsStyles.formatAcres(c.acres));
+        if (c.percent >= 0)
+            attrs.setAttribute(CALFIRE_PREFIX + "contained", Math.round(c.percent) + "%");
+        if (!c.location.isEmpty())
+            attrs.setAttribute(CALFIRE_PREFIX + "location", c.location + (c.county.isEmpty() ? "" : ", " + c.county + " County"));
+        if (!c.updated.isEmpty())
+            attrs.setAttribute(CALFIRE_PREFIX + "updated", CalFire.when(c.updated));
+        if (!c.active)
+            attrs.setAttribute(CALFIRE_PREFIX + "status", "final" + (c.extinguished.isEmpty() ? "" : ", out " + CalFire.when(c.extinguished)));
+    }
+    /** A burn's identity for My Fires: normName|year, its extent, and its title. */
+    public static final String ATTR_FIRE = "_fire", ATTR_FIRE_BOX = "_firebox", ATTR_FIRE_TITLE = "_firetitle";
+
+    /** Whether only My Fires are drawn right now: the switch is on and the list has a fire in it. */
+    public boolean myFiresShown() {
+        return spec.myFiresOnly && !spec.myFires.isEmpty();
+    }
+
+    public int myFiresCount() {
+        return spec.myFires.size();
+    }
+
+    /** Whether My Fires has no room for another fire. */
+    public boolean myFiresFull() {
+        return spec.myFires.size() >= LayerSpec.MY_FIRES_MAX;
+    }
+
+    /** The My Fires entry the burn with these attributes is, or null. */
+    private LayerSpec.MyFire myFireOf(String key, double[] b) {
+        if (key == null || b == null)
+            return null;
+        for (LayerSpec.MyFire f : spec.myFires)
+            if (f.key.equals(key) && FireHistoryStyles.overlap(f.box, b))
+                return f;
+        return null;
+    }
+
+    /** Whether the burn with these attributes is in My Fires. */
+    public boolean isMyFire(AttributeSet a) {
+        return myFireOf(attr(a, ATTR_FIRE), box(attr(a, ATTR_FIRE_BOX))) != null;
+    }
+
+    private static String attr(AttributeSet a, String k) {
+        try {
+            return a != null && a.containsAttribute(k) ? a.getStringAttribute(k) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static double[] box(String s) {
+        if (s == null)
+            return null;
+        final String[] p = s.split(",");
+        if (p.length != 4)
+            return null;
+        try {
+            final double[] b = { Double.parseDouble(p[0]), Double.parseDouble(p[1]), Double.parseDouble(p[2]),
+                    Double.parseDouble(p[3]) };
+            return LayerSpec.lonLatBox(b) ? b : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** Whether a cached burn is one of My Fires. */
+    private boolean inMyFires(Pending pf) {
+        return myFireOf(attr(pf.attrs, ATTR_FIRE), box(attr(pf.attrs, ATTR_FIRE_BOX))) != null;
+    }
+
+    /**
+     * Adds a burn to My Fires; false when the attributes name no burn or the list is full.
+     * What shows does not change: the fire gets its white edge, and the fires around it
+     * stay so the next can be picked (operator, 2026-10-06: adding hid every other fire,
+     * and picking a second meant going back to turn Only My Fires off). The caller saves.
+     * Worker thread.
+     */
+    public boolean addMyFire(AttributeSet a) {
+        final String k = attr(a, ATTR_FIRE);
+        final double[] b = box(attr(a, ATTR_FIRE_BOX));
+        if (k == null || b == null)
+            return false;
+        if (myFireOf(k, b) == null) {
+            if (spec.myFires.size() >= LayerSpec.MY_FIRES_MAX)
+                return false;
+            final String t = attr(a, ATTR_FIRE_TITLE);
+            spec.myFires.add(new LayerSpec.MyFire(k, b, t != null ? t : k));
+        }
+        redraw();
+        return true;
+    }
+
+    /** Takes a burn out of My Fires; with none left, every fire shows again. Worker thread. */
+    public void removeMyFire(AttributeSet a) {
+        final boolean was = myFiresShown();
+        final LayerSpec.MyFire f = myFireOf(attr(a, ATTR_FIRE), box(attr(a, ATTR_FIRE_BOX)));
+        if (f != null)
+            spec.myFires.remove(f);
+        if (spec.myFires.isEmpty())
+            spec.myFiresOnly = false;
+        myFiresChanged(was);
+    }
+
+    /**
+     * Only My Fires on or off, the list kept. Only the switch, at once, on the thread the
+     * tap came in on, so the button answers even while a fetch holds the worker (operator,
+     * 2026-10-06: "I can't click only my fires"). {@link #myFiresChanged} redraws after.
+     */
+    public void setMyFiresOnly(boolean on) {
+        spec.myFiresOnly = on && !spec.myFires.isEmpty();
+    }
+
+    /** Empties My Fires and shows every fire. Worker thread. */
+    public void clearMyFires() {
+        final boolean was = myFiresShown();
+        spec.myFires.clear();
+        spec.myFiresOnly = false;
+        myFiresChanged(was);
+    }
+
+    /**
+     * What was drawn before Only My Fires went on: put back the moment it goes off, so
+     * every fire returns at once while the view is fetched again behind it, not ten
+     * seconds later (2026-10-06).
+     */
+    private List<Pending> viewCache;
+
+    /** Redraws after My Fires changed; {@code was} is whether only My Fires showed before. Worker thread. */
+    public void myFiresChanged(boolean was) {
+        synchronized (lock) {
+            final boolean now = myFiresShown();
+            if (!was && now) {
+                viewCache = cache;
+            } else if (was && !now && viewCache != null) {
+                cache = viewCache;
+                viewCache = null;
+            }
+        }
+        redraw();
+    }
+
+    private void redraw() {
+        synchronized (lock) {
+            if (store != null && !closed) {
+                loadCacheLocked();
+                rewriteStore(true);
+            }
+        }
+    }
+
+    /** The year a My Fires key carries ("RANCH|2007"), 0 when none. */
+    private static int yearOf(String key) {
+        final int bar = key == null ? -1 : key.lastIndexOf('|');
+        if (bar < 0)
+            return 0;
+        try {
+            final int y = Integer.parseInt(key.substring(bar + 1));
+            return y > 1800 && y < 2100 ? y : 0;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /** One fire's extent, a little wider, as a query scope. */
+    private static Esri.Scope boxScope(double[] ib) {
+        final double padX = Math.max(0.01, (ib[2] - ib[0]) * 0.05), padY = Math.max(0.01, (ib[3] - ib[1]) * 0.05);
+        return Esri.Scope.box(ib[1] - padY, ib[0] - padX, ib[3] + padY, ib[2] + padX);
+    }
+
+    /** While set, the scope every fetch uses: one of My Fires' extents. */
+    private volatile Esri.Scope scopeOverride;
+    /** While set, the one year every Fire History fetch asks for: that My Fire's. */
+    private volatile int yearOverride;
+
+    /** When an unnamed fire leaves the map, epoch ms (NewStartsStyles.UNNAMED_KEEP_MS after it was found). */
+    static final String ATTR_DROP_AT = "_drop_at";
 
     private static String packStyle(Style s) {
         try {
@@ -1792,7 +2465,7 @@ public class LoadedLayer {
                 if (f == null)
                     return null;
                 final Style icon = new com.atakmap.map.layer.feature.style.IconPointStyle(0xFFFFFFFF,
-                        "file://" + f.getAbsolutePath(), dim[0] / scale, dim[1] / scale, 0, 0, 0f, true);
+                        "file://" + f.getAbsolutePath(), dim[0] / scale, dim[1] / scale, 0, 0, 0f, false); // level, see NwcgStyles.point
                 return NwcgStyles.withoutLabel(icon);
             } catch (Exception e) {
                 Log.w(TAG, "labelled text \"" + text + "\"", e);
@@ -1837,7 +2510,7 @@ public class LoadedLayer {
             if (f == null)
                 return null;
             final Style icon = new com.atakmap.map.layer.feature.style.IconPointStyle(0xFFFFFFFF,
-                    "file://" + f.getAbsolutePath(), dim[0] / scale, dim[1] / scale, 0, 0, 0f, true);
+                    "file://" + f.getAbsolutePath(), dim[0] / scale, dim[1] / scale, 0, 0, 0f, false); // level, see NwcgStyles.point
             return NwcgStyles.withoutLabel(icon);
         } catch (Exception e) {
             Log.w(TAG, "labelled point \"" + text + "\"", e);
@@ -1865,8 +2538,13 @@ public class LoadedLayer {
     }
 
     private long newSet(FeatureSetDatabase2 db, String name, double minGsd, double maxGsd) throws Exception {
+        return newSet(db, name, minGsd, maxGsd, true);
+    }
+
+    /** A new set, shown or hidden from the start, so no rewrite undoes a switch. */
+    private long newSet(FeatureSetDatabase2 db, String name, double minGsd, double maxGsd, boolean visible) throws Exception {
         final long id = db.insertFeatureSet(new FeatureSet("FeatureLayer", spec.id, name, minGsd, maxGsd));
-        db.setFeatureSetVisible(id, true);
+        db.setFeatureSetVisible(id, visible);
         return id;
     }
 
@@ -1935,7 +2613,7 @@ public class LoadedLayer {
             final FeatureSetCursor c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
             try {
                 while (c.moveToNext())
-                    out.add(new SetInfo(c.getId(), c.getName(), spec.isOn(twinBase(c.getName()))));
+                    out.add(new SetInfo(c.getId(), c.getName(), shows(twinBase(c.getName()))));
             } finally {
                 c.close();
             }
@@ -2108,11 +2786,22 @@ public class LoadedLayer {
         return ids;
     }
 
-    /** Features in the store, each counted once: the named twin of a point is not a second feature. */
+    /** Features shown, each counted once: the named twin of a point is not a second feature. */
     private int countFeatures() {
+        return countFeatures(true);
+    }
+
+    /** Features kept in the store, shown or hidden: what the phone has without a network. */
+    private int storedFeatures() {
+        return countFeatures(false);
+    }
+
+    private int countFeatures(boolean shownOnly) {
         try {
             int n = 0;
             for (SetInfo si : setsLocked()) {
+                if (shownOnly && !si.visible)
+                    continue;
                 final FeatureDataStore2.FeatureQueryParameters p = new FeatureDataStore2.FeatureQueryParameters();
                 p.featureSetFilter = new FeatureDataStore2.FeatureSetQueryParameters();
                 p.featureSetFilter.ids = java.util.Collections.singleton(si.id);

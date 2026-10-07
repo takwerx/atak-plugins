@@ -118,7 +118,10 @@ final class DartMarkers {
     /** A line in the layer's diagnostic file, for what cannot be seen from the Mac (no logcat on the XCover). */
     private void diag(String line) {
         try {
-            final File f = new File(iconDir.getParentFile(), "dartdiag-" + layerId + ".txt");
+            // On the card beside the start log, where adb can read it; the icons it sits
+            // next to moved to ATAK's private storage.
+            final File f = new File(com.atakmap.coremap.filesystem.FileSystemUtils.getItem("tools/featurelayer"),
+                    "dartdiag-" + layerId + ".txt");
             if (f.length() > 200_000)
                 //noinspection ResultOfMethodCallIgnored
                 f.delete();
