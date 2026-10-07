@@ -922,6 +922,54 @@ push and `gh release create` when the check fails. When a version is skipped
 or folded into the next one, re-stamp the block in the same commit that bumps
 `PLUGIN_VERSION`.
 
+## Downloaded data survives a restart with no network
+
+Once a plugin has downloaded something a crew uses in the field, it comes back
+after ATAK or the phone restarts **with no network**, whether its layer was on
+or off. The operator's words (2026-10-06), on finding Feature Layer deleted a
+switched-off layer and kept it only in memory: *"layers once synced need to
+come back on if phone is restarted and have no internet ... I can't believe I
+did not make that a requirement."* Field phones lose signal, and ATAK restarts
+on its own under low memory.
+
+Decide per kind of data, and write the decision in the PLAN:
+
+- **Keep** reference and incident data: perimeters, zones, fire history,
+  obstacles, infrastructure, sites and frequencies, map packages, camera
+  locations, closures and road work, heat detections, alerts and TFRs. A
+  time-limited item past its end is shown as expired, never silently as current.
+- **Do not keep** what is live by nature and misleading when old: video, stills,
+  traffic-flow tiles, crash reports. Atmosphere decides its own.
+
+How:
+
+- **On/off and filters hide, never delete.** With a feature store: write every
+  fetched feature, hide with `setFeatureSetVisible` on a `visibleOnly`
+  `FeatureLayer3` (which also drops a hidden set's labels), and create new sets
+  with the current visibility. Feature Layer `9932483` is the reference.
+- **The pane comes back too.** The list, counts, details on tap and the time of
+  the last good fetch are rebuilt from disk. A map that draws while the pane says
+  "0", or a tap that says "expired", is the gap, not a fix.
+- **A failed fetch never empties anything; a partial one merges** with what is held.
+- **Say it in words** on the status line: `No network, showing what this phone
+  saved 2 h ago.`, never the host error.
+- **Files go in `FileSystemUtils.getItem("tools/<plugin>")`**, written to a temp
+  file and renamed, never in Android's cache dir, which the system clears.
+
+**It is not only downloads.** Anything the operator set up on the map, a
+launch point, a drawn area, a mode, a typed number, comes back too and repaints
+at start (UAS Flight Plan lost its launch point at every reload, 2026-10-06:
+*"i thought we had a new rule about this sort of data survives restarts"*).
+Stopping takes things off the map and forgets nothing; only the user's own
+Clear forgets.
+
+Test it on a device before the ship prompt: switch the layer off,
+`adb shell svc wifi disable` (adb over USB keeps working), restart ATAK, switch
+it on, then `svc wifi enable`. Test a reinstall as well as a kill: a force-stop
+never runs the plugin's `onStop`, an install or upgrade does, and UAS Flight
+Plan passed the kill while every reinstall lost the plan. Where every plugin stood on 2026-10-06, with the
+fix for each: `../atak-plugins-notes/docs/AUDIT-2026-10-06-offline-after-restart.md`.
+
 ## Anything that keeps running after the tap
 
 ATAK runs one tool at a time and ends the active tool whenever another starts,

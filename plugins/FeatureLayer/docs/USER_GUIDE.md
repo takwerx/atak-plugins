@@ -1,10 +1,10 @@
 # Feature Layer — User Guide
 
-**Download Feature Layer 0.10** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -17,8 +17,8 @@ your own NIFC ArcGIS login; the other built-in sources are public.
 Feature Layer puts live ArcGIS feature layers on the ATAK map the way a GIS
 analyst sees them: every point, line and area stays a feature you can tap for its
 attributes, drawn with the symbols its community uses. Layers you add stay on the
-phone, draw from the cache the moment ATAK starts, and refresh on their own when
-there is signal.
+phone, on or off, draw from the cache the moment ATAK starts, and refresh on their
+own when there is signal. With no network they still come back after a restart.
 
 ## Opening it
 
@@ -27,6 +27,11 @@ there is signal.
 Open it from the ATAK toolbar: the globe with the layer stack. Tapping it again
 closes the pane.
 
+The pane opens on one row of buttons and your layers under it: **Add Layer**,
+**Find** and **All ON / All OFF**. **Add Layer** opens a page of sources; **Back**,
+or adding a layer, returns to the list. **Find** searches every loaded layer at
+once, whatever source it came from.
+
 ## Pick a source
 
 ![Pick a source](screenshots/2_pick_a_source.png)
@@ -34,6 +39,11 @@ closes the pane.
 - **NIFC** is the live National Incident Feature Service. It needs your own NIFC
   ArcGIS login.
 - **SARCOP Training** is NAPSG's public search-and-rescue sandbox.
+- **New Fire Starts** is new wildfires and prescribed fires across the country,
+  the last 24 hours, public.
+- **Ongoing Fires** is every fire not yet contained, from the day after it was
+  found, public.
+- **Fire History** is where fires have burned since 1900, public.
 - **CA Air Intel** is statewide California fire perimeters, public.
 - **NIFS Archive (demo)** is last year's Dragon Bravo fire, public, for trying the
   symbology without a login.
@@ -42,9 +52,9 @@ closes the pane.
 
 ## Signing in
 
-![The main pane with NIFC picked](screenshots/3_main_pane_signed_in.png)
+![Add a layer with NIFC picked and signed in](screenshots/3_main_pane_signed_in.png)
 
-With NIFC picked, tap **Sign in**. The organization's own login page opens inside
+In **Add Layer**, with NIFC picked, tap **Sign in**. The organization's own login page opens inside
 the pane, with multi-factor sign-in if the org uses it. The plugin never sees your
 password.
 
@@ -65,19 +75,31 @@ latest fires. Pick one from the list and it loads: event points, event lines, th
 perimeter lines and polygons, IR points and polygons, accountable property and
 label points.
 
-SARCOP Training works the same way with **Find incident**. CA Air Intel needs no
-search: **Add perimeters**.
+SARCOP Training works the same way with **Find incident**. CA Air Intel and New
+Fire Starts need no search: **Add perimeters**, **Add new starts**.
 
 ## Layers
 
-![Two layer rows](screenshots/7_layer_rows.png)
+![The main screen: Add Layer, Find, All ON, and the layers one line each](screenshots/7_main_screen.png)
 
-Each layer has a row: **ON/OFF**, **Features**, **Go to**, then **Auto** (how often
-it refreshes), **Refresh** and **Remove**. The line under the name says how many
-features it holds, when it last refreshed, and the refresh interval.
+Each layer is one line: its name and **ON** or **OFF**. Tap it to turn the layer
+on or off. The arrow at the right opens its controls: a line saying how many
+features it holds, when it last refreshed and the refresh interval, then
+**Features**, **Go to**, **Auto** (how often it refreshes), **Refresh** and
+**Remove**. The arrow works while a layer is off, and each row stays open or
+closed the way you left it.
 
-**All ON / All OFF** beside the heading works every layer at once. The row says
-**Loading…** while a layer fetches. **Go to** frames the whole incident.
+**No network.** Everything a layer has downloaded stays on the phone whether the
+layer is on or off, and comes back after ATAK or the phone restarts. With no signal
+the row says *no network, showing what this phone saved*. What you see is what was
+last downloaded: a layer that loads what is in view has the area you last looked at.
+
+![No network: the row says what is shown](screenshots/67_no_network.png)
+
+**All ON / All OFF** beside the heading works every layer at once. A row says
+**Loading…** while its layer fetches. **Go to** frames the whole incident; layers
+spread across a state or the country (DART, FireGuard, New Fire Starts, CA Air
+Intel) have no Go to.
 
 ## On the map
 
@@ -131,14 +153,15 @@ limit nothing in the layer draws; zoom in and it all comes back.
 
 ![Blank Find lists the types](screenshots/15_find_types.png)
 
-**Feature** on the main pane, or **Find** inside a layer's Features, opens a search
-inside that layer. With nothing typed, **Find** lists every kind of thing the
+**Find** on the main screen searches every loaded layer at once; **Find** inside a
+layer's Features searches only that layer. With nothing typed, **Find** lists every kind of thing the
 layer holds with a count. Tap one to list its features.
 
 ![Search results](screenshots/16_search_results.png)
 
 Type a name, a number or a type for a free search across names and every
-attribute. Each row shows what it is, when it was collected, and how far away, in
+attribute. Features named for what you typed come first; under them, features that
+only mention it in another field, each saying which field and what it says. Each row shows what it is, when it was collected, and how far away, in
 your ATAK units, with **tap to go there**. **From: Me** or **From: Map center**
 says where distances are measured from, and the list follows it: pan the map on
 **Map center**, or walk on **Me**, and the distances keep up.
@@ -184,7 +207,7 @@ minute, and both sit at the top of the layer list whatever else is loaded.
 
 ![The Vehicles row](screenshots/07b_layer_row_dart.png)
 
-A DART row carries the usual controls plus a scope: what the layer fetches.
+A DART row's controls also carry a scope: what the layer fetches.
 
 ### On the map
 
@@ -348,6 +371,145 @@ all time. Widening the window adds fires, not copies.
 
 Active perimeters draw in orange with a dark red edge, named at the center.
 Inactive ones are not fetched.
+
+## New Fire Starts
+
+New wildfires and prescribed fires across the country, from the moment a dispatch
+center enters them: NIFC's own "New Starts" view. A start stays until it is
+contained, controlled or out, or for 24 hours after it was found. Public, no
+login. **Add new starts** puts it in the list.
+
+![A new start on the map: name and acres](screenshots/51_new_starts_map.png)
+
+Each start is a marker the size of a DART one: a red flame for a wildfire, a green
+**RX** for a prescribed fire. A flame drawn in outline is a wildfire reported with
+no size and nothing added since. The arrow on the layer's row opens a map key with
+all three. Names and acres show from five miles in.
+
+![The New Fire Starts row: status, map key, Features](screenshots/52_new_starts_row.png)
+
+Its Features list has three types, each **ON/OFF**: **Wildfire**, **Wildfire, No
+Size Yet** and **Prescribed Fire**. Turn off Prescribed Fire to see only
+wildfires. Wildfire, No Size Yet holds starts that came in from a dispatch center
+and were never updated: some centers enter every fire call this way, with a
+dispatch number for a name, and never touch it again. Turn it off to see only the
+fires someone has sized.
+
+![Its Features list: time window, zoom gate, labels, the three types](screenshots/53_new_starts_features.png)
+
+A fire with only a number for a name, such as LAC-357251, leaves the map an hour
+after it was found unless someone has named it by then. Some dispatch centers file
+every brush-fire call this way and never come back to it; LA County's filed most of
+the 62 such fires listed one October evening. The row's status line says how many
+were left out.
+
+**Where** is **Everywhere** at first: every start in the country is loaded, so
+**Find** reaches a fire wherever the map is. Slide it to load only the starts within
+a distance of My Location or the map center. **Time window** picks the last hour, 3, 6, 12 or 24 hours.
+
+![The time window](screenshots/54_time_window.png)
+ The
+**Zoom gate** is off at first, so starts draw at every zoom. The layer refreshes
+every 5 minutes, as often as NIFC's view does.
+
+**Find** in its Features lists the starts by type, nearest first, from you or
+from the map center.
+
+## Ongoing Fires
+
+Every wildfire and prescribed fire NIFC lists as not yet contained, controlled or
+out: about 400 across the country in early October. It starts where New Fire
+Starts ends, a day after a fire was found, so with both on each fire shows once:
+today's starts in New Fire Starts, everything older here. Public, no login. **Add
+ongoing fires** puts it in the list.
+
+The markers, the three types and **Where** work as in New Fire Starts. Labels add
+how much is contained: "DOME · 6,760 ac · 40%". A fire stays listed until someone
+declares it contained, so a fire at 100% can still be on the map. NIFC drops a fire
+under 10 acres after 3 days with no update, under 100 acres after 8, and a larger
+one after 14.
+
+![An ongoing fire on the map](screenshots/55_ongoing_fires_map.png)
+
+Tap a fire on the map, from either layer, and its details open straight away, with
+no radial menu.
+
+![A fire's details: CAL FIRE's record first](screenshots/56_fire_details.png)
+
+**CAL FIRE** sits beside **Go there** in a fire's details when CAL FIRE runs or
+posts the fire; it opens CAL FIRE's incident page, with the engines, crews and
+dozers assigned. CAL FIRE's own acres, containment, location and update time are
+the first lines of the details, and a fire CAL FIRE has closed says "final".
+
+**InciWeb** sits beside **Go there** in a fire's details when the fire has an
+InciWeb page, most often a Forest Service or other federal fire; it opens the page
+in the phone's browser. The plugin learns which fires have a page from InciWeb's
+own feed, read every 30 minutes.
+
+## Fire History
+
+Where fires have burned, from 1900 to today, from NIFC's interagency fire
+perimeter history: about 140,000 burns. It is drawn the way the Enterprise
+Geospatial Portal (EGP) draws it. Burns from the last ten years are colored by how
+long ago they burned: purple under six months, blue six months to a year, green one
+to two years, yellow two to three, orange three to ten. Earlier burns are one type
+per decade: the 2010s rust, the 2000s dark brown, the 1990s tan, the 1980s teal, and
+1979 and earlier grey. (EGP greys every decade; a 20-year-old burn scar still
+matters, so here the decades back to 1980 keep a color.) **Add fire history** puts it in the list.
+
+![The Fire History map key](screenshots/58_fire_history_key.png)
+
+Each band and each decade is its own type in the Features list, each ON/OFF, so
+the 1990s can be shown alone, or only the last three years. The arrow on its row
+opens a map key with the colors. A burn over 20 acres is labeled with its name and
+year, "Carr Fire (2018)", from 2 miles on the scale bar in (Label zoom changes it); tap one and its details open, with its acres, agency and
+the rest. Where
+several agencies mapped one fire, it shows once.
+
+![Its Features list: each band and decade, ON/OFF and fill](screenshots/58b_fire_history_features.png)
+
+![A burn's details](screenshots/59_burn_details.png)
+
+It loads what is in view, up to about 155 miles across, with the shapes simplified
+to the zoom; zoom in and they load again in finer detail.
+
+**Find** on the main screen searches all of Fire History by name, not only what is
+in view. Add a year to pick one fire out of many with the same name: "Ranch 2007".
+**Go** takes the map to it, close enough to read its name.
+
+![Find in Fire History: "Cedar 2003"](screenshots/60_find_fire_history.png)
+
+### My Fires
+
+Pick out the burns that matter to the incident you are working, then show only
+those:
+
+1. Open a burn's details: tap it on the map, or find it with **Find**.
+2. Tap **Add to My Fires**. The burn gets a white edge, and every other fire stays
+   on the map so you can pick the next.
+3. Add the rest the same way. **Remove from My Fires**, in a burn's details, takes
+   one off.
+
+![A burn in My Fires: its white edge](screenshots/64_fire_history_map.png)
+
+![Its details: Remove from My Fires, and Only My Fires](screenshots/61_burn_in_my_fires.png)
+
+4. Tap **Only My Fires OFF (3)**, under Add in the details or under the arrow on
+   the row. It turns green, ON, and Fire History shows only your fires, wherever
+   you pan and whichever decades are ticked. The row reads "Fire History: My Fires
+   (3)". Tap it again to see every fire; your list is kept.
+
+![Only My Fires ON](screenshots/62_only_my_fires_on.png)
+
+![Only your fires on the map](screenshots/66_only_my_fires_map.png)
+
+![The row with My Fires](screenshots/63_my_fires_row.png)
+
+**Clear My Fires**, under the arrow on the row, empties the list when the incident
+is over. The map key ends with a **My Fires** line for the white edge. The list is
+kept when ATAK restarts.
+
+![Clear My Fires asks first](screenshots/65_clear_my_fires.png)
 
 ## Your own organization
 

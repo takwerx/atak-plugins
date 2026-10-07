@@ -484,9 +484,15 @@ public final class NwcgStyles {
         return point(iconUri, 1.0f);
     }
 
-    /** The icon at a fraction of its own size, for symbols a standard draws small. */
+    /**
+     * The icon at a fraction of its own size, for symbols a standard draws small.
+     * Level when the map is spun, the way ATAK's own markers stand: the last argument is
+     * absolute rotation, and {@code true} turned every symbol with the map, so a pill's
+     * text read sideways at 90 degrees and upside down at 180. Every icon this plugin
+     * draws is level; none of them is a bearing.
+     */
     public static Style point(String iconUri, float scale) {
-        return new IconPointStyle(WHITE, iconUri, scale, 0, 0, 0f, true);
+        return new IconPointStyle(WHITE, iconUri, scale, 0, 0, 0f, false);
     }
 
     /**
