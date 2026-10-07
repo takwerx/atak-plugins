@@ -82,8 +82,8 @@
     <string name="section_request">Ceiling to request</string>
     <string name="section_ceiling_area">Ceiling to ask for</string>
     <string name="section_mode">Ceiling</string>
-    <string name="mode_given">Air Attack gave me one</string>
-    <string name="mode_plan">I need to ask for one</string>
+    <string name="mode_given">Given a ceiling</string>
+    <string name="mode_plan">Need a ceiling</string>
     <string name="given_value">Ceiling from Air Attack: %1$s</string>
     <string name="given_none">Tap to type the ceiling Air Attack gave you</string>
     <string name="given_prompt">Ceiling from Air Attack, %1$s MSL</string>
