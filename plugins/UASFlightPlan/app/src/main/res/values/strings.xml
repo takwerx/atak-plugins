@@ -80,10 +80,21 @@
     <!-- Settings rows -->
     <string name="ceiling">Ceiling</string>
     <string name="section_request">Ceiling to request</string>
-    <string name="section_ceiling_area">Ceiling for this area</string>
+    <string name="section_ceiling_area">Ceiling to ask for</string>
+    <string name="section_mode">Ceiling</string>
+    <string name="mode_given">Air Attack gave me one</string>
+    <string name="mode_plan">I need to ask for one</string>
+    <string name="given_value">Ceiling from Air Attack: %1$s</string>
+    <string name="given_none">Tap to type the ceiling Air Attack gave you</string>
+    <string name="given_prompt">Ceiling from Air Attack, %1$s MSL</string>
+    <string name="section_given_area">What that ceiling does to this area</string>
+    <string name="given_highest">Highest ground in the area: %1$s</string>
+    <string name="given_clear">Lowest clearance over the area: %1$s</string>
+    <string name="given_short">The ceiling is UNDER the highest ground by %1$s: the red islands cannot be flown over.</string>
+    <string name="given_no_ceiling">Type the ceiling Air Attack gave you to see what it does to this area.</string>
     <string name="req_highest_line">Highest ground in the area: %1$s</string>
     <string name="req_flight_line">Fly above the terrain: + %1$s</string>
-    <string name="req_my_ceiling">Your ceiling: %1$s (rounded up to the next %2$s)</string>
+    <string name="req_my_ceiling">Ask Air Attack for %1$s (rounded up to the next %2$s)</string>
     <string name="req_sep_line">Separation: + %1$s</string>
     <string name="req_ask">Ask Air Attack for a floor of %1$s</string>
     <string name="req_granted">Floor from Air Attack: %1$s (you asked for %2$s)</string>

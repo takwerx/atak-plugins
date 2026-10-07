@@ -50,10 +50,49 @@
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <!-- The ceiling for this area, added up from what the plugin knows and what the
-         pilot set: the highest ground in the area, how high above the terrain the
-         aircraft flies, the separation. One number; the map is painted against it.
-         A ceiling Air Attack handed back instead is typed under Settings. -->
+    <!-- Two ways to get a ceiling, and the pilot picks which one they are in:
+         Air Attack gave one (type it, see what it does to the area), or they are
+         planning and need one to ask for (the highest ground plus the height they
+         fly above it). The map is painted against whichever is in force. -->
+    <TextView
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="10dp"
+        android:text="@string/section_mode" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_mode_given"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="@string/mode_given" />
+
+        <Button
+            android:id="@+id/btn_mode_plan"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="@string/mode_plan" />
+    </LinearLayout>
+
+    <!-- In "Air Attack gave me a ceiling": the typed ceiling, one button. -->
+    <Button
+        android:id="@+id/btn_given_value"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/request_heading"
         style="@style/TakwerxSectionHeading"

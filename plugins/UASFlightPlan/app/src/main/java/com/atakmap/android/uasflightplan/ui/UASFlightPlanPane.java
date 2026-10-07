@@ -55,6 +55,10 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     static final double DEFAULT_RADIUS_M = 1609.344d;
 
     private static final String PREF_FLIGHT_AGL_FT = "uasflightplan.flightAglFt";
+    /** Which of the two ways the pilot is in: true when Air Attack gave the ceiling. */
+    private static final String PREF_MODE_GIVEN = "uasflightplan.modeGiven";
+    /** The ceiling Air Attack gave, feet MSL. */
+    private static final String PREF_GIVEN_FT = "uasflightplan.givenFt";
     /** What the operator's unit usually flies; Part 107's limit is the last preset. */
     private static final double DEFAULT_FLIGHT_AGL_FT = 200d;
     private static final double[] FLIGHT_PRESETS_FT = { 100d, 200d, 300d, 400d };
@@ -93,6 +97,9 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     private final TextView ceilingLine;
     private final Fold flightFold;
     private final LinearLayout flightTiles;
+    private final Button btnModeGiven;
+    private final Button btnModePlan;
+    private final Button btnGivenValue;
     private final TextView requestHeading;
     private final TextView requestLines;
     private final TextView requestTotal;
@@ -182,6 +189,31 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         btnLaunch = header.findViewById(R.id.btn_launch);
         ground = header.findViewById(R.id.ground);
         ceilingLine = header.findViewById(R.id.ceiling);
+        btnModeGiven = header.findViewById(R.id.btn_mode_given);
+        btnModePlan = header.findViewById(R.id.btn_mode_plan);
+        btnGivenValue = header.findViewById(R.id.btn_given_value);
+        btnModeGiven.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                prefs.edit().putBoolean(PREF_MODE_GIVEN, true).apply();
+                applyCeiling();
+                if (givenFt() == null)
+                    typeGiven();
+            }
+        });
+        btnModePlan.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                prefs.edit().putBoolean(PREF_MODE_GIVEN, false).apply();
+                applyCeiling();
+            }
+        });
+        btnGivenValue.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                typeGiven();
+            }
+        });
         requestHeading = header.findViewById(R.id.request_heading);
         requestLines = header.findViewById(R.id.request_lines);
         requestTotal = header.findViewById(R.id.request_total);
@@ -615,13 +647,23 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
     /* ----- the ceiling ----- */
 
+    /** True when the pilot is working to a ceiling Air Attack gave them. */
+    private boolean modeGiven() {
+        return prefs.getBoolean(PREF_MODE_GIVEN, false);
+    }
+
+    /** The ceiling Air Attack gave, feet MSL, or null when none was typed. */
+    private Double givenFt() {
+        final float v = prefs.getFloat(PREF_GIVEN_FT, Float.NaN);
+        return Float.isNaN(v) ? null : (double) v;
+    }
+
     /**
-     * The ceiling for the area, feet MSL: the highest ground in it plus the height
-     * the aircraft flies above the terrain, rounded up to the next hundred. The
-     * map is painted against it and it is what the pilot tells Air Attack. Null
-     * before the terrain is in.
+     * The ceiling to ask for when planning, feet MSL: the highest ground in the
+     * area plus the height the aircraft flies above the terrain, rounded up to the
+     * next hundred. Null before the terrain is in.
      */
-    private Double ceilingFt() {
+    private Double plannedFt() {
         final TerrainGrid g = overlay.getGrid();
         if (g == null)
             return null;
@@ -630,6 +672,14 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             return null;
         final double raw = Units.metersToFeet(hi) + flightAglFt();
         return Math.ceil(raw / REQUEST_STEP_FT) * REQUEST_STEP_FT;
+    }
+
+    /**
+     * The ceiling the map is painted against, feet MSL: what Air Attack gave in
+     * that mode, the planned one otherwise. Null when there is none yet.
+     */
+    private Double ceilingFt() {
+        return modeGiven() ? givenFt() : plannedFt();
     }
 
     private Double ceilingM() {
@@ -645,6 +695,18 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             obstacles.setCeiling(ft);
         }
         syncAll();
+    }
+
+    private void typeGiven() {
+        final Double c = givenFt();
+        typeFeet(R.string.given_prompt, c == null ? 0d : c, new FeetSink() {
+            @Override
+            public void accept(double ft) {
+                prefs.edit().putFloat(PREF_GIVEN_FT, (float) ft)
+                        .putBoolean(PREF_MODE_GIVEN, true).apply();
+                applyCeiling();
+            }
+        });
     }
 
     /* ----- height above terrain ----- */
@@ -710,10 +772,48 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         }
     }
 
-    /** The ceiling block on the main screen, or nothing before the terrain is in. */
+    /** The ceiling block on the main screen, for whichever mode the pilot is in. */
     private void syncRequest() {
+        final boolean given = modeGiven();
+        final int on = pluginContext.getResources().getColor(R.color.state_on);
+        btnModeGiven.setTextColor(given ? on : 0xFFFFFFFF);
+        btnModePlan.setTextColor(given ? 0xFFFFFFFF : on);
+        btnGivenValue.setVisibility(given ? View.VISIBLE : View.GONE);
+
         final TerrainGrid g = overlay.getGrid();
-        final Double c = ceilingFt();
+        final double ground = overlay.getGroundMslM();
+        if (given) {
+            final Double c = givenFt();
+            btnGivenValue.setText(c == null
+                    ? pluginContext.getString(R.string.given_none)
+                    : pluginContext.getString(R.string.given_value,
+                            Units.altitudeMsl(Units.feetToMeters(c))));
+            final boolean show = g != null && c != null;
+            requestHeading.setVisibility(show ? View.VISIBLE : View.GONE);
+            requestLines.setVisibility(show ? View.VISIBLE : View.GONE);
+            requestTotal.setVisibility(View.GONE);
+            ceilingLine.setVisibility(show ? View.VISIBLE : View.GONE);
+            if (!show)
+                return;
+            requestHeading.setText(R.string.section_given_area);
+            final double hiFt = Units.metersToFeet(g.highestMsl());
+            final double clear = c - hiFt;
+            requestLines.setText(pluginContext.getString(R.string.given_highest,
+                    Units.altitudeMsl(g.highestMsl()))
+                    + "\n" + (clear >= 0
+                            ? pluginContext.getString(R.string.given_clear,
+                                    Units.height(Units.feetToMeters(clear)))
+                            : pluginContext.getString(R.string.given_short,
+                                    Units.height(Units.feetToMeters(-clear)))));
+            if (!Double.isNaN(ground))
+                ceilingLine.setText(pluginContext.getString(R.string.above_launch_line,
+                        Units.height(Units.feetToMeters(c) - ground)));
+            else
+                ceilingLine.setVisibility(View.GONE);
+            return;
+        }
+
+        final Double c = plannedFt();
         final boolean show = g != null && c != null;
         requestHeading.setVisibility(show ? View.VISIBLE : View.GONE);
         requestLines.setVisibility(show ? View.VISIBLE : View.GONE);
@@ -721,6 +821,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         ceilingLine.setVisibility(show ? View.VISIBLE : View.GONE);
         if (!show)
             return;
+        requestHeading.setText(R.string.section_ceiling_area);
         requestLines.setText(pluginContext.getString(R.string.req_highest_line,
                 Units.altitudeMsl(g.highestMsl()))
                 + "\n" + pluginContext.getString(R.string.req_flight_line,
@@ -728,7 +829,6 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         requestTotal.setText(pluginContext.getString(R.string.req_my_ceiling,
                 Units.altitudeMsl(Units.feetToMeters(c)),
                 Units.height(Units.feetToMeters(REQUEST_STEP_FT))));
-        final double ground = overlay.getGroundMslM();
         if (!Double.isNaN(ground))
             ceilingLine.setText(pluginContext.getString(R.string.above_launch_line,
                     Units.height(Units.feetToMeters(c) - ground)));
