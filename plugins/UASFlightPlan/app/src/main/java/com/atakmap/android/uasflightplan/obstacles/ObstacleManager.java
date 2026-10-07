@@ -209,6 +209,11 @@ public final class ObstacleManager {
         notifyChanged();
     }
 
+    /** The obstacle a drawn feature stands for, or null. Main thread. */
+    public Obstacle obstacleFor(long featureId) {
+        return overlay.obstacleFor(featureId);
+    }
+
     /** Pans the map to an obstacle. */
     public void panTo(Obstacle o) {
         mapView.getMapController().panTo(new GeoPoint(o.lat, o.lon), true);

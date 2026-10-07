@@ -68,6 +68,8 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     private final ObstacleAdapter adapter;
     private final TextView listHeading;
     private final Fold obstaclesFold;
+    private final View detailsPage;
+    private Obstacle showing;
 
     private final TextView status;
     private final ListView list;
@@ -185,6 +187,20 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                 showSettings(false);
             }
         });
+        detailsPage = root.findViewById(R.id.details_page);
+        root.findViewById(R.id.btn_details_back).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showMain();
+            }
+        });
+        root.findViewById(R.id.btn_details_zoom).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (showing != null)
+                    obstacles.panTo(showing);
+            }
+        });
 
         obstaclesFold = new Fold(settings, R.id.fold_obstacles_head, R.id.fold_obstacles_chev,
                 R.id.fold_obstacles_body, PREF_FOLD + "obstacles", false);
@@ -254,8 +270,76 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                 d.append(", ").append(o.city);
             ((TextView) row.findViewById(R.id.detail)).setText(d.toString());
             ((TextView) row.findViewById(R.id.distance)).setText(Units.distance(o.distanceM));
+            // A row holding a Button swallows the list's own item click, so the row
+            // and the button each get their own: the row goes there, Details opens it.
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    obstacles.panTo(o);
+                }
+            });
+            row.findViewById(R.id.btn_row_details).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showDetails(o);
+                }
+            });
             return row;
         }
+    }
+
+    /**
+     * One obstacle's page: the one way in, from the list's Details button and from a
+     * tap on the map alike. Every field in words, nothing a pilot has to decode.
+     */
+    public void showDetails(Obstacle o) {
+        if (o == null)
+            return;
+        showing = o;
+        ((TextView) root.findViewById(R.id.details_title)).setText(String.format(Locale.US,
+                "%s, %s AGL", o.kind(), Units.height(Units.feetToMeters(o.aglFt))));
+        ((TextView) root.findViewById(R.id.details_subtitle)).setText(
+                pluginContext.getString(R.string.details_source));
+        final StringBuilder sb = new StringBuilder();
+        sb.append(pluginContext.getString(R.string.d_height,
+                Units.height(Units.feetToMeters(o.aglFt)))).append('\n');
+        if (!Double.isNaN(o.amslFt))
+            sb.append(pluginContext.getString(R.string.d_top,
+                    Units.altitudeMsl(Units.feetToMeters(o.amslFt)))).append('\n');
+        final Double cft = ceilingFt();
+        if (cft == null || Double.isNaN(o.amslFt)) {
+            sb.append(pluginContext.getString(R.string.d_no_ceiling)).append('\n');
+        } else {
+            final double gapM = Units.feetToMeters(Math.abs(cft - o.amslFt));
+            sb.append(pluginContext.getString(
+                    o.aboveCeiling(cft) ? R.string.d_above : R.string.d_under,
+                    Units.altitudeMsl(Units.feetToMeters(cft)), Units.height(gapM)))
+                    .append('\n');
+        }
+        sb.append('\n');
+        sb.append(pluginContext.getString(R.string.d_lighting, o.lightingWords())).append('\n');
+        sb.append(pluginContext.getString(R.string.d_verified, pluginContext.getString(
+                o.isVerified() ? R.string.yes : R.string.no))).append('\n');
+        if (o.quantity > 1)
+            sb.append(pluginContext.getString(R.string.d_quantity, o.quantity)).append('\n');
+        if (!o.city.isEmpty())
+            sb.append(pluginContext.getString(R.string.d_city,
+                    o.city + (o.state.isEmpty() ? "" : ", " + o.state))).append('\n');
+        sb.append(pluginContext.getString(R.string.d_distance, Units.distance(o.distanceM)))
+                .append('\n');
+        if (!o.oas.isEmpty())
+            sb.append(pluginContext.getString(R.string.d_faa, o.oas)).append('\n');
+        ((TextView) root.findViewById(R.id.details_fields)).setText(sb.toString().trim());
+        settingsPage.setVisibility(View.GONE);
+        list.setVisibility(View.GONE);
+        detailsPage.setVisibility(View.VISIBLE);
+    }
+
+    /** The main screen back: list visible, every other page gone. */
+    private void showMain() {
+        detailsPage.setVisibility(View.GONE);
+        settingsPage.setVisibility(View.GONE);
+        list.setVisibility(View.VISIBLE);
     }
 
     /* ----- wiring ----- */
@@ -737,6 +821,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
     /** The settings page in place of the list, or the list back. */
     private void showSettings(boolean open) {
+        detailsPage.setVisibility(View.GONE);
         settingsPage.setVisibility(open ? View.VISIBLE : View.GONE);
         list.setVisibility(open ? View.GONE : View.VISIBLE);
     }
@@ -754,7 +839,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
     /** The pane was shown. It opens on the main screen every time. */
     public void onPaneShown() {
-        showSettings(false);
+        showMain();
         syncAll();
     }
 

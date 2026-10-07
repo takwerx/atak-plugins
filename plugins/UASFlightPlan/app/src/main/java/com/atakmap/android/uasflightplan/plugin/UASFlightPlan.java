@@ -68,6 +68,47 @@ public class UASFlightPlan implements IPlugin {
         }
     };
 
+    /**
+     * A tap on one of our obstacles opens its page in the pane, not ATAK's built-in
+     * feature metadata screen. ATAK asks these listeners before it opens a radial,
+     * and one that answers true stops it; items that are not ours keep theirs. A
+     * moment later, not now: a pick from ATAK's Select Item list closes the list
+     * and then posts its own "show details", which closed a page opened at once
+     * (Atmosphere, 2026-10-05).
+     */
+    private final com.atakmap.android.menu.MapMenuEventListener tapOpensPage =
+            new com.atakmap.android.menu.MapMenuEventListener() {
+                @Override
+                public boolean onShowMenu(final com.atakmap.android.maps.MapItem item) {
+                    if (item == null || !item.getMetaBoolean("uasflightplan", false))
+                        return false;
+                    final MapView mv = MapView.getMapView();
+                    if (mv == null || obstacles == null)
+                        return false;
+                    final com.atakmap.android.uasflightplan.obstacles.Obstacle o =
+                            obstacles.obstacleFor(item.getMetaLong("featureid", -1L));
+                    if (o == null)
+                        return false;
+                    mv.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                showPane();
+                                if (pane != null)
+                                    pane.showDetails(o);
+                            } catch (RuntimeException e) {
+                                Log.w(TAG, "tap to page", e);
+                            }
+                        }
+                    }, 250);
+                    return true;
+                }
+
+                @Override
+                public void onHideMenu(com.atakmap.android.maps.MapItem item) {
+                }
+            };
+
     IServiceController serviceController;
     Context pluginContext;
     IHostUIService uiService;
@@ -119,6 +160,10 @@ public class UASFlightPlan implements IPlugin {
             overlay.start();
             obstacles = new ObstacleManager(mapView, pluginContext);
             obstacles.start();
+            final com.atakmap.android.menu.MapMenuReceiver menus =
+                    com.atakmap.android.menu.MapMenuReceiver.getInstance();
+            if (menus != null)
+                menus.addEventListener(tapOpensPage);
         } else {
             // Without a map there is nothing to draw on. The toolbar button still
             // appears and says so when tapped, rather than failing silently.
@@ -152,6 +197,10 @@ public class UASFlightPlan implements IPlugin {
         }
         // Nothing may stay behind: a reload that left the layer or the GL SPI
         // registered would paint with classes from the previous build.
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.removeEventListener(tapOpensPage);
         if (obstacles != null) {
             obstacles.stop();
             obstacles = null;

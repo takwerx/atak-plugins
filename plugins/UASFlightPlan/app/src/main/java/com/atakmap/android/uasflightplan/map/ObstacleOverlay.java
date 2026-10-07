@@ -60,8 +60,15 @@ public final class ObstacleOverlay {
     /** Top under the ceiling. */
     public static final int BELOW_ARGB = 0xFFFFA000;
 
-    /** The most drawn per circle: two features each, and a rewrite has to stay quick. */
-    public static final int MAX_DRAWN = 1500;
+    /** The most drawn per circle: three features each, and a rewrite has to stay quick. */
+    public static final int MAX_DRAWN = 1000;
+
+    /**
+     * The tower icon's half height on screen, in device pixels: the 48 px glyph
+     * draws at about its own size. The label pill keeps this much plus a little
+     * clear above the point so it never covers the icon.
+     */
+    private static final int ICON_HALF_PX = 24;
 
     private final MapView mapView;
     private final Context pluginContext;
@@ -104,6 +111,25 @@ public final class ObstacleOverlay {
                         protected MapItem featureToMapItem(Feature feature) {
                             final MapItem item = super.featureToMapItem(feature);
                             item.setMetaLong("featureid", feature.getId());
+                            // Ours: the plugin's tap listener opens its own page for it.
+                            item.setMetaBoolean("uasflightplan", true);
+                            // ATAK's callout on a tapped item reads the point's altitude
+                            // as sea level, and the feature's z is height above ground
+                            // ("80 ft MSL" on an 80 ft building). Give the tapped item
+                            // the top's real altitude, as HAE, which ATAK shows as MSL.
+                            final Obstacle o = byFeature.get(feature.getId());
+                            if (o != null && !Double.isNaN(o.amslFt)
+                                    && item instanceof com.atakmap.android.maps.PointMapItem) {
+                                try {
+                                    final double hae = com.atakmap.coremap.maps.conversion.EGM96
+                                            .getHAE(o.lat, o.lon, Units.feetToMeters(o.amslFt));
+                                    ((com.atakmap.android.maps.PointMapItem) item).setPoint(
+                                            new com.atakmap.coremap.maps.coords.GeoPoint(
+                                                    o.lat, o.lon, hae));
+                                } catch (RuntimeException | LinkageError e) {
+                                    Log.w(TAG, "callout altitude", e);
+                                }
+                            }
                             item.setMetaString("title", feature.getName());
                             item.setMetaString("callsign", feature.getName());
                             // Tap two overlapping obstacles and ATAK offers a chooser;
@@ -113,6 +139,40 @@ public final class ObstacleOverlay {
                                     + R.drawable.ic_obstacle);
                             item.setMetaInteger("iconColor", 0xFFFFFFFF);
                             return item;
+                        }
+
+                        // One obstacle is three features (mast, icon, pill), and ATAK
+                        // hands back every one a tap touches, so a tap offered a
+                        // chooser listing the same tower twice. Keep one hit per
+                        // obstacle.
+                        @Override
+                        public java.util.SortedSet<MapItem> deepHitTest(MapView view,
+                                com.atakmap.map.hittest.HitTestQueryParameters params,
+                                java.util.Map<com.atakmap.map.layer.Layer2, java.util.Collection<com.atakmap.map.hittest.HitTestControl>> controls) {
+                            return dedupe(super.deepHitTest(view, params, controls));
+                        }
+
+                        @Override
+                        public java.util.SortedSet<MapItem> deepHitTestItems(int xpos, int ypos,
+                                com.atakmap.coremap.maps.coords.GeoPoint point, MapView view) {
+                            return dedupe(super.deepHitTestItems(xpos, ypos, point, view));
+                        }
+
+                        private java.util.SortedSet<MapItem> dedupe(java.util.SortedSet<MapItem> hits) {
+                            // Obstacles OFF keeps the features; a tap must not find them.
+                            if (!visible && hits != null)
+                                return new java.util.TreeSet<>(hits.comparator());
+                            if (hits == null || hits.size() < 2)
+                                return hits;
+                            final java.util.Set<Obstacle> seen = new java.util.HashSet<>();
+                            final java.util.SortedSet<MapItem> out =
+                                    new java.util.TreeSet<>(hits.comparator());
+                            for (MapItem m : hits) {
+                                final Obstacle o = byFeature.get(m.getMetaLong("featureid", -1L));
+                                if (o == null || seen.add(o))
+                                    out.add(m);
+                            }
+                            return out;
                         }
                     };
             overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
@@ -259,24 +319,35 @@ public final class ObstacleOverlay {
                 FeatureDataStore2.TIMESTAMP_NONE, FeatureDataStore2.FEATURE_VERSION_NONE));
         byFeature.put(mastId, o);
 
-        // The label is the icon: one composed pill, the glyph in the ceiling color
-        // and the words in white, with the feature's own label suppressed so the
-        // name is not drawn a second time in ATAK's square box. Rotation relative to
-        // the screen, so the words stay level when the map is spun.
+        // The icon at the top: the tower glyph in the ceiling color, its own label
+        // suppressed so ATAK does not draw the name in its square box beside it.
         final Point top = new Point(o.lon, o.lat, topM);
-        final ObstaclePills.Pill pill = pills.pill(name, color);
-        final Style style = pill == null
-                ? new IconPointStyle(color, "android.resource://"
-                        + pluginContext.getPackageName() + "/" + R.drawable.ic_obstacle)
-                : new CompositeStyle(new Style[] {
-                        new IconPointStyle(0xFFFFFFFF, pill.uri, pill.width, pill.height,
-                                0f, 0f, 0, 0, 0f, false),
-                        new LabelPointStyle("", 0x00FFFFFF, 0x00000000,
-                                LabelPointStyle.ScrollMode.DEFAULT) });
+        final Style iconStyle = new CompositeStyle(new Style[] {
+                new IconPointStyle(color, "android.resource://"
+                        + pluginContext.getPackageName() + "/" + R.drawable.ic_obstacle),
+                new LabelPointStyle("", 0x00FFFFFF, 0x00000000,
+                        LabelPointStyle.ScrollMode.DEFAULT) });
         final long topId = store.insertFeature(new Feature(fsid,
-                FeatureDataStore2.FEATURE_ID_NONE, name, top, style, attrs, standing,
+                FeatureDataStore2.FEATURE_ID_NONE, name, top, iconStyle, attrs, standing,
                 FeatureDataStore2.TIMESTAMP_NONE, FeatureDataStore2.FEATURE_VERSION_NONE));
         byFeature.put(topId, o);
+
+        // The label: a pill of its own at the same point, composed to sit above the
+        // icon, level with the screen whatever the map's rotation. Not a label-only
+        // point: a tap on the words is a tap on the obstacle.
+        final ObstaclePills.Pill pill = pills.pill(name, ICON_HALF_PX + 6);
+        if (pill != null) {
+            final Style pillStyle = new CompositeStyle(new Style[] {
+                    new IconPointStyle(0xFFFFFFFF, pill.uri, pill.width, pill.height,
+                            0f, 0f, 0, 0, 0f, false),
+                    new LabelPointStyle("", 0x00FFFFFF, 0x00000000,
+                            LabelPointStyle.ScrollMode.DEFAULT) });
+            final long labelId = store.insertFeature(new Feature(fsid,
+                    FeatureDataStore2.FEATURE_ID_NONE, name, new Point(o.lon, o.lat, topM),
+                    pillStyle, attrs, standing,
+                    FeatureDataStore2.TIMESTAMP_NONE, FeatureDataStore2.FEATURE_VERSION_NONE));
+            byFeature.put(labelId, o);
+        }
     }
 
     /** The obstacle a drawn feature stands for, or null. */
