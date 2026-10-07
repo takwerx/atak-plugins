@@ -29,12 +29,15 @@ public final class TfrFeatures {
     /** Enough fill to read as an area, little enough to see the map through it. */
     private static final int FILL_ALPHA = 0x33;
     /**
-     * The coarsest map resolution, meters per pixel, at which an area's label still
-     * draws. ATAK's own default is 14, which hides the label on anything bigger than a
-     * few miles -- and a TFR is routinely a 30 NM ring, so its name would only appear
-     * once it was far too big to see.
+     * The style's own label gate, left wide open on purpose.
+     *
+     * <p>ATAK's default is 14 meters per pixel, which hides the label on anything bigger
+     * than a few miles, and a TFR is routinely a 30 NM ring. This was 400, which put the
+     * labels on at about a fifty mile scale bar and could not be changed. The gate the
+     * operator actually sets lives in the plugin and is compared against ATAK's own scale
+     * bar, so this one is opened up and left out of the way.
      */
-    private static final double LABEL_MAX_RES = 400d;
+    private static final double LABEL_MAX_RES = 100000d;
 
     private TfrFeatures() {
     }
@@ -82,12 +85,14 @@ public final class TfrFeatures {
             // way to say where the text goes.
             final double[] mid = centroid(a);
             if (mid != null) {
-                out.add(new TfrOverlay.Drawn(t.notamId, setKey, setName, name,
-                        new Point(mid[1], mid[0]),
+                final TfrOverlay.Drawn lbl = new TfrOverlay.Drawn(t.notamId, setKey, setName,
+                        name, new Point(mid[1], mid[0]),
                         new LabelPointStyle(label(t, a), 0xFFFFFFFF, 0x99000000,
                                 LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f, false,
                                 LABEL_MAX_RES),
-                        attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                        attrs, Feature.AltitudeMode.ClampToGround, 0d);
+                lbl.isLabel = true;
+                out.add(lbl);
             }
         }
         return out;

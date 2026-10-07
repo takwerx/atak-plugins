@@ -160,6 +160,28 @@ public final class TfrWatch {
         return wasCeiling != -1 || wasPoints != -1;
     }
 
+    /**
+     * Take a geofence off the map and out of ATAK's drawings.
+     *
+     * <p>The operator's own item, so this only ever runs on their say-so -- the plugin
+     * reports a stale fence and offers the removal, it never quietly deletes something
+     * somebody made.
+     */
+    public static boolean remove(MapView mapView, String uid) {
+        if (mapView == null || uid == null)
+            return false;
+        final MapItem item = mapView.getRootGroup().deepFindUID(uid);
+        if (item == null)
+            return false;
+        try {
+            com.atakmap.android.geofence.data.GeoFence.clearGeofenceState(mapView, item);
+        } catch (Exception ignored) {
+            // No fence attached, or ATAK has already forgotten it. The shape still goes.
+        }
+        item.removeFromGroup();
+        return true;
+    }
+
     /** One line for the status, or null when every fence still holds. */
     public static String line(List<Watched> stale) {
         if (stale.isEmpty())
@@ -171,7 +193,7 @@ public final class TfrWatch {
         return stale.size() + " geofences are out of date. Check them.";
     }
 
-    static String words(State s) {
+    public static String words(State s) {
         switch (s) {
             case EXPIRED:
                 return "the restriction has expired. Remove it or it guards nothing.";

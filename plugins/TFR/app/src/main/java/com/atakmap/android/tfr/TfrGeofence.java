@@ -81,9 +81,15 @@ public final class TfrGeofence {
             shape.setPoints(pts, new SparseArray<PointMapItem>());
             shape.setClosed(true);
             shape.setTitle(title(t, a));
-            shape.setStrokeColor(0xFFE01B24);
-            shape.setFillColor(0x33E01B24);
-            shape.setStrokeWeight(3.0d);
+            // A fence must not look like the restriction it was cut from. Both are rings
+            // in the same place, and the operator tapped one expecting the read-only
+            // airspace and got an editable drawing: "ook its showing as an editbale item
+            // wtf is this" (2026-10-07). So: cyan, dashed, and no fill, against the
+            // restriction's solid red or amber with a translucent fill.
+            shape.setStrokeColor(0xFF00E5FF);
+            shape.setFillColor(0x00000000);
+            shape.setStrokeWeight(4.0d);
+            shape.setLineStyle(com.atakmap.android.maps.Polyline.BASIC_LINE_STYLE_DASHED);
 
             if (withAltitude) {
                 // The fence derives its band from the item: base from the shape's own
@@ -164,9 +170,13 @@ public final class TfrGeofence {
         return v.feet * 0.3048d;
     }
 
+    /**
+     * Named as what it is. "TFR 6/7093 11NM NE SANTA CLARITA" read as the restriction
+     * itself in ATAK's own lists, which is the same confusion as the matching ring.
+     */
     private static String title(Tfr t, TfrArea a) {
-        final StringBuilder b = new StringBuilder("TFR ");
-        b.append(t.notamId).append(' ').append(t.place());
+        final StringBuilder b = new StringBuilder("Geofence: ");
+        b.append(t.place());
         if (!a.name.isEmpty())
             b.append(" (").append(a.name).append(')');
         return b.toString();

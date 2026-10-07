@@ -48,6 +48,7 @@ public class TfrManager {
     static final String PREF_ON = "on";
     static final String PREF_TYPES_OFF = "typesOff";
     static final String PREF_GATE_BAR_M = "gateBarM";
+    static final String PREF_LABEL_BAR_M = "labelBarM";
     static final String PREF_WHERE_MODE = "whereMode";
     static final String PREF_WHERE_VALUES = "whereValues";
     static final String PREF_AREA_MODE = "areaMode";
@@ -113,6 +114,13 @@ public class TfrManager {
     /** The scale-bar distance at or below which the map draws; -1 is always. */
     private volatile long gateBarM;
     private volatile boolean gateHiding;
+    /**
+     * The labels have their own gate, because an operator wants to see where the
+     * restrictions are from much further out than they want to read their names.
+     * Ten miles by default (operator, 2026-10-07).
+     */
+    private volatile long labelBarM = 16093L;
+    private volatile boolean labelsHidden;
     /** Geofences whose restriction has expired, been lifted or changed under them. */
     private volatile List<TfrWatch.Watched> staleFences = Collections.emptyList();
     private volatile int whereMode;
@@ -129,6 +137,7 @@ public class TfrManager {
         // A fresh install starts off: nothing pulls the country before it is asked to.
         on = p.getBoolean(PREF_ON, false);
         gateBarM = p.getLong(PREF_GATE_BAR_M, -1L);
+        labelBarM = p.getLong(PREF_LABEL_BAR_M, 16093L);
         // A set, not a joined string: a type carrying the separator would come back as two
         // bogus entries and the filter would restore wrong.
         whereMode = p.getInt(PREF_WHERE_MODE, WHERE_EVERYWHERE);
@@ -255,6 +264,12 @@ public class TfrManager {
 
     public List<TfrWatch.Watched> staleFences() {
         return staleFences;
+    }
+
+    /** Take one of the operator's geofences off the map, on their say-so only. */
+    public void removeFence(String uid) {
+        if (TfrWatch.remove(mapView, uid))
+            checkFences();
     }
 
     /**
@@ -518,6 +533,21 @@ public class TfrManager {
         changed();
     }
 
+    public long labelBarMeters() {
+        return labelBarM;
+    }
+
+    public boolean areLabelsHidden() {
+        return labelsHidden;
+    }
+
+    public void setLabelBarMeters(long meters) {
+        labelBarM = meters;
+        prefs().edit().putLong(PREF_LABEL_BAR_M, meters).apply();
+        applyGate();
+        changed();
+    }
+
     /** What ATAK's own scale bar reads right now, in meters. */
     public double barMeters() {
         return ScaleBar.meters(mapView);
@@ -532,11 +562,19 @@ public class TfrManager {
      * nothing on screen to say why.
      */
     private void applyGate() {
-        final boolean hide = on && gateBarM > 0 && barMeters() > gateBarM * 1.02;
+        final double bar = barMeters();
+        final boolean hide = on && gateBarM > 0 && bar > gateBarM * 1.02;
         final boolean was = gateHiding;
         gateHiding = hide;
         overlay.setVisible(on && !hide);
-        if (was != hide)
+
+        // The labels gate separately, and only matter while the areas are drawn at all.
+        final boolean hideLabels = labelBarM > 0 && bar > labelBarM * 1.02;
+        final boolean wasLabels = labelsHidden;
+        labelsHidden = hideLabels;
+        overlay.setLabelsVisible(!hideLabels);
+
+        if (was != hide || wasLabels != hideLabels)
             changed();
     }
 
@@ -571,6 +609,9 @@ public class TfrManager {
         if (gateHiding)
             b.append(" Zoom in to see restrictions on the map. Shown at ")
                     .append(ScaleBar.describe(gateBarM)).append(" or closer.");
+        else if (labelsHidden)
+            b.append(" Names appear at ").append(ScaleBar.describe(labelBarM))
+                    .append(" or closer.");
         // A fence guarding airspace that was lifted is worse than no fence, so this is
         // said on the pinned line rather than left to be discovered.
         final String fences = TfrWatch.line(staleFences);

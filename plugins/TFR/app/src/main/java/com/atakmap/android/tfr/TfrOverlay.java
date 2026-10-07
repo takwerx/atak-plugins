@@ -79,6 +79,9 @@ public class TfrOverlay {
     private final Map<String, List<Long>> fidsByNotam = new HashMap<>();
     /** NOTAMs the place filter is letting through; null means no place filter at all. */
     private volatile Set<String> notamsShown;
+    /** The label points, which the operator gates separately from the areas. */
+    private final Set<Long> labelFids = new HashSet<>();
+    private volatile boolean labelsOn = true;
 
     /**
      * Its own thread: a visibility write waits behind any rewrite in progress, and the
@@ -117,6 +120,8 @@ public class TfrOverlay {
         public final Feature.AltitudeMode altitudeMode;
         /** Wall height in meters; 0 for a flat ring on the ground. */
         public final double extrude;
+        /** True for the point that carries the area's text, which has its own zoom gate. */
+        public boolean isLabel;
 
         public Drawn(String notamId, String setKey, String setName, String name,
                 Geometry geometry, Style style, AttributeSet attrs,
@@ -300,6 +305,17 @@ public class TfrOverlay {
     }
 
     /**
+     * The label gate, which is its own thing: an operator wants to see where the
+     * restrictions are from much further out than they want to read their names.
+     */
+    public void setLabelsVisible(boolean on) {
+        if (labelsOn == on)
+            return;
+        labelsOn = on;
+        applyVisibility();
+    }
+
+    /**
      * Push the switches into the store.
      *
      * <p>The layer is hidden first so the areas go on the next frame however busy the
@@ -390,8 +406,13 @@ public class TfrOverlay {
         final Set<Long> show = new HashSet<>();
         final Set<Long> hide = new HashSet<>();
         for (Map.Entry<String, List<Long>> e : fidsByNotam.entrySet()) {
-            final boolean on = allow == null || allow.contains(e.getKey());
-            (on ? show : hide).addAll(e.getValue());
+            final boolean placeAllows = allow == null || allow.contains(e.getKey());
+            for (Long fid : e.getValue()) {
+                // One answer per feature from both gates, computed together: two passes
+                // each writing features.visible would undo one another.
+                final boolean on = placeAllows && (labelsOn || !labelFids.contains(fid));
+                (on ? show : hide).add(fid);
+            }
         }
         try {
             if (!show.isEmpty()) {
@@ -433,6 +454,7 @@ public class TfrOverlay {
                 final List<Long> old = existingSets();
                 final Map<String, Long> fresh = new HashMap<>();
                 fidsByNotam.clear();
+                labelFids.clear();
                 for (Drawn d : drawn) {
                     Long fsid = fresh.get(d.setKey);
                     if (fsid == null) {
@@ -441,6 +463,8 @@ public class TfrOverlay {
                     }
                     final long fid = store.insertFeature(new Feature(fsid, d.name,
                             d.geometry, d.style, d.attrs, d.altitudeMode, d.extrude));
+                    if (d.isLabel)
+                        labelFids.add(fid);
                     List<Long> ids = fidsByNotam.get(d.notamId);
                     if (ids == null) {
                         ids = new ArrayList<>(2);

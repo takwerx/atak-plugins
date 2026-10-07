@@ -27,6 +27,7 @@ import com.atakmap.android.tfr.Places;
 import com.atakmap.android.tfr.TfrManager;
 import com.atakmap.android.tfr.TfrTypes;
 import com.atakmap.android.tfr.TfrVertical;
+import com.atakmap.android.tfr.TfrWatch;
 import com.atakmap.android.tfr.plugin.R;
 import com.atakmap.coremap.conversions.Span;
 import com.atakmap.coremap.conversions.SpanUtilities;
@@ -74,7 +75,11 @@ public class TfrPane implements TfrManager.Listener {
     private LinearLayout settingsContainer, typesContainer, updatesContainer, keyBody;
     private Button useZoomButton, gateButton;
     private TextView gateNow, downloadedNote;
-    private Fold gateFold, areaFold, whereFold, typesFold, keyFold, updatesFold;
+    private Fold gateFold, labelsFold, areaFold, whereFold, typesFold, keyFold, updatesFold,
+            fencesFold;
+    private Button labelsGateButton;
+    private TextView labelsNote;
+    private LinearLayout fencesContainer;
     private LinearLayout areaContainer, whereContainer;
     private TextView areaNote;
 
@@ -130,8 +135,16 @@ public class TfrPane implements TfrManager.Listener {
         whereContainer = settings.findViewById(R.id.where_container);
         areaNote = settings.findViewById(R.id.area_note);
 
+        labelsGateButton = settings.findViewById(R.id.btn_labels_gate);
+        labelsNote = settings.findViewById(R.id.labels_note);
+        fencesContainer = settings.findViewById(R.id.fences_container);
+
         gateFold = new Fold(settings, R.id.fold_gate_head, R.id.fold_gate_chev,
                 R.id.fold_gate_body, "fold.gate");
+        labelsFold = new Fold(settings, R.id.fold_labels_head, R.id.fold_labels_chev,
+                R.id.fold_labels_body, "fold.labels");
+        fencesFold = new Fold(settings, R.id.fold_fences_head, R.id.fold_fences_chev,
+                R.id.fold_fences_body, "fold.fences");
         areaFold = new Fold(settings, R.id.fold_area_head, R.id.fold_area_chev,
                 R.id.fold_area_body, "fold.area");
         whereFold = new Fold(settings, R.id.fold_where_head, R.id.fold_where_chev,
@@ -212,6 +225,12 @@ public class TfrPane implements TfrManager.Listener {
             @Override
             public void onClick(View v) {
                 pickGate();
+            }
+        });
+        labelsGateButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickLabelGate();
             }
         });
         root.findViewById(R.id.btn_types_all_on).setOnClickListener(new View.OnClickListener() {
@@ -308,11 +327,21 @@ public class TfrPane implements TfrManager.Listener {
 
     private void renderSettings() {
         gateFold.label("Zoom gate", manager.gateBarMeters() > 0
-                ? ScaleBar.describe(manager.gateBarMeters()) + " or closer" : "Always");
+                ? gateLabel(manager.gateBarMeters()) + " or closer" : "Always");
         gateButton.setText(manager.gateBarMeters() > 0
-                ? ScaleBar.describe(manager.gateBarMeters()) + " or closer" : "Always");
+                ? gateLabel(manager.gateBarMeters()) + " or closer" : "Always");
         gateNow.setText("Scale bar now " + ScaleBar.describe(manager.barMeters())
                 + (manager.isGateHiding() ? " - hidden" : ""));
+
+        labelsFold.label("Labels", manager.labelBarMeters() > 0
+                ? gateLabel(manager.labelBarMeters()) + " or closer" : "Always");
+        labelsGateButton.setText(manager.labelBarMeters() > 0
+                ? gateLabel(manager.labelBarMeters()) + " or closer" : "Always");
+        labelsNote.setText(manager.areLabelsHidden()
+                ? "Hidden now. Scale bar reads " + ScaleBar.describe(manager.barMeters()) + "."
+                : "Showing now.");
+
+        buildFences();
 
         areaFold.label("Area", manager.areaLabel());
         buildArea();
@@ -334,6 +363,97 @@ public class TfrPane implements TfrManager.Listener {
         updatesFold.label("Updates", "every " + manager.refreshMinutesForDisplay() + " min");
         buildUpdates();
         downloadedNote.setText(manager.describeCacheForDisplay());
+    }
+
+    /**
+     * The operator's own geofences, and a way to clear the ones guarding nothing.
+     *
+     * <p>Never removed on the plugin's own initiative: it is their shape, so the plugin
+     * reports what has become of the restriction and offers the removal.
+     */
+    private void buildFences() {
+        final List<TfrWatch.Watched> stale = manager.staleFences();
+        fencesFold.label("Geofences", stale.isEmpty() ? "all current"
+                : stale.size() + " out of date");
+        fencesContainer.removeAllViews();
+        if (stale.isEmpty()) {
+            final TextView t = new TextView(pluginContext);
+            t.setText("Every geofence you made still matches a live restriction.");
+            t.setTextSize(13f);
+            t.setTextColor(pluginContext.getResources().getColor(R.color.dim_text));
+            fencesContainer.addView(t);
+            return;
+        }
+        for (final TfrWatch.Watched w : stale) {
+            final TextView t = new TextView(pluginContext);
+            t.setText(w.title + " - " + TfrWatch.words(w.state));
+            t.setTextSize(13f);
+            t.setPadding(0, 6, 0, 2);
+            t.setTextColor(pluginContext.getResources().getColor(R.color.white));
+            fencesContainer.addView(t);
+
+            final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = 4;
+            b.setLayoutParams(lp);
+            b.setText("Remove this geofence");
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    manager.removeFence(w.uid);
+                    render();
+                }
+            });
+            fencesContainer.addView(b);
+        }
+        if (stale.size() > 1) {
+            final Button all = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = 6;
+            all.setLayoutParams(lp);
+            all.setText("Remove all " + stale.size());
+            all.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    for (TfrWatch.Watched w2 : manager.staleFences())
+                        manager.removeFence(w2.uid);
+                    render();
+                }
+            });
+            fencesContainer.addView(all);
+        }
+    }
+
+    private void pickLabelGate() {
+        final String unit = Units.bigLabel();
+        final double[] presets = { 1, 5, 10, 25, 50 };
+        final String[] labels = new String[presets.length + 1];
+        final double[] meters = new double[presets.length + 1];
+        for (int i = 0; i < presets.length; i++) {
+            labels[i] = trim(presets[i]) + " " + unit + " or closer";
+            meters[i] = Units.bigToMeters(presets[i]);
+        }
+        labels[presets.length] = "Always";
+        meters[presets.length] = -1;
+        int checked = presets.length;
+        for (int i = 0; i < meters.length - 1; i++)
+            if (Math.abs(meters[i] - manager.labelBarMeters()) < 1)
+                checked = i;
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Show names when the scale bar reads")
+                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int which) {
+                        manager.setLabelBarMeters((long) Math.round(meters[which]));
+                        dlg.dismiss();
+                        render();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        fromTop(d);
     }
 
     /** How much of the picture the list covers. The map is governed by Where and Types. */
@@ -636,6 +756,21 @@ public class TfrPane implements TfrManager.Listener {
 
     private static String trim(double v) {
         return v == Math.rint(v) ? Integer.toString((int) v) : Double.toString(v);
+    }
+
+    /**
+     * A gate's distance the way the picker wrote it.
+     *
+     * <p>Not {@code ScaleBar.describe}, which goes through ATAK's generic span formatter
+     * and renders a ten mile gate as "10.00 mi". The row head should read back exactly
+     * what was chosen from the list.
+     */
+    private static String gateLabel(long meters) {
+        if (meters <= 0)
+            return "Always";
+        final double big = meters / Units.bigToMeters(1);
+        final double rounded = Math.rint(big * 100) / 100;
+        return trim(rounded) + " " + Units.bigLabel();
     }
 
     // ---- details ----
