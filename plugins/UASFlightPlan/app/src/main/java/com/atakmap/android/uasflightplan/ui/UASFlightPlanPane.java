@@ -559,6 +559,15 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                 dlg.dismiss();
                 if (launch.isPicking())
                     launch.cancelPick();
+                // A new area replaces the old one, and the old one goes now, not
+                // when the new shape closes: two outlines on the map while drawing
+                // is confusing (operator, 2026-10-06). The plan falls back to the
+                // circle until the new shape is closed.
+                if (drawnArea != null) {
+                    areaPicker.clearDrawn();
+                    drawnArea = null;
+                    recompute();
+                }
                 areaPicker.start();
                 syncAll();
             }
