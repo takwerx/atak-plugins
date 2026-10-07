@@ -554,18 +554,18 @@ takes any ArcGIS Online organization you sign in to.
 #tak-slide[
 = My Fires
 
-  Keep only the burns that matter to your incident on the map.
+  Pick the burns that matter to your incident, then show only those.
 
   + Open a burn's details: tap it on the map, or find it with *Find*.
-  + Tap *Add to My Fires*. Fire History shows only the fires on your list,
-    wherever you pan and whichever decades are ticked. Its row reads
-    "Fire History: My Fires (1)".
-  + Add the next one the same way. *Remove from My Fires* in a burn's details
-    takes one off.
+  + Tap *Add to My Fires*. The burn gets a white edge; every other fire stays
+    on the map so you can pick the next.
+  + Add the rest the same way. *Remove from My Fires* takes one off.
+  + Tap *Only My Fires OFF (3)*, under Add or under the arrow on the row. It
+    turns green, ON: only your fires show, wherever you pan. Tap again to see
+    every fire; the list is kept.
 
-  The arrow on the row opens *Only My Fires ON*: tap it to OFF to see every fire
-  again and keep the list, and back to ON for your fires. *Clear My Fires* empties
-  the list when the incident is over. The list is kept when ATAK restarts.
+  *Clear My Fires* on the row empties the list when the incident is over. The
+  map key ends with a *My Fires* line. The list is kept when ATAK restarts.
 ]
 
 #tak-slide[
@@ -611,6 +611,8 @@ guide as a PDF.
 = What it needs
 
 An Android device running ATAK-CIV 5.6, 5.7 or 5.8. A network connection to
-load or refresh layers; cached layers draw without one. A NIFC ArcGIS login for
+load or refresh layers. Everything downloaded stays on the phone, on or off,
+and draws after a restart without one: the row says "no network, showing what
+this phone saved". A NIFC ArcGIS login for
 NIFC incidents; the other built-in sources are public.
 ]

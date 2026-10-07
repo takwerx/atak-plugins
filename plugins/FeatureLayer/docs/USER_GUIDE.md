@@ -17,8 +17,8 @@ your own NIFC ArcGIS login; the other built-in sources are public.
 Feature Layer puts live ArcGIS feature layers on the ATAK map the way a GIS
 analyst sees them: every point, line and area stays a feature you can tap for its
 attributes, drawn with the symbols its community uses. Layers you add stay on the
-phone, draw from the cache the moment ATAK starts, and refresh on their own when
-there is signal.
+phone, on or off, draw from the cache the moment ATAK starts, and refresh on their
+own when there is signal. With no network they still come back after a restart.
 
 ## Opening it
 
@@ -88,6 +88,11 @@ features it holds, when it last refreshed and the refresh interval, then
 **Features**, **Go to**, **Auto** (how often it refreshes), **Refresh** and
 **Remove**. The arrow works while a layer is off, and each row stays open or
 closed the way you left it.
+
+**No network.** Everything a layer has downloaded stays on the phone whether the
+layer is on or off, and comes back after ATAK or the phone restarts. With no signal
+the row says *no network, showing what this phone saved*. What you see is what was
+last downloaded: a layer that loads what is in view has the area you last looked at.
 
 **All ON / All OFF** beside the heading works every layer at once. A row says
 **Loading…** while its layer fetches. **Go to** frames the whole incident; layers
@@ -453,19 +458,21 @@ in view. Add a year to pick one fire out of many with the same name: "Ranch 2007
 
 ### My Fires
 
-Pick out the burns that matter to the incident you are working, and keep only
-those on the map:
+Pick out the burns that matter to the incident you are working, then show only
+those:
 
 1. Open a burn's details: tap it on the map, or find it with **Find**.
-2. Tap **Add to My Fires**. Fire History now shows only the fires on your list,
-   wherever you pan and whichever decades are ticked, and its row reads
-   "Fire History: My Fires (1)".
-3. Add the next one the same way. **Remove from My Fires**, in a burn's details,
-   takes one off.
+2. Tap **Add to My Fires**. The burn gets a white edge, and every other fire stays
+   on the map so you can pick the next.
+3. Add the rest the same way. **Remove from My Fires**, in a burn's details, takes
+   one off.
+4. Tap **Only My Fires OFF (3)**, under Add in the details or under the arrow on
+   the row. It turns green, ON, and Fire History shows only your fires, wherever
+   you pan and whichever decades are ticked. The row reads "Fire History: My Fires
+   (3)". Tap it again to see every fire; your list is kept.
 
-The arrow on the row opens two buttons. **Only My Fires ON** turns to OFF and
-shows every fire again without losing your list; tap it again to go back to your
-fires. **Clear My Fires** empties the list when the incident is over. The list is
+**Clear My Fires**, under the arrow on the row, empties the list when the incident
+is over. The map key ends with a **My Fires** line for the white edge. The list is
 kept when ATAK restarts.
 
 ## Your own organization
