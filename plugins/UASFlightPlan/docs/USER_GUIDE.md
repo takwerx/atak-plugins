@@ -194,8 +194,9 @@ change it.
 
 - **Islands cover 14% of the area. Highest ground in the area: 5,687 ft
   MSL.** How much of the area is unworkable at this ceiling.
-- **Only DTED0 covers this ground. That is too coarse...** No paint until
-  finer elevation is loaded.
+- **Only SRTM3 covers this ground. That is too coarse...** No paint until
+  finer elevation is loaded, and the ground line says the ground is unknown
+  until DTED2 covers it.
 
   ![No terrain data](screenshots/16_no_terrain_data.png)
 - **117 more hidden by the filters.** Obstacles the height and type filters

@@ -37,3 +37,6 @@ captures/
 # Submission zips
 dist/
 *.zip
+
+# Build output: gradle/typst.gradle writes the manual here; the zip excludes it.
+app/src/main/assets/usermanual.pdf
