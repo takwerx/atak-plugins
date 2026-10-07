@@ -6,6 +6,7 @@ import android.preference.PreferenceManager;
 
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.uasflightplan.map.ObstacleOverlay;
+import com.atakmap.android.uasflightplan.terrain.Extent;
 import com.atakmap.android.uasflightplan.plugin.R;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoCalculations;
@@ -280,15 +281,15 @@ public final class ObstacleManager {
     }
 
     /** Asks the FAA for the circle. Main thread; the answer arrives on main. */
-    public void load(final GeoPoint center, final double radiusM) {
+    public void load(final GeoPoint launchPoint, final Extent extent) {
         if (!started)
             return;
-        launch = center;
+        launch = launchPoint;
         final int mine = generation.incrementAndGet();
         loading = true;
         failure = null;
         notifyChanged();
-        DofSource.fetch(center, radiusM, new DofSource.Callback() {
+        DofSource.fetch(extent, new DofSource.Callback() {
             @Override
             public void onLoaded(List<Obstacle> inCircle, boolean wasCapped) {
                 if (mine != generation.get())

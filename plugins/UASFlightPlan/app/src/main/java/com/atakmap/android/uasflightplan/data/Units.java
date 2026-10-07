@@ -126,6 +126,19 @@ public final class Units {
         return new double[] { 0.5d * 1609.344d, 1609.344d, 2d * 1609.344d, 3d * 1609.344d };
     }
 
+    /** An area in the operator's large unit squared: "2.3 sq mi" or "6.1 sq km". */
+    public static String area(double squareMeters) {
+        final int t = rangeType();
+        if (t == Span.METRIC)
+            return String.format(Locale.US, "%.1f sq km", squareMeters / 1e6);
+        if (t == Span.NM)
+            return String.format(Locale.US, "%.1f sq NM", squareMeters / (1852d * 1852d));
+        final double sqMi = squareMeters / (1609.344d * 1609.344d);
+        return sqMi < 0.1d
+                ? String.format(Locale.US, "%.0f acres", squareMeters / 4046.8564d)
+                : String.format(Locale.US, "%.1f sq mi", sqMi);
+    }
+
     /** An altitude: "1,043 ft MSL". The reference is part of the number. */
     public static String altitudeMsl(double meters) {
         return String.format(Locale.US, "%,.0f %s MSL", toAltitudeUnit(meters),

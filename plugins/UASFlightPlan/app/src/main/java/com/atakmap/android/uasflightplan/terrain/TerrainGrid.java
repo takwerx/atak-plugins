@@ -31,13 +31,13 @@ public final class TerrainGrid {
     public final double[] msl;
     public final int width;
     public final int height;
-    /** The rectangle the grid covers: the square around the circle. */
+    /** The rectangle the grid covers: the box around the extent. */
     public final GeoBounds bounds;
     public final double latStep;
     public final double lonStep;
     /** Ground meters per cell, the smaller of the two axes. */
     public final double cellMeters;
-    /** True for the cells inside the working circle. */
+    /** True for the cells inside the extent. */
     public final boolean[] inCircle;
     /**
      * True for the outermost cells of the circle: the edge of what was computed.
@@ -45,12 +45,13 @@ public final class TerrainGrid {
      * map; a sea with no shore reads as if the whole map had been checked.
      */
     public final boolean[] ring;
-    /** Cells inside the circle. */
+    /** Cells inside the extent. */
     public final int circleCells;
-    /** Cells inside the circle with no elevation. */
+    /** Cells inside the extent with no elevation. */
     public final int unknownCells;
-    /** The launch point the circle is centered on. */
-    public final GeoPoint center;
+    /** The extent this grid covers. */
+    public final Extent extent;
+    /** Meters, for a circle; NaN for a drawn ring. */
     public final double radiusM;
     /** What the engine said its numbers were referenced to, e.g. "HAE". */
     public final String reference;
@@ -61,7 +62,7 @@ public final class TerrainGrid {
 
     TerrainGrid(double[] msl, int width, int height, GeoBounds bounds,
             double latStep, double lonStep, double cellMeters, boolean[] inCircle,
-            boolean[] ring, GeoPoint center, double radiusM, String reference,
+            boolean[] ring, Extent extent, String reference,
             double geoidOffsetM, String sources) {
         this.msl = msl;
         this.width = width;
@@ -72,8 +73,8 @@ public final class TerrainGrid {
         this.cellMeters = cellMeters;
         this.inCircle = inCircle;
         this.ring = ring;
-        this.center = center;
-        this.radiusM = radiusM;
+        this.extent = extent;
+        this.radiusM = extent.radiusM;
         this.reference = reference;
         this.geoidOffsetM = geoidOffsetM;
         this.sources = sources;
@@ -90,7 +91,12 @@ public final class TerrainGrid {
         this.unknownCells = unknown;
     }
 
-    /** Cells inside the circle that have an elevation. */
+    /** The ground inside the extent, square meters. */
+    public double areaM2() {
+        return circleCells * cellMeters * cellMeters;
+    }
+
+    /** Cells inside the extent that have an elevation. */
     public int knownCells() {
         return circleCells - unknownCells;
     }

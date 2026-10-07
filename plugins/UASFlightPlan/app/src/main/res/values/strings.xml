@@ -60,7 +60,15 @@
     <!-- Launch point picker -->
     <string name="tap_map">Tap the map</string>
     <string name="use_position">My position</string>
-    <string name="clear_launch">Clear the launch point</string>
+    <string name="draw_area">Draw the area to cover</string>
+    <string name="clear_area">Clear the area</string>
+    <string name="clear_launch">Clear everything</string>
+    <string name="area">Area</string>
+    <string name="extent_circle">Circle %1$s</string>
+    <string name="extent_drawn">Drawn area</string>
+    <string name="extent_drawn_area">Drawn area, %1$s</string>
+    <string name="status_drawing">Tap the map to place each corner, then tap the first marker to close the shape. Undo and End Shape are on ATAK\'s drawing toolbar.</string>
+    <string name="status_area_no_launch">Area drawn. Place the launch point to check it.</string>
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
 
@@ -87,13 +95,13 @@
     <!-- Status line. Says what is happening, what was painted, or why nothing is drawn. -->
     <string name="status_idle">Tap Launch point to start. The islands are painted inside a circle around it.</string>
     <string name="status_picking">Tap the map where you will launch. Back cancels.</string>
-    <string name="status_reading">Reading the terrain within %1$s…</string>
+    <string name="status_reading">Reading the terrain, %1$s…</string>
     <string name="status_no_gps">No GPS fix, so there is no position to use. Tap the map instead.</string>
     <string name="status_map_off">Map off.</string>
     <string name="all_under_water">Everything in the circle is under the ceiling.</string>
     <string name="islands_share">Islands cover %.0f%% of the circle.</string>
     <string name="highest_ground">Highest ground in the circle: %1$s.</string>
-    <string name="terrain_detail">Circle %1$s, terrain checked every %2$s.</string>
+    <string name="terrain_detail">%1$s, terrain checked every %2$s.</string>
     <string name="missing_share">%.0f%% of the circle has no terrain data and is not painted.</string>
     <string name="ceiling_proposed">Ceiling set to %1$s above the launch ground. Change it under Settings.</string>
 </resources>

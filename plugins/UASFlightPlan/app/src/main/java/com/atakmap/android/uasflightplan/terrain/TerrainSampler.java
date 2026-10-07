@@ -117,16 +117,6 @@ public final class TerrainSampler {
         }
     }
 
-    /** The square that just contains the circle. */
-    public static GeoBounds boundsFor(GeoPoint center, double radiusM) {
-        final GeoPoint n = GeoCalculations.pointAtDistance(center, 0d, radiusM);
-        final GeoPoint s = GeoCalculations.pointAtDistance(center, 180d, radiusM);
-        final GeoPoint e = GeoCalculations.pointAtDistance(center, 90d, radiusM);
-        final GeoPoint w = GeoCalculations.pointAtDistance(center, 270d, radiusM);
-        return new GeoBounds(new GeoPoint(n.getLatitude(), w.getLongitude()),
-                new GeoPoint(s.getLatitude(), e.getLongitude()));
-    }
-
     /**
      * Asks what elevation the circle would actually be read from, before reading it.
      *
@@ -136,8 +126,8 @@ public final class TerrainSampler {
      * enough to mean anything". {@code getElevationMetadata} answers with ATAK's own
      * source constants, probed on a coarse grid inside the circle.
      */
-    public static Coverage surveyCoverage(GeoPoint center, double radiusM) {
-        final GeoBounds aoi = boundsFor(center, radiusM);
+    public static Coverage surveyCoverage(Extent extent) {
+        final GeoBounds aoi = extent.bounds;
         final int n = 12;
         final List<String> sources = new ArrayList<>();
         int good = 0, probes = 0;
@@ -152,7 +142,7 @@ public final class TerrainSampler {
             for (int x = 0; x < n; x++) {
                 final double lat = aoi.getSouth() + y * latStep;
                 final double lon = aoi.getWest() + x * lonStep;
-                if (GeoCalculations.distanceTo(center, new GeoPoint(lat, lon)) > radiusM)
+                if (!extent.contains(lat, lon))
                     continue;
 
                 String src = null;
@@ -233,14 +223,13 @@ public final class TerrainSampler {
     }
 
     /**
-     * Samples the circle.
+     * Samples the extent.
      *
-     * @param center  the launch point
-     * @param radiusM the working radius, meters
      * @return the grid, never null; {@link TerrainGrid#unknownCells} says what is missing
      */
-    public static TerrainGrid sample(GeoPoint center, double radiusM, Coverage coverage) {
-        final GeoBounds aoi = boundsFor(center, radiusM);
+    public static TerrainGrid sample(Extent extent, Coverage coverage) {
+        final GeoBounds aoi = extent.bounds;
+        final GeoPoint center = extent.center;
         final GeoPoint nw = new GeoPoint(aoi.getNorth(), aoi.getWest());
         final GeoPoint ne = new GeoPoint(aoi.getNorth(), aoi.getEast());
         final GeoPoint sw = new GeoPoint(aoi.getSouth(), aoi.getWest());
@@ -258,8 +247,8 @@ public final class TerrainSampler {
 
         Log.d(TAG, "sampling " + width + "x" + height + " cells, "
                 + Math.round(cellEastM) + "m x " + Math.round(cellNorthM) + "m, over "
-                + Math.round(eastM) + "m x " + Math.round(northM) + "m, radius "
-                + Math.round(radiusM) + "m");
+                + Math.round(eastM) + "m x " + Math.round(northM) + "m, "
+                + (extent.isCircle() ? "circle " + Math.round(extent.radiusM) + "m" : "drawn"));
 
         final double[] z = new double[width * height];
 
@@ -306,31 +295,45 @@ public final class TerrainSampler {
         Log.d(TAG, "engine reference " + reference + ", geoid offset "
                 + String.format(java.util.Locale.US, "%.2f", offset) + " m subtracted");
 
-        final double cx = (width - 1) / 2d, cy = (height - 1) / 2d;
-        final double r2 = radiusM * radiusM;
-        // The edge ring is a fixed number of cells wide, so it stays one visible
-        // line at the zoom the circle is looked at, whatever the radius.
-        final double inner = Math.max(0d, radiusM - RING_CELLS * Math.min(cellEastM, cellNorthM));
-        final double inner2 = inner * inner;
+        final double latStep = (aoi.getNorth() - aoi.getSouth()) / Math.max(1, height - 1);
+        final double lonStep = (aoi.getEast() - aoi.getWest()) / Math.max(1, width - 1);
+
         final boolean[] in = new boolean[z.length];
-        final boolean[] ring = new boolean[z.length];
         for (int i = 0; i < z.length; i++) {
             if (!GeoPoint.isAltitudeValid(z[i]))
                 z[i] = Double.NaN;
             else
                 z[i] -= offset;
             final int x = i % width, y = i / width;
-            final double dx = (x - cx) * cellEastM, dy = (y - cy) * cellNorthM;
-            final double d2 = dx * dx + dy * dy;
-            in[i] = d2 <= r2;
-            ring[i] = in[i] && d2 > inner2;
+            in[i] = extent.contains(aoi.getNorth() - y * latStep, aoi.getWest() + x * lonStep);
+        }
+        // The edge is a fixed number of cells wide, so it stays one visible line at
+        // the zoom the extent is looked at: an inside cell with an outside cell
+        // within reach. A drawn ring also keeps its own outline on the map.
+        final int r = (int) Math.ceil(RING_CELLS);
+        final boolean[] ring = new boolean[z.length];
+        for (int i = 0; i < z.length; i++) {
+            if (!in[i])
+                continue;
+            final int x = i % width, y = i / width;
+            boolean edge = false;
+            for (int dy = -r; dy <= r && !edge; dy++) {
+                final int yy = y + dy;
+                for (int dx = -r; dx <= r; dx++) {
+                    final int xx = x + dx;
+                    if (dx * dx + dy * dy > RING_CELLS * RING_CELLS)
+                        continue;
+                    if (xx < 0 || yy < 0 || xx >= width || yy >= height || !in[yy * width + xx]) {
+                        edge = true;
+                        break;
+                    }
+                }
+            }
+            ring[i] = edge;
         }
 
-        final double latStep = (aoi.getNorth() - aoi.getSouth()) / Math.max(1, height - 1);
-        final double lonStep = (aoi.getEast() - aoi.getWest()) / Math.max(1, width - 1);
-
         return new TerrainGrid(z, width, height, aoi, latStep, lonStep,
-                Math.min(cellEastM, cellNorthM), in, ring, center, radiusM, reference,
+                Math.min(cellEastM, cellNorthM), in, ring, extent, reference,
                 offset, coverage == null ? "" : coverage.describe());
     }
 

@@ -1,6 +1,7 @@
 package com.atakmap.android.uasflightplan.map;
 
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.uasflightplan.terrain.Extent;
 import com.atakmap.android.uasflightplan.terrain.TerrainGrid;
 import com.atakmap.android.uasflightplan.terrain.TerrainSampler;
 import com.atakmap.coremap.log.Log;
@@ -89,7 +90,7 @@ public final class IslandOverlay {
     private double groundMslM = Double.NaN;
     private Double ceilingMslM;
     private GeoPoint launch;
-    private double radiusM;
+    private Extent extent;
 
     public IslandOverlay(MapView mapView) {
         this.mapView = mapView;
@@ -121,8 +122,8 @@ public final class IslandOverlay {
         return launch;
     }
 
-    public double getRadiusM() {
-        return radiusM;
+    public Extent getExtent() {
+        return extent;
     }
 
     /** Puts the layer on the map. Called once when the plugin starts. */
@@ -173,7 +174,7 @@ public final class IslandOverlay {
      * hears {@link Listener#onSampled} on the main thread, and then
      * {@link Listener#onPainted} if a ceiling is already in force.
      */
-    public void computeFor(final GeoPoint point, final double radius) {
+    public void computeFor(final GeoPoint point, final Extent area) {
         // A pane left on screen by a plugin reload still holds a reference to the
         // overlay that was stopped underneath it. Its worker is shut down, so handing
         // it work would throw RejectedExecutionException straight out of a click
@@ -184,7 +185,7 @@ public final class IslandOverlay {
         }
 
         launch = point;
-        radiusM = radius;
+        extent = area;
         final int mine = generation.incrementAndGet();
 
         worker.execute(new Runnable() {
@@ -194,7 +195,7 @@ public final class IslandOverlay {
                 // happily return a number off DTED0 at a kilometer per post, and that
                 // number would paint a confident sea over a ridge nothing can see.
                 final TerrainSampler.Coverage coverage =
-                        TerrainSampler.surveyCoverage(point, radius);
+                        TerrainSampler.surveyCoverage(area);
                 if (!coverage.meetsDted2()) {
                     postFail(mine, noDted2Message(coverage));
                     return;
@@ -203,7 +204,7 @@ public final class IslandOverlay {
                 final double ground = TerrainSampler.groundMsl(point);
                 final TerrainGrid g;
                 try {
-                    g = TerrainSampler.sample(point, radius, coverage);
+                    g = TerrainSampler.sample(area, coverage);
                 } catch (RuntimeException e) {
                     Log.e(TAG, "terrain sampling failed", e);
                     postFail(mine, "The terrain around that point could not be read.");

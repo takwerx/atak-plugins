@@ -21,12 +21,15 @@ import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.maps.Marker;
 import com.atakmap.android.uasflightplan.data.Units;
+import com.atakmap.android.uasflightplan.map.Area;
+import com.atakmap.android.uasflightplan.map.AreaPicker;
 import com.atakmap.android.uasflightplan.map.IslandOverlay;
 import com.atakmap.android.uasflightplan.map.LaunchPoint;
 import com.atakmap.android.uasflightplan.map.ObstacleOverlay;
 import com.atakmap.android.uasflightplan.obstacles.Obstacle;
 import com.atakmap.android.uasflightplan.obstacles.ObstacleManager;
 import com.atakmap.android.uasflightplan.plugin.R;
+import com.atakmap.android.uasflightplan.terrain.Extent;
 import com.atakmap.android.uasflightplan.terrain.TerrainGrid;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 
@@ -46,7 +49,7 @@ import java.util.Locale;
  * field that went away with the view.
  */
 public final class UASFlightPlanPane implements IslandOverlay.Listener,
-        LaunchPoint.Callback, ObstacleManager.Listener {
+        LaunchPoint.Callback, ObstacleManager.Listener, AreaPicker.Callback {
 
     /** Proposed ceiling, feet above the launch ground, until the pilot sets one. */
     static final double DEFAULT_ABOVE_LAUNCH_FT = 1000d;
@@ -64,6 +67,9 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     private final IslandOverlay overlay;
     private final ObstacleManager obstacles;
     private final LaunchPoint launch;
+    private final AreaPicker areaPicker;
+    /** The ring the pilot drew, or null: then the plan covers the circle. */
+    private Area drawnArea;
     private final SharedPreferences prefs;
     private final ObstacleAdapter adapter;
     private final TextView listHeading;
@@ -148,6 +154,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         this.overlay = overlay;
         this.obstacles = obstacles;
         this.launch = new LaunchPoint(mapView, pluginContext, this);
+        this.areaPicker = new AreaPicker(mapView, this);
         this.prefs = PreferenceManager.getDefaultSharedPreferences(host);
 
         status = root.findViewById(R.id.status);
@@ -423,9 +430,13 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
         final Button tap = tile(pluginContext.getString(R.string.tap_map), dp);
         final Button here = tile(pluginContext.getString(R.string.use_position), dp);
+        final Button draw = tile(pluginContext.getString(R.string.draw_area), dp);
+        final Button clearArea = tile(pluginContext.getString(R.string.clear_area), dp);
         final Button clear = tile(pluginContext.getString(R.string.clear_launch), dp);
         box.addView(tap);
         box.addView(here);
+        box.addView(draw);
+        box.addView(clearArea);
         box.addView(clear);
         final GeoPoint self = selfPosition();
         if (self == null) {
@@ -435,6 +446,10 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         if (launch.getPoint() == null) {
             clear.setEnabled(false);
             clear.setAlpha(0.5f);
+        }
+        if (drawnArea == null) {
+            clearArea.setEnabled(false);
+            clearArea.setAlpha(0.5f);
         }
 
         // Strings, never ids: a dialog on the host context resolves an id in
@@ -459,6 +474,25 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                 onPicked(self);
             }
         });
+        draw.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dlg.dismiss();
+                if (launch.isPicking())
+                    launch.cancelPick();
+                areaPicker.start();
+                syncAll();
+            }
+        });
+        clearArea.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dlg.dismiss();
+                areaPicker.clearDrawn();
+                drawnArea = null;
+                recompute();
+            }
+        });
         clear.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -467,6 +501,63 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             }
         });
         dlg.show();
+    }
+
+    /** The ground the plan covers: the drawn ring when there is one, else the circle. */
+    private Extent extent() {
+        if (drawnArea != null)
+            return Extent.drawn(drawnArea.bounds, drawnArea.ring);
+        final GeoPoint p = launch.getPoint();
+        return p == null ? null : Extent.circle(p, radiusM());
+    }
+
+    /** Samples and fetches again for the launch point and extent as they stand now. */
+    private void recompute() {
+        final GeoPoint p = launch.getPoint();
+        final Extent e = extent();
+        if (p == null || e == null) {
+            syncAll();
+            return;
+        }
+        working = true;
+        lastFail = null;
+        overlay.computeFor(p, e);
+        obstacles.load(p, e);
+        syncAll();
+    }
+
+    /* ----- AreaPicker.Callback ----- */
+
+    @Override
+    public void onAreaPicked(Area area) {
+        drawnArea = area;
+        if (launch.getPoint() == null) {
+            // No launch point yet: the area is kept and the plan starts when the
+            // point is placed. Say so.
+            lastFail = null;
+            syncAll();
+            return;
+        }
+        recompute();
+    }
+
+    @Override
+    public void onPickingStarted() {
+        syncAll();
+    }
+
+    @Override
+    public void onCancelled(String reason) {
+        if (reason != null)
+            lastFail = reason;
+        syncAll();
+    }
+
+    @Override
+    public void onAreaRemoved() {
+        // Deleted from ATAK's own menus: the plan goes back to the circle.
+        drawnArea = null;
+        recompute();
     }
 
     private Button tile(String text, float dp) {
@@ -482,6 +573,10 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     private void clearAll() {
         if (launch.isPicking())
             launch.cancelPick();
+        if (areaPicker.isActive())
+            areaPicker.cancel();
+        areaPicker.clearDrawn();
+        drawnArea = null;
         launch.clear();
         lastFail = null;
         proposedNote = null;
@@ -607,14 +702,11 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                 @Override
                 public void onClick(View v) {
                     prefs.edit().putFloat(PREF_RADIUS_M, (float) m).apply();
-                    final GeoPoint p = launch.getPoint();
-                    if (p != null) {
-                        working = true;
-                        lastFail = null;
-                        overlay.computeFor(p, m);
-                        obstacles.load(p, m);
-                    }
-                    syncAll();
+                    // The circle only matters while no area is drawn.
+                    if (drawnArea == null)
+                        recompute();
+                    else
+                        syncAll();
                 }
             });
             circleTiles.addView(b);
@@ -746,11 +838,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     @Override
     public void onPicked(GeoPoint point) {
         launch.place(point);
-        working = true;
-        lastFail = null;
-        overlay.computeFor(point, radiusM());
-        obstacles.load(point, radiusM());
-        syncAll();
+        recompute();
     }
 
     @Override
@@ -854,7 +942,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
         ceilingFold.label(pluginContext.getString(R.string.ceiling),
                 c == null ? null : Units.altitudeMsl(c));
-        circleFold.label(pluginContext.getString(R.string.circle), Units.largeUnit(radiusM()));
+        circleFold.label(pluginContext.getString(R.string.area), extentWords());
         btnCeilingAbove.setText(pluginContext.getString(R.string.ceiling_above_launch,
                 Units.height(Units.feetToMeters(DEFAULT_ABOVE_LAUNCH_FT))));
         final boolean haveGround = !Double.isNaN(g);
@@ -892,13 +980,18 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     private String statusLine() {
         if (launch.isPicking())
             return pluginContext.getString(R.string.status_picking);
+        if (areaPicker.isActive())
+            return pluginContext.getString(R.string.status_drawing);
         if (working)
-            return pluginContext.getString(R.string.status_reading, Units.largeUnit(radiusM()));
+            return pluginContext.getString(R.string.status_reading, extentWords());
         if (lastFail != null)
             return lastFail;
         final TerrainGrid grid = overlay.getGrid();
-        if (grid == null)
+        if (grid == null) {
+            if (drawnArea != null && launch.getPoint() == null)
+                return pluginContext.getString(R.string.status_area_no_launch);
             return pluginContext.getString(R.string.status_idle);
+        }
 
         final StringBuilder sb = new StringBuilder();
         final Double c = overlay.getCeilingMslM();
@@ -917,7 +1010,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                         Units.altitudeMsl(hi)));
         }
         sb.append('\n').append(pluginContext.getString(R.string.terrain_detail,
-                Units.largeUnit(grid.radiusM), Units.height(grid.cellMeters)));
+                extentWords(), Units.height(grid.cellMeters)));
         if (grid.unknownCells > 0)
             sb.append('\n').append(String.format(Locale.US,
                     pluginContext.getString(R.string.missing_share),
@@ -930,6 +1023,18 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         if (proposedNote != null)
             sb.append('\n').append(proposedNote);
         return sb.toString();
+    }
+
+    /** "Circle 1 mi" or "Drawn area, 2.3 sq mi", for the status line and the row head. */
+    private String extentWords() {
+        if (drawnArea == null)
+            return pluginContext.getString(R.string.extent_circle, Units.largeUnit(radiusM()));
+        final TerrainGrid g = overlay.getGrid();
+        final double m2 = g != null && g.extent != null && !g.extent.isCircle()
+                ? g.areaM2() : Double.NaN;
+        return Double.isNaN(m2)
+                ? pluginContext.getString(R.string.extent_drawn)
+                : pluginContext.getString(R.string.extent_drawn_area, Units.area(m2));
     }
 
     /** The settings page in place of the list, or the list back. */
@@ -991,11 +1096,16 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             launch.cancelPick();
             syncAll();
         }
+        // The shape tool keeps running with the pane closed, as ATAK's own tools
+        // do; it ends when the pilot closes the shape or presses Back.
     }
 
     /** Called when the plugin itself is stopping. */
     public void onClosed() {
         onPaneClosed();
+        if (areaPicker.isActive())
+            areaPicker.cancel();
+        areaPicker.dispose();
         launch.dispose();
         overlay.setListener(null);
         obstacles.setListener(null);

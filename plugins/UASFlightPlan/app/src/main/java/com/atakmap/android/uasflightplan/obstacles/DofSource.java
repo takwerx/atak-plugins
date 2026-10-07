@@ -1,7 +1,7 @@
 package com.atakmap.android.uasflightplan.obstacles;
 
 import com.atakmap.android.uasflightplan.net.Http;
-import com.atakmap.android.uasflightplan.terrain.TerrainSampler;
+import com.atakmap.android.uasflightplan.terrain.Extent;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoBounds;
 import com.atakmap.coremap.maps.coords.GeoCalculations;
@@ -65,13 +65,13 @@ public final class DofSource {
     }
 
     /** Fetches on a worker; the callback lands on the main thread. */
-    public static void fetch(final GeoPoint center, final double radiusM, final Callback cb) {
-        page(center, radiusM, 0, new ArrayList<Obstacle>(), cb);
+    public static void fetch(final Extent extent, final Callback cb) {
+        page(extent, 0, new ArrayList<Obstacle>(), cb);
     }
 
-    private static void page(final GeoPoint center, final double radiusM, final int offset,
+    private static void page(final Extent extent, final int offset,
             final List<Obstacle> acc, final Callback cb) {
-        final GeoBounds box = TerrainSampler.boundsFor(center, radiusM);
+        final GeoBounds box = extent.bounds;
         final Map<String, String> form = new LinkedHashMap<>();
         form.put("where", "1=1");
         form.put("geometry", String.format(Locale.US,
@@ -101,7 +101,7 @@ public final class DofSource {
                         cb.onFailed("The FAA server refused the request.");
                         return;
                     }
-                    got = parse(root, center, radiusM, acc);
+                    got = parse(root, extent, acc);
                     more = root.optBoolean("exceededTransferLimit", false);
                 } catch (JSONException | java.io.UnsupportedEncodingException e) {
                     Log.w(TAG, "FAA response could not be read", e);
@@ -110,7 +110,7 @@ public final class DofSource {
                 }
                 final int fetched = offset + got;
                 if (more && got > 0 && fetched < MAX_ROWS) {
-                    page(center, radiusM, fetched, acc, cb);
+                    page(extent, fetched, acc, cb);
                     return;
                 }
                 Collections.sort(acc, new Comparator<Obstacle>() {
@@ -134,7 +134,7 @@ public final class DofSource {
     }
 
     /** Adds the rows inside the circle to {@code acc}; returns rows seen on the page. */
-    private static int parse(JSONObject root, GeoPoint center, double radiusM,
+    private static int parse(JSONObject root, Extent extent,
             List<Obstacle> acc) throws JSONException {
         final JSONArray features = root.optJSONArray("features");
         if (features == null)
@@ -149,9 +149,9 @@ public final class DofSource {
             final double lat = g.optDouble("y", Double.NaN);
             if (Double.isNaN(lat) || Double.isNaN(lon))
                 continue;
-            final double d = GeoCalculations.distanceTo(center, new GeoPoint(lat, lon));
-            if (d > radiusM)
+            if (!extent.contains(lat, lon))
                 continue;
+            final double d = GeoCalculations.distanceTo(extent.center, new GeoPoint(lat, lon));
             final double agl = a.optDouble("AGL", Double.NaN);
             final double amsl = a.optDouble("AMSL", Double.NaN);
             if (Double.isNaN(agl) && Double.isNaN(amsl))
