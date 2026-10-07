@@ -2,8 +2,6 @@ ATAK Plugin — UAS Flight Plan
 
 **Download UAS Flight Plan 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/uas-flight-plan/releases/download/v0.1/ATAK-Plugin-UASFlightPlan-0.1--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/uas-flight-plan/releases/download/v0.1/ATAK-Plugin-UASFlightPlan-0.1--5.7.0-civ-release.apk
 - **ATAK-CIV 5.8:** https://github.com/takwerx/uas-flight-plan/releases/download/v0.1/ATAK-Plugin-UASFlightPlan-0.1--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/uas-flight-plan/releases
@@ -48,6 +46,8 @@ _________________________________________________________________
 STATUS
 
 Version 0.1, first release, for feedback from UAS pilots in the field.
+Published for ATAK-CIV 5.8; the 5.6 and 5.7 builds follow with the next
+release.
 
 Exercised on hardware: Samsung Galaxy XCover Pro (ATAK-CIV 5.8.0.3), with
 DTED2 elevation loaded for southern California. Terrain readings checked
