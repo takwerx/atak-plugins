@@ -52,7 +52,7 @@ once, whatever source it came from.
 
 ## Signing in
 
-![The main pane with NIFC picked](screenshots/3_main_pane_signed_in.png)
+![Add a layer with NIFC picked and signed in](screenshots/3_main_pane_signed_in.png)
 
 In **Add Layer**, with NIFC picked, tap **Sign in**. The organization's own login page opens inside
 the pane, with multi-factor sign-in if the org uses it. The plugin never sees your
@@ -80,7 +80,7 @@ Fire Starts need no search: **Add perimeters**, **Add new starts**.
 
 ## Layers
 
-![Two layer rows](screenshots/7_layer_rows.png)
+![The main screen: Add Layer, Find, All ON, and the layers one line each](screenshots/7_main_screen.png)
 
 Each layer is one line: its name and **ON** or **OFF**. Tap it to turn the layer
 on or off. The arrow at the right opens its controls: a line saying how many
