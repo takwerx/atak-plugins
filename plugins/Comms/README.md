@@ -1,10 +1,10 @@
 ATAK Plugin — Comms
 
-**Download Comms 0.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Comms 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.7/ATAK-Plugin-Comms-0.7--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.7/ATAK-Plugin-Comms-0.7--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.7/ATAK-Plugin-Comms-0.7--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/comms/releases
 
@@ -49,6 +49,11 @@ Capabilities:
 
 _________________________________________________________________
 STATUS
+
+Version 0.8: one versionCode per APK. The same plugin as 0.7, rebuilt so that
+each ATAK target's APK carries its own versionCode, the plugin version and the
+ATAK version folded into one integer, which lets an MDM hold all three builds
+and push each one as an update. Nothing else changed.
 
 0.7 is the first public release: 387 California sites, 212 nets and 1,024
 channels, each site carrying at least one net and the tone that opens it, with

@@ -108,6 +108,279 @@ public final class Sources {
         return s;
     }
 
+    // ---- DART: NIFC personnel and vehicle last known locations ----------------------
+
+    /**
+     * The two DART feeds, both shared to the whole NIFC org. `Dart_AVLs` (no `_view`) is
+     * the Parent service, whose own item says it must not be shared beyond the DART
+     * Group; these are the internal views NIFC shares to the org and to EGP's WildFireSA
+     * Advanced. Read-only, and never republished as CoT: they are internal-to-NIFC
+     * positions of people, and a CoT reaches every EUD on the server.
+     */
+    static final String DART_PERSONNEL = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/DART_Personnel_EGP/FeatureServer";
+    static final String DART_VEHICLES = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/Dart_AVLs_view/FeatureServer";
+
+    /** Default scope: what is within this of the operator, until they pick an area. */
+    static final double DART_DEFAULT_RADIUS_M = 40000;
+
+    private static LayerSpec dart(String id, String title, String layerTitle, String base, String labelField,
+            String setField, String timeField) {
+        final LayerSpec s = new LayerSpec();
+        s.id = id;
+        s.title = title;
+        s.subtitle = "DART";
+        s.portal = NIFC_PORTAL; // the same portal as NIFS live, so one sign-in covers both
+        s.orgName = "NIFC";
+        s.base = base;
+        s.layerIds = new int[] { 0 };
+        s.where = "1=1";
+        s.geojson = false;
+        s.profile = LayerSpec.Profile.GENERIC;
+        s.labelField = labelField;
+        s.layerTitle = layerTitle;
+        s.setField = setField;
+        s.timeField = timeField;
+        s.live = true;
+        // A last known location moves about every 60 s, so a slower refresh draws the
+        // past. The change check is a few hundred bytes and the fetch only follows a
+        // change, so this is cheap even on a thin link.
+        s.refreshMinutes = 1;
+        s.sinceHours = 24; // both services are 24-hour views; asking for more returns nothing
+        s.iconSet = "dart"; // EGP's glyphs; see DartStyles
+        s.labelGsd = LayerSpec.DEFAULT_LABEL_GSD_WIDE; // callsigns from five miles in; fires get one
+        // What is in view, not what is around the operator. A phone with no fix has no
+        // position -- the XCover sat over a fire with DART on and fetched nothing, because
+        // the self marker had nothing to give -- and the thing being asked about is the
+        // part of the map being looked at. "me" stays available for locking to your own
+        // surroundings while scanning elsewhere.
+        s.scopeKind = "view";          // the operator's default: what is in view (2026-09-18)
+        s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
+        // Nationally 387 people and 3,981 vehicles, measured 2026-09-17. A scope keeps a
+        // fetch in the tens, and the cap is what stops a wide area drawing the country.
+        s.maxFeatures = 300;
+        return s;
+    }
+
+    /**
+     * People sharing a last known location: Field Maps "My Tracks", WFTAK and Garmin
+     * inReach, deduplicated by NIFC into one 24-hour view. Labeled by callsign, which
+     * only about a quarter of them have submitted; typed by resource_type, which is the
+     * field that carries IHC / ENG / OPS. Not `category`, which holds a cohort code.
+     */
+    public static LayerSpec dartPersonnel() {
+        return dart("dart-personnel", "Personnel", "Personnel", DART_PERSONNEL, "call_sign",
+                "resource_type", "location_timestamp");
+    }
+
+    static final String FIREGUARD = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/FireGuard_Project_Data/FeatureServer";
+
+    /**
+     * National FireGuard detections: the polygons the FireGuard analysts draw around a
+     * satellite heat detection, with type, acreage, urgency and jurisdiction. About 33 a
+     * day nationally, 750 in EGP's fourteen-day window, so no scope and no cap. Colored by
+     * age the way EGP colors them (FireGuardStyles); typed by IncidentType.
+     */
+    public static LayerSpec fireGuard() {
+        final LayerSpec s = new LayerSpec();
+        s.id = "nifc-fireguard";
+        s.title = "FireGuard";
+        s.subtitle = "NIFC";
+        s.layerTitle = "Detection";
+        s.portal = NIFC_PORTAL;
+        s.orgName = "NIFC";
+        s.base = FIREGUARD;
+        s.layerIds = new int[] { 0 };
+        s.where = "delete_feature <> 'Yes'"; // EGP's own filter; a deleted detection stays in the table
+        s.geojson = false;
+        s.profile = LayerSpec.Profile.GENERIC;
+        s.labelField = "SerialNumber";
+        s.setField = "IncidentType";
+        s.timeField = "CreationDate";
+        s.sinceHours = 24;
+        s.live = true;
+        s.refreshMinutes = 5;
+        s.iconSet = "fireguard";
+        s.labelGsd = LayerSpec.DEFAULT_LABEL_GSD_WIDE;
+        s.fillAlpha = 0x99; // the age ramp has to read; a quarter-alpha pale yellow does not
+        return s;
+    }
+
+    static final String NEW_STARTS = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Last24h/FeatureServer";
+    public static final String NEW_STARTS_ID = "nifc-new-starts";
+
+    /**
+     * New fire starts: IRWIN wildfires and prescribed fires found in the last 24 hours
+     * and not yet contained, controlled or out, NIFC's public "New Starts" view
+     * (operator, 2026-10-05: "this for new initial attack starts"). About a hundred
+     * nationally on an October afternoon, so the scope is a choice rather than a need
+     * and a national view is allowed (no ceiling, see LoadedLayer.viewCeilingM). Typed
+     * by NewStartsStyles: wildfire, wildfire with no size reported, prescribed fire.
+     */
+    public static LayerSpec newStarts() {
+        final LayerSpec s = new LayerSpec();
+        s.id = NEW_STARTS_ID;
+        s.title = "New Fire Starts";
+        s.subtitle = "NIFC";
+        s.layerTitle = "Fire Start";
+        s.portal = null; // public
+        s.base = NEW_STARTS;
+        s.layerIds = new int[] { 0 };
+        s.where = "1=1";
+        s.geojson = false;
+        s.profile = LayerSpec.Profile.GENERIC;
+        s.labelField = "IncidentName"; // the service's display field is the incident commander's name
+        s.setField = "IncidentTypeCategory";
+        s.timeField = "FireDiscoveryDateTime";
+        // A start's size and containment arrive as edits, after it was found; checking
+        // discovery time alone would call those refreshes "no change" and keep the old size.
+        s.stampField = "ModifiedOnDateTime_dt";
+        s.sinceHours = 24; // the service's own window; it holds nothing older
+        s.live = true;
+        s.refreshMinutes = 5; // the service is refreshed from IRWIN every 5 minutes
+        s.iconSet = "newstarts";
+        s.labelGsd = LayerSpec.DEFAULT_LABEL_GSD_WIDE;
+        s.scopeKind = "all"; // everywhere: the control's zero for this layer; a radius narrows it
+        s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
+        s.maxFeatures = 2000; // the service's own page; a national fetch is a few hundred
+        NewStartsStyles.notes(s);
+        return s;
+    }
+
+    static final String ONGOING = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer";
+    public static final String ONGOING_ID = "nifc-ongoing";
+
+    /**
+     * Ongoing fires: NIFC's public "Current Wildland Fire Incident Locations", every IRWIN
+     * wildfire, prescribed fire and complex not yet contained, controlled or out, with
+     * NIFC's fall-off rules (a fire under 10 acres goes after 3 days without an update,
+     * under 100 after 8, larger after 14). 408 on 2026-10-05. The last 24 hours are New
+     * Fire Starts' (operator: "split at 24 hours"), so with both on a fire shows once.
+     * Drawn and typed as New Fire Starts are; a fire with an InciWeb page carries it.
+     */
+    public static LayerSpec ongoingFires() {
+        final LayerSpec s = newStarts();
+        s.id = ONGOING_ID;
+        s.title = "Ongoing Fires";
+        s.layerTitle = "Fire";
+        s.base = ONGOING;
+        s.sinceHours = 0;
+        s.minAgeHours = 24;
+        s.iconSet = "ongoing";
+        return s;
+    }
+
+    static final String FIRE_PERIMETERS = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters/FeatureServer";
+    static final String FIRE_HISTORY = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/InterAgencyFirePerimeterHistory_All_Years_View/FeatureServer";
+    public static final String FIRE_HISTORY_ID = "nifc-fire-history";
+    static final double FIRE_HISTORY_LABEL_GSD = 2 * 1609.344 / ScaleBar.FALLBACK_BAR_PIXELS;
+
+    /**
+     * Fire History: where fires have burned, 1900 to today, as EGP draws it
+     * (FireHistoryStyles). Two public NIFC services as one layer: WFIGS Interagency
+     * Perimeters for the current decade (42,481 on 2026-10-06) and the InterAgency Fire
+     * Perimeter History for every year before (98,168). What is in view, simplified to
+     * the zoom, up to 250 km across.
+     */
+    public static LayerSpec fireHistory() {
+        final LayerSpec s = new LayerSpec();
+        s.id = FIRE_HISTORY_ID;
+        s.title = "Fire History";
+        s.subtitle = "NIFC";
+        s.layerTitle = "Burn";
+        s.portal = null;
+        s.base = FIRE_PERIMETERS;
+        s.layerIds = new int[] { 0, 0 };
+        s.sourceBases = new String[] { FIRE_PERIMETERS, FIRE_HISTORY };
+        s.generalize = true;
+        s.where = "1=1";
+        s.geojson = false;
+        s.profile = LayerSpec.Profile.GENERIC;
+        s.live = false;
+        s.refreshMinutes = 0; // history: fetched as the map moves, not on a clock
+        s.iconSet = "firehistory";
+        s.fillAlpha = 0x80; // EGP draws it half see-through
+        // Names from 2 mi on the scale bar in. EGP's 1:320,000 (about 85 m/px, 10 mi on
+        // the bar) is a desktop screen's level; on a phone the names covered each other,
+        // and Go there, which stops at the label level, landed too far out (operator,
+        // 2026-10-06).
+        s.labelGsd = FIRE_HISTORY_LABEL_GSD;
+        s.scopeKind = "view";
+        s.scopeRadiusM = DART_DEFAULT_RADIUS_M;
+        s.maxFeatures = 2500;
+        FireHistoryStyles.notes(s);
+        return s;
+    }
+
+    /** USFS and DOI fire vehicles, every row inside 24 hours and most inside the hour. */
+    public static LayerSpec dartVehicles() {
+        return dart("dart-vehicles", "Vehicles", "Vehicle", DART_VEHICLES, "ResourceName", "ResourceType",
+                "DateTime");
+    }
+
+    /**
+     * Re-applies what the plugin owns to a restored layer. A saved layer carries the
+     * definition it was added with, so a built-in source that gains a field in a new
+     * build keeps drawing the old way: DART's EGP symbology never appeared because
+     * {@code iconSet} was null in JSON saved before that field existed, so the styling
+     * code was never even asked (2026-09-17).
+     *
+     * <p>Only fields the plugin decides are touched. The operator's own choices -- the
+     * scope, which types are switched on, whether labels show -- are left alone.
+     */
+    public static void migrate(LayerSpec s) {
+        if (s == null || s.id == null)
+            return;
+        final LayerSpec now = "dart-personnel".equals(s.id) ? dartPersonnel()
+                : "dart-vehicles".equals(s.id) ? dartVehicles()
+                : "nifc-fireguard".equals(s.id) ? fireGuard()
+                : NEW_STARTS_ID.equals(s.id) ? newStarts()
+                : ONGOING_ID.equals(s.id) ? ongoingFires()
+                : FIRE_HISTORY_ID.equals(s.id) ? fireHistory() : null;
+        if (now == null)
+            return;
+        s.base = now.base;
+        s.layerIds = now.layerIds;
+        s.title = now.title;
+        s.subtitle = now.subtitle;
+        s.layerTitle = now.layerTitle;
+        s.portal = now.portal;
+        s.orgName = now.orgName;
+        s.profile = now.profile;
+        s.iconSet = now.iconSet;
+        s.labelField = now.labelField;
+        s.setField = now.setField;
+        s.timeField = now.timeField;
+        s.stampField = now.stampField;
+        s.minAgeHours = now.minAgeHours;
+        s.sourceBases = now.sourceBases;
+        s.generalize = now.generalize;
+        s.maxFeatures = now.maxFeatures;
+        for (java.util.Map.Entry<String, String> n : now.setNotes.entrySet()) {
+            s.setNotes.put(n.getKey(), n.getValue());
+            if (!s.setKind.containsKey(n.getKey()))
+                s.setKind.put(n.getKey(), now.setKind.get(n.getKey()));
+        }
+        // DART's views hold 24 hours and nothing else, so its window is the plugin's;
+        // New Fire Starts has a window control and the operator's choice stands.
+        if (!NEW_STARTS_ID.equals(s.id) || s.sinceHours <= 0 || s.sinceHours > now.sinceHours)
+            s.sinceHours = now.sinceHours;
+        // The scope is the operator's choice and the pane has a control for it now; a
+        // saved layer keeps whatever they set. Only a layer with no scope at all gets the
+        // default.
+        if (s.scopeKind == null) {
+            s.scopeKind = now.scopeKind;
+            s.scopeRadiusM = now.scopeRadiusM;
+        }
+        // The first New Fire Starts build defaulted to what is in view, which this layer
+        // no longer offers: its zero is everywhere.
+        // The first Fire History build labeled from EGP's desktop level; a layer still on it
+        // takes the phone's.
+        if (FIRE_HISTORY_ID.equals(s.id) && s.labelGsd == 85)
+            s.labelGsd = FIRE_HISTORY_LABEL_GSD;
+        if ((NEW_STARTS_ID.equals(s.id) || ONGOING_ID.equals(s.id)) && "view".equals(s.scopeKind))
+            s.scopeKind = "all";
+    }
+
     /** A whole feature service from a user's own org: every layer, generic symbology, capped. */
     /** CA Air Intel: statewide fire perimeters from FIRIS, CAL FIRE intel flights, USFS, NIFC and WFIGS, public. */
     static final String CA_AIR_INTEL = "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/CA_Perimeters_NIFC_FIRIS_public_view/FeatureServer";

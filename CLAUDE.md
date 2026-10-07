@@ -158,8 +158,9 @@ list and search show, and they are invisible from inside the README:
 "Before you start" note listing which ATAK versions have published builds.
 
 **How a guide gets built — shot list first.** The guide and the typst manual
-are written around screenshots, and the screenshots come from a signed build
-on an official phone (a dev build watermarks every frame). The order is fixed:
+are written around screenshots. Pictures where the map is the point come from a
+signed build on an official phone (a dev build watermarks the map); pictures of
+the plugin's own UI do not, see below. The order is fixed:
 
 1. Write `../atak-plugins-notes/docs/SHOTLIST-<Name>-manual.md`: framing rules,
    then a table of numbered shots (section, what it shows, crop). Cam Depot's
@@ -173,6 +174,22 @@ on an official phone (a dev build watermarks every frame). The order is fixed:
    manual's set into `docs/user_manual/` as `<n>.png`.
 4. Write USER_GUIDE.md and `usermanual.typ` around them, add the Tool
    Preferences entry if the plugin has none, and submit the second build.
+
+**UI pictures come from the dev build, in the same submission.** A picture of
+the plugin's own UI (the pane, a dialog, a menu, a settings list) is a crop,
+and the DEVELOPER BUILD watermark sits on the map, never inside a pane or a
+dialog. So the session shoots it on the dev phone with the local build, crops
+it to the pane or the dialog, and commits it with the change that altered the
+screen. Before zipping any change that alters a screen the manual shows, grep
+the manual and guide for that screen and retake those pictures first. Never
+leave a UI picture for "the signed build": Atmosphere 0.3 went to tak.gov on
+2026-09-28 with two stale pictures listed that way, and the operator had to
+resubmit (*"anytime we can take and crop use the dev build and not waste a
+trip. like menus ... that arent map features"*). Only map shots wait for the
+signed build, and the operator frames those on the screenshot phone.
+`submission-zip.sh` stops when a release changes layouts, strings or UI code
+and no manual picture; `PICTURES_CHECKED=1` answers it when the manual shows
+none of those screens, or only map shots need retaking. `/ship` asks again.
 
 A plugin's *support surface* is its own repo: its Releases carry the
 tak.gov-signed APKs, its Issues take the bug reports. Anything that is not a
@@ -188,7 +205,28 @@ public repos. `/ship` covers the subtree push and the per-plugin release.
 ## Plugin UI standard — look like ATAK, not like a plugin
 
 Every takwerx plugin uses the same controls, so a user moving between them is not
-learning a new dialect each time. `CamDepot` is the reference implementation.
+learning a new dialect each time.
+
+**The pane itself has one shape, and it is written down in the `plugin-ui` skill
+(`.claude/skills/plugin-ui/SKILL.md`). It is the baseline a new plugin starts
+from: load it when writing a new plugin's PLAN and building its pane. Existing
+plugins keep what they have unless the operator asks to change them.** The short
+version: a main screen
+of three buttons (map switch | Settings | Notify) with the list straight under
+it; everything set once and left on a Settings page of drop-down rows reading
+`Name: value`; switches that say `<Thing> ON` / `OFF` in green or red text; a
+zoom gate stored and compared as the distance ATAK's scale bar reads; Area and
+Where as separate filters; one rule behind the list, the map and the map key;
+and a status line naming everything that is not shown. It was worked out across
+Feature Layer, Atmosphere, IPAWS, Evac Zone and Traffic, so a new plugin should
+not have to be taught it again. The rules below are the base it builds on.
+
+**When the operator likes something and says it should be the standard** ("make
+this the standard", "I want this in my other plugins"), add it to the skill the
+same day, from any session: a `tooling-<topic>` branch in `atak-plugins-tooling`,
+then `/ship tooling`. A memory alone is not enough; memory is recalled by chance,
+the skill is loaded for every new plugin. It changes new plugins only, never the
+existing ones unless the operator asks there.
 
 **Use ATAK's own button drawables.** `new-plugin.sh` already copies them out of the
 SDK template — `btn_gray` is a selector over `new_dark_button_bg` /
@@ -244,7 +282,11 @@ silently trimmed map reads as the whole picture.
 
 ## The SDK lives outside this repo
 
-- Path: `~/atak-sdk/ATAK-CIV-<version>/` (currently `ATAK-CIV-5.6.0.8`).
+- Path: `~/atak-sdk/ATAK-CIV-<version>/`, one per target, all from tak.gov:
+  `5.6.0.23`, `5.7.0.14`, `5.8.0.3` (`local-properties.sh` picks the newest per
+  target). `5.6.0.8` is older and only still supplies `takdev.plugin`. The open
+  source at `TAK-Product-Center/atak-civ` (checked out at `~/atak-sdk/atak-civ-source`)
+  stops at 5.5.1.10 and is not what any plugin builds against.
 - Contains `main.jar` (the ATAK API you compile against), `atak-gradle-takdev.jar`
   (the Gradle plugin), `android_keystore` (shared dev signing key), `atak.apk`
   (the matching ATAK build to sideload), `ATAK_Plugin_Development_Guide.pdf`, and
@@ -366,7 +408,8 @@ produces a plugin that builds fine and then refuses to load:
   not to change these, and the third-party publication pipeline expects the resulting
   `ATAK-Plugin-<name>-<ver>-<gitsha>-<atakver>.apk` naming. The one deliberate
   departure is `versionCode`: it is `PLUGIN_VERSION_CODE`, derived from
-  `PLUGIN_VERSION`, never the SDK's `getVersionCode()` — see the release checklist.
+  `PLUGIN_VERSION` and `ATAK_VERSION`, never the SDK's `getVersionCode()` — see
+  the release checklist.
 
 ## Release builds differ from debug builds — test the release APK
 
@@ -587,9 +630,23 @@ It reads the plugin, version and ATAK target off the APK name inside, files the
 APK and AAB under `dist/signed/` and the scans under
 `dist/scans/<Plugin>/<version>/<target>/`, and then gates on what decides whether
 a build is fit to publish: the signer is the TAK Product Center, the versionCode
-is `MAJOR*10000+MINOR*100+PATCH`, the versionName agrees with the file name, the
+is the one `PLUGIN_VERSION` and the ATAK target derive (release checklist), the
+versionName agrees with the file name, the
 package id and signing certificate match the last signed release, and Fortify
 rendered zero results. It exits non-zero on a real finding.
+
+**A Fortify finding the operator has accepted is recorded, not worked around.**
+Some findings cannot be cleared because they describe the design: the Market
+fetches what its catalog names, and Fortify's SSRF rule follows that data to
+the connection whatever the code checks on the way. The operator's decision
+to accept one goes in `../atak-plugins-notes/fortify-accepted.txt` as
+`Plugin|Category|File|record`, with the record (`docs/FORTIFY-ACCEPTED-...md`)
+saying what the finding is, why it cannot be cleared, what holds instead and
+what would reopen it. The intake matches a finding on all three fields, reads
+them from the scan's own results (`audit.fvdl` inside `scan_results.fpr`),
+prints it as ACCEPTED and passes; any other finding still fails. The first
+was the Market's SSRF on 2026-09-20, after the two path findings beside it
+were fixed. Never add a line without that decision and that record.
 
 **Dependency-Check needs a human's eye and the script gives it one.** The scanner
 opens every archive in the build, including Android assets the packager has
@@ -674,6 +731,24 @@ Policy the scrub enforces, in words:
 - The notes repo is where a denylist entry is added the moment something
   sensitive shows up anywhere; the scrub then holds the line mechanically.
 
+## Our own skill — `takwerx/atak-plugin-pipeline`
+
+`skills/atak-plugin-pipeline/` is this pipeline packaged for developers outside
+takwerx, published as the public repo `takwerx/atak-plugin-pipeline` (MIT). It
+reaches that repo the way a plugin reaches its own, by subtree push from `main`:
+
+```bash
+git subtree split --prefix=skills/atak-plugin-pipeline -b pipeline-export
+git push https://github.com/takwerx/atak-plugin-pipeline.git pipeline-export:refs/heads/main
+```
+
+Its scripts are **deliberate forks** of `scripts/`, not links: they drop the
+worktrees, the notes repo, the depot catalog and `/ship`, and resolve a plugin
+through `plugin_dir()` instead of assuming `plugins/<Name>/`. So a fix to a gate
+here is a fix there too, in the same tooling branch, or the public copy drifts.
+It must never carry an SDK artifact, a takwerx server, catalog or fleet detail,
+or a notes-repo path; its own CI refuses binaries and SDK file names.
+
 ## The `atak-plugin` skill — useful, but this file wins
 
 `joshuafuller/atak-plugin-skill` is installed at `~/.claude/skills/atak-plugin` and
@@ -714,8 +789,9 @@ Work through this before building submission zips. None of it is theoretical.
 **Think like the MDM and the package manager, not only the plugin loader.** The
 fleet gets these plugins pushed by Watchtower MDM. A release that sideloads fine
 but cannot be pushed as an update is a broken release: same package name, same
-signer, a `versionCode` higher than the last release, and one APK per ATAK
-target the fleet runs. When a new fleet-side failure turns up, add a mechanical
+signer, one APK per ATAK target the fleet runs, and a `versionCode` that is
+higher than the last release on that target and different from every other
+target of the release. When a new fleet-side failure turns up, add a mechanical
 check for it the same day.
 
 **Two icons, not one.** `android:icon` is what Android shows on **light**
@@ -756,17 +832,38 @@ Cam Depot 1.3 exists only to carry the fix. Sideloading and the Market never
 showed it, because the system installer replaces a same-version-code package.
 
 So every plugin's `app/build.gradle` sets `versionCode = PLUGIN_VERSION_CODE`,
-computed from `PLUGIN_VERSION` as `MAJOR*10000 + MINOR*100 + PATCH` (1.3 →
-10300), the same on every machine. `new-plugin.sh` writes it, and
+computed from `PLUGIN_VERSION`, at first as `MAJOR*10000 + MINOR*100 + PATCH`
+(1.3 → 10300), the same on every machine. `new-plugin.sh` writes it, and
 `submission-zip.sh` reads the clean-extract APK with `aapt` and fails the zip
 when the code is not that number.
+
+**One code per release was not enough: the ATAK target is folded in too.** A
+release is one APK per ATAK version, all the same package, and on 2026-09-20 an
+MDM handed the 5.7 and 5.8 builds of Feature Layer 0.9 reported an incompatible
+build (takwerx/feature-layer#1): both said code 900 and the hashes differed, so
+it could neither upgrade one with the other nor treat them as one file.
+Watchtower had accepted Cam Depot 1.3 because only one target was loaded. Since
+2026-09-20 the code is `(MAJOR*10000 + MINOR*100 + PATCH) * 10000 + ATAK_MAJOR*1000
++ ATAK_MINOR*10 + ATAK_PATCH`, from `PLUGIN_VERSION` and `ATAK_VERSION` (1.3 on
+5.8.0 → 103005080), so the three builds of a release carry three codes, ordered
+5.6 < 5.7 < 5.8, and every release is above the last on every target. Every
+new-scheme code is above every old one, so the switch is a plain upgrade on
+every phone. The ceilings are plugin major 20, ATAK major 9, ATAK patch 9; the
+build throws past them. `check-version-code.sh --signed` reads each target's
+last signed APK and requires the new code above it, and refuses two targets of
+one release with one code. What it costs: the 5.8 build orders above the 5.7
+build, so moving a phone *down* an ATAK version needs the plugin uninstalled
+first; moving up takes the matching plugin as a normal update. And a unique
+code lets an MDM hold every target of a release, it does not pick the right
+one: the 5.8 build installs on any phone and only ATAK refuses to load it, so
+the MDM assigns each build to a device group by ATAK version.
 
 `scripts/check-version-code.sh <Plugin>` holds the rest of the rule, and it
 is the rule: the version is above every release in `~/atak-dist/signed/` (a
 resubmission is a new version; `--target` lets one target that was never
 signed be re-zipped), and with `--signed` this version's APKs are all present,
-one per target the README links, carry that code, and keep the package name
-and signing certificate of the last release. `submission-zip.sh` runs it per
+one per target the README links, carry that target's code, and keep the package
+name and signing certificate of the last release. `submission-zip.sh` runs it per
 target before zipping, `/ship` runs it with `--signed --live`, and
 `release-links-guard.sh` blocks the subtree push and `gh release create` on a
 FAIL. Watchtower accepted Cam Depot 1.3 as the update to 1.2 on 2026-09-06,
@@ -824,6 +921,54 @@ release exists, and `.claude/hooks/release-links-guard.sh` blocks the subtree
 push and `gh release create` when the check fails. When a version is skipped
 or folded into the next one, re-stamp the block in the same commit that bumps
 `PLUGIN_VERSION`.
+
+## Downloaded data survives a restart with no network
+
+Once a plugin has downloaded something a crew uses in the field, it comes back
+after ATAK or the phone restarts **with no network**, whether its layer was on
+or off. The operator's words (2026-10-06), on finding Feature Layer deleted a
+switched-off layer and kept it only in memory: *"layers once synced need to
+come back on if phone is restarted and have no internet ... I can't believe I
+did not make that a requirement."* Field phones lose signal, and ATAK restarts
+on its own under low memory.
+
+Decide per kind of data, and write the decision in the PLAN:
+
+- **Keep** reference and incident data: perimeters, zones, fire history,
+  obstacles, infrastructure, sites and frequencies, map packages, camera
+  locations, closures and road work, heat detections, alerts and TFRs. A
+  time-limited item past its end is shown as expired, never silently as current.
+- **Do not keep** what is live by nature and misleading when old: video, stills,
+  traffic-flow tiles, crash reports. Atmosphere decides its own.
+
+How:
+
+- **On/off and filters hide, never delete.** With a feature store: write every
+  fetched feature, hide with `setFeatureSetVisible` on a `visibleOnly`
+  `FeatureLayer3` (which also drops a hidden set's labels), and create new sets
+  with the current visibility. Feature Layer `9932483` is the reference.
+- **The pane comes back too.** The list, counts, details on tap and the time of
+  the last good fetch are rebuilt from disk. A map that draws while the pane says
+  "0", or a tap that says "expired", is the gap, not a fix.
+- **A failed fetch never empties anything; a partial one merges** with what is held.
+- **Say it in words** on the status line: `No network, showing what this phone
+  saved 2 h ago.`, never the host error.
+- **Files go in `FileSystemUtils.getItem("tools/<plugin>")`**, written to a temp
+  file and renamed, never in Android's cache dir, which the system clears.
+
+**It is not only downloads.** Anything the operator set up on the map, a
+launch point, a drawn area, a mode, a typed number, comes back too and repaints
+at start (UAS Flight Plan lost its launch point at every reload, 2026-10-06:
+*"i thought we had a new rule about this sort of data survives restarts"*).
+Stopping takes things off the map and forgets nothing; only the user's own
+Clear forgets.
+
+Test it on a device before the ship prompt: switch the layer off,
+`adb shell svc wifi disable` (adb over USB keeps working), restart ATAK, switch
+it on, then `svc wifi enable`. Test a reinstall as well as a kill: a force-stop
+never runs the plugin's `onStop`, an install or upgrade does, and UAS Flight
+Plan passed the kill while every reinstall lost the plan. Where every plugin stood on 2026-10-06, with the
+fix for each: `../atak-plugins-notes/docs/AUDIT-2026-10-06-offline-after-restart.md`.
 
 ## Anything that keeps running after the tap
 

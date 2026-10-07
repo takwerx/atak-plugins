@@ -1,17 +1,17 @@
 # Cam Depot for ATAK — User Guide
 
-**Version 1.3 · takwerx**
+**Version 1.5 · takwerx**
 
-**Download Cam Depot 1.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cam Depot 1.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.3/ATAK-Plugin-CamDepot-1.3--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.3/ATAK-Plugin-CamDepot-1.3--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.3/ATAK-Plugin-CamDepot-1.3--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.5/ATAK-Plugin-CamDepot-1.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.5/ATAK-Plugin-CamDepot-1.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.5/ATAK-Plugin-CamDepot-1.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cam-depot/releases
 
 Cam Depot puts public traffic and wildfire cameras on the ATAK map — roughly
-38,000 of them across 54 states and provinces, from state departments of
+43,000 of them across 55 states and provinces, from state departments of
 transportation, the FAA, and the wildfire lookout networks. You pick an area,
 filter down to what you want, and bring it in. Tap a camera for its latest
 picture; where the agency publishes a stream, play it as live video inside ATAK.
@@ -214,7 +214,7 @@ Where the agency publishes a stream, **Live video** plays it in ATAK's own playe
 
 Not every camera has one. A camera that only publishes pictures says
 **Video (still only)** rather than offering a button that cannot work. Of the
-38,000 cameras in the catalog, about 10,500 stream.
+43,000 cameras in the catalog, about 16,500 stream.
 
 Streams are checked before they are published, so a camera that offers video was
 serving video when the catalog was built. Agencies do have outages; when one does,

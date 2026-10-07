@@ -1,10 +1,10 @@
 ATAK Plugin — Map Depot
 
-**Download Map Depot 1.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.11** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.6/ATAK-Plugin-MapDepot-1.6--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.6/ATAK-Plugin-MapDepot-1.6--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.6/ATAK-Plugin-MapDepot-1.6--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.11/ATAK-Plugin-MapDepot-1.11--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.11/ATAK-Plugin-MapDepot-1.11--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.11/ATAK-Plugin-MapDepot-1.11--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -61,12 +61,32 @@ nothing has to be imported by hand afterwards:
 Any folder in either archive can be pinned to the top of the list, so a crew
 assigned to a fire reaches it in one tap rather than four.
 
-The catalog is fetched at runtime and cached, so a device that has been to the
-depot once still shows what it holds when there is no signal. The two incident
-archives are read live, since what they hold changes through the day.
+The catalog is fetched at runtime and saved on the phone, so a device that has
+been to the depot once still shows what it holds when there is no signal. The
+three incident archives are read live, since what they hold changes through the
+day; with no signal their list is the maps already on the phone and the pinned
+fires.
 
 _________________________________________________________________
 STATUS
+
+Version 1.11: the plugin's lists come back with no network. The incident map
+list shows the maps on the phone and the pinned fires instead of an empty list,
+the saved catalog moves out of Android's cache folder (which the system empties
+when storage runs low) to atak/tools/mapdepot, and a reply from the depot that
+is not a catalog can no longer replace the saved copy. Each section says "No
+network" and how old its saved list is. Offline Public Land Vector Tiles is
+offered again on official ATAK-CIV 5.8.0.5, which fixed the start-up crash
+behind the 1.5 gate (TAK Product Center ATAK-21131); 5.8.0.4 stays gated.
+1.10 went to tak.gov once and was superseded before publication: its scan
+read a folder name in an error message as a system information leak.
+
+Version 1.9: a downloaded region that inflates to nothing is refused instead
+of hashed, and the hash is finalized with data in hand (tak.gov's Fortify
+scan flagged the digest on 1.7 and 1.8). 1.9 also carries the change 1.7 was
+built for: each ATAK target's APK has its own versionCode, so an MDM can hold
+all three builds and push each one as an update. 1.7 and 1.8 each went to
+tak.gov once and were superseded on the scan finding before publication.
 
 Version 1.6. Verified on ATAK-CIV 5.8.0.3 (SDK build) and, as the tak.gov-signed
 builds, on official ATAK-CIV 5.6.0.18 and 5.8.0.4 -- on the latter the gate,

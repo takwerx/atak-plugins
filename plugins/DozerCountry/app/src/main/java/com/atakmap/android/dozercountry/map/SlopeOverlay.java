@@ -149,6 +149,7 @@ public final class SlopeOverlay {
 
     /** Removes the painting and the legend, leaving the layer in place for the next area. */
     public void clear() {
+        lastArea = null;
         generation.incrementAndGet();
         lastField = null;
         layer.clear();
@@ -162,7 +163,16 @@ public final class SlopeOverlay {
      * Samples the area and paints it. Returns immediately; the listener is called on
      * the main thread when the work is done.
      */
+    /** The last area computed, so a change of machine can repaint the same ground. */
+    private Area lastArea;
+
+    /** The last area computed, or null. */
+    public Area getLastArea() {
+        return lastArea;
+    }
+
     public void computeFor(final Area area) {
+        lastArea = area;
         final GeoBounds bounds = area.bounds;
         // A pane left on screen by a plugin reload still holds a reference to the
         // overlay that was stopped underneath it. Its worker is shut down, so handing
