@@ -81,9 +81,8 @@ polygon tool: tap each corner, then tap the first corner to close the shape.
 Undo and End Shape are on ATAK's toolbar.
 
 The shape replaces the circle. If no launch point is placed yet, the plugin
-asks for it the moment the shape closes:
-
-![Where will you launch](screenshots/6_where_launch.png)
+asks for it the moment the shape closes, with just two choices: **My
+position** or **Tap the map**.
 
 Starting a new area removes the old one at once. The shape is one of your own
 ATAK drawings, so it comes back when ATAK restarts and the plugin picks it up.
@@ -169,10 +168,14 @@ change it.
 - **Types**: which kinds show, with the count of each in the area.
   Transmission towers, wire spans, towers, turbines, stacks and tanks are on;
   buildings, poles and solar panels are off.
+
+  ![The Types row](screenshots/14_types.png)
 - **Height above terrain**: how high above the ground you fly. Both ceiling
   modes use it.
 - **Area**: the circle size when no area is drawn.
 - **Map key**: what the colors mean.
+
+  ![The Map key](screenshots/15_map_key.png)
 
 ---
 
@@ -182,10 +185,14 @@ change it.
   MSL.** How much of the area is unworkable at this ceiling.
 - **Only DTED0 covers this ground. That is too coarse...** No paint until
   finer elevation is loaded.
+
+  ![No terrain data](screenshots/16_no_terrain_data.png)
 - **117 more hidden by the filters.** Obstacles the height and type filters
   are keeping off the map.
 - **No answer from the FAA; showing what this phone saved for this area.**
   No network; the last fetch for this same area is in use.
+
+  ![Offline](screenshots/17_offline.png)
 - **Map off.** The Islands switch is off; the plan is still there.
 
 ---
