@@ -205,9 +205,10 @@ public final class TerrainSampler {
         if (Double.isNaN(hae))
             return Double.NaN;
         final double msl = toMsl(p, hae, reference);
+        // The point itself stays out of the log (it can be the phone's own fix).
         Log.d(TAG, String.format(java.util.Locale.US,
-                "ground at %.5f,%.5f: engine %.1f m %s, geoid offset %.1f m, %.1f m MSL",
-                p.getLatitude(), p.getLongitude(), hae, reference, hae - msl, msl));
+                "ground at the launch point: engine %.1f m %s, geoid offset %.1f m, %.1f m MSL",
+                hae, reference, hae - msl, msl));
         return msl;
     }
 

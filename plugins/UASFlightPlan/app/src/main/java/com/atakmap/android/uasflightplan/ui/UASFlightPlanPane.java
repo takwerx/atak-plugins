@@ -8,6 +8,7 @@ import android.preference.PreferenceManager;
 import android.text.InputType;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -22,6 +23,9 @@ import com.atakmap.android.maps.Marker;
 import com.atakmap.android.uasflightplan.data.Units;
 import com.atakmap.android.uasflightplan.map.IslandOverlay;
 import com.atakmap.android.uasflightplan.map.LaunchPoint;
+import com.atakmap.android.uasflightplan.map.ObstacleOverlay;
+import com.atakmap.android.uasflightplan.obstacles.Obstacle;
+import com.atakmap.android.uasflightplan.obstacles.ObstacleManager;
 import com.atakmap.android.uasflightplan.plugin.R;
 import com.atakmap.android.uasflightplan.terrain.TerrainGrid;
 import com.atakmap.coremap.maps.coords.GeoPoint;
@@ -42,7 +46,7 @@ import java.util.Locale;
  * field that went away with the view.
  */
 public final class UASFlightPlanPane implements IslandOverlay.Listener,
-        LaunchPoint.Callback {
+        LaunchPoint.Callback, ObstacleManager.Listener {
 
     /** Proposed ceiling, feet above the launch ground, until the pilot sets one. */
     static final double DEFAULT_ABOVE_LAUNCH_FT = 1000d;
@@ -58,8 +62,12 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     private final Context host;
     private final MapView mapView;
     private final IslandOverlay overlay;
+    private final ObstacleManager obstacles;
     private final LaunchPoint launch;
     private final SharedPreferences prefs;
+    private final ObstacleAdapter adapter;
+    private final TextView listHeading;
+    private final Fold obstaclesFold;
 
     private final TextView status;
     private final ListView list;
@@ -91,6 +99,11 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         boolean open;
 
         Fold(View page, int headId, int chevronId, int bodyId, String pref) {
+            this(page, headId, chevronId, bodyId, pref, true);
+        }
+
+        /** @param headOpens false for a row whose head is a switch: only the arrow opens it */
+        Fold(View page, int headId, int chevronId, int bodyId, String pref, boolean headOpens) {
             head = page.findViewById(headId);
             chevron = page.findViewById(chevronId);
             body = page.findViewById(bodyId);
@@ -104,7 +117,8 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                     show();
                 }
             };
-            head.setOnClickListener(flip);
+            if (headOpens)
+                head.setOnClickListener(flip);
             chevron.setOnClickListener(flip);
             show();
         }
@@ -120,12 +134,13 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     }
 
     public UASFlightPlanPane(View root, Context pluginContext, MapView mapView,
-            IslandOverlay overlay) {
+            IslandOverlay overlay, ObstacleManager obstacles) {
         this.root = root;
         this.pluginContext = pluginContext;
         this.host = mapView.getContext();
         this.mapView = mapView;
         this.overlay = overlay;
+        this.obstacles = obstacles;
         this.launch = new LaunchPoint(mapView, pluginContext, this);
         this.prefs = PreferenceManager.getDefaultSharedPreferences(host);
 
@@ -135,9 +150,17 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         final View header = PluginLayoutInflater.inflate(pluginContext,
                 R.layout.controls_header, null);
         list.addHeaderView(header, null, false);
-        // A header is only drawn once there is an adapter, even an empty one.
-        list.setAdapter(new ArrayAdapter<String>(host,
-                android.R.layout.simple_list_item_1, new ArrayList<String>()));
+        adapter = new ObstacleAdapter();
+        list.setAdapter(adapter);
+        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                final int i = position - list.getHeaderViewsCount();
+                if (i >= 0 && i < adapter.getCount())
+                    obstacles.panTo(adapter.getItem(i));
+            }
+        });
+        listHeading = header.findViewById(R.id.list_heading);
 
         btnIslands = header.findViewById(R.id.btn_islands);
         btnLaunch = header.findViewById(R.id.btn_launch);
@@ -163,6 +186,14 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             }
         });
 
+        obstaclesFold = new Fold(settings, R.id.fold_obstacles_head, R.id.fold_obstacles_chev,
+                R.id.fold_obstacles_body, PREF_FOLD + "obstacles", false);
+        obstaclesFold.head.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                obstacles.setEnabled(!obstacles.isEnabled());
+            }
+        });
         ceilingFold = new Fold(settings, R.id.fold_ceiling_head, R.id.fold_ceiling_chev,
                 R.id.fold_ceiling_body, PREF_FOLD + "ceiling");
         circleFold = new Fold(settings, R.id.fold_circle_head, R.id.fold_circle_chev,
@@ -184,8 +215,47 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         if (c != null)
             overlay.setCeiling(c);
 
+        final Double cft = ceilingFt();
+        if (cft != null)
+            obstacles.setCeiling(cft);
         overlay.setListener(this);
+        obstacles.setListener(this);
         syncAll();
+    }
+
+    /** One row per obstacle, nearest first: the kind and height, then what else is known. */
+    private final class ObstacleAdapter extends ArrayAdapter<Obstacle> {
+        ObstacleAdapter() {
+            super(host, 0, new ArrayList<Obstacle>());
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            final View row = convertView != null ? convertView
+                    : PluginLayoutInflater.inflate(pluginContext, R.layout.obstacle_row, null);
+            final Obstacle o = getItem(position);
+            final double ceilingFt = obstacles.getCeilingMslFt();
+            final boolean above = !Double.isNaN(ceilingFt) && o.aboveCeiling(ceilingFt);
+            row.findViewById(R.id.bar).setBackgroundColor(
+                    above ? ObstacleOverlay.ABOVE_ARGB : ObstacleOverlay.BELOW_ARGB);
+            ((TextView) row.findViewById(R.id.kind)).setText(String.format(Locale.US,
+                    "%s, %s AGL", o.kind(), Units.height(Units.feetToMeters(o.aglFt))));
+            final StringBuilder d = new StringBuilder();
+            if (!Double.isNaN(o.amslFt))
+                d.append(pluginContext.getString(R.string.top_at,
+                        Units.altitudeMsl(Units.feetToMeters(o.amslFt))));
+            if (above)
+                d.append(d.length() > 0 ? ", " : "")
+                        .append(pluginContext.getString(R.string.row_above_ceiling));
+            d.append(d.length() > 0 ? ", " : "").append(o.lightingWords());
+            d.append(", ").append(pluginContext.getString(
+                    o.isVerified() ? R.string.row_verified : R.string.row_unverified));
+            if (!o.city.isEmpty())
+                d.append(", ").append(o.city);
+            ((TextView) row.findViewById(R.id.detail)).setText(d.toString());
+            ((TextView) row.findViewById(R.id.distance)).setText(Units.distance(o.distanceM));
+            return row;
+        }
     }
 
     /* ----- wiring ----- */
@@ -306,6 +376,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         proposedNote = null;
         working = false;
         overlay.clear();
+        obstacles.clear();
     }
 
     /* ----- the ceiling ----- */
@@ -325,6 +396,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         prefs.edit().putFloat(PREF_CEILING_FT, (float) ft).apply();
         proposedNote = null;
         overlay.setCeiling(Units.feetToMeters(ft));
+        obstacles.setCeiling(ft);
         syncAll();
     }
 
@@ -429,6 +501,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                         working = true;
                         lastFail = null;
                         overlay.computeFor(p, m);
+                        obstacles.load(p, m);
                     }
                     syncAll();
                 }
@@ -445,6 +518,8 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         keyRow(IslandOverlay.ISLAND_ARGB, R.string.key_island);
         keyRow(IslandOverlay.WATER_ARGB, R.string.key_water);
         keyRow(IslandOverlay.EDGE_ARGB, R.string.key_edge);
+        keyRow(ObstacleOverlay.ABOVE_ARGB, R.string.key_obstacle_above);
+        keyRow(ObstacleOverlay.BELOW_ARGB, R.string.key_obstacle_below);
     }
 
     private void keyRow(int argb, int textId) {
@@ -471,6 +546,14 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         keyBody.addView(row);
     }
 
+    /** A launch point handed in from outside the pane: placed as if tapped. */
+    public void placeLaunchPoint(GeoPoint point) {
+        if (launch.isPicking())
+            launch.cancelPick();
+        onPicked(point);
+        mapView.getMapController().panTo(point, true);
+    }
+
     /* ----- LaunchPoint.Callback ----- */
 
     @Override
@@ -479,6 +562,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         working = true;
         lastFail = null;
         overlay.computeFor(point, radiusM());
+        obstacles.load(point, radiusM());
         syncAll();
     }
 
@@ -499,7 +583,15 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             proposedNote = pluginContext.getString(R.string.ceiling_proposed,
                     Units.height(Units.feetToMeters(DEFAULT_ABOVE_LAUNCH_FT)));
             overlay.setCeiling(Units.feetToMeters(ft));
+            obstacles.setCeiling(ft);
         }
+        syncAll();
+    }
+
+    /* ----- ObstacleManager.Listener ----- */
+
+    @Override
+    public void onObstaclesChanged() {
         syncAll();
     }
 
@@ -545,6 +637,23 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
         syncIslandsSwitch();
         btnLaunch.setText(launch.isPicking() ? R.string.cancel : R.string.launch_point);
+
+        // The list and its heading: the obstacles the manager holds, nearest first.
+        adapter.clear();
+        adapter.addAll(obstacles.getObstacles());
+        adapter.notifyDataSetChanged();
+        if (adapter.getCount() > 0) {
+            listHeading.setText(pluginContext.getString(R.string.heading_obstacles)
+                    + " (" + adapter.getCount() + ")");
+            listHeading.setVisibility(View.VISIBLE);
+        } else {
+            listHeading.setVisibility(View.GONE);
+        }
+        final String thing = pluginContext.getString(R.string.app_obstacles);
+        final boolean on = obstacles.isEnabled();
+        obstaclesFold.head.setText(thing + (on ? " ON" : " OFF"));
+        obstaclesFold.head.setTextColor(pluginContext.getResources().getColor(
+                on ? R.color.state_on : R.color.state_off));
 
         ceilingFold.label(pluginContext.getString(R.string.ceiling),
                 c == null ? null : Units.altitudeMsl(c));
@@ -618,6 +727,9 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                     Math.max(1d, 100d * grid.unknownCells / Math.max(1, grid.circleCells))));
         if (!overlay.isVisible())
             sb.append('\n').append(pluginContext.getString(R.string.status_map_off));
+        final String ob = obstacles.statusLine(launch.getPoint() != null);
+        if (ob != null)
+            sb.append('\n').append(ob);
         if (proposedNote != null)
             sb.append('\n').append(proposedNote);
         return sb.toString();
@@ -664,6 +776,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         onPaneClosed();
         launch.dispose();
         overlay.setListener(null);
+        obstacles.setListener(null);
     }
 
     public View getRoot() {

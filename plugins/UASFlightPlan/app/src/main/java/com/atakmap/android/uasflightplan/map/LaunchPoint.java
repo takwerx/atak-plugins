@@ -160,7 +160,9 @@ public final class LaunchPoint {
         } else {
             marker.setPoint(p);
         }
-        Log.d(TAG, "launch point at " + p);
+        // No coordinates in the log: with "My position" this is the phone's own fix,
+        // and ATAK's log-to-file lands logcat on shared storage.
+        Log.d(TAG, "launch point placed");
     }
 
     /** Takes the marker off the map. */

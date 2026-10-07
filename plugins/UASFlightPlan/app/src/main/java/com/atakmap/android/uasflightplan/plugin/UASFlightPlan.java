@@ -11,6 +11,7 @@ import com.atakmap.android.ipc.AtakBroadcast;
 import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.uasflightplan.map.IslandOverlay;
+import com.atakmap.android.uasflightplan.obstacles.ObstacleManager;
 import com.atakmap.android.uasflightplan.ui.UASFlightPlanPane;
 import com.atakmap.coremap.log.Log;
 
@@ -44,8 +45,11 @@ public class UASFlightPlan implements IPlugin {
      * A system receiver, because {@code registerReceiver} is process-local and
      * {@code am broadcast} never reaches it. Driving ATAK's Tools list over adb
      * is unreliable and every stray tap lands in another plugin's pane; this is
-     * how a session opens the pane for a test, and it opens the pane and nothing
-     * else.
+     * how a session opens the pane for a test.
+     *
+     * <p>With {@code lat} and {@code lon} extras (degrees, doubles) it also
+     * places the launch point there, which is how another plugin hands a point
+     * over and how a test lands on a known spot. Nothing else is read from it.
      */
     public static final String ACTION_SHOW = "com.atakmap.android.uasflightplan.SHOW";
 
@@ -53,6 +57,14 @@ public class UASFlightPlan implements IPlugin {
         @Override
         public void onReceive(Context context, Intent intent) {
             showPane();
+            if (intent == null || pane == null)
+                return;
+            final double lat = intent.getDoubleExtra("lat", Double.NaN);
+            final double lon = intent.getDoubleExtra("lon", Double.NaN);
+            if (Double.isNaN(lat) || Double.isNaN(lon)
+                    || Math.abs(lat) > 90d || Math.abs(lon) > 180d)
+                return;
+            pane.placeLaunchPoint(new com.atakmap.coremap.maps.coords.GeoPoint(lat, lon));
         }
     };
 
@@ -63,6 +75,7 @@ public class UASFlightPlan implements IPlugin {
     Pane templatePane;
 
     private IslandOverlay overlay;
+    private ObstacleManager obstacles;
     private UASFlightPlanPane pane;
 
     public UASFlightPlan(IServiceController serviceController) {
@@ -104,6 +117,8 @@ public class UASFlightPlan implements IPlugin {
         if (mapView != null) {
             overlay = new IslandOverlay(mapView);
             overlay.start();
+            obstacles = new ObstacleManager(mapView, pluginContext);
+            obstacles.start();
         } else {
             // Without a map there is nothing to draw on. The toolbar button still
             // appears and says so when tapped, rather than failing silently.
@@ -137,6 +152,10 @@ public class UASFlightPlan implements IPlugin {
         }
         // Nothing may stay behind: a reload that left the layer or the GL SPI
         // registered would paint with classes from the previous build.
+        if (obstacles != null) {
+            obstacles.stop();
+            obstacles = null;
+        }
         if (overlay != null) {
             overlay.stop();
             overlay = null;
@@ -146,7 +165,7 @@ public class UASFlightPlan implements IPlugin {
 
     private void showPane() {
         final MapView mapView = MapView.getMapView();
-        if (mapView == null || overlay == null) {
+        if (mapView == null || overlay == null || obstacles == null) {
             Log.w(TAG, "no MapView yet; ignoring the toolbar tap");
             return;
         }
@@ -154,7 +173,7 @@ public class UASFlightPlan implements IPlugin {
         if (templatePane == null) {
             final View root = PluginLayoutInflater.inflate(pluginContext,
                     R.layout.main_layout, null);
-            pane = new UASFlightPlanPane(root, pluginContext, mapView, overlay);
+            pane = new UASFlightPlanPane(root, pluginContext, mapView, overlay, obstacles);
 
             templatePane = new PaneBuilder(root)
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
