@@ -21,7 +21,10 @@ import com.atakmap.map.layer.feature.datastore.FeatureSetDatabase2;
 import com.atakmap.map.layer.feature.geometry.LineString;
 import com.atakmap.map.layer.feature.geometry.Point;
 import com.atakmap.map.layer.feature.style.BasicStrokeStyle;
+import com.atakmap.map.layer.feature.style.CompositeStyle;
 import com.atakmap.map.layer.feature.style.IconPointStyle;
+import com.atakmap.map.layer.feature.style.LabelPointStyle;
+import com.atakmap.map.layer.feature.style.Style;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -68,6 +71,10 @@ public final class ObstacleOverlay {
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
     private volatile boolean visible = true;
+    private final ObstaclePills pills = new ObstaclePills();
+    /** Which obstacle each drawn feature is, for a tap. Worker writes, main reads. */
+    private final java.util.concurrent.ConcurrentHashMap<Long, Obstacle> byFeature =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     public ObstacleOverlay(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
@@ -165,6 +172,7 @@ public final class ObstacleOverlay {
                 // insert, each of which has ATAK re-query the store on its main thread.
                 store.acquireModifyLock(true);
                 locked = true;
+                byFeature.clear();
                 final List<Long> old = existingSets();
                 final long fsid = store.insertFeatureSet(new FeatureSet("UASFlightPlan",
                         "obstacles", pluginContext.getString(R.string.obstacles_layer),
@@ -204,6 +212,7 @@ public final class ObstacleOverlay {
                 store.acquireModifyLock(true);
                 locked = true;
                 dropAllSets();
+                byFeature.clear();
             } catch (Exception e) {
                 Log.w(TAG, "obstacle clear failed", e);
             } finally {
@@ -244,16 +253,35 @@ public final class ObstacleOverlay {
         final LineString mast = new LineString(3);
         mast.addPoint(o.lon, o.lat, 0d);
         mast.addPoint(o.lon, o.lat, topM);
-        store.insertFeature(new Feature(fsid, FeatureDataStore2.FEATURE_ID_NONE, name, mast,
+        final long mastId = store.insertFeature(new Feature(fsid,
+                FeatureDataStore2.FEATURE_ID_NONE, name, mast,
                 new BasicStrokeStyle(color, 3f), attrs, standing,
                 FeatureDataStore2.TIMESTAMP_NONE, FeatureDataStore2.FEATURE_VERSION_NONE));
+        byFeature.put(mastId, o);
 
+        // The label is the icon: one composed pill, the glyph in the ceiling color
+        // and the words in white, with the feature's own label suppressed so the
+        // name is not drawn a second time in ATAK's square box. Rotation relative to
+        // the screen, so the words stay level when the map is spun.
         final Point top = new Point(o.lon, o.lat, topM);
-        store.insertFeature(new Feature(fsid, FeatureDataStore2.FEATURE_ID_NONE, name, top,
-                new IconPointStyle(color, "android.resource://"
-                        + pluginContext.getPackageName() + "/" + R.drawable.ic_obstacle),
-                attrs, standing,
+        final ObstaclePills.Pill pill = pills.pill(name, color);
+        final Style style = pill == null
+                ? new IconPointStyle(color, "android.resource://"
+                        + pluginContext.getPackageName() + "/" + R.drawable.ic_obstacle)
+                : new CompositeStyle(new Style[] {
+                        new IconPointStyle(0xFFFFFFFF, pill.uri, pill.width, pill.height,
+                                0f, 0f, 0, 0, 0f, false),
+                        new LabelPointStyle("", 0x00FFFFFF, 0x00000000,
+                                LabelPointStyle.ScrollMode.DEFAULT) });
+        final long topId = store.insertFeature(new Feature(fsid,
+                FeatureDataStore2.FEATURE_ID_NONE, name, top, style, attrs, standing,
                 FeatureDataStore2.TIMESTAMP_NONE, FeatureDataStore2.FEATURE_VERSION_NONE));
+        byFeature.put(topId, o);
+    }
+
+    /** The obstacle a drawn feature stands for, or null. */
+    public Obstacle obstacleFor(long featureId) {
+        return byFeature.get(featureId);
     }
 
     private void dropAllSets() {
