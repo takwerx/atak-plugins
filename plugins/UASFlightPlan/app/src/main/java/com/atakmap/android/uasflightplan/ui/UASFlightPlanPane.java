@@ -687,11 +687,28 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         return ft == null ? null : Units.feetToMeters(ft);
     }
 
-    /** Hands the ceiling to the overlay and the obstacles, and redraws the pane. */
+    /**
+     * The highest ground the aircraft can work over, feet MSL: the ceiling minus
+     * the height it flies above the terrain. Ground above this is an island: flying
+     * over it at that height would put the aircraft through the ceiling. In the
+     * planning mode the ceiling was built from the same height, so this is the
+     * highest ground in the area, rounded up.
+     */
+    private Double workableFt() {
+        final Double c = ceilingFt();
+        return c == null ? null : c - flightAglFt();
+    }
+
+    /**
+     * Hands the ceiling to the overlay and the obstacles, and redraws the pane.
+     * The islands are painted against the workable ground; the obstacles against
+     * the ceiling itself, since the aircraft can be anywhere under it.
+     */
     private void applyCeiling() {
         final Double ft = ceilingFt();
-        if (ft != null) {
-            overlay.setCeiling(Units.feetToMeters(ft));
+        final Double work = workableFt();
+        if (ft != null && work != null) {
+            overlay.setCeiling(Units.feetToMeters(work));
             obstacles.setCeiling(ft);
         }
         syncAll();
@@ -797,14 +814,19 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                 return;
             requestHeading.setText(R.string.section_given_area);
             final double hiFt = Units.metersToFeet(g.highestMsl());
-            final double clear = c - hiFt;
-            requestLines.setText(pluginContext.getString(R.string.given_highest,
-                    Units.altitudeMsl(g.highestMsl()))
-                    + "\n" + (clear >= 0
-                            ? pluginContext.getString(R.string.given_clear,
-                                    Units.height(Units.feetToMeters(clear)))
-                            : pluginContext.getString(R.string.given_short,
-                                    Units.height(Units.feetToMeters(-clear)))));
+            final double work = c - flightAglFt();
+            final double margin = work - hiFt;
+            requestLines.setText(pluginContext.getString(R.string.given_fly,
+                    Units.height(Units.feetToMeters(flightAglFt())))
+                    + "\n" + pluginContext.getString(R.string.given_workable,
+                            Units.altitudeMsl(Units.feetToMeters(work)))
+                    + "\n" + (margin >= 0
+                            ? pluginContext.getString(R.string.given_ok,
+                                    Units.altitudeMsl(g.highestMsl()),
+                                    Units.height(Units.feetToMeters(margin)))
+                            : pluginContext.getString(R.string.given_too_high,
+                                    Units.altitudeMsl(g.highestMsl()),
+                                    Units.height(Units.feetToMeters(-margin)))));
             if (!Double.isNaN(ground))
                 ceilingLine.setText(pluginContext.getString(R.string.above_launch_line,
                         Units.height(Units.feetToMeters(c) - ground)));

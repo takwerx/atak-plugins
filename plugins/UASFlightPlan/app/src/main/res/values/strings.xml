@@ -88,6 +88,10 @@
     <string name="given_none">Tap to type the ceiling Air Attack gave you</string>
     <string name="given_prompt">Ceiling from Air Attack, %1$s MSL</string>
     <string name="section_given_area">What that ceiling does to this area</string>
+    <string name="given_fly">Fly above the terrain: %1$s</string>
+    <string name="given_workable">Highest ground you can work over: %1$s</string>
+    <string name="given_ok">Highest ground in the area: %1$s, under that by %2$s. All of it is workable.</string>
+    <string name="given_too_high">Highest ground in the area: %1$s, %2$s too high. The red islands cannot be worked at this height above the terrain.</string>
     <string name="given_highest">Highest ground in the area: %1$s</string>
     <string name="given_clear">Lowest clearance over the area: %1$s</string>
     <string name="given_short">The ceiling is UNDER the highest ground by %1$s: the red islands cannot be flown over.</string>
@@ -126,7 +130,7 @@
     <string name="type_the_ceiling">Type the ceiling</string>
     <string name="ceiling_above_launch">Ground + %1$s</string>
     <string name="ceiling_prompt">Ceiling, %1$s MSL</string>
-    <string name="key_island">Ground at or above your ceiling: cannot fly here</string>
+    <string name="key_island">Ground too high to work over at your height above the terrain</string>
     <string name="key_water">Ground under the ceiling</string>
     <string name="key_edge">Edge of the area that was checked</string>
 
@@ -145,7 +149,7 @@
     <string name="status_reading">Reading the terrain, %1$s…</string>
     <string name="status_no_gps">No GPS fix, so there is no position to use. Tap the map instead.</string>
     <string name="status_map_off">Map off.</string>
-    <string name="all_under_water">Everything in the area is under the ceiling.</string>
+    <string name="all_under_water">All the ground in the area can be worked over.</string>
     <string name="islands_share">Islands cover %.0f%% of the area.</string>
     <string name="highest_ground">Highest ground in the area: %1$s.</string>
     <string name="terrain_detail">%1$s, terrain checked every %2$s.</string>
