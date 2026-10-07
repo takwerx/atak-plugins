@@ -123,6 +123,11 @@ public final class Raws {
         public final double windFromDeg, gustFromDeg;
         /** Ten-hour fuel moisture, percent, or NaN. */
         public final double fuelMoisture;
+        /**
+         * The utility that runs the station -- "SCE", "SDG&E", "PG&E", "HPWREN" -- or
+         * empty for a RAWS. See {@link UtilityStations}.
+         */
+        public final String network;
 
         Station(JSONObject a) {
             wxId = str(a, "WXID");
@@ -145,6 +150,39 @@ public final class Raws {
             windFromDeg = number(a, "WindDirDegrees");
             gustFromDeg = number(a, "WindDirPeak");
             fuelMoisture = number(a, "FuelMoisture");
+            network = "";
+        }
+
+        /** A utility network's station, which reads less than a RAWS does. */
+        Station(String wxId, String mesowestId, String name, String network, double latitude,
+                double longitude, int elevation, long observedAt, double relativeHumidity,
+                double airTempF, double windMph, double gustMph, double windFromDeg) {
+            this.wxId = wxId;
+            this.mesowestId = mesowestId;
+            this.name = name;
+            this.network = network;
+            this.state = "CA";
+            this.county = "";
+            this.agency = network;
+            this.unit = "";
+            this.status = "";
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.elevation = elevation;
+            this.observedAt = observedAt;
+            this.relativeHumidity = relativeHumidity;
+            this.airTempF = airTempF;
+            this.fuelTempF = Double.NaN;
+            this.windMph = windMph;
+            this.gustMph = gustMph;
+            this.windFromDeg = windFromDeg;
+            this.gustFromDeg = Double.NaN;
+            this.fuelMoisture = Double.NaN;
+        }
+
+        /** True for a utility network's station rather than a RAWS. */
+        public boolean isUtility() {
+            return !network.isEmpty();
         }
 
         /** True when the station sent nothing worth drawing: no wind, no humidity. */
@@ -210,7 +248,7 @@ public final class Raws {
         return out;
     }
 
-    private static String str(JSONObject a, String key) {
+    static String str(JSONObject a, String key) {
         final String s = a.optString(key, "");
         return s == null || s.equals("null") ? "" : s.trim();
     }

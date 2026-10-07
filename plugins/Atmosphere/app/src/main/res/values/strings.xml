@@ -43,6 +43,11 @@
     <string name="stations_show_heading">Draw on the map</string>
     <string name="stations_gate_heading">Draw stations at this zoom or closer</string>
     <string name="stations_label_gate_heading">Draw their readings at this zoom or closer</string>
+    <string name="stations_utility_gate_heading">Draw utility stations at this zoom or closer</string>
+    <string name="stations_utility_on">Utility Stations ON</string>
+    <string name="stations_utility_off">Utility Stations OFF</string>
+    <string name="stations_utility_allow_title">Show utility weather stations?</string>
+    <string name="stations_utility_allow_text">Atmosphere will ask Cal OES for the utility weather stations around you (SCE, SDG&amp;E, PG&amp;E and HPWREN, California only) and what they are reading. They draw in slate, apart from the blue fire weather stations.\n\nThey average wind over a minute or two, not ten like a fire weather station, so they read higher than one beside them, and they have no fuel moisture.\n\nLike the fire weather stations, this sends the point you measure from, rounded to about 100 m.\n\nServer: services.arcgis.com (Cal OES)</string>
     <string name="stations_always">Always</string>
     <string name="stations_allow_title">Show weather stations?</string>
     <string name="stations_allow_text">Atmosphere will ask the National Interagency Fire Center for the fire weather stations around you and what they are reading.\n\nUnlike the other layers, this one sends a position: the point you measure from, rounded to about 100 m. Switch it to Map center if you would rather it never send where you are.\n\nServer: services3.arcgis.com</string>
@@ -100,6 +105,11 @@
     <string name="firezones_label_gate_heading">Draw zone numbers at this zoom or closer</string>
     <string name="firezones_allow_title">Show the fire weather zones?</string>
     <string name="firezones_allow_text">Atmosphere will ask the National Weather Service for the fire weather zones in the map view, and which of them are under a Red Flag Warning or Fire Weather Watch, and draw them on the map. The map view is sent, not your position.\n\nServers: mapservices.weather.noaa.gov and api.weather.gov</string>
+    <string name="erc_on">Fire Danger ON</string>
+    <string name="erc_off">Fire Danger OFF</string>
+    <string name="erc_allow_title">Show fire danger?</string>
+    <string name="erc_allow_text">Atmosphere will ask the US Forest Service for the Energy Release Component (ERC) and Burning Index of every Predictive Service Area in the lower 48, once every few hours, and shade the map by how dry each area is. Tapping an area also asks its GACC for that area\'s ERC chart. Your position is not sent.\n\nServers: services3.arcgis.com, gacc.nifc.gov</string>
+    <string name="credit_erc">Fire danger (ERC and BI by Predictive Service Area) from the USDA Forest Service, from FEMS (%1$s); charts from each GACC (%2$s)</string>
     <string name="sawti_on">SAWTI ON</string>
     <string name="sawti_off">SAWTI OFF</string>
     <string name="sawti_allow_title">Show SAWTI?</string>
@@ -126,6 +136,7 @@
     <string name="psps_off">PSPS OFF</string>
     <string name="psps_allow_title">Show PSPS?</string>
     <string name="psps_allow_text">Atmosphere will ask Cal OES which California counties a utility has warned may have a Public Safety Power Shutoff, and where the power has been cut, and draw them. It covers PG&amp;E, SCE and SDG&amp;E customers only. Your position is not sent.\n\nServer: services.arcgis.com</string>
+    <string name="credit_utility_stations">Utility weather stations from SCE, SDG&amp;E, PG&amp;E and HPWREN via Synoptic Data and the California Governor\'s Office of Emergency Services (Cal OES), not verified by Cal OES (%1$s)</string>
     <string name="credit_psps">Public Safety Power Shutoffs from the California Governor\'s Office of Emergency Services (Cal OES), as reported by PG&amp;E, SCE and SDG&amp;E (%1$s)</string>
     <string name="credit_firewx">Fire weather outlook from the NOAA Storm Prediction Center (%1$s)</string>
     <string name="flood_on">Flash Flood Outlook ON</string>
@@ -280,6 +291,7 @@
     <string name="heading_zones_find">Find a zone</string>
     <string name="heading_zones_starred">Starred zones</string>
     <string name="heading_zones_forecast">Fire weather planning forecast</string>
+    <string name="heading_zones_erc">Fire danger (ERC)</string>
     <string name="zones_gate_text">The National Weather Service\'s fire weather planning forecast for a zone, the way the office wrote it. See the zone you are reading, look one up by number or name, and star the ones you work.</string>
     <string name="zones_load">Show fire zone forecasts</string>
     <string name="zones_allow_title">Show fire zone forecasts?</string>
@@ -324,6 +336,7 @@
     <string name="tab_spots">Spot Weather Forecast</string>
     <string name="tab_zones">Fire Weather Zones</string>
     <string name="tab_sawti">SAWTI</string>
+    <string name="tab_erc">Fire Danger</string>
     <string name="tab_stations">Weather Stations</string>
     <string name="tab_gauges">River Gauges</string>
     <string name="tab_buoys">Buoys</string>

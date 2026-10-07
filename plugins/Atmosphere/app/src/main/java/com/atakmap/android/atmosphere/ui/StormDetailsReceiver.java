@@ -70,6 +70,9 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
 
         /** A SAWTI zone opens the SAWTI page on that zone and day ("3|2026-09-30"). */
         void openSawti(String ref);
+
+        /** A Predictive Service Area opens its fire danger and its GACC's chart ("SC08"). */
+        void openErc(String code);
     }
 
     private static SpotOpener spotOpener;
@@ -112,6 +115,10 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         final String ref = item.getMetaString("atmosphereRef", "");
         if (!ref.isEmpty() && "sawti".equals(item.getMetaString("atmosphereLayer", ""))) {
             spotOpener.openSawti(ref);
+            return true;
+        }
+        if (!ref.isEmpty() && "erc".equals(item.getMetaString("atmosphereLayer", ""))) {
+            spotOpener.openErc(ref);
             return true;
         }
         final String zoneId = item.getMetaString("zoneId", "");

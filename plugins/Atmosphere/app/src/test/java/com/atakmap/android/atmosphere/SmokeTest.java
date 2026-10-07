@@ -97,17 +97,17 @@ public class SmokeTest {
     }
 
     @Test
-    public void theViewPicksTheModelAndTheSkyStaysOnHrrr() {
+    public void everyZoomInTheLower48IsHrrr() {
         // A fire's worth of map.
         assertEquals(Model.HRRR, NomadsSmoke.forView(-121, 38, -119, 39.5, Height.GROUND));
-        // The West at once: RAP for the ground, HRRR for the sky, which RAP lacks.
-        assertEquals(Model.RAP, NomadsSmoke.forView(-125, 30, -100, 49, Height.GROUND));
+        // The West at once: still HRRR, so the plume keeps its shape as the map zooms.
+        assertEquals(Model.HRRR, NomadsSmoke.forView(-125, 30, -100, 49, Height.GROUND));
         assertEquals(Model.HRRR, NomadsSmoke.forView(-125, 30, -100, 49, Height.SKY));
         // Alaska: nothing here carries smoke.
         assertNull(NomadsSmoke.forView(-152, 60, -148, 63, Height.GROUND));
-        // RAP is asked for its whole grid, HRRR for the wind's box.
-        assertTrue(NomadsSmoke.maxSpanLon(Model.RAP) > 70);
-        assertEquals(Model.HRRR.maxSpanLon, NomadsSmoke.maxSpanLon(Model.HRRR), 0);
+        // A few states at most are asked for; wider views are drawn for their middle.
+        assertEquals(25.0, NomadsSmoke.maxSpanLon(Model.HRRR), 0);
+        assertEquals(18.0, NomadsSmoke.maxSpanLat(Model.HRRR), 0);
     }
 
     @Test

@@ -22,8 +22,8 @@ import java.util.List;
  *       constituents), numbers 0 and 1, so the wind's GRIB2 reader takes them as they
  *       stand. Present at f00, f18 and f48. An 8 by 6 degree box is 150 KB.</li>
  *   <li>RAP's {@code awp130pgrbf} holds {@code MASSDEN} at 8 m, same template, and no
- *       column field. The whole CONUS at 13 km is 264 KB, cheap enough for a
- *       continental view of the near-ground smoke.</li>
+ *       column field. Not used: it is a different forecast of the same smoke, and
+ *       switching to it on a wide view changed the plume's shape with the zoom.</li>
  *   <li>GFS carries neither. Outside HRRR and RAP's lower 48 there is no smoke
  *       forecast here, and the layer says so.</li>
  * </ul>
@@ -142,44 +142,43 @@ public final class NomadsSmoke {
             return out;
         }
 
-        /** True when a model carries this field. Only HRRR has the column. */
-        public boolean carriedBy(Model m) {
-            return m == Model.HRRR || (m == Model.RAP && this == GROUND);
-        }
     }
 
     private NomadsSmoke() {
     }
 
     /**
-     * The model for a view: HRRR close in, where 3 km cells follow a plume down a
-     * drainage; RAP when the view is wider than HRRR is asked for, near the ground
-     * only. Null when the view's center is outside the lower 48, where no model here
-     * carries smoke.
+     * The model for a view: HRRR at every zoom, null when the view's center is outside
+     * the lower 48, where no model here carries smoke.
+     *
+     * <p>It was HRRR close in and RAP for a view wider than the wind's 8 by 6 degree
+     * box, and the two are different forecasts of the same smoke: over the West at
+     * one hour, RAP's 13 km cells put smoke on 0.4% of the map and HRRR's 3 km cells
+     * on 1.2% (2026-10-05). Zooming across the line redrew the plume in another shape
+     * (operator: "it was wide then smaller made no sense"). One model at every zoom
+     * keeps the picture the same picture; a wider view costs a bigger download
+     * instead, see {@link #maxSpanLon}.
      */
     public static Model forView(double west, double south, double east, double north,
             Height height) {
         final double cLat = (north + south) / 2, cLon = (east + west) / 2;
-        if (!Model.HRRR.covers(cLat, cLon))
-            return null;
-        final boolean fitsHrrr = east - west <= Model.HRRR.maxSpanLon
-                && north - south <= Model.HRRR.maxSpanLat;
-        if (fitsHrrr || !height.carriedBy(Model.RAP))
-            return Model.HRRR;
-        return Model.RAP;
+        return Model.HRRR.covers(cLat, cLon) ? Model.HRRR : null;
     }
 
     /**
-     * The widest box worth asking a model for, degrees across and up. HRRR as the wind
-     * has it; RAP its whole grid, because a smoke picture with the coasts cut off is a
-     * wrong picture and all of CONUS is 264 KB.
+     * The widest box asked for, degrees across and up: a few states. Wider than the
+     * wind's box because one field is cheap -- the West's middle at 25 by 19 degrees
+     * was 1.3 MB an hour (2026-10-05) -- and a view wider than this is drawn for its
+     * middle, which the pane says.
      */
+    public static final double SPAN_LON = 25.0, SPAN_LAT = 18.0;
+
     public static double maxSpanLon(Model m) {
-        return m == Model.RAP ? m.east - m.west : m.maxSpanLon;
+        return Math.min(SPAN_LON, m.east - m.west);
     }
 
     public static double maxSpanLat(Model m) {
-        return m == Model.RAP ? m.north - m.south : m.maxSpanLat;
+        return Math.min(SPAN_LAT, m.north - m.south);
     }
 
     public static String url(Model model, Height height, long runUtc, int forecastHour,

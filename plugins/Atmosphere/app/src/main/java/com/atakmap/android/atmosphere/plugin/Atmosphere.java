@@ -9,12 +9,14 @@ import android.view.View;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.atmosphere.compat.GeneratedFiles;
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.SnapshotStore;
 import com.atakmap.android.atmosphere.data.WeatherClient;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.overlay.AirQualityOverlay;
 import com.atakmap.android.atmosphere.overlay.SpotOverlay;
+import com.atakmap.android.atmosphere.overlay.ErcOverlay;
 import com.atakmap.android.atmosphere.overlay.BuoyOverlay;
 import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.GaugeOverlay;
@@ -107,22 +109,35 @@ public class Atmosphere implements IPlugin {
     private final com.atakmap.android.menu.MapMenuEventListener tapOpensPage =
             new com.atakmap.android.menu.MapMenuEventListener() {
                 @Override
-                public boolean onShowMenu(com.atakmap.android.maps.MapItem item) {
+                public boolean onShowMenu(final com.atakmap.android.maps.MapItem item) {
                     if (item == null || !item.getMetaBoolean("atmosphere", false))
                         return false;
-                    try {
-                        if (com.atakmap.android.atmosphere.ui.StormDetailsReceiver
-                                .openPage(item))
-                            return true;
-                        final android.content.Intent details = new android.content.Intent(
-                                com.atakmap.android.atmosphere.ui.StormDetailsReceiver.ACTION);
-                        details.putExtra("targetUID", item.getUID());
-                        AtakBroadcast.getInstance().sendBroadcast(details);
-                        return true;
-                    } catch (RuntimeException e) {
-                        Log.w(TAG, "tap to page", e);
+                    final MapView mv = MapView.getMapView();
+                    if (mv == null)
                         return false;
-                    }
+                    // A moment later, not now. A pick from ATAK's Select Item list
+                    // closes the list and then posts its own "show details", and
+                    // either one closed the page opened here: the map centered on the
+                    // area and nothing opened (2026-10-05). After both, the page
+                    // stays. A plain tap waits a quarter second it does not notice.
+                    mv.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                if (com.atakmap.android.atmosphere.ui.StormDetailsReceiver
+                                        .openPage(item))
+                                    return;
+                                final android.content.Intent details =
+                                        new android.content.Intent(com.atakmap.android
+                                                .atmosphere.ui.StormDetailsReceiver.ACTION);
+                                details.putExtra("targetUID", item.getUID());
+                                AtakBroadcast.getInstance().sendBroadcast(details);
+                            } catch (RuntimeException e) {
+                                Log.w(TAG, "tap to page", e);
+                            }
+                        }
+                    }, 250);
+                    return true;
                 }
 
                 @Override
@@ -131,6 +146,7 @@ public class Atmosphere implements IPlugin {
             };
     private FireWxOutlookOverlay firewx;
     private SawtiOverlay sawti;
+    private ErcOverlay erc;
     private LightningOverlay lightning;
     private PspsOverlay psps;
     private FloodOutlookOverlay flood;
@@ -220,6 +236,7 @@ public class Atmosphere implements IPlugin {
      * The warnings layer was removed on 2026-09-26: alerts are IPAWS's, the
      * companion plugin, which draws the same feed and sends notifications. A phone
      * that ran it holds 600 zone shapes (28 MB) and a store it no longer reads.
+     * The symbol folders that 0.9 and earlier composed on the card go the same way.
      * Swept once, on a daemon thread, never on the load thread.
      */
     private static void sweepRemovedLayerFiles() {
@@ -236,6 +253,15 @@ public class Atmosphere implements IPlugin {
                             "warnings.sqlite-wal", "warnings.sqlite-shm" })
                         //noinspection ResultOfMethodCallIgnored
                         new java.io.File(root, f).delete();
+                    // The icons moved to ATAK's private storage in 0.10 (takwerx/atmosphere#2).
+                    // By name only: the stores and the manual beside them stay.
+                    for (String f : GeneratedFiles.LEGACY)
+                        deleteTree(new java.io.File(root, f));
+                    final String[] left = root.list();
+                    if (left != null)
+                        for (String f : left)
+                            if (f.startsWith(GeneratedFiles.LEGACY_SET_ASIDE))
+                                deleteTree(new java.io.File(root, f));
                 } catch (Exception e) {
                     Log.w(TAG, "could not sweep the removed warnings layer's files", e);
                 }
@@ -297,6 +323,8 @@ public class Atmosphere implements IPlugin {
         firewx.start();
         sawti = new SawtiOverlay(mapView, pluginContext, egress);
         sawti.start();
+        erc = new ErcOverlay(mapView, pluginContext, egress);
+        erc.start();
         lightning = new LightningOverlay(mapView, egress);
         lightning.start();
         psps = new PspsOverlay(mapView, pluginContext, egress);
@@ -369,6 +397,14 @@ public class Atmosphere implements IPlugin {
                     }
 
                     @Override
+                    public void openErc(String code) {
+                        if (atmospherePane == null)
+                            showPane();
+                        if (atmospherePane != null)
+                            atmospherePane.openErc(code);
+                    }
+
+                    @Override
                     public void openBuoy(String id) {
                         if (atmospherePane == null)
                             showPane();
@@ -393,6 +429,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFireWx(firewx);
             if (sawti != null)
                 atmospherePane.setSawti(sawti);
+            if (erc != null)
+                atmospherePane.setErc(erc);
             if (lightning != null)
                 atmospherePane.setLightning(lightning);
             if (psps != null)
@@ -506,6 +544,10 @@ public class Atmosphere implements IPlugin {
             sawti.stop();
             sawti = null;
         }
+        if (erc != null) {
+            erc.stop();
+            erc = null;
+        }
         if (firewx != null) {
             firewx.stop();
             firewx = null;
@@ -592,6 +634,8 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setFireWx(firewx);
             if (sawti != null)
                 atmospherePane.setSawti(sawti);
+            if (erc != null)
+                atmospherePane.setErc(erc);
             if (lightning != null)
                 atmospherePane.setLightning(lightning);
             if (psps != null)

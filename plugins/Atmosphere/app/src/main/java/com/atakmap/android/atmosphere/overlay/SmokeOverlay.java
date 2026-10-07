@@ -36,11 +36,11 @@ import java.util.concurrent.ThreadFactory;
  * runs and hours ({@link Model#forecastHours}), the view padded by half its span and
  * clamped to the model's cover, grids cached per (model, height, run, hour, region), a
  * move outside the region or a zoom past a third of it fetching again, and a non-GRIB
- * answer stepping back a run. What differs is the model ladder -- HRRR close in, RAP
- * for a wider view near the ground, nothing outside the lower 48 ({@link
- * NomadsSmoke#forView}) -- and that the picture is built off the main thread: a
- * resample and a few hundred thousand colored pixels is not work for the thread the
- * pane answers on.
+ * answer stepping back a run. What differs is that there is no model ladder -- HRRR
+ * at every zoom, so the plume keeps its shape as the map zooms, and nothing outside
+ * the lower 48 ({@link NomadsSmoke#forView}) -- and that the picture is built off the
+ * main thread: a resample and a few hundred thousand colored pixels is not work for
+ * the thread the pane answers on.
  */
 public final class SmokeOverlay {
 
@@ -54,8 +54,14 @@ public final class SmokeOverlay {
     private static final int MAX_PX = 768;
     private static final long MOVE_SETTLE_MS = 600L;
     private static final long SCRUB_SETTLE_MS = 180L;
-    /** A frame is a grid and a bitmap of up to 2.3 MB; a dozen is a shift's worth of scrubbing. */
+    /** A dozen frames is a shift's worth of scrubbing. */
     private static final int CACHE_FRAMES = 12;
+    /**
+     * And no more than this held: a frame is its grid and its picture, and a
+     * multi-state frame is about 4 MB of each together where a fire's worth is a
+     * fraction of one.
+     */
+    private static final long CACHE_BYTES = 40L << 20;
     private static final int RUN_STEPS_BACK = 4;
 
     public interface Listener {
@@ -74,6 +80,10 @@ public final class SmokeOverlay {
             this.grid = grid;
             this.bitmap = bitmap;
             this.bounds = new GeoBounds(grid.north, grid.west, grid.south, grid.east);
+        }
+
+        long bytes() {
+            return grid.values.length * 4L + bitmap.getByteCount();
         }
     }
 
@@ -479,10 +489,26 @@ public final class SmokeOverlay {
                         cache.put(key(run, h, r), f);
                         if (h == hour)
                             show(f);
+                        trimCache();
                     }
                 });
             }
         });
+    }
+
+    /** Drop the least recently shown frames past {@link #CACHE_BYTES}, never the one on the map. */
+    private void trimCache() {
+        long total = 0;
+        for (Frame f : cache.values())
+            total += f.bytes();
+        final java.util.Iterator<Frame> it = cache.values().iterator();
+        while (total > CACHE_BYTES && it.hasNext()) {
+            final Frame f = it.next();
+            if (f == shown)
+                continue;
+            total -= f.bytes();
+            it.remove();
+        }
     }
 
     private void show(Frame f) {

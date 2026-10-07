@@ -183,9 +183,30 @@ final class AtmosphereFeatures {
      * offset the bitmap can be trimmed to its own ink and still land on its point.
      */
     static Style icon(String iconUri, int width, int height, float offsetX, float offsetY) {
+        return icon(iconUri, width, height, offsetX, offsetY, false);
+    }
+
+    /**
+     * An icon that turns with the map, for a mark whose direction is a bearing --
+     * a wind barb. It must be centered on its point: the renderer turns the bitmap
+     * about its own middle and applies the offset on screen, unturned, so an offset
+     * icon that turns swings off its point as the map spins.
+     */
+    static Style turning(String iconUri, int width, int height) {
+        return icon(iconUri, width, height, 0f, 0f, true);
+    }
+
+    /**
+     * Every other icon stays level when the map is spun, the way ATAK's own marker
+     * labels do (operator, 2026-10-05: "all labels for all features should rotate").
+     * They were drawn turning with the map, so a name read sideways at 90 degrees and
+     * upside down at 180, and an offset icon slid off its point as it turned.
+     */
+    private static Style icon(String iconUri, int width, int height, float offsetX,
+            float offsetY, boolean turnsWithMap) {
         return new CompositeStyle(new Style[] {
                 new IconPointStyle(0xFFFFFFFF, iconUri, width, height,
-                        offsetX, offsetY, 0, 0, 0f, true),
+                        offsetX, offsetY, 0, 0, 0f, turnsWithMap),
                 new LabelPointStyle("", 0x00FFFFFF, 0x00000000,
                         LabelPointStyle.ScrollMode.DEFAULT) });
     }
@@ -353,9 +374,68 @@ final class AtmosphereFeatures {
     }
 
     private volatile HitFilter hitFilter;
+    /** A rating's label as an exact-color pill; see {@link ZonePills#pill(String, int, int)}. */
+    private ZonePills ratingPills;
 
     void setHitFilter(HitFilter f) {
         hitFilter = f;
+    }
+
+    /**
+     * The coarsest map resolution, meters per pixel, at which an area of this layer
+     * answers a tap, and then only on its label; 0 for anywhere in the area, the
+     * default.
+     */
+    private volatile double labelTapMaxResolution;
+
+    /**
+     * Areas that cover the whole map answer a tap on their label only. The Fire
+     * Danger areas tile the lower 48, so with the layer on nearly every tap on the map
+     * opened one (operator, 2026-10-05); a tap that misses every label now falls
+     * through to the map as if the layer were not there. Past the resolution the
+     * labels stop drawing at, nothing answers: there is no label to tap.
+     */
+    void tapAtLabelOnly(double maxResolution) {
+        labelTapMaxResolution = maxResolution;
+    }
+
+    /** A rating's pill, composer made on first use; null when it cannot be written. */
+    private ZonePills.Pill ratingPill(String text, int textColor, int fillColor) {
+        if (ratingPills == null)
+            ratingPills = new ZonePills();
+        return ratingPills.pill(text, textColor, fillColor);
+    }
+
+    /** Drop the areas whose label is not under the tap; see {@link #tapAtLabelOnly}. */
+    private void atLabelOnly(java.util.SortedSet<MapItem> hits, MapView view,
+            com.atakmap.coremap.maps.coords.GeoPoint tap) {
+        final double max = labelTapMaxResolution;
+        if (max <= 0 || hits == null || hits.isEmpty() || view == null || tap == null)
+            return;
+        final boolean labelsDrawn = view.getMapResolution() <= max;
+        final float density = view.getResources().getDisplayMetrics().density;
+        final android.graphics.PointF at = view.forward(tap);
+        final java.util.Iterator<MapItem> it = hits.iterator();
+        while (it.hasNext()) {
+            final MapItem m = it.next();
+            if (!m.hasMetaValue("_labelLat") || !labelsDrawn) {
+                it.remove();
+                continue;
+            }
+            final android.graphics.PointF p = view.forward(
+                    new com.atakmap.coremap.maps.coords.GeoPoint(
+                            m.getMetaDouble("_labelLat", 0), m.getMetaDouble("_labelLon", 0)));
+            // The label's box: a pill's own pixels, or from a text label's length at
+            // the default size; padded a little for a gloved finger.
+            final float pad = 8f * density;
+            final float halfWidth = m.hasMetaValue("_labelHalfW")
+                    ? (float) m.getMetaDouble("_labelHalfW", 0) + pad
+                    : (m.getMetaInteger("_labelChars", 12) * 3.9f + 10f) * density;
+            final float halfHeight = m.hasMetaValue("_labelHalfH")
+                    ? (float) m.getMetaDouble("_labelHalfH", 0) + pad : 18f * density;
+            if (Math.abs(at.x - p.x) > halfWidth || Math.abs(at.y - p.y) > halfHeight)
+                it.remove();
+        }
     }
 
     /** Drop the hits the layer says are not under the tap, but never all of them. */
@@ -544,8 +624,10 @@ final class AtmosphereFeatures {
             if (swatchUri != null)
                 return;
             try {
-                final File dir = FileSystemUtils.getItem("tools/atmosphere");
-                if (dir != null && !dir.isDirectory())
+                final File dir = com.atakmap.android.atmosphere.compat.GeneratedFiles.root();
+                if (dir == null)
+                    return;
+                if (!dir.isDirectory())
                     //noinspection ResultOfMethodCallIgnored
                     dir.mkdirs();
                 final File out = new File(dir, "swatch_v1.png");
@@ -573,6 +655,25 @@ final class AtmosphereFeatures {
     }
 
     /** The stroke color of a style, the fill's if it has no stroke, white otherwise. */
+    /**
+     * The color a Select Item row shows for an area: its fill's, when the fill is
+     * what the area says (a Fire Danger class, a SAWTI level, a Red Flag Warning),
+     * its edge's otherwise. Every Fire Danger row was the same gray, its edge
+     * (operator, 2026-10-05).
+     */
+    private static int swatchColorOf(Style s) {
+        if (s instanceof CompositeStyle) {
+            final CompositeStyle c = (CompositeStyle) s;
+            for (int i = 0; i < c.getNumStyles(); i++)
+                if (c.getStyle(i) instanceof BasicFillStyle) {
+                    final int fill = ((BasicFillStyle) c.getStyle(i)).getColor();
+                    if ((fill >>> 24) >= 0x20)
+                        return fill | 0xFF000000;
+                }
+        }
+        return strokeColorOf(s);
+    }
+
     private static int strokeColorOf(Style s) {
         if (s instanceof BasicStrokeStyle)
             return ((BasicStrokeStyle) s).getColor();
@@ -779,6 +880,7 @@ final class AtmosphereFeatures {
                             final int raw = hits == null ? -1 : hits.size();
                             onePerPlace(hits, params == null ? null : params.geo);
                             narrow(hits, params == null ? null : params.geo);
+                            atLabelOnly(hits, view, params == null ? null : params.geo);
                             Log.d(tag, "deepHitTest: " + (controls == null ? -1 : controls.size())
                                     + " controls, " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
@@ -793,6 +895,7 @@ final class AtmosphereFeatures {
                             final int raw = hits == null ? -1 : hits.size();
                             onePerPlace(hits, point);
                             narrow(hits, point);
+                            atLabelOnly(hits, view, point);
                             Log.d(tag, "deepHitTestItems: " + raw + " hits"
                                     + (hits != null && hits.size() != raw ? ", " + hits.size() + " kept" : ""));
                             return hits;
@@ -888,12 +991,23 @@ final class AtmosphereFeatures {
                             // stroke color is its swatch.
                             if (a != null && a.containsAttribute("_labelOnly"))
                                 item.setMetaBoolean("_labelOnly", true);
+                            if (a != null && a.containsAttribute("_labelLat")) {
+                                item.setMetaDouble("_labelLat", a.getDoubleAttribute("_labelLat"));
+                                item.setMetaDouble("_labelLon", a.getDoubleAttribute("_labelLon"));
+                                item.setMetaInteger("_labelChars", a.getIntAttribute("_labelChars"));
+                                if (a.containsAttribute("_labelHalfW")) {
+                                    item.setMetaDouble("_labelHalfW",
+                                            a.getDoubleAttribute("_labelHalfW"));
+                                    item.setMetaDouble("_labelHalfH",
+                                            a.getDoubleAttribute("_labelHalfH"));
+                                }
+                            }
                             if (a != null && a.containsAttribute("_oneRowPerName"))
                                 item.setMetaBoolean("_oneRowPerName", true);
                             if (!(item instanceof com.atakmap.android.maps.Marker)) {
                                 final String sw = swatchUri;
                                 if (sw != null) {
-                                    final int c = strokeColorOf(feature.getStyle());
+                                    final int c = swatchColorOf(feature.getStyle());
                                     item.setMetaString("iconUri", sw);
                                     item.setMetaInteger("iconColor", c);
                                     item.setMetaInteger("color", c);
@@ -1291,6 +1405,13 @@ final class AtmosphereFeatures {
                         Log.d(tag, "label '" + centered + "' at " + (c == null ? "nowhere"
                                 : String.format(java.util.Locale.US, "%.3f,%.3f", c[0], c[1])));
                         if (c != null) {
+                            // Where the label is, on the area itself, for a layer whose
+                            // areas answer a tap on their label only.
+                            if (d.attrs != null) {
+                                d.attrs.setAttribute("_labelLat", c[0]);
+                                d.attrs.setAttribute("_labelLon", c[1]);
+                                d.attrs.setAttribute("_labelChars", centered.length());
+                            }
                             final AttributeSet la = new AttributeSet();
                             la.setAttribute("_labelOnly", 1);
                             // In the shape's own color, so a label met in the middle of a
@@ -1300,18 +1421,51 @@ final class AtmosphereFeatures {
                             final LabelPointStyle own = labelStyleOf(d.style);
                             final boolean colored = own != null
                                     && (own.getBackgroundColor() >>> 24) == 0xFF;
+                            // A rating's tile is drawn solid: through ATAK's label blend a
+                            // see-through orange came out yellow over the map, a class
+                            // the key does not have (Fire Danger 92nd percentile drew
+                            // #EFD708 for #FFAA00, operator, 2026-10-05).
                             final int bg = ((colored ? own.getBackgroundColor() : edge)
-                                    & 0x00FFFFFF) | 0xD9000000;
+                                    & 0x00FFFFFF) | (colored ? 0xFF000000 : 0xD9000000);
                             final int text = colored ? own.getTextColor()
                                     : luminance(edge) > 150 ? 0xFF000000 : 0xFFFFFFFF;
-                            store.insertFeature(new Feature(fsid, d.name, new Point(c[1], c[0]),
-                                    colored
-                                            ? new LabelPointStyle(centered, text, bg,
-                                                    LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f,
-                                                    true, own.getLabelMinRenderResolution())
-                                            : new LabelPointStyle(centered, text, bg,
-                                                    LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f, true),
-                                    la, Feature.AltitudeMode.ClampToGround, 0d));
+                            // A rating's tile is a composed pill, in a set of its own that
+                            // draws from the label's resolution in, the way the text label
+                            // was gated: exact pixels, where ATAK's label renderer turned
+                            // an orange yellow.
+                            final ZonePills.Pill pill = colored ? ratingPill(centered, text,
+                                    own.getBackgroundColor()) : null;
+                            if (pill != null) {
+                                final String labelSet = d.setName + " labels";
+                                Long lsid = fresh.get(labelSet);
+                                if (lsid == null) {
+                                    lsid = store.insertFeatureSet(new FeatureSet(PROVIDER, type,
+                                            labelSet, Math.min(d.minGsd,
+                                                    own.getLabelMinRenderResolution()),
+                                            d.maxGsd));
+                                    store.setFeatureSetVisible(lsid, true);
+                                    fresh.put(labelSet, lsid);
+                                }
+                                if (d.attrs != null) {
+                                    d.attrs.setAttribute("_labelHalfW", pill.pxWidth / 2.0);
+                                    d.attrs.setAttribute("_labelHalfH", pill.pxHeight / 2.0);
+                                }
+                                store.insertFeature(new Feature(lsid, d.name,
+                                        new Point(c[1], c[0]),
+                                        icon(pill.uri, pill.width, pill.height), la,
+                                        Feature.AltitudeMode.ClampToGround, 0d));
+                            } else {
+                                store.insertFeature(new Feature(fsid, d.name,
+                                        new Point(c[1], c[0]), colored
+                                                ? new LabelPointStyle(centered, text, bg,
+                                                        LabelPointStyle.ScrollMode.OFF, 0f, 0, 0,
+                                                        0f, false,
+                                                        own.getLabelMinRenderResolution())
+                                                : new LabelPointStyle(centered, text, bg,
+                                                        LabelPointStyle.ScrollMode.OFF, 0f, 0, 0,
+                                                        0f, false),
+                                        la, Feature.AltitudeMode.ClampToGround, 0d));
+                            }
                         }
                     }
                     store.insertFeature(new Feature(fsid, d.name, d.geometry,
