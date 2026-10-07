@@ -422,6 +422,15 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
      * Spinner, built on the host context so it can show at all.
      */
     private void launchDialog() {
+        launchDialog(false);
+    }
+
+    /**
+     * @param afterDraw true right after a shape is closed: the popup then asks only
+     *                  where the launch point is, since that is the one thing left
+     *                  before the plan can be checked
+     */
+    private void launchDialog(boolean afterDraw) {
         final float dp = pluginContext.getResources().getDisplayMetrics().density;
         final LinearLayout box = new LinearLayout(host);
         box.setOrientation(LinearLayout.VERTICAL);
@@ -433,11 +442,21 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         final Button draw = tile(pluginContext.getString(R.string.draw_area), dp);
         final Button clearArea = tile(pluginContext.getString(R.string.clear_area), dp);
         final Button clear = tile(pluginContext.getString(R.string.clear_launch), dp);
-        box.addView(tap);
+        if (afterDraw) {
+            final TextView note = new TextView(host);
+            note.setText(pluginContext.getString(R.string.area_drawn_now_launch));
+            note.setTextSize(14);
+            note.setTextColor(0xFFFFFFFF);
+            note.setPadding(0, 0, 0, (int) (10 * dp));
+            box.addView(note);
+        }
         box.addView(here);
-        box.addView(draw);
-        box.addView(clearArea);
-        box.addView(clear);
+        box.addView(tap);
+        if (!afterDraw) {
+            box.addView(draw);
+            box.addView(clearArea);
+            box.addView(clear);
+        }
         final GeoPoint self = selfPosition();
         if (self == null) {
             here.setEnabled(false);
@@ -455,7 +474,8 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         // Strings, never ids: a dialog on the host context resolves an id in
         // ATAK's own resources and shows some other plugin's or ATAK's text.
         final AlertDialog dlg = new AlertDialog.Builder(host)
-                .setTitle(pluginContext.getString(R.string.launch_point))
+                .setTitle(pluginContext.getString(afterDraw
+                        ? R.string.where_is_launch : R.string.launch_point))
                 .setView(box)
                 .setNegativeButton(pluginContext.getString(R.string.cancel), null)
                 .create();
@@ -532,10 +552,11 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     public void onAreaPicked(Area area) {
         drawnArea = area;
         if (launch.getPoint() == null) {
-            // No launch point yet: the area is kept and the plan starts when the
-            // point is placed. Say so.
+            // The shape is closed and the one thing left is where the pilot stands:
+            // ask now, rather than make them find the button (operator, 2026-10-06).
             lastFail = null;
             syncAll();
+            launchDialog(true);
             return;
         }
         recompute();

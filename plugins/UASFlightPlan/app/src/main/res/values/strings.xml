@@ -69,6 +69,8 @@
     <string name="extent_drawn_area">Drawn area, %1$s</string>
     <string name="status_drawing">Tap the map to place each corner, then tap the first marker to close the shape. Undo and End Shape are on ATAK\'s drawing toolbar.</string>
     <string name="status_area_no_launch">Area drawn. Place the launch point to check it.</string>
+    <string name="where_is_launch">Where will you launch?</string>
+    <string name="area_drawn_now_launch">Area drawn. Now the launch point: where you stand with the controller.</string>
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
 
