@@ -2235,7 +2235,8 @@ public class FeatureLayer implements IPlugin {
         if (l.spec.refreshMinutes > 0)
             sb.append(" · auto ").append(l.spec.refreshMinutes).append(" min");
         if (!l.refreshing && l.stale)
-            sb.append(" · STALE: ").append(l.status);
+            sb.append(com.atakmap.android.featurelayer.LoadedLayer.NO_NETWORK.equals(l.status) ? " · " : " · STALE: ")
+                    .append(l.status);
         else if (!l.refreshing && l.status.startsWith("partial"))
             sb.append(" · ").append(l.status);
         if (l.capped)

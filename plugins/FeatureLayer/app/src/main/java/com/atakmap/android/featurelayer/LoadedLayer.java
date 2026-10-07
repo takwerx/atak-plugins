@@ -304,10 +304,13 @@ public class LoadedLayer {
         };
         overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
                 displayName(), "file://asset/nothing", query, null, null);
-        // The renderer keeps labels of anything it has ever seen, hidden or not, so the
-        // store only ever holds what is shown: drop what should not be before the map sees it.
+        // Everything fetched stays in the store, hidden or shown, so a layer or a type
+        // switched off comes back after a restart with no network (operator, 2026-10-06:
+        // "layers once synced need to come back on if phone is restarted and have no
+        // internet"). Until then off deleted it and only the memory copy remained. The
+        // layer reads visible sets only, which also drops a hidden set's labels.
         dedupeSets();
-        pruneHidden();
+        applyVisibility();
         // A DART layer is drawn by its markers (see DartMarkers): neither its feature layer
         // nor its Overlay Manager entry is registered, because either one renders the
         // store's own discs under the markers. Gating the sets to 0 was supposed to do
@@ -320,7 +323,7 @@ public class LoadedLayer {
             mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
         }
         count = countFeatures();
-        status = count > 0 ? "cached" : "empty";
+        status = storedFeatures() > 0 ? "cached" : "empty";
     }
 
     /**
@@ -458,8 +461,13 @@ public class LoadedLayer {
                 return false;
             loadCacheLocked();
             if (v && cache.isEmpty())
-                return countFeatures() == 0;
-            rewriteStore();
+                return storedFeatures() == 0;
+            // DART draws its markers from the rewrite; a store an older build emptied on
+            // off has nothing to show yet. Everything else is a visibility switch.
+            if (dartLabels != null || (storedFeatures() == 0 && !cache.isEmpty()))
+                rewriteStore();
+            else
+                applyVisibility();
         }
         return false;
     }
@@ -631,8 +639,7 @@ public class LoadedLayer {
                 return false;
             loadCacheLocked();
             if (v) {
-                // A type that was off at the last fetch is not in the store, so the memory
-                // copy cannot show it either: that one needs a fetch.
+                // A type the last fetch did not bring is in neither copy: that one needs a fetch.
                 boolean have = false;
                 for (Pending pf : cache)
                     if (setName.equals(pf.setName)) {
@@ -642,7 +649,18 @@ public class LoadedLayer {
                 if (!have)
                     return true;
             }
-            rewriteStore();
+            boolean stored = false;
+            for (SetInfo si : rawSetsLocked())
+                if (twinBase(si.name).equals(setName)) {
+                    stored = true;
+                    break;
+                }
+            // In the store already: shown or hidden where it is. Not yet (a store an older
+            // build wrote, which held only what was shown), or DART: written again.
+            if (stored && dartLabels == null)
+                applyVisibility();
+            else
+                rewriteStore();
         }
         return false;
     }
@@ -683,23 +701,22 @@ public class LoadedLayer {
         }
     }
 
-    /** Removes from the store what should not be shown right now. Lock held. */
-    private void pruneHidden() {
+    /** Shows each set in the store or hides it, by the layer and type switches; nothing is deleted. Lock held. */
+    private void applyVisibility() {
         boolean bulk = false;
         try {
             store.acquireModifyLock(true);
             bulk = true;
             for (SetInfo si : rawSetsLocked()) {
-                if (shows(twinBase(si.name)))
-                    continue;
                 try {
-                    store.deleteFeatureSet(si.id);
+                    store.setFeatureSetVisible(si.id, si.visible);
                 } catch (Exception e) {
-                    Log.w(TAG, "prune " + si.name, e);
+                    Log.w(TAG, "visibility " + si.name, e);
                 }
             }
+            count = countFeatures();
         } catch (Exception e) {
-            Log.w(TAG, "prune failed", e);
+            Log.w(TAG, "visibility failed", e);
         } finally {
             if (bulk)
                 store.releaseModifyLock();
@@ -743,8 +760,9 @@ public class LoadedLayer {
             final Map<String, Long> twins = new HashMap<>();
             int written = 0;
             for (Pending pf : drawOrder(cache)) {
-                if (!shows(pf.setName))
-                    continue;
+                // Every type is written, a switched-off one into a hidden set, so it is on
+                // the phone when it is switched on again, network or not.
+                final boolean visible = shows(pf.setName);
                 if (myFiresShown() && !inMyFires(pf))
                     continue; // only My Fires
                 // A named point with a label level is written twice: the bare symbol in the
@@ -759,7 +777,7 @@ public class LoadedLayer {
                 final double gate = Math.min(pf.minGsd, spec.gateGsd);
                 Long fsid = sets.get(pf.setName);
                 if (fsid == null) {
-                    fsid = newSet(store, pf.setName, gate, split ? Math.min(spec.labelGsd, gate) : 0d);
+                    fsid = newSet(store, pf.setName, gate, split ? Math.min(spec.labelGsd, gate) : 0d, visible);
                     sets.put(pf.setName, fsid);
                 }
                 // One of My Fires: its edge white, so the ones picked stand out among the rest.
@@ -773,7 +791,7 @@ public class LoadedLayer {
                 if (split) {
                     Long tid = twins.get(pf.setName);
                     if (tid == null) {
-                        tid = newSet(store, pf.setName + LABEL_TWIN, Math.min(spec.labelGsd, gate), 0d);
+                        tid = newSet(store, pf.setName + LABEL_TWIN, Math.min(spec.labelGsd, gate), 0d, visible);
                         twins.put(pf.setName, tid);
                     }
                     Style twin = drawnForm(pf, named, true);
@@ -782,7 +800,7 @@ public class LoadedLayer {
                     store.insertFeature(new Feature(tid, pf.name, pf.geometry, twin,
                             pf.attrs, Feature.AltitudeMode.ClampToGround, 0d));
                 }
-                if (labels != null && pf.name != null && !pf.name.isEmpty()
+                if (visible && labels != null && pf.name != null && !pf.name.isEmpty()
                         && pf.geometry instanceof com.atakmap.map.layer.feature.geometry.Point) {
                     final com.atakmap.map.layer.feature.geometry.Point pt =
                             (com.atakmap.map.layer.feature.geometry.Point) pf.geometry;
@@ -1515,11 +1533,33 @@ public class LoadedLayer {
         } catch (Exception e) {
             Log.w(TAG, spec.id + " refresh failed", e);
             stale = true;
-            status = "no update: " + e.getMessage();
+            status = noNetwork(e) ? NO_NETWORK : "no update: " + e.getMessage();
         } finally {
             refreshing = false;
             if (progress != null)
                 progress.run();
+        }
+    }
+
+    /** The row's words when a fetch fails for want of a network: what is drawn is what the phone kept. */
+    public static final String NO_NETWORK = "no network, showing what this phone saved";
+
+    /**
+     * Whether a fetch failed because there is no network: none active, or a host that
+     * would not resolve. The row said "STALE: no update: layer 0: Unable to resolve host
+     * services3.arcgis.com" on dev 1 offline (2026-10-06).
+     */
+    private boolean noNetwork(Exception e) {
+        final String m = String.valueOf(e.getMessage());
+        if (m.contains("Unable to resolve host") || m.contains("Network is unreachable"))
+            return true;
+        try {
+            final android.net.ConnectivityManager cm = (android.net.ConnectivityManager) mapView.getContext()
+                    .getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+            final android.net.NetworkInfo ni = cm == null ? null : cm.getActiveNetworkInfo();
+            return ni == null || !ni.isConnected();
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
@@ -2498,8 +2538,13 @@ public class LoadedLayer {
     }
 
     private long newSet(FeatureSetDatabase2 db, String name, double minGsd, double maxGsd) throws Exception {
+        return newSet(db, name, minGsd, maxGsd, true);
+    }
+
+    /** A new set, shown or hidden from the start, so no rewrite undoes a switch. */
+    private long newSet(FeatureSetDatabase2 db, String name, double minGsd, double maxGsd, boolean visible) throws Exception {
         final long id = db.insertFeatureSet(new FeatureSet("FeatureLayer", spec.id, name, minGsd, maxGsd));
-        db.setFeatureSetVisible(id, true);
+        db.setFeatureSetVisible(id, visible);
         return id;
     }
 
@@ -2741,11 +2786,22 @@ public class LoadedLayer {
         return ids;
     }
 
-    /** Features in the store, each counted once: the named twin of a point is not a second feature. */
+    /** Features shown, each counted once: the named twin of a point is not a second feature. */
     private int countFeatures() {
+        return countFeatures(true);
+    }
+
+    /** Features kept in the store, shown or hidden: what the phone has without a network. */
+    private int storedFeatures() {
+        return countFeatures(false);
+    }
+
+    private int countFeatures(boolean shownOnly) {
         try {
             int n = 0;
             for (SetInfo si : setsLocked()) {
+                if (shownOnly && !si.visible)
+                    continue;
                 final FeatureDataStore2.FeatureQueryParameters p = new FeatureDataStore2.FeatureQueryParameters();
                 p.featureSetFilter = new FeatureDataStore2.FeatureSetQueryParameters();
                 p.featureSetFilter.ids = java.util.Collections.singleton(si.id);
