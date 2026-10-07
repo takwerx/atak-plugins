@@ -956,9 +956,18 @@ How:
 - **Files go in `FileSystemUtils.getItem("tools/<plugin>")`**, written to a temp
   file and renamed, never in Android's cache dir, which the system clears.
 
+**It is not only downloads.** Anything the operator set up on the map, a
+launch point, a drawn area, a mode, a typed number, comes back too and repaints
+at start (UAS Flight Plan lost its launch point at every reload, 2026-10-06:
+*"i thought we had a new rule about this sort of data survives restarts"*).
+Stopping takes things off the map and forgets nothing; only the user's own
+Clear forgets.
+
 Test it on a device before the ship prompt: switch the layer off,
 `adb shell svc wifi disable` (adb over USB keeps working), restart ATAK, switch
-it on, then `svc wifi enable`. Where every plugin stood on 2026-10-06, with the
+it on, then `svc wifi enable`. Test a reinstall as well as a kill: a force-stop
+never runs the plugin's `onStop`, an install or upgrade does, and UAS Flight
+Plan passed the kill while every reinstall lost the plan. Where every plugin stood on 2026-10-06, with the
 fix for each: `../atak-plugins-notes/docs/AUDIT-2026-10-06-offline-after-restart.md`.
 
 ## Anything that keeps running after the tap
