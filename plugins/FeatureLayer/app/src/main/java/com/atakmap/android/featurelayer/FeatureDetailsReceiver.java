@@ -52,7 +52,17 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         final List<String> keys = new ArrayList<>();
         if (attrs != null)
             keys.addAll(attrs.getAttributeNames());
-        Collections.sort(keys, String.CASE_INSENSITIVE_ORDER);
+        // CAL FIRE's own lines first, together: on a fire it runs they are the current
+        // acres and containment, and the IRWIN record's sixty fields follow.
+        Collections.sort(keys, new java.util.Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                final boolean ca = a.startsWith(LoadedLayer.CALFIRE_PREFIX), cb = b.startsWith(LoadedLayer.CALFIRE_PREFIX);
+                if (ca != cb)
+                    return ca ? -1 : 1;
+                return String.CASE_INSENSITIVE_ORDER.compare(a, b);
+            }
+        });
         final StringBuilder sb = new StringBuilder();
         for (String k : keys) {
             String v;
@@ -76,6 +86,113 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         return sb.toString().trim();
     }
 
+    /**
+     * Shows the InciWeb button when the feature carries a page and opens it in the
+     * browser. The address is checked again here, not only when it was attached: the
+     * store it was read back from sits on the shared card.
+     */
+    public static void bindInciWeb(View button, AttributeSet attrs, MapView mapView) {
+        final String url = read(attrs, LoadedLayer.ATTR_INCIWEB);
+        bindLink(button, InciWeb.isPage(url) ? url : null, mapView);
+    }
+
+    /** The same for the fire's CAL FIRE incident page. */
+    public static void bindCalFire(View button, AttributeSet attrs, MapView mapView) {
+        final String url = read(attrs, LoadedLayer.ATTR_CALFIRE);
+        bindLink(button, CalFire.isPage(url) ? url : null, mapView);
+    }
+
+    /** Add to My Fires / Remove from My Fires on a Fire History burn's details; gone for anything else. */
+    /**
+     * A Fire History burn's two My Fires buttons: Add to My Fires / Remove from My Fires,
+     * and under it Only My Fires ON/OFF with the count, once the list has a fire, so a
+     * few can be picked from the map and then shown alone without leaving the details.
+     * Both gone for anything that is not a burn.
+     */
+    public static void bindOnly(View addView, View onlyView, final LoadedLayer layer, final AttributeSet attrs,
+            final LayerManager manager) {
+        if (!(addView instanceof android.widget.Button) || !(onlyView instanceof android.widget.Button))
+            return;
+        final android.widget.Button b = (android.widget.Button) addView;
+        final android.widget.Button only = (android.widget.Button) onlyView;
+        if (layer == null || manager == null || read(attrs, LoadedLayer.ATTR_FIRE) == null) {
+            b.setVisibility(View.GONE);
+            only.setVisibility(View.GONE);
+            return;
+        }
+        b.setVisibility(View.VISIBLE);
+        final boolean full = !layer.isMyFire(attrs) && layer.myFiresFull();
+        b.setEnabled(!full);
+        b.setText(full ? "My Fires is full (" + LayerSpec.MY_FIRES_MAX + ")"
+                : layer.isMyFire(attrs) ? "Remove from My Fires" : "Add to My Fires");
+        showOnly(only, layer.myFiresCount(), layer.myFiresShown());
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View x) {
+                final boolean in = layer.isMyFire(attrs);
+                manager.myFires(layer, in ? LayerManager.MY_REMOVE : LayerManager.MY_ADD, attrs);
+                b.setText(in ? "Add to My Fires" : "Remove from My Fires");
+                // The worker has not run yet: the count and the switch as they will be.
+                final int n = layer.myFiresCount() + (in ? -1 : 1);
+                showOnly(only, n, n > 0 && layer.spec.myFiresOnly);
+            }
+        });
+        only.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View x) {
+                final boolean on = layer.myFiresShown();
+                manager.myFires(layer, on ? LayerManager.MY_ONLY_OFF : LayerManager.MY_ONLY_ON, null);
+                showOnly(only, layer.myFiresCount(), !on);
+            }
+        });
+    }
+
+    /** "Only My Fires ON (2)" in green or "OFF (2)" in red, as on the layer's row; gone with none. */
+    private static void showOnly(android.widget.Button only, int n, boolean on) {
+        if (n <= 0) {
+            only.setVisibility(View.GONE);
+            return;
+        }
+        only.setVisibility(View.VISIBLE);
+        only.setText("Only My Fires " + (on ? "ON" : "OFF") + " (" + n + ")");
+        only.setTextColor(on ? android.graphics.Color.parseColor("#4CAF50") : android.graphics.Color.parseColor("#F44336"));
+    }
+
+    private static String read(AttributeSet attrs, String key) {
+        try {
+            if (attrs != null && attrs.containsAttribute(key))
+                return attrs.getStringAttribute(key);
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    /** Shows the button for a checked page and opens exactly that page; hides it for null. */
+    private static void bindLink(View button, final String page, final MapView mapView) {
+        if (button == null)
+            return;
+        if (page == null) {
+            button.setVisibility(View.GONE);
+            button.setOnClickListener(null);
+            return;
+        }
+        button.setVisibility(View.VISIBLE);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try {
+                    final Intent i = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(page));
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    mapView.getContext().startActivity(i);
+                } catch (Exception e) {
+                    Log.w(TAG, "could not open " + page, e);
+                    android.widget.Toast.makeText(mapView.getContext(), "No browser to open the page",
+                            android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         final String uid = intent.getStringExtra("targetUID");
@@ -84,6 +201,11 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
             Log.d(TAG, "details: no map item for " + uid);
             return;
         }
+        show(item);
+    }
+
+    /** Opens the details of a tapped feature's map item; the radial's Details and a fire's tap both land here. */
+    public void show(MapItem item) {
         final long fid = item.getMetaLong("featureid", -1);
         final String layerId = item.getMetaString("nifs_layer", null);
         final FeatureDataStore2 store = layerId == null ? null : manager.storeFor(layerId);
@@ -105,6 +227,9 @@ public class FeatureDetailsReceiver extends DropDownReceiver implements OnStateL
         ((TextView) view.findViewById(R.id.details_subtitle))
                 .setText(layer == null ? "" : layer.displayName());
         ((TextView) view.findViewById(R.id.details_attributes)).setText(body);
+        bindInciWeb(view.findViewById(R.id.btn_inciweb), f.getAttributes(), getMapView());
+        bindCalFire(view.findViewById(R.id.btn_calfire), f.getAttributes(), getMapView());
+        bindOnly(view.findViewById(R.id.btn_only), view.findViewById(R.id.btn_only_show), layer, f.getAttributes(), manager);
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
     }
 

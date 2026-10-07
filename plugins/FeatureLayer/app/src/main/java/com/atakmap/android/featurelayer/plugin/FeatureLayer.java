@@ -7,6 +7,7 @@ import android.graphics.Color;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -166,6 +167,12 @@ public class FeatureLayer implements IPlugin {
 
     private static final Org[] BUILT_IN = {
             new Org("nifc", "NIFC", Sources.NIFC_PORTAL, "Find fire", "Search"),
+            new Org("new-starts", "New Fire Starts", null, "Add new starts",
+                    "Wildfires and prescribed fires reported in the last 24 hours, public"),
+            new Org("ongoing", "Ongoing Fires", null, "Add ongoing fires",
+                    "Fires found more than a day ago and not yet contained, public"),
+            new Org("fire-history", "Fire History", null, "Add fire history",
+                    "Where fires have burned since 1900, by years since and by decade, public"),
             new Org("sarcop-live", "SARCOP Live", Sources.NAPSG_PORTAL, "Find incident", "Search"),
             new Org("sarcop-training", "SARCOP Training", null, "Find incident", "Search"),
             new Org("ca-air-intel", "CA Air Intel", null, "Add perimeters", "Statewide fire perimeters, public"),
@@ -352,6 +359,18 @@ public class FeatureLayer implements IPlugin {
     private void showPane() {
         if (pane == null) {
             paneView = PluginLayoutInflater.inflate(pluginContext, R.layout.main_layout, null);
+            // Starting to scroll means done typing. A text box at the top of the scroller
+            // that still holds focus pulls it back up to itself on every redraw, and the
+            // Find list redraws as the layers refresh: scrolled down a list of fires, it
+            // kept jumping back to the box (operator, 2026-10-05).
+            paneView.findViewById(R.id.pane_scroll).setOnTouchListener(new View.OnTouchListener() {
+                @Override
+                public boolean onTouch(View v, android.view.MotionEvent e) {
+                    if (e.getActionMasked() == android.view.MotionEvent.ACTION_MOVE)
+                        doneTyping();
+                    return false;
+                }
+            });
             final Button orgButton = paneView.findViewById(R.id.btn_org);
             final Button signin = paneView.findViewById(R.id.btn_signin);
             final Button find = paneView.findViewById(R.id.btn_find);
@@ -375,9 +394,16 @@ public class FeatureLayer implements IPlugin {
                         toast(org.title + ": signed out");
                         return;
                     }
+                    // The sign-in page is a drop-down of its own, and opening it closes
+                    // this pane; nothing brought the pane back, so every sign-in ended on
+                    // the bare map (operator, 2026-10-05: "after i log into nifc the pane
+                    // closes i have to reopen plugin"). It comes back when the sign-in
+                    // ends either way but cancelled: a cancel may be another tool taking
+                    // the side of the screen, and reopening here would fight it.
                     auth.signIn(new ArcGisAuth.Callback() {
                         @Override
                         public void onSignedIn(String username) {
+                            showPane();
                             refreshOrgUi();
                             toast(org.title + ": signed in as " + username);
                             if (org.custom && org.title.equals(LayerManager.hostOf(org.portal)))
@@ -387,6 +413,8 @@ public class FeatureLayer implements IPlugin {
 
                         @Override
                         public void onFailed(String reason) {
+                            if (!"cancelled".equals(reason))
+                                showPane();
                             toast(org.title + ": sign-in failed: " + reason);
                         }
                     });
@@ -398,13 +426,26 @@ public class FeatureLayer implements IPlugin {
                     onFind(find, search.getText().toString().trim());
                 }
             });
-            paneView.findViewById(R.id.btn_find_feature).setOnClickListener(new View.OnClickListener() {
+            // The main screen's row: Add Layer opens the sources, Find searches every
+            // loaded layer whatever it came from (operator, 2026-10-05: the source row
+            // made a feature search something only NIFC had).
+            paneView.findViewById(R.id.btn_add_layer).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    findFeature(search.getText().toString().trim());
+                    showAddPanel();
                 }
             });
-            // Clears the source search box, beside All ON/OFF where the operator asked for it.
+            paneView.findViewById(R.id.btn_find_all).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (manager == null || manager.snapshot().isEmpty()) {
+                        toast("Nothing loaded yet: Add Layer first");
+                        return;
+                    }
+                    findFeature("", null);
+                }
+            });
+            // Clears the source search box, beside its Find.
             paneView.findViewById(R.id.btn_clear_search).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -450,6 +491,10 @@ public class FeatureLayer implements IPlugin {
                                 refreshResultsInPlace();
                             else
                                 pickSets(showing, true);
+                        } else if (showing == null && finding && !reading && scope == null && !scanning(null)) {
+                            // Find over every layer, opened from the main screen: its rows
+                            // follow the fetches once they have all landed, not per tick.
+                            refreshResultsInPlace();
                         }
                     }
                 });
@@ -499,33 +544,69 @@ public class FeatureLayer implements IPlugin {
      * The main pane's Feature button: a search is always inside one layer, so with one
      * loaded it opens there, and with more it asks which first.
      */
-    private void findFeature(final String text) {
+    /** The Add Layer page: the sources, sign-in and fire search, with Back to the list. */
+    private void showAddPanel() {
+        if (paneView == null)
+            return;
+        paneView.findViewById(R.id.main_panel).setVisibility(View.GONE);
+        paneView.findViewById(R.id.add_panel).setVisibility(View.VISIBLE);
+        ((TextView) paneView.findViewById(R.id.features_title)).setText("Add a layer");
+        paneView.findViewById(R.id.features_header).setVisibility(View.VISIBLE);
+        paneView.findViewById(R.id.btn_features_back).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                backToMain();
+            }
+        });
+        refreshOrgUi();
+        scrollPaneToTop();
+    }
+
+    /** The main screen again, from the Add page or after a layer was added there. */
+    private void backToMain() {
+        if (paneView == null)
+            return;
+        // The search box on the Add page may hold focus; hidden with it, focus lands on
+        // a list row and the scroller follows it down.
+        final View focused = paneView.findFocus();
+        if (focused != null)
+            focused.clearFocus();
+        paneView.findViewById(R.id.add_panel).setVisibility(View.GONE);
+        paneView.findViewById(R.id.features_header).setVisibility(View.GONE);
+        paneView.findViewById(R.id.main_panel).setVisibility(View.VISIBLE);
+        renderRows();
+        scrollPaneToTop();
+    }
+
+    /** Adds a layer and goes back to the list, where its row now is: the Add page has done its job. */
+    private void addLayer(com.atakmap.android.featurelayer.LayerSpec spec) {
         if (manager == null)
             return;
-        final List<LoadedLayer> layers = manager.snapshot();
-        if (layers.isEmpty()) {
-            toast("Nothing loaded yet");
-            return;
-        }
-        if (layers.size() == 1) {
-            findFeature(text, layers.get(0));
-            return;
-        }
-        final String[] labels = new String[layers.size()];
-        for (int i = 0; i < layers.size(); i++)
-            labels[i] = layers.get(i).spec.title;
-        new AlertDialog.Builder(mapView.getContext()).setTitle("Search in")
-                .setItems(labels, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int which) {
-                        findFeature(text, layers.get(which));
-                    }
-                }).setNegativeButton("Cancel", null).show();
+        manager.add(spec);
+        backToMain();
     }
 
     // ---- the search pane: every loaded feature, filtered and sorted, with Back ----------
 
     private static final int RESULT_CAP = 200;
+    /**
+     * The typed name, its trailing year dropped ("Ranch 2007" is Ranch), as a pattern that
+     * matches only at the start of a word; null when nothing is typed.
+     */
+    static java.util.regex.Pattern wordStart(String text) {
+        if (text == null)
+            return null;
+        final String name = text.trim().replaceAll("\\s*\\b(1[89]\\d\\d|20\\d\\d)$", "").trim();
+        if (name.isEmpty())
+            return null;
+        return java.util.regex.Pattern.compile("(^|[^A-Za-z0-9])" + java.util.regex.Pattern.quote(name),
+                java.util.regex.Pattern.CASE_INSENSITIVE);
+    }
+
+    static boolean startsWord(java.util.regex.Pattern word, String title) {
+        return title != null && word.matcher(title).find();
+    }
+
     private static final String[] SORT_LABELS = { "Nearest", "Newest", "Oldest", "Name" };
     private String filterType;      // null = all
     private LoadedLayer scope;      // opened from a layer's Features: only that layer, Back returns there
@@ -679,11 +760,25 @@ public class FeatureLayer implements IPlugin {
         return com.atakmap.android.featurelayer.ScaleBar.describe(l.spec.gateGsd * com.atakmap.android.featurelayer.ScaleBar.FALLBACK_BAR_PIXELS) + " or closer";
     }
 
+    /** Keyboard away and no text box focused, so the scroller stays where the operator puts it. */
+    private void doneTyping() {
+        if (paneView == null)
+            return;
+        final View f = paneView.findFocus();
+        if (!(f instanceof EditText))
+            return;
+        final android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                mapView.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null)
+            imm.hideSoftInputFromWindow(f.getWindowToken(), 0);
+        f.clearFocus();
+    }
+
     /** Opens the search pane with the text inside one layer: a fire, an incident, a source. */
     private void findFeature(String text, LoadedLayer only) {
-        if (manager == null || paneView == null || only == null)
+        if (manager == null || paneView == null)
             return;
-        scope = only;
+        scope = only; // null: every loaded layer, from the main screen's Find
         filterType = null;
         // The sort and the measuring point come back the way they were left.
         sortMode = uiPrefs().getInt("sortMode", 0);
@@ -698,6 +793,7 @@ public class FeatureLayer implements IPlugin {
         final View.OnClickListener doFind = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                doneTyping();
                 renderResults();
             }
         };
@@ -715,6 +811,7 @@ public class FeatureLayer implements IPlugin {
             @Override
             public boolean onEditorAction(TextView v, int actionId, android.view.KeyEvent event) {
                 if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                    doneTyping();
                     renderResults();
                     return true;
                 }
@@ -814,6 +911,18 @@ public class FeatureLayer implements IPlugin {
         return hits;
     }
 
+    /**
+     * Where a row that only mentions the text says it: the field and a few words around
+     * the match, "Comments: ...Primarily replace rails on fence...".
+     */
+    private static String mentionOf(LoadedLayer.Hit h, String text) {
+        final String v = h.matchedText == null ? "" : h.matchedText.replace('\n', ' ').trim();
+        final int at = v.toLowerCase(java.util.Locale.US).indexOf(text.toLowerCase(java.util.Locale.US));
+        final int from = Math.max(0, at - 15), to = Math.min(v.length(), Math.max(at, 0) + text.length() + 30);
+        final String cut = (from > 0 ? "\u2026" : "") + v.substring(from, to) + (to < v.length() ? "\u2026" : "");
+        return h.matchedIn + ": \"" + cut + "\"";
+    }
+
     /** Where the map is looking right now. */
     private com.atakmap.coremap.maps.coords.GeoPoint mapCenter() {
         try {
@@ -908,14 +1017,26 @@ public class FeatureLayer implements IPlugin {
         // A typed name in a scoped layer: the feed's own answer, anywhere, once it is in;
         // the cached view's matches until then.
         final List<LoadedLayer.Hit> fromFeed = text.isEmpty() ? null : feedHitsFor(text, scope);
+        // Find from the main screen with a name typed: Fire History answers from all of
+        // its history, not only what is loaded in view (operator, 2026-10-06: "can i do
+        // a search for a feature?"). Its view's matches stand until the answer is in.
+        final LoadedLayer history = scope == null && !text.isEmpty() ? historyLayer() : null;
+        final List<LoadedLayer.Hit> fromHistory = history == null ? null : feedHitsFor(text, history);
         if (fromFeed != null) {
             for (LoadedLayer.Hit h : fromFeed)
                 if (filterType == null || filterType.equalsIgnoreCase(h.type))
                     hits.add(new Object[] { scope, h });
         } else {
-            for (Object[] o : all)
+            for (Object[] o : all) {
+                if (fromHistory != null && o[0] == history)
+                    continue; // the history's own answer replaces its in-view matches
                 if (filterType == null || filterType.equalsIgnoreCase(((LoadedLayer.Hit) o[1]).type))
                     hits.add(o);
+            }
+            if (fromHistory != null)
+                for (LoadedLayer.Hit h : fromHistory)
+                    if (filterType == null || filterType.equalsIgnoreCase(h.type))
+                        hits.add(new Object[] { history, h });
         }
         // From the device, or from the map's center; without a fix, the map center stands in.
         final com.atakmap.coremap.maps.coords.GeoPoint me = fromMapCenter ? null : selfPoint();
@@ -930,10 +1051,25 @@ public class FeatureLayer implements IPlugin {
                         new com.atakmap.coremap.maps.coords.GeoPoint(h.lat, h.lon)));
             }
         final int mode = sortMode == 0 && from == null ? 3 : sortMode;
+        final java.util.regex.Pattern word = wordStart(text);
         java.util.Collections.sort(hits, new java.util.Comparator<Object[]>() {
             @Override
             public int compare(Object[] a, Object[] b) {
                 final LoadedLayer.Hit x = (LoadedLayer.Hit) a[1], y = (LoadedLayer.Hit) b[1];
+                // What is named for the text first, then what only mentions it, each in
+                // the chosen order: "Prima" listed a DOME repair point whose comment says
+                // "Primarily" above the PRIMA fire, because it was nearer (2026-10-05).
+                final int byName = Boolean.compare(x.matchedIn != null, y.matchedIn != null);
+                if (byName != 0)
+                    return byName;
+                // Among names, those with a word starting with the text first: "Ranch 2007"
+                // listed Rocky Branch and Maple Branch above Ranch Fire (2007), because
+                // "Branch" holds "ranch" and they were newer (2026-10-07).
+                if (word != null) {
+                    final int byWord = Boolean.compare(!startsWord(word, x.title), !startsWord(word, y.title));
+                    if (byWord != 0)
+                        return byWord;
+                }
                 switch (mode) {
                     case 0:
                         return Double.compare(dist.get(a), dist.get(b));
@@ -956,9 +1092,19 @@ public class FeatureLayer implements IPlugin {
             st.append(hits.isEmpty() ? "" : hits.size() + " in view \u00b7 ").append("asking the feed for \"").append(text).append("\"\u2026");
         } else if (hits.isEmpty())
             st.append(emptyOrScanning(text, scope));
-        else
-            st.append(hits.size()).append(hits.size() == 1 ? " feature" : " features")
-                    .append(scanning(scope) ? " \u00b7 updating\u2026" : "");
+        else {
+            int mention = 0;
+            for (Object[] o : hits)
+                if (((LoadedLayer.Hit) o[1]).matchedIn != null)
+                    mention++;
+            final int named = hits.size() - mention;
+            if (text.isEmpty() || mention == 0)
+                st.append(hits.size()).append(hits.size() == 1 ? " feature" : " features");
+            else
+                st.append(named).append(" named \"").append(text).append("\", ").append(mention)
+                        .append(mention == 1 ? " more mentions it" : " more mention it");
+            st.append(scanning(scope) ? " \u00b7 updating\u2026" : "");
+        }
         if (hits.size() > RESULT_CAP)
             st.append(", showing ").append(SORT_LABELS[mode].toLowerCase(java.util.Locale.US)).append(" ").append(RESULT_CAP);
         if (noFix && from != null)
@@ -987,6 +1133,8 @@ public class FeatureLayer implements IPlugin {
                 sub.append(h.type);
             if (scope == null)
                 sub.append(sub.length() > 0 ? " \u00b7 " : "").append(h.layer);
+            if (h.matchedIn != null)
+                sub.append(sub.length() > 0 ? " \u00b7 " : "").append(mentionOf(h, text));
             // A DART row says how old its report is, in the bucket's color -- the same
             // green / yellow / red as the ring on its marker. Other layers keep the date.
             final boolean dart = com.atakmap.android.featurelayer.DartStyles.handles(l.spec);
@@ -1004,7 +1152,9 @@ public class FeatureLayer implements IPlugin {
                 agoText = min < 1 ? "just now" : min < 60 ? min + " min ago"
                         : min < 1440 ? (min / 60) + " h " + (min % 60) + " min ago" : (min / 1440) + " d ago";
             }
-            if (h.time > 0 && !dart)
+            // A burn's title carries its year; the time behind it is only for sorting, and
+            // for the older records it is a made-up 1 July.
+            if (h.time > 0 && !dart && !com.atakmap.android.featurelayer.FireHistoryStyles.handles(l.spec))
                 sub.append(sub.length() > 0 ? " \u00b7 " : "").append(when.format(new java.util.Date(h.time)));
             final TextView subView = row.findViewById(R.id.result_sub);
             if (agoText != null) {
@@ -1062,6 +1212,13 @@ public class FeatureLayer implements IPlugin {
                 l.zoomTo(h);
             }
         });
+        com.atakmap.android.featurelayer.FeatureDetailsReceiver.bindInciWeb(
+                paneView.findViewById(R.id.btn_details_inciweb), h.attrs, mapView);
+        com.atakmap.android.featurelayer.FeatureDetailsReceiver.bindCalFire(
+                paneView.findViewById(R.id.btn_details_calfire), h.attrs, mapView);
+        com.atakmap.android.featurelayer.FeatureDetailsReceiver.bindOnly(
+                paneView.findViewById(R.id.btn_details_only), paneView.findViewById(R.id.btn_details_only_show),
+                l, h.attrs, manager);
         searchPanel.setVisibility(View.GONE);
         paneView.findViewById(R.id.features_header).setVisibility(View.GONE); // one Back, the details' own
         panel.setVisibility(View.VISIBLE);
@@ -1101,7 +1258,7 @@ public class FeatureLayer implements IPlugin {
             @Override
             public void onClick(View v) {
                 if (manager != null)
-                    manager.add(Sources.fireGuard());
+                    addLayer(Sources.fireGuard());
             }
         });
         if (org == null) {
@@ -1116,12 +1273,17 @@ public class FeatureLayer implements IPlugin {
         searchRow.setVisibility(View.VISIBLE);
         find.setText(org.findLabel);
         search.setHint(org.hint);
-        search.setVisibility("nifs-archive".equals(org.id) || "ca-air-intel".equals(org.id) ? View.GONE : View.VISIBLE);
+        search.setVisibility("nifs-archive".equals(org.id) || "ca-air-intel".equals(org.id)
+                || "new-starts".equals(org.id) || "ongoing".equals(org.id)
+                || "fire-history".equals(org.id) ? View.GONE : View.VISIBLE);
         // A source that is one fixed layer has nothing to search: its button adds the
         // layer, and once the layer is in the list below the button goes away (the
         // operator read "Add perimeters" over an added layer as a second thing to add).
         final String fixedLayer = "ca-air-intel".equals(org.id) ? "ca-air-intel"
-                : "nifs-archive".equals(org.id) ? "nifs-archive:Dragon Bravo" : null;
+                : "nifs-archive".equals(org.id) ? "nifs-archive:Dragon Bravo"
+                : "new-starts".equals(org.id) ? Sources.NEW_STARTS_ID
+                : "ongoing".equals(org.id) ? Sources.ONGOING_ID
+                : "fire-history".equals(org.id) ? Sources.FIRE_HISTORY_ID : null;
         if (fixedLayer != null && manager != null) {
             boolean loaded = false;
             for (LoadedLayer l : manager.snapshot())
@@ -1150,10 +1312,19 @@ public class FeatureLayer implements IPlugin {
         Log.d(TAG, org.id + " find: \"" + text + "\"");
         switch (org.id) {
             case "nifs-archive":
-                manager.add(Sources.nifsArchiveDemo());
+                addLayer(Sources.nifsArchiveDemo());
                 return;
             case "ca-air-intel":
-                manager.add(Sources.caAirIntel());
+                addLayer(Sources.caAirIntel());
+                return;
+            case "new-starts":
+                addLayer(Sources.newStarts());
+                return;
+            case "ongoing":
+                addLayer(Sources.ongoingFires());
+                return;
+            case "fire-history":
+                addLayer(Sources.fireHistory());
                 return;
             case "sarcop-live":
                 toast("SARCOP Live is not wired up yet; SARCOP Training is");
@@ -1255,18 +1426,40 @@ public class FeatureLayer implements IPlugin {
         });
         for (final LoadedLayer l : layers) {
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.layer_row, null);
-            ((TextView) row.findViewById(R.id.row_title)).setText(l.displayName());
-            ((TextView) row.findViewById(R.id.row_status)).setText(statusLine(l));
+            final TextView status = row.findViewById(R.id.row_status);
+            status.setText(statusLine(l));
             final Button toggle = row.findViewById(R.id.row_toggle);
             if (l.refreshing || l.busy) {
-                toggle.setText("Loading\u2026");
+                toggle.setText(l.displayName() + " Loading\u2026");
                 toggle.setTextColor(Color.parseColor("#FFC107"));
                 toggle.setEnabled(false);
             } else {
-                toggle.setText(l.isVisible() ? "ON" : "OFF");
+                toggle.setText(l.myFiresShown() && l.isVisible()
+                        ? l.spec.title + ": My Fires (" + l.myFiresCount() + ")"
+                        : l.displayName() + (l.isVisible() ? " ON" : " OFF"));
                 toggle.setTextColor(l.isVisible() ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
                 toggle.setEnabled(true);
             }
+            // One line per layer, its controls under the arrow (Atmosphere's layers page,
+            // operator 2026-10-05). Closed until opened, and remembered per layer: the
+            // list is rebuilt on every refresh, so the state cannot live in the views.
+            final ImageButton expand = row.findViewById(R.id.row_expand);
+            final View body = row.findViewById(R.id.row_body);
+            final String foldKey = foldPref(l);
+            final boolean open = uiPrefs().getBoolean(foldKey, false);
+            expand.setRotation(open ? 180f : 0f);
+            body.setVisibility(open ? View.VISIBLE : View.GONE);
+            status.setVisibility(open ? View.VISIBLE : View.GONE);
+            expand.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final boolean nowOpen = body.getVisibility() != View.VISIBLE;
+                    uiPrefs().edit().putBoolean(foldKey, nowOpen).apply();
+                    expand.setRotation(nowOpen ? 180f : 0f);
+                    body.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
+                    status.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
+                }
+            });
             toggle.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -1279,6 +1472,9 @@ public class FeatureLayer implements IPlugin {
                     pickSets(l);
                 }
             });
+            // Go to frames one incident; a feed spread over a state or the country has no
+            // one place to go, and Features takes the row.
+            row.findViewById(R.id.row_goto).setVisibility(l.isWideFeed() ? View.GONE : View.VISIBLE);
             row.findViewById(R.id.row_goto).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -1309,9 +1505,12 @@ public class FeatureLayer implements IPlugin {
             row.findViewById(R.id.row_remove).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    uiPrefs().edit().remove(foldKey).apply();
                     manager.remove(l);
                 }
             });
+            bindKey((LinearLayout) row.findViewById(R.id.row_key), l);
+            bindMyFires(row, l);
             final View scopeBlock = row.findViewById(R.id.row_scope);
             if (l.hasScopeControl()) {
                 scopeBlock.setVisibility(View.VISIBLE);
@@ -1344,7 +1543,7 @@ public class FeatureLayer implements IPlugin {
      * not jump and does not revert to the type list.
      */
     private void refreshResultsInPlace() {
-        if (paneView == null || scope == null)
+        if (paneView == null)
             return;
         final android.widget.ScrollView sv = paneView.findViewById(R.id.pane_scroll);
         final int keepY = sv == null ? 0 : sv.getScrollY();
@@ -1363,8 +1562,22 @@ public class FeatureLayer implements IPlugin {
     /** Radius choices, in the operator's own big unit. 0 is "what is in view". */
     private static final int[] SCOPE_PRESETS = { 0, 2, 5, 10, 25, 50 };
 
-    private static String scopePresetLabel(int r) {
-        return r == 0 ? "What is in view" : r + " " + Units.bigLabel();
+    private static String scopePresetLabel(LoadedLayer l, int r) {
+        return r == 0 ? zeroLabel(l) : r + " " + Units.bigLabel();
+    }
+
+    /**
+     * What the radius control's zero means for a layer. Most scoped layers hold too much
+     * to fetch nationally, so zero is what is in view. New Fire Starts is a hundred or so
+     * starts across the country: zero is everywhere, and Find reaches a fire wherever the
+     * map is (operator, 2026-10-05, looking for FORK in Shasta with the map in Texas).
+     */
+    private static String zeroKind(LoadedLayer l) {
+        return com.atakmap.android.featurelayer.NewStartsStyles.handles(l.spec) ? "all" : "view";
+    }
+
+    private static String zeroLabel(LoadedLayer l) {
+        return "all".equals(zeroKind(l)) ? "Everywhere" : "What is in view";
     }
 
     /**
@@ -1378,7 +1591,7 @@ public class FeatureLayer implements IPlugin {
         final android.widget.SeekBar seek = row.findViewById(R.id.row_scope_seek);
         final Button from = row.findViewById(R.id.row_scope_from);
         final boolean center = "center".equals(l.spec.scopeKind);
-        final boolean inView = "view".equals(l.spec.scopeKind);
+        final boolean inView = "view".equals(l.spec.scopeKind) || "all".equals(l.spec.scopeKind);
         final String fromName = center ? "Map Center" : "My Location";
         final int big = inView ? 0
                 : (int) Math.max(0, Math.min(seek.getMax(), Math.round(l.spec.scopeRadiusM / Units.bigToMeters(1))));
@@ -1389,7 +1602,7 @@ public class FeatureLayer implements IPlugin {
             @Override
             public void onProgressChanged(android.widget.SeekBar sb, int p, boolean fromUser) {
                 if (fromUser)
-                    label.setText(p == 0 ? "What is in view"
+                    label.setText(p == 0 ? zeroLabel(l)
                             : "Within " + p + " " + Units.bigLabel() + " of " + fromName);
             }
 
@@ -1436,7 +1649,7 @@ public class FeatureLayer implements IPlugin {
                 final String[] items = new String[SCOPE_PRESETS.length];
                 int checked = -1;
                 for (int i = 0; i < SCOPE_PRESETS.length; i++) {
-                    items[i] = scopePresetLabel(SCOPE_PRESETS[i]);
+                    items[i] = scopePresetLabel(l, SCOPE_PRESETS[i]);
                     if (SCOPE_PRESETS[i] == (inView ? 0 : big))
                         checked = i;
                 }
@@ -1459,7 +1672,7 @@ public class FeatureLayer implements IPlugin {
 
     private void applyScope(LoadedLayer l, int big, String kind) {
         if (big <= 0)
-            manager.setScope(l, "view", 0);
+            manager.setScope(l, zeroKind(l), 0);
         else
             manager.setScope(l, kind, Units.bigToMeters(big));
     }
@@ -1537,23 +1750,29 @@ public class FeatureLayer implements IPlugin {
             }
         });
         container.removeAllViews();
-        if (l.spec.timeField != null) {
-            // How far back: the where clause changes, so this one refetches.
+        if (l.spec.timeField != null && l.spec.minAgeHours <= 0) {
+            // How far back: the where clause changes, so this one refetches. Not on
+            // Ongoing Fires, which is everything older than a day by definition.
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.feature_row, null);
             ((TextView) row.findViewById(R.id.feature_name)).setText("Time window");
             final Button win = row.findViewById(R.id.feature_fill);
             win.setText(l.spec.windowLabel());
             row.findViewById(R.id.feature_toggle).setVisibility(View.GONE);
-            final int[] hours = { 6, 12, 24, 72, 168, 720, 0 };
-            final String[] labels = { "Last 6 hours", "Last 12 hours", "Last 24 hours", "Last 3 days", "Last 7 days", "Last 30 days", "All time" };
+            // New Fire Starts holds 24 hours and nothing older, so it offers the
+            // hours inside that; every other windowed layer reaches back days.
+            final boolean starts = com.atakmap.android.featurelayer.NewStartsStyles.handles(l.spec);
+            final int[] hours = starts ? new int[] { 1, 3, 6, 12, 24 } : new int[] { 6, 12, 24, 72, 168, 720, 0 };
+            final String[] labels = starts
+                    ? new String[] { "Last hour", "Last 3 hours", "Last 6 hours", "Last 12 hours", "Last 24 hours" }
+                    : new String[] { "Last 6 hours", "Last 12 hours", "Last 24 hours", "Last 3 days", "Last 7 days", "Last 30 days", "All time" };
             win.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    int checked = 3;
+                    int checked = starts ? hours.length - 1 : 3;
                     for (int i = 0; i < hours.length; i++)
                         if (hours[i] == l.spec.sinceHours)
                             checked = i;
-                    new AlertDialog.Builder(mapView.getContext()).setTitle("Perimeters from")
+                    new AlertDialog.Builder(mapView.getContext()).setTitle(starts ? "Fires reported in" : "Perimeters from")
                             .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
                                 @Override
                                 public void onClick(DialogInterface d, int which) {
@@ -1814,7 +2033,7 @@ public class FeatureLayer implements IPlugin {
         }
         if (manager != null)
             for (LoadedLayer l : manager.snapshot())
-                if (l.hasScopeControl())
+                if (l.hasScopeControl() && !l.holdsEverything())
                     return " \u00b7 scoped layers search only their own area";
         return "";
     }
@@ -1832,7 +2051,7 @@ public class FeatureLayer implements IPlugin {
      * its way, so the cached matches show meanwhile.
      */
     private List<LoadedLayer.Hit> feedHitsFor(final String text, final LoadedLayer only) {
-        if (only == null || !only.hasScopeControl() || text == null || text.isEmpty())
+        if (only == null || !only.hasScopeControl() || only.holdsEverything() || text == null || text.isEmpty())
             return null;
         final boolean fresh = text.equals(feedText) && feedHits != null && System.currentTimeMillis() - feedAt < 120_000;
         if (fresh)
@@ -1856,6 +2075,15 @@ public class FeatureLayer implements IPlugin {
                     refreshResultsInPlace();
             }
         });
+        return null;
+    }
+
+    /** The loaded Fire History layer, or null. */
+    private LoadedLayer historyLayer() {
+        if (manager != null)
+            for (LoadedLayer l : manager.snapshot())
+                if (com.atakmap.android.featurelayer.FireHistoryStyles.handles(l.spec))
+                    return l;
         return null;
     }
 
@@ -1892,13 +2120,141 @@ public class FeatureLayer implements IPlugin {
         return b;
     }
 
+    /**
+     * The map key under a fire layer's arrow: each type's marker beside its name, from
+     * the images the map draws with. Other layers have none, and the block stays gone.
+     */
+    private void bindKey(LinearLayout key, LoadedLayer l) {
+        if (key == null)
+            return;
+        if (com.atakmap.android.featurelayer.FireHistoryStyles.handles(l.spec)) {
+            bindHistoryKey(key, l);
+            return;
+        }
+        if (!com.atakmap.android.featurelayer.NewStartsStyles.handles(l.spec)) {
+            key.setVisibility(View.GONE);
+            return;
+        }
+        while (key.getChildCount() > 1)
+            key.removeViewAt(1); // keep the heading
+        final float dp = paneView.getResources().getDisplayMetrics().density;
+        for (String[] k : com.atakmap.android.featurelayer.NewStartsStyles.KEY) {
+            final java.io.File f = l.keyIcon(k[0]);
+            final android.graphics.Bitmap bmp = f == null ? null
+                    : android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath());
+            final LinearLayout line = new LinearLayout(key.getContext());
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            line.setPadding(0, Math.round(3 * dp), 0, Math.round(3 * dp));
+            final android.widget.ImageView icon = new android.widget.ImageView(key.getContext());
+            if (bmp != null)
+                icon.setImageBitmap(bmp);
+            final int side = Math.round(32 * dp);
+            line.addView(icon, new LinearLayout.LayoutParams(side, side));
+            final TextView name = new TextView(key.getContext());
+            name.setText(k[1]);
+            name.setTextColor(Color.WHITE);
+            name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+            name.setPadding(Math.round(10 * dp), 0, 0, 0);
+            line.addView(name);
+            key.addView(line);
+        }
+        key.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Fire History's key: each band and decade as a swatch in EGP's fill, from the same
+     * table the map is drawn with.
+     */
+    private void bindHistoryKey(LinearLayout key, LoadedLayer l) {
+        while (key.getChildCount() > 1)
+            key.removeViewAt(1);
+        final float dp = paneView.getResources().getDisplayMetrics().density;
+        final List<Object[]> rows = new java.util.ArrayList<>(java.util.Arrays.asList(com.atakmap.android.featurelayer.FireHistoryStyles.KEY));
+        if (l.myFiresCount() > 0)
+            rows.add(new Object[] { "My Fires", null }); // the white edge, no fill of its own
+        for (Object[] k : rows) {
+            final LinearLayout line = new LinearLayout(key.getContext());
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            line.setPadding(0, Math.round(2 * dp), 0, Math.round(2 * dp));
+            final View swatch = new View(key.getContext());
+            final android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+            if (k[1] == null) {
+                d.setColor(0x00000000);
+                d.setStroke(Math.max(2, Math.round(2.5f * dp)), 0xFFFFFFFF);
+            } else {
+                d.setColor(0xFF000000 | (Integer) k[1]);
+                d.setStroke(Math.max(1, Math.round(dp)), 0xFF999999);
+            }
+            d.setCornerRadius(3 * dp);
+            swatch.setBackground(d);
+            final int side = Math.round(22 * dp);
+            line.addView(swatch, new LinearLayout.LayoutParams(side, side));
+            final TextView name = new TextView(key.getContext());
+            name.setText((String) k[0]);
+            name.setTextColor(Color.WHITE);
+            name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+            name.setPadding(Math.round(10 * dp), 0, 0, 0);
+            line.addView(name);
+            key.addView(line);
+        }
+        key.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * My Fires on a Fire History row, once the list has a fire: Only My Fires ON (green)
+     * or OFF (red) with the count, and Clear My Fires behind a confirmation, since the
+     * list is the operator's own work for an incident.
+     */
+    private void bindMyFires(View row, final LoadedLayer l) {
+        final View block = row.findViewById(R.id.row_myfires);
+        final int n = l.myFiresCount();
+        if (!com.atakmap.android.featurelayer.FireHistoryStyles.handles(l.spec) || n == 0) {
+            block.setVisibility(View.GONE);
+            return;
+        }
+        block.setVisibility(View.VISIBLE);
+        final Button only = row.findViewById(R.id.row_myfires_only);
+        final boolean on = l.myFiresShown();
+        only.setText("Only My Fires " + (on ? "ON" : "OFF") + " (" + n + ")");
+        only.setTextColor(on ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+        only.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.myFires(l, on ? com.atakmap.android.featurelayer.LayerManager.MY_ONLY_OFF
+                        : com.atakmap.android.featurelayer.LayerManager.MY_ONLY_ON, null);
+            }
+        });
+        row.findViewById(R.id.row_myfires_clear).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new AlertDialog.Builder(mapView.getContext())
+                        .setTitle("Clear My Fires")
+                        .setMessage("Take " + (n == 1 ? "the fire" : n == 2 ? "both fires" : "all " + n + " fires")
+                                + " out of My Fires and show every fire again?")
+                        .setPositiveButton("Clear", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int w) {
+                                manager.myFires(l, com.atakmap.android.featurelayer.LayerManager.MY_CLEAR, null);
+                            }
+                        }).setNegativeButton("Cancel", null).show();
+            }
+        });
+    }
+
+    /** Where a layer row's open/closed state is kept, by layer id. */
+    private static String foldPref(LoadedLayer l) {
+        return "fold." + l.spec.id;
+    }
+
     private static String statusLine(LoadedLayer l) {
         final StringBuilder sb = new StringBuilder();
         if (l.refreshing)
             return "Loading features\u2026 " + l.progress + " so far";
         if (l.busy)
             return "Loading features\u2026";
-        sb.append(l.count).append(" features");
+        sb.append(l.count).append(l.count == 1 ? " feature" : " features");
         if (l.lastRefresh > 0)
             sb.append(" · refreshed ").append(age(l.lastRefresh)).append(" ago");
         else
@@ -1906,11 +2262,15 @@ public class FeatureLayer implements IPlugin {
         if (l.spec.refreshMinutes > 0)
             sb.append(" · auto ").append(l.spec.refreshMinutes).append(" min");
         if (!l.refreshing && l.stale)
-            sb.append(" · STALE: ").append(l.status);
+            sb.append(com.atakmap.android.featurelayer.LoadedLayer.NO_NETWORK.equals(l.status) ? " · " : " · STALE: ")
+                    .append(l.status);
         else if (!l.refreshing && l.status.startsWith("partial"))
             sb.append(" · ").append(l.status);
         if (l.capped)
             sb.append(" \u00b7 ").append(l.spec.maxFeatures).append(" shown, more exist: zoom in or shrink the radius");
+        if (l.unnamedHidden > 0)
+            sb.append(" \u00b7 ").append(l.unnamedHidden).append(l.unnamedHidden == 1 ? " fire" : " fires")
+                    .append(" with no name, over 1 h, left out");
         return sb.toString();
     }
 
@@ -1941,9 +2301,9 @@ public class FeatureLayer implements IPlugin {
                     @Override
                     public void onClick(DialogInterface d, int which) {
                         if (which != 1)
-                            manager.add(Sources.dartVehicles());
+                            addLayer(Sources.dartVehicles());
                         if (which != 2)
-                            manager.add(Sources.dartPersonnel());
+                            addLayer(Sources.dartPersonnel());
                         d.dismiss();
                     }
                 })
@@ -1963,7 +2323,7 @@ public class FeatureLayer implements IPlugin {
                         final Sources.Fire fire = fires.get(which);
                         if (!manager.auth(Sources.NIFC_PORTAL).isSignedIn())
                             toast("Sign in to NIFC to load " + fire.name);
-                        manager.add(Sources.nifsLive(fire));
+                        addLayer(Sources.nifsLive(fire));
                     }
                 })
                 .setNegativeButton("Cancel", null)
@@ -2012,7 +2372,7 @@ public class FeatureLayer implements IPlugin {
                                 if (error != null)
                                     toast("Could not read " + item.title + ": " + error);
                                 else
-                                    manager.add(spec);
+                                    addLayer(spec);
                             }
                         });
                     }
@@ -2030,7 +2390,7 @@ public class FeatureLayer implements IPlugin {
                 .setItems(labels, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {
-                        manager.add(Sources.sarcopTraining(events.get(which)));
+                        addLayer(Sources.sarcopTraining(events.get(which)));
                     }
                 })
                 .setNegativeButton("Cancel", null)

@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.10** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.10/ATAK-Plugin-FeatureLayer-0.10--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -33,6 +33,23 @@ Built-in sources:
     intel flights, USFS, NIFC and WFIGS, public. Each source toggles on its own,
     a time window picks how far back to look, and only the latest perimeter per
     fire per source is drawn.
+  - New Fire Starts: NIFC's public view of new wildfires and prescribed fires,
+    nationwide, for 24 hours after each is found or until it is contained.
+    Wildfires, wildfires with no size reported yet, and prescribed fires toggle
+    on their own; a time window of 1 to 24 hours, and the same distance-from-me
+    or map-center control DART has.
+  - Ongoing Fires: NIFC's public view of current wildfires and prescribed fires
+    not yet contained, from the day after each is found, so it and New Fire
+    Starts never show one fire twice. Labeled with acres and percent
+    contained; a fire with an InciWeb page opens it from its details.
+  - Fire History: where fires have burned since 1900, from NIFC's
+    interagency fire perimeter history, drawn as EGP draws it: the last ten
+    years colored by years since (under six months, to one, two, three and
+    ten years), then each decade in a color of its own back to the 1980s
+    and grey before, each band and decade switched on its
+    own, labeled "Carr Fire (2018)". Search it by name and year, and keep
+    the fires that matter to an incident as My Fires, shown alone until
+    cleared.
   - Add your own org: any ArcGIS Online organization. Sign in, search its
     content, add a layer; it draws with the service's own renderer.
 
@@ -44,6 +61,43 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 
 _________________________________________________________________
 STATUS
+
+0.14, the guide's pictures for 0.13, and two fixes. Every picture of a
+changed screen retaken on official ATAK. Find puts names that start with the
+typed word first ("Ranch 2007" no longer lists Rocky Branch above Ranch Fire).
+CAL FIRE's connection, which needs a certificate authority Android 12 and 13
+do not carry, now names its TLS version.
+
+0.13, fire history, and layers that stay on the phone. Fire History: where
+fires have burned since 1900, from NIFC's interagency perimeters, drawn as EGP
+draws them for the last ten years and with a color for each decade back to the
+1980s, newest burn on top; each band and decade switched on its own; Find
+searches it by name and year ("Ranch 2007"), one copy per fire. My Fires keeps
+the burns that matter to an incident: add them from the details, each edged in
+white, then show only those until the list is cleared. CAL FIRE's own record
+(acres, containment, a link to its incident page) on the fires it runs. A layer
+or a type switched off is now hidden, not deleted, so everything downloaded
+comes back after a restart with no network, and the row says so in words.
+
+0.12, fires and a simpler pane. Two new public sources from NIFC: New Fire
+Starts, every wildfire and prescribed fire found in the last 24 hours, and
+Ongoing Fires, every fire not yet contained from the day after it was found,
+so with both on each fire shows once. A red flame marks a wildfire, a green RX
+a prescribed fire; labels carry acres and percent contained; a fire with only
+a dispatch number for a name leaves the map an hour after it was found; a tap
+on a fire opens its details, and a fire with an InciWeb page links to it. The
+main screen is now Add Layer, Find and All ON/OFF over a list of one-line
+layers, each opening its controls under an arrow; Find searches every loaded
+layer, names before other fields. Every icon and label stays level when the
+map turns, generated icons live in ATAK's private storage instead of the
+shared card, and the pane comes back after a sign-in.
+
+0.11, saved layers restore without holding up ATAK: at start, the cached
+store of each saved layer is re-styled on the plugin's own thread instead of
+ATAK's main thread. A phone with a large saved layer (a long-lived NIFS live
+layer, a DART fleet) hung for twenty seconds at every ATAK start on 0.9 and
+0.10, with "ATAK isn't responding" dialogs before any pane opened. Nothing
+else changed.
 
 0.10, one versionCode per APK: the same plugin as 0.9, rebuilt so that each
 ATAK target's APK carries its own versionCode, the plugin version and the ATAK
