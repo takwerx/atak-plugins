@@ -150,12 +150,27 @@ public final class LaunchPoint {
             marker.setMovable(false);
             marker.setClickable(true);
             marker.setMetaBoolean("adapt_marker_icon", false);
-            marker.setIcon(new Icon.Builder()
-                    .setImageUri(Icon.STATE_DEFAULT, "android.resource://"
-                            + plugin.getPackageName() + "/" + R.drawable.ic_launch)
-                    .setAnchor(Icon.ANCHOR_CENTER, Icon.ANCHOR_CENTER)
-                    .setColor(Icon.STATE_DEFAULT, 0xFFFFFFFF)
-                    .build());
+            // The word is pixels in the icon, a pill above the glyph: ATAK's own
+            // marker label was clipped to "ch" by its label engine. Its label is
+            // switched off so it does not draw a second, trimmed one.
+            final LaunchIcon.Composed composed = LaunchIcon.compose(plugin,
+                    plugin.getString(R.string.launch_marker));
+            if (composed != null) {
+                marker.setIcon(new Icon.Builder()
+                        .setImageUri(Icon.STATE_DEFAULT, composed.uri)
+                        .setSize(composed.widthDp, composed.heightDp)
+                        .setAnchor(composed.anchorXDp, composed.anchorYDp)
+                        .setColor(Icon.STATE_DEFAULT, 0xFFFFFFFF)
+                        .build());
+                marker.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);
+            } else {
+                marker.setIcon(new Icon.Builder()
+                        .setImageUri(Icon.STATE_DEFAULT, "android.resource://"
+                                + plugin.getPackageName() + "/" + R.drawable.ic_launch)
+                        .setAnchor(Icon.ANCHOR_CENTER, Icon.ANCHOR_CENTER)
+                        .setColor(Icon.STATE_DEFAULT, 0xFFFFFFFF)
+                        .build());
+            }
             group().addItem(marker);
         } else {
             marker.setPoint(p);
