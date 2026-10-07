@@ -18,7 +18,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -46,6 +48,21 @@ public class TfrManager {
     static final String PREF_ON = "on";
     static final String PREF_TYPES_OFF = "typesOff";
     static final String PREF_GATE_BAR_M = "gateBarM";
+    static final String PREF_WHERE_MODE = "whereMode";
+    static final String PREF_WHERE_VALUES = "whereValues";
+    static final String PREF_AREA_MODE = "areaMode";
+    static final String PREF_AREA_RADIUS_M = "areaRadiusM";
+
+    /** How the operator is saying where they care about. */
+    public static final int WHERE_EVERYWHERE = 0;
+    public static final int WHERE_STATE = 1;
+    public static final int WHERE_REGION = 2;
+    public static final int WHERE_CENTER = 3;
+
+    /** How much of it the list covers. */
+    public static final int AREA_EVERYWHERE = 0;
+    public static final int AREA_IN_VIEW = 1;
+    public static final int AREA_RADIUS = 2;
 
     /** Tool Preferences, shared with ATAK's own settings screen. */
     public static final String PREF_REFRESH_MIN = "tfr_refresh_minutes";
@@ -96,6 +113,10 @@ public class TfrManager {
     /** The scale-bar distance at or below which the map draws; -1 is always. */
     private volatile long gateBarM;
     private volatile boolean gateHiding;
+    private volatile int whereMode;
+    private final Set<String> whereValues = new LinkedHashSet<>();
+    private volatile int areaMode = AREA_IN_VIEW;
+    private volatile long areaRadiusM = 80467L;
 
     public TfrManager(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
@@ -108,6 +129,10 @@ public class TfrManager {
         gateBarM = p.getLong(PREF_GATE_BAR_M, -1L);
         // A set, not a joined string: a type carrying the separator would come back as two
         // bogus entries and the filter would restore wrong.
+        whereMode = p.getInt(PREF_WHERE_MODE, WHERE_EVERYWHERE);
+        whereValues.addAll(p.getStringSet(PREF_WHERE_VALUES, Collections.<String> emptySet()));
+        areaMode = p.getInt(PREF_AREA_MODE, AREA_IN_VIEW);
+        areaRadiusM = p.getLong(PREF_AREA_RADIUS_M, 80467L);
         typesOff.addAll(p.getStringSet(PREF_TYPES_OFF,
                 new HashSet<>(Collections.singletonList(DEFAULT_OFF))));
     }
@@ -226,13 +251,150 @@ public class TfrManager {
         return known;
     }
 
-    /** Everything the type filter lets through. The map draws exactly this. */
+    /** Everything the type and place filters let through. The map draws exactly this. */
     public List<Tfr> shown() {
         final List<Tfr> out = new ArrayList<>();
         for (Tfr t : known)
-            if (isTypeOn(t.type))
+            if (isTypeOn(t.type) && matchesWhere(t))
                 out.add(t);
         return out;
+    }
+
+    // ---- where: state, FAA region or center ----
+
+    public int whereMode() {
+        return whereMode;
+    }
+
+    public Set<String> whereValues() {
+        return Collections.unmodifiableSet(whereValues);
+    }
+
+    public void setWhere(int mode, Set<String> values) {
+        whereMode = mode;
+        whereValues.clear();
+        if (values != null)
+            whereValues.addAll(values);
+        prefs().edit().putInt(PREF_WHERE_MODE, mode)
+                .putStringSet(PREF_WHERE_VALUES, new HashSet<>(whereValues)).apply();
+        pushPlaceFilter();
+        changed();
+    }
+
+    /**
+     * Whether a restriction passes the place filter.
+     *
+     * <p>A nationwide notice passes whatever is picked. It applies everywhere by
+     * definition, so hiding it because the operator chose a state would be hiding
+     * something that covers that state.
+     */
+    public boolean matchesWhere(Tfr t) {
+        if (whereMode == WHERE_EVERYWHERE || whereValues.isEmpty())
+            return true;
+        if ("USA".equals(t.state))
+            return true;
+        switch (whereMode) {
+            case WHERE_STATE:
+                return whereValues.contains(t.state);
+            case WHERE_REGION:
+                final String r = Places.regionOf(t.state);
+                return r != null && whereValues.contains(r);
+            case WHERE_CENTER:
+                return whereValues.contains(t.facility);
+            default:
+                return true;
+        }
+    }
+
+    /** What the Where row's head reads. */
+    public String whereLabel() {
+        if (whereMode == WHERE_EVERYWHERE || whereValues.isEmpty())
+            return "Everywhere";
+        if (whereValues.size() == 1) {
+            final String only = whereValues.iterator().next();
+            switch (whereMode) {
+                case WHERE_STATE:
+                    return Places.stateName(only);
+                case WHERE_CENTER:
+                    return Places.centerName(only);
+                default:
+                    return only;
+            }
+        }
+        final String noun = whereMode == WHERE_STATE ? "states"
+                : whereMode == WHERE_REGION ? "regions" : "centers";
+        return whereValues.size() + " " + noun;
+    }
+
+    /** Counts for the picker, keyed the way the chosen mode names places. */
+    public Map<String, Integer> whereCounts(int mode) {
+        final Map<String, Integer> out = new LinkedHashMap<>();
+        for (Tfr t : known) {
+            if (!isTypeOn(t.type))
+                continue;
+            final String key;
+            switch (mode) {
+                case WHERE_STATE:
+                    key = t.state;
+                    break;
+                case WHERE_REGION:
+                    key = Places.regionOf(t.state);
+                    break;
+                case WHERE_CENTER:
+                    key = t.facility;
+                    break;
+                default:
+                    key = null;
+            }
+            if (key == null || key.isEmpty())
+                continue;
+            final Integer n = out.get(key);
+            out.put(key, n == null ? 1 : n + 1);
+        }
+        return out;
+    }
+
+    private void pushPlaceFilter() {
+        if (whereMode == WHERE_EVERYWHERE || whereValues.isEmpty()) {
+            overlay.setNotamsShown(null);
+            return;
+        }
+        final Set<String> allow = new HashSet<>();
+        for (Tfr t : known)
+            if (matchesWhere(t))
+                allow.add(t.notamId);
+        overlay.setNotamsShown(allow);
+    }
+
+    // ---- area: how much of it the list covers ----
+
+    public int areaMode() {
+        return areaMode;
+    }
+
+    public long areaRadiusMeters() {
+        return areaRadiusM;
+    }
+
+    public void setArea(int mode, long radiusM) {
+        areaMode = mode;
+        areaRadiusM = radiusM > 0 ? radiusM : areaRadiusM;
+        prefs().edit().putInt(PREF_AREA_MODE, areaMode)
+                .putLong(PREF_AREA_RADIUS_M, areaRadiusM).apply();
+        changed();
+    }
+
+    /** What the Area row's head reads. */
+    public String areaLabel() {
+        switch (areaMode) {
+            case AREA_EVERYWHERE:
+                return "Everything";
+            case AREA_RADIUS:
+                return "Within " + com.atakmap.android.tfr.ui.ScaleBar.describe(areaRadiusM)
+                        + " of me";
+            default:
+                return "What is in view";
+        }
     }
 
     /**
@@ -243,14 +405,56 @@ public class TfrManager {
      * looking at".
      */
     public List<Tfr> inView() {
+        if (areaMode == AREA_EVERYWHERE)
+            return shown();
+        if (areaMode == AREA_RADIUS) {
+            final GeoPoint me = self();
+            final List<Tfr> out = new ArrayList<>();
+            for (Tfr t : shown())
+                if (nearest(me, t) <= areaRadiusM)
+                    out.add(t);
+            return out;
+        }
         final GeoBounds b = mapView.getBounds();
-        if (b == null)
+        // The globe has no usable extent, and neither does a tilted 3D view at some
+        // angles. Everything is a better answer than an empty list that reads as
+        // "there are none here".
+        if (b == null || Double.isNaN(b.getNorth()) || Double.isNaN(b.getSouth()))
             return shown();
         final List<Tfr> out = new ArrayList<>();
         for (Tfr t : shown())
             if (intersects(t, b))
                 out.add(t);
         return out;
+    }
+
+    /** Where "of me" measures from: the self marker, or the map center with no fix. */
+    public GeoPoint self() {
+        final com.atakmap.android.maps.Marker m = mapView.getSelfMarker();
+        if (m != null) {
+            final GeoPoint p = m.getPoint();
+            // 0,0 is not a fix, whatever isValid() says about it.
+            if (p != null && p.isValid() && (p.getLatitude() != 0 || p.getLongitude() != 0))
+                return p;
+        }
+        return mapView.getPoint().get();
+    }
+
+    public boolean hasFix() {
+        final com.atakmap.android.maps.Marker m = mapView.getSelfMarker();
+        if (m == null)
+            return false;
+        final GeoPoint p = m.getPoint();
+        return p != null && p.isValid() && (p.getLatitude() != 0 || p.getLongitude() != 0);
+    }
+
+    static double nearest(GeoPoint from, Tfr t) {
+        double best = Double.MAX_VALUE;
+        for (TfrArea a : t.areas)
+            for (double[] p : a.ring)
+                best = Math.min(best, com.atakmap.coremap.maps.coords.GeoCalculations
+                        .distanceTo(from, new GeoPoint(p[0], p[1])));
+        return best;
     }
 
     private static boolean intersects(Tfr t, GeoBounds view) {
@@ -449,6 +653,7 @@ public class TfrManager {
                 ? failed + (failed == 1 ? " restriction" : " restrictions") + " would not download"
                 : null;
         rewriteOverlay();
+        pushPlaceFilter();
         post();
     }
 

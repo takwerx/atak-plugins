@@ -76,6 +76,10 @@ public class TfrOverlay {
     private final Map<String, Long> setIds = new HashMap<>();
     /** Raw type to set id as last read off disk, before any rewrite has run. */
     private final Map<Long, String> setKeyById = new HashMap<>();
+    /** NOTAM to the features drawn for it, so a place filter can hide without deleting. */
+    private final Map<String, List<Long>> fidsByNotam = new HashMap<>();
+    /** NOTAMs the place filter is letting through; null means no place filter at all. */
+    private volatile Set<String> notamsShown;
 
     /**
      * Its own thread: a visibility write waits behind any rewrite in progress, and the
@@ -101,6 +105,8 @@ public class TfrOverlay {
          * it. That is the "missing from the map reads as clear airspace" failure, in the
          * one place the list and the map are supposed to follow a single rule.
          */
+        /** Which restriction this belongs to, so a place filter can hide all of its areas. */
+        public final String notamId;
         public final String setKey;
         /** What Overlay Manager shows for the set. Display only. */
         public final String setName;
@@ -113,9 +119,10 @@ public class TfrOverlay {
         /** Wall height in meters; 0 for a flat ring on the ground. */
         public final double extrude;
 
-        public Drawn(String setKey, String setName, String name, Geometry geometry,
-                Style style, AttributeSet attrs, Feature.AltitudeMode altitudeMode,
-                double extrude) {
+        public Drawn(String notamId, String setKey, String setName, String name,
+                Geometry geometry, Style style, AttributeSet attrs,
+                Feature.AltitudeMode altitudeMode, double extrude) {
+            this.notamId = notamId;
             this.setKey = setKey;
             this.setName = setName;
             this.name = name;
@@ -279,6 +286,19 @@ public class TfrOverlay {
     }
 
     /**
+     * The place filter: which NOTAMs a state, region or center pick is letting through.
+     * Null means no place filter.
+     *
+     * <p>Per feature rather than per set, because the sets are per type and a place cuts
+     * across them. Hidden either way -- never deleted -- so the picture is whole again the
+     * moment the filter is widened, with no network.
+     */
+    public void setNotamsShown(Set<String> notams) {
+        notamsShown = notams == null ? null : new HashSet<>(notams);
+        applyVisibility();
+    }
+
+    /**
      * Push the switches into the store.
      *
      * <p>The layer is hidden first so the areas go on the next frame however busy the
@@ -327,6 +347,7 @@ public class TfrOverlay {
     private void pushVisibilityLocked() {
         if (store == null)
             return;
+        pushPlaceVisibilityLocked();
         final Set<Long> show = new HashSet<>();
         final Set<Long> hide = new HashSet<>();
         for (Map.Entry<String, Long> e : setIds.entrySet()) {
@@ -355,6 +376,40 @@ public class TfrOverlay {
         }
     }
 
+    /**
+     * Hide or show whole restrictions for the place filter.
+     *
+     * <p>Two scoped writes again, for the same reason the set call needed them. Caller
+     * holds {@link #lock}.
+     */
+    private void pushPlaceVisibilityLocked() {
+        final Set<String> allow = notamsShown;
+        if (fidsByNotam.isEmpty())
+            return;
+        final Set<Long> show = new HashSet<>();
+        final Set<Long> hide = new HashSet<>();
+        for (Map.Entry<String, List<Long>> e : fidsByNotam.entrySet()) {
+            final boolean on = allow == null || allow.contains(e.getKey());
+            (on ? show : hide).addAll(e.getValue());
+        }
+        try {
+            if (!show.isEmpty()) {
+                final FeatureDataStore2.FeatureQueryParameters p =
+                        new FeatureDataStore2.FeatureQueryParameters();
+                p.ids = show;
+                store.setFeaturesVisible(p, true);
+            }
+            if (!hide.isEmpty()) {
+                final FeatureDataStore2.FeatureQueryParameters p =
+                        new FeatureDataStore2.FeatureQueryParameters();
+                p.ids = hide;
+                store.setFeaturesVisible(p, false);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "applying the place filter failed", e);
+        }
+    }
+
     // ---- writing ----
 
     /**
@@ -376,14 +431,21 @@ public class TfrOverlay {
                 locked = true;
                 final List<Long> old = existingSets();
                 final Map<String, Long> fresh = new HashMap<>();
+                fidsByNotam.clear();
                 for (Drawn d : drawn) {
                     Long fsid = fresh.get(d.setKey);
                     if (fsid == null) {
                         fsid = newSet(d.setKey, d.setName);
                         fresh.put(d.setKey, fsid);
                     }
-                    store.insertFeature(new Feature(fsid, d.name, d.geometry, d.style,
-                            d.attrs, d.altitudeMode, d.extrude));
+                    final long fid = store.insertFeature(new Feature(fsid, d.name,
+                            d.geometry, d.style, d.attrs, d.altitudeMode, d.extrude));
+                    List<Long> ids = fidsByNotam.get(d.notamId);
+                    if (ids == null) {
+                        ids = new ArrayList<>(2);
+                        fidsByNotam.put(d.notamId, ids);
+                    }
+                    ids.add(fid);
                 }
                 for (Long id : old) {
                     try {

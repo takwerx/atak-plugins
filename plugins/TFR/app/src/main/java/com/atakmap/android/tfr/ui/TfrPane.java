@@ -22,6 +22,7 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.tfr.Tfr;
 import com.atakmap.android.tfr.TfrArea;
 import com.atakmap.android.tfr.TfrFeatures;
+import com.atakmap.android.tfr.Places;
 import com.atakmap.android.tfr.TfrManager;
 import com.atakmap.android.tfr.TfrTypes;
 import com.atakmap.android.tfr.plugin.R;
@@ -35,7 +36,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Locale;
 
 /**
@@ -64,7 +68,9 @@ public class TfrPane implements TfrManager.Listener {
     private LinearLayout settingsContainer, typesContainer, updatesContainer, keyBody;
     private Button useZoomButton, gateButton;
     private TextView gateNow, downloadedNote;
-    private Fold gateFold, typesFold, keyFold, updatesFold;
+    private Fold gateFold, areaFold, whereFold, typesFold, keyFold, updatesFold;
+    private LinearLayout areaContainer, whereContainer;
+    private TextView areaNote;
 
     private final List<Tfr> rows = new ArrayList<>();
     private RowAdapter adapter;
@@ -108,8 +114,16 @@ public class TfrPane implements TfrManager.Listener {
         gateNow = settings.findViewById(R.id.gate_now);
         downloadedNote = settings.findViewById(R.id.downloaded_note);
 
+        areaContainer = settings.findViewById(R.id.area_container);
+        whereContainer = settings.findViewById(R.id.where_container);
+        areaNote = settings.findViewById(R.id.area_note);
+
         gateFold = new Fold(settings, R.id.fold_gate_head, R.id.fold_gate_chev,
                 R.id.fold_gate_body, "fold.gate");
+        areaFold = new Fold(settings, R.id.fold_area_head, R.id.fold_area_chev,
+                R.id.fold_area_body, "fold.area");
+        whereFold = new Fold(settings, R.id.fold_where_head, R.id.fold_where_chev,
+                R.id.fold_where_body, "fold.where");
         typesFold = new Fold(settings, R.id.fold_types_head, R.id.fold_types_chev,
                 R.id.fold_types_body, "fold.types");
         keyFold = new Fold(settings, R.id.fold_key_head, R.id.fold_key_chev,
@@ -254,6 +268,11 @@ public class TfrPane implements TfrManager.Listener {
         gateNow.setText("Scale bar now " + ScaleBar.describe(manager.barMeters())
                 + (manager.isGateHiding() ? " - hidden" : ""));
 
+        areaFold.label("Area", manager.areaLabel());
+        buildArea();
+        whereFold.label("Where", manager.whereLabel());
+        buildWhere();
+
         final List<String[]> counts = manager.typeCounts();
         int onCount = 0;
         for (String[] c : counts)
@@ -269,6 +288,189 @@ public class TfrPane implements TfrManager.Listener {
         updatesFold.label("Updates", "every " + manager.refreshMinutesForDisplay() + " min");
         buildUpdates();
         downloadedNote.setText(manager.describeCacheForDisplay());
+    }
+
+    /** How much of the picture the list covers. The map is governed by Where and Types. */
+    private void buildArea() {
+        areaContainer.removeAllViews();
+        addChoice(areaContainer, "Everything", manager.areaMode() == TfrManager.AREA_EVERYWHERE,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        manager.setArea(TfrManager.AREA_EVERYWHERE, 0);
+                    }
+                });
+        addChoice(areaContainer, "What is in view", manager.areaMode() == TfrManager.AREA_IN_VIEW,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        manager.setArea(TfrManager.AREA_IN_VIEW, 0);
+                    }
+                });
+        addChoice(areaContainer, "Within " + ScaleBar.describe(manager.areaRadiusMeters())
+                + (manager.hasFix() ? " of me" : " of the map center"),
+                manager.areaMode() == TfrManager.AREA_RADIUS, new Runnable() {
+                    @Override
+                    public void run() {
+                        pickRadius();
+                    }
+                });
+        areaNote.setText(manager.hasFix() ? ""
+                : "No GPS fix, measuring from the map center.");
+        areaNote.setVisibility(manager.hasFix() ? View.GONE : View.VISIBLE);
+    }
+
+    /**
+     * Where, said three ways. A state is the vocabulary the server-side feed already
+     * uses, a region is how the FAA organizes itself, and a center is what the feed puts
+     * on every row.
+     */
+    private void buildWhere() {
+        whereContainer.removeAllViews();
+        addChoice(whereContainer, "Everywhere", manager.whereMode() == TfrManager.WHERE_EVERYWHERE,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        manager.setWhere(TfrManager.WHERE_EVERYWHERE, null);
+                    }
+                });
+        addChoice(whereContainer, "By state", manager.whereMode() == TfrManager.WHERE_STATE,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        pickWhere(TfrManager.WHERE_STATE, "Which states");
+                    }
+                });
+        addChoice(whereContainer, "By FAA region", manager.whereMode() == TfrManager.WHERE_REGION,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        pickWhere(TfrManager.WHERE_REGION, "Which FAA regions");
+                    }
+                });
+        addChoice(whereContainer, "By center", manager.whereMode() == TfrManager.WHERE_CENTER,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        pickWhere(TfrManager.WHERE_CENTER, "Which centers");
+                    }
+                });
+    }
+
+    private void addChoice(LinearLayout into, String text, boolean chosen, final Runnable act) {
+        final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = 4;
+        b.setLayoutParams(lp);
+        b.setText(text);
+        b.setTextColor(pluginContext.getResources().getColor(
+                chosen ? R.color.state_on : R.color.white));
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                act.run();
+                render();
+            }
+        });
+        into.addView(b);
+    }
+
+    /** Multi-choice, applied on OK, with a count on every place and a neutral Clear. */
+    private void pickWhere(final int mode, String title) {
+        final Map<String, Integer> counts = manager.whereCounts(mode);
+        final List<String> keys = new ArrayList<>();
+        if (mode == TfrManager.WHERE_REGION) {
+            // Every region, so one with nothing in it today can still be chosen.
+            keys.addAll(Places.regions());
+            for (String k : counts.keySet())
+                if (!keys.contains(k))
+                    keys.add(k);
+        } else {
+            keys.addAll(counts.keySet());
+            Collections.sort(keys);
+        }
+        if (keys.isEmpty()) {
+            new AlertDialog.Builder(mapView.getContext())
+                    .setMessage("Nothing is downloaded yet, so there is nothing to choose from.")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        final String[] labels = new String[keys.size()];
+        final boolean[] checked = new boolean[keys.size()];
+        final Set<String> picked = new LinkedHashSet<>(
+                manager.whereMode() == mode ? manager.whereValues()
+                        : Collections.<String> emptySet());
+        for (int i = 0; i < keys.size(); i++) {
+            final String k = keys.get(i);
+            final Integer n = counts.get(k);
+            labels[i] = name(mode, k) + (n == null ? "" : "  (" + n + ")");
+            checked[i] = picked.contains(k);
+        }
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle(title)
+                .setMultiChoiceItems(labels, checked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dlg, int which, boolean on) {
+                                if (on)
+                                    picked.add(keys.get(which));
+                                else
+                                    picked.remove(keys.get(which));
+                            }
+                        })
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int which) {
+                        manager.setWhere(picked.isEmpty() ? TfrManager.WHERE_EVERYWHERE : mode,
+                                picked);
+                        render();
+                    }
+                })
+                .setNeutralButton("Clear", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int which) {
+                        manager.setWhere(TfrManager.WHERE_EVERYWHERE, null);
+                        render();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        fromTop(d);
+    }
+
+    private static String name(int mode, String key) {
+        if (mode == TfrManager.WHERE_STATE)
+            return Places.stateName(key);
+        if (mode == TfrManager.WHERE_CENTER)
+            return Places.centerName(key);
+        return key;
+    }
+
+    private void pickRadius() {
+        final String unit = Units.bigLabel();
+        final double[] presets = { 10, 25, 50, 100, 250 };
+        final String[] labels = new String[presets.length];
+        for (int i = 0; i < presets.length; i++)
+            labels[i] = trim(presets[i]) + " " + unit;
+        int checked = -1;
+        for (int i = 0; i < presets.length; i++)
+            if (Math.abs(Units.bigToMeters(presets[i]) - manager.areaRadiusMeters()) < 1)
+                checked = i;
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Show restrictions within")
+                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int which) {
+                        manager.setArea(TfrManager.AREA_RADIUS,
+                                (long) Math.round(Units.bigToMeters(presets[which])));
+                        dlg.dismiss();
+                        render();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        fromTop(d);
     }
 
     /** A filter states what it will cost before it is used, so every row carries its count. */

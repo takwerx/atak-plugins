@@ -60,15 +60,19 @@ public final class TfrFeatures {
             final double ceilM = metersOf(a.ceiling);
             final double wall = ceilM - floorM;
             if (wall > 1) {
-                out.add(new TfrOverlay.Drawn(setKey, setName, name,
-                        polygon(a, floorM), wallStyle(color, label(t, a)), attrs,
+                // No label on the wall. A LabelPointStyle in an extruded feature's
+                // composite does not draw -- the ring was unlabeled on the phone at a zoom
+                // well inside the label's own resolution gate -- and the footprint below
+                // carries it instead, which is the clamped case that does work.
+                out.add(new TfrOverlay.Drawn(t.notamId, setKey, setName, name,
+                        polygon(a, floorM), wallStyle(color, null), attrs,
                         altitudeMode(a), wall));
             }
             // The footprint, clamped. ATAK draws its own extruded shapes this way, as
             // two features: without it the area is invisible looking straight down,
             // which is how the map is read most of the time.
-            out.add(new TfrOverlay.Drawn(setKey, setName, name, polygon(a, Double.NaN),
-                    style(color, wall > 1 ? null : label(t, a)), attrs,
+            out.add(new TfrOverlay.Drawn(t.notamId, setKey, setName, name, polygon(a, Double.NaN),
+                    style(color, label(t, a)), attrs,
                     Feature.AltitudeMode.ClampToGround, 0d));
         }
         return out;
