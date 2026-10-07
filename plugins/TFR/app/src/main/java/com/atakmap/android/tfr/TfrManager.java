@@ -53,6 +53,11 @@ public class TfrManager {
     static final String PREF_WHERE_VALUES = "whereValues";
     static final String PREF_AREA_MODE = "areaMode";
     static final String PREF_AREA_RADIUS_M = "areaRadiusM";
+    static final String PREF_MEASURE_FROM = "measureFrom";
+
+    /** What distances and the radius are measured from. */
+    public static final int FROM_ME = 0;
+    public static final int FROM_MAP_CENTER = 1;
 
     /** How the operator is saying where they care about. */
     public static final int WHERE_EVERYWHERE = 0;
@@ -127,6 +132,7 @@ public class TfrManager {
     private final Set<String> whereValues = new LinkedHashSet<>();
     private volatile int areaMode = AREA_IN_VIEW;
     private volatile long areaRadiusM = 80467L;
+    private volatile int measureFrom = FROM_ME;
 
     public TfrManager(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
@@ -144,6 +150,7 @@ public class TfrManager {
         whereValues.addAll(p.getStringSet(PREF_WHERE_VALUES, Collections.<String> emptySet()));
         areaMode = p.getInt(PREF_AREA_MODE, AREA_IN_VIEW);
         areaRadiusM = p.getLong(PREF_AREA_RADIUS_M, 80467L);
+        measureFrom = p.getInt(PREF_MEASURE_FROM, FROM_ME);
         typesOff.addAll(p.getStringSet(PREF_TYPES_OFF,
                 new HashSet<>(Collections.singletonList(DEFAULT_OFF))));
     }
@@ -423,6 +430,19 @@ public class TfrManager {
         changed();
     }
 
+    /** What the list's heading calls itself, which has to match the Area actually set. */
+    public String listHeading() {
+        switch (areaMode) {
+            case AREA_EVERYWHERE:
+                return "All restrictions";
+            case AREA_RADIUS:
+                return "Within " + com.atakmap.android.tfr.ui.ScaleBar.gate(areaRadiusM)
+                        + " of me";
+            default:
+                return "Restrictions in view";
+        }
+    }
+
     /** What the Area row's head reads. */
     public String areaLabel() {
         switch (areaMode) {
@@ -467,14 +487,39 @@ public class TfrManager {
         return out;
     }
 
-    /** Where "of me" measures from: the self marker, or the map center with no fix. */
+    public int measureFrom() {
+        return measureFrom;
+    }
+
+    public void setMeasureFrom(int mode) {
+        measureFrom = mode;
+        prefs().edit().putInt(PREF_MEASURE_FROM, mode).apply();
+        changed();
+    }
+
+    /** What the row's label for that setting reads. */
+    public String measureFromLabel() {
+        if (measureFrom == FROM_MAP_CENTER)
+            return "Map center";
+        return hasFix() ? "My location" : "My location (no fix, using the map center)";
+    }
+
+    /**
+     * The point every distance in the pane is measured from: the operator's own position,
+     * or the middle of the map when they asked for that or have no fix.
+     *
+     * <p>One point for the sort, the row distances and the radius, so the list cannot be
+     * ordered by one thing while it reports another.
+     */
     public GeoPoint self() {
-        final com.atakmap.android.maps.Marker m = mapView.getSelfMarker();
-        if (m != null) {
-            final GeoPoint p = m.getPoint();
-            // 0,0 is not a fix, whatever isValid() says about it.
-            if (p != null && p.isValid() && (p.getLatitude() != 0 || p.getLongitude() != 0))
-                return p;
+        if (measureFrom == FROM_ME) {
+            final com.atakmap.android.maps.Marker m = mapView.getSelfMarker();
+            if (m != null) {
+                final GeoPoint p = m.getPoint();
+                // 0,0 is not a fix, whatever isValid() says about it.
+                if (p != null && p.isValid() && (p.getLatitude() != 0 || p.getLongitude() != 0))
+                    return p;
+            }
         }
         return mapView.getPoint().get();
     }

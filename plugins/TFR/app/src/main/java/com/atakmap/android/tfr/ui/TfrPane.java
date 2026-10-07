@@ -305,7 +305,7 @@ public class TfrPane implements TfrManager.Listener {
         rows.clear();
         final List<Tfr> inView = manager.isOn() ? manager.inView() : new ArrayList<Tfr>();
         inViewTotal = inView.size();
-        final GeoPoint from = mapView.getPoint().get();
+        final GeoPoint from = manager.self();
         Collections.sort(inView, new Comparator<Tfr>() {
             @Override
             public int compare(Tfr a, Tfr b) {
@@ -314,9 +314,12 @@ public class TfrPane implements TfrManager.Listener {
         });
         for (int i = 0; i < inView.size() && i < LIST_CAP; i++)
             rows.add(inView.get(i));
-        headingText.setText(manager.isOn()
-                ? "Restrictions in view (" + inViewTotal + ")"
-                : "Restrictions in view");
+        // The heading names the scope it is actually showing. It read "in view" whatever
+        // Area was set to, so an operator who had chosen Everything zoomed onto a single
+        // restriction and the count did not move -- correctly, and for a reason the pane
+        // was hiding from them.
+        headingText.setText(manager.isOn() ? manager.listHeading() + " (" + inViewTotal + ")"
+                : manager.listHeading());
         adapter.notifyDataSetChanged();
     }
 
@@ -468,7 +471,15 @@ public class TfrPane implements TfrManager.Listener {
                         manager.setArea(TfrManager.AREA_IN_VIEW, 0);
                     }
                 });
-        addChoice(areaContainer, "Within " + ScaleBar.describe(manager.areaRadiusMeters())
+        addChoice(areaContainer, "Measuring from: " + manager.measureFromLabel(), false,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        manager.setMeasureFrom(manager.measureFrom() == TfrManager.FROM_ME
+                                ? TfrManager.FROM_MAP_CENTER : TfrManager.FROM_ME);
+                    }
+                });
+        addChoice(areaContainer, "Within " + ScaleBar.gate(manager.areaRadiusMeters())
                 + (manager.hasFix() ? " of me" : " of the map center"),
                 manager.areaMode() == TfrManager.AREA_RADIUS, new Runnable() {
                     @Override
@@ -1054,46 +1065,48 @@ public class TfrPane implements TfrManager.Listener {
             final long now = System.currentTimeMillis();
             final Resources res = pluginContext.getResources();
 
-            // Tap the row to go there, Details to read it. The operator asked for a go to
-            // on the list, and going somewhere is what a row tap means everywhere else.
+            // Feature Layer's way round, which is what the operator pointed at: the row
+            // opens details, the Go button moves the map.
             v.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View x) {
-                    goTo(t);
-                }
-            });
-            final Button details = v.findViewById(R.id.row_details);
-            details.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View x) {
                     showDetails(t);
                 }
             });
+            final Button goTo = v.findViewById(R.id.row_goto);
+            goTo.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View x) {
+                    goTo(t);
+                }
+            });
 
             ((TextView) v.findViewById(R.id.row_place)).setText(t.place());
+            ((TextView) v.findViewById(R.id.row_limits)).setText(limits(t, myFeetMsl()));
+
             final TextView state = v.findViewById(R.id.row_state);
+            final String type = TfrTypes.label(t.type);
             if (t.hasNoMappedArea()) {
-                state.setText("no area");
+                state.setText(type + "   no mapped area");
                 state.setTextColor(res.getColor(R.color.dim_text));
             } else if (t.isActive(now)) {
-                state.setText("active");
+                state.setText(type + "   ACTIVE");
                 state.setTextColor(manager.activeColor());
             } else if (t.expireMs > 0 && now > t.expireMs) {
                 // Past its published end. Never shown as merely "scheduled", which reads
                 // as something that is still coming.
-                state.setText("expired");
+                state.setText(type + "   EXPIRED");
                 state.setTextColor(res.getColor(R.color.dim_text));
             } else {
-                state.setText("scheduled");
+                state.setText(type + "   SCHEDULED");
                 state.setTextColor(manager.upcomingColor());
             }
 
-            ((TextView) v.findViewById(R.id.row_limits)).setText(limits(t, myFeetMsl()));
-            final double d = distance(mapView.getPoint().get(), t);
-            ((TextView) v.findViewById(R.id.row_window)).setText(TfrTypes.label(t.type)
-                    + (d < Double.MAX_VALUE
-                            ? "   " + SpanUtilities.formatType(Units.type(), d, Span.METER)
-                            : ""));
+            // The distance on the right, where Feature Layer puts it: it is what the list
+            // is ordered by, so it should be readable down the edge in one pass.
+            final double d = distance(manager.self(), t);
+            ((TextView) v.findViewById(R.id.row_window)).setText(d < Double.MAX_VALUE
+                    ? SpanUtilities.formatType(Units.type(), d, Span.METER) : "");
             return v;
         }
     }
