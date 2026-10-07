@@ -391,8 +391,13 @@ public final class ObstacleManager {
             sb.append(pluginContext.getString(fetched.isEmpty()
                     ? R.string.status_obstacles_none : R.string.status_obstacles_all_filtered));
         } else {
-            sb.append(pluginContext.getString(R.string.status_obstacles_count,
-                    obstacles.size(), aboveCeiling()));
+            if (obstacles.size() == 1)
+                sb.append(pluginContext.getString(R.string.status_obstacles_one,
+                        pluginContext.getString(aboveCeiling() > 0
+                                ? R.string.above_ceiling_yes : R.string.above_ceiling_no)));
+            else
+                sb.append(pluginContext.getString(R.string.status_obstacles_count,
+                        obstacles.size(), aboveCeiling()));
             if (capped)
                 sb.append(' ').append(pluginContext.getString(
                         R.string.status_obstacles_capped, obstacles.size(), obstacles.size()));
