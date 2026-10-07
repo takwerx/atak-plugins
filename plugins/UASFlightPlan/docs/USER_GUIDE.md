@@ -1,10 +1,12 @@
 # UAS Flight Plan for ATAK — User Guide
 
-**Version 0.1 · takwerx**
+**Version 0.2 · takwerx**
 
-**Download UAS Flight Plan 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download UAS Flight Plan 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.8:** https://github.com/takwerx/uas-flight-plan/releases/download/v0.1/ATAK-Plugin-UASFlightPlan-0.1--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/uas-flight-plan/releases/download/v0.2/ATAK-Plugin-UASFlightPlan-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/uas-flight-plan/releases/download/v0.2/ATAK-Plugin-UASFlightPlan-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/uas-flight-plan/releases/download/v0.2/ATAK-Plugin-UASFlightPlan-0.2--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/uas-flight-plan/releases
 
@@ -19,9 +21,8 @@ height.
 
 ## Before you start
 
-- **ATAK versions.** Version 0.1 is published for ATAK-CIV 5.8. Builds for
-  5.6 and 5.7 follow with the next release. A plugin built for another ATAK
-  version will not load.
+- **ATAK versions.** Version 0.2 is published for ATAK-CIV 5.6, 5.7 and
+  5.8. A plugin built for another ATAK version will not load.
 - **Elevation data.** The plugin reads the elevation loaded in ATAK. It needs
   DTED2 (30 m posts) or finer for the area you work in; the Map Depot plugin
   can download it. With coarser data the plugin says so and paints nothing,
@@ -103,9 +104,9 @@ that is your situation; the chosen one is green.
 You are planning and have to ask Air Attack for a ceiling. The block reads:
 
 > Highest ground in the area: 5,687 ft MSL
-> Fly above the terrain: + 200 ft
-> **Ask Air Attack for 5,900 ft MSL** (rounded up to the next 100 ft)
-> That is 2,323 ft above your launch point: the number for the controller.
+> Fly above the terrain: + 400 ft
+> **Ask Air Attack for 6,100 ft MSL** (rounded up to the next 100 ft)
+> That is 2,523 ft above your launch point: the number for the controller.
 
 ![Need a ceiling](screenshots/7_need_ceiling.png)
 
