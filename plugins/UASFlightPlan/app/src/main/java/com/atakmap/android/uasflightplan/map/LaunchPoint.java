@@ -197,10 +197,14 @@ public final class LaunchPoint {
         Log.d(TAG, "launch point placed");
     }
 
-    /** Takes the marker off the map and forgets it. */
+    /** The pilot's Clear: takes the marker off the map and forgets it. */
     public void clear() {
         android.preference.PreferenceManager.getDefaultSharedPreferences(mapView.getContext())
                 .edit().remove(PREF_LAT).remove(PREF_LON).apply();
+        removeMarker();
+    }
+
+    private void removeMarker() {
         if (marker == null)
             return;
         if (marker.getGroup() != null)
@@ -208,10 +212,14 @@ public final class LaunchPoint {
         marker = null;
     }
 
-    /** Called when the plugin stops: nothing of ours may stay on the map. */
+    /**
+     * Called when the plugin stops: nothing of ours may stay on the map, but the
+     * point is remembered, so a reload or an upgrade brings the plan back. A reload
+     * ran the pilot's Clear here and the plan was gone every time (2026-10-06).
+     */
     public void dispose() {
         cancelPick();
-        clear();
+        removeMarker();
         if (group != null) {
             try {
                 mapView.getRootGroup().removeGroup(group);

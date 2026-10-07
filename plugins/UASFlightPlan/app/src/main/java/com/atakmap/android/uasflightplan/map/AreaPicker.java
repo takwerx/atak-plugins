@@ -116,11 +116,22 @@ public final class AreaPicker implements ToolListener {
         ToolManagerBroadcastReceiver.getInstance().registerListener(this);
     }
 
-    /** Must be called when the plugin stops, or the listener outlives the plugin. */
+    /**
+     * Must be called when the plugin stops, or the listener outlives the plugin.
+     *
+     * <p>The drawn shape stays on the map: it is one of the pilot's own drawings,
+     * ATAK brings it back at every start, and the next instance adopts it as the
+     * plan's area. Only the pilot's Clear removes it.
+     */
     public void dispose() {
+        if (active)
+            cancel();
         ToolManagerBroadcastReceiver.getInstance().unregisterListener(this);
         restoreColor();
-        clearDrawn();
+        if (drawn != null) {
+            drawn.removeOnGroupChangedListener(watcher);
+            drawn = null;
+        }
     }
 
     /**
