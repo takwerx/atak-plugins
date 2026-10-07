@@ -36,6 +36,9 @@ public final class LaunchPoint {
     private static final String TAG = "UASLaunch";
     private static final String GROUP = "UAS Flight Plan";
     private static final String UID = "uasflightplan.launch";
+    /** Where the marker is, so the plan comes back after a reload or a restart. */
+    private static final String PREF_LAT = "uasflightplan.launchLat";
+    private static final String PREF_LON = "uasflightplan.launchLon";
 
     public interface Callback {
         void onPicked(GeoPoint point);
@@ -135,8 +138,22 @@ public final class LaunchPoint {
         mapView.removeOnKeyListener(backListener);
     }
 
-    /** Puts the marker at a point, creating it the first time. */
+    /** The launch point saved by the last session, or null. */
+    public GeoPoint saved() {
+        final android.content.SharedPreferences prefs = android.preference.PreferenceManager
+                .getDefaultSharedPreferences(mapView.getContext());
+        final float lat = prefs.getFloat(PREF_LAT, Float.NaN);
+        final float lon = prefs.getFloat(PREF_LON, Float.NaN);
+        if (Float.isNaN(lat) || Float.isNaN(lon))
+            return null;
+        return new GeoPoint(lat, lon);
+    }
+
+    /** Puts the marker at a point, creating it the first time, and remembers it. */
     public void place(GeoPoint p) {
+        android.preference.PreferenceManager.getDefaultSharedPreferences(mapView.getContext())
+                .edit().putFloat(PREF_LAT, (float) p.getLatitude())
+                .putFloat(PREF_LON, (float) p.getLongitude()).apply();
         if (marker == null) {
             marker = new Marker(p, UID);
             marker.setType("b-m-p-s-m");
@@ -180,8 +197,10 @@ public final class LaunchPoint {
         Log.d(TAG, "launch point placed");
     }
 
-    /** Takes the marker off the map. */
+    /** Takes the marker off the map and forgets it. */
     public void clear() {
+        android.preference.PreferenceManager.getDefaultSharedPreferences(mapView.getContext())
+                .edit().remove(PREF_LAT).remove(PREF_LON).apply();
         if (marker == null)
             return;
         if (marker.getGroup() != null)

@@ -164,6 +164,16 @@ public class UASFlightPlan implements IPlugin {
                     com.atakmap.android.menu.MapMenuReceiver.getInstance();
             if (menus != null)
                 menus.addEventListener(tapOpensPage);
+            // The plan the pilot left comes back without a tap: the pane is built
+            // now (not shown), which restores the launch point and the area and
+            // recomputes. A moment later, so ATAK's map and drawings are up first.
+            mapView.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (overlay != null && obstacles != null)
+                        ensurePane(mapView);
+                }
+            }, 2000L);
         } else {
             // Without a map there is nothing to draw on. The toolbar button still
             // appears and says so when tapped, rather than failing silently.
@@ -212,6 +222,20 @@ public class UASFlightPlan implements IPlugin {
         templatePane = null;
     }
 
+    /** Builds the pane once; it restores the saved plan as it is built. */
+    private void ensurePane(MapView mapView) {
+        if (templatePane != null)
+            return;
+        final View root = PluginLayoutInflater.inflate(pluginContext,
+                R.layout.main_layout, null);
+        pane = new UASFlightPlanPane(root, pluginContext, mapView, overlay, obstacles);
+        templatePane = new PaneBuilder(root)
+                .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
+                .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
+                .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
+                .build();
+    }
+
     private void showPane() {
         final MapView mapView = MapView.getMapView();
         if (mapView == null || overlay == null || obstacles == null) {
@@ -219,17 +243,7 @@ public class UASFlightPlan implements IPlugin {
             return;
         }
 
-        if (templatePane == null) {
-            final View root = PluginLayoutInflater.inflate(pluginContext,
-                    R.layout.main_layout, null);
-            pane = new UASFlightPlanPane(root, pluginContext, mapView, overlay, obstacles);
-
-            templatePane = new PaneBuilder(root)
-                    .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
-                    .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
-                    .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
-                    .build();
-        }
+        ensurePane(mapView);
 
         if (!uiService.isPaneVisible(templatePane)) {
             // The lifecycle listener is not optional. LaunchPoint takes ATAK's map

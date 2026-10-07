@@ -69,6 +69,8 @@ public final class ObstacleManager {
 
     private Listener listener;
     private boolean started;
+    /** True when the list on screen came from the phone's own copy, not the FAA. */
+    private boolean fromCache;
 
     // Main-thread state. 'fetched' is everything the FAA sent for the circle;
     // 'obstacles' is what passes the filter, and it is the one list the map and
@@ -253,6 +255,10 @@ public final class ObstacleManager {
         return capped;
     }
 
+    public boolean isFromCache() {
+        return fromCache;
+    }
+
     public int getDrawn() {
         return drawn;
     }
@@ -289,24 +295,62 @@ public final class ObstacleManager {
         loading = true;
         failure = null;
         notifyChanged();
+        final String key = ObstacleCache.key(extent);
         DofSource.fetch(extent, new DofSource.Callback() {
             @Override
-            public void onLoaded(List<Obstacle> inCircle, boolean wasCapped) {
+            public void onLoaded(final List<Obstacle> inCircle, boolean wasCapped) {
                 if (mine != generation.get())
                     return;
                 fetched = inCircle;
                 capped = wasCapped;
                 loading = false;
+                fromCache = false;
                 refilter();
+                // Kept on the phone, so the plan comes back with no network. The
+                // file changes every 8 weeks at most, so the copy is nearly always
+                // right.
+                // A copy: the pane re-sorts the live list on the main thread every
+                // few seconds, and a sort during the write would abort it.
+                final List<Obstacle> copy = new ArrayList<>(inCircle);
+                worker.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        ObstacleCache.save(key, copy);
+                    }
+                });
             }
 
             @Override
-            public void onFailed(String reason) {
+            public void onFailed(final String reason) {
                 if (mine != generation.get())
                     return;
-                loading = false;
-                failure = reason;
-                notifyChanged();
+                // No answer from the FAA: the phone's own copy for this same area,
+                // if it has one, and say so. A failed fetch must never blank a plan
+                // that was there a moment ago.
+                worker.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        final List<Obstacle> saved = ObstacleCache.load(key);
+                        mapView.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (mine != generation.get())
+                                    return;
+                                loading = false;
+                                if (saved != null) {
+                                    fetched = saved;
+                                    capped = false;
+                                    fromCache = true;
+                                    failure = null;
+                                    refilter();
+                                } else {
+                                    failure = reason;
+                                    notifyChanged();
+                                }
+                            }
+                        });
+                    }
+                });
             }
         });
     }
@@ -409,6 +453,8 @@ public final class ObstacleManager {
         if (hidden > 0)
             sb.append(' ').append(pluginContext.getString(R.string.status_obstacles_hidden,
                     hidden));
+        if (fromCache)
+            sb.append(' ').append(pluginContext.getString(R.string.status_obstacles_cached));
         if (!isEnabled())
             sb.append(' ').append(pluginContext.getString(R.string.status_obstacles_off));
         return sb.toString();

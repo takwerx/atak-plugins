@@ -66,6 +66,7 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     private static final double REQUEST_STEP_FT = 100d;
     private static final String PREF_RADIUS_M = "uasflightplan.radiusM";
     private static final String PREF_FOLD = "uasflightplan.fold.";
+    private static final String PREF_ISLANDS = "uasflightplan.islands";
 
     private final View root;
     private final Context pluginContext;
@@ -304,10 +305,18 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
         overlay.setListener(this);
         obstacles.setListener(this);
-        // An area left on the map by the last session or the last build is this
-        // plan's area, not an orphan: ATAK brings drawn shapes back at every start.
+        // The plan comes back as it was left: the area ATAK brought back as one of
+        // the pilot's drawings, the launch point the plugin saved, and the terrain
+        // and obstacles recomputed from them (the terrain is on the phone; the
+        // obstacles come from the phone's copy when the FAA cannot be reached).
         drawnArea = areaPicker.adoptExisting();
-        syncAll();
+        final GeoPoint savedLaunch = launch.saved();
+        if (savedLaunch != null) {
+            launch.place(savedLaunch);
+            recompute();
+        } else {
+            syncAll();
+        }
     }
 
     /** One row per obstacle, nearest first: the kind and height, then what else is known. */
@@ -424,7 +433,9 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         btnIslands.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                overlay.setVisible(!overlay.isVisible());
+                final boolean on = !overlay.isVisible();
+                prefs.edit().putBoolean(PREF_ISLANDS, on).apply();
+                overlay.setVisible(on);
                 syncAll();
             }
         });
@@ -1049,6 +1060,10 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     @Override
     public void onPainted(TerrainGrid grid, double ceilingMslM, int islandCells) {
         working = false;
+        // The switch as the pilot left it: a painted overlay they had turned off
+        // stays off.
+        if (!prefs.getBoolean(PREF_ISLANDS, true))
+            overlay.setVisible(false);
         syncAll();
     }
 
