@@ -22,8 +22,8 @@ public final class Obstacle {
     public final int quantity;
     public final String city;
     public final String state;
-    /** Distance from the launch point, meters. */
-    public final double distanceM;
+    /** Distance from the point the list measures from, meters; re-measured as that moves. */
+    public double distanceM;
 
     public Obstacle(String oas, String typeCode, double lat, double lon, double aglFt,
             double amslFt, String lighting, String verified, int quantity, String city,

@@ -8,6 +8,7 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.uasflightplan.map.ObstacleOverlay;
 import com.atakmap.android.uasflightplan.plugin.R;
 import com.atakmap.coremap.log.Log;
+import com.atakmap.coremap.maps.coords.GeoCalculations;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 
 import java.util.ArrayList;
@@ -78,6 +79,7 @@ public final class ObstacleManager {
     private String failure;
     private int drawn;
     private double ceilingMslFt = Double.NaN;
+    private GeoPoint launch;
 
     public ObstacleManager(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
@@ -171,6 +173,46 @@ public final class ObstacleManager {
         return fetched.size();
     }
 
+    /**
+     * Where the distances in the list are measured from: the phone's own position
+     * when it has a fix, otherwise the launch point. The operator wants "how far
+     * from your location", and in the field the two are usually the same spot.
+     */
+    public GeoPoint measureFrom() {
+        final GeoPoint self = selfPosition();
+        return self != null ? self : launch;
+    }
+
+    /** True when the list measures from the phone's fix rather than the launch point. */
+    public boolean measuringFromSelf() {
+        return selfPosition() != null;
+    }
+
+    private GeoPoint selfPosition() {
+        final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
+        final GeoPoint p = self == null ? null : self.getPoint();
+        if (p == null || !p.isValid() || (p.getLatitude() == 0 && p.getLongitude() == 0))
+            return null;
+        return new GeoPoint(p.getLatitude(), p.getLongitude());
+    }
+
+    /** Re-measures and re-sorts the list from {@link #measureFrom()}. Main thread. */
+    public void resort() {
+        final GeoPoint from = measureFrom();
+        if (from == null)
+            return;
+        for (Obstacle o : fetched)
+            o.distanceM = GeoCalculations.distanceTo(from, new GeoPoint(o.lat, o.lon));
+        final java.util.Comparator<Obstacle> nearest = new java.util.Comparator<Obstacle>() {
+            @Override
+            public int compare(Obstacle a, Obstacle b) {
+                return Double.compare(a.distanceM, b.distanceM);
+            }
+        };
+        Collections.sort(fetched, nearest);
+        Collections.sort(obstacles, nearest);
+    }
+
     /** The filter: reads the settings each time, never a copy. */
     public boolean passes(Obstacle o) {
         return o.aglFt >= minAglFt() && isGroupOn(o.group());
@@ -183,6 +225,7 @@ public final class ObstacleManager {
             if (passes(o))
                 kept.add(o);
         obstacles = kept;
+        resort();
         redraw(generation.get());
         notifyChanged();
     }
@@ -235,6 +278,7 @@ public final class ObstacleManager {
     public void load(final GeoPoint center, final double radiusM) {
         if (!started)
             return;
+        launch = center;
         final int mine = generation.incrementAndGet();
         loading = true;
         failure = null;
@@ -272,6 +316,7 @@ public final class ObstacleManager {
 
     public void clear() {
         generation.incrementAndGet();
+        launch = null;
         fetched = Collections.emptyList();
         obstacles = Collections.emptyList();
         capped = false;

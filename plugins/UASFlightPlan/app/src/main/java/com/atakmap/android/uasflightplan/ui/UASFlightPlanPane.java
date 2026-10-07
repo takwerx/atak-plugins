@@ -347,7 +347,8 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         if (!o.city.isEmpty())
             sb.append(pluginContext.getString(R.string.d_city,
                     o.city + (o.state.isEmpty() ? "" : ", " + o.state))).append('\n');
-        sb.append(pluginContext.getString(R.string.d_distance, Units.distance(o.distanceM)))
+        sb.append(pluginContext.getString(obstacles.measuringFromSelf()
+                ? R.string.d_distance_you : R.string.d_distance, Units.distance(o.distanceM)))
                 .append('\n');
         if (!o.oas.isEmpty())
             sb.append(pluginContext.getString(R.string.d_faa, o.oas)).append('\n');
@@ -825,8 +826,9 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         adapter.addAll(obstacles.getObstacles());
         adapter.notifyDataSetChanged();
         if (adapter.getCount() > 0) {
-            listHeading.setText(pluginContext.getString(R.string.heading_obstacles)
-                    + " (" + adapter.getCount() + ")");
+            listHeading.setText(pluginContext.getString(obstacles.measuringFromSelf()
+                    ? R.string.heading_obstacles_from_you
+                    : R.string.heading_obstacles_from_launch, adapter.getCount()));
             listHeading.setVisibility(View.VISIBLE);
         } else {
             listHeading.setVisibility(View.GONE);
@@ -944,10 +946,32 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
     /* ----- lifecycle ----- */
 
+    /**
+     * The phone moves without the map moving, so the distances are re-measured
+     * every few seconds while the pane is up.
+     */
+    private static final long RESORT_MS = 5000L;
+    private boolean shown;
+    private final Runnable tick = new Runnable() {
+        @Override
+        public void run() {
+            if (!shown)
+                return;
+            if (!obstacles.getObstacles().isEmpty()) {
+                obstacles.resort();
+                syncAll();
+            }
+            root.postDelayed(this, RESORT_MS);
+        }
+    };
+
     /** The pane was shown. It opens on the main screen every time. */
     public void onPaneShown() {
         showMain();
         syncAll();
+        shown = true;
+        root.removeCallbacks(tick);
+        root.postDelayed(tick, RESORT_MS);
     }
 
     /**
@@ -957,6 +981,8 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
      * it waits for the tap.
      */
     public void onPaneClosed() {
+        shown = false;
+        root.removeCallbacks(tick);
         if (launch.isPicking()) {
             launch.cancelPick();
             syncAll();
