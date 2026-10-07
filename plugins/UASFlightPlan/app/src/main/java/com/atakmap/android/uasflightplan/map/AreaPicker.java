@@ -246,7 +246,7 @@ public final class AreaPicker implements ToolListener {
         clearDrawn();
         drawn = made;
         drawn.addOnGroupChangedListener(watcher);
-        drawn.setTitle("UAS Flight Plan area");
+        drawn.setTitle(AREA_TITLE);
         // The boundary is a boundary, not an annotation. ATAK gives a drawn shape a
         // centre dot and a floating name by default, and over an overlay whose whole
         // job is to be read they are two more things in the way.
@@ -303,16 +303,73 @@ public final class AreaPicker implements ToolListener {
         }
     };
 
-    /** Takes the boundary off the map. Called when the overlay is cleared. */
+    /** The title every area this plugin draws carries, so it can be found again. */
+    private static final String AREA_TITLE = "UAS Flight Plan area";
+
+    /**
+     * Takes the boundary off the map, and with it any shape with our title that a
+     * previous plugin instance left behind.
+     *
+     * <p>A reinstall makes a new picker that never saw the shape the old one drew,
+     * and ATAK saves drawn shapes as the operator's own and brings them back at
+     * every start. So "clear" is by title, not by the one reference this instance
+     * holds: the operator drew a second area and the first stayed on the map
+     * (2026-10-06).
+     */
     public void clearDrawn() {
-        if (drawn == null)
-            return;
         final DrawingShape going = drawn;
         // Null it first so the watcher knows this removal was ours and stays quiet.
         drawn = null;
-        going.removeOnGroupChangedListener(watcher);
-        if (going.getGroup() != null)
-            going.removeFromGroup();
+        if (going != null) {
+            going.removeOnGroupChangedListener(watcher);
+            if (going.getGroup() != null)
+                going.removeFromGroup();
+        }
+        for (DrawingShape leftover : ours()) {
+            if (leftover.getGroup() != null)
+                leftover.removeFromGroup();
+        }
+    }
+
+    /**
+     * Takes over a shape with our title already on the map, from a previous
+     * instance or a previous ATAK session, as the current area. Returns it, or
+     * null when there is none. Several (one per reinstall before this fix) are
+     * reduced to the last one.
+     */
+    public Area adoptExisting() {
+        final java.util.List<DrawingShape> found = ours();
+        if (found.isEmpty())
+            return null;
+        final DrawingShape keep = found.get(found.size() - 1);
+        for (DrawingShape extra : found) {
+            if (extra != keep && extra.getGroup() != null)
+                extra.removeFromGroup();
+        }
+        final Area area = new Area(keep.getPoints());
+        if (!keep.isClosed() || !area.isUsable()) {
+            keep.removeFromGroup();
+            return null;
+        }
+        drawn = keep;
+        drawn.addOnGroupChangedListener(watcher);
+        Log.d(TAG, "adopted an area left on the map, " + area.ring.size() + " vertices");
+        return area;
+    }
+
+    /** Every shape on the map with our title, in map order. */
+    private java.util.List<DrawingShape> ours() {
+        final java.util.List<DrawingShape> out = new java.util.ArrayList<>();
+        try {
+            for (MapItem i : DrawingToolsMapComponent.getGroup().getItems()) {
+                if (i instanceof DrawingShape && i != drawn
+                        && AREA_TITLE.equals(i.getTitle()))
+                    out.add((DrawingShape) i);
+            }
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not list the drawing group", e);
+        }
+        return out;
     }
 
     private void closeToolbar() {

@@ -324,6 +324,9 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             obstacles.setCeiling(cft);
         overlay.setListener(this);
         obstacles.setListener(this);
+        // An area left on the map by the last session or the last build is this
+        // plan's area, not an orphan: ATAK brings drawn shapes back at every start.
+        drawnArea = areaPicker.adoptExisting();
         syncAll();
     }
 
