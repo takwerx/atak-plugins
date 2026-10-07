@@ -563,14 +563,15 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
                 if (launch.isPicking())
                     launch.cancelPick();
                 // A new area replaces the old one, and the old one goes now, not
-                // when the new shape closes: two outlines on the map while drawing
-                // is confusing (operator, 2026-10-06). The plan falls back to the
-                // circle until the new shape is closed.
-                if (drawnArea != null) {
-                    areaPicker.clearDrawn();
-                    drawnArea = null;
-                    recompute();
-                }
+                // when the new shape closes. Nothing is painted while the pilot
+                // draws: the circle coming back under the half-drawn shape read as
+                // the old area still being there (operator, 2026-10-06, twice).
+                areaPicker.clearDrawn();
+                drawnArea = null;
+                working = false;
+                lastFail = null;
+                overlay.clear();
+                obstacles.clear();
                 areaPicker.start();
                 syncAll();
             }
@@ -642,7 +643,11 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     public void onCancelled(String reason) {
         if (reason != null)
             lastFail = reason;
-        syncAll();
+        // No new shape: the plan goes back to the circle around the launch point.
+        if (drawnArea == null && launch.getPoint() != null)
+            recompute();
+        else
+            syncAll();
     }
 
     @Override
