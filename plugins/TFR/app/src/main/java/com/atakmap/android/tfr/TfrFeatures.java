@@ -3,6 +3,7 @@ package com.atakmap.android.tfr;
 import com.atakmap.map.layer.feature.AttributeSet;
 import com.atakmap.map.layer.feature.Feature;
 import com.atakmap.map.layer.feature.geometry.LineString;
+import com.atakmap.map.layer.feature.geometry.Point;
 import com.atakmap.map.layer.feature.geometry.Polygon;
 import com.atakmap.map.layer.feature.style.BasicFillStyle;
 import com.atakmap.map.layer.feature.style.BasicStrokeStyle;
@@ -72,8 +73,22 @@ public final class TfrFeatures {
             // two features: without it the area is invisible looking straight down,
             // which is how the map is read most of the time.
             out.add(new TfrOverlay.Drawn(t.notamId, setKey, setName, name, polygon(a, Double.NaN),
-                    style(color, label(t, a)), attrs,
+                    style(color, null), attrs,
                     Feature.AltitudeMode.ClampToGround, 0d));
+
+            // The label, on a point of its own at the middle of the ring. ATAK puts a
+            // polygon's own label wherever it likes, which came out on the edge; a point
+            // feature at the centroid is how Atmosphere centers one, and it is the only
+            // way to say where the text goes.
+            final double[] mid = centroid(a);
+            if (mid != null) {
+                out.add(new TfrOverlay.Drawn(t.notamId, setKey, setName, name,
+                        new Point(mid[1], mid[0]),
+                        new LabelPointStyle(label(t, a), 0xFFFFFFFF, 0x99000000,
+                                LabelPointStyle.ScrollMode.OFF, 0f, 0, 0, 0f, false,
+                                LABEL_MAX_RES),
+                        attrs, Feature.AltitudeMode.ClampToGround, 0d));
+            }
         }
         return out;
     }
@@ -122,6 +137,38 @@ public final class TfrFeatures {
             }
         }
         return new Polygon(ring);
+    }
+
+    /**
+     * The middle of a ring, for the label to sit on.
+     *
+     * <p>The polygon centroid rather than the average of the vertices: a TFR is often an
+     * even ring, where the two agree, but an irregular one with its points bunched along
+     * one edge would drag a vertex average off into the side of the shape. Falls back to
+     * the average when the ring is degenerate enough to have no area.
+     */
+    private static double[] centroid(TfrArea a) {
+        final List<double[]> r = a.ring;
+        if (r.size() < 3)
+            return null;
+        double twiceArea = 0, lat = 0, lon = 0;
+        for (int i = 0, j = r.size() - 1; i < r.size(); j = i++) {
+            final double yi = r.get(i)[0], xi = r.get(i)[1];
+            final double yj = r.get(j)[0], xj = r.get(j)[1];
+            final double cross = xj * yi - xi * yj;
+            twiceArea += cross;
+            lat += (yi + yj) * cross;
+            lon += (xi + xj) * cross;
+        }
+        if (Math.abs(twiceArea) < 1e-12) {
+            double sy = 0, sx = 0;
+            for (double[] p : r) {
+                sy += p[0];
+                sx += p[1];
+            }
+            return new double[] { sy / r.size(), sx / r.size() };
+        }
+        return new double[] { lat / (3 * twiceArea), lon / (3 * twiceArea) };
     }
 
     /**
@@ -190,7 +237,13 @@ public final class TfrFeatures {
      */
     private static String label(Tfr t, TfrArea a) {
         final StringBuilder b = new StringBuilder(t.place());
-        if (a.ceiling.present)
+        if (!a.ceiling.present)
+            return b.toString();
+        // Name the floor when it is not the ground. "to 5,000 ft MSL" on a shelf that
+        // starts at 2,500 reads as airspace you are under when you are in it.
+        if (a.floor.present && !a.floor.surface && a.floor.feet > 0)
+            b.append("  ").append(a.floor.label()).append(" to ").append(a.ceiling.label());
+        else
             b.append("  to ").append(a.ceiling.label());
         return b.toString();
     }
