@@ -275,7 +275,7 @@ takes any ArcGIS Online organization you sign in to.
 = DART: on the map
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("33.png", width: 100%)
+  #image("33.jpg", width: 100%)
 
   Every rig is drawn the way NIFC's own EGP viewer draws it, with its whole
   callsign above the icon. The ring says how recently it reported: green inside
@@ -288,7 +288,7 @@ takes any ArcGIS Online organization you sign in to.
   color says whose: green for the Forest Service, lime yellow-green for the
   U.S. Wildland Fire Service and BLM, grey for a rig with no agency in the feed.
 ][
-  #image("36.png", width: 100%)
+  #image("36.jpg", width: 100%)
 
   People come three ways. A yellow DART pin is a Field Maps user, the handset on
   a light disc is a Garmin inReach, the badge on a light disc is a WFTAK user. An
@@ -313,7 +313,7 @@ takes any ArcGIS Online organization you sign in to.
   in and the layer keeps what it has. A layer never draws more than 300 rigs at
   once; when there are more, the row says so and asks you to zoom in.
 ][
-  #image("34.png", width: 100%)
+  #image("34.jpg", width: 100%)
 
   Zoomed out, the callsigns come off and the discs stay, so a wide view stays
   readable. Where that happens is the *Label zoom*, on the next page.
@@ -372,7 +372,7 @@ takes any ArcGIS Online organization you sign in to.
 = FireGuard
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("45.png", width: 100%)
+  #image("45.jpg", width: 100%)
 
   *FireGuard* adds NIFC's FireGuard detections: the areas the analysts draw around
   a satellite heat detection, named by type and acreage, marked URGENT when they
@@ -520,7 +520,7 @@ takes any ArcGIS Online organization you sign in to.
 = New Fire Starts: on the map
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("51.png", width: 100%)
+  #image("51.jpg", width: 100%)
 
   A start with its name and acres, from five miles in.
 ][
@@ -568,7 +568,7 @@ takes any ArcGIS Online organization you sign in to.
 = Ongoing Fires: a tap
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("55.png", width: 100%)
+  #image("55.jpg", width: 100%)
 
   An ongoing fire, named with its acres.
 ][
@@ -644,7 +644,7 @@ takes any ArcGIS Online organization you sign in to.
 = My Fires: picking
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("64.png", width: 100%)
+  #image("64.jpg", width: 100%)
 
   A burn in My Fires has a white edge; the others stay on the map.
 ][
@@ -662,7 +662,7 @@ takes any ArcGIS Online organization you sign in to.
 
   *Only My Fires ON*: green.
 ][
-  #image("66.png", width: 100%)
+  #image("66.jpg", width: 100%)
 
   Only your fires on the map, wherever you pan.
 ][
