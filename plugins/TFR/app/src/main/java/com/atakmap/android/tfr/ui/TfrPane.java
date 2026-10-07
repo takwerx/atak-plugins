@@ -876,6 +876,11 @@ public class TfrPane implements TfrManager.Listener {
             } else if (t.isActive(now)) {
                 state.setText("active");
                 state.setTextColor(manager.activeColor());
+            } else if (t.expireMs > 0 && now > t.expireMs) {
+                // Past its published end. Never shown as merely "scheduled", which reads
+                // as something that is still coming.
+                state.setText("expired");
+                state.setTextColor(res.getColor(R.color.dim_text));
             } else {
                 state.setText("scheduled");
                 state.setTextColor(manager.upcomingColor());

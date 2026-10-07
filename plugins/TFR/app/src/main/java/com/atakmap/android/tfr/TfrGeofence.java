@@ -119,7 +119,8 @@ public final class TfrGeofence {
             // Theirs now: archived, persisted, editable, deletable. The opposite of the
             // read-only feature layer it came from.
             shape.setMetaBoolean("archive", true);
-            shape.setMetaString("tfr_from_notam", t.notamId);
+            // What it was cut from, so a later sync can tell whether it still holds.
+            TfrWatch.stamp(shape, t, a);
             if (shape.getGroup() == null)
                 group.addItem(shape);
             shape.persist(mapView.getMapEventDispatcher(), null, TfrGeofence.class);

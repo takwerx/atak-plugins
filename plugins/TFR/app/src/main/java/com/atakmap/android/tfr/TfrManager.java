@@ -113,6 +113,8 @@ public class TfrManager {
     /** The scale-bar distance at or below which the map draws; -1 is always. */
     private volatile long gateBarM;
     private volatile boolean gateHiding;
+    /** Geofences whose restriction has expired, been lifted or changed under them. */
+    private volatile List<TfrWatch.Watched> staleFences = Collections.emptyList();
     private volatile int whereMode;
     private final Set<String> whereValues = new LinkedHashSet<>();
     private volatile int areaMode = AREA_IN_VIEW;
@@ -249,6 +251,28 @@ public class TfrManager {
 
     public List<Tfr> all() {
         return known;
+    }
+
+    public List<TfrWatch.Watched> staleFences() {
+        return staleFences;
+    }
+
+    /**
+     * Re-judge every geofence against what is known now.
+     *
+     * <p>Walks the map, so it runs on the clock and after a sync rather than on every
+     * render of the pane. Expiry needs no network and is caught by the tick alone.
+     */
+    private void checkFences() {
+        try {
+            final List<TfrWatch.Watched> was = staleFences;
+            staleFences = TfrWatch.check(mapView, known, lastSuccessMs > 0 || !known.isEmpty(),
+                    System.currentTimeMillis());
+            if (!staleFences.isEmpty() || !was.isEmpty())
+                Log.d(TAG, "geofences out of date: " + staleFences.size());
+        } catch (Exception e) {
+            Log.w(TAG, "checking geofences failed", e);
+        }
     }
 
     /** Everything the type and place filters let through. The map draws exactly this. */
@@ -547,6 +571,11 @@ public class TfrManager {
         if (gateHiding)
             b.append(" Zoom in to see restrictions on the map. Shown at ")
                     .append(ScaleBar.describe(gateBarM)).append(" or closer.");
+        // A fence guarding airspace that was lifted is worse than no fence, so this is
+        // said on the pinned line rather than left to be discovered.
+        final String fences = TfrWatch.line(staleFences);
+        if (fences != null)
+            b.append(' ').append(fences);
         return b.toString();
     }
 
@@ -654,6 +683,7 @@ public class TfrManager {
                 : null;
         rewriteOverlay();
         pushPlaceFilter();
+        checkFences();
         post();
     }
 
@@ -720,6 +750,8 @@ public class TfrManager {
             // asleep for an hour, so what decides a refresh is the age of the last
             // success, not a count of ticks.
             final long interval = refreshMinutes() * 60L * 1000L;
+            // Expiry is a clock, not a download: a fence can lapse with no network.
+            checkFences();
             if (lastSuccessMs == 0 || System.currentTimeMillis() - lastSuccessMs >= interval)
                 syncNow();
             else
