@@ -22,6 +22,7 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.tfr.Tfr;
 import com.atakmap.android.tfr.TfrArea;
 import com.atakmap.android.tfr.TfrFeatures;
+import com.atakmap.android.tfr.TfrGeofence;
 import com.atakmap.android.tfr.Places;
 import com.atakmap.android.tfr.TfrManager;
 import com.atakmap.android.tfr.TfrTypes;
@@ -621,14 +622,104 @@ public class TfrPane implements TfrManager.Listener {
         new AlertDialog.Builder(mapView.getContext())
                 .setTitle(t.place())
                 .setMessage(b.toString())
-                .setPositiveButton("Close", null)
+                .setPositiveButton("Geofence", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        geofence(t);
+                    }
+                })
                 .setNeutralButton("FAA page", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {
                         open(t.faaPageUrl());
                     }
                 })
+                .setNegativeButton("Close", null)
                 .show();
+    }
+
+    /**
+     * Make a geofence from a restriction.
+     *
+     * <p>Which area first, when there is more than one -- an inner and an outer ring are
+     * different airspace and fencing the wrong one is not obvious afterwards -- then
+     * whether to carry the published floor and ceiling, then ATAK's own geofence screen
+     * for everything else.
+     */
+    private void geofence(final Tfr t) {
+        final List<TfrArea> areas = t.drawable();
+        if (areas.isEmpty()) {
+            new AlertDialog.Builder(mapView.getContext())
+                    .setTitle(t.place())
+                    .setMessage("This one has no mapped area, so there is no shape to fence."
+                            + " Read the notice for what it covers.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        if (areas.size() == 1) {
+            geofenceArea(t, areas.get(0));
+            return;
+        }
+        final String[] labels = new String[areas.size()];
+        for (int i = 0; i < areas.size(); i++) {
+            final TfrArea a = areas.get(i);
+            labels[i] = (a.name.isEmpty() ? "Area " + (i + 1) : a.name)
+                    + "  " + a.floor.label() + " to " + a.ceiling.label();
+        }
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Which area")
+                .setSingleChoiceItems(labels, -1, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int which) {
+                        dlg.dismiss();
+                        geofenceArea(t, areas.get(which));
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        fromTop(d);
+    }
+
+    private void geofenceArea(final Tfr t, final TfrArea a) {
+        final String limits = a.floor.label() + " to " + a.ceiling.label();
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Make a geofence")
+                .setMessage("This makes a shape you own, from " + t.place()
+                        + ", and opens ATAK's geofence settings for it.\n\n"
+                        + "It is a copy taken now. If this restriction changes or is"
+                        + " lifted, the geofence stays as it is and you remove it"
+                        + " yourself.\n\n"
+                        + "Use the published limits (" + limits + ") so it only alerts"
+                        + " on something actually inside the airspace, or ground only to"
+                        + " alert on anything crossing the area at any height.")
+                .setPositiveButton("Use the limits", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        make(t, a, true);
+                    }
+                })
+                .setNeutralButton("Ground only", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        make(t, a, false);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void make(Tfr t, TfrArea a, boolean withAltitude) {
+        final com.atakmap.android.drawing.mapItems.DrawingShape shape =
+                TfrGeofence.create(mapView, t, a, withAltitude);
+        if (shape == null) {
+            new AlertDialog.Builder(mapView.getContext())
+                    .setMessage("That area could not be turned into a shape.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        TfrGeofence.edit(shape);
     }
 
     private void open(String url) {
