@@ -124,6 +124,27 @@
         <item name="android:ellipsize">end</item>
     </style>
 
+    <!-- The arrow on a Settings drop-down row. -->
+    <style name="TakwerxIconButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_marginLeft">2dp</item>
+        <item name="android:layout_marginRight">2dp</item>
+        <item name="android:background">@drawable/btn_gray</item>
+        <item name="android:scaleType">centerInside</item>
+        <item name="android:padding">9dp</item>
+    </style>
+
+    <style name="TakwerxSectionHeading">
+        <item name="android:textSize">10sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:alpha">0.6</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">3dp</item>
+    </style>
+
     <!-- ==== Style for ISRV Dark Buttons ==== -->
     <style name="darkButton" parent="@android:style/Widget.Button">
         <item name="android:background">@drawable/btn_gray</item>

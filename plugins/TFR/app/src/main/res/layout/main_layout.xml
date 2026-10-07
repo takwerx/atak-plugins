@@ -1,7 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The whole pane is one ListView. A ListView cannot live inside a ScrollView, so the controls
-     go in the list's own header instead of above it: that way the panel scrolls as one thing
-     on a phone in portrait, where the controls alone are taller than the pane. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -9,13 +6,83 @@
     android:paddingLeft="6dp"
     android:paddingRight="6dp">
 
+    <!-- Pinned in the pane root, not inside the list: how old the picture is, and
+         anything that is not being shown, has to be readable without scrolling to it. -->
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="8dp"
+        android:paddingBottom="6dp"
+        android:textSize="13sp"
+        android:textColor="@color/white"
+        android:text="@string/status_waiting" />
+
+    <!-- The controls live in this list's header rather than in a ScrollView above it:
+         a ListView inside a ScrollView gets one line of height, so the whole panel has
+         to be one scroller. Click positions are offset by getHeaderViewsCount(). -->
     <ListView
         android:id="@+id/tfr_list"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:divider="#2a2a2a"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="#20FFFFFF"
         android:dividerHeight="1dp"
         android:fadeScrollbars="false"
-        android:scrollbarStyle="outsideOverlay" />
+        android:listSelector="@android:color/transparent" />
+
+    <!-- The settings page, in place of the list while it is open: the same pane by a
+         visibility swap, not a dialog and not a second pane. focusableInTouchMode and
+         beforeDescendants keep the scroller from jumping to a button that is rebuilt. -->
+    <LinearLayout
+        android:id="@+id/settings_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/btn_settings_back"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="90dp"
+                android:text="@string/back" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="12dp"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textColor="@color/white"
+                android:text="@string/settings" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false"
+            android:focusableInTouchMode="true"
+            android:descendantFocusability="beforeDescendants">
+
+            <LinearLayout
+                android:id="@+id/settings_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="12dp" />
+        </ScrollView>
+    </LinearLayout>
 
 </LinearLayout>
