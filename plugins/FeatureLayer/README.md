@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.13** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.12/ATAK-Plugin-FeatureLayer-0.12--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.12/ATAK-Plugin-FeatureLayer-0.12--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.12/ATAK-Plugin-FeatureLayer-0.12--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.13/ATAK-Plugin-FeatureLayer-0.13--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.13/ATAK-Plugin-FeatureLayer-0.13--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.13/ATAK-Plugin-FeatureLayer-0.13--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -61,6 +61,17 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 
 _________________________________________________________________
 STATUS
+
+0.13, fire history, and layers that stay on the phone. Fire History: where
+fires have burned since 1900, from NIFC's interagency perimeters, drawn as EGP
+draws them for the last ten years and with a color for each decade back to the
+1980s, newest burn on top; each band and decade switched on its own; Find
+searches it by name and year ("Ranch 2007"), one copy per fire. My Fires keeps
+the burns that matter to an incident: add them from the details, each edged in
+white, then show only those until the list is cleared. CAL FIRE's own record
+(acres, containment, a link to its incident page) on the fires it runs. A layer
+or a type switched off is now hidden, not deleted, so everything downloaded
+comes back after a restart with no network, and the row says so in words.
 
 0.12, fires and a simpler pane. Two new public sources from NIFC: New Fire
 Starts, every wildfire and prescribed fire found in the last 24 hours, and
