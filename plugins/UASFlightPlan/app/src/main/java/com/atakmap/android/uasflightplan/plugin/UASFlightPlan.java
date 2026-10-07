@@ -53,6 +53,9 @@ public class UASFlightPlan implements IPlugin {
      */
     public static final String ACTION_SHOW = "com.atakmap.android.uasflightplan.SHOW";
 
+    /** The key of the plugin's row under ATAK's Tool Preferences. */
+    private static final String PREFS_KEY = "uasflightplanPreference";
+
     private final BroadcastReceiver showReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -151,6 +154,7 @@ public class UASFlightPlan implements IPlugin {
             return;
 
         uiService.addToolbarItem(toolbarItem);
+        registerPreferences();
         AtakBroadcast.getInstance().registerSystemReceiver(showReceiver,
                 new DocumentedIntentFilter(ACTION_SHOW, "Open the UAS Flight Plan pane"));
 
@@ -185,6 +189,7 @@ public class UASFlightPlan implements IPlugin {
     public void onStop() {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+        unregisterPreferences();
         try {
             AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
         } catch (RuntimeException e) {
@@ -220,6 +225,45 @@ public class UASFlightPlan implements IPlugin {
             overlay = null;
         }
         templatePane = null;
+    }
+
+    /**
+     * Put the plugin in ATAK's Tool Preferences, which is the only way a pilot
+     * can reach the user manual.
+     *
+     * <p>The manual is compiled into {@code assets/usermanual.pdf}, and an asset is
+     * not reachable by anyone; without this entry it ships inside the APK with no
+     * way to open it.
+     *
+     * <p>Guarded rather than assumed: this reaches into ATAK's own preferences
+     * classes, so a build that does not expose them costs the manual entry and
+     * nothing else.
+     */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment
+                            .ToolPreference(
+                                    pluginContext.getString(R.string.app_name),
+                                    pluginContext.getString(R.string.prefs_summary),
+                                    PREFS_KEY,
+                                    // ic_toolbar, not ic_launcher: this row sits on
+                                    // ATAK's dark UI and wants the bare glyph.
+                                    pluginContext.getResources().getDrawable(
+                                            R.drawable.ic_toolbar),
+                                    new UASFlightPlanPreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment
+                    .unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
     }
 
     /** Builds the pane once; it restores the saved plan as it is built. */

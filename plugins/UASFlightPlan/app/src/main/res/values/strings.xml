@@ -2,6 +2,9 @@
 <resources>
     <!-- App -->
     <string name="app_name">UAS Flight Plan</string>
+    <string name="prefs_summary">The ceiling a mission area needs, and what a given ceiling does to it</string>
+    <string name="manual_title">Plugin Documentation</string>
+    <string name="manual_summary">Open the UAS Flight Plan user guide: the launch point, the area, the two ceiling modes, islands and obstacles</string>
     <!-- description -->
     <string name="app_desc">Launch point ground elevation and the terrain above your MSL ceiling, painted as islands</string>
 
@@ -142,6 +145,8 @@
     <!-- Readouts. %1$s is an altitude with its unit and MSL already on it. -->
     <string name="ground_here">Ground here: %1$s (0 AGL)</string>
     <string name="ground_none">No launch point yet.</string>
+    <string name="ground_unknown">Ground here: unknown until DTED2 covers it.</string>
+    <string name="ground_reading">Ground here: reading the terrain.</string>
     <string name="ceiling_line">Ceiling %1$s is %2$s above your launch point.</string>
 
     <!-- Status line. Says what is happening, what was painted, or why nothing is drawn. -->
