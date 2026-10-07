@@ -112,8 +112,22 @@ public class TFR implements IPlugin {
             manager.dispose();
             manager = null;
         }
-        if (uiService != null)
+        if (uiService != null) {
+            // Close and forget the pane, or a reload leaves the old view on screen bound
+            // to the manager that was just disposed: it showed "Updated 13 min ago" and
+            // "in view (0)" over a map that was drawing a restriction, which reads as the
+            // list having lost track rather than as a pane nobody rebuilt.
+            if (pane != null) {
+                try {
+                    uiService.closePane(pane);
+                } catch (Exception e) {
+                    Log.w(TAG, "closing the pane failed", e);
+                }
+                pane = null;
+            }
             uiService.removeToolbarItem(toolbarItem);
+        }
+        paneUi = null;
     }
 
     private void registerReceiver() {
