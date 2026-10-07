@@ -155,8 +155,82 @@ final class CalFire {
                 + "/" + m.group(4) + "/";
     }
 
+    /**
+     * Sectigo Public Server Authentication Root R46, DER in base64. CAL FIRE's server
+     * moved to a certificate that chains to it (Sectigo OV R36, issued 2026-09-14, live
+     * on incidents.fire.ca.gov by the evening of 2026-10-06), and Android before 14 does
+     * not carry this root: on dev 1 (Android 12) and the S22+ (13) every CAL FIRE fetch
+     * failed with "Trust anchor for certification path not found", so the fires lost
+     * their CAL FIRE acres, containment and link. Android 14 ships the same certificate
+     * (/apex/com.android.conscrypt/cacerts/e071171e.0); SHA-256
+     * 7B:B6:47:A6:2A:EE:AC:88:BF:25:7A:A5:22:D0:1F:FE:A3:95:E0:AB:45:C7:3F:93:F6:56:54:EC:38:F2:5A:06,
+     * checked against it. Valid to 2046.
+     */
+    private static final String SECTIGO_R46 =
+            "MIIFijCCA3KgAwIBAgIQdY39i658BwD6qSWn4cetFDANBgkqhkiG9w0BAQwFADBfMQswCQYDVQQG"
+            + "EwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMTYwNAYDVQQDEy1TZWN0aWdvIFB1YmxpYyBT"
+            + "ZXJ2ZXIgQXV0aGVudGljYXRpb24gUm9vdCBSNDYwHhcNMjEwMzIyMDAwMDAwWhcNNDYwMzIxMjM1"
+            + "OTU5WjBfMQswCQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMTYwNAYDVQQDEy1T"
+            + "ZWN0aWdvIFB1YmxpYyBTZXJ2ZXIgQXV0aGVudGljYXRpb24gUm9vdCBSNDYwggIiMA0GCSqGSIb3"
+            + "DQEBAQUAA4ICDwAwggIKAoICAQCTvtU2UnXYASOgHEdCSe5jtrch/cSV1UgrJnwUUxDaef0rty2k"
+            + "1Cz66jLdScK5vQ9IPXtamFSvnl0xdE8H/FAh3aTPaE8bEmNtJZlMKpnzSDBh+oF8HqcIStw+Kxwf"
+            + "GExxqjWMrfhu6DtK2eWUAtaJhBOqbchPM8xQljeSM9xfiOefVNlI8JhD1mb9nxc4Q8UBUQvX4yMP"
+            + "FF1bFOdLvt30yNoDN9HWOaEhUTCDsG3XME6WW5HwcCSrv0WBZEMNvSE6Lzzpng3LILVCJ8zab5vu"
+            + "ZDCQOc2TZYEhMbUjUDM3IuM47fgxMMxF/mL50V0yeUKH32rMVhlATc6qu/m1dkmU8Sf4kaWD5Qaz"
+            + "Yw6A3OASVYCmO2a0OYctyPDQ0RTp5A1NDvZdV3LFOxxHVp3i1fuBYYzMTYCQNFu31xR13NgESJ/A"
+            + "wSiItOkcyqex8Va3e0lMWeUgFaiEAin6OJRpmkkGj80feRQXEgyDet4fsZfu+Zd4KKTIRJLpfSYF"
+            + "plhym3kT2BFfrsU4YjRosoYwjviQYZ4ybPUHNs2iTG7sijbt8uaZFURww3y8nDnAtOFr94MlI1fZ"
+            + "EoDlSfB1D++N6xybVCi0ITz8fAr/73trdf+LHaAZBav6+CuBQug4urv7qv094PPK306Xlynt8xhW"
+            + "6aWWrL3DkJiy4Pmi1KZHQ3xtzwIDAQABo0IwQDAdBgNVHQ4EFgQUVnNYZJX5khqwEioEYnmhQBWI"
+            + "IUkwDgYDVR0PAQH/BAQDAgGGMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQEMBQADggIBAC9c"
+            + "mTz8Bl6MlC5w6tIyMY208FHVvArzZJ8HXtXBc2hkeqK5Duj5XYUtqDdFqij0lgVQYKlJfp/imTYp"
+            + "E0RHap1VIDzYm/EDMrraQKFz6oOht0SmDpkBm+S8f74TlH7Kph52gDY9hAaLMyZlbcp+nv4fjFg4"
+            + "exqDsQ+8FxG75gbMY/qB8oFM2gsQa6H61SilzwZAFv97fRheORKkU55+MkIQpiGRqRxOF3yEvJ+M"
+            + "0ejf5lG5Nkc/kLnHvALcWxxPDkjBJYOcCj+esQMzEhonrPcibCTRAUH4WAP+JWgiH5paPHxsnnVI"
+            + "84HxZmduTILA7rpXDhjvLpr3Etiga+kFpaHpaPi8TD8SHkXoUsCjvxInebnMMTzD9joiFgOgyY9m"
+            + "pFuiTdaBJQbpdqQACj7LzTWb4OE4y2BThihCQRxEV+ioratF4yUQvNs+ZUH7G6aXD+u5dHn5Hrwd"
+            + "Vw1Hr8Mvn4dGp+smWg9WY7ViYG4A++MnESLn/pmPNPW56MORcr3Ywx65LvKRRFHQV80MNNVIIb/b"
+            + "E/FmJUNS0nAiNs2fxBx1IK1jcmMGDw4nztJqDby1ORrp0XZ60Vzk50lJLVU3aPAaOpg+VBeHVOmm"
+            + "J1CJeyAvP/+/oYtKR5j/K3tJPsMpRmAYQqszKbrAKbkTidOIijlBO8n9pu0f9GBj39ItVQGL";
+
+    private static volatile javax.net.ssl.SSLSocketFactory tls;
+
+    /**
+     * The phone's own roots plus Sectigo R46, for CAL FIRE's connection only; every other
+     * connection the plugin makes keeps the phone's trust as it is. Hostname checking is
+     * HttpsURLConnection's own, untouched.
+     */
+    private static javax.net.ssl.SSLSocketFactory tls() throws Exception {
+        javax.net.ssl.SSLSocketFactory f = tls;
+        if (f != null)
+            return f;
+        final java.security.KeyStore ks = java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType());
+        ks.load(null, null);
+        final javax.net.ssl.TrustManagerFactory system = javax.net.ssl.TrustManagerFactory
+                .getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());
+        system.init((java.security.KeyStore) null);
+        int n = 0;
+        for (javax.net.ssl.TrustManager tm : system.getTrustManagers())
+            if (tm instanceof javax.net.ssl.X509TrustManager)
+                for (java.security.cert.X509Certificate ca : ((javax.net.ssl.X509TrustManager) tm).getAcceptedIssuers())
+                    ks.setCertificateEntry("system-" + (n++), ca);
+        ks.setCertificateEntry("sectigo-r46", java.security.cert.CertificateFactory.getInstance("X.509")
+                .generateCertificate(new java.io.ByteArrayInputStream(
+                        android.util.Base64.decode(SECTIGO_R46, android.util.Base64.DEFAULT))));
+        final javax.net.ssl.TrustManagerFactory tmf = javax.net.ssl.TrustManagerFactory
+                .getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(ks);
+        final javax.net.ssl.SSLContext ctx = javax.net.ssl.SSLContext.getInstance("TLS");
+        ctx.init(null, tmf.getTrustManagers(), null);
+        f = ctx.getSocketFactory();
+        tls = f;
+        return f;
+    }
+
     private static String fetch(String url) throws Exception {
         final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        if (c instanceof javax.net.ssl.HttpsURLConnection)
+            ((javax.net.ssl.HttpsURLConnection) c).setSSLSocketFactory(tls());
         c.setConnectTimeout(20000);
         c.setReadTimeout(60000);
         c.setInstanceFollowRedirects(false);
