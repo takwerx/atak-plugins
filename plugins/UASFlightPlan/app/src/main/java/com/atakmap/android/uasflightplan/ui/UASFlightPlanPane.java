@@ -57,6 +57,15 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     static final double DEFAULT_RADIUS_M = 1609.344d;
 
     private static final String PREF_CEILING_FT = "uasflightplan.ceilingFt";
+    private static final String PREF_FLIGHT_AGL_FT = "uasflightplan.flightAglFt";
+    private static final String PREF_SEPARATION_FT = "uasflightplan.separationFt";
+    /** What the operator's unit usually flies; Part 107's limit is the last preset. */
+    private static final double DEFAULT_FLIGHT_AGL_FT = 200d;
+    private static final double[] FLIGHT_PRESETS_FT = { 100d, 200d, 300d, 400d };
+    private static final double DEFAULT_SEPARATION_FT = 500d;
+    private static final double[] SEPARATION_PRESETS_FT = { 500d, 1000d, 1500d, 2000d };
+    /** The request is rounded up to this, feet: ceilings are asked for in hundreds. */
+    private static final double REQUEST_STEP_FT = 100d;
     private static final String PREF_RADIUS_M = "uasflightplan.radiusM";
     private static final String PREF_FOLD = "uasflightplan.fold.";
 
@@ -89,6 +98,14 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
     private final TextView ground;
     private final TextView ceilingLine;
     private final Fold ceilingFold;
+    private final Fold flightFold;
+    private final Fold sepFold;
+    private final LinearLayout flightTiles;
+    private final LinearLayout sepTiles;
+    private final TextView requestHeading;
+    private final TextView requestLines;
+    private final TextView requestTotal;
+    private final Button btnUseRequest;
     private final Fold circleFold;
     private final Fold keyFold;
     private final LinearLayout ceilingSteps;
@@ -179,6 +196,18 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         btnLaunch = header.findViewById(R.id.btn_launch);
         ground = header.findViewById(R.id.ground);
         ceilingLine = header.findViewById(R.id.ceiling);
+        requestHeading = header.findViewById(R.id.request_heading);
+        requestLines = header.findViewById(R.id.request_lines);
+        requestTotal = header.findViewById(R.id.request_total);
+        btnUseRequest = header.findViewById(R.id.btn_use_request);
+        btnUseRequest.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final Double r = requestedCeilingFt();
+                if (r != null)
+                    setCeilingFt(r);
+            }
+        });
 
         // Everything set once and left lives on the Settings page, which takes the
         // list's place while it is open.
@@ -237,6 +266,36 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
             @Override
             public void onClick(View v) {
                 obstacles.setAllGroups(false);
+            }
+        });
+        flightFold = new Fold(settings, R.id.fold_flight_head, R.id.fold_flight_chev,
+                R.id.fold_flight_body, PREF_FOLD + "flight");
+        sepFold = new Fold(settings, R.id.fold_sep_head, R.id.fold_sep_chev,
+                R.id.fold_sep_body, PREF_FOLD + "sep");
+        flightTiles = settings.findViewById(R.id.flight_tiles);
+        sepTiles = settings.findViewById(R.id.sep_tiles);
+        settings.findViewById(R.id.btn_flight_type).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                typeFeet(R.string.height_prompt, flightAglFt(), new FeetSink() {
+                    @Override
+                    public void accept(double ft) {
+                        prefs.edit().putFloat(PREF_FLIGHT_AGL_FT, (float) ft).apply();
+                        syncAll();
+                    }
+                });
+            }
+        });
+        settings.findViewById(R.id.btn_sep_type).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                typeFeet(R.string.separation_prompt, separationFt(), new FeetSink() {
+                    @Override
+                    public void accept(double ft) {
+                        prefs.edit().putFloat(PREF_SEPARATION_FT, (float) ft).apply();
+                        syncAll();
+                    }
+                });
             }
         });
         ceilingFold = new Fold(settings, R.id.fold_ceiling_head, R.id.fold_ceiling_chev,
@@ -694,6 +753,119 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
         input.requestFocus();
     }
 
+    /* ----- the ceiling to request ----- */
+
+    private double flightAglFt() {
+        return prefs.getFloat(PREF_FLIGHT_AGL_FT, (float) DEFAULT_FLIGHT_AGL_FT);
+    }
+
+    private double separationFt() {
+        return prefs.getFloat(PREF_SEPARATION_FT, (float) DEFAULT_SEPARATION_FT);
+    }
+
+    /**
+     * The ceiling to ask Air Attack for, feet MSL: the highest ground in the area,
+     * plus the height the aircraft flies above the terrain, plus the separation,
+     * rounded up to the next hundred. Null before the terrain is in.
+     */
+    private Double requestedCeilingFt() {
+        final TerrainGrid g = overlay.getGrid();
+        if (g == null)
+            return null;
+        final double hi = g.highestMsl();
+        if (Double.isNaN(hi))
+            return null;
+        final double raw = Units.metersToFeet(hi) + flightAglFt() + separationFt();
+        return Math.ceil(raw / REQUEST_STEP_FT) * REQUEST_STEP_FT;
+    }
+
+    private interface FeetSink {
+        void accept(double ft);
+    }
+
+    /** A typed number in ATAK's altitude unit, stored in feet. */
+    private void typeFeet(int promptId, double currentFt, final FeetSink sink) {
+        final EditText input = new EditText(host);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setSingleLine(true);
+        input.setText(String.format(Locale.US, "%.0f",
+                Units.toAltitudeUnit(Units.feetToMeters(currentFt))));
+        new AlertDialog.Builder(host)
+                .setTitle(pluginContext.getString(promptId, Units.altitudeUnit()))
+                .setView(input)
+                .setNegativeButton(pluginContext.getString(R.string.cancel), null)
+                .setPositiveButton(pluginContext.getString(R.string.ok),
+                        new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        try {
+                            final double v = Double.parseDouble(input.getText().toString().trim());
+                            final double ft = Units.altitudeInFeet() ? v : Units.metersToFeet(v);
+                            sink.accept(Math.max(0d, ft));
+                        } catch (NumberFormatException e) {
+                            // Nothing typed; the value stays as it was.
+                        }
+                    }
+                })
+                .show();
+        input.requestFocus();
+    }
+
+    /** Preset tiles in feet, the chosen one in green; shared by the two height rows. */
+    private void buildFeetTiles(LinearLayout into, double[] presetsFt, final double currentFt,
+            final FeetSink sink) {
+        into.removeAllViews();
+        final float dp = pluginContext.getResources().getDisplayMetrics().density;
+        for (final double ft : presetsFt) {
+            final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+            b.setText(Units.height(Units.feetToMeters(ft)));
+            b.setTextColor(Math.abs(ft - currentFt) < 0.5d
+                    ? pluginContext.getResources().getColor(R.color.state_on)
+                    : 0xFFFFFFFF);
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = (int) (4 * dp);
+            b.setLayoutParams(lp);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    sink.accept(ft);
+                }
+            });
+            into.addView(b);
+        }
+    }
+
+    /** The request block on the main screen, or nothing before the terrain is in. */
+    private void syncRequest() {
+        final TerrainGrid g = overlay.getGrid();
+        final Double r = requestedCeilingFt();
+        final boolean show = g != null && r != null;
+        requestHeading.setVisibility(show ? View.VISIBLE : View.GONE);
+        requestLines.setVisibility(show ? View.VISIBLE : View.GONE);
+        requestTotal.setVisibility(show ? View.VISIBLE : View.GONE);
+        btnUseRequest.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show)
+            return;
+        final String lines = pluginContext.getString(R.string.req_highest,
+                Units.altitudeMsl(g.highestMsl()))
+                + "\n" + pluginContext.getString(R.string.req_flight,
+                        Units.height(Units.feetToMeters(flightAglFt())))
+                + "\n" + pluginContext.getString(R.string.req_separation,
+                        Units.height(Units.feetToMeters(separationFt())));
+        requestLines.setText(lines);
+        requestTotal.setText(pluginContext.getString(R.string.req_total,
+                Units.altitudeMsl(Units.feetToMeters(r)))
+                + " (" + pluginContext.getString(R.string.req_rounded,
+                        Units.height(Units.feetToMeters(REQUEST_STEP_FT))) + ")");
+        final Double c = ceilingFt();
+        final boolean inUse = c != null && Math.abs(c - r) < 0.5d;
+        btnUseRequest.setText(pluginContext.getString(
+                inUse ? R.string.req_in_use : R.string.use_as_ceiling));
+        btnUseRequest.setEnabled(!inUse);
+        btnUseRequest.setAlpha(inUse ? 0.6f : 1f);
+    }
+
     /* ----- the circle ----- */
 
     private double radiusM() {
@@ -963,6 +1135,25 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
         ceilingFold.label(pluginContext.getString(R.string.ceiling),
                 c == null ? null : Units.altitudeMsl(c));
+        flightFold.label(pluginContext.getString(R.string.height_above_terrain),
+                Units.height(Units.feetToMeters(flightAglFt())));
+        sepFold.label(pluginContext.getString(R.string.separation),
+                Units.height(Units.feetToMeters(separationFt())));
+        buildFeetTiles(flightTiles, FLIGHT_PRESETS_FT, flightAglFt(), new FeetSink() {
+            @Override
+            public void accept(double ft) {
+                prefs.edit().putFloat(PREF_FLIGHT_AGL_FT, (float) ft).apply();
+                syncAll();
+            }
+        });
+        buildFeetTiles(sepTiles, SEPARATION_PRESETS_FT, separationFt(), new FeetSink() {
+            @Override
+            public void accept(double ft) {
+                prefs.edit().putFloat(PREF_SEPARATION_FT, (float) ft).apply();
+                syncAll();
+            }
+        });
+        syncRequest();
         circleFold.label(pluginContext.getString(R.string.area), extentWords());
         btnCeilingAbove.setText(pluginContext.getString(R.string.ceiling_above_launch,
                 Units.height(Units.feetToMeters(DEFAULT_ABOVE_LAUNCH_FT))));

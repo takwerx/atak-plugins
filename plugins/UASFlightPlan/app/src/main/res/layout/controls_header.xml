@@ -60,6 +60,46 @@
         android:textColor="@color/white"
         android:textSize="15sp" />
 
+    <!-- The ceiling to ask Air Attack for: the highest ground in the area, the
+         height the pilot flies above it, and the separation, added up and rounded
+         up. Shown once the terrain is in; one button sets it as the ceiling. -->
+    <TextView
+        android:id="@+id/request_heading"
+        style="@style/TakwerxSectionHeading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="10dp"
+        android:visibility="gone"
+        android:text="@string/section_request" />
+
+    <TextView
+        android:id="@+id/request_lines"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="@color/white"
+        android:textSize="15sp"
+        android:lineSpacingExtra="3dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/request_total"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="4dp"
+        android:textColor="@color/white"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/btn_use_request"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:visibility="gone"
+        android:text="@string/use_as_ceiling" />
+
     <TextView
         android:id="@+id/list_heading"
         style="@style/TakwerxSectionHeading"

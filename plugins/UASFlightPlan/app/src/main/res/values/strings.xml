@@ -76,6 +76,21 @@
 
     <!-- Settings rows -->
     <string name="ceiling">Ceiling</string>
+    <string name="section_request">Ceiling to request</string>
+    <string name="height_above_terrain">Height above terrain</string>
+    <string name="separation">Separation</string>
+    <string name="type_the_height">Type the height</string>
+    <string name="type_the_separation">Type the separation</string>
+    <string name="height_prompt">Height above terrain, %1$s</string>
+    <string name="separation_prompt">Separation, %1$s</string>
+    <string name="flight_note">How high above the ground the aircraft flies. Part 107 allows 400 ft above the terrain under it.</string>
+    <string name="req_highest">Highest ground in the area: %1$s</string>
+    <string name="req_flight">Height above terrain: %1$s</string>
+    <string name="req_separation">Separation: %1$s</string>
+    <string name="req_total">Request a ceiling of %1$s</string>
+    <string name="req_rounded">rounded up to the next %1$s</string>
+    <string name="use_as_ceiling">Use it as the ceiling</string>
+    <string name="req_in_use">That is the ceiling in use.</string>
     <string name="circle">Circle</string>
     <string name="map_key">Map key</string>
     <string name="type_the_ceiling">Type the ceiling</string>
@@ -95,7 +110,7 @@
     <string name="ceiling_line">Ceiling %1$s is %2$s above your launch point.</string>
 
     <!-- Status line. Says what is happening, what was painted, or why nothing is drawn. -->
-    <string name="status_idle">Tap Launch point to start. The islands are painted inside a circle around it.</string>
+    <string name="status_idle">Tap Launch point to start: place the launch point, or draw the area to cover. The plan covers the drawn area, or a circle around the launch point.</string>
     <string name="status_picking">Tap the map where you will launch. Back cancels.</string>
     <string name="status_reading">Reading the terrain, %1$s…</string>
     <string name="status_no_gps">No GPS fix, so there is no position to use. Tap the map instead.</string>
