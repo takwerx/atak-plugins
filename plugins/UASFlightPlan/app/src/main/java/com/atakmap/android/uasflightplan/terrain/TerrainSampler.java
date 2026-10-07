@@ -60,6 +60,9 @@ public final class TerrainSampler {
      */
     public static final int MAX_DIM = 512;
 
+    /** Width of the edge ring, in cells. */
+    public static final double RING_CELLS = 2.5d;
+
     private TerrainSampler() {
     }
 
@@ -304,7 +307,12 @@ public final class TerrainSampler {
 
         final double cx = (width - 1) / 2d, cy = (height - 1) / 2d;
         final double r2 = radiusM * radiusM;
+        // The edge ring is a fixed number of cells wide, so it stays one visible
+        // line at the zoom the circle is looked at, whatever the radius.
+        final double inner = Math.max(0d, radiusM - RING_CELLS * Math.min(cellEastM, cellNorthM));
+        final double inner2 = inner * inner;
         final boolean[] in = new boolean[z.length];
+        final boolean[] ring = new boolean[z.length];
         for (int i = 0; i < z.length; i++) {
             if (!GeoPoint.isAltitudeValid(z[i]))
                 z[i] = Double.NaN;
@@ -312,15 +320,17 @@ public final class TerrainSampler {
                 z[i] -= offset;
             final int x = i % width, y = i / width;
             final double dx = (x - cx) * cellEastM, dy = (y - cy) * cellNorthM;
-            in[i] = dx * dx + dy * dy <= r2;
+            final double d2 = dx * dx + dy * dy;
+            in[i] = d2 <= r2;
+            ring[i] = in[i] && d2 > inner2;
         }
 
         final double latStep = (aoi.getNorth() - aoi.getSouth()) / Math.max(1, height - 1);
         final double lonStep = (aoi.getEast() - aoi.getWest()) / Math.max(1, width - 1);
 
         return new TerrainGrid(z, width, height, aoi, latStep, lonStep,
-                Math.min(cellEastM, cellNorthM), in, center, radiusM, reference, offset,
-                coverage == null ? "" : coverage.describe());
+                Math.min(cellEastM, cellNorthM), in, ring, center, radiusM, reference,
+                offset, coverage == null ? "" : coverage.describe());
     }
 
     private static int dim(double spanM) {

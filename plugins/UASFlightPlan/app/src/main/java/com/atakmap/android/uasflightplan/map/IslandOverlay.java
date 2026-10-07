@@ -37,8 +37,16 @@ public final class IslandOverlay {
 
     /** Ground at or above the ceiling: opaque, cannot be here at all. */
     public static final int ISLAND_ARGB = 0xD9E53935;
-    /** Ground below the ceiling: a light wash, so "under water" reads as water. */
-    public static final int WATER_ARGB = 0x3D1E88E5;
+    /**
+     * Ground below the ceiling: a wash, so "under water" reads as water.
+     *
+     * <p>45%, not the 24% of the first build, which was invisible over imagery at
+     * every zoom. The raster goes through a premultiplied bitmap and the wash
+     * looked dimmed twice; measured by eye on the XCover, not in GL.
+     */
+    public static final int WATER_ARGB = 0x731E88E5;
+    /** The circle's edge: the limit of what was checked, white so it reads on any ground. */
+    public static final int EDGE_ARGB = 0xD9FFFFFF;
 
     /** What the pane is told. */
     public interface Listener {
@@ -241,7 +249,7 @@ public final class IslandOverlay {
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                final int[] argb = g.toArgb(ceiling, ISLAND_ARGB, WATER_ARGB);
+                final int[] argb = g.toArgb(ceiling, ISLAND_ARGB, WATER_ARGB, EDGE_ARGB);
                 final int islands = g.islandCells(ceiling);
                 mapView.post(new Runnable() {
                     @Override

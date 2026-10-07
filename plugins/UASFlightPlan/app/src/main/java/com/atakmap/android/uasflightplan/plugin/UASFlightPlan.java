@@ -1,10 +1,14 @@
 package com.atakmap.android.uasflightplan.plugin;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
 import android.view.View;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.ipc.AtakBroadcast;
+import com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.uasflightplan.map.IslandOverlay;
 import com.atakmap.android.uasflightplan.ui.UASFlightPlanPane;
@@ -34,6 +38,23 @@ import gov.tak.platform.marshal.MarshalManager;
 public class UASFlightPlan implements IPlugin {
 
     private static final String TAG = "UASFlightPlan";
+
+    /**
+     * Opens the pane from the outside: {@code am broadcast -a <ACTION_SHOW>}.
+     * A system receiver, because {@code registerReceiver} is process-local and
+     * {@code am broadcast} never reaches it. Driving ATAK's Tools list over adb
+     * is unreliable and every stray tap lands in another plugin's pane; this is
+     * how a session opens the pane for a test, and it opens the pane and nothing
+     * else.
+     */
+    public static final String ACTION_SHOW = "com.atakmap.android.uasflightplan.SHOW";
+
+    private final BroadcastReceiver showReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            showPane();
+        }
+    };
 
     IServiceController serviceController;
     Context pluginContext;
@@ -76,6 +97,8 @@ public class UASFlightPlan implements IPlugin {
             return;
 
         uiService.addToolbarItem(toolbarItem);
+        AtakBroadcast.getInstance().registerSystemReceiver(showReceiver,
+                new DocumentedIntentFilter(ACTION_SHOW, "Open the UAS Flight Plan pane"));
 
         final MapView mapView = MapView.getMapView();
         if (mapView != null) {
@@ -92,6 +115,11 @@ public class UASFlightPlan implements IPlugin {
     public void onStop() {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
+        try {
+            AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "show receiver was not registered", e);
+        }
 
         // Close the pane, do not just drop the reference. ATAK keeps showing a pane
         // whose plugin has been unloaded, and every control on it still points at the

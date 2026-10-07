@@ -39,6 +39,12 @@ public final class TerrainGrid {
     public final double cellMeters;
     /** True for the cells inside the working circle. */
     public final boolean[] inCircle;
+    /**
+     * True for the outermost cells of the circle: the edge of what was computed.
+     * Drawn whatever is under them, so the limit of the picture is always on the
+     * map; a sea with no shore reads as if the whole map had been checked.
+     */
+    public final boolean[] ring;
     /** Cells inside the circle. */
     public final int circleCells;
     /** Cells inside the circle with no elevation. */
@@ -55,8 +61,8 @@ public final class TerrainGrid {
 
     TerrainGrid(double[] msl, int width, int height, GeoBounds bounds,
             double latStep, double lonStep, double cellMeters, boolean[] inCircle,
-            GeoPoint center, double radiusM, String reference, double geoidOffsetM,
-            String sources) {
+            boolean[] ring, GeoPoint center, double radiusM, String reference,
+            double geoidOffsetM, String sources) {
         this.msl = msl;
         this.width = width;
         this.height = height;
@@ -65,6 +71,7 @@ public final class TerrainGrid {
         this.lonStep = lonStep;
         this.cellMeters = cellMeters;
         this.inCircle = inCircle;
+        this.ring = ring;
         this.center = center;
         this.radiusM = radiusM;
         this.reference = reference;
@@ -116,13 +123,18 @@ public final class TerrainGrid {
      * @param ceilingMslM the ceiling, meters MSL
      * @param island      ARGB for ground at or above the ceiling
      * @param water       ARGB for ground below it; 0 to leave the map showing through
+     * @param edge        ARGB for the ring at the circle's edge
      * @return one ARGB per cell, 0 outside the circle and where the ground is unknown
      */
-    public int[] toArgb(double ceilingMslM, int island, int water) {
+    public int[] toArgb(double ceilingMslM, int island, int water, int edge) {
         final int[] out = new int[msl.length];
         for (int i = 0; i < msl.length; i++) {
             if (!inCircle[i])
                 continue;
+            if (ring[i]) {
+                out[i] = edge;
+                continue;
+            }
             final double z = msl[i];
             if (Double.isNaN(z))
                 continue;
