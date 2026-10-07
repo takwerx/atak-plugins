@@ -55,7 +55,7 @@
     <string name="status_obstacles_all_filtered">Charted obstacles in the area, none past the height and type filters.</string>
     <string name="status_obstacles_hidden">%1$d more hidden by the filters.</string>
     <string name="taller_than">Taller than</string>
-    <string name="taller_any">Any height</string>
+    <string name="taller_any">Any</string>
     <string name="types">Types</string>
     <string name="types_value">%1$d of %2$d</string>
     <string name="all_on">All on</string>
