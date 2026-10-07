@@ -108,15 +108,22 @@ public class TfrOverlay {
         public final Geometry geometry;
         public final Style style;
         public final AttributeSet attrs;
+        /** Absolute for an MSL block, Relative for one measured above the surface. */
+        public final Feature.AltitudeMode altitudeMode;
+        /** Wall height in meters; 0 for a flat ring on the ground. */
+        public final double extrude;
 
         public Drawn(String setKey, String setName, String name, Geometry geometry,
-                Style style, AttributeSet attrs) {
+                Style style, AttributeSet attrs, Feature.AltitudeMode altitudeMode,
+                double extrude) {
             this.setKey = setKey;
             this.setName = setName;
             this.name = name;
             this.geometry = geometry;
             this.style = style;
             this.attrs = attrs;
+            this.altitudeMode = altitudeMode;
+            this.extrude = extrude;
         }
     }
 
@@ -287,17 +294,7 @@ public class TfrOverlay {
             @Override
             public void run() {
                 synchronized (lock) {
-                    if (store == null)
-                        return;
-                    try {
-                        for (Map.Entry<String, Long> e : setIds.entrySet()) {
-                            // The latest wish, not the one this task was queued with.
-                            final boolean on = visible && !typesOff.contains(e.getKey());
-                            store.setFeatureSetVisible(e.getValue(), on);
-                        }
-                    } catch (Exception e) {
-                        Log.w(TAG, "applying visibility failed", e);
-                    }
+                    pushVisibilityLocked();
                 }
                 mapView.post(new Runnable() {
                     @Override
@@ -309,6 +306,53 @@ public class TfrOverlay {
                 });
             }
         });
+    }
+
+    /**
+     * Push the switches into the store, in two scoped writes.
+     *
+     * <p><b>Not</b> {@code setFeatureSetVisible(fsid, on)}, which looks like the obvious
+     * call and is unusable: ATAK's {@code FDB2.setFeatureSetVisibleImpl} compiles
+     * {@code "UPDATE featuresets SET visible = ?"} with <b>no WHERE clause</b> and ignores
+     * the fsid it was handed, so every call rewrites every set in the store and the last
+     * one in a loop wins. It updates its in-memory copy per set, so the map looks right
+     * until ATAK restarts and the store is read back -- which is exactly when a switched
+     * off type is supposed to come back switched off.
+     *
+     * <p>{@code setFeatureSetsVisible(params, on)} builds a real {@code WHERE id IN (...)}.
+     * Two calls, one per answer, so a set is never left on the wrong side.
+     *
+     * <p>Caller holds {@link #lock}.
+     */
+    private void pushVisibilityLocked() {
+        if (store == null)
+            return;
+        final Set<Long> show = new HashSet<>();
+        final Set<Long> hide = new HashSet<>();
+        for (Map.Entry<String, Long> e : setIds.entrySet()) {
+            // The latest wish, not the one this task was queued with: two quick taps must
+            // end where the button says.
+            if (visible && !typesOff.contains(e.getKey()))
+                show.add(e.getValue());
+            else
+                hide.add(e.getValue());
+        }
+        try {
+            if (!show.isEmpty()) {
+                final FeatureDataStore2.FeatureSetQueryParameters p =
+                        new FeatureDataStore2.FeatureSetQueryParameters();
+                p.ids = show;
+                store.setFeatureSetsVisible(p, true);
+            }
+            if (!hide.isEmpty()) {
+                final FeatureDataStore2.FeatureSetQueryParameters p =
+                        new FeatureDataStore2.FeatureSetQueryParameters();
+                p.ids = hide;
+                store.setFeatureSetsVisible(p, false);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "applying visibility failed", e);
+        }
     }
 
     // ---- writing ----
@@ -339,7 +383,7 @@ public class TfrOverlay {
                         fresh.put(d.setKey, fsid);
                     }
                     store.insertFeature(new Feature(fsid, d.name, d.geometry, d.style,
-                            d.attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                            d.attrs, d.altitudeMode, d.extrude));
                 }
                 for (Long id : old) {
                     try {
@@ -350,6 +394,8 @@ public class TfrOverlay {
                 }
                 setIds.clear();
                 setIds.putAll(fresh);
+                // Once, after every set exists, rather than per set as they are made.
+                pushVisibilityLocked();
                 count = countFeatures();
                 Log.d(TAG, "rewritten: " + count + " areas in " + fresh.size() + " sets");
             } catch (Exception e) {
@@ -371,7 +417,6 @@ public class TfrOverlay {
         // survives a restart and can be read back off disk before the first rewrite.
         final long id = store.insertFeatureSet(
                 new FeatureSet(PROVIDER, key, name, Double.MAX_VALUE, 0d));
-        store.setFeatureSetVisible(id, visible && !typesOff.contains(key));
         setKeyById.put(id, key);
         return id;
     }

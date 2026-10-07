@@ -1,6 +1,7 @@
 package com.atakmap.android.tfr;
 
 import com.atakmap.map.layer.feature.AttributeSet;
+import com.atakmap.map.layer.feature.Feature;
 import com.atakmap.map.layer.feature.geometry.LineString;
 import com.atakmap.map.layer.feature.geometry.Polygon;
 import com.atakmap.map.layer.feature.style.BasicFillStyle;
@@ -50,8 +51,25 @@ public final class TfrFeatures {
             final boolean active = activeAt(t, a, nowMs);
             final int color = active ? activeColor : upcomingColor;
             final String name = name(t, a, areas.size(), i);
-            out.add(new TfrOverlay.Drawn(setKey, setName, name, polygon(a),
-                    style(color, label(t, a)), attributes(t, a, active)));
+            final AttributeSet attrs = attributes(t, a, active);
+
+            // The volume. A restriction is a block of airspace, not a line on the
+            // ground, and the question an operator is asking it -- can I be under this
+            // -- is the one a flat ring cannot answer.
+            final double floorM = metersOf(a.floor);
+            final double ceilM = metersOf(a.ceiling);
+            final double wall = ceilM - floorM;
+            if (wall > 1) {
+                out.add(new TfrOverlay.Drawn(setKey, setName, name,
+                        polygon(a, floorM), wallStyle(color, label(t, a)), attrs,
+                        altitudeMode(a), wall));
+            }
+            // The footprint, clamped. ATAK draws its own extruded shapes this way, as
+            // two features: without it the area is invisible looking straight down,
+            // which is how the map is read most of the time.
+            out.add(new TfrOverlay.Drawn(setKey, setName, name, polygon(a, Double.NaN),
+                    style(color, wall > 1 ? null : label(t, a)), attrs,
+                    Feature.AltitudeMode.ClampToGround, 0d));
         }
         return out;
     }
@@ -72,19 +90,75 @@ public final class TfrFeatures {
         return nowMs >= from && nowMs <= to;
     }
 
-    /** <b>Longitude first.</b> Unlike {@code GeoPoint}, and nothing complains if it is not. */
-    private static Polygon polygon(TfrArea a) {
-        final LineString ring = new LineString(2);
-        for (double[] p : a.ring)
-            ring.addPoint(p[1], p[0]);
+    /**
+     * The ring. <b>Longitude first</b>, unlike {@code GeoPoint}, and nothing complains if
+     * it is not.
+     *
+     * @param baseM the floor in meters for an extruded volume, or NaN for a flat ring
+     *            clamped to the ground
+     */
+    private static Polygon polygon(TfrArea a, double baseM) {
+        final boolean flat = Double.isNaN(baseM);
+        final LineString ring = new LineString(flat ? 2 : 3);
+        for (double[] p : a.ring) {
+            if (flat)
+                ring.addPoint(p[1], p[0]);
+            else
+                ring.addPoint(p[1], p[0], baseM);
+        }
         // A ring that does not close draws as an open shape with a seam across it.
         if (!a.ring.isEmpty()) {
             final double[] first = a.ring.get(0);
             final double[] last = a.ring.get(a.ring.size() - 1);
-            if (first[0] != last[0] || first[1] != last[1])
-                ring.addPoint(first[1], first[0]);
+            if (first[0] != last[0] || first[1] != last[1]) {
+                if (flat)
+                    ring.addPoint(first[1], first[0]);
+                else
+                    ring.addPoint(first[1], first[0], baseM);
+            }
         }
         return new Polygon(ring);
+    }
+
+    /**
+     * Which frame the volume is drawn in, which is the whole reason the parser reads
+     * {@code codeDistVer} per area.
+     *
+     * <p>{@code HEI} is a height above the surface, so the block rides the terrain and the
+     * mode is Relative. {@code ALT} is above mean sea level, so it sits at a fixed
+     * altitude whatever the ground does, and the mode is Absolute. A restriction whose
+     * floor is the surface is drawn Absolute from sea level: the top then lands exactly on
+     * the published ceiling and the part below the terrain is simply buried, which is what
+     * "surface" means on a mountain.
+     */
+    private static Feature.AltitudeMode altitudeMode(TfrArea a) {
+        final TfrArea.Vert governing = a.ceiling.present ? a.ceiling : a.floor;
+        if (a.floor.present && a.floor.surface)
+            return Feature.AltitudeMode.Absolute;
+        return governing.agl ? Feature.AltitudeMode.Relative : Feature.AltitudeMode.Absolute;
+    }
+
+    /** Feet to meters, with a surface or unstated limit reading as zero. */
+    private static double metersOf(TfrArea.Vert v) {
+        if (!v.present || v.surface)
+            return 0d;
+        return v.feet * 0.3048d;
+    }
+
+    /**
+     * The wall. {@code EXTRUDE_VERTEX} is what puts an outline up the sides rather than
+     * only around the lid; it is what ATAK's own extruded polylines use.
+     */
+    private static Style wallStyle(int color, String label) {
+        final Style fill = new BasicFillStyle((FILL_ALPHA << 24) | (color & 0x00FFFFFF));
+        final Style stroke = new BasicStrokeStyle(color, STROKE,
+                BasicStrokeStyle.EXTRUDE_VERTEX);
+        if (label == null || label.isEmpty())
+            return new CompositeStyle(new Style[] { fill, stroke });
+        return new CompositeStyle(new Style[] { fill, stroke,
+                new LabelPointStyle(label, 0xFFFFFFFF, 0x99000000,
+                        LabelPointStyle.ScrollMode.DEFAULT, 0f, 0, 0, 0f, false,
+                        LABEL_MAX_RES) });
     }
 
     /**
