@@ -114,6 +114,16 @@ public abstract class OutlookOverlay {
         day = p0 == null ? 1 : clampDay(p0.getInt(prefDay, 1));
         this.features = new AtmosphereFeatures(mapView, pluginContext, tag, name,
                 layerId + ".sqlite", layerId, false);
+        if (tapsAtLabelOnly())
+            features.tapAtLabelOnly(labelMaxResolution());
+    }
+
+    /**
+     * Whether an area answers a tap on its label only, for areas that cover the whole
+     * map. Called from the constructor: a constant.
+     */
+    protected boolean tapsAtLabelOnly() {
+        return false;
     }
 
     /** The requests, in order; each answer goes to {@link #parse(int, String)} with its index. */
@@ -282,9 +292,33 @@ public abstract class OutlookOverlay {
         }
         Http.get(urls[index], egress.userAgent(), new HashMap<String, String>(), new Http.Callback() {
             @Override
-            public void onSuccess(String body) {
-                got.addAll(parse(index, body));
-                fetch(index + 1, got, mine);
+            public void onSuccess(final String body) {
+                if (mine != generation || !on) {
+                    inFlight = false;
+                    return;
+                }
+                // Parsed on the worker, then back to main for the next request: the
+                // answer comes back on main, and the national PSA map is 470 KB of
+                // JSON, which is not work for the thread the pane answers on. A stop
+                // shuts the worker down, and an answer that lands after it must not
+                // take ATAK with it (security review, 2026-10-05).
+                try {
+                    worker.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            final List<Area> parsed = parse(index, body);
+                            mapView.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    got.addAll(parsed);
+                                    fetch(index + 1, got, mine);
+                                }
+                            });
+                        }
+                    });
+                } catch (java.util.concurrent.RejectedExecutionException stopped) {
+                    inFlight = false;
+                }
             }
 
             @Override

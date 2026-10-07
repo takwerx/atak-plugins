@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.9** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.11** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.9/ATAK-Plugin-Atmosphere-0.9--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.9/ATAK-Plugin-Atmosphere-0.9--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.9/ATAK-Plugin-Atmosphere-0.9--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.11/ATAK-Plugin-Atmosphere-0.11--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.11/ATAK-Plugin-Atmosphere-0.11--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.11/ATAK-Plugin-Atmosphere-0.11--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -32,7 +32,9 @@ Capabilities:
   - Weather stations around you, colored against the Red Flag criteria of
     their own fire weather zone (the California, Great Basin, Southwest and
     Northwest annual operating plans are transcribed), with every reading and
-    the criteria behind a tap, favorites, and a list with counted filters.
+    the criteria behind a tap, favorites, and a list with counted filters. In
+    California, the utilities' stations too (SCE, SDG&E, PG&E, HPWREN, from
+    Cal OES), drawn apart and saying their wind reads higher than a RAWS.
   - River gauges colored by flood category, with stage, flow, flood stages and
     the observed and forecast hydrograph; buoys and coastal stations with
     their readings graded by sea state, the nearest tide and current
@@ -55,6 +57,11 @@ Capabilities:
     words and the recommended actions; NOAA's 15-minute lightning strike
     density; California's Public Safety Power Shutoffs from Cal OES (counties
     warned, power off, power back on), saying what it does not cover.
+  - Fire danger: every Predictive Service Area in the lower 48 shaded by its
+    Energy Release Component percentile, observed or forecast, from the
+    Forest Service's national service; tap an area's name for its ERC and
+    Burning Index and its GACC's own ERC chart, full screen to pinch and zoom.
+    Each fire weather zone gives the ERC of the area it is in.
   - Spot forecasts: every open request the National Weather Service has, with
     the office's forecast, newest or closest first and by type, and help
     preparing your own request.
@@ -72,15 +79,17 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.9, for ATAK-CIV 5.6, 5.7 and 5.8. New: SAWTI, the Santa Ana Wildfire Threat
-Index, on the map and as a page; lightning strike density; California's Public
-Safety Power Shutoffs. (0.8 was a picture build for the manual and was not
-published.) 0.7 brought fire weather zones and their planning forecast, spot
-forecasts newest or closest and by type, a tap that opens an item's page, and
-Title Case names. Developed on a
-Samsung Galaxy XCover Pro running ATAK-CIV 5.8.0.3 and checked on official
-ATAK-CIV 5.8 with the tak.gov-signed 0.8; compiled clean against the 5.6.0.23
-and 5.7.0.14 SDKs. The manual and the user guide carry screenshots from the
+0.11, for ATAK-CIV 5.6, 5.7 and 5.8. New: Fire Danger, the Energy Release
+Component by Predictive Service Area with each GACC's chart; California's
+utility weather stations; a Layers button in the top row; labels that stay
+level when the map turns; the smoke forecast at every zoom; fire weather zones
+outlined in purple; Atmosphere's drawn icons kept in ATAK's private storage
+rather than the shared card (takwerx/atmosphere#2). (0.10 was a picture build
+for the manual and was not published.) 0.9 brought SAWTI, lightning strike
+density and California's Public Safety Power Shutoffs. Developed on a Samsung
+Galaxy XCover Pro running ATAK-CIV 5.8.0.3 and checked on official ATAK-CIV
+5.8 with the tak.gov-signed 0.10; compiled clean against the 5.6.0.23 and
+5.7.0.14 SDKs. The manual and the user guide carry screenshots from the
 signed build.
 
 Parsers for every service are covered by unit tests that run off-device

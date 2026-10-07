@@ -7,7 +7,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 
 import com.atakmap.android.atmosphere.data.Spot;
-import com.atakmap.coremap.filesystem.FileSystemUtils;
+import com.atakmap.android.atmosphere.compat.GeneratedFiles;
 import com.atakmap.coremap.log.Log;
 
 import java.io.File;
@@ -49,7 +49,7 @@ final class SpotIcons {
     private final Map<String, String> cache = new HashMap<>();
 
     SpotIcons() {
-        dir = FileSystemUtils.getItem("tools/atmosphere/spot-icons");
+        dir = GeneratedFiles.icons("spot");
         if (dir != null && !dir.isDirectory())
             //noinspection ResultOfMethodCallIgnored
             dir.mkdirs();
