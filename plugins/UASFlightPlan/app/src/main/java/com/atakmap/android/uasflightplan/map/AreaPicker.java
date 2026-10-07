@@ -259,7 +259,7 @@ public final class AreaPicker implements ToolListener {
         drawn.addOnGroupChangedListener(watcher);
         drawn.setTitle(AREA_TITLE);
         // The boundary is a boundary, not an annotation. ATAK gives a drawn shape a
-        // centre dot and a floating name by default, and over an overlay whose whole
+        // center dot and a floating name by default, and over an overlay whose whole
         // job is to be read they are two more things in the way.
         drawn.setCenterPointVisible(false);
         drawn.setCenterPointLabelVisible(false);
