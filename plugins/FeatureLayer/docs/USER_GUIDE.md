@@ -94,6 +94,8 @@ layer is on or off, and comes back after ATAK or the phone restarts. With no sig
 the row says *no network, showing what this phone saved*. What you see is what was
 last downloaded: a layer that loads what is in view has the area you last looked at.
 
+![No network: the row says what is shown](screenshots/67_no_network.png)
+
 **All ON / All OFF** beside the heading works every layer at once. A row says
 **Loading…** while its layer fetches. **Go to** frames the whole incident; layers
 spread across a state or the country (DART, FireGuard, New Fire Starts, CA Air
@@ -377,10 +379,14 @@ center enters them: NIFC's own "New Starts" view. A start stays until it is
 contained, controlled or out, or for 24 hours after it was found. Public, no
 login. **Add new starts** puts it in the list.
 
+![A new start on the map: name and acres](screenshots/51_new_starts_map.png)
+
 Each start is a marker the size of a DART one: a red flame for a wildfire, a green
 **RX** for a prescribed fire. A flame drawn in outline is a wildfire reported with
 no size and nothing added since. The arrow on the layer's row opens a map key with
 all three. Names and acres show from five miles in.
+
+![The New Fire Starts row: status, map key, Features](screenshots/52_new_starts_row.png)
 
 Its Features list has three types, each **ON/OFF**: **Wildfire**, **Wildfire, No
 Size Yet** and **Prescribed Fire**. Turn off Prescribed Fire to see only
@@ -388,6 +394,8 @@ wildfires. Wildfire, No Size Yet holds starts that came in from a dispatch cente
 and were never updated: some centers enter every fire call this way, with a
 dispatch number for a name, and never touch it again. Turn it off to see only the
 fires someone has sized.
+
+![Its Features list: time window, zoom gate, labels, the three types](screenshots/53_new_starts_features.png)
 
 A fire with only a number for a name, such as LAC-357251, leaves the map an hour
 after it was found unless someone has named it by then. Some dispatch centers file
@@ -397,7 +405,10 @@ were left out.
 
 **Where** is **Everywhere** at first: every start in the country is loaded, so
 **Find** reaches a fire wherever the map is. Slide it to load only the starts within
-a distance of My Location or the map center. **Time window** picks the last hour, 3, 6, 12 or 24 hours. The
+a distance of My Location or the map center. **Time window** picks the last hour, 3, 6, 12 or 24 hours.
+
+![The time window](screenshots/54_time_window.png)
+ The
 **Zoom gate** is off at first, so starts draw at every zoom. The layer refreshes
 every 5 minutes, as often as NIFC's view does.
 
@@ -418,8 +429,12 @@ declares it contained, so a fire at 100% can still be on the map. NIFC drops a f
 under 10 acres after 3 days with no update, under 100 acres after 8, and a larger
 one after 14.
 
+![An ongoing fire on the map](screenshots/55_ongoing_fires_map.png)
+
 Tap a fire on the map, from either layer, and its details open straight away, with
 no radial menu.
+
+![A fire's details: CAL FIRE's record first](screenshots/56_fire_details.png)
 
 **CAL FIRE** sits beside **Go there** in a fire's details when CAL FIRE runs or
 posts the fire; it opens CAL FIRE's incident page, with the engines, crews and
@@ -442,6 +457,8 @@ per decade: the 2010s rust, the 2000s dark brown, the 1990s tan, the 1980s teal,
 1979 and earlier grey. (EGP greys every decade; a 20-year-old burn scar still
 matters, so here the decades back to 1980 keep a color.) **Add fire history** puts it in the list.
 
+![The Fire History map key](screenshots/58_fire_history_key.png)
+
 Each band and each decade is its own type in the Features list, each ON/OFF, so
 the 1990s can be shown alone, or only the last three years. The arrow on its row
 opens a map key with the colors. A burn over 20 acres is labeled with its name and
@@ -449,12 +466,18 @@ year, "Carr Fire (2018)", from 2 miles on the scale bar in (Label zoom changes i
 the rest. Where
 several agencies mapped one fire, it shows once.
 
+![Its Features list: each band and decade, ON/OFF and fill](screenshots/58b_fire_history_features.png)
+
+![A burn's details](screenshots/59_burn_details.png)
+
 It loads what is in view, up to about 155 miles across, with the shapes simplified
 to the zoom; zoom in and they load again in finer detail.
 
 **Find** on the main screen searches all of Fire History by name, not only what is
 in view. Add a year to pick one fire out of many with the same name: "Ranch 2007".
 **Go** takes the map to it, close enough to read its name.
+
+![Find in Fire History: "Cedar 2003"](screenshots/60_find_fire_history.png)
 
 ### My Fires
 
@@ -466,14 +489,27 @@ those:
    on the map so you can pick the next.
 3. Add the rest the same way. **Remove from My Fires**, in a burn's details, takes
    one off.
+
+![A burn in My Fires: its white edge](screenshots/64_fire_history_map.png)
+
+![Its details: Remove from My Fires, and Only My Fires](screenshots/61_burn_in_my_fires.png)
+
 4. Tap **Only My Fires OFF (3)**, under Add in the details or under the arrow on
    the row. It turns green, ON, and Fire History shows only your fires, wherever
    you pan and whichever decades are ticked. The row reads "Fire History: My Fires
    (3)". Tap it again to see every fire; your list is kept.
 
+![Only My Fires ON](screenshots/62_only_my_fires_on.png)
+
+![Only your fires on the map](screenshots/66_only_my_fires_map.png)
+
+![The row with My Fires](screenshots/63_my_fires_row.png)
+
 **Clear My Fires**, under the arrow on the row, empties the list when the incident
 is over. The map key ends with a **My Fires** line for the white edge. The list is
 kept when ATAK restarts.
+
+![Clear My Fires asks first](screenshots/65_clear_my_fires.png)
 
 ## Your own organization
 

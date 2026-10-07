@@ -517,6 +517,35 @@ takes any ArcGIS Online organization you sign in to.
 ]
 
 #tak-slide[
+= New Fire Starts: on the map
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("51.png", width: 100%)
+
+  A start with its name and acres, from five miles in.
+][
+  #image("52.png", width: 100%)
+
+  The row: how many were left out, and the map key.
+][
+  #image("53.png", height: 220pt)
+
+  Its Features: time window, zoom gate, labels, and the three types.
+]
+]
+
+#tak-slide[
+= New Fire Starts: time window
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("54.png", height: 230pt)
+][
+  *Time window* keeps the starts reported in the last hour, 3, 6, 12 or 24
+  hours.
+]
+]
+
+#tak-slide[
 = Ongoing Fires
 
   Every wildfire and prescribed fire NIFC lists as not yet contained, controlled
@@ -536,6 +565,21 @@ takes any ArcGIS Online organization you sign in to.
 ]
 
 #tak-slide[
+= Ongoing Fires: a tap
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("55.png", width: 100%)
+
+  An ongoing fire, named with its acres.
+][
+  #image("56.png", width: 100%)
+
+  A tap opens its details. *CAL FIRE* opens the incident page; CAL FIRE's acres,
+  containment and location come first.
+]
+]
+
+#tak-slide[
 = Fire History
 
   Where fires have burned, 1900 to today, from NIFC's interagency fire perimeter
@@ -549,6 +593,34 @@ takes any ArcGIS Online organization you sign in to.
   (2018)"; a tap opens a burn's details. It loads what is in view, up to about
   155 miles across, simplified to the zoom. *Find* searches all of it by name;
   add a year to pick one fire: "Ranch 2007".
+]
+
+#tak-slide[
+= Fire History: key and types
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("58.png", height: 230pt)
+
+  The map key under the row's arrow.
+][
+  #image("58b.png", height: 230pt)
+
+  Its Features: each band and decade ON/OFF, with its fill.
+]
+]
+
+#tak-slide[
+= Fire History: a burn, and Find
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("59.png", width: 100%)
+
+  A tap opens a burn's details, with *Add to My Fires*.
+][
+  #image("60.png", width: 100%)
+
+  *Find* on the main screen searches every year by name; a year picks one fire.
+]
 ]
 
 #tak-slide[
@@ -566,6 +638,40 @@ takes any ArcGIS Online organization you sign in to.
 
   *Clear My Fires* on the row empties the list when the incident is over. The
   map key ends with a *My Fires* line. The list is kept when ATAK restarts.
+]
+
+#tak-slide[
+= My Fires: picking
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("64.png", width: 100%)
+
+  A burn in My Fires has a white edge; the others stay on the map.
+][
+  #image("61.png", width: 100%)
+
+  Its details: *Remove from My Fires*, and *Only My Fires* with the count.
+]
+]
+
+#tak-slide[
+= My Fires: only yours
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("62.png", width: 100%)
+
+  *Only My Fires ON*: green.
+][
+  #image("66.png", width: 100%)
+
+  Only your fires on the map, wherever you pan.
+][
+  #image("63.png", width: 100%)
+
+  The row reads "My Fires"; *Clear My Fires* asks first:
+
+  #image("65.png", width: 100%)
+]
 ]
 
 #tak-slide[
@@ -597,6 +703,18 @@ takes any ArcGIS Online organization you sign in to.
   *Forget* removes an organization you added by mistake. *Find layer* searches
   the organization's own feature services by name, blank for all of them; pick
   one and it loads with the service's own symbology.
+]
+]
+
+#tak-slide[
+= No network
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("67.png", width: 100%)
+][
+  Everything a layer has downloaded stays on the phone, on or off, and comes
+  back after ATAK or the phone restarts. With no signal the row says so; what
+  shows is what was last downloaded.
 ]
 ]
 
