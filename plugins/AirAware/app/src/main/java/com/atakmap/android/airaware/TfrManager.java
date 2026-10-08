@@ -363,6 +363,35 @@ public class TfrManager {
         }
     }
 
+    /**
+     * Every layer the front page switches, in the order it shows them: {key, name}.
+     *
+     * <p>One list, because there are three places that have to agree -- the rows, All on
+     * and All off -- and when the airspace layers were added the rows knew about them and
+     * All off did not, so All off left two layers drawn and read as broken.
+     */
+    public List<String[]> layers() {
+        final List<String[]> out = new ArrayList<>();
+        out.add(new String[] { LAYER_RESTRICTIONS, "TFR" });
+        out.add(new String[] { LAYER_AIRSPACE, "Airspace" });
+        out.add(new String[] { LAYER_SUA, "Special Use" });
+        out.add(new String[] { LAYER_AIRFIELDS, "METARs" });
+        return out;
+    }
+
+    /** All on, all off. One call so the map, the prefs and the rows move together. */
+    public void setAllLayersOn(boolean value) {
+        for (String[] layer : layers()) {
+            if (value)
+                layersOff.remove(layer[0]);
+            else
+                layersOff.add(layer[0]);
+        }
+        prefs().edit().putStringSet(PREF_LAYERS_OFF, new HashSet<>(layersOff)).apply();
+        overlay.setTypesOff(hiddenSets());
+        changed();
+    }
+
     public boolean isLayerOn(String layer) {
         return !layersOff.contains(layer);
     }

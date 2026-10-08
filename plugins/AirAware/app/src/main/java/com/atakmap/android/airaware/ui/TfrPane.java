@@ -120,16 +120,14 @@ public class TfrPane implements TfrManager.Listener {
         header.findViewById(R.id.layers_all_on).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                manager.setLayerOn(TfrManager.LAYER_RESTRICTIONS, true);
-                manager.setLayerOn(TfrManager.LAYER_AIRFIELDS, true);
+                manager.setAllLayersOn(true);
                 render();
             }
         });
         header.findViewById(R.id.layers_all_off).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                manager.setLayerOn(TfrManager.LAYER_RESTRICTIONS, false);
-                manager.setLayerOn(TfrManager.LAYER_AIRFIELDS, false);
+                manager.setAllLayersOn(false);
                 render();
             }
         });
@@ -677,10 +675,19 @@ public class TfrPane implements TfrManager.Listener {
         if (layerList == null)
             return;
         layerList.removeAllViews();
-        addLayerRow("TFR", TfrManager.LAYER_RESTRICTIONS, restrictionsStatus());
-        addLayerRow("Airspace", TfrManager.LAYER_AIRSPACE, airspaceStatus(false));
-        addLayerRow("Special Use", TfrManager.LAYER_SUA, airspaceStatus(true));
-        addLayerRow("METARs", TfrManager.LAYER_AIRFIELDS, airfieldsStatus());
+        // The manager's list, not one written out here: see TfrManager.layers().
+        for (String[] layer : manager.layers())
+            addLayerRow(layer[1], layer[0], layerStatus(layer[0]));
+    }
+
+    private String layerStatus(String key) {
+        if (TfrManager.LAYER_RESTRICTIONS.equals(key))
+            return restrictionsStatus();
+        if (TfrManager.LAYER_AIRSPACE.equals(key))
+            return airspaceStatus(false);
+        if (TfrManager.LAYER_SUA.equals(key))
+            return airspaceStatus(true);
+        return airfieldsStatus();
     }
 
     /**
