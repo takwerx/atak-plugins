@@ -55,6 +55,7 @@ public class TfrManager {
     public static final String LAYER_SUA = Airspace.LAYER_SUA;
     static final String PREF_AIRSPACE_BAR_M = "airspaceBarM";
     static final String PREF_AIRSPACE_CYCLE = "airspaceCycle";
+    static final String PREF_AIRSPACE_LABELS = "airspaceLabels";
     static final String PREF_CLASSES_OFF = "classesOff";
     static final String PREF_GATE_BAR_M = "gateBarM";
     static final String PREF_LABEL_BAR_M = "labelBarM";
@@ -188,6 +189,16 @@ public class TfrManager {
     private volatile String airspaceCycle = "";
     /** True when a tile this view needs is not downloaded and could not be fetched. */
     private volatile boolean airspaceMissing;
+    /**
+     * Whether airspace shelves carry their name on the map. <b>Off.</b>
+     *
+     * <p>A label per shelf is forty labels over Los Angeles, stacked over each other and
+     * over everything else -- operator: "labels i think are useless". The chart
+     * underneath already names what it draws, the pinned line says what you are standing
+     * in, and a tap gives the whole shelf, so this is something to switch on rather than
+     * something to switch off.
+     */
+    private volatile boolean airspaceLabels;
 
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
@@ -209,6 +220,7 @@ public class TfrManager {
         // A hundred miles: airspace is big, and a shelf matters long before you reach it.
         airspaceBarM = p.getLong(PREF_AIRSPACE_BAR_M, 160934L);
         airspaceCycle = p.getString(PREF_AIRSPACE_CYCLE, "");
+        airspaceLabels = p.getBoolean(PREF_AIRSPACE_LABELS, false);
         classesOff.addAll(p.getStringSet(PREF_CLASSES_OFF, DEFAULT_CLASSES_OFF));
         // A set, not a joined string: a type carrying the separator would come back as two
         // bogus entries and the filter would restore wrong.
@@ -446,6 +458,10 @@ public class TfrManager {
         // Airspace: the kinds switched off one at a time, plus everything belonging to a
         // layer that is off or gated out by zoom.
         off.addAll(classesOff);
+        // Hiding one kind's names, without hiding the kind.
+        if (!airspaceLabels)
+            for (Airspace a : airspaces)
+                off.add(a.setKey() + TfrOverlay.LABEL_SUFFIX);
         final boolean classesGone = layersOff.contains(LAYER_AIRSPACE) || airspaceHidden;
         final boolean suaGone = layersOff.contains(LAYER_SUA) || airspaceHidden;
         for (Airspace a : airspaces) {
@@ -473,6 +489,19 @@ public class TfrManager {
         for (Map.Entry<String, Integer> e : counts.entrySet())
             out.add(new String[] { e.getKey(), Integer.toString(e.getValue()) });
         return out;
+    }
+
+    public boolean airspaceLabelsOn() {
+        return airspaceLabels;
+    }
+
+    public void setAirspaceLabelsOn(boolean value) {
+        if (airspaceLabels == value)
+            return;
+        airspaceLabels = value;
+        prefs().edit().putBoolean(PREF_AIRSPACE_LABELS, value).apply();
+        overlay.setTypesOff(hiddenSets());
+        changed();
     }
 
     public boolean isClassOn(String setKey) {

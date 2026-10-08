@@ -55,7 +55,12 @@ public class TfrOverlay {
     private static final String TAG = "TfrOverlay";
     private static final String PROVIDER = "TFR";
     /** Appended to a type's key for the set holding that type's labels. */
-    private static final String LABEL_SUFFIX = " \u0000labels";
+    /**
+     * Public so a caller can hide one kind's labels without hiding its areas: the set
+     * key plus this is a set key in its own right, and {@code setTypesOff} now matches
+     * the whole key as well as the type it belongs to.
+     */
+    public static final String LABEL_SUFFIX = " \u0000labels";
     private static final String TYPE = "tfr";
 
     private final MapView mapView;
@@ -419,7 +424,10 @@ public class TfrOverlay {
             // The latest wish, not the one this task was queued with: two quick taps must
             // end where the button says. A label set answers to the label gate as well as
             // to its own type.
-            if (visible && !typesOff.contains(type) && (!isLabelSet || labelsOn))
+            // The whole key as well as the base type: hiding "as:B" hides Class B, and
+            // hiding "as:B \u0000labels" hides only its names.
+            if (visible && !typesOff.contains(type) && !typesOff.contains(key)
+                    && (!isLabelSet || labelsOn))
                 show.add(e.getValue());
             else
                 hide.add(e.getValue());

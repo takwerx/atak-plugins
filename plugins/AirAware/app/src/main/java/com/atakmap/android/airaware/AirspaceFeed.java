@@ -182,12 +182,12 @@ public final class AirspaceFeed {
 
         final Airspace a = new Airspace();
         a.id = at.isNull("OBJECTID") ? "" : Long.toString(at.optLong("OBJECTID", 0L));
-        a.ident = at.optString("IDENT_TXT", "").trim();
-        a.name = at.optString("NAME_TXT", "").trim();
-        a.classCode = at.optString("CLASS_CODE", "").trim();
-        a.typeCode = at.optString("TYPE_CODE", "").trim();
-        a.localType = at.optString("LOCALTYPE_TXT", "").trim();
-        a.workHours = at.optString("WORKHR_CODE", "").trim();
+        a.ident = text(at, "IDENT_TXT");
+        a.name = text(at, "NAME_TXT");
+        a.classCode = text(at, "CLASS_CODE");
+        a.typeCode = text(at, "TYPE_CODE");
+        a.localType = text(at, "LOCALTYPE_TXT");
+        a.workHours = text(at, "WORKHR_CODE");
         vert(a.floor, at, "DISTVERTLOWER_VAL", "DISTVERTLOWER_UOM", "DISTVERTLOWER_CODE");
         vert(a.ceiling, at, "DISTVERTUPPER_VAL", "DISTVERTUPPER_UOM", "DISTVERTUPPER_CODE");
 
@@ -292,6 +292,19 @@ public final class AirspaceFeed {
         v.feet = (int) Math.round(value);
         v.agl = "SFC".equals(code) || "AGL".equals(code) || "HEI".equals(code);
         v.surface = v.agl && v.feet == 0;
+    }
+
+    /**
+     * A string field, empty when the source says nothing.
+     *
+     * <p>Not {@code optString}: on Android that returns the four characters "null" for a
+     * JSON null rather than the fallback, and most airspace has no identifier -- so the
+     * map filled up with "Military operations area null" and "Restricted area null".
+     */
+    private static String text(JSONObject at, String key) {
+        if (at.isNull(key))
+            return "";
+        return at.optString(key, "").trim();
     }
 
     private static String trimNumber(double d) {

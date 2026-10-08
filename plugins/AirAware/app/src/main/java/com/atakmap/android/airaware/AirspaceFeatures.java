@@ -268,17 +268,17 @@ public final class AirspaceFeatures {
     }
 
     /**
-     * What the map says. The kind, then the floor.
+     * What the map says: the kind, then both ends.
      *
-     * <p>Not the ceiling: shelves of one airspace share a ceiling and differ only in how
-     * low they come down, so the floor is the number that tells two of them apart and the
-     * number that decides whether you are underneath.
+     * <p>It said only the floor, and the operator asked the question that exposes why
+     * that is not enough -- "how do i know if something has a ceiling or not?". From the
+     * floor alone you cannot tell a Class D you can fly over from a Class E that runs up
+     * to whatever is above it, and that is the difference the layer exists to show. So
+     * the label carries {@link Airspace#heights()}, which ends in "and up" when nothing
+     * is published above.
      */
     private static String label(Airspace a) {
-        final StringBuilder b = new StringBuilder(kind(a));
-        if (a.floor.present)
-            b.append("  from ").append(a.floor.label());
-        return b.toString();
+        return kind(a) + "  " + a.heights();
     }
 
     /** "Class B", "Restricted R-2503", "Military operations area". */

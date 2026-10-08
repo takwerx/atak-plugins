@@ -815,6 +815,16 @@ public class TfrPane implements TfrManager.Listener {
                         pickAirspaceGate();
                     }
                 });
+        // Off by default and on the layer that owns them, because forty of them over a
+        // metro area is the map gone.
+        addValueButton(body, "Names on the map",
+                manager.airspaceLabelsOn() ? "On" : "Off", new Runnable() {
+                    @Override
+                    public void run() {
+                        manager.setAirspaceLabelsOn(!manager.airspaceLabelsOn());
+                        render();
+                    }
+                });
     }
 
     private String airspaceKindsSummary(boolean specialUse) {
