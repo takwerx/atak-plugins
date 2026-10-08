@@ -96,12 +96,20 @@ public final class TfrVertical {
      * below anything that would change what the sentence says.
      */
     public static boolean inside(TfrArea a, GeoPoint p) {
-        if (a == null || p == null || a.ring.size() < 3)
+        if (a == null || p == null)
             return false;
-        final double y = p.getLatitude();
-        final double x = p.getLongitude();
+        return inside(a.ring, p.getLatitude(), p.getLongitude());
+    }
+
+    /**
+     * The same test against a bare ring, which is what airspace carries: a shelf is a
+     * list of outer rings with holes, not a {@link TfrArea}. One implementation, so a
+     * restriction and a shelf can never disagree about whether a point is inside.
+     */
+    public static boolean inside(List<double[]> r, double y, double x) {
+        if (r == null || r.size() < 3)
+            return false;
         boolean in = false;
-        final List<double[]> r = a.ring;
         for (int i = 0, j = r.size() - 1; i < r.size(); j = i++) {
             final double yi = r.get(i)[0], xi = r.get(i)[1];
             final double yj = r.get(j)[0], xj = r.get(j)[1];

@@ -19,6 +19,8 @@ import android.widget.TextView;
 
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.airaware.Airspace;
+import com.atakmap.android.airaware.AirspaceFeatures;
 import com.atakmap.android.airaware.Metar;
 import com.atakmap.android.airaware.MetarFeatures;
 import com.atakmap.android.airaware.Tfr;
@@ -74,16 +76,10 @@ public class TfrPane implements TfrManager.Listener {
     private Tfr showing;
     private Button switchButton, settingsButton, refreshButton, backButton;
     private TextView statusText, headingText;
-    private LinearLayout settingsContainer, typesContainer, updatesContainer, keyBody;
-    private Button useZoomButton, gateButton;
-    private TextView gateNow, downloadedNote;
-    private Fold layersFold, gateFold, labelsFold, areaFold, fromFold, whereFold,
-            typesFold, keyFold, updatesFold, fencesFold;
-    private Button labelsGateButton;
-    private TextView labelsNote;
-    private LinearLayout fencesContainer, fromContainer, layersContainer;
-    private LinearLayout areaContainer, whereContainer;
-    private TextView areaNote;
+    private LinearLayout settingsContainer, updatesContainer, keyBody;
+    private TextView downloadedNote;
+    private Fold fromFold, keyFold, updatesFold, fencesFold;
+    private LinearLayout fencesContainer, fromContainer, layerList;
 
     private final List<Tfr> rows = new ArrayList<>();
     private RowAdapter adapter;
@@ -120,45 +116,40 @@ public class TfrPane implements TfrManager.Listener {
         settingsButton = header.findViewById(R.id.btn_settings);
         refreshButton = header.findViewById(R.id.btn_refresh);
         headingText = header.findViewById(R.id.list_heading);
+        layerList = header.findViewById(R.id.layer_list);
+        header.findViewById(R.id.layers_all_on).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setLayerOn(TfrManager.LAYER_RESTRICTIONS, true);
+                manager.setLayerOn(TfrManager.LAYER_AIRFIELDS, true);
+                render();
+            }
+        });
+        header.findViewById(R.id.layers_all_off).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setLayerOn(TfrManager.LAYER_RESTRICTIONS, false);
+                manager.setLayerOn(TfrManager.LAYER_AIRFIELDS, false);
+                render();
+            }
+        });
 
         final View settings = PluginLayoutInflater.inflate(pluginContext,
                 R.layout.settings_controls, null);
         settingsContainer.addView(settings);
         backButton = root.findViewById(R.id.btn_settings_back);
-        typesContainer = settings.findViewById(R.id.types_container);
         updatesContainer = settings.findViewById(R.id.updates_container);
         keyBody = settings.findViewById(R.id.fold_key_body);
-        useZoomButton = settings.findViewById(R.id.btn_use_zoom);
-        gateButton = settings.findViewById(R.id.btn_gate);
-        gateNow = settings.findViewById(R.id.gate_now);
         downloadedNote = settings.findViewById(R.id.downloaded_note);
 
-        areaContainer = settings.findViewById(R.id.area_container);
-        whereContainer = settings.findViewById(R.id.where_container);
-        areaNote = settings.findViewById(R.id.area_note);
 
-        labelsGateButton = settings.findViewById(R.id.btn_labels_gate);
-        labelsNote = settings.findViewById(R.id.labels_note);
         fencesContainer = settings.findViewById(R.id.fences_container);
         fromContainer = settings.findViewById(R.id.from_container);
-        layersContainer = settings.findViewById(R.id.layers_container);
 
-        layersFold = new Fold(settings, R.id.fold_layers_head, R.id.fold_layers_chev,
-                R.id.fold_layers_body, "fold.layers");
-        gateFold = new Fold(settings, R.id.fold_gate_head, R.id.fold_gate_chev,
-                R.id.fold_gate_body, "fold.gate");
-        labelsFold = new Fold(settings, R.id.fold_labels_head, R.id.fold_labels_chev,
-                R.id.fold_labels_body, "fold.labels");
         fencesFold = new Fold(settings, R.id.fold_fences_head, R.id.fold_fences_chev,
                 R.id.fold_fences_body, "fold.fences");
-        areaFold = new Fold(settings, R.id.fold_area_head, R.id.fold_area_chev,
-                R.id.fold_area_body, "fold.area");
         fromFold = new Fold(settings, R.id.fold_from_head, R.id.fold_from_chev,
                 R.id.fold_from_body, "fold.from");
-        whereFold = new Fold(settings, R.id.fold_where_head, R.id.fold_where_chev,
-                R.id.fold_where_body, "fold.where");
-        typesFold = new Fold(settings, R.id.fold_types_head, R.id.fold_types_chev,
-                R.id.fold_types_body, "fold.types");
         keyFold = new Fold(settings, R.id.fold_key_head, R.id.fold_key_chev,
                 R.id.fold_key_body, "fold.key");
         updatesFold = new Fold(settings, R.id.fold_updates_head, R.id.fold_updates_chev,
@@ -222,41 +213,6 @@ public class TfrPane implements TfrManager.Listener {
                 render();
             }
         });
-        useZoomButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                manager.setGateBarMeters((long) Math.round(manager.barMeters()));
-                render();
-            }
-        });
-        gateButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                pickGate();
-            }
-        });
-        labelsGateButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                pickLabelGate();
-            }
-        });
-        root.findViewById(R.id.btn_types_all_on).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                for (String[] c : manager.typeCounts())
-                    manager.setTypeOn(c[0], true);
-                render();
-            }
-        });
-        root.findViewById(R.id.btn_types_all_off).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                for (String[] c : manager.typeCounts())
-                    manager.setTypeOn(c[0], false);
-                render();
-            }
-        });
         // The row's own listener, not the list's: a row holding a focusable Button stops
         // firing OnItemClickListener altogether, so the tap would simply die.
         list.setOnItemClickListener(null);
@@ -305,6 +261,7 @@ public class TfrPane implements TfrManager.Listener {
         refreshButton.setEnabled(on && !manager.isSyncing());
         statusText.setText(manager.status());
 
+        buildLayerRows();
         rebuildList();
         renderSettings();
     }
@@ -331,41 +288,10 @@ public class TfrPane implements TfrManager.Listener {
         adapter.notifyDataSetChanged();
     }
 
+    /** Settings now holds only what is not a layer's own: see the layer rows for those. */
     private void renderSettings() {
-        gateFold.label("Zoom gate", manager.gateBarMeters() > 0
-                ? gateLabel(manager.gateBarMeters()) + " or closer" : "Always");
-        gateButton.setText(manager.gateBarMeters() > 0
-                ? gateLabel(manager.gateBarMeters()) + " or closer" : "Always");
-        gateNow.setText("Scale bar now " + ScaleBar.describe(manager.barMeters())
-                + (manager.isGateHiding() ? " - hidden" : ""));
-
-        buildLayers();
-
-        labelsFold.label("Labels", manager.labelBarMeters() > 0
-                ? gateLabel(manager.labelBarMeters()) + " or closer" : "Always");
-        labelsGateButton.setText(manager.labelBarMeters() > 0
-                ? gateLabel(manager.labelBarMeters()) + " or closer" : "Always");
-        labelsNote.setText(manager.areLabelsHidden()
-                ? "Hidden now. Scale bar reads " + ScaleBar.describe(manager.barMeters()) + "."
-                : "Showing now.");
-
-        buildFences();
-
-        areaFold.label("Area", manager.areaLabel());
-        buildArea();
         fromFold.label("Measure from", manager.measureFromLabel());
         buildFrom();
-        whereFold.label("Where", manager.whereLabel());
-        buildWhere();
-
-        final List<String[]> counts = manager.typeCounts();
-        int onCount = 0;
-        for (String[] c : counts)
-            if (manager.isTypeOn(c[0]))
-                onCount++;
-        typesFold.label("Types", counts.isEmpty() ? "nothing downloaded yet"
-                : onCount + " of " + counts.size());
-        buildTypeTiles(counts);
 
         keyFold.label("Map key", null);
         buildKey();
@@ -436,6 +362,140 @@ public class TfrPane implements TfrManager.Listener {
         }
     }
 
+    /** Types as a multi-choice with counts, applied on OK. */
+    private void pickTypes() {
+        final List<String[]> counts = manager.typeCounts();
+        if (counts.isEmpty()) {
+            new AlertDialog.Builder(mapView.getContext())
+                    .setMessage("Nothing is downloaded yet, so there is nothing to choose.")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        final String[] labels = new String[counts.size()];
+        final boolean[] checked = new boolean[counts.size()];
+        for (int i = 0; i < counts.size(); i++) {
+            labels[i] = TfrTypes.label(counts.get(i)[0]) + "  (" + counts.get(i)[1] + ")";
+            checked[i] = manager.isTypeOn(counts.get(i)[0]);
+        }
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Which kinds of restriction")
+                .setMultiChoiceItems(labels, checked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dlg, int which, boolean on) {
+                                manager.setTypeOn(counts.get(which)[0], on);
+                            }
+                        })
+                .setPositiveButton("Done", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int w) {
+                        render();
+                    }
+                })
+                .show();
+        fromTop(d);
+    }
+
+    /** Which vocabulary to name places in, then the places themselves. */
+    private void pickWhereMode() {
+        final String[] modes = { "Everywhere", "By state", "By FAA region", "By center" };
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Where")
+                .setItems(modes, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int which) {
+                        switch (which) {
+                            case 1:
+                                pickWhere(TfrManager.WHERE_STATE, "Which states");
+                                break;
+                            case 2:
+                                pickWhere(TfrManager.WHERE_REGION, "Which FAA regions");
+                                break;
+                            case 3:
+                                pickWhere(TfrManager.WHERE_CENTER, "Which centers");
+                                break;
+                            default:
+                                manager.setWhere(TfrManager.WHERE_EVERYWHERE, null);
+                                render();
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        fromTop(d);
+    }
+
+    /** How much of the picture the list covers. */
+    private void pickArea() {
+        final String[] labels = {
+                "Everything", "What is in view",
+                "Within " + ScaleBar.gate(manager.areaRadiusMeters())
+                        + (manager.hasFix() ? " of me" : " of the map center")
+        };
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Area the list covers")
+                .setSingleChoiceItems(labels, manager.areaMode(),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dlg, int which) {
+                                dlg.dismiss();
+                                if (which == TfrManager.AREA_RADIUS)
+                                    pickRadius();
+                                else
+                                    manager.setArea(which, 0);
+                                render();
+                            }
+                        })
+                .setNegativeButton("Cancel", null)
+                .show();
+        fromTop(d);
+    }
+
+    private void pickAirfieldGate() {
+        pickBarGate("Show airfields when the scale bar reads",
+                manager.airfieldBarMeters(), new OnGate() {
+                    @Override
+                    public void set(long meters) {
+                        manager.setAirfieldBarMeters(meters);
+                    }
+                });
+    }
+
+    private interface OnGate {
+        void set(long meters);
+    }
+
+    /** One scale-bar picker, since three gates now want the same list. */
+    private void pickBarGate(String title, long current, final OnGate onGate) {
+        final String unit = Units.bigLabel();
+        final double[] presets = { 1, 5, 10, 25, 50 };
+        final String[] labels = new String[presets.length + 1];
+        final double[] meters = new double[presets.length + 1];
+        for (int i = 0; i < presets.length; i++) {
+            labels[i] = trim(presets[i]) + " " + unit + " or closer";
+            meters[i] = Units.bigToMeters(presets[i]);
+        }
+        labels[presets.length] = "Always";
+        meters[presets.length] = -1;
+        int checked = presets.length;
+        for (int i = 0; i < meters.length - 1; i++)
+            if (Math.abs(meters[i] - current) < 1)
+                checked = i;
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle(title)
+                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int which) {
+                        onGate.set((long) Math.round(meters[which]));
+                        dlg.dismiss();
+                        render();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        fromTop(d);
+    }
+
     private void pickLabelGate() {
         final String unit = Units.bigLabel();
         final double[] presets = { 1, 5, 10, 25, 50 };
@@ -466,76 +526,9 @@ public class TfrPane implements TfrManager.Listener {
         fromTop(d);
     }
 
-    /** How much of the picture the list covers. The map is governed by Where and Types. */
-    private void buildArea() {
-        areaContainer.removeAllViews();
-        addChoice(areaContainer, "Everything", manager.areaMode() == TfrManager.AREA_EVERYWHERE,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        manager.setArea(TfrManager.AREA_EVERYWHERE, 0);
-                    }
-                });
-        addChoice(areaContainer, "What is in view", manager.areaMode() == TfrManager.AREA_IN_VIEW,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        manager.setArea(TfrManager.AREA_IN_VIEW, 0);
-                    }
-                });
-        addChoice(areaContainer, "Within " + ScaleBar.gate(manager.areaRadiusMeters())
-                + (manager.hasFix() ? " of me" : " of the map center"),
-                manager.areaMode() == TfrManager.AREA_RADIUS, new Runnable() {
-                    @Override
-                    public void run() {
-                        pickRadius();
-                    }
-                });
-        areaNote.setText(manager.hasFix() ? ""
-                : "No GPS fix, measuring from the map center.");
-        areaNote.setVisibility(manager.hasFix() ? View.GONE : View.VISIBLE);
-    }
 
-    /**
-     * The layers, each a switch that says its own state.
-     *
-     * <p>Feature Layer's shape, which is what the operator pointed at: the head is the
-     * switch, not a label with a control beside it.
-     */
-    private void buildLayers() {
-        final Resources res = pluginContext.getResources();
-        final int on = countLayersOn();
-        layersFold.label("Layers", on + " of 2 on");
-        layersContainer.removeAllViews();
-        addLayerSwitch(res, "Restrictions", TfrManager.LAYER_RESTRICTIONS);
-        addLayerSwitch(res, MetarFeatures.SET_NAME, TfrManager.LAYER_AIRFIELDS);
-    }
 
-    private int countLayersOn() {
-        int n = 0;
-        if (manager.isLayerOn(TfrManager.LAYER_RESTRICTIONS))
-            n++;
-        if (manager.isLayerOn(TfrManager.LAYER_AIRFIELDS))
-            n++;
-        return n;
-    }
 
-    private void addLayerSwitch(Resources res, final String name, final String key) {
-        final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
-        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = 4;
-        b.setLayoutParams(lp);
-        setState(res, b, name, manager.isLayerOn(key));
-        b.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                manager.setLayerOn(key, !manager.isLayerOn(key));
-                render();
-            }
-        });
-        layersContainer.addView(b);
-    }
 
     /** What the distances and the ordering are measured from. */
     private void buildFrom() {
@@ -556,42 +549,6 @@ public class TfrPane implements TfrManager.Listener {
                 });
     }
 
-    /**
-     * Where, said three ways. A state is the vocabulary the server-side feed already
-     * uses, a region is how the FAA organizes itself, and a center is what the feed puts
-     * on every row.
-     */
-    private void buildWhere() {
-        whereContainer.removeAllViews();
-        addChoice(whereContainer, "Everywhere", manager.whereMode() == TfrManager.WHERE_EVERYWHERE,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        manager.setWhere(TfrManager.WHERE_EVERYWHERE, null);
-                    }
-                });
-        addChoice(whereContainer, "By state", manager.whereMode() == TfrManager.WHERE_STATE,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        pickWhere(TfrManager.WHERE_STATE, "Which states");
-                    }
-                });
-        addChoice(whereContainer, "By FAA region", manager.whereMode() == TfrManager.WHERE_REGION,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        pickWhere(TfrManager.WHERE_REGION, "Which FAA regions");
-                    }
-                });
-        addChoice(whereContainer, "By center", manager.whereMode() == TfrManager.WHERE_CENTER,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        pickWhere(TfrManager.WHERE_CENTER, "Which centers");
-                    }
-                });
-    }
 
     private void addChoice(LinearLayout into, String text, boolean chosen, final Runnable act) {
         final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
@@ -709,27 +666,260 @@ public class TfrPane implements TfrManager.Listener {
         fromTop(d);
     }
 
-    /** A filter states what it will cost before it is used, so every row carries its count. */
-    private void buildTypeTiles(List<String[]> counts) {
-        typesContainer.removeAllViews();
-        final Resources res = pluginContext.getResources();
-        for (final String[] c : counts) {
-            final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
-            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.topMargin = 4;
-            b.setLayoutParams(lp);
-            setState(res, b, TfrTypes.label(c[0]) + " (" + c[1] + ")", manager.isTypeOn(c[0]));
-            b.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    manager.setTypeOn(c[0], !manager.isTypeOn(c[0]));
-                    render();
-                }
-            });
-            typesContainer.addView(b);
-        }
+    /**
+     * The layer rows on the front page: each a switch that says its state, with that
+     * layer's own controls under its arrow.
+     *
+     * <p>Built in code rather than laid out, because a layer's controls are its own and
+     * the set of layers will grow. Open and closed is remembered per layer.
+     */
+    private void buildLayerRows() {
+        if (layerList == null)
+            return;
+        layerList.removeAllViews();
+        addLayerRow("TFR", TfrManager.LAYER_RESTRICTIONS, restrictionsStatus());
+        addLayerRow("Airspace", TfrManager.LAYER_AIRSPACE, airspaceStatus(false));
+        addLayerRow("Special Use", TfrManager.LAYER_SUA, airspaceStatus(true));
+        addLayerRow("METARs", TfrManager.LAYER_AIRFIELDS, airfieldsStatus());
     }
+
+    /**
+     * What the airspace rows say when they are open.
+     *
+     * <p>The shared FAA quota gets its own sentence. A layer that quietly stopped
+     * updating reads as a broken plugin, and this one is neither our fault nor the
+     * operator's -- so it says what is happening and that the map is still good.
+     */
+    private String airspaceStatus(boolean specialUse) {
+        final String layer = specialUse ? TfrManager.LAYER_SUA : TfrManager.LAYER_AIRSPACE;
+        if (!manager.isLayerOn(layer))
+            return "Off. Nothing drawn.";
+        if (manager.isAirspaceBusy())
+            return "The FAA airspace service is busy. Showing what is already here.";
+        int n = 0;
+        for (String[] row : manager.airspaceCounts(specialUse))
+            if (manager.isClassOn(row[0]))
+                n += Integer.parseInt(row[1]);
+        if (n == 0)
+            return "Nothing here yet";
+        final String what = specialUse ? " special use areas" : " shelves";
+        return n + what + (manager.isAirspaceCapped() ? " (more than fit, zoom in)" : "");
+    }
+
+    private String restrictionsStatus() {
+        final int n = manager.shown().size();
+        if (!manager.isLayerOn(TfrManager.LAYER_RESTRICTIONS))
+            return "Off. Nothing drawn.";
+        return n + (n == 1 ? " restriction" : " restrictions") + " on the map";
+    }
+
+    private String airfieldsStatus() {
+        final int n = manager.airfields().size();
+        if (!manager.isLayerOn(TfrManager.LAYER_AIRFIELDS))
+            return "Off. Nothing drawn.";
+        return n == 0 ? "No stations yet" : n + " stations in view";
+    }
+
+    private void addLayerRow(final String name, final String key, String status) {
+        final Resources res = pluginContext.getResources();
+        final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.layer_row, null);
+        final Button head = row.findViewById(R.id.layer_toggle);
+        final ImageButton chev = row.findViewById(R.id.layer_expand);
+        final TextView statusView = row.findViewById(R.id.layer_status);
+        final LinearLayout body = row.findViewById(R.id.layer_body);
+
+        setState(res, head, name, manager.isLayerOn(key));
+        head.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setLayerOn(key, !manager.isLayerOn(key));
+                render();
+            }
+        });
+
+        final String pref = "layerfold." + key;
+        final boolean open = prefs.getBoolean(pref, false);
+        statusView.setText(status);
+        statusView.setVisibility(open ? View.VISIBLE : View.GONE);
+        body.setVisibility(open ? View.VISIBLE : View.GONE);
+        chev.setRotation(open ? 180f : 0f);
+        // The arrow works while the layer is off, so it can be set up before it is on.
+        chev.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                prefs.edit().putBoolean(pref, !open).apply();
+                render();
+            }
+        });
+
+        if (open) {
+            if (TfrManager.LAYER_RESTRICTIONS.equals(key))
+                fillRestrictionControls(body);
+            else if (TfrManager.LAYER_AIRSPACE.equals(key))
+                fillAirspaceControls(body, false);
+            else if (TfrManager.LAYER_SUA.equals(key))
+                fillAirspaceControls(body, true);
+            else
+                fillAirfieldControls(body);
+        }
+        layerList.addView(row);
+    }
+
+    /** What belongs to the restrictions and nothing else. */
+    private void fillRestrictionControls(LinearLayout body) {
+        addValueButton(body, "Types", typesSummary(), new Runnable() {
+            @Override
+            public void run() {
+                pickTypes();
+            }
+        });
+        addValueButton(body, "Where", manager.whereLabel(), new Runnable() {
+            @Override
+            public void run() {
+                pickWhereMode();
+            }
+        });
+        addValueButton(body, "Area", manager.areaLabel(), new Runnable() {
+            @Override
+            public void run() {
+                pickArea();
+            }
+        });
+        addValueButton(body, "Zoom gate", ScaleBar.gate(manager.gateBarMeters()), new Runnable() {
+            @Override
+            public void run() {
+                pickGate();
+            }
+        });
+        addValueButton(body, "Labels", ScaleBar.gate(manager.labelBarMeters()), new Runnable() {
+            @Override
+            public void run() {
+                pickLabelGate();
+            }
+        });
+    }
+
+    /**
+     * What belongs to the airspace shelves.
+     *
+     * <p>The two rows share a zoom gate on purpose: they come from one fetch, so gating
+     * them apart would buy nothing and give the operator two numbers to keep in step.
+     */
+    private void fillAirspaceControls(LinearLayout body, final boolean specialUse) {
+        addValueButton(body, specialUse ? "Kinds" : "Classes",
+                airspaceKindsSummary(specialUse), new Runnable() {
+                    @Override
+                    public void run() {
+                        pickAirspaceKinds(specialUse);
+                    }
+                });
+        addValueButton(body, "Show at", ScaleBar.gate(manager.airspaceBarMeters()),
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        pickAirspaceGate();
+                    }
+                });
+    }
+
+    private String airspaceKindsSummary(boolean specialUse) {
+        final List<String[]> counts = manager.airspaceCounts(specialUse);
+        if (counts.isEmpty())
+            return "nothing here yet";
+        int on = 0;
+        for (String[] row : counts)
+            if (manager.isClassOn(row[0]))
+                on++;
+        if (on == counts.size())
+            return "all " + counts.size();
+        if (on == 0)
+            return "none";
+        return on + " of " + counts.size();
+    }
+
+    private void pickAirspaceKinds(final boolean specialUse) {
+        final List<String[]> counts = manager.airspaceCounts(specialUse);
+        if (counts.isEmpty()) {
+            new AlertDialog.Builder(mapView.getContext())
+                    .setMessage("Nothing is downloaded here yet, so there is nothing to choose.")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        final String[] labels = new String[counts.size()];
+        final boolean[] checked = new boolean[counts.size()];
+        for (int i = 0; i < counts.size(); i++) {
+            labels[i] = Airspace.setName(counts.get(i)[0]) + "  (" + counts.get(i)[1] + ")";
+            checked[i] = manager.isClassOn(counts.get(i)[0]);
+        }
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle(specialUse ? "Which special use areas" : "Which classes")
+                .setMultiChoiceItems(labels, checked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dlg, int which, boolean on) {
+                                manager.setClassOn(counts.get(which)[0], on);
+                            }
+                        })
+                .setPositiveButton("Done", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int w) {
+                        render();
+                    }
+                })
+                .show();
+        fromTop(d);
+    }
+
+    private void pickAirspaceGate() {
+        pickBarGate("Show airspace when the scale bar reads",
+                manager.airspaceBarMeters(), new OnGate() {
+                    @Override
+                    public void set(long meters) {
+                        manager.setAirspaceBarMeters(meters);
+                    }
+                });
+    }
+
+    /** What belongs to the airfield chips and nothing else. */
+    private void fillAirfieldControls(LinearLayout body) {
+        addValueButton(body, "Show at", ScaleBar.gate(manager.airfieldBarMeters()),
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        pickAirfieldGate();
+                    }
+                });
+    }
+
+    private void addValueButton(LinearLayout into, String name, String value,
+            final Runnable act) {
+        final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = 4;
+        b.setLayoutParams(lp);
+        b.setGravity(android.view.Gravity.LEFT | android.view.Gravity.CENTER_VERTICAL);
+        b.setText(value == null || value.isEmpty() ? name : name + ": " + value);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                act.run();
+            }
+        });
+        into.addView(b);
+    }
+
+    private String typesSummary() {
+        final List<String[]> counts = manager.typeCounts();
+        if (counts.isEmpty())
+            return "nothing downloaded yet";
+        int on = 0;
+        for (String[] c : counts)
+            if (manager.isTypeOn(c[0]))
+                on++;
+        return on + " of " + counts.size();
+    }
+
 
     /** Built from the same colors the map draws with, so the two cannot drift. */
     private void buildKey() {
@@ -888,6 +1078,61 @@ public class TfrPane implements TfrManager.Listener {
         settingsPage.setVisibility(View.GONE);
         list.setVisibility(View.GONE);
         detailsPage.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * A shelf of airspace, on the same details page.
+     *
+     * <p>Neither of the restriction's two buttons belongs here. A geofence off a Class B
+     * shelf would alarm on every flight in a metro area, and there is no FAA notice page
+     * for charted airspace -- it is on the sectional, not in a NOTAM.
+     */
+    public void showAirspace(final Airspace a) {
+        if (root == null || a == null)
+            return;
+        showing = null;
+        detailsTitle.setText(a.title());
+        final StringBuilder b = new StringBuilder();
+        b.append(airspaceKind(a));
+        if (!a.ident.isEmpty())
+            b.append("   ").append(a.ident);
+        b.append("\n\n").append(a.heights()).append('\n');
+        b.append("\nActive: ").append(AirspaceFeatures.hours(a.workHours)).append('\n');
+        if (!a.localType.isEmpty())
+            b.append("\n").append(a.localType).append('\n');
+
+        // Where the operator stands in it, which is the question the layer exists for.
+        final GeoPoint me = mapView.getSelfMarker() == null ? null
+                : mapView.getSelfMarker().getPoint();
+        final double myFt = TfrVertical.myFeetMsl(me);
+        if (!Double.isNaN(myFt) && a.ceiling.present && !a.ceiling.surface) {
+            final double head = a.ceiling.feet - myFt;
+            if (head > 0)
+                b.append("\nIts top is ").append(TfrVertical.feet(head))
+                        .append(" above you.\n");
+        }
+        if (!Double.isNaN(myFt) && a.floor.present && !a.floor.surface) {
+            final double below = a.floor.feet - myFt;
+            if (below > 0)
+                b.append("\nIts floor is ").append(TfrVertical.feet(below))
+                        .append(" above you, so you are underneath it.\n");
+        }
+        b.append("\nCharted airspace from the FAA. No warranty of accuracy or")
+                .append(" timeliness - always check current charts and NOTAMs.");
+        detailsBody.setText(b.toString());
+        detailsGeofence.setVisibility(View.GONE);
+        detailsFaa.setVisibility(View.GONE);
+        settingsPage.setVisibility(View.GONE);
+        list.setVisibility(View.GONE);
+        detailsPage.setVisibility(View.VISIBLE);
+    }
+
+    private static String airspaceKind(Airspace a) {
+        if (a.isClass()) {
+            final String c = a.classCode == null ? "" : a.classCode.trim();
+            return c.isEmpty() ? "Airspace" : "Class " + c.toUpperCase(Locale.US);
+        }
+        return Airspace.setName(a.setKey());
     }
 
     private String detailsText(final Tfr t) {

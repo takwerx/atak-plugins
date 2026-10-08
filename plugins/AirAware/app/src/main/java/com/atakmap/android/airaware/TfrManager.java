@@ -52,8 +52,13 @@ public class TfrManager {
     /** The layers an operator turns on and off as wholes. */
     public static final String LAYER_RESTRICTIONS = "restrictions";
     public static final String LAYER_AIRFIELDS = MetarFeatures.SET_KEY;
+    public static final String LAYER_AIRSPACE = Airspace.LAYER_CLASSES;
+    public static final String LAYER_SUA = Airspace.LAYER_SUA;
+    static final String PREF_AIRSPACE_BAR_M = "airspaceBarM";
+    static final String PREF_CLASSES_OFF = "classesOff";
     static final String PREF_GATE_BAR_M = "gateBarM";
     static final String PREF_LABEL_BAR_M = "labelBarM";
+    static final String PREF_AIRFIELD_BAR_M = "airfieldBarM";
     static final String PREF_WHERE_MODE = "whereMode";
     static final String PREF_WHERE_VALUES = "whereValues";
     static final String PREF_AREA_MODE = "areaMode";
@@ -94,6 +99,16 @@ public class TfrManager {
      * airspace that never changes. Off out of the box, remembered once touched.
      */
     private static final String DEFAULT_OFF = "SECURITY";
+    /**
+     * Airspace kinds a fresh install leaves off.
+     *
+     * <p>Class A starts at 18,000 ft, so nothing an operator on the ground or an aircraft
+     * over a fire does is affected by it, and drawn it is a lid over the whole map. Class
+     * G is uncontrolled -- it is everywhere that is not something else, and charts do not
+     * depict it either.
+     */
+    private static final Set<String> DEFAULT_CLASSES_OFF = new HashSet<>(
+            java.util.Arrays.asList("as:A", "as:G", "as:?"));
 
     private static final long TICK_MS = 60 * 1000L;
     private static final int DEFAULT_REFRESH_MIN = 30;
@@ -133,6 +148,12 @@ public class TfrManager {
      */
     private volatile long labelBarM = 16093L;
     private volatile boolean labelsHidden;
+    /**
+     * The airfield chips are dense -- seventy across California and Nevada -- so they are
+     * a close-in thing and gate tighter than the restrictions, which matter from far out.
+     */
+    private volatile long airfieldBarM = 48280L;
+    private volatile boolean airfieldsHidden;
     /** Geofences whose restriction has expired, been lifted or changed under them. */
     private volatile List<TfrWatch.Watched> staleFences = Collections.emptyList();
     private volatile int whereMode;
@@ -144,6 +165,23 @@ public class TfrManager {
     private volatile List<Metar> metars = Collections.emptyList();
     private volatile double[] metarBox;
     private volatile long metarFetchedMs;
+    /**
+     * Airspace shelves for where the operator is looking.
+     *
+     * <p>Held far longer than the observations: airspace changes on the FAA's 56-day
+     * publication cycle, and the service's quota is shared with every other caller in the
+     * world, so a refetch is a once-a-day thing and a pan inside the box is free.
+     */
+    private volatile List<Airspace> airspaces = Collections.emptyList();
+    private volatile double[] airspaceBox;
+    private volatile long airspaceFetchedMs;
+    /** Set while the service has refused us, so the status line can say why nothing moved. */
+    private volatile long airspaceBusyUntilMs;
+    private volatile boolean airspaceCapped;
+    private volatile long airspaceBarM = 160934L;
+    private volatile boolean airspaceHidden;
+    /** Classes and special-use kinds switched off individually, by set key. */
+    private final Set<String> classesOff = new LinkedHashSet<>();
 
     public TfrManager(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
@@ -155,6 +193,10 @@ public class TfrManager {
         on = p.getBoolean(PREF_ON, false);
         gateBarM = p.getLong(PREF_GATE_BAR_M, -1L);
         labelBarM = p.getLong(PREF_LABEL_BAR_M, 16093L);
+        airfieldBarM = p.getLong(PREF_AIRFIELD_BAR_M, 48280L);
+        // A hundred miles: airspace is big, and a shelf matters long before you reach it.
+        airspaceBarM = p.getLong(PREF_AIRSPACE_BAR_M, 160934L);
+        classesOff.addAll(p.getStringSet(PREF_CLASSES_OFF, DEFAULT_CLASSES_OFF));
         // A set, not a joined string: a type carrying the separator would come back as two
         // bogus entries and the filter would restore wrong.
         whereMode = p.getInt(PREF_WHERE_MODE, WHERE_EVERYWHERE);
@@ -230,6 +272,7 @@ public class TfrManager {
         if (on) {
             applyGate();
             maybeFetchMetars();
+            maybeFetchAirspace();
             syncNow();
         } else {
             lastError = null;
@@ -343,12 +386,145 @@ public class TfrManager {
      */
     private Set<String> hiddenSets() {
         final Set<String> off = new HashSet<>(typesOff);
-        if (layersOff.contains(LAYER_AIRFIELDS))
+        if (layersOff.contains(LAYER_AIRFIELDS) || airfieldsHidden)
             off.add(LAYER_AIRFIELDS);
         if (layersOff.contains(LAYER_RESTRICTIONS))
             for (Tfr t : known)
                 off.add(t.type);
+        // Airspace: the kinds switched off one at a time, plus everything belonging to a
+        // layer that is off or gated out by zoom.
+        off.addAll(classesOff);
+        final boolean classesGone = layersOff.contains(LAYER_AIRSPACE) || airspaceHidden;
+        final boolean suaGone = layersOff.contains(LAYER_SUA) || airspaceHidden;
+        for (Airspace a : airspaces) {
+            final boolean isClass = a.isClass();
+            if ((isClass && classesGone) || (!isClass && suaGone))
+                off.add(a.setKey());
+        }
         return off;
+    }
+
+    /**
+     * Every airspace kind on the device with how many shelves carry it, for the pickers.
+     * Keyed by set key so the label and the switch agree with what the map draws.
+     */
+    public List<String[]> airspaceCounts(boolean specialUse) {
+        final Map<String, Integer> counts = new LinkedHashMap<>();
+        for (Airspace a : airspaces) {
+            if (a.isSpecialUse() != specialUse)
+                continue;
+            final String k = a.setKey();
+            final Integer n = counts.get(k);
+            counts.put(k, n == null ? 1 : n + 1);
+        }
+        final List<String[]> out = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : counts.entrySet())
+            out.add(new String[] { e.getKey(), Integer.toString(e.getValue()) });
+        return out;
+    }
+
+    public boolean isClassOn(String setKey) {
+        return !classesOff.contains(setKey);
+    }
+
+    public void setClassOn(String setKey, boolean value) {
+        if (value)
+            classesOff.remove(setKey);
+        else
+            classesOff.add(setKey);
+        prefs().edit().putStringSet(PREF_CLASSES_OFF, new HashSet<>(classesOff)).apply();
+        overlay.setTypesOff(hiddenSets());
+        changed();
+    }
+
+    public long airspaceBarMeters() {
+        return airspaceBarM;
+    }
+
+    public void setAirspaceBarMeters(long m) {
+        airspaceBarM = m;
+        prefs().edit().putLong(PREF_AIRSPACE_BAR_M, m).apply();
+        applyGate();
+        changed();
+    }
+
+    /** Every shelf on the device, whatever is switched on. */
+    public List<Airspace> airspace() {
+        return airspaces;
+    }
+
+    /** One shelf by the id its features carry, for a tap on the map. */
+    public Airspace airspaceById(String id) {
+        if (id == null)
+            return null;
+        for (Airspace a : airspaces)
+            if (id.equals(a.id))
+                return a;
+        return null;
+    }
+
+    /**
+     * What the operator is standing in, lowest floor first.
+     *
+     * <p>The question the layer exists to answer. Only shelves whose boundary contains the
+     * position and whose floor and ceiling bracket the altitude count, so standing under a
+     * 5,000 ft shelf does not report being in it.
+     */
+    public List<Airspace> airspaceAtMe() {
+        final GeoPoint me = mapView.getSelfMarker() == null ? null
+                : mapView.getSelfMarker().getPoint();
+        if (me == null)
+            return Collections.emptyList();
+        final double groundFt = TfrVertical.myFeetMsl(me);
+        final List<Airspace> out = new ArrayList<>();
+        for (Airspace a : airspaces) {
+            if (classesOff.contains(a.setKey()))
+                continue;
+            if (!isLayerOn(a.isClass() ? LAYER_AIRSPACE : LAYER_SUA))
+                continue;
+            if (!containsPoint(a, me.getLatitude(), me.getLongitude()))
+                continue;
+            if (a.containsAltitudeFt(groundFt, groundFt))
+                out.add(a);
+        }
+        Collections.sort(out, new java.util.Comparator<Airspace>() {
+            @Override
+            public int compare(Airspace x, Airspace y) {
+                return Integer.compare(floorOf(x), floorOf(y));
+            }
+        });
+        return out;
+    }
+
+    private static int floorOf(Airspace a) {
+        return a.floor.present && !a.floor.surface ? a.floor.feet : 0;
+    }
+
+    /** Ray casting against the outer rings, with holes taken back out. */
+    private static boolean containsPoint(Airspace a, double lat, double lon) {
+        for (Airspace.Part p : a.parts) {
+            if (!TfrVertical.inside(p.outer, lat, lon))
+                continue;
+            boolean inHole = false;
+            for (List<double[]> h : p.holes)
+                if (TfrVertical.inside(h, lat, lon)) {
+                    inHole = true;
+                    break;
+                }
+            if (!inHole)
+                return true;
+        }
+        return false;
+    }
+
+    /** Whether the airspace service has turned us away, and we are waiting it out. */
+    public boolean isAirspaceBusy() {
+        return System.currentTimeMillis() < airspaceBusyUntilMs;
+    }
+
+    /** True when the view held more shelves than one fetch will carry. */
+    public boolean isAirspaceCapped() {
+        return airspaceCapped;
     }
 
 
@@ -635,6 +811,17 @@ public class TfrManager {
         changed();
     }
 
+    public long airfieldBarMeters() {
+        return airfieldBarM;
+    }
+
+    public void setAirfieldBarMeters(long meters) {
+        airfieldBarM = meters;
+        prefs().edit().putLong(PREF_AIRFIELD_BAR_M, meters).apply();
+        applyGate();
+        changed();
+    }
+
     public long labelBarMeters() {
         return labelBarM;
     }
@@ -671,10 +858,15 @@ public class TfrManager {
         overlay.setVisible(on && !hide);
 
         // The labels gate separately, and only matter while the areas are drawn at all.
+        airfieldsHidden = airfieldBarM > 0 && bar > airfieldBarM * 1.02;
+        // Airspace has its own gate and a far wider default than the airfields: a shelf
+        // matters from a long way out, and a hundred miles of it is still readable.
+        airspaceHidden = airspaceBarM > 0 && bar > airspaceBarM * 1.02;
         final boolean hideLabels = labelBarM > 0 && bar > labelBarM * 1.02;
         final boolean wasLabels = labelsHidden;
         labelsHidden = hideLabels;
         overlay.setLabelsVisible(!hideLabels);
+        overlay.setTypesOff(hiddenSets());
 
         if (was != hide || wasLabels != hideLabels)
             changed();
@@ -698,6 +890,11 @@ public class TfrManager {
         final StringBuilder b = new StringBuilder();
         if (!on)
             return "AirAware off. Turn it on to download and show airspace.";
+        // First, because it is the question the airspace layer exists to answer and the
+        // operator should not have to tap anything to get it.
+        final String where = airspaceHereLine();
+        if (where != null)
+            b.append(where).append(' ');
         if (syncing && !syncStatus.isEmpty())
             b.append(syncStatus).append('.');
         else if (lastError != null)
@@ -719,7 +916,47 @@ public class TfrManager {
         final String fences = TfrWatch.line(staleFences);
         if (fences != null)
             b.append(' ').append(fences);
+        if (isAirspaceBusy())
+            b.append(" The FAA airspace service is busy; airspace is as last downloaded.");
         return b.toString();
+    }
+
+    /**
+     * Which airspace the operator is standing in, in one sentence, or null when there is
+     * nothing to say.
+     *
+     * <p>Silent rather than reassuring when nothing is known: no position, no download or
+     * the layer switched off all read as "not checked", and "You are in Class G" said on
+     * the strength of an empty list would be a confident wrong answer in exactly the place
+     * it matters. Class G is also never named -- it is everywhere that is not something
+     * else, so saying it adds nothing.
+     */
+    private String airspaceHereLine() {
+        if (!isLayerOn(LAYER_AIRSPACE) || airspaces.isEmpty())
+            return null;
+        final List<Airspace> here = airspaceAtMe();
+        final List<String> names = new ArrayList<>();
+        for (Airspace a : here) {
+            if (!a.isClass())
+                continue;
+            final String c = a.classCode == null ? "" : a.classCode.trim().toUpperCase(Locale.US);
+            if (c.isEmpty() || "G".equals(c))
+                continue;
+            final String n = "Class " + c;
+            if (!names.contains(n))
+                names.add(n);
+        }
+        if (names.isEmpty())
+            return null;
+        if (names.size() == 1)
+            return "You are in " + names.get(0) + ".";
+        final StringBuilder b = new StringBuilder("You are in ");
+        for (int i = 0; i < names.size(); i++) {
+            if (i > 0)
+                b.append(i == names.size() - 1 ? " and " : ", ");
+            b.append(names.get(i));
+        }
+        return b.append('.').toString();
     }
 
     static String ago(long ms) {
@@ -852,6 +1089,10 @@ public class TfrManager {
         // The airfield chips ride in the same rewrite: one store, one locked pass, and
         // the set they land in is switched like any other type.
         drawn.addAll(MetarFeatures.drawn(metars));
+        // So do the airspace shelves, for the same reason, and like everything else they
+        // are written whether their layer is on or off: off hides, never deletes.
+        for (Airspace a : airspaces)
+            drawn.addAll(AirspaceFeatures.drawn(a));
         overlay.rewrite(drawn);
         overlay.setTypesOff(hiddenSets());
     }
@@ -938,6 +1179,7 @@ public class TfrManager {
                 return;
             applyGate();
             maybeFetchMetars();
+            maybeFetchAirspace();
             changed();
         }
     };
@@ -990,6 +1232,65 @@ public class TfrManager {
 
     public List<Metar> airfields() {
         return metars;
+    }
+
+    /**
+     * Fetch the airspace for the view, rarely.
+     *
+     * <p>Nothing like the observations. Airspace changes on the FAA's 56-day publication
+     * cycle, so a day-old answer is a current answer; and the service's quota -- 6,000
+     * request units a minute, shared with every other caller in the world -- is spent in
+     * eight queries, so a plugin that refetched on every pan would spend most of its life
+     * being refused. So: a box padded by half its own width, refetched only when the view
+     * leaves it or the answer is a day old, and a refusal parks the layer for a quarter of
+     * an hour with what it already has still on the map.
+     */
+    private void maybeFetchAirspace() {
+        if (!on || isAirspaceBusy())
+            return;
+        if (!isLayerOn(LAYER_AIRSPACE) && !isLayerOn(LAYER_SUA))
+            return;
+        final GeoBounds b = mapView.getBounds();
+        if (b == null || Double.isNaN(b.getNorth()) || Double.isNaN(b.getSouth()))
+            return;
+        final double[] box = airspaceBox;
+        final boolean stale = System.currentTimeMillis() - airspaceFetchedMs > 24 * 60 * 60 * 1000L;
+        if (!stale && box != null
+                && b.getSouth() >= box[0] && b.getWest() >= box[1]
+                && b.getNorth() <= box[2] && b.getEast() <= box[3])
+            return;
+        final double span = Math.abs(b.getNorth() - b.getSouth());
+        final double padLat = Math.max(0.3, span * 0.5);
+        final double padLon = Math.max(0.3, Math.abs(b.getEast() - b.getWest()) * 0.5);
+        final double[] want = {
+                b.getSouth() - padLat, b.getWest() - padLon,
+                b.getNorth() + padLat, b.getEast() + padLon
+        };
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final List<Airspace> got = AirspaceFeed.inBox(want[0], want[1], want[2],
+                            want[3], want[2] - want[0]);
+                    airspaces = Collections.unmodifiableList(got);
+                    airspaceBox = want;
+                    airspaceFetchedMs = System.currentTimeMillis();
+                    airspaceCapped = got.size() >= 4000;
+                    Log.d(TAG, "airspace: " + got.size() + " shelves in view");
+                    rewriteOverlay();
+                    post();
+                } catch (AirspaceFeed.RateLimited e) {
+                    // Shared quota, not our bug and not the operator's. Keep the last good
+                    // picture and stop asking for a while; the status line says so.
+                    airspaceBusyUntilMs = System.currentTimeMillis() + 15 * 60 * 1000L;
+                    Log.d(TAG, "airspace service busy, keeping what we have");
+                    post();
+                } catch (Exception e) {
+                    // A failed fetch never empties anything.
+                    Log.w(TAG, "fetching airspace failed", e);
+                }
+            }
+        });
     }
 
     private void changed() {

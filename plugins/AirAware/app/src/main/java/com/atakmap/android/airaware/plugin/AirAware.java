@@ -197,13 +197,22 @@ public class AirAware implements IPlugin {
                     return;
                 }
                 final String icao = item.getMetaString("metar_icao", null);
-                if (icao == null)
+                if (icao != null) {
+                    final com.atakmap.android.airaware.Metar m = manager.airfield(icao);
+                    if (m == null)
+                        return;
+                    showPane();
+                    paneUi.showAirfield(m);
                     return;
-                final com.atakmap.android.airaware.Metar m = manager.airfield(icao);
-                if (m == null)
+                }
+                final String shelf = item.getMetaString("airspace_id", null);
+                if (shelf == null)
+                    return;
+                final com.atakmap.android.airaware.Airspace a = manager.airspaceById(shelf);
+                if (a == null)
                     return;
                 showPane();
-                paneUi.showAirfield(m);
+                paneUi.showAirspace(a);
             }
         };
         mapView.getMapEventDispatcher().addMapEventListener(

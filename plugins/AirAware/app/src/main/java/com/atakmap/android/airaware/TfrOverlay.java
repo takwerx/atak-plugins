@@ -188,6 +188,9 @@ public class TfrOverlay {
                                 final String icao = string(a, "metar_icao");
                                 if (icao != null)
                                     item.setMetaString("metar_icao", icao);
+                                final String shelf = string(a, "airspace_id");
+                                if (shelf != null)
+                                    item.setMetaString("airspace_id", shelf);
                                 final String place = string(a, "place");
                                 if (place != null && !place.isEmpty())
                                     label = place;
