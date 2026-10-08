@@ -156,9 +156,16 @@ public final class AirspaceFeatures {
         for (Airspace.Part part : a.parts) {
             if (part.outer.size() < 3)
                 continue;
-            // The volume. This is the whole point of the layer: a shelf whose floor is at
-            // 5,000 is airspace you fly under, and a flat ring cannot say that.
-            if (wall > 1)
+            // The volume, for special use only.
+            //
+            // A restricted area or a MOA is one bounded thing you route around, with a
+            // published top -- the same question a TFR asks, so it gets the same answer.
+            // Class airspace is not that: Los Angeles Class B is twelve nested shelves
+            // over one airport, and stood up they merge into a block with no map
+            // underneath, while half of what is around them is Class E with no published
+            // ceiling to draw to. Operator, 2026-10-08: "3D is good for TFR i think maybe
+            // not for airspace?".
+            if (wall > 1 && a.isSpecialUse())
                 out.add(new TfrOverlay.Drawn(id, setKey, setName, name,
                         polygon(part, floorM), volumeStyle(color, alpha), attrs, mode, wall));
             // The footprint, clamped, so the shelf is there looking straight down.
