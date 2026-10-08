@@ -14,5 +14,7 @@
     <color name="tfr_active">#e01b24</color>
     <color name="tfr_upcoming">#ffb300</color>
     <color name="dim_text">#b0b0b0</color>
+    <!-- Map Depot's "tap to go there" green: one affordance, one color, across plugins. -->
+    <color name="action_green">#4caf50</color>
 
 </resources>

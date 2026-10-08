@@ -1081,19 +1081,20 @@ public class TfrPane implements TfrManager.Listener {
             final long now = System.currentTimeMillis();
             final Resources res = pluginContext.getResources();
 
-            // Feature Layer's way round, which is what the operator pointed at: the row
-            // opens details, the Go button moves the map.
+            // Map Depot's way: the row goes there and says so in green, with no Go
+            // button taking up the width. Details keeps a button of its own, because a
+            // row has only one tap to give.
             v.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View x) {
-                    showDetails(t);
+                    goTo(t);
                 }
             });
-            final Button goTo = v.findViewById(R.id.row_goto);
-            goTo.setOnClickListener(new View.OnClickListener() {
+            final Button details = v.findViewById(R.id.row_details);
+            details.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View x) {
-                    goTo(t);
+                    showDetails(t);
                 }
             });
 
@@ -1102,20 +1103,40 @@ public class TfrPane implements TfrManager.Listener {
 
             final TextView state = v.findViewById(R.id.row_state);
             final String type = TfrTypes.label(t.type);
+            final String head;
+            final int headColor;
             if (t.hasNoMappedArea()) {
-                state.setText(type + "   no mapped area");
-                state.setTextColor(res.getColor(R.color.dim_text));
+                head = type + "   no mapped area";
+                headColor = res.getColor(R.color.dim_text);
             } else if (t.isActive(now)) {
-                state.setText(type + "   ACTIVE");
-                state.setTextColor(manager.activeColor());
+                head = type + "   ACTIVE";
+                headColor = manager.activeColor();
             } else if (t.expireMs > 0 && now > t.expireMs) {
                 // Past its published end. Never shown as merely "scheduled", which reads
                 // as something that is still coming.
-                state.setText(type + "   EXPIRED");
-                state.setTextColor(res.getColor(R.color.dim_text));
+                head = type + "   EXPIRED";
+                headColor = res.getColor(R.color.dim_text);
             } else {
-                state.setText(type + "   SCHEDULED");
-                state.setTextColor(manager.upcomingColor());
+                head = type + "   SCHEDULED";
+                headColor = manager.upcomingColor();
+            }
+            // The hint on a line of its own and only the hint colored, the way Map Depot
+            // does it: appended to the type it wraps wherever the width runs out rather
+            // than where it reads well, and a whole green row is a christmas tree.
+            if (t.hasNoMappedArea()) {
+                state.setText(head);
+                state.setTextColor(headColor);
+            } else {
+                final String hint = "\ntap to go there";
+                final android.text.SpannableString line =
+                        new android.text.SpannableString(head + hint);
+                line.setSpan(new android.text.style.ForegroundColorSpan(headColor),
+                        0, head.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                line.setSpan(new android.text.style.ForegroundColorSpan(
+                        res.getColor(R.color.action_green)),
+                        line.length() - hint.length() + 1, line.length(),
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                state.setText(line);
             }
 
             // The distance on the right, where Feature Layer puts it: it is what the list

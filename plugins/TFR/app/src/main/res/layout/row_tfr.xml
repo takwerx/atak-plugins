@@ -44,12 +44,12 @@
     </LinearLayout>
 
     <Button
-        android:id="@+id/row_goto"
+        android:id="@+id/row_details"
         style="@style/TakwerxButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginLeft="8dp"
-        android:text="Go" />
+        android:text="Details" />
 
     <TextView
         android:id="@+id/row_window"

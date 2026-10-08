@@ -29,6 +29,7 @@
         android:divider="#20FFFFFF"
         android:dividerHeight="1dp"
         android:fadeScrollbars="false"
+        android:scrollbarSize="3dp"
         android:listSelector="@android:color/transparent" />
 
     <!-- The details page, in place of the list. A tap on a restriction, on the map or
@@ -99,6 +100,7 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:fadeScrollbars="false"
+        android:scrollbarSize="3dp"
             android:focusableInTouchMode="true"
             android:descendantFocusability="beforeDescendants">
 
@@ -156,6 +158,7 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:fadeScrollbars="false"
+        android:scrollbarSize="3dp"
             android:focusableInTouchMode="true"
             android:descendantFocusability="beforeDescendants">
 

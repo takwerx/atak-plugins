@@ -205,11 +205,10 @@ public class TFR implements IPlugin {
         if (pane == null) {
             pane = new PaneBuilder(paneUi.build())
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
-                    // Narrower than the half every other takwerx plugin uses, because the
-                    // operator asked: "i dont like the side slider pane thing its two
-                    // large". Worth revisiting as a house decision rather than leaving
-                    // TFR the one odd pane.
-                    .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.38D)
+                    // Half, like every other takwerx plugin. Narrowing it to 0.38 was
+                    // tried and put back: TFR being the one odd pane is worse than a pane
+                    // being wide, and what was actually too large wants finding first.
+                    .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
                     .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
                     .build();
         }
