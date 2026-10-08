@@ -162,7 +162,9 @@
     <string name="ceiling_proposed">Ceiling set to %1$s above the launch ground. Change it under Settings.</string>
     <string name="file_laanc">File LAANC</string>
     <string name="laanc_title">File an authorization</string>
-    <string name="laanc_uss">LAANC - through an FAA-approved supplier</string>
-    <string name="laanc_dronezone">FAA DroneZone - anything LAANC does not cover</string>
+    <string name="laanc_uss">LAANC in Aloft Air Control</string>
+    <string name="laanc_dronezone">FAA DroneZone (web) - what LAANC does not cover</string>
+    <string name="laanc_other_uss">Another FAA-approved supplier</string>
+    <string name="laanc_install_aloft">Aloft Air Control is not installed. Opening the Play Store.</string>
     <string name="laanc_no_browser">No browser on this device to open it with.</string>
 </resources>

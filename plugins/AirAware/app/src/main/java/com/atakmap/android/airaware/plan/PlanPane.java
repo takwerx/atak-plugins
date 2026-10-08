@@ -1275,22 +1275,58 @@ public final class PlanPane implements IslandOverlay.Listener,
      * instead. Which one a pilot needs depends on where they are flying, so this asks
      * rather than guessing, and the plugin never pretends to have filed anything.
      */
+    /** Aloft Air Control: about half of all LAANC authorizations in the country. */
+    private static final String ALOFT = "ai.aloft.aircontrol";
+    private static final String FAA_USS_LIST =
+            "https://www.faa.gov/uas/programs_partnerships/data_exchange";
+    private static final String DRONEZONE = "https://faadronezone-access.faa.gov/";
+
     private void askLaanc() {
         final String[] labels = {
                 pluginContext.getString(R.string.laanc_uss),
+                pluginContext.getString(R.string.laanc_other_uss),
                 pluginContext.getString(R.string.laanc_dronezone) };
-        final String[] urls = {
-                "https://www.faa.gov/uas/programs_partnerships/data_exchange",
-                "https://faadronezone-access.faa.gov/" };
         new android.app.AlertDialog.Builder(host)
                 .setTitle(pluginContext.getString(R.string.laanc_title))
                 .setItems(labels, new android.content.DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(android.content.DialogInterface d, int which) {
-                        openUrl(urls[which]);
+                        if (which == 0)
+                            openAloft();
+                        else
+                            openUrl(which == 1 ? FAA_USS_LIST : DRONEZONE);
                     }
                 })
                 .show();
+    }
+
+    /**
+     * Opens Aloft Air Control, or the Play Store when it is not installed.
+     *
+     * <p>One app is named because one app earns it: Aloft handles roughly half of every
+     * LAANC authorization issued in the United States and also runs the FAA's own
+     * B4UFLY. The FAA has no DroneZone app to launch -- DroneZone is a web portal -- so
+     * naming the market leader is the nearest thing to "launch the app", and the other
+     * two rows are there for a pilot who uses a different supplier.
+     */
+    private void openAloft() {
+        final android.content.pm.PackageManager pm = host.getPackageManager();
+        final android.content.Intent app = pm == null ? null
+                : pm.getLaunchIntentForPackage(ALOFT);
+        if (app != null) {
+            app.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                host.startActivity(app);
+                return;
+            } catch (RuntimeException e) {
+                com.atakmap.coremap.log.Log.w("AirAwarePlan",
+                        "Aloft would not start", e);
+            }
+        }
+        android.widget.Toast.makeText(host,
+                pluginContext.getString(R.string.laanc_install_aloft),
+                android.widget.Toast.LENGTH_SHORT).show();
+        openUrl("https://play.google.com/store/apps/details?id=" + ALOFT);
     }
 
     /**
