@@ -1282,6 +1282,8 @@ public final class PlanPane implements IslandOverlay.Listener,
     private static final String DRONEZONE = "https://faadronezone-access.faa.gov/";
     /** Aloft's web app, which files LAANC too and which its app claims as a link. */
     private static final String ALOFT_WEB = "https://air.aloft.ai/";
+    /** Read off a phone; a third party's internal name, so never the only route. */
+    private static final String ALOFT_ACTIVITY = "ai.aloft.aircontrol2.MainActivity";
 
     private void askLaanc() {
         final String[] labels = {
@@ -1305,37 +1307,41 @@ public final class PlanPane implements IslandOverlay.Listener,
     /**
      * Opens Aloft Air Control if it is on the phone, and only then falls back.
      *
-     * <p>Four tries, because one is not enough on a modern Android. ATAK targets SDK 34
-     * and declares no {@code QUERY_ALL_PACKAGES}, and a plugin's own manifest cannot
-     * help -- the package manager attributes the call to the host process -- so
-     * {@code getLaunchIntentForPackage} returns null for Aloft <i>even when it is
-     * installed</i>. Trusting that alone would send a pilot who already has the app to
-     * the Play Store, which is the thing the operator asked not to happen.
+     * <p>Harder than it should be. ATAK targets SDK 34 and declares no
+     * {@code QUERY_ALL_PACKAGES}, and a plugin cannot help itself here -- the package
+     * manager attributes the call to the host process, not to the plugin's own
+     * manifest. So anything that has to <i>resolve</i> Aloft first comes back empty
+     * even though it is installed: {@code getLaunchIntentForPackage} returns null, and
+     * so does an {@code ACTION_MAIN} intent aimed at the package.
      *
-     * <p>So: ask for the launch intent, which works wherever visibility allows it; then
-     * an explicit launcher intent at the package, which starting is permitted to do;
-     * then Aloft's own web address, which the installed app claims as an app link and
-     * the browser takes otherwise; and the Play listing last, when the app really is
-     * not there.
+     * <p>What is left is a fully explicit component, which needs no resolution. The
+     * class name was read off the phone with
+     * {@code cmd package resolve-activity --brief ai.aloft.aircontrol}. It is a third
+     * party's internal name and could change with one of their releases, so every step
+     * below it still has to work on its own.
+     *
+     * <p>And the web address is a fallback to the <i>browser</i>, not to the app: Aloft
+     * does not claim {@code air.aloft.ai} as an app link on this phone, so that tap
+     * reaches their web app, which files LAANC just as well.
      */
     private void openAloft() {
+        // 1. The ordinary way, for any phone where visibility is not in the way.
         final android.content.pm.PackageManager pm = host.getPackageManager();
         if (pm != null) {
             final android.content.Intent launch = pm.getLaunchIntentForPackage(ALOFT);
-            if (launch != null && start(launch))
+            if (launch != null && start(launch, "launch intent"))
                 return;
         }
-        final android.content.Intent explicit = new android.content.Intent(
-                android.content.Intent.ACTION_MAIN);
-        explicit.addCategory(android.content.Intent.CATEGORY_LAUNCHER);
-        explicit.setPackage(ALOFT);
-        if (start(explicit))
+        // 2. The explicit component: no resolution, so no visibility filter.
+        final android.content.Intent explicit = new android.content.Intent();
+        explicit.setClassName(ALOFT, ALOFT_ACTIVITY);
+        if (start(explicit, "explicit component"))
             return;
-        // Aloft's own address: the app claims it, so an installed copy takes the tap
-        // and a phone without one gets the web app, which files LAANC just as well.
+        // 3. Their web app, which does the same job in a browser.
         if (start(new android.content.Intent(android.content.Intent.ACTION_VIEW,
-                android.net.Uri.parse(ALOFT_WEB))))
+                android.net.Uri.parse(ALOFT_WEB)), "web app"))
             return;
+        // 4. Only now is it fair to say it is not here.
         android.widget.Toast.makeText(host,
                 pluginContext.getString(R.string.laanc_install_aloft),
                 android.widget.Toast.LENGTH_SHORT).show();
@@ -1343,12 +1349,15 @@ public final class PlanPane implements IslandOverlay.Listener,
     }
 
     /** Starts an intent, answering whether anything took it. */
-    private boolean start(android.content.Intent i) {
+    private boolean start(android.content.Intent i, String what) {
         try {
             i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
             host.startActivity(i);
+            com.atakmap.coremap.log.Log.d("AirAwarePlan", "LAANC opened by " + what);
             return true;
         } catch (RuntimeException e) {
+            com.atakmap.coremap.log.Log.d("AirAwarePlan",
+                    "LAANC " + what + " did not take it: " + e);
             return false;
         }
     }
