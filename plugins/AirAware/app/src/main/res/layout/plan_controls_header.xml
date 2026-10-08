@@ -131,6 +131,18 @@
         android:textSize="15sp"
         android:visibility="gone" />
 
+    <!-- Filing is somebody else's web form, so this only takes the pilot to it.
+         LAANC is granted through FAA-approved suppliers, not by the FAA directly,
+         and anything LAANC does not cover goes through DroneZone instead, so the
+         button asks which rather than guessing. -->
+    <Button
+        android:id="@+id/btn_laanc"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/file_laanc" />
+
     <TextView
         android:id="@+id/list_heading"
         style="@style/TakwerxSectionHeading"

@@ -177,6 +177,14 @@ public final class PlanPane implements IslandOverlay.Listener,
                     obstacles.panTo(adapter.getItem(i));
             }
         });
+        final android.widget.Button laanc = header.findViewById(R.id.btn_laanc);
+        if (laanc != null)
+            laanc.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    askLaanc();
+                }
+            });
         listHeading = header.findViewById(R.id.list_heading);
 
         btnIslands = header.findViewById(R.id.btn_islands);
@@ -1258,6 +1266,46 @@ public final class PlanPane implements IslandOverlay.Listener,
     };
 
     /** The pane was shown. It opens on the main screen every time. */
+    /**
+     * Takes the pilot to where an authorization is actually filed.
+     *
+     * <p>Only a link, deliberately. LAANC is granted through FAA-approved UAS Service
+     * Suppliers rather than by the FAA itself, and anything LAANC does not cover -- a
+     * zero-foot grid, a waiver, airspace outside the program -- goes through DroneZone
+     * instead. Which one a pilot needs depends on where they are flying, so this asks
+     * rather than guessing, and the plugin never pretends to have filed anything.
+     */
+    private void askLaanc() {
+        final String[] labels = {
+                pluginContext.getString(R.string.laanc_uss),
+                pluginContext.getString(R.string.laanc_dronezone) };
+        final String[] urls = {
+                "https://www.faa.gov/uas/programs_partnerships/data_exchange",
+                "https://faadronezone-access.faa.gov/" };
+        new android.app.AlertDialog.Builder(host)
+                .setTitle(pluginContext.getString(R.string.laanc_title))
+                .setItems(labels, new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int which) {
+                        openUrl(urls[which]);
+                    }
+                })
+                .show();
+    }
+
+    private void openUrl(String url) {
+        try {
+            final android.content.Intent i = new android.content.Intent(
+                    android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url));
+            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            host.startActivity(i);
+        } catch (RuntimeException e) {
+            android.widget.Toast.makeText(host,
+                    pluginContext.getString(R.string.laanc_no_browser),
+                    android.widget.Toast.LENGTH_SHORT).show();
+        }
+    }
+
     public void onPaneShown() {
         showMain();
         syncAll();

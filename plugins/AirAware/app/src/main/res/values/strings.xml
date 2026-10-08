@@ -16,7 +16,7 @@
     <string name="status_waiting">Checking.</string>
     <string name="use_this_zoom">Use this zoom</string>
     <!-- The flight planner, carried over from UAS Flight Plan. -->
-    <string name="flight_plan">Flight Plan</string>
+    <string name="flight_plan">UAS Flight Plan</string>
     <string name="launch_marker">Launch</string>
     <string name="prompt_tap_launch">Tap the map where you will launch</string>
     <!-- From UAS Flight Plan, with the planner. -->
@@ -160,4 +160,9 @@
     <string name="terrain_detail">%1$s, terrain checked every %2$s.</string>
     <string name="missing_share">%.0f%% of the area has no terrain data and is not painted.</string>
     <string name="ceiling_proposed">Ceiling set to %1$s above the launch ground. Change it under Settings.</string>
+    <string name="file_laanc">File LAANC</string>
+    <string name="laanc_title">File an authorization</string>
+    <string name="laanc_uss">LAANC - through an FAA-approved supplier</string>
+    <string name="laanc_dronezone">FAA DroneZone - anything LAANC does not cover</string>
+    <string name="laanc_no_browser">No browser on this device to open it with.</string>
 </resources>
