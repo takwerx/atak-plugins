@@ -178,6 +178,15 @@ public class TfrManager {
     private volatile List<Airspace> airspaces = Collections.emptyList();
     private volatile double[] airspaceBox;
     private volatile long airspaceFetchedMs;
+    /**
+     * How finely the shapes we are holding were drawn, in degrees.
+     *
+     * <p>Kept because being inside the cached box is not the same as having shapes good
+     * enough for the zoom: the geometry fetched for a wide view stays when the operator
+     * zooms in, and against a sectional base map at Twentynine Palms that showed as
+     * straight runs and corners across the chart's smooth Class E circle.
+     */
+    private volatile double airspaceOffsetDeg = Double.MAX_VALUE;
     /** Set while the service has refused us, so the status line can say why nothing moved. */
     private volatile long airspaceBusyUntilMs;
     /**
@@ -1334,15 +1343,21 @@ public class TfrManager {
         final GeoBounds b = mapView.getBounds();
         if (b == null || Double.isNaN(b.getNorth()) || Double.isNaN(b.getSouth()))
             return;
+        final double span = Math.abs(b.getNorth() - b.getSouth());
+        // What this view wants. Halving is the trigger rather than any change, so a pinch
+        // does not refetch on every frame; one zoom step in is not new geometry, four are.
+        final double wantOffset = AirspaceFeed.generalization(span);
+        final boolean tooCoarse = wantOffset < airspaceOffsetDeg / 2d;
         final double[] box = airspaceBox;
         final boolean stale = System.currentTimeMillis() - airspaceFetchedMs > 24 * 60 * 60 * 1000L;
-        if (!stale && box != null
+        if (!stale && !tooCoarse && box != null
                 && b.getSouth() >= box[0] && b.getWest() >= box[1]
                 && b.getNorth() <= box[2] && b.getEast() <= box[3])
             return;
-        final double span = Math.abs(b.getNorth() - b.getSouth());
-        final double padLat = Math.max(0.3, span * 0.5);
-        final double padLon = Math.max(0.3, Math.abs(b.getEast() - b.getWest()) * 0.5);
+        // The pad follows the view too. A third of a degree around an eight-mile view is
+        // five times more airspace than is on screen, at the fine detail that view wants.
+        final double padLat = Math.max(0.1, span * 0.5);
+        final double padLon = Math.max(0.1, Math.abs(b.getEast() - b.getWest()) * 0.5);
         final double[] want = {
                 b.getSouth() - padLat, b.getWest() - padLon,
                 b.getNorth() + padLat, b.getEast() + padLon
@@ -1352,9 +1367,10 @@ public class TfrManager {
             public void run() {
                 try {
                     final List<Airspace> got = AirspaceFeed.inBox(want[0], want[1], want[2],
-                            want[3], want[2] - want[0]);
+                            want[3], wantOffset);
                     airspaces = Collections.unmodifiableList(got);
                     airspaceBox = want;
+                    airspaceOffsetDeg = wantOffset;
                     airspaceFetchedMs = System.currentTimeMillis();
                     airspaceCapped = got.size() >= 4000;
                     airspaceRetryMs = FIRST_RETRY_MS;

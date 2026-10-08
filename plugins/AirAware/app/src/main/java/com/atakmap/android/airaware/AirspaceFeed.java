@@ -75,11 +75,11 @@ public final class AirspaceFeed {
      *            server is asked to draw the boundaries
      */
     public static List<Airspace> inBox(double south, double west, double north, double east,
-            double degreesOnScreen) throws IOException {
+            double offsetDegrees) throws IOException {
         final List<Airspace> out = new ArrayList<>();
         int offset = 0;
         while (out.size() < MAX_ROWS) {
-            final JSONObject root = page(south, west, north, east, degreesOnScreen, offset);
+            final JSONObject root = page(south, west, north, east, offsetDegrees, offset);
             final JSONArray features = root.optJSONArray("features");
             if (features == null || features.length() == 0)
                 break;
@@ -96,7 +96,7 @@ public final class AirspaceFeed {
     }
 
     private static JSONObject page(double south, double west, double north, double east,
-            double degreesOnScreen, int offset) throws IOException {
+            double offsetDegrees, int offset) throws IOException {
         // The envelope is JSON: the comma form is accepted but silently drops the spatial
         // reference, and this service then matches nothing.
         final String envelope = String.format(Locale.US,
@@ -110,7 +110,7 @@ public final class AirspaceFeed {
         u.append("&where=").append(enc(TYPES));
         u.append("&outFields=").append(enc(FIELDS));
         u.append("&maxAllowableOffset=").append(
-                String.format(Locale.US, "%.6f", generalization(degreesOnScreen)));
+                String.format(Locale.US, "%.6f", offsetDegrees));
         u.append("&resultRecordCount=").append(PAGE);
         if (offset > 0)
             u.append("&resultOffset=").append(offset);
@@ -139,14 +139,21 @@ public final class AirspaceFeed {
     /**
      * How coarsely the server may draw a boundary, in degrees.
      *
-     * <p>Roughly a quarter of a percent of what is on screen, which is well under a pixel
-     * at any zoom, with a floor so a close-in view does not ask for every published vertex
-     * and a ceiling so a continent-wide view still has recognizable shapes.
+     * <p>This was a quarter of a percent of the view with a floor of 0.0004 degrees, and
+     * on a sectional base map at Twentynine Palms the difference showed: the chart's
+     * Class E circle is smooth and ours had straight runs and corners across it, because
+     * 0.0004 degrees is about 45 m of chord and a circle is where that is most visible.
+     * Measured over the same box: 0.0015 is 102 KB, 0.0005 is 207 KB and 0.0001 is
+     * 392 KB, so detail is cheap enough to buy.
+     *
+     * <p>It is taken from the view rather than the padded box, with a floor fine enough
+     * that a circle reads as a circle at any zoom an operator uses, and a ceiling so a
+     * continent-wide view is not a million vertices.
      */
-    private static double generalization(double degreesOnScreen) {
+    static double generalization(double degreesOnScreen) {
         if (!(degreesOnScreen > 0))
-            return 0.002d;
-        return Math.max(0.0004d, Math.min(0.02d, degreesOnScreen / 400d));
+            return 0.0005d;
+        return Math.max(0.00008d, Math.min(0.004d, degreesOnScreen / 1500d));
     }
 
     private static Airspace one(JSONObject f) {
