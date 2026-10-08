@@ -299,14 +299,32 @@ public class TfrOverlay {
     // ---- switches: hide, never delete ----
 
     /** The map switch. Hides every area at once and keeps all of them. */
+    /**
+     * Every one of these refuses to do anything when nothing has changed.
+     *
+     * <p>{@link #applyVisibility()} takes the whole layer off the map and puts it back a
+     * moment later, which is the only way the renderer picks up a visibility change in
+     * the store. That is one blink. The map settling called the setters again on every
+     * pan and every zoom step with exactly the same answer as before, so the blink
+     * happened continuously while the operator moved: "as i zoome in and it tries to
+     * redraw lots of flashing, lables on off etc". Now a pan that changes nothing costs
+     * nothing, and the blink is only paid when something really did change -- crossing a
+     * zoom gate, or a switch being moved.
+     */
     public void setVisible(final boolean on) {
+        if (visible == on)
+            return;
         visible = on;
         applyVisibility();
     }
 
     /** The type filter. A type switched off is hidden, so it survives a restart. */
     public void setTypesOff(Set<String> off) {
-        typesOff = off == null ? Collections.<String> emptySet() : new HashSet<>(off);
+        final Set<String> want = off == null ? Collections.<String> emptySet()
+                : new HashSet<>(off);
+        if (want.equals(typesOff))
+            return;
+        typesOff = want;
         applyVisibility();
     }
 
@@ -319,7 +337,10 @@ public class TfrOverlay {
      * moment the filter is widened, with no network.
      */
     public void setNotamsShown(Set<String> notams) {
-        notamsShown = notams == null ? null : new HashSet<>(notams);
+        final Set<String> want = notams == null ? null : new HashSet<>(notams);
+        if (want == null ? notamsShown == null : want.equals(notamsShown))
+            return;
+        notamsShown = want;
         applyVisibility();
     }
 

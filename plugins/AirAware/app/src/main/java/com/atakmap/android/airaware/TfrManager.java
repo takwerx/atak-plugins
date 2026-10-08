@@ -110,6 +110,8 @@ public class TfrManager {
             java.util.Arrays.asList("as:A", "as:G", "as:?"));
 
     private static final long TICK_MS = 60 * 1000L;
+    /** The shortest gap between airfield fetches, however far the map is moved. */
+    private static final long METAR_MIN_GAP_MS = 20 * 1000L;
     /** The airspace quota refills by the minute, so the first retry is soon. */
     private static final long FIRST_RETRY_MS = 20 * 1000L;
     private static final long MAX_RETRY_MS = 15 * 60 * 1000L;
@@ -945,22 +947,30 @@ public class TfrManager {
         final String where = airspaceHereLine();
         if (where != null)
             b.append(where).append(' ');
-        if (syncing && !syncStatus.isEmpty())
-            b.append(syncStatus).append('.');
-        else if (lastError != null)
-            b.append(lastError).append(lastSuccessMs > 0
-                    ? ", showing what this phone saved " + ago(System.currentTimeMillis() - lastSuccessMs) + "."
-                    : ".");
-        else if (lastSuccessMs == 0)
-            b.append("Not downloaded yet.");
-        else
-            b.append("Updated ").append(ago(System.currentTimeMillis() - lastSuccessMs)).append('.');
-        if (gateHiding)
-            b.append(" Zoom in to see restrictions on the map. Shown at ")
-                    .append(ScaleBar.gate(gateBarM)).append(" or closer.");
-        else if (labelsHidden)
-            b.append(" Names appear at ").append(ScaleBar.gate(labelBarM))
-                    .append(" or closer.");
+        // Everything from here to the fences belongs to the restrictions, so it is said
+        // only while that layer is on. With TFR off and airspace running, the line read
+        // "Not downloaded yet." -- which is true of a download the operator had not
+        // asked for, and reads as the thing they were looking at being broken.
+        if (isLayerOn(LAYER_RESTRICTIONS)) {
+            if (syncing && !syncStatus.isEmpty())
+                b.append(syncStatus).append('.');
+            else if (lastError != null)
+                b.append(lastError).append(lastSuccessMs > 0
+                        ? ", showing what this phone saved "
+                                + ago(System.currentTimeMillis() - lastSuccessMs) + "."
+                        : ".");
+            else if (lastSuccessMs == 0)
+                b.append("Restrictions not downloaded yet.");
+            else
+                b.append("Updated ").append(ago(System.currentTimeMillis() - lastSuccessMs))
+                        .append('.');
+            if (gateHiding)
+                b.append(" Zoom in to see restrictions on the map. Shown at ")
+                        .append(ScaleBar.gate(gateBarM)).append(" or closer.");
+            else if (labelsHidden)
+                b.append(" Names appear at ").append(ScaleBar.gate(labelBarM))
+                        .append(" or closer.");
+        }
         // A fence guarding airspace that was lifted is worse than no fence, so this is
         // said on the pinned line rather than left to be discovered.
         final String fences = TfrWatch.line(staleFences);
@@ -1269,8 +1279,14 @@ public class TfrManager {
                 && b.getSouth() >= box[0] && b.getWest() >= box[1]
                 && b.getNorth() <= box[2] && b.getEast() <= box[3])
             return;
-        final double padLat = Math.max(0.2, (b.getNorth() - b.getSouth()) * 0.25);
-        final double padLon = Math.max(0.2, (b.getEast() - b.getWest()) * 0.25);
+        // Zooming out leaves the box at every step, and each answer rewrites the whole
+        // store: one zoom out fetched five times in thirty seconds and the map redrew
+        // five times with it. A floor between fetches costs nothing -- an observation is
+        // an hour old anyway -- and a wider pad means fewer steps leave the box at all.
+        if (System.currentTimeMillis() - metarFetchedMs < METAR_MIN_GAP_MS)
+            return;
+        final double padLat = Math.max(0.3, (b.getNorth() - b.getSouth()) * 0.6);
+        final double padLon = Math.max(0.3, (b.getEast() - b.getWest()) * 0.6);
         final double[] want = {
                 b.getSouth() - padLat, b.getWest() - padLon,
                 b.getNorth() + padLat, b.getEast() + padLon
