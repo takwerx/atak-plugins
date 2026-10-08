@@ -42,6 +42,15 @@ public final class AirspaceFeatures {
     private static final int CLASS_C = 0xFFB5126A;
     private static final int CLASS_D = 0xFF42A5F5;
     private static final int CLASS_E = 0xFFE05297;
+    /**
+     * Class E that starts at 1,200 ft AGL, which the chart draws blue, not magenta.
+     *
+     * <p>The sectional uses the vignette's color to say how low Class E comes down: a
+     * soft magenta band where it begins at 700 ft AGL, a blue one where it begins at
+     * 1,200. Coloring every Class E magenta would tell a pilot the controlled airspace
+     * starts 500 feet lower than it does.
+     */
+    private static final int CLASS_E_1200 = 0xFF5C86C8;
     /** 18,000 ft and up: drawn grey because nothing below it is affected. */
     private static final int CLASS_A = 0xFF78909C;
     private static final int CLASS_OTHER = 0xFF9E9E9E;
@@ -54,6 +63,25 @@ public final class AirspaceFeatures {
     private static final int MOA = 0xFF8E24AA;
 
     private AirspaceFeatures() {
+    }
+
+    /**
+     * The color one shelf draws in.
+     *
+     * <p>Class E is the only kind whose color depends on more than its class, so the
+     * shelf is asked rather than the set key; everything else answers from the key alone
+     * and is shared with the map key.
+     */
+    public static int color(Airspace a) {
+        if (a != null && a.isClass() && "E".equalsIgnoreCase(a.classCode == null ? ""
+                : a.classCode.trim()) && isAtLeast1200Agl(a.floor))
+            return CLASS_E_1200;
+        return color(a == null ? null : a.setKey());
+    }
+
+    private static boolean isAtLeast1200Agl(TfrArea.Vert floor) {
+        return floor != null && floor.present && floor.agl && !floor.surface
+                && floor.feet >= 1200;
     }
 
     /** The color a set key draws in, which is also what the map key shows. */
@@ -97,7 +125,7 @@ public final class AirspaceFeatures {
         if (setKey.isEmpty())
             return out;
         final String setName = Airspace.setName(setKey);
-        final int color = color(setKey);
+        final int color = color(a);
         final String name = featureName(a);
         final AttributeSet attrs = attributes(a);
         final String id = "as" + a.id;
