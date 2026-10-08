@@ -815,6 +815,13 @@ public class TfrPane implements TfrManager.Listener {
                         pickAirspaceGate();
                     }
                 });
+        addValueButton(body, "3D", manager.airspace3dOn() ? "On" : "Off", new Runnable() {
+            @Override
+            public void run() {
+                manager.setAirspace3dOn(!manager.airspace3dOn());
+                render();
+            }
+        });
         // Off by default and on the layer that owns them, because forty of them over a
         // metro area is the map gone.
         addValueButton(body, "Names on the map",

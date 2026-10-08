@@ -56,6 +56,7 @@ public class TfrManager {
     static final String PREF_AIRSPACE_BAR_M = "airspaceBarM";
     static final String PREF_AIRSPACE_CYCLE = "airspaceCycle";
     static final String PREF_AIRSPACE_LABELS = "airspaceLabels";
+    static final String PREF_AIRSPACE_3D = "airspace3d";
     static final String PREF_CLASSES_OFF = "classesOff";
     static final String PREF_GATE_BAR_M = "gateBarM";
     static final String PREF_LABEL_BAR_M = "labelBarM";
@@ -199,6 +200,15 @@ public class TfrManager {
      * something to switch off.
      */
     private volatile boolean airspaceLabels;
+    /**
+     * Whether class shelves stand up. <b>On.</b>
+     *
+     * <p>Taken out on the operator's own reasoning that a dozen nested shelves read as a
+     * block, and put straight back when they saw it -- "oh shit the 3d is bitchen for
+     * airspace i just had a view". So it is theirs to switch rather than mine to decide,
+     * and it starts on. Special use always stands up either way.
+     */
+    private volatile boolean airspace3d;
 
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
@@ -221,6 +231,7 @@ public class TfrManager {
         airspaceBarM = p.getLong(PREF_AIRSPACE_BAR_M, 160934L);
         airspaceCycle = p.getString(PREF_AIRSPACE_CYCLE, "");
         airspaceLabels = p.getBoolean(PREF_AIRSPACE_LABELS, false);
+        airspace3d = p.getBoolean(PREF_AIRSPACE_3D, true);
         classesOff.addAll(p.getStringSet(PREF_CLASSES_OFF, DEFAULT_CLASSES_OFF));
         // A set, not a joined string: a type carrying the separator would come back as two
         // bogus entries and the filter would restore wrong.
@@ -489,6 +500,26 @@ public class TfrManager {
         for (Map.Entry<String, Integer> e : counts.entrySet())
             out.add(new String[] { e.getKey(), Integer.toString(e.getValue()) });
         return out;
+    }
+
+    public boolean airspace3dOn() {
+        return airspace3d;
+    }
+
+    /** Changing this changes which features exist, so the store is rewritten. */
+    public void setAirspace3dOn(boolean value) {
+        if (airspace3d == value)
+            return;
+        airspace3d = value;
+        prefs().edit().putBoolean(PREF_AIRSPACE_3D, value).apply();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                rewriteOverlay();
+                post();
+            }
+        });
+        changed();
     }
 
     public boolean airspaceLabelsOn() {
@@ -1184,8 +1215,9 @@ public class TfrManager {
         drawn.addAll(MetarFeatures.drawn(metars));
         // So do the airspace shelves, for the same reason, and like everything else they
         // are written whether their layer is on or off: off hides, never deletes.
+        final boolean in3d = airspace3d;
         for (Airspace a : airspaces)
-            drawn.addAll(AirspaceFeatures.drawn(a));
+            drawn.addAll(AirspaceFeatures.drawn(a, in3d));
         overlay.rewrite(drawn);
         overlay.setTypesOff(hiddenSets());
     }

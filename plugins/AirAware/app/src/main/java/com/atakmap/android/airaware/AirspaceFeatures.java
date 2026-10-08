@@ -135,8 +135,16 @@ public final class AirspaceFeatures {
                         ? NO_FILL : FILL_ALPHA;
     }
 
-    /** Everything to draw for one shelf: its volume, its footprint and one label. */
-    public static List<TfrOverlay.Drawn> drawn(Airspace a) {
+    /**
+     * Everything to draw for one shelf: its volume, its footprint and one label.
+     *
+     * @param extrudeClasses whether class shelves stand up. Special use always does: a
+     *            restricted area or a MOA is one bounded thing you route around with a
+     *            published top, the same question a TFR asks. Class airspace is a
+     *            judgement call -- twelve nested shelves over Los Angeles can merge into
+     *            a block with no map underneath -- so the operator owns it.
+     */
+    public static List<TfrOverlay.Drawn> drawn(Airspace a, boolean extrudeClasses) {
         final List<TfrOverlay.Drawn> out = new ArrayList<>();
         final String setKey = a.setKey();
         if (setKey.isEmpty())
@@ -152,6 +160,9 @@ public final class AirspaceFeatures {
         final double ceilM = metersOf(a.ceiling);
         final double wall = a.ceiling.present ? ceilM - floorM : 0d;
         final Feature.AltitudeMode mode = altitudeMode(a);
+        // Nothing published above it, and it starts off the ground: draw where it starts.
+        final boolean floating = !a.ceiling.present && a.floor.present && !a.floor.surface
+                && a.floor.feet > 0;
 
         for (Airspace.Part part : a.parts) {
             if (part.outer.size() < 3)
@@ -165,12 +176,32 @@ public final class AirspaceFeatures {
             // underneath, while half of what is around them is Class E with no published
             // ceiling to draw to. Operator, 2026-10-08: "3D is good for TFR i think maybe
             // not for airspace?".
-            if (wall > 1 && a.isSpecialUse())
+            if (wall > 1 && (extrudeClasses || a.isSpecialUse()))
                 out.add(new TfrOverlay.Drawn(id, setKey, setName, name,
                         polygon(part, floorM), volumeStyle(color, alpha), attrs, mode, wall));
-            // The footprint, clamped, so the shelf is there looking straight down.
-            out.add(new TfrOverlay.Drawn(id, setKey, setName, name, polygon(part, Double.NaN),
-                    flatStyle(color, alpha), attrs, Feature.AltitudeMode.ClampToGround, 0d));
+            // The footprint.
+            //
+            // On the ground for anything with a top, so the shelf is there looking
+            // straight down. But airspace with no published ceiling is drawn as its
+            // FLOOR, lifted to the altitude it really starts at, with nothing above it:
+            // Class E at 700 ft AGL becomes a sheet 700 ft over the terrain that you can
+            // see sky through. Under the sheet you are in Class G, through it you are in
+            // Class E, which is the question somebody flying low is actually asking --
+            // and it invents no ceiling. Clamped to the ground it read as airspace
+            // starting at your feet, which is the one thing it is not.
+            if (floating) {
+                // Its own kind's fill, not a special one: filling a Class E sheet is
+                // what tinted the whole map purple before, and it would do it again the
+                // moment the camera went back to straight down. An outline floating at
+                // 700 ft says where the floor is just as well, and the map stays legible.
+                out.add(new TfrOverlay.Drawn(id, setKey, setName, name,
+                        polygon(part, floorM), flatStyle(color, alpha), attrs,
+                        mode, 0d));
+            } else {
+                out.add(new TfrOverlay.Drawn(id, setKey, setName, name,
+                        polygon(part, Double.NaN), flatStyle(color, alpha), attrs,
+                        Feature.AltitudeMode.ClampToGround, 0d));
+            }
         }
 
         // One label for the shelf, on the biggest part. Airspace is dense -- forty-four
