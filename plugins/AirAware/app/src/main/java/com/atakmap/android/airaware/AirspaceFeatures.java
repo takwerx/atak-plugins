@@ -300,10 +300,18 @@ public final class AirspaceFeatures {
         return plural;
     }
 
-    /** Never empty: the Select Item chooser lists an unnamed feature as "[Unnamed]". */
+    /**
+     * The feature's own name, which is the row the Select Item chooser shows.
+     *
+     * <p>The heights are part of the name, because the source's name is not unique: a
+     * tap near Chino listed "Riverside Class E5" twice, which is correct -- one shelf
+     * begins at 700 ft above the ground and the other at 1,200 -- and useless, because
+     * the two rows read the same. Never empty either; the chooser lists an unnamed
+     * feature as "[Unnamed]".
+     */
     private static String featureName(Airspace a) {
-        final String t = a.title();
-        return t.isEmpty() ? kind(a) : t;
+        final String t = a.title().isEmpty() ? kind(a) : a.title();
+        return t + "   " + a.heights();
     }
 
     /** The source's own fields, which is what the details pane reads. */
