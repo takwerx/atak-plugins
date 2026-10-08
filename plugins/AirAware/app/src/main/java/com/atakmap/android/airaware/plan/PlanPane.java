@@ -1280,6 +1280,8 @@ public final class PlanPane implements IslandOverlay.Listener,
     private static final String FAA_USS_LIST =
             "https://www.faa.gov/uas/programs_partnerships/data_exchange";
     private static final String DRONEZONE = "https://faadronezone-access.faa.gov/";
+    /** Aloft's web app, which files LAANC too and which its app claims as a link. */
+    private static final String ALOFT_WEB = "https://air.aloft.ai/";
 
     private void askLaanc() {
         final String[] labels = {
@@ -1301,43 +1303,56 @@ public final class PlanPane implements IslandOverlay.Listener,
     }
 
     /**
-     * Opens Aloft Air Control, or the Play Store when it is not installed.
+     * Opens Aloft Air Control if it is on the phone, and only then falls back.
      *
-     * <p>One app is named because one app earns it: Aloft handles roughly half of every
-     * LAANC authorization issued in the United States and also runs the FAA's own
-     * B4UFLY. The FAA has no DroneZone app to launch -- DroneZone is a web portal -- so
-     * naming the market leader is the nearest thing to "launch the app", and the other
-     * two rows are there for a pilot who uses a different supplier.
+     * <p>Four tries, because one is not enough on a modern Android. ATAK targets SDK 34
+     * and declares no {@code QUERY_ALL_PACKAGES}, and a plugin's own manifest cannot
+     * help -- the package manager attributes the call to the host process -- so
+     * {@code getLaunchIntentForPackage} returns null for Aloft <i>even when it is
+     * installed</i>. Trusting that alone would send a pilot who already has the app to
+     * the Play Store, which is the thing the operator asked not to happen.
+     *
+     * <p>So: ask for the launch intent, which works wherever visibility allows it; then
+     * an explicit launcher intent at the package, which starting is permitted to do;
+     * then Aloft's own web address, which the installed app claims as an app link and
+     * the browser takes otherwise; and the Play listing last, when the app really is
+     * not there.
      */
     private void openAloft() {
         final android.content.pm.PackageManager pm = host.getPackageManager();
-        final android.content.Intent app = pm == null ? null
-                : pm.getLaunchIntentForPackage(ALOFT);
-        if (app != null) {
-            app.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-            try {
-                host.startActivity(app);
+        if (pm != null) {
+            final android.content.Intent launch = pm.getLaunchIntentForPackage(ALOFT);
+            if (launch != null && start(launch))
                 return;
-            } catch (RuntimeException e) {
-                com.atakmap.coremap.log.Log.w("AirAwarePlan",
-                        "Aloft would not start", e);
-            }
         }
+        final android.content.Intent explicit = new android.content.Intent(
+                android.content.Intent.ACTION_MAIN);
+        explicit.addCategory(android.content.Intent.CATEGORY_LAUNCHER);
+        explicit.setPackage(ALOFT);
+        if (start(explicit))
+            return;
+        // Aloft's own address: the app claims it, so an installed copy takes the tap
+        // and a phone without one gets the web app, which files LAANC just as well.
+        if (start(new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                android.net.Uri.parse(ALOFT_WEB))))
+            return;
         android.widget.Toast.makeText(host,
                 pluginContext.getString(R.string.laanc_install_aloft),
                 android.widget.Toast.LENGTH_SHORT).show();
         openUrl("https://play.google.com/store/apps/details?id=" + ALOFT);
     }
 
-    /**
-     * Hands the link to whatever on the phone can take it.
-     *
-     * <p>A chooser rather than a straight view, so an installed LAANC app that claims
-     * the address gets offered beside the browser. No package name is hard-coded: there
-     * is no official FAA DroneZone app for Android to name, filing happens in whichever
-     * approved supplier's app a pilot uses, and launching a package we guessed at would
-     * be worse than opening the page.
-     */
+    /** Starts an intent, answering whether anything took it. */
+    private boolean start(android.content.Intent i) {
+        try {
+            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            host.startActivity(i);
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     private void openUrl(String url) {
         try {
             final android.content.Intent view = new android.content.Intent(
