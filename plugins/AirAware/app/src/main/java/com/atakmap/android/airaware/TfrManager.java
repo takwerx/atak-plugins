@@ -1010,7 +1010,13 @@ public class TfrManager {
                 }
             });
         }
-        final boolean hideLabels = labelBarM > 0 && bar > labelBarM * 1.02;
+        // Labels belong to a flat map. A name is pinned to the middle of its shape, and
+        // the middle of a shape in a tilted view is usually out on the horizon -- the
+        // operator's 3D screens were a row of half-clipped boxes stacked on the skyline
+        // saying nothing about what was in front of them. Tilted, you identify a volume
+        // by tapping it.
+        final boolean tilted = Math.abs(mapView.getMapTilt()) > 2d;
+        final boolean hideLabels = tilted || (labelBarM > 0 && bar > labelBarM * 1.02);
         final boolean wasLabels = labelsHidden;
         labelsHidden = hideLabels;
         overlay.setLabelsVisible(!hideLabels);

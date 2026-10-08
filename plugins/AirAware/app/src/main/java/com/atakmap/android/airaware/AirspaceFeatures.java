@@ -215,8 +215,12 @@ public final class AirspaceFeatures {
                         polygon(part, floorM), flatStyle(color, alpha), attrs,
                         mode, 0d));
             } else {
+                // No fill under a shelf that is standing up: the walls already say where
+                // it is, and the footprint's tint on top of them turned the imagery
+                // magenta from edge to edge the moment the operator was inside one.
                 out.add(new TfrOverlay.Drawn(id, setKey, setName, name,
-                        polygon(part, Double.NaN), flatStyle(color, alpha), attrs,
+                        polygon(part, Double.NaN),
+                        flatStyle(color, solid ? NO_FILL : alpha), attrs,
                         Feature.AltitudeMode.ClampToGround, 0d));
             }
         }
