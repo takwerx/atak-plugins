@@ -25,6 +25,15 @@
             android:text="@string/settings" />
 
         <Button
+            android:id="@+id/btn_plan"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1.3"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="@string/flight_plan" />
+
+        <Button
             android:id="@+id/btn_refresh"
             style="@style/TakwerxButton"
             android:layout_width="0dp"

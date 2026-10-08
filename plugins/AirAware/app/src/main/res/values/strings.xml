@@ -15,4 +15,8 @@
     <string name="heading_list">Restrictions in view</string>
     <string name="status_waiting">Checking.</string>
     <string name="use_this_zoom">Use this zoom</string>
+    <!-- The flight planner, carried over from UAS Flight Plan. -->
+    <string name="flight_plan">Flight Plan</string>
+    <string name="launch_marker">Launch</string>
+    <string name="prompt_tap_launch">Tap the map where you will launch</string>
 </resources>

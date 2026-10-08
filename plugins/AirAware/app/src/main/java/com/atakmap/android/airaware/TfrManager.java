@@ -250,6 +250,13 @@ public class TfrManager {
     private volatile double obstacleFloorFt = Obstacle.DEFAULT_MIN_AGL_FT;
     private final Set<String> obstacleGroupsOff = new LinkedHashSet<>();
     private ObstaclePills pills;
+    /**
+     * The flight planner, absorbed from UAS Flight Plan.
+     *
+     * <p>Owned here rather than by the pane because a plan outlives the pane being
+     * open: the terrain sample and the launch marker are the plugin's, not a screen's.
+     */
+    private final com.atakmap.android.airaware.plan.PlanManager plan;
 
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
@@ -260,6 +267,8 @@ public class TfrManager {
     public TfrManager(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
         this.pluginContext = pluginContext;
+        this.plan = new com.atakmap.android.airaware.plan.PlanManager(mapView,
+                pluginContext);
         this.overlay = new TfrOverlay(mapView, pluginContext,
                 new File(FileSystemUtils.getItem("tools/airaware"), "airaware.sqlite"), "AirAware");
         final SharedPreferences p = prefs();
@@ -299,6 +308,10 @@ public class TfrManager {
         this.listener = l;
     }
 
+    public com.atakmap.android.airaware.plan.PlanManager plan() {
+        return plan;
+    }
+
     public void start() {
         if (started)
             return;
@@ -309,6 +322,13 @@ public class TfrManager {
             Log.w(TAG, "attaching the overlay failed", e);
         }
         mapView.addOnMapMovedListener(moved);
+        plan.setListener(new com.atakmap.android.airaware.plan.PlanManager.Listener() {
+            @Override
+            public void onPlanChanged() {
+                changed();
+            }
+        });
+        plan.start();
         main.postDelayed(tick, TICK_MS);
         // Airspace rode entirely on the map moving, so after a plugin reload the map had
         // restrictions and no airspace until the operator happened to pan -- which is
@@ -338,6 +358,7 @@ public class TfrManager {
         main.removeCallbacks(tick);
         main.removeCallbacks(settled);
         mapView.removeOnMapMovedListener(moved);
+        plan.stop();
         // Each reinstall otherwise pins this generation's threads through its own static
         // pools, and ATAK runs out of memory after enough reloads.
         worker.shutdownNow();
