@@ -20,6 +20,7 @@ import android.widget.TextView;
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.airaware.Metar;
+import com.atakmap.android.airaware.MetarFeatures;
 import com.atakmap.android.airaware.Tfr;
 import com.atakmap.android.airaware.TfrArea;
 import com.atakmap.android.airaware.TfrFeatures;
@@ -76,11 +77,11 @@ public class TfrPane implements TfrManager.Listener {
     private LinearLayout settingsContainer, typesContainer, updatesContainer, keyBody;
     private Button useZoomButton, gateButton;
     private TextView gateNow, downloadedNote;
-    private Fold gateFold, labelsFold, areaFold, fromFold, whereFold, typesFold, keyFold,
-            updatesFold, fencesFold;
+    private Fold layersFold, gateFold, labelsFold, areaFold, fromFold, whereFold,
+            typesFold, keyFold, updatesFold, fencesFold;
     private Button labelsGateButton;
     private TextView labelsNote;
-    private LinearLayout fencesContainer, fromContainer;
+    private LinearLayout fencesContainer, fromContainer, layersContainer;
     private LinearLayout areaContainer, whereContainer;
     private TextView areaNote;
 
@@ -140,7 +141,10 @@ public class TfrPane implements TfrManager.Listener {
         labelsNote = settings.findViewById(R.id.labels_note);
         fencesContainer = settings.findViewById(R.id.fences_container);
         fromContainer = settings.findViewById(R.id.from_container);
+        layersContainer = settings.findViewById(R.id.layers_container);
 
+        layersFold = new Fold(settings, R.id.fold_layers_head, R.id.fold_layers_chev,
+                R.id.fold_layers_body, "fold.layers");
         gateFold = new Fold(settings, R.id.fold_gate_head, R.id.fold_gate_chev,
                 R.id.fold_gate_body, "fold.gate");
         labelsFold = new Fold(settings, R.id.fold_labels_head, R.id.fold_labels_chev,
@@ -335,6 +339,8 @@ public class TfrPane implements TfrManager.Listener {
         gateNow.setText("Scale bar now " + ScaleBar.describe(manager.barMeters())
                 + (manager.isGateHiding() ? " - hidden" : ""));
 
+        buildLayers();
+
         labelsFold.label("Labels", manager.labelBarMeters() > 0
                 ? gateLabel(manager.labelBarMeters()) + " or closer" : "Always");
         labelsGateButton.setText(manager.labelBarMeters() > 0
@@ -488,6 +494,47 @@ public class TfrPane implements TfrManager.Listener {
         areaNote.setText(manager.hasFix() ? ""
                 : "No GPS fix, measuring from the map center.");
         areaNote.setVisibility(manager.hasFix() ? View.GONE : View.VISIBLE);
+    }
+
+    /**
+     * The layers, each a switch that says its own state.
+     *
+     * <p>Feature Layer's shape, which is what the operator pointed at: the head is the
+     * switch, not a label with a control beside it.
+     */
+    private void buildLayers() {
+        final Resources res = pluginContext.getResources();
+        final int on = countLayersOn();
+        layersFold.label("Layers", on + " of 2 on");
+        layersContainer.removeAllViews();
+        addLayerSwitch(res, "Restrictions", TfrManager.LAYER_RESTRICTIONS);
+        addLayerSwitch(res, MetarFeatures.SET_NAME, TfrManager.LAYER_AIRFIELDS);
+    }
+
+    private int countLayersOn() {
+        int n = 0;
+        if (manager.isLayerOn(TfrManager.LAYER_RESTRICTIONS))
+            n++;
+        if (manager.isLayerOn(TfrManager.LAYER_AIRFIELDS))
+            n++;
+        return n;
+    }
+
+    private void addLayerSwitch(Resources res, final String name, final String key) {
+        final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = 4;
+        b.setLayoutParams(lp);
+        setState(res, b, name, manager.isLayerOn(key));
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setLayerOn(key, !manager.isLayerOn(key));
+                render();
+            }
+        });
+        layersContainer.addView(b);
     }
 
     /** What the distances and the ordering are measured from. */
@@ -800,8 +847,9 @@ public class TfrPane implements TfrManager.Listener {
         showing = t;
         detailsTitle.setText(t.place());
         detailsBody.setText(detailsText(t));
+        detailsGeofence.setVisibility(View.VISIBLE);
+        detailsFaa.setVisibility(View.VISIBLE);
         detailsGeofence.setEnabled(!t.drawable().isEmpty());
-        detailsFaa.setEnabled(true);
         settingsPage.setVisibility(View.GONE);
         list.setVisibility(View.GONE);
         detailsPage.setVisibility(View.VISIBLE);
@@ -833,9 +881,10 @@ public class TfrPane implements TfrManager.Listener {
         if (!m.raw.isEmpty())
             b.append("\n\n").append(m.raw);
         detailsBody.setText(b.toString());
-        // Nothing to fence and no FAA page for a station.
-        detailsGeofence.setEnabled(false);
-        detailsFaa.setEnabled(false);
+        // Gone, not greyed. A disabled button still reads as something this screen does
+        // and you are being denied; a station simply has no geofence and no FAA page.
+        detailsGeofence.setVisibility(View.GONE);
+        detailsFaa.setVisibility(View.GONE);
         settingsPage.setVisibility(View.GONE);
         list.setVisibility(View.GONE);
         detailsPage.setVisibility(View.VISIBLE);

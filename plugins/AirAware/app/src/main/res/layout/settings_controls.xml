@@ -73,6 +73,49 @@
             android:textColor="@color/dim_text" />
     </LinearLayout>
 
+
+    <!-- The layers, each a switch that says its own state. Feature Layer's shape: the
+         head IS the switch. Types below are the restrictions' own kinds. -->
+    <LinearLayout
+        android:id="@+id/fold_layers_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+
+        <Button
+            android:id="@+id/fold_layers_head"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+
+        <ImageButton
+            android:id="@+id/fold_layers_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="@string/show_settings"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/fold_layers_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="4dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/layers_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </LinearLayout>
+
     <!-- When the names appear, which is not when the areas do. -->
     <LinearLayout
         android:id="@+id/fold_labels_row"

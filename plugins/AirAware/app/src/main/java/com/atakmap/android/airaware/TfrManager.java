@@ -47,6 +47,11 @@ public class TfrManager {
     private static final String PREFS = "airaware";
     static final String PREF_ON = "on";
     static final String PREF_TYPES_OFF = "typesOff";
+    static final String PREF_LAYERS_OFF = "layersOff";
+
+    /** The layers an operator turns on and off as wholes. */
+    public static final String LAYER_RESTRICTIONS = "restrictions";
+    public static final String LAYER_AIRFIELDS = MetarFeatures.SET_KEY;
     static final String PREF_GATE_BAR_M = "gateBarM";
     static final String PREF_LABEL_BAR_M = "labelBarM";
     static final String PREF_WHERE_MODE = "whereMode";
@@ -110,6 +115,8 @@ public class TfrManager {
     private boolean on;
     /** Raw FAA type strings the operator has switched off. */
     private final Set<String> typesOff = new LinkedHashSet<>();
+    /** Whole layers switched off. Restrictions and airfields are independent. */
+    private final Set<String> layersOff = new LinkedHashSet<>();
 
     private volatile List<Tfr> known = Collections.emptyList();
     private volatile boolean syncing;
@@ -155,6 +162,7 @@ public class TfrManager {
         areaMode = p.getInt(PREF_AREA_MODE, AREA_IN_VIEW);
         areaRadiusM = p.getLong(PREF_AREA_RADIUS_M, 80467L);
         measureFrom = p.getInt(PREF_MEASURE_FROM, FROM_ME);
+        layersOff.addAll(p.getStringSet(PREF_LAYERS_OFF, Collections.<String> emptySet()));
         typesOff.addAll(p.getStringSet(PREF_TYPES_OFF,
                 new HashSet<>(Collections.singletonList(DEFAULT_OFF))));
     }
@@ -168,7 +176,7 @@ public class TfrManager {
             return;
         started = true;
         try {
-            overlay.attach(on && !gateHiding, new HashSet<>(typesOff));
+            overlay.attach(on && !gateHiding, hiddenSets());
         } catch (Exception e) {
             Log.w(TAG, "attaching the overlay failed", e);
         }
@@ -245,7 +253,7 @@ public class TfrManager {
         prefs().edit().putStringSet(PREF_TYPES_OFF, new HashSet<>(typesOff)).apply();
         // Hidden, never deleted: a type switched off has to come back after a restart
         // with no network, which it cannot do if the features were dropped.
-        overlay.setTypesOff(new HashSet<>(typesOff));
+        overlay.setTypesOff(hiddenSets());
         changed();
     }
 
@@ -265,11 +273,6 @@ public class TfrManager {
         final List<String[]> out = new ArrayList<>();
         for (int i = 0; i < order.size(); i++)
             out.add(new String[] { order.get(i), Integer.toString(counts.get(i)) });
-        // Airfield conditions switch like any other kind: the overlay keys set visibility
-        // on the same string, so it needs no special case anywhere else.
-        if (!metars.isEmpty())
-            out.add(new String[] { MetarFeatures.SET_KEY,
-                    Integer.toString(metars.size()) });
         return out;
     }
 
@@ -317,9 +320,43 @@ public class TfrManager {
         }
     }
 
+    public boolean isLayerOn(String layer) {
+        return !layersOff.contains(layer);
+    }
+
+    public void setLayerOn(String layer, boolean on) {
+        if (on)
+            layersOff.remove(layer);
+        else
+            layersOff.add(layer);
+        prefs().edit().putStringSet(PREF_LAYERS_OFF, new HashSet<>(layersOff)).apply();
+        overlay.setTypesOff(hiddenSets());
+        changed();
+    }
+
+    /**
+     * Every set key the map should be hiding: the kinds switched off, plus everything
+     * belonging to a layer switched off.
+     *
+     * <p>One place computes it, so a layer switch and a type switch cannot disagree about
+     * what is on the map.
+     */
+    private Set<String> hiddenSets() {
+        final Set<String> off = new HashSet<>(typesOff);
+        if (layersOff.contains(LAYER_AIRFIELDS))
+            off.add(LAYER_AIRFIELDS);
+        if (layersOff.contains(LAYER_RESTRICTIONS))
+            for (Tfr t : known)
+                off.add(t.type);
+        return off;
+    }
+
+
     /** Everything the type and place filters let through. The map draws exactly this. */
     public List<Tfr> shown() {
         final List<Tfr> out = new ArrayList<>();
+        if (!isLayerOn(LAYER_RESTRICTIONS))
+            return out;
         for (Tfr t : known)
             if (isTypeOn(t.type) && matchesWhere(t))
                 out.add(t);
@@ -816,7 +853,7 @@ public class TfrManager {
         // the set they land in is switched like any other type.
         drawn.addAll(MetarFeatures.drawn(metars));
         overlay.rewrite(drawn);
-        overlay.setTypesOff(new HashSet<>(typesOff));
+        overlay.setTypesOff(hiddenSets());
     }
 
     private void progress(final String message) {
