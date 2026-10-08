@@ -1,4 +1,4 @@
-TFR
+AirAware
 
 
 _________________________________________________________________
@@ -38,7 +38,7 @@ LICENSE
 
 Copyright (C) 2026 Andreas Johansson (TAKWERX).
 
-TFR is free software, licensed under the
+AirAware is free software, licensed under the
 **[GNU Affero General Public License v3.0 or later](LICENSE)**
 (AGPL-3.0-or-later), with an
 **[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
@@ -47,15 +47,15 @@ without the AGPL reaching into ATAK itself.
 
 You may run it, study it, modify it, and share it -- for any purpose, commercial
 or not, with no fee and no per-seat license. What the AGPL adds over a permissive
-license is a guarantee that it **stays** free: modify TFR and pass it on,
+license is a guarantee that it **stays** free: modify AirAware and pass it on,
 and the people you pass it to are owed the complete corresponding source of your
 version under the same license. Nobody can take this, close it, and sell it back
 to the emergency-services community.
 
-**If you only install and use TFR, this obligation never touches you.**
+**If you only install and use AirAware, this obligation never touches you.**
 Running it, in any agency, on any number of devices, triggers nothing.
 
-**Scope.** The AGPL covers TFR's own code. It does not change the license
+**Scope.** The AGPL covers AirAware's own code. It does not change the license
 of the TAK Software, which stays under the TAK Software License Agreement, and it
 does not cover the parts of this repository scaffolded from the TAK-SDK plugin
 template -- those are listed under Provenance in

@@ -1,13 +1,13 @@
-# TFR Contributor License Agreement
+# AirAware Contributor License Agreement
 
 **Version 1.0**
 
 ## Why this exists — in plain English
 
-TFR is licensed under the AGPL so that it stays free: anyone who modifies
+AirAware is licensed under the AGPL so that it stays free: anyone who modifies
 it and serves it to others has to offer them the source. That promise is only
 worth something if somebody can actually enforce it, and under copyright law only
-the copyright holder has standing to do so. If the copyright in TFR is
+the copyright holder has standing to do so. If the copyright in AirAware is
 scattered across dozens of contributors, nobody can enforce anything, and the
 license becomes decoration.
 
@@ -16,13 +16,13 @@ So this agreement asks you for two things:
 1. **You keep the copyright in your work.** You are not signing it away. You can
    use your own contribution anywhere else, for anything, forever.
 2. **You grant TAKWERX a broad license to it** — broad enough to ship it in
-   TFR, to enforce the AGPL against someone who takes the project
+   AirAware, to enforce the AGPL against someone who takes the project
    proprietary, and to offer the project under other terms as well.
 
 Point 2 includes the right to license your contribution under terms other than
 the AGPL. Be aware of what that means: it allows TAKWERX to sell a commercial
 exception to an organization whose procurement rules forbid AGPL software. It
-does **not** allow TAKWERX to take TFR closed — the AGPL grant already
+does **not** allow TAKWERX to take AirAware closed — the AGPL grant already
 made to the public is irrevocable, and every release remains available under it.
 
 If you are not comfortable with the terms below, say so in the pull request. A
@@ -37,7 +37,7 @@ You accept and agree to the following terms for your present and future
 Contributions submitted to Andreas Johansson, an individual doing business as
 TAKWERX ("**TAKWERX**", "we", "us"). TAKWERX is a trading name, not a separate
 legal entity; the grants below run to that individual, and to any entity to
-which the copyright in TFR is later assigned. Except for the
+which the copyright in AirAware is later assigned. Except for the
 licenses granted here, you retain all right, title and interest in and to your
 Contributions.
 
@@ -142,7 +142,7 @@ git commit -s -m "your commit message"
 The presence of that line on a commit you submit to this project means:
 
 > I certify that I wrote this contribution or otherwise have the right to submit
-> it under the project's license, and I accept the terms of the TFR
+> it under the project's license, and I accept the terms of the AirAware
 > Contributor License Agreement, version 1.0.
 
 Corporate contributors whose employer requires a signed entity agreement should

@@ -1,6 +1,6 @@
-# Licensing notes for TFR
+# Licensing notes for AirAware
 
-TFR is licensed under the **[GNU Affero General Public License v3.0 or
+AirAware is licensed under the **[GNU Affero General Public License v3.0 or
 later](LICENSE)** (AGPL-3.0-or-later).
 
 Two things about an ATAK plugin do not follow from the license text alone, and
@@ -18,14 +18,14 @@ permission below is granted explicitly.
 
 > **Additional permission under GNU AGPL version 3 section 7**
 >
-> As a special exception, the copyright holders of TFR give you permission to
-> combine, link with, and distribute TFR, or a work based on TFR, together
+> As a special exception, the copyright holders of AirAware give you permission to
+> combine, link with, and distribute AirAware, or a work based on AirAware, together
 > with the TAK Software — ATAK-CIV, ATAK-GOV, ATAK-MIL and the TAK Software
 > Development Kit, as licensed by the United States Government under the TAK
 > Software License Agreement — and to convey the resulting work.
 >
 > You must still comply with the GNU AGPL in all respects for the portions of the
-> resulting work that are TFR, or a work based on TFR.
+> resulting work that are AirAware, or a work based on AirAware.
 >
 > If you modify this file, you may extend this exception to your version of the
 > file, but you are not obliged to do so. If you do not wish to do so, delete this
@@ -37,7 +37,7 @@ AGPL reaches into ATAK. What stays covered is this plugin's own source: modify i
 and pass it on, and the people you pass it to are owed that source under the same
 license.
 
-**If you only install and use TFR, none of this touches you.** Running the
+**If you only install and use AirAware, none of this touches you.** Running the
 plugin, in any agency, on any number of devices, triggers no obligation at all.
 
 **This exception does not come from the Government, and does not change the TAK
@@ -66,7 +66,7 @@ AGPL applies to the modifications.
 
 **From the TAK-SDK `plugintemplate` sample**, essentially unchanged:
 
-- `app/src/main/java/com/atakmap/android/tfr/plugin/PluginNativeLoader.java`
+- `app/src/main/java/com/atakmap/android/airaware/plugin/PluginNativeLoader.java`
   (identical to the template but for the package name)
 - `build.gradle`, `settings.gradle`, `gradle.properties`, `gradle/versions.gradle`
 - `app/build.gradle` and `app/proguard-gradle.txt` — template files with a plugin's
@@ -77,7 +77,7 @@ AGPL applies to the modifications.
 **Derived from the template and substantially rewritten** — AGPL applies to the
 changes:
 
-- `app/src/main/java/com/atakmap/android/tfr/plugin/TFR.java`
+- `app/src/main/java/com/atakmap/android/airaware/plugin/AirAware.java`
 
 **Third party:**
 

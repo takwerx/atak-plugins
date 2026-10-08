@@ -1,6 +1,6 @@
-# Contributing to TFR
+# Contributing to AirAware
 
-TFR is an ATAK plugin, free software under the
+AirAware is an ATAK plugin, free software under the
 [GNU Affero General Public License v3.0 or later](LICENSE), with an
 [additional permission](LICENSE-EXCEPTION.md) covering the TAK SDK.
 
@@ -45,7 +45,7 @@ Every new source file gets an SPDX identifier:
 
 ```java
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// TFR — an ATAK plugin
+// AirAware — an ATAK plugin
 // Copyright (C) 2026 Andreas Johansson (TAKWERX)
 //
 // This program is free software: you can redistribute it and/or modify it under
@@ -81,7 +81,7 @@ sensitive, ever.
 By submitting a contribution you agree to the terms in [CLA.md](CLA.md).
 
 In short: you keep the copyright in your work, and you grant TAKWERX a license
-broad enough to ship it as part of TFR. This is what lets the project be
+broad enough to ship it as part of AirAware. This is what lets the project be
 enforced as a whole — the AGPL's promise that it stays open is only meaningful if
 there is a single party with standing to enforce it.
 
@@ -105,7 +105,7 @@ for a fix before disclosure.
 
 ## Where this is built
 
-TFR is developed in
+AirAware is developed in
 [takwerx/atak-plugins](https://github.com/takwerx/atak-plugins) alongside the
 other TAKWERX plugins, and published here by subtree push. Pull requests against
 this repository are the right place to send changes; they are merged back
