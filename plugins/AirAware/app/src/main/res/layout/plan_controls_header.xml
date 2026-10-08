@@ -154,6 +154,14 @@
         android:layout_marginTop="8dp"
         android:text="@string/file_laanc" />
 
+    <Button
+        android:id="@+id/btn_notam"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="@string/notify_flight_service" />
+
     <TextView
         android:id="@+id/list_heading"
         style="@style/TakwerxSectionHeading"

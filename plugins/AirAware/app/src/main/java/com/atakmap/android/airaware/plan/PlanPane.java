@@ -186,6 +186,14 @@ public final class PlanPane implements IslandOverlay.Listener,
                         onBack.run();
                 }
             });
+        final android.widget.Button notam = header.findViewById(R.id.btn_notam);
+        if (notam != null)
+            notam.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    notifyFlightService();
+                }
+            });
         final android.widget.Button laanc = header.findViewById(R.id.btn_laanc);
         if (laanc != null)
             laanc.setOnClickListener(new View.OnClickListener() {
@@ -1293,6 +1301,75 @@ public final class PlanPane implements IslandOverlay.Listener,
     private static final String ALOFT_WEB = "https://air.aloft.ai/";
     /** Read off a phone; a third party's internal name, so never the only route. */
     private static final String ALOFT_ACTIVITY = "ai.aloft.aircontrol2.MainActivity";
+
+    /**
+     * What to read out to Flight Service, from the plan that is already on screen.
+     *
+     * <p>Not required for Part 107 work and it authorizes nothing -- a NOTAM is a notice
+     * to other pilots, not permission and not a restriction. It earns its place on this
+     * screen for the case the operator described: a fire that is out and a mop-up flown
+     * over the same ground for days near an airport. During the fire the TFR did this
+     * job; on mop-up there is no TFR and nothing tells the pattern traffic anybody is
+     * there.
+     *
+     * <p>Everything in it comes off the plan, because reading a position and a ceiling
+     * off a scrap of paper while holding a phone is how numbers get said wrong.
+     */
+    private void notifyFlightService() {
+        final StringBuilder b = new StringBuilder();
+        final GeoPoint p = launch.getPoint();
+        b.append("UAS operation - notice to airmen\n\n");
+        if (p == null) {
+            b.append("Position:   no launch point set yet\n");
+        } else {
+            b.append("Position:   ").append(String.format(java.util.Locale.US,
+                    "%.5f, %.5f", p.getLatitude(), p.getLongitude())).append('\n');
+        }
+        final Extent extent = extent();
+        if (extent != null && extent.isCircle())
+            b.append("Area:       ").append(PlanUnits.distance(extent.radiusM))
+                    .append(" radius\n");
+        else if (extent != null)
+            b.append("Area:       the drawn area\n");
+        final Double ceiling = ceilingFt();
+        if (ceiling != null)
+            b.append("Altitude:   surface to ")
+                    .append(Math.round(flightAglFt())).append(" ft AGL (")
+                    .append(Math.round(ceiling)).append(" ft MSL)\n");
+        b.append("Times:      from now until you say otherwise\n");
+        b.append("Purpose:    UAS fire mapping\n");
+        b.append("\nFlight Service: 1-877-487-6867\n");
+        b.append("\nA NOTAM tells other pilots you are there. It does not authorize")
+                .append(" you and does not keep anyone away.");
+        final String text = b.toString();
+
+        new android.app.AlertDialog.Builder(host)
+                .setTitle(R.string.notify_flight_service)
+                .setMessage(text)
+                .setPositiveButton(R.string.call_flight_service,
+                        new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface d, int w) {
+                                start(new android.content.Intent(
+                                        android.content.Intent.ACTION_DIAL,
+                                        android.net.Uri.parse("tel:18774876867")), "dialer");
+                            }
+                        })
+                .setNeutralButton(R.string.copy_details,
+                        new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface d, int w) {
+                                final android.content.ClipboardManager cb =
+                                        (android.content.ClipboardManager) host
+                                                .getSystemService(Context.CLIPBOARD_SERVICE);
+                                if (cb != null)
+                                    cb.setPrimaryClip(android.content.ClipData.newPlainText(
+                                            "NOTAM", text));
+                            }
+                        })
+                .setNegativeButton(R.string.close, null)
+                .show();
+    }
 
     private void askLaanc() {
         final String[] labels = {

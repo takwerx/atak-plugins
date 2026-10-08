@@ -162,6 +162,10 @@
     <string name="ceiling_proposed">Ceiling set to %1$s above the launch ground. Change it under Settings.</string>
     <string name="back_to_airaware">&#8249; AirAware layers</string>
     <string name="file_laanc">File LAANC</string>
+    <string name="notify_flight_service">Notify Flight Service</string>
+    <string name="call_flight_service">Call</string>
+    <string name="copy_details">Copy</string>
+    <string name="close">Close</string>
     <string name="laanc_title">File an authorization</string>
     <string name="laanc_uss">LAANC in Aloft Air Control</string>
     <string name="laanc_dronezone">FAA DroneZone (web) - what LAANC does not cover</string>
