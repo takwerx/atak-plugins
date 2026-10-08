@@ -74,7 +74,7 @@ public class TfrPane implements TfrManager.Listener {
     private Button detailsBack, detailsGeofence, detailsFaa;
     /** What the details page is showing, so its buttons know their subject. */
     private Tfr showing;
-    private Button switchButton, settingsButton, refreshButton, backButton;
+    private Button settingsButton, refreshButton, backButton;
     private TextView statusText, headingText;
     private LinearLayout settingsContainer, updatesContainer, keyBody;
     private TextView downloadedNote;
@@ -112,7 +112,6 @@ public class TfrPane implements TfrManager.Listener {
         adapter = new RowAdapter();
         list.setAdapter(adapter);
 
-        switchButton = header.findViewById(R.id.btn_switch);
         settingsButton = header.findViewById(R.id.btn_settings);
         refreshButton = header.findViewById(R.id.btn_refresh);
         headingText = header.findViewById(R.id.list_heading);
@@ -165,13 +164,6 @@ public class TfrPane implements TfrManager.Listener {
     }
 
     private void wire() {
-        switchButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                manager.setOn(!manager.isOn());
-                render();
-            }
-        });
         settingsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -247,16 +239,10 @@ public class TfrPane implements TfrManager.Listener {
     public void render() {
         if (root == null)
             return;
-        final Resources res = pluginContext.getResources();
-        final boolean on = manager.isOn();
-
-        if (manager.isSyncing()) {
-            switchButton.setText("Loading...");
-            switchButton.setTextColor(0xFFFFC107);
-        } else {
-            setState(res, switchButton, "AirAware", on);
-        }
-        refreshButton.setEnabled(on && !manager.isSyncing());
+        // Refresh is the restrictions' download, so it follows that layer and not the
+        // plugin: there is no plugin-wide on any more.
+        refreshButton.setEnabled(manager.isLayerOn(TfrManager.LAYER_RESTRICTIONS)
+                && !manager.isSyncing());
         statusText.setText(manager.status());
 
         buildLayerRows();
@@ -266,7 +252,10 @@ public class TfrPane implements TfrManager.Listener {
 
     private void rebuildList() {
         rows.clear();
-        final List<Tfr> inView = manager.isOn() ? manager.inView() : new ArrayList<Tfr>();
+        // The list is the restrictions' list, so it follows that layer. With METARs on
+        // and TFR off it was still counting restrictions nobody could see.
+        final boolean on = manager.isLayerOn(TfrManager.LAYER_RESTRICTIONS);
+        final List<Tfr> inView = on ? manager.inView() : new ArrayList<Tfr>();
         inViewTotal = inView.size();
         final GeoPoint from = manager.self();
         Collections.sort(inView, new Comparator<Tfr>() {
@@ -281,7 +270,7 @@ public class TfrPane implements TfrManager.Listener {
         // Area was set to, so an operator who had chosen Everything zoomed onto a single
         // restriction and the count did not move -- correctly, and for a reason the pane
         // was hiding from them.
-        headingText.setText(manager.isOn() ? manager.listHeading() + " (" + inViewTotal + ")"
+        headingText.setText(on ? manager.listHeading() + " (" + inViewTotal + ")"
                 : manager.listHeading());
         adapter.notifyDataSetChanged();
     }

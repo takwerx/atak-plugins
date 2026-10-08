@@ -45,7 +45,6 @@ public class TfrManager {
     private static final String TAG = "TfrManager";
 
     private static final String PREFS = "airaware";
-    static final String PREF_ON = "on";
     static final String PREF_TYPES_OFF = "typesOff";
     static final String PREF_LAYERS_OFF = "layersOff";
 
@@ -127,7 +126,6 @@ public class TfrManager {
 
     private Listener listener;
     private boolean started;
-    private boolean on;
     /** Raw FAA type strings the operator has switched off. */
     private final Set<String> typesOff = new LinkedHashSet<>();
     /** Whole layers switched off. Restrictions and airfields are independent. */
@@ -189,8 +187,8 @@ public class TfrManager {
         this.overlay = new TfrOverlay(mapView, pluginContext,
                 new File(FileSystemUtils.getItem("tools/airaware"), "airaware.sqlite"), "AirAware");
         final SharedPreferences p = prefs();
-        // A fresh install starts off: nothing pulls the country before it is asked to.
-        on = p.getBoolean(PREF_ON, false);
+        // A fresh install starts with every layer off: nothing pulls the country, or a
+        // megabyte of airspace, before it is asked to.
         gateBarM = p.getLong(PREF_GATE_BAR_M, -1L);
         labelBarM = p.getLong(PREF_LABEL_BAR_M, 16093L);
         airfieldBarM = p.getLong(PREF_AIRFIELD_BAR_M, 48280L);
@@ -204,7 +202,7 @@ public class TfrManager {
         areaMode = p.getInt(PREF_AREA_MODE, AREA_IN_VIEW);
         areaRadiusM = p.getLong(PREF_AREA_RADIUS_M, 80467L);
         measureFrom = p.getInt(PREF_MEASURE_FROM, FROM_ME);
-        layersOff.addAll(p.getStringSet(PREF_LAYERS_OFF, Collections.<String> emptySet()));
+        layersOff.addAll(p.getStringSet(PREF_LAYERS_OFF, allLayerKeys()));
         typesOff.addAll(p.getStringSet(PREF_TYPES_OFF,
                 new HashSet<>(Collections.singletonList(DEFAULT_OFF))));
     }
@@ -218,7 +216,7 @@ public class TfrManager {
             return;
         started = true;
         try {
-            overlay.attach(on && !gateHiding, hiddenSets());
+            overlay.attach(isAnyLayerOn() && !gateHiding, hiddenSets());
         } catch (Exception e) {
             Log.w(TAG, "attaching the overlay failed", e);
         }
@@ -230,7 +228,7 @@ public class TfrManager {
             @Override
             public void run() {
                 loadFromCache();
-                if (on)
+                if (isLayerOn(LAYER_RESTRICTIONS))
                     syncOnWorker();
             }
         });
@@ -249,37 +247,27 @@ public class TfrManager {
 
     // ---- the switch ----
 
+    /**
+     * Whether the plugin is doing anything at all, which is no longer a switch of its
+     * own: it is whether any layer is on.
+     *
+     * <p>There was a master switch above the layer rows, from before this plugin had
+     * layers, and with four of them it had become a second vaguer copy of All off --
+     * operator, 2026-10-08: "im confused with gui what does airaware off at top adn then
+     * all on all off mean?". So a layer is the only unit, and on means it downloads and
+     * it draws. That is the rule the operator set for the whole plugin originally ("if
+     * you have it on it syncs at open if you have it set to off it does not"), now per
+     * layer, so restrictions can stay current while airspace is off.
+     */
     public boolean isOn() {
-        return on;
+        return isAnyLayerOn();
     }
 
-    /**
-     * On syncs at open and keeps itself current; off touches nothing and draws nothing.
-     *
-     * <p>Off leaves the store and the cache alone, so turning it back on is a 24 KB list
-     * diff rather than another three megabytes -- and so the last good picture is still
-     * there after a restart with no network, which is the rule for downloaded data.
-     *
-     * <p>This is deliberately more than the baseline's "the map switch hides the map,
-     * nothing else": the operator asked for one switch that decides whether the plugin
-     * touches the network at all.
-     */
-    public void setOn(boolean value) {
-        if (on == value)
-            return;
-        on = value;
-        prefs().edit().putBoolean(PREF_ON, value).apply();
-        if (on) {
-            applyGate();
-            maybeFetchMetars();
-            maybeFetchAirspace();
-            syncNow();
-        } else {
-            lastError = null;
-            syncStatus = "";
-            overlay.setVisible(false);
-        }
-        changed();
+    private boolean isAnyLayerOn() {
+        for (String[] layer : layers())
+            if (!layersOff.contains(layer[0]))
+                return true;
+        return false;
     }
 
     // ---- the type filter ----
@@ -379,16 +367,38 @@ public class TfrManager {
         return out;
     }
 
+    private Set<String> allLayerKeys() {
+        final Set<String> keys = new LinkedHashSet<>();
+        for (String[] layer : layers())
+            keys.add(layer[0]);
+        return keys;
+    }
+
     /** All on, all off. One call so the map, the prefs and the rows move together. */
     public void setAllLayersOn(boolean value) {
-        for (String[] layer : layers()) {
-            if (value)
-                layersOff.remove(layer[0]);
-            else
-                layersOff.add(layer[0]);
-        }
+        if (value)
+            layersOff.clear();
+        else
+            layersOff.addAll(allLayerKeys());
+        afterLayerChange();
+    }
+
+    /**
+     * What every layer switch does once the preference is written.
+     *
+     * <p>A layer just switched on starts its own download, because that is now the whole
+     * meaning of on. Each call is cheap when there is nothing to do: the restriction sync
+     * returns while one is already running, and the two box fetches return while the view
+     * is still inside the box they last asked for.
+     */
+    private void afterLayerChange() {
         prefs().edit().putStringSet(PREF_LAYERS_OFF, new HashSet<>(layersOff)).apply();
+        applyGate();
         overlay.setTypesOff(hiddenSets());
+        if (isLayerOn(LAYER_RESTRICTIONS))
+            syncNow();
+        maybeFetchMetars();
+        maybeFetchAirspace();
         changed();
     }
 
@@ -396,14 +406,12 @@ public class TfrManager {
         return !layersOff.contains(layer);
     }
 
-    public void setLayerOn(String layer, boolean on) {
-        if (on)
+    public void setLayerOn(String layer, boolean value) {
+        if (value)
             layersOff.remove(layer);
         else
             layersOff.add(layer);
-        prefs().edit().putStringSet(PREF_LAYERS_OFF, new HashSet<>(layersOff)).apply();
-        overlay.setTypesOff(hiddenSets());
-        changed();
+        afterLayerChange();
     }
 
     /**
@@ -881,10 +889,10 @@ public class TfrManager {
      */
     private void applyGate() {
         final double bar = barMeters();
-        final boolean hide = on && gateBarM > 0 && bar > gateBarM * 1.02;
+        final boolean hide = isAnyLayerOn() && gateBarM > 0 && bar > gateBarM * 1.02;
         final boolean was = gateHiding;
         gateHiding = hide;
-        overlay.setVisible(on && !hide);
+        overlay.setVisible(isAnyLayerOn() && !hide);
 
         // The labels gate separately, and only matter while the areas are drawn at all.
         airfieldsHidden = airfieldBarM > 0 && bar > airfieldBarM * 1.02;
@@ -917,8 +925,8 @@ public class TfrManager {
      */
     public String status() {
         final StringBuilder b = new StringBuilder();
-        if (!on)
-            return "AirAware off. Turn it on to download and show airspace.";
+        if (!isAnyLayerOn())
+            return "Nothing is switched on. Turn a layer on to download and show it.";
         // First, because it is the question the airspace layer exists to answer and the
         // operator should not have to tap anything to get it.
         final String where = airspaceHereLine();
@@ -1004,7 +1012,7 @@ public class TfrManager {
     // ---- sync ----
 
     public void syncNow() {
-        if (!on || syncing)
+        if (!isLayerOn(LAYER_RESTRICTIONS) || syncing)
             return;
         worker.execute(new Runnable() {
             @Override
@@ -1055,7 +1063,7 @@ public class TfrManager {
         int done = 0;
         int failed = 0;
         for (Tfr t : rows) {
-            if (!on || Thread.currentThread().isInterrupted())
+            if (!isLayerOn(LAYER_RESTRICTIONS) || Thread.currentThread().isInterrupted())
                 break;
             done++;
             byte[] xml = cache.read(t.notamId);
@@ -1160,7 +1168,7 @@ public class TfrManager {
             if (!started)
                 return;
             main.postDelayed(this, TICK_MS);
-            if (!on || syncing)
+            if (!isAnyLayerOn() || syncing)
                 return;
             // Never assume the timer fired. Doze defers everything and a phone can be
             // asleep for an hour, so what decides a refresh is the age of the last
@@ -1222,7 +1230,7 @@ public class TfrManager {
      * because a pan of half a screen is not new weather.
      */
     private void maybeFetchMetars() {
-        if (!on)
+        if (!isLayerOn(LAYER_AIRFIELDS))
             return;
         final GeoBounds b = mapView.getBounds();
         if (b == null || Double.isNaN(b.getNorth()) || Double.isNaN(b.getSouth()))
@@ -1275,7 +1283,7 @@ public class TfrManager {
      * an hour with what it already has still on the map.
      */
     private void maybeFetchAirspace() {
-        if (!on || isAirspaceBusy())
+        if (isAirspaceBusy())
             return;
         if (!isLayerOn(LAYER_AIRSPACE) && !isLayerOn(LAYER_SUA))
             return;

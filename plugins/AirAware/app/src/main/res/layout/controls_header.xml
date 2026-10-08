@@ -12,24 +12,16 @@
         android:orientation="horizontal"
         android:layout_marginTop="6dp">
 
-        <!-- Wider than the two beside it, which is a deliberate break from the equal
-             thirds the pane standard asks for: "AirAware OFF" does not fit a third of a
-             half-width pane and ellipsized to "AirAware O...". A switch whose state you
-             cannot read is not a switch. -->
-        <Button
-            android:id="@+id/btn_switch"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1.5"
-            android:layout_height="wrap_content" />
-
+        <!-- No master switch. There was one, from before this plugin had layers, and
+             with four of them it had become a second vaguer copy of All off: the
+             operator could not tell what each one meant. A layer is the only unit now,
+             and on means it downloads and it draws. -->
         <Button
             android:id="@+id/btn_settings"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
             android:text="@string/settings" />
 
         <Button
