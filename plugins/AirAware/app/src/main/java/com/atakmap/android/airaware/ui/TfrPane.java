@@ -23,7 +23,6 @@ import com.atakmap.android.airaware.Airspace;
 import com.atakmap.android.airaware.AirspaceFeatures;
 import com.atakmap.android.airaware.Metar;
 import com.atakmap.android.airaware.Obstacle;
-import com.atakmap.android.airaware.plan.PlanManager;
 import com.atakmap.android.airaware.MetarFeatures;
 import com.atakmap.android.airaware.Tfr;
 import com.atakmap.android.airaware.TfrArea;
@@ -76,10 +75,9 @@ public class TfrPane implements TfrManager.Listener {
     private Button detailsBack, detailsGeofence, detailsFaa;
     /** What the details page is showing, so its buttons know their subject. */
     private Tfr showing;
-    private Button settingsButton, refreshButton, backButton, planButton, planBack;
-    private View planPage;
-    private LinearLayout planContainer;
-    private TextView planStatus;
+    private Button settingsButton, refreshButton, backButton, planButton;
+    /** What the Flight Plan button does; the plugin supplies it. */
+    private Runnable onPlan;
     private TextView statusText, headingText;
     private LinearLayout settingsContainer, updatesContainer, keyBody;
     private TextView downloadedNote;
@@ -141,10 +139,6 @@ public class TfrPane implements TfrManager.Listener {
                 R.layout.settings_controls, null);
         settingsContainer.addView(settings);
         backButton = root.findViewById(R.id.btn_settings_back);
-        planPage = root.findViewById(R.id.plan_page);
-        planContainer = root.findViewById(R.id.plan_container);
-        planStatus = root.findViewById(R.id.plan_status);
-        planBack = root.findViewById(R.id.btn_plan_back);
         updatesContainer = settings.findViewById(R.id.updates_container);
         keyBody = settings.findViewById(R.id.fold_key_body);
         downloadedNote = settings.findViewById(R.id.downloaded_note);
@@ -180,16 +174,14 @@ public class TfrPane implements TfrManager.Listener {
                 showSettings(true);
             }
         });
+        // The planner is UAS Flight Plan's own pane, carried over whole, and it opens
+        // as its own pane rather than a page in here: that is the screen the operator
+        // already knows and nothing about it should change.
         planButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                showPlan(true);
-            }
-        });
-        planBack.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showPlan(false);
+                if (onPlan != null)
+                    onPlan.run();
             }
         });
         backButton.setOnClickListener(new View.OnClickListener() {
@@ -247,6 +239,10 @@ public class TfrPane implements TfrManager.Listener {
         render();
     }
 
+    public void setOnPlan(Runnable r) {
+        this.onPlan = r;
+    }
+
     public boolean isShowingDetails() {
         return detailsPage != null && detailsPage.getVisibility() == View.VISIBLE;
     }
@@ -270,267 +266,6 @@ public class TfrPane implements TfrManager.Listener {
         buildLayerRows();
         rebuildList();
         renderSettings();
-        if (planPage != null && planPage.getVisibility() == View.VISIBLE)
-            renderPlan();
-    }
-
-    /** The planner page, in place of the list. */
-    private void showPlan(boolean on) {
-        if (planPage == null)
-            return;
-        settingsPage.setVisibility(View.GONE);
-        detailsPage.setVisibility(View.GONE);
-        planPage.setVisibility(on ? View.VISIBLE : View.GONE);
-        list.setVisibility(on ? View.GONE : View.VISIBLE);
-        if (on)
-            renderPlan();
-    }
-
-    public boolean isShowingPlan() {
-        return planPage != null && planPage.getVisibility() == View.VISIBLE;
-    }
-
-    /**
-     * What the planner shows.
-     *
-     * <p>Two scenarios, never one number with a sync button: either a ceiling has been
-     * given and the question is what breaches it, or one is needed and the question is
-     * what to ask for. The mode picks which, and each keeps its own answer.
-     */
-    private void renderPlan() {
-        final PlanManager plan = manager.plan();
-        if (plan == null || planContainer == null)
-            return;
-        planContainer.removeAllViews();
-        planStatus.setText(plan.status());
-
-        addValueButton(planContainer, "Launch point",
-                plan.launchPoint() == null ? "not set" : "set", new Runnable() {
-                    @Override
-                    public void run() {
-                        pickLaunch(plan);
-                    }
-                });
-        addValueButton(planContainer, "Area",
-                SpanUtilities.formatType(Units.type(), plan.radiusM(), Span.METER) + " around it", new Runnable() {
-                    @Override
-                    public void run() {
-                        pickFromMeters("How far around the launch point",
-                                PlanManager.RADIUS_PRESETS_M, plan.radiusM(),
-                                new OnMeters() {
-                                    @Override
-                                    public void set(double m) {
-                                        plan.setRadiusM(m);
-                                    }
-                                });
-                    }
-                });
-        addValueButton(planContainer, "Ceiling",
-                plan.mode() == PlanManager.MODE_NEED ? "Need a ceiling" : "Given a ceiling",
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        pickPlanMode(plan);
-                    }
-                });
-
-        if (plan.mode() == PlanManager.MODE_GIVEN) {
-            addValueButton(planContainer, "Set to",
-                    TfrVertical.comma((int) Math.round(plan.ceilingAglFt()))
-                            + " ft above launch",
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            pickPlanFeet("Ceiling above the launch point",
-                                    PlanManager.CEILING_PRESETS_FT, plan.ceilingAglFt(),
-                                    new OnFeet() {
-                                        @Override
-                                        public void set(double ft) {
-                                            plan.setCeilingAglFt(ft);
-                                        }
-                                    });
-                        }
-                    });
-        } else {
-            addValueButton(planContainer, "Clearance",
-                    TfrVertical.comma((int) Math.round(plan.clearanceFt()))
-                            + " ft over the highest ground",
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            pickPlanFeet("Clearance over the highest ground",
-                                    new double[] { 100, 200, 300, 500 },
-                                    plan.clearanceFt(), new OnFeet() {
-                                        @Override
-                                        public void set(double ft) {
-                                            plan.setClearanceFt(ft);
-                                            plan.repaintCeiling();
-                                        }
-                                    });
-                        }
-                    });
-        }
-
-        addValueButton(planContainer, "Terrain over the ceiling",
-                plan.islandsOn() ? "Shown" : "Hidden", new Runnable() {
-                    @Override
-                    public void run() {
-                        plan.setIslandsOn(!plan.islandsOn());
-                        render();
-                    }
-                });
-
-        addPlanAnswers(plan);
-
-        final Button clear = new Button(pluginContext, null,
-                pluginContext.getResources().getIdentifier("TakwerxButton", "style",
-                        pluginContext.getPackageName()));
-        clear.setText("Clear the plan");
-        clear.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                plan.clearPlan();
-                render();
-            }
-        });
-        planContainer.addView(clear);
-    }
-
-    /** The numbers, which is what the page is for. */
-    private void addPlanAnswers(PlanManager plan) {
-        final double ground = plan.groundMslFt();
-        if (Double.isNaN(ground))
-            return;
-        final StringBuilder b = new StringBuilder();
-        b.append("Ground at launch: ")
-                .append(TfrVertical.comma((int) Math.round(ground))).append(" ft MSL\n");
-        final double top = plan.highestTerrainMslFt();
-        if (!Double.isNaN(top))
-            b.append("Highest ground in the area: ")
-                    .append(TfrVertical.comma((int) Math.round(top))).append(" ft MSL\n");
-        if (plan.mode() == PlanManager.MODE_NEED) {
-            final double need = plan.neededAglFt();
-            if (!Double.isNaN(need))
-                b.append("\nAsk for ")
-                        .append(TfrVertical.comma((int) Math.round(need)))
-                        .append(" ft above launch.\n");
-        }
-        final double ceiling = plan.ceilingMslFt();
-        if (!Double.isNaN(ceiling))
-            b.append("That is ").append(TfrVertical.comma((int) Math.round(ceiling)))
-                    .append(" ft MSL.\n");
-
-        final List<Obstacle> breaching = plan.breaching(manager.obstacles());
-        if (!breaching.isEmpty()) {
-            b.append("\n").append(breaching.size())
-                    .append(breaching.size() == 1 ? " obstacle reaches it:"
-                            : " obstacles reach it:");
-            for (int i = 0; i < breaching.size() && i < 5; i++) {
-                final Obstacle o = breaching.get(i);
-                b.append("\n  ").append(o.kind()).append("  ")
-                        .append(TfrVertical.comma((int) Math.round(o.amslFt)))
-                        .append(" ft MSL");
-            }
-        }
-        final TextView tv = new TextView(pluginContext);
-        tv.setTextColor(0xFFFFFFFF);
-        tv.setTextSize(14f);
-        tv.setPadding(4, 12, 4, 12);
-        tv.setText(b.toString());
-        planContainer.addView(tv);
-    }
-
-    private void pickLaunch(final PlanManager plan) {
-        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
-                .setTitle("Launch point")
-                .setItems(new String[] { "Tap it on the map", "Use my position" },
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dlg, int which) {
-                                if (which == 0)
-                                    plan.pickLaunch();
-                                else
-                                    plan.useMyPosition();
-                                render();
-                            }
-                        })
-                .show();
-        fromTop(d);
-    }
-
-    private void pickPlanMode(final PlanManager plan) {
-        final String[] labels = {
-                "Given a ceiling - show me what reaches it",
-                "Need a ceiling - work out what to ask for" };
-        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
-                .setTitle("Which question")
-                .setSingleChoiceItems(labels,
-                        plan.mode() == PlanManager.MODE_NEED ? 1 : 0,
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dlg, int which) {
-                                plan.setMode(which == 1 ? PlanManager.MODE_NEED
-                                        : PlanManager.MODE_GIVEN);
-                                dlg.dismiss();
-                                render();
-                            }
-                        })
-                .show();
-        fromTop(d);
-    }
-
-    private interface OnFeet {
-        void set(double feet);
-    }
-
-    private interface OnMeters {
-        void set(double meters);
-    }
-
-    private void pickPlanFeet(String title, final double[] presets, double current,
-            final OnFeet onSet) {
-        final String[] labels = new String[presets.length];
-        int selected = 0;
-        for (int i = 0; i < presets.length; i++) {
-            labels[i] = TfrVertical.comma((int) Math.round(presets[i])) + " ft";
-            if (Math.abs(presets[i] - current) < 0.5)
-                selected = i;
-        }
-        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
-                .setTitle(title)
-                .setSingleChoiceItems(labels, selected, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dlg, int which) {
-                        onSet.set(presets[which]);
-                        dlg.dismiss();
-                        render();
-                    }
-                })
-                .show();
-        fromTop(d);
-    }
-
-    private void pickFromMeters(String title, final double[] presets, double current,
-            final OnMeters onSet) {
-        final String[] labels = new String[presets.length];
-        int selected = 0;
-        for (int i = 0; i < presets.length; i++) {
-            labels[i] = SpanUtilities.formatType(Units.type(), presets[i], Span.METER);
-            if (Math.abs(presets[i] - current) < 1)
-                selected = i;
-        }
-        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
-                .setTitle(title)
-                .setSingleChoiceItems(labels, selected, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dlg, int which) {
-                        onSet.set(presets[which]);
-                        dlg.dismiss();
-                        render();
-                    }
-                })
-                .show();
-        fromTop(d);
     }
 
     private void rebuildList() {

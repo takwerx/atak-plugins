@@ -16,6 +16,8 @@ import com.atakmap.coremap.log.Log;
 
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
+import android.view.View;
+import com.atak.plugins.impl.PluginLayoutInflater;
 import gov.tak.api.ui.IHostUIService;
 import gov.tak.api.ui.Pane;
 import gov.tak.api.ui.PaneBuilder;
@@ -38,6 +40,16 @@ public class AirAware implements IPlugin {
     IServiceController serviceController;
     Context pluginContext;
     IHostUIService uiService;
+    /**
+     * The flight planner: UAS Flight Plan's own pane, carried over whole when the
+     * operator deprecated that plugin into this one. It keeps its own overlay, obstacle
+     * manager, launch point and area picker, and its own screen, because that is the
+     * screen the operator already knows and nothing about it should change.
+     */
+    private com.atakmap.android.airaware.plan.PlanPane planPane;
+    private Pane planTemplate;
+    private com.atakmap.android.airaware.plan.IslandOverlay planOverlay;
+    private com.atakmap.android.airaware.plan.ObstacleManager planObstacles;
     ToolbarItem toolbarItem;
     Pane pane;
 
@@ -81,6 +93,12 @@ public class AirAware implements IPlugin {
         if (mapView != null) {
             manager = new TfrManager(mapView, pluginContext);
             paneUi = new TfrPane(mapView, pluginContext, manager);
+            paneUi.setOnPlan(new Runnable() {
+                @Override
+                public void run() {
+                    showPlanPane();
+                }
+            });
             manager.setListener(paneUi);
             manager.start();
             registerReceiver();
@@ -121,6 +139,16 @@ public class AirAware implements IPlugin {
             manager.dispose();
             manager = null;
         }
+        if (planPane != null) {
+            planPane.onPaneClosed();
+            planPane = null;
+        }
+        if (planOverlay != null) {
+            planOverlay.stop();
+            planOverlay = null;
+        }
+        planObstacles = null;
+        planTemplate = null;
         if (uiService != null) {
             // Close and forget the pane, or a reload leaves the old view on screen bound
             // to the manager that was just disposed: it showed "Updated 13 min ago" and
@@ -259,6 +287,49 @@ public class AirAware implements IPlugin {
         } catch (RuntimeException e) {
             Log.w(TAG, "opening the page for a tap failed", e);
         }
+    }
+
+    /** Builds the planner's pane once; it restores the saved plan as it is built. */
+    private void ensurePlanPane() {
+        if (planTemplate != null)
+            return;
+        planOverlay = new com.atakmap.android.airaware.plan.IslandOverlay(mapView);
+        planObstacles = new com.atakmap.android.airaware.plan.ObstacleManager(mapView,
+                pluginContext);
+        final View root = PluginLayoutInflater.inflate(pluginContext,
+                R.layout.plan_main, null);
+        planPane = new com.atakmap.android.airaware.plan.PlanPane(root, pluginContext,
+                mapView, planOverlay, planObstacles);
+        planTemplate = new PaneBuilder(root)
+                .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
+                .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
+                .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
+                .build();
+    }
+
+    private void showPlanPane() {
+        if (uiService == null || mapView == null)
+            return;
+        ensurePlanPane();
+        if (uiService.isPaneVisible(planTemplate))
+            return;
+        // The lifecycle listener is not optional. LaunchPoint takes ATAK's map event
+        // listeners exclusively while it waits for the tap; if the pane is closed with
+        // the X mid-pick, nothing else ever pops them and the map goes deaf to ATAK's
+        // own handlers until the plugin is reloaded.
+        uiService.showPane(planTemplate, new IHostUIService.IPaneLifecycleListener() {
+            @Override
+            public void onPaneVisible(boolean visible) {
+                if (visible && planPane != null)
+                    planPane.onPaneShown();
+            }
+
+            @Override
+            public void onPaneClose() {
+                if (planPane != null)
+                    planPane.onPaneClosed();
+            }
+        });
     }
 
     private void showPane() {

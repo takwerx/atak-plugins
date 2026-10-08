@@ -6,8 +6,8 @@
     android:paddingLeft="6dp"
     android:paddingRight="6dp">
 
-    <!-- Pinned in the pane root, not inside the list: how old the picture is, and
-         anything that is not being shown, has to be readable without scrolling to it. -->
+    <!-- Pinned in the pane root, not inside the list: what is and is not being
+         shown has to be readable without scrolling to it. -->
     <TextView
         android:id="@+id/status"
         android:layout_width="match_parent"
@@ -16,109 +16,25 @@
         android:paddingBottom="6dp"
         android:textSize="13sp"
         android:textColor="@color/white"
-        android:text="@string/status_waiting" />
+        android:text="@string/status_idle" />
 
-    <!-- The controls live in this list's header rather than in a ScrollView above it:
-         a ListView inside a ScrollView gets one line of height, so the whole panel has
-         to be one scroller. Click positions are offset by getHeaderViewsCount(). -->
+    <!-- The controls live in this list's header rather than in a ScrollView above
+         it: a ListView inside a ScrollView gets one line of height, so the whole
+         panel has to be one scroller. Click positions are offset by
+         getHeaderViewsCount() because of it. -->
     <ListView
-        android:id="@+id/tfr_list"
+        android:id="@+id/list"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:divider="#20FFFFFF"
         android:dividerHeight="1dp"
         android:fadeScrollbars="false"
-        android:scrollbarSize="3dp"
         android:listSelector="@android:color/transparent" />
 
-    <!-- The details page, in place of the list. A tap on a restriction, on the map or
-         in the list, lands here rather than in a dialog over the map: the operator asked
-         for the side pane, the way the other plugins are going. -->
-    <LinearLayout
-        android:id="@+id/details_page"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="6dp">
-
-            <Button
-                android:id="@+id/btn_details_back"
-                style="@style/TakwerxButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minWidth="90dp"
-                android:text="@string/back" />
-
-            <TextView
-                android:id="@+id/details_title"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="12dp"
-                android:textSize="17sp"
-                android:textStyle="bold"
-                android:singleLine="true"
-                android:ellipsize="end"
-                android:textColor="@color/white" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingTop="6dp">
-
-            <Button
-                android:id="@+id/btn_details_geofence"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Geofence" />
-
-            <Button
-                android:id="@+id/btn_details_faa"
-                style="@style/TakwerxButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginLeft="6dp"
-                android:text="FAA page" />
-        </LinearLayout>
-
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:fadeScrollbars="false"
-        android:scrollbarSize="3dp"
-            android:focusableInTouchMode="true"
-            android:descendantFocusability="beforeDescendants">
-
-            <TextView
-                android:id="@+id/details_body"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingTop="8dp"
-                android:paddingBottom="12dp"
-                android:textSize="14sp"
-                android:textColor="@color/white"
-                android:textIsSelectable="true" />
-        </ScrollView>
-    </LinearLayout>
-
-    <!-- The settings page, in place of the list while it is open: the same pane by a
-         visibility swap, not a dialog and not a second pane. focusableInTouchMode and
-         beforeDescendants keep the scroller from jumping to a button that is rebuilt. -->
+    <!-- The settings page, in place of the list while it is open. focusableInTouchMode
+         and beforeDescendants keep the scroller from jumping to a button that is
+         rebuilt (the circle tiles are). -->
     <LinearLayout
         android:id="@+id/settings_page"
         android:layout_width="match_parent"
@@ -158,7 +74,6 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:fadeScrollbars="false"
-        android:scrollbarSize="3dp"
             android:focusableInTouchMode="true"
             android:descendantFocusability="beforeDescendants">
 
@@ -167,6 +82,77 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
+                android:paddingBottom="12dp" />
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- One obstacle's page, in place of the list while it is open. The same frame
+         as every takwerx details page: Back pinned top-left so it stays reachable
+         while the fields scroll, the name beside it, Zoom to on the right. -->
+    <LinearLayout
+        android:id="@+id/details_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/btn_details_back"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="90dp"
+                android:text="@string/back" />
+
+            <TextView
+                android:id="@+id/details_title"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="8dp"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/white" />
+
+            <Button
+                android:id="@+id/btn_details_zoom"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/zoom_to" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/details_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="4dp"
+            android:paddingBottom="6dp"
+            android:textSize="13sp"
+            android:textColor="#BBBBBB" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false">
+
+            <TextView
+                android:id="@+id/details_fields"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="@color/white"
                 android:paddingBottom="12dp" />
         </ScrollView>
     </LinearLayout>

@@ -17,4 +17,5 @@
     <!-- Map Depot's "tap to go there" green: one affordance, one color, across plugins. -->
     <color name="action_green">#4caf50</color>
 
+    <color name="working">#FFC107</color>
 </resources>
