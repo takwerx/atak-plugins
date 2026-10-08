@@ -1293,12 +1293,23 @@ public final class PlanPane implements IslandOverlay.Listener,
                 .show();
     }
 
+    /**
+     * Hands the link to whatever on the phone can take it.
+     *
+     * <p>A chooser rather than a straight view, so an installed LAANC app that claims
+     * the address gets offered beside the browser. No package name is hard-coded: there
+     * is no official FAA DroneZone app for Android to name, filing happens in whichever
+     * approved supplier's app a pilot uses, and launching a package we guessed at would
+     * be worse than opening the page.
+     */
     private void openUrl(String url) {
         try {
-            final android.content.Intent i = new android.content.Intent(
+            final android.content.Intent view = new android.content.Intent(
                     android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url));
-            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-            host.startActivity(i);
+            final android.content.Intent chooser = android.content.Intent.createChooser(
+                    view, pluginContext.getString(R.string.laanc_title));
+            chooser.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            host.startActivity(chooser);
         } catch (RuntimeException e) {
             android.widget.Toast.makeText(host,
                     pluginContext.getString(R.string.laanc_no_browser),
