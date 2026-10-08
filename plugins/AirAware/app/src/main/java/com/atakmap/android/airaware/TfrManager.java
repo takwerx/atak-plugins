@@ -121,6 +121,16 @@ public class TfrManager {
      * the country.
      */
     private static final int MAX_TILES = 24;
+    /**
+     * The widest scale bar at which airspace is drawn with height, about fifteen miles.
+     *
+     * <p>Not a preference. Height is a close-in thing by nature: six hundred shelves
+     * standing up across a region is a wireframe thicket nobody can read, and the same
+     * picture flat is still the whole lateral story. So 3D arrives when the view is
+     * close enough for it to mean something and leaves when it is not, and the operator
+     * never has to manage it.
+     */
+    private static final long VOLUME_BAR_M = 24140L;
     private static final int DEFAULT_REFRESH_MIN = 30;
 
     public interface Listener {
@@ -209,6 +219,8 @@ public class TfrManager {
      * and it starts on. Special use always stands up either way.
      */
     private volatile boolean airspace3d;
+    /** True while the view is too wide for height to read. */
+    private volatile boolean volumesGated;
 
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
@@ -985,6 +997,19 @@ public class TfrManager {
         // Airspace has its own gate and a far wider default than the airfields: a shelf
         // matters from a long way out, and a hundred miles of it is still readable.
         airspaceHidden = airspaceBarM > 0 && bar > airspaceBarM * 1.02;
+        // Crossing this changes which features exist, so it is a rewrite rather than a
+        // visibility push -- and only on the crossing, never on an ordinary pan.
+        final boolean gateVolumes = bar > VOLUME_BAR_M * 1.02;
+        if (gateVolumes != volumesGated) {
+            volumesGated = gateVolumes;
+            worker.execute(new Runnable() {
+                @Override
+                public void run() {
+                    rewriteOverlay();
+                    post();
+                }
+            });
+        }
         final boolean hideLabels = labelBarM > 0 && bar > labelBarM * 1.02;
         final boolean wasLabels = labelsHidden;
         labelsHidden = hideLabels;
@@ -1226,9 +1251,10 @@ public class TfrManager {
         drawn.addAll(MetarFeatures.drawn(metars));
         // So do the airspace shelves, for the same reason, and like everything else they
         // are written whether their layer is on or off: off hides, never deletes.
+        final boolean solid = !volumesGated;
         final boolean in3d = airspace3d;
         for (Airspace a : airspaces)
-            drawn.addAll(AirspaceFeatures.drawn(a, in3d));
+            drawn.addAll(AirspaceFeatures.drawn(a, solid, in3d));
         overlay.rewrite(drawn);
         overlay.setTypesOff(hiddenSets());
     }

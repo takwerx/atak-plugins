@@ -35,6 +35,15 @@ public final class AirspaceFeatures {
     /** Twelve shelves over one airport is normal, so each one has to be nearly clear. */
     private static final int FILL_ALPHA = 0x18;
     /**
+     * A standing volume carries more fill than its footprint.
+     *
+     * <p>At the footprint's alpha the walls read as a wireframe model rather than as a
+     * block of air you cannot be in, which is the whole point of standing them up. It is
+     * affordable now only because height is gated to close-in views, so a handful are on
+     * screen rather than six hundred.
+     */
+    private static final int WALL_ALPHA = 0x30;
+    /**
      * Class E is drawn as an outline with nothing inside it.
      *
      * <p>Class E transition areas start at 700 or 1,200 ft above the ground and cover
@@ -138,13 +147,20 @@ public final class AirspaceFeatures {
     /**
      * Everything to draw for one shelf: its volume, its footprint and one label.
      *
-     * @param extrudeClasses whether class shelves stand up. Special use always does: a
-     *            restricted area or a MOA is one bounded thing you route around with a
-     *            published top, the same question a TFR asks. Class airspace is a
-     *            judgement call -- twelve nested shelves over Los Angeles can merge into
-     *            a block with no map underneath -- so the operator owns it.
+     * @param solid whether this is drawn with height at all: walls on what has a top,
+     *            and a floating floor on what does not. False draws everything flat on
+     *            the ground. The caller turns it off when the view is too wide for
+     *            height to read -- six hundred shelves standing up across a region is a
+     *            wireframe thicket, and the same picture flat is still the whole lateral
+     *            story.
+     * @param extrudeClasses whether class shelves stand up when {@code solid}. Special
+     *            use always does: a restricted area or a MOA is one bounded thing you
+     *            route around with a published top, the same question a TFR asks. Class
+     *            airspace is a judgement call -- twelve nested shelves over Los Angeles
+     *            can merge into a block with no map underneath -- so the operator owns it.
      */
-    public static List<TfrOverlay.Drawn> drawn(Airspace a, boolean extrudeClasses) {
+    public static List<TfrOverlay.Drawn> drawn(Airspace a, boolean solid,
+            boolean extrudeClasses) {
         final List<TfrOverlay.Drawn> out = new ArrayList<>();
         final String setKey = a.setKey();
         if (setKey.isEmpty())
@@ -161,8 +177,8 @@ public final class AirspaceFeatures {
         final double wall = a.ceiling.present ? ceilM - floorM : 0d;
         final Feature.AltitudeMode mode = altitudeMode(a);
         // Nothing published above it, and it starts off the ground: draw where it starts.
-        final boolean floating = !a.ceiling.present && a.floor.present && !a.floor.surface
-                && a.floor.feet > 0;
+        final boolean floating = solid && !a.ceiling.present && a.floor.present
+                && !a.floor.surface && a.floor.feet > 0;
 
         for (Airspace.Part part : a.parts) {
             if (part.outer.size() < 3)
@@ -176,9 +192,10 @@ public final class AirspaceFeatures {
             // underneath, while half of what is around them is Class E with no published
             // ceiling to draw to. Operator, 2026-10-08: "3D is good for TFR i think maybe
             // not for airspace?".
-            if (wall > 1 && (extrudeClasses || a.isSpecialUse()))
+            if (solid && wall > 1 && (extrudeClasses || a.isSpecialUse()))
                 out.add(new TfrOverlay.Drawn(id, setKey, setName, name,
-                        polygon(part, floorM), volumeStyle(color, alpha), attrs, mode, wall));
+                        polygon(part, floorM), volumeStyle(color, WALL_ALPHA), attrs,
+                        mode, wall));
             // The footprint.
             //
             // On the ground for anything with a top, so the shelf is there looking
