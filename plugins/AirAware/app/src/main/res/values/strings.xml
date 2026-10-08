@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">AirAware</string>
+    <!-- description -->
+    <string name="app_desc">Airspace awareness: restrictions, and what is over you</string>
+
+    <string name="state_on_label">ON</string>
+    <string name="state_off_label">OFF</string>
+
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="refresh">Refresh</string>
+    <string name="show_settings">Show settings</string>
+    <string name="heading_list">Restrictions in view</string>
+    <string name="status_waiting">Checking.</string>
+    <string name="use_this_zoom">Use this zoom</string>
+</resources>
