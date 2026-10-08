@@ -22,6 +22,7 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.airaware.Airspace;
 import com.atakmap.android.airaware.AirspaceFeatures;
 import com.atakmap.android.airaware.Metar;
+import com.atakmap.android.airaware.Obstacle;
 import com.atakmap.android.airaware.MetarFeatures;
 import com.atakmap.android.airaware.Tfr;
 import com.atakmap.android.airaware.TfrArea;
@@ -670,6 +671,8 @@ public class TfrPane implements TfrManager.Listener {
     }
 
     private String layerStatus(String key) {
+        if (TfrManager.LAYER_OBSTACLES.equals(key))
+            return obstaclesStatus();
         if (TfrManager.LAYER_RESTRICTIONS.equals(key))
             return restrictionsStatus();
         if (TfrManager.LAYER_AIRSPACE.equals(key))
@@ -754,6 +757,8 @@ public class TfrPane implements TfrManager.Listener {
                 fillAirspaceControls(body, false);
             else if (TfrManager.LAYER_SUA.equals(key))
                 fillAirspaceControls(body, true);
+            else if (TfrManager.LAYER_OBSTACLES.equals(key))
+                fillObstacleControls(body);
             else
                 fillAirfieldControls(body);
         }
@@ -890,6 +895,110 @@ public class TfrPane implements TfrManager.Listener {
                         manager.setAirspaceBarMeters(meters);
                     }
                 });
+    }
+
+    private String obstaclesStatus() {
+        if (!manager.isLayerOn(TfrManager.LAYER_OBSTACLES))
+            return "Off. Nothing drawn.";
+        final int n = manager.obstacles().size();
+        if (n == 0)
+            return manager.isObstaclesMissing() ? "Not downloaded for here yet"
+                    : "None here above " + (int) manager.obstacleFloorFt() + " ft";
+        return n + " obstacles"
+                + (manager.isObstaclesCapped() ? " (tallest shown, zoom in for the rest)" : "");
+    }
+
+    /** What belongs to the obstacles and nothing else. */
+    private void fillObstacleControls(LinearLayout body) {
+        addValueButton(body, "Kinds", obstacleKindsSummary(), new Runnable() {
+            @Override
+            public void run() {
+                pickObstacleGroups();
+            }
+        });
+        addValueButton(body, "Taller than",
+                (int) manager.obstacleFloorFt() + " ft", new Runnable() {
+                    @Override
+                    public void run() {
+                        pickObstacleFloor();
+                    }
+                });
+        addValueButton(body, "Show at", ScaleBar.gate(manager.obstacleBarMeters()),
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        pickBarGate("Show obstacles when the scale bar reads",
+                                manager.obstacleBarMeters(), new OnGate() {
+                                    @Override
+                                    public void set(long meters) {
+                                        manager.setObstacleBarMeters(meters);
+                                    }
+                                });
+                    }
+                });
+    }
+
+    private String obstacleKindsSummary() {
+        int on = 0;
+        final String[] groups = Obstacle.GROUPS;
+        for (String g : groups)
+            if (manager.isObstacleGroupOn(g))
+                on++;
+        if (on == groups.length)
+            return "all " + groups.length;
+        return on == 0 ? "none" : on + " of " + groups.length;
+    }
+
+    private void pickObstacleGroups() {
+        final List<String[]> counts = manager.obstacleGroupCounts();
+        final String[] labels = new String[counts.size()];
+        final boolean[] checked = new boolean[counts.size()];
+        for (int i = 0; i < counts.size(); i++) {
+            labels[i] = Obstacle.groupName(counts.get(i)[0]) + "  (" + counts.get(i)[1] + ")";
+            checked[i] = manager.isObstacleGroupOn(counts.get(i)[0]);
+        }
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Which kinds of obstacle")
+                .setMultiChoiceItems(labels, checked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dlg, int which, boolean on) {
+                                manager.setObstacleGroupOn(counts.get(which)[0], on);
+                            }
+                        })
+                .setPositiveButton("Done", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int w) {
+                        render();
+                    }
+                })
+                .show();
+        fromTop(d);
+    }
+
+    private void pickObstacleFloor() {
+        final double[] presets = Obstacle.MIN_AGL_PRESETS_FT;
+        final String[] labels = new String[presets.length];
+        int selected = 0;
+        for (int i = 0; i < presets.length; i++) {
+            labels[i] = presets[i] <= 0 ? "Everything the FAA lists"
+                    : "Taller than " + (int) presets[i] + " ft";
+            if (Math.abs(presets[i] - manager.obstacleFloorFt()) < 0.5)
+                selected = i;
+        }
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Height above the ground")
+                .setSingleChoiceItems(labels, selected,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dlg, int which) {
+                                manager.setObstacleFloorFt(presets[which]);
+                                dlg.dismiss();
+                                render();
+                            }
+                        })
+                .show();
+        fromTop(d);
     }
 
     /** What belongs to the airfield chips and nothing else. */
@@ -1145,6 +1254,47 @@ public class TfrPane implements TfrManager.Listener {
             return c.isEmpty() ? "Airspace" : "Class " + c.toUpperCase(Locale.US);
         }
         return Airspace.setName(a.setKey());
+    }
+
+    /** One obstacle, on the same details page. Never ATAK's own metadata. */
+    public void showObstacle(final Obstacle o) {
+        if (root == null || o == null)
+            return;
+        showing = null;
+        detailsTitle.setText(o.kind());
+        final StringBuilder b = new StringBuilder();
+        b.append(TfrVertical.comma((int) Math.round(o.aglFt)))
+                .append(" ft above the ground\n");
+        b.append(TfrVertical.comma((int) Math.round(o.amslFt))).append(" ft MSL at the top");
+        if (o.quantity > 1)
+            b.append("\n\n").append(o.quantity).append(" of them at this point");
+        if (!o.city.isEmpty() || !o.state.isEmpty())
+            b.append("\n\n").append(o.city).append(o.city.isEmpty() ? "" : ", ")
+                    .append(o.state);
+        b.append("\n\nLighting: ").append(o.lighting.isEmpty() ? "none listed" : o.lighting);
+        b.append("\nSurvey: ").append("O".equals(o.verified) ? "verified" : "unverified");
+        b.append("\nFAA number: ").append(o.oas);
+
+        final GeoPoint me = mapView.getSelfMarker() == null ? null
+                : mapView.getSelfMarker().getPoint();
+        final double myFt = TfrVertical.myFeetMsl(me);
+        if (!Double.isNaN(myFt)) {
+            final double over = o.amslFt - myFt;
+            if (over > 0)
+                b.append("\n\nIts top is ").append(TfrVertical.feet(over))
+                        .append(" above you.");
+            else
+                b.append("\n\nYou are ").append(TfrVertical.feet(-over))
+                        .append(" above its top.");
+        }
+        b.append("\n\nFAA Digital Obstacle File. Charting obstacles only - not every")
+                .append(" tower, and no distribution lines.");
+        detailsBody.setText(b.toString());
+        detailsGeofence.setVisibility(View.GONE);
+        detailsFaa.setVisibility(View.GONE);
+        settingsPage.setVisibility(View.GONE);
+        list.setVisibility(View.GONE);
+        detailsPage.setVisibility(View.VISIBLE);
     }
 
     private String detailsText(final Tfr t) {

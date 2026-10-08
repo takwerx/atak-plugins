@@ -200,6 +200,9 @@ public class TfrOverlay {
                                 final String shelf = string(a, "airspace_id");
                                 if (shelf != null)
                                     item.setMetaString("airspace_id", shelf);
+                                final String oas = string(a, "obstacle_oas");
+                                if (oas != null)
+                                    item.setMetaString("obstacle_oas", oas);
                                 final String place = string(a, "place");
                                 if (place != null && !place.isEmpty())
                                     label = place;
@@ -247,10 +250,15 @@ public class TfrOverlay {
                                 // footprint under it and the label -- so without its own
                                 // key the chooser listed Chino Class D three times.
                                 final String shelf = m.getMetaString("airspace_id", null);
+                                // Obstacles are three features each -- mast, glyph and
+                                // pill -- so without this the chooser lists one tower
+                                // three times, the same way airspace did.
+                                final String oas = m.getMetaString("obstacle_oas", null);
                                 final String key = notam != null ? "n:" + notam
                                         : icao != null ? "m:" + icao
                                                 : shelf != null ? "a:" + shelf
-                                                        : "f:" + m.getMetaLong("featureid", -1);
+                                                        : oas != null ? "o:" + oas
+                                                                : "f:" + m.getMetaLong("featureid", -1);
                                 if (seen.add(key))
                                     out.add(m);
                             }

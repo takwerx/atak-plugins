@@ -53,10 +53,15 @@ public class TfrManager {
     public static final String LAYER_AIRFIELDS = MetarFeatures.SET_KEY;
     public static final String LAYER_AIRSPACE = Airspace.LAYER_CLASSES;
     public static final String LAYER_SUA = Airspace.LAYER_SUA;
+    public static final String LAYER_OBSTACLES = "obstacles";
     static final String PREF_AIRSPACE_BAR_M = "airspaceBarM";
     static final String PREF_AIRSPACE_CYCLE = "airspaceCycle";
     static final String PREF_AIRSPACE_LABELS = "airspaceLabels";
     static final String PREF_AIRSPACE_3D = "airspace3d";
+    static final String PREF_OBSTACLE_CYCLE = "obstacleCycle";
+    static final String PREF_OBSTACLE_GROUPS_OFF = "obstacleGroupsOff";
+    static final String PREF_OBSTACLE_FLOOR_FT = "obstacleFloorFt";
+    static final String PREF_OBSTACLE_BAR_M = "obstacleBarM";
     static final String PREF_CLASSES_OFF = "classesOff";
     static final String PREF_GATE_BAR_M = "gateBarM";
     static final String PREF_LABEL_BAR_M = "labelBarM";
@@ -131,6 +136,15 @@ public class TfrManager {
      * never has to manage it.
      */
     private static final long VOLUME_BAR_M = 24140L;
+    /**
+     * The most obstacles drawn at once, three features each.
+     *
+     * <p>Los Angeles holds 12,542 in two degrees and the filter does not always cut
+     * that far, so there has to be a stop. The pane says when it bites.
+     */
+    private static final int MAX_OBSTACLES = 400;
+    /** Amber: a thing that sticks up, not a restriction and not weather. */
+    private static final int DEFAULT_OBSTACLE = 0xFFFFB300;
     private static final int DEFAULT_REFRESH_MIN = 30;
 
     public interface Listener {
@@ -221,6 +235,17 @@ public class TfrManager {
     private volatile boolean airspace3d;
     /** True while the view is too wide for height to read. */
     private volatile boolean volumesGated;
+    /** The FAA obstacle file, for the tiles the view needs. */
+    private volatile List<Obstacle> obstacles = Collections.emptyList();
+    private volatile Set<String> obstacleKeys = Collections.emptySet();
+    private volatile String obstacleCycle = "";
+    private volatile boolean obstaclesHidden;
+    private volatile boolean obstaclesCapped;
+    private volatile boolean obstaclesMissing;
+    private volatile long obstacleBarM = 16093L;
+    private volatile double obstacleFloorFt = Obstacle.DEFAULT_MIN_AGL_FT;
+    private final Set<String> obstacleGroupsOff = new LinkedHashSet<>();
+    private ObstaclePills pills;
 
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
@@ -244,6 +269,15 @@ public class TfrManager {
         airspaceCycle = p.getString(PREF_AIRSPACE_CYCLE, "");
         airspaceLabels = p.getBoolean(PREF_AIRSPACE_LABELS, false);
         airspace3d = p.getBoolean(PREF_AIRSPACE_3D, true);
+        obstacleCycle = p.getString(PREF_OBSTACLE_CYCLE, "");
+        obstacleBarM = p.getLong(PREF_OBSTACLE_BAR_M, 16093L);
+        obstacleFloorFt = p.getFloat(PREF_OBSTACLE_FLOOR_FT,
+                (float) Obstacle.DEFAULT_MIN_AGL_FT);
+        final Set<String> groupsOff = new LinkedHashSet<>();
+        for (String g : Obstacle.GROUPS)
+            if (!Obstacle.DEFAULT_ON.contains(g))
+                groupsOff.add(g);
+        obstacleGroupsOff.addAll(p.getStringSet(PREF_OBSTACLE_GROUPS_OFF, groupsOff));
         classesOff.addAll(p.getStringSet(PREF_CLASSES_OFF, DEFAULT_CLASSES_OFF));
         // A set, not a joined string: a type carrying the separator would come back as two
         // bogus entries and the filter would restore wrong.
@@ -424,6 +458,7 @@ public class TfrManager {
         out.add(new String[] { LAYER_RESTRICTIONS, "TFR" });
         out.add(new String[] { LAYER_AIRSPACE, "Airspace" });
         out.add(new String[] { LAYER_SUA, "Special Use" });
+        out.add(new String[] { LAYER_OBSTACLES, "Obstacles" });
         out.add(new String[] { LAYER_AIRFIELDS, "METARs" });
         return out;
     }
@@ -463,6 +498,21 @@ public class TfrManager {
         changed();
     }
 
+    /** Every obstacle group on the device with how many pass the filter, for the picker. */
+    public List<String[]> obstacleGroupCounts() {
+        final Map<String, Integer> counts = new LinkedHashMap<>();
+        for (String g : Obstacle.GROUPS)
+            counts.put(g, 0);
+        for (Obstacle o : obstacles) {
+            final Integer n = counts.get(o.group());
+            counts.put(o.group(), n == null ? 1 : n + 1);
+        }
+        final List<String[]> out = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : counts.entrySet())
+            out.add(new String[] { e.getKey(), Integer.toString(e.getValue()) });
+        return out;
+    }
+
     public boolean isLayerOn(String layer) {
         return !layersOff.contains(layer);
     }
@@ -489,6 +539,13 @@ public class TfrManager {
         if (layersOff.contains(LAYER_RESTRICTIONS))
             for (Tfr t : known)
                 off.add(t.type);
+        // Obstacles: by group, and the whole layer by its own zoom gate. Dense enough
+        // that the gate matters more than anywhere else -- 12,542 in the two degrees
+        // over Los Angeles.
+        final boolean obstaclesGone = layersOff.contains(LAYER_OBSTACLES) || obstaclesHidden;
+        for (String g : Obstacle.GROUPS)
+            if (obstaclesGone || obstacleGroupsOff.contains(g))
+                off.add(ObstacleFeatures.SET_PREFIX + g);
         // Airspace: the kinds switched off one at a time, plus everything belonging to a
         // layer that is off or gated out by zoom.
         off.addAll(classesOff);
@@ -997,6 +1054,7 @@ public class TfrManager {
         // Airspace has its own gate and a far wider default than the airfields: a shelf
         // matters from a long way out, and a hundred miles of it is still readable.
         airspaceHidden = airspaceBarM > 0 && bar > airspaceBarM * 1.02;
+        obstaclesHidden = obstacleBarM > 0 && bar > obstacleBarM * 1.02;
         // Crossing this changes which features exist, so it is a rewrite rather than a
         // visibility push -- and only on the crossing, never on an ordinary pan.
         final boolean gateVolumes = bar > VOLUME_BAR_M * 1.02;
@@ -1261,6 +1319,17 @@ public class TfrManager {
         final boolean in3d = airspace3d;
         for (Airspace a : airspaces)
             drawn.addAll(AirspaceFeatures.drawn(a, solid, in3d));
+        if (pills == null)
+            pills = new ObstaclePills();
+        int drawnObstacles = 0;
+        for (Obstacle o : obstacles) {
+            if (drawnObstacles >= MAX_OBSTACLES)
+                break;
+            drawn.addAll(ObstacleFeatures.drawn(o, solid, pills, pluginContext,
+                    DEFAULT_OBSTACLE));
+            drawnObstacles++;
+        }
+        obstaclesCapped = obstacles.size() > MAX_OBSTACLES;
         overlay.rewrite(drawn);
         overlay.setTypesOff(hiddenSets());
     }
@@ -1452,27 +1521,156 @@ public class TfrManager {
             @Override
             public void run() {
                 loadTilesOnWorker(south, west, north, east);
+                loadObstaclesOnWorker(south, west, north, east);
             }
         });
     }
 
+    /**
+     * The obstacles for this view, from the same kind of tiles as the airspace.
+     *
+     * <p>Filtered here rather than at the map: a group switched off or a tower under the
+     * floor is not drawn, is not in the count, and is not in the list, so the three
+     * cannot disagree. The floor matters more than it sounds -- the FAA file lists every
+     * obstruction study down to a 20 ft solar array, and 148 became 31 at Corona once
+     * the operator's defaults were applied.
+     */
+    private void loadObstaclesOnWorker(double south, double west, double north,
+            double east) {
+        if (!isLayerOn(LAYER_OBSTACLES))
+            return;
+        final TilePack pack = ObstacleTiles.pack();
+        final TilePack.Index index = pack.index();
+        if (!index.cycle.isEmpty() && !index.cycle.equals(obstacleCycle)) {
+            if (!obstacleCycle.isEmpty()) {
+                Log.d(TAG, "obstacle cycle " + obstacleCycle + " -> " + index.cycle);
+                pack.clear();
+            }
+            obstacleCycle = index.cycle;
+            prefs().edit().putString(PREF_OBSTACLE_CYCLE, obstacleCycle).apply();
+            obstacleKeys = Collections.emptySet();
+        }
+        List<String> keys = TilePack.keysFor(index, south, west, north, east);
+        if (keys.size() > MAX_TILES)
+            keys = keys.subList(0, MAX_TILES);
+        final Set<String> want = new LinkedHashSet<>(keys);
+        if (want.equals(obstacleKeys) && !obstacles.isEmpty())
+            return;
+
+        final List<Obstacle> kept = new ArrayList<>();
+        boolean missed = false;
+        for (String key : want) {
+            try {
+                for (Obstacle o : ObstacleTiles.tile(pack, key))
+                    if (passesObstacleFilter(o))
+                        kept.add(o);
+            } catch (Exception e) {
+                missed = true;
+                Log.d(TAG, "obstacle tile " + key + " is not here yet: " + e);
+            }
+        }
+        // Tallest first, so the cap keeps what matters rather than what sorted first.
+        Collections.sort(kept, new java.util.Comparator<Obstacle>() {
+            @Override
+            public int compare(Obstacle a, Obstacle b) {
+                return Double.compare(b.aglFt, a.aglFt);
+            }
+        });
+        obstacleKeys = want;
+        obstaclesMissing = missed;
+        obstacles = Collections.unmodifiableList(kept);
+        Log.d(TAG, "obstacles: " + kept.size() + " from " + want.size() + " tiles");
+        rewriteOverlay();
+        post();
+    }
+
+    private boolean passesObstacleFilter(Obstacle o) {
+        if (o.aglFt < obstacleFloorFt)
+            return false;
+        return !obstacleGroupsOff.contains(o.group());
+    }
+
+    public List<Obstacle> obstacles() {
+        return obstacles;
+    }
+
+    public Obstacle obstacleByOas(String oas) {
+        if (oas == null)
+            return null;
+        for (Obstacle o : obstacles)
+            if (oas.equals(o.oas))
+                return o;
+        return null;
+    }
+
+    public boolean isObstaclesCapped() {
+        return obstaclesCapped;
+    }
+
+    public boolean isObstaclesMissing() {
+        return obstaclesMissing;
+    }
+
+    public double obstacleFloorFt() {
+        return obstacleFloorFt;
+    }
+
+    public void setObstacleFloorFt(double ft) {
+        obstacleFloorFt = ft;
+        prefs().edit().putFloat(PREF_OBSTACLE_FLOOR_FT, (float) ft).apply();
+        refetchObstacles();
+    }
+
+    public boolean isObstacleGroupOn(String group) {
+        return !obstacleGroupsOff.contains(group);
+    }
+
+    public void setObstacleGroupOn(String group, boolean on) {
+        if (on)
+            obstacleGroupsOff.remove(group);
+        else
+            obstacleGroupsOff.add(group);
+        prefs().edit().putStringSet(PREF_OBSTACLE_GROUPS_OFF,
+                new HashSet<>(obstacleGroupsOff)).apply();
+        refetchObstacles();
+    }
+
+    public long obstacleBarMeters() {
+        return obstacleBarM;
+    }
+
+    public void setObstacleBarMeters(long m) {
+        obstacleBarM = m;
+        prefs().edit().putLong(PREF_OBSTACLE_BAR_M, m).apply();
+        applyGate();
+        changed();
+    }
+
+    /** The filter decides what is loaded, so changing it reloads from the tiles on disk. */
+    private void refetchObstacles() {
+        obstacleKeys = Collections.emptySet();
+        changed();
+        main.removeCallbacks(settled);
+        main.postDelayed(settled, 50);
+    }
+
     /** Worker thread only: this reads and writes files. */
     private void loadTilesOnWorker(double south, double west, double north, double east) {
-        final File dir = AirspaceTiles.dir(FileSystemUtils.getItem("tools/airaware"));
-        final AirspaceTiles.Index index = AirspaceTiles.index(dir);
+        final TilePack pack = AirspaceTiles.pack();
+        final TilePack.Index index = pack.index();
         // A new publication cycle makes every tile on the phone the wrong cycle, and the
         // two would otherwise sit side by side with no way to tell them apart.
         if (!index.cycle.isEmpty() && !index.cycle.equals(airspaceCycle)) {
             if (!airspaceCycle.isEmpty()) {
                 Log.d(TAG, "airspace cycle " + airspaceCycle + " -> " + index.cycle);
-                AirspaceTiles.clear(dir);
+                pack.clear();
             }
             airspaceCycle = index.cycle;
             prefs().edit().putString(PREF_AIRSPACE_CYCLE, airspaceCycle).apply();
             airspaceKeys = Collections.emptySet();
         }
 
-        List<String> keys = AirspaceTiles.keysFor(index, south, west, north, east);
+        List<String> keys = TilePack.keysFor(index, south, west, north, east);
         final boolean capped = keys.size() > MAX_TILES;
         if (capped)
             keys = keys.subList(0, MAX_TILES);
@@ -1485,7 +1683,7 @@ public class TfrManager {
         final Map<String, Airspace> merged = new LinkedHashMap<>();
         boolean missed = false;
         try {
-            for (Airspace a : AirspaceTiles.wide(dir))
+            for (Airspace a : AirspaceTiles.wide(pack))
                 merged.put(a.id, a);
         } catch (Exception e) {
             missed = true;
@@ -1493,7 +1691,7 @@ public class TfrManager {
         }
         for (String key : want) {
             try {
-                for (Airspace a : AirspaceTiles.tile(dir, key))
+                for (Airspace a : AirspaceTiles.tile(pack, key))
                     merged.put(a.id, a);
             } catch (Exception e) {
                 // One tile short is a thin picture, not an empty one.
