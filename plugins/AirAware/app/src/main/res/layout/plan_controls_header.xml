@@ -6,6 +6,17 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
+    <!-- Back to AirAware's own pane. The planner is a pane of its own, so without
+         this the only way back to the layer switches is the toolbar, and a pilot who
+         opened the planner to check a ceiling could not turn a layer off again. -->
+    <Button
+        android:id="@+id/btn_airaware"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="@string/back_to_airaware" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

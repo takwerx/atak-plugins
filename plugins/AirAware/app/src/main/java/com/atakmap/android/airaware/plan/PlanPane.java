@@ -177,6 +177,15 @@ public final class PlanPane implements IslandOverlay.Listener,
                     obstacles.panTo(adapter.getItem(i));
             }
         });
+        final android.widget.Button backToAirAware = header.findViewById(R.id.btn_airaware);
+        if (backToAirAware != null)
+            backToAirAware.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (onBack != null)
+                        onBack.run();
+                }
+            });
         final android.widget.Button laanc = header.findViewById(R.id.btn_laanc);
         if (laanc != null)
             laanc.setOnClickListener(new View.OnClickListener() {
@@ -1375,6 +1384,13 @@ public final class PlanPane implements IslandOverlay.Listener,
                     pluginContext.getString(R.string.laanc_no_browser),
                     android.widget.Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** Takes the operator back to AirAware's pane; the plugin supplies it. */
+    private Runnable onBack;
+
+    public void setOnBack(Runnable r) {
+        this.onBack = r;
     }
 
     public void onPaneShown() {

@@ -300,6 +300,14 @@ public class AirAware implements IPlugin {
                 R.layout.plan_main, null);
         planPane = new com.atakmap.android.airaware.plan.PlanPane(root, pluginContext,
                 mapView, planOverlay, planObstacles);
+        planPane.setOnBack(new Runnable() {
+            @Override
+            public void run() {
+                if (uiService != null && planTemplate != null)
+                    uiService.closePane(planTemplate);
+                showPane();
+            }
+        });
         planTemplate = new PaneBuilder(root)
                 .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
                 .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)

@@ -160,6 +160,7 @@
     <string name="terrain_detail">%1$s, terrain checked every %2$s.</string>
     <string name="missing_share">%.0f%% of the area has no terrain data and is not painted.</string>
     <string name="ceiling_proposed">Ceiling set to %1$s above the launch ground. Change it under Settings.</string>
+    <string name="back_to_airaware">&#8249; AirAware layers</string>
     <string name="file_laanc">File LAANC</string>
     <string name="laanc_title">File an authorization</string>
     <string name="laanc_uss">LAANC in Aloft Air Control</string>
