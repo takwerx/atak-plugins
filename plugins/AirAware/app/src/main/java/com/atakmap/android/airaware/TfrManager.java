@@ -54,6 +54,7 @@ public class TfrManager {
     public static final String LAYER_AIRSPACE = Airspace.LAYER_CLASSES;
     public static final String LAYER_SUA = Airspace.LAYER_SUA;
     public static final String LAYER_OBSTACLES = "obstacles";
+    public static final String LAYER_UASFM = UasfmFeatures.SET_KEY;
     static final String PREF_AIRSPACE_BAR_M = "airspaceBarM";
     static final String PREF_AIRSPACE_CYCLE = "airspaceCycle";
     static final String PREF_AIRSPACE_LABELS = "airspaceLabels";
@@ -62,6 +63,8 @@ public class TfrManager {
     static final String PREF_OBSTACLE_GROUPS_OFF = "obstacleGroupsOff";
     static final String PREF_OBSTACLE_FLOOR_FT = "obstacleFloorFt";
     static final String PREF_OBSTACLE_BAR_M = "obstacleBarM";
+    static final String PREF_UASFM_CYCLE = "uasfmCycle";
+    static final String PREF_UASFM_BAR_M = "uasfmBarM";
     static final String PREF_CLASSES_OFF = "classesOff";
     static final String PREF_GATE_BAR_M = "gateBarM";
     static final String PREF_LABEL_BAR_M = "labelBarM";
@@ -143,6 +146,8 @@ public class TfrManager {
      * that far, so there has to be a stop. The pane says when it bites.
      */
     private static final int MAX_OBSTACLES = 400;
+    /** Grid squares are one feature each and tiny; past this the view is a wash. */
+    private static final int MAX_UASFM_CELLS = 1500;
     /** Amber: a thing that sticks up, not a restriction and not weather. */
     private static final int DEFAULT_OBSTACLE = 0xFFFFB300;
     private static final int DEFAULT_REFRESH_MIN = 30;
@@ -250,6 +255,15 @@ public class TfrManager {
     private volatile double obstacleFloorFt = Obstacle.DEFAULT_MIN_AGL_FT;
     private final Set<String> obstacleGroupsOff = new LinkedHashSet<>();
     private ObstaclePills pills;
+    /** The UAS Facility Map: what a drone may fly to here without an authorization. */
+    private volatile List<UasfmCell> uasfmAll = Collections.emptyList();
+    private volatile List<UasfmCell> uasfm = Collections.emptyList();
+    private volatile Set<String> uasfmKeys = Collections.emptySet();
+    private volatile double[] uasfmBox;
+    private volatile String uasfmCycle = "";
+    private volatile boolean uasfmHidden;
+    private volatile boolean uasfmCapped;
+    private volatile long uasfmBarM = 8047L;
 
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
@@ -274,6 +288,10 @@ public class TfrManager {
         airspaceLabels = p.getBoolean(PREF_AIRSPACE_LABELS, false);
         airspace3d = p.getBoolean(PREF_AIRSPACE_3D, true);
         obstacleCycle = p.getString(PREF_OBSTACLE_CYCLE, "");
+        uasfmCycle = p.getString(PREF_UASFM_CYCLE, "");
+        // Five miles. The cells are half a nautical mile across, so any wider and
+        // the grid is a wash of colour rather than a rule you can read.
+        uasfmBarM = p.getLong(PREF_UASFM_BAR_M, 8047L);
         obstacleBarM = p.getLong(PREF_OBSTACLE_BAR_M, 16093L);
         obstacleFloorFt = p.getFloat(PREF_OBSTACLE_FLOOR_FT,
                 (float) Obstacle.DEFAULT_MIN_AGL_FT);
@@ -462,6 +480,7 @@ public class TfrManager {
         out.add(new String[] { LAYER_RESTRICTIONS, "TFR" });
         out.add(new String[] { LAYER_AIRSPACE, "Airspace" });
         out.add(new String[] { LAYER_SUA, "Special Use" });
+        out.add(new String[] { LAYER_UASFM, "UAS ceilings" });
         out.add(new String[] { LAYER_OBSTACLES, "Obstacles" });
         out.add(new String[] { LAYER_AIRFIELDS, "METARs" });
         return out;
@@ -546,6 +565,8 @@ public class TfrManager {
         // Obstacles: by group, and the whole layer by its own zoom gate. Dense enough
         // that the gate matters more than anywhere else -- 12,542 in the two degrees
         // over Los Angeles.
+        if (layersOff.contains(LAYER_UASFM) || uasfmHidden)
+            off.add(UasfmFeatures.SET_KEY);
         final boolean obstaclesGone = layersOff.contains(LAYER_OBSTACLES) || obstaclesHidden;
         for (String g : Obstacle.GROUPS)
             if (obstaclesGone || obstacleGroupsOff.contains(g))
@@ -1059,6 +1080,7 @@ public class TfrManager {
         // matters from a long way out, and a hundred miles of it is still readable.
         airspaceHidden = airspaceBarM > 0 && bar > airspaceBarM * 1.02;
         obstaclesHidden = obstacleBarM > 0 && bar > obstacleBarM * 1.02;
+        uasfmHidden = uasfmBarM > 0 && bar > uasfmBarM * 1.02;
         // Crossing this changes which features exist, so it is a rewrite rather than a
         // visibility push -- and only on the crossing, never on an ordinary pan.
         final boolean gateVolumes = bar > VOLUME_BAR_M * 1.02;
@@ -1111,6 +1133,16 @@ public class TfrManager {
         final String where = airspaceHereLine();
         if (where != null)
             b.append(where).append(' ');
+        // And straight after it, what you may actually do here, which is the question a
+        // drone pilot opens this for. 0 is an answer, not a gap.
+        final UasfmCell cell = isLayerOn(LAYER_UASFM) ? uasfmHere() : null;
+        if (cell != null) {
+            b.append(cell.ceilingFt == 0
+                    ? "No UAS flight here without further coordination."
+                    : "You may fly to " + TfrVertical.comma(cell.ceilingFt)
+                            + " ft AGL here without authorization.");
+            b.append(' ');
+        }
         // Everything from here to the fences belongs to the restrictions, so it is said
         // only while that layer is on. With TFR off and airspace running, the line read
         // "Not downloaded yet." -- which is true of a download the operator had not
@@ -1328,6 +1360,8 @@ public class TfrManager {
         for (Obstacle o : obstacles)
             drawn.addAll(ObstacleFeatures.drawn(o, solid, pills, pluginContext,
                     DEFAULT_OBSTACLE));
+        for (UasfmCell c : uasfm)
+            drawn.addAll(UasfmFeatures.drawn(c));
         overlay.rewrite(drawn);
         overlay.setTypesOff(hiddenSets());
     }
@@ -1525,6 +1559,8 @@ public class TfrManager {
                 loadTilesOnWorker(south, west, north, east);
                 loadObstaclesOnWorker(south, west, north, east,
                         viewSouth, viewWest, viewNorth, viewEast);
+                loadUasfmOnWorker(south, west, north, east,
+                        viewSouth, viewWest, viewNorth, viewEast);
             }
         });
     }
@@ -1637,6 +1673,105 @@ public class TfrManager {
                 + " in view");
         rewriteOverlay();
         post();
+    }
+
+    /**
+     * The UAS Facility Map for this view, held and drawn the same way the obstacles are:
+     * tiles fill a list, and what is drawn is picked from it for the view.
+     *
+     * <p>The cap is tighter than anywhere else because the cells are tiny -- 7,210 in
+     * the two degrees over New York -- and a grid square is one feature each.
+     */
+    private void loadUasfmOnWorker(double south, double west, double north, double east,
+            double viewSouth, double viewWest, double viewNorth, double viewEast) {
+        if (!isLayerOn(LAYER_UASFM))
+            return;
+        final TilePack pack = UasfmTiles.pack();
+        final TilePack.Index index = pack.index();
+        if (!index.cycle.isEmpty() && !index.cycle.equals(uasfmCycle)) {
+            if (!uasfmCycle.isEmpty()) {
+                Log.d(TAG, "UAS ceiling cycle " + uasfmCycle + " -> " + index.cycle);
+                pack.clear();
+            }
+            uasfmCycle = index.cycle;
+            prefs().edit().putString(PREF_UASFM_CYCLE, uasfmCycle).apply();
+            uasfmKeys = Collections.emptySet();
+        }
+        List<String> keys = TilePack.keysFor(index, south, west, north, east);
+        if (keys.size() > MAX_TILES)
+            keys = keys.subList(0, MAX_TILES);
+        final Set<String> want = new LinkedHashSet<>(keys);
+        if (!want.equals(uasfmKeys) || uasfmAll.isEmpty()) {
+            final List<UasfmCell> loaded = new ArrayList<>();
+            for (String key : want) {
+                try {
+                    loaded.addAll(UasfmTiles.tile(pack, key));
+                } catch (Exception e) {
+                    Log.d(TAG, "UAS ceiling tile " + key + " is not here yet: " + e);
+                }
+            }
+            uasfmKeys = want;
+            uasfmAll = Collections.unmodifiableList(loaded);
+            uasfmBox = null;
+            Log.d(TAG, "UAS ceilings: " + loaded.size() + " held from " + want.size()
+                    + " tiles");
+        }
+
+        final double[] box = uasfmBox;
+        if (box != null && viewSouth >= box[0] && viewWest >= box[1]
+                && viewNorth <= box[2] && viewEast <= box[3] && !uasfm.isEmpty())
+            return;
+        final double padLat = Math.max(0.01, (viewNorth - viewSouth) * 0.3);
+        final double padLon = Math.max(0.01, (viewEast - viewWest) * 0.3);
+        final double[] want2 = { viewSouth - padLat, viewWest - padLon,
+                viewNorth + padLat, viewEast + padLon };
+        final List<UasfmCell> inView = new ArrayList<>();
+        for (UasfmCell c : uasfmAll) {
+            if (c.north() < want2[0] || c.south() > want2[2]
+                    || c.east() < want2[1] || c.west() > want2[3])
+                continue;
+            if (inView.size() >= MAX_UASFM_CELLS)
+                break;
+            inView.add(c);
+        }
+        uasfmCapped = inView.size() >= MAX_UASFM_CELLS;
+        uasfm = Collections.unmodifiableList(inView);
+        uasfmBox = want2;
+        Log.d(TAG, "UAS ceilings: drawing " + uasfm.size());
+        rewriteOverlay();
+        post();
+    }
+
+    /** The cell the operator is standing in, or null. */
+    public UasfmCell uasfmHere() {
+        if (mapView.getSelfMarker() == null)
+            return null;
+        final GeoPoint me = mapView.getSelfMarker().getPoint();
+        if (me == null)
+            return null;
+        for (UasfmCell c : uasfmAll)
+            if (c.contains(me.getLatitude(), me.getLongitude()))
+                return c;
+        return null;
+    }
+
+    public List<UasfmCell> uasfmDrawn() {
+        return uasfm;
+    }
+
+    public boolean isUasfmCapped() {
+        return uasfmCapped;
+    }
+
+    public long uasfmBarMeters() {
+        return uasfmBarM;
+    }
+
+    public void setUasfmBarMeters(long m) {
+        uasfmBarM = m;
+        prefs().edit().putLong(PREF_UASFM_BAR_M, m).apply();
+        applyGate();
+        changed();
     }
 
     private boolean passesObstacleFilter(Obstacle o) {

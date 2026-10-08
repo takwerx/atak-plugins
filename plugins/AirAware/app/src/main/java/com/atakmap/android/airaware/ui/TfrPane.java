@@ -23,6 +23,7 @@ import com.atakmap.android.airaware.Airspace;
 import com.atakmap.android.airaware.AirspaceFeatures;
 import com.atakmap.android.airaware.Metar;
 import com.atakmap.android.airaware.Obstacle;
+import com.atakmap.android.airaware.UasfmCell;
 import com.atakmap.android.airaware.MetarFeatures;
 import com.atakmap.android.airaware.Tfr;
 import com.atakmap.android.airaware.TfrArea;
@@ -688,6 +689,8 @@ public class TfrPane implements TfrManager.Listener {
     }
 
     private String layerStatus(String key) {
+        if (TfrManager.LAYER_UASFM.equals(key))
+            return uasfmStatus();
         if (TfrManager.LAYER_OBSTACLES.equals(key))
             return obstaclesStatus();
         if (TfrManager.LAYER_RESTRICTIONS.equals(key))
@@ -776,6 +779,8 @@ public class TfrPane implements TfrManager.Listener {
                 fillAirspaceControls(body, true);
             else if (TfrManager.LAYER_OBSTACLES.equals(key))
                 fillObstacleControls(body);
+            else if (TfrManager.LAYER_UASFM.equals(key))
+                fillUasfmControls(body);
             else
                 fillAirfieldControls(body);
         }
@@ -910,6 +915,35 @@ public class TfrPane implements TfrManager.Listener {
                     @Override
                     public void set(long meters) {
                         manager.setAirspaceBarMeters(meters);
+                    }
+                });
+    }
+
+    private String uasfmStatus() {
+        if (!manager.isLayerOn(TfrManager.LAYER_UASFM))
+            return "Off. Nothing drawn.";
+        final UasfmCell here = manager.uasfmHere();
+        if (here != null)
+            return here.label() + "  (" + here.where() + ")";
+        final int n = manager.uasfmDrawn().size();
+        if (n == 0)
+            return "No UAS grid here - outside controlled airspace";
+        return n + " squares" + (manager.isUasfmCapped() ? " (zoom in for the rest)" : "");
+    }
+
+    /** What belongs to the UAS ceilings and nothing else. */
+    private void fillUasfmControls(LinearLayout body) {
+        addValueButton(body, "Show at", ScaleBar.gate(manager.uasfmBarMeters()),
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        pickBarGate("Show UAS ceilings when the scale bar reads",
+                                manager.uasfmBarMeters(), new OnGate() {
+                                    @Override
+                                    public void set(long meters) {
+                                        manager.setUasfmBarMeters(meters);
+                                    }
+                                });
                     }
                 });
     }
