@@ -234,9 +234,14 @@ public class TfrOverlay {
                             for (MapItem m : hits) {
                                 final String notam = m.getMetaString("tfr_notam_id", null);
                                 final String icao = m.getMetaString("metar_icao", null);
+                                // Airspace is three features per shelf -- the volume, the
+                                // footprint under it and the label -- so without its own
+                                // key the chooser listed Chino Class D three times.
+                                final String shelf = m.getMetaString("airspace_id", null);
                                 final String key = notam != null ? "n:" + notam
                                         : icao != null ? "m:" + icao
-                                                : "f:" + m.getMetaLong("featureid", -1);
+                                                : shelf != null ? "a:" + shelf
+                                                        : "f:" + m.getMetaLong("featureid", -1);
                                 if (seen.add(key))
                                     out.add(m);
                             }

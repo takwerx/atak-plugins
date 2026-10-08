@@ -34,6 +34,16 @@ public final class AirspaceFeatures {
     private static final float STROKE = 2f;
     /** Twelve shelves over one airport is normal, so each one has to be nearly clear. */
     private static final int FILL_ALPHA = 0x18;
+    /**
+     * Class E is drawn as an outline with nothing inside it.
+     *
+     * <p>Class E transition areas start at 700 or 1,200 ft above the ground and cover
+     * essentially the whole country, so a fill is a tint over the entire map -- which is
+     * what it looked like on the phone, the imagery purple from edge to edge. The
+     * sectional has the same problem and solves it the same way: the vignette marks where
+     * Class E steps down, and the inside of it is left as map.
+     */
+    private static final int NO_FILL = 0x00;
     /** Left wide open; the gate the operator sets lives in the plugin. See TfrFeatures. */
     private static final double LABEL_MAX_RES = 100000d;
 
@@ -118,6 +128,13 @@ public final class AirspaceFeatures {
         return CLASS_OTHER;
     }
 
+    /** How much of the map this kind of shelf is allowed to tint. */
+    private static int fillAlpha(Airspace a) {
+        return a != null && a.isClass()
+                && "E".equalsIgnoreCase(a.classCode == null ? "" : a.classCode.trim())
+                        ? NO_FILL : FILL_ALPHA;
+    }
+
     /** Everything to draw for one shelf: its volume, its footprint and one label. */
     public static List<TfrOverlay.Drawn> drawn(Airspace a) {
         final List<TfrOverlay.Drawn> out = new ArrayList<>();
@@ -126,6 +143,7 @@ public final class AirspaceFeatures {
             return out;
         final String setName = Airspace.setName(setKey);
         final int color = color(a);
+        final int alpha = fillAlpha(a);
         final String name = featureName(a);
         final AttributeSet attrs = attributes(a);
         final String id = "as" + a.id;
@@ -142,10 +160,10 @@ public final class AirspaceFeatures {
             // 5,000 is airspace you fly under, and a flat ring cannot say that.
             if (wall > 1)
                 out.add(new TfrOverlay.Drawn(id, setKey, setName, name,
-                        polygon(part, floorM), volumeStyle(color), attrs, mode, wall));
+                        polygon(part, floorM), volumeStyle(color, alpha), attrs, mode, wall));
             // The footprint, clamped, so the shelf is there looking straight down.
             out.add(new TfrOverlay.Drawn(id, setKey, setName, name, polygon(part, Double.NaN),
-                    flatStyle(color), attrs, Feature.AltitudeMode.ClampToGround, 0d));
+                    flatStyle(color, alpha), attrs, Feature.AltitudeMode.ClampToGround, 0d));
         }
 
         // One label for the shelf, on the biggest part. Airspace is dense -- forty-four
@@ -232,16 +250,21 @@ public final class AirspaceFeatures {
         return v.feet * 0.3048d;
     }
 
-    private static Style volumeStyle(int color) {
+    private static Style volumeStyle(int color, int alpha) {
+        final BasicStrokeStyle stroke = new BasicStrokeStyle(color, STROKE,
+                BasicStrokeStyle.EXTRUDE_VERTEX);
+        if (alpha == NO_FILL)
+            return stroke;
         return new CompositeStyle(new Style[] {
-                new BasicFillStyle((FILL_ALPHA << 24) | (color & 0x00FFFFFF)),
-                new BasicStrokeStyle(color, STROKE, BasicStrokeStyle.EXTRUDE_VERTEX) });
+                new BasicFillStyle((alpha << 24) | (color & 0x00FFFFFF)), stroke });
     }
 
-    private static Style flatStyle(int color) {
+    private static Style flatStyle(int color, int alpha) {
+        final BasicStrokeStyle stroke = new BasicStrokeStyle(color, STROKE);
+        if (alpha == NO_FILL)
+            return stroke;
         return new CompositeStyle(new Style[] {
-                new BasicFillStyle((FILL_ALPHA << 24) | (color & 0x00FFFFFF)),
-                new BasicStrokeStyle(color, STROKE) });
+                new BasicFillStyle((alpha << 24) | (color & 0x00FFFFFF)), stroke });
     }
 
     /**
