@@ -174,7 +174,11 @@ public class TfrOverlay {
                             // stops ATAK opening one -- on its own that makes a tap do
                             // nothing, so the plugin listens for the click itself and
                             // opens the details page.
-                            item.setMetaString("menu", "");
+                            // Not blanked any more. A blank menu stopped the radial but
+                            // left ATAK selecting the item and leaving its own callout on
+                            // the map; the plugin now answers ATAK's menu question with
+                            // "handled" instead, which stops both. See AirAware.registerTap.
+                            item.setMetaBoolean("airaware", true);
                             AttributeSet a = feature.getAttributes();
                             // Null on a tap: the hit-test query asks the store to skip
                             // attributes, so they have to be fetched by id.

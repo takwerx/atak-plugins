@@ -46,7 +46,7 @@ public class AirAware implements IPlugin {
     private TfrPane paneUi;
     private BroadcastReceiver receiver;
     private BroadcastReceiver showReceiver;
-    private com.atakmap.android.maps.MapEventDispatcher.MapEventDispatchListener tapListener;
+    private com.atakmap.android.menu.MapMenuEventListener menuListener;
 
     public AirAware(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -107,10 +107,12 @@ public class AirAware implements IPlugin {
             }
             showReceiver = null;
         }
-        if (tapListener != null && mapView != null) {
-            mapView.getMapEventDispatcher().removeMapEventListener(
-                    com.atakmap.android.maps.MapEvent.ITEM_CLICK, tapListener);
-            tapListener = null;
+        if (menuListener != null) {
+            final com.atakmap.android.menu.MapMenuReceiver menus =
+                    com.atakmap.android.menu.MapMenuReceiver.getInstance();
+            if (menus != null)
+                menus.removeEventListener(menuListener);
+            menuListener = null;
         }
         if (manager != null) {
             // Everything this plugin drew comes off with it, and nothing it downloaded is
@@ -173,50 +175,80 @@ public class AirAware implements IPlugin {
     /**
      * A tap on a restriction opens its details in the pane.
      *
-     * <p>A listener rather than a radial: the features carry a blank menu, so ATAK opens
-     * nothing of its own and the click arrives here. Only our own items are claimed --
-     * every other plugin's and ATAK's own still behave exactly as before, which is why
-     * this adds a listener rather than clearing ITEM_CLICK.
+     * <p><b>ATAK is asked for the item before it opens anything of its own.</b> Listening
+     * for the click instead left ATAK to do its half as well: it selected the item and
+     * left its own callout -- "Edwards Afb Class E5 ... 2,534 ft MSL" -- pinned to the
+     * top of the map, still there after Back, because nothing we did ever told ATAK the
+     * tap was handled. A {@code MapMenuEventListener} that answers true does tell it.
+     * Items that are not ours are not claimed and keep their radial exactly as before.
+     * This is Atmosphere's path, for the same reason and after the same bug.
      */
     private void registerTap() {
-        tapListener = new com.atakmap.android.maps.MapEventDispatcher.MapEventDispatchListener() {
+        menuListener = new com.atakmap.android.menu.MapMenuEventListener() {
             @Override
-            public void onMapEvent(com.atakmap.android.maps.MapEvent event) {
-                if (event == null || manager == null || paneUi == null)
-                    return;
-                final MapItem item = event.getItem();
-                if (item == null)
-                    return;
-                final String notam = item.getMetaString("tfr_notam_id", null);
-                if (notam != null) {
-                    final Tfr t = manager.byNotam(notam);
-                    if (t == null)
-                        return;
-                    showPane();
-                    paneUi.showDetails(t);
-                    return;
-                }
-                final String icao = item.getMetaString("metar_icao", null);
-                if (icao != null) {
-                    final com.atakmap.android.airaware.Metar m = manager.airfield(icao);
-                    if (m == null)
-                        return;
-                    showPane();
-                    paneUi.showAirfield(m);
-                    return;
-                }
-                final String shelf = item.getMetaString("airspace_id", null);
-                if (shelf == null)
-                    return;
-                final com.atakmap.android.airaware.Airspace a = manager.airspaceById(shelf);
-                if (a == null)
-                    return;
-                showPane();
-                paneUi.showAirspace(a);
+            public boolean onShowMenu(final MapItem item) {
+                if (item == null || manager == null || paneUi == null)
+                    return false;
+                if (item.getMetaString("tfr_notam_id", null) == null
+                        && item.getMetaString("metar_icao", null) == null
+                        && item.getMetaString("airspace_id", null) == null)
+                    return false;
+                // A moment later, not now: a pick from ATAK's Select Item list closes the
+                // list and then posts its own show-details, which closed the page opened
+                // here. A plain tap does not notice the quarter second.
+                mapView.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        openFor(item);
+                    }
+                }, 250);
+                return true;
+            }
+
+            @Override
+            public void onHideMenu(MapItem item) {
             }
         };
-        mapView.getMapEventDispatcher().addMapEventListener(
-                com.atakmap.android.maps.MapEvent.ITEM_CLICK, tapListener);
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.addEventListener(menuListener);
+        else
+            Log.w(TAG, "no radial menu receiver; taps keep ATAK's own menu");
+    }
+
+    /** Whatever the tapped item is, on AirAware's own page. */
+    private void openFor(MapItem item) {
+        try {
+            final String notam = item.getMetaString("tfr_notam_id", null);
+            if (notam != null) {
+                final Tfr t = manager.byNotam(notam);
+                if (t == null)
+                    return;
+                showPane();
+                paneUi.showDetails(t);
+                return;
+            }
+            final String icao = item.getMetaString("metar_icao", null);
+            if (icao != null) {
+                final com.atakmap.android.airaware.Metar m = manager.airfield(icao);
+                if (m == null)
+                    return;
+                showPane();
+                paneUi.showAirfield(m);
+                return;
+            }
+            final String shelf = item.getMetaString("airspace_id", null);
+            if (shelf == null)
+                return;
+            final com.atakmap.android.airaware.Airspace a = manager.airspaceById(shelf);
+            if (a == null)
+                return;
+            showPane();
+            paneUi.showAirspace(a);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "opening the page for a tap failed", e);
+        }
     }
 
     private void showPane() {
