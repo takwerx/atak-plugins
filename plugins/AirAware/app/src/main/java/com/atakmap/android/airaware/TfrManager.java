@@ -260,6 +260,17 @@ public class TfrManager {
         }
         mapView.addOnMapMovedListener(moved);
         main.postDelayed(tick, TICK_MS);
+        // Airspace rode entirely on the map moving, so after a plugin reload the map had
+        // restrictions and no airspace until the operator happened to pan -- which is
+        // exactly how it looked to them, as 3D not working. The tiles are on disk, so
+        // this is a file read, not a download. A moment's delay so the map has bounds.
+        main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (started)
+                    maybeFetchAirspace();
+            }
+        }, 1500L);
         // The store is a file, so last session's areas are already on the map. Read them
         // back into the list before any network call, then catch up.
         worker.execute(new Runnable() {
