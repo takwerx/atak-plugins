@@ -110,6 +110,9 @@ public class TfrManager {
             java.util.Arrays.asList("as:A", "as:G", "as:?"));
 
     private static final long TICK_MS = 60 * 1000L;
+    /** The airspace quota refills by the minute, so the first retry is soon. */
+    private static final long FIRST_RETRY_MS = 20 * 1000L;
+    private static final long MAX_RETRY_MS = 15 * 60 * 1000L;
     private static final int DEFAULT_REFRESH_MIN = 30;
 
     public interface Listener {
@@ -175,6 +178,15 @@ public class TfrManager {
     private volatile long airspaceFetchedMs;
     /** Set while the service has refused us, so the status line can say why nothing moved. */
     private volatile long airspaceBusyUntilMs;
+    /**
+     * How long to wait after a refusal, doubling each time up to a quarter of an hour.
+     *
+     * <p>It was a flat fifteen minutes, and on the first ever fetch that is a quarter of
+     * an hour of empty map and a message about somebody else's quota -- which is how the
+     * operator met the layer. The quota refills every minute, so the first retry should
+     * be soon and only a service that keeps saying no earns a long wait.
+     */
+    private volatile long airspaceRetryMs = FIRST_RETRY_MS;
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
     private volatile boolean airspaceHidden;
@@ -238,6 +250,7 @@ public class TfrManager {
         started = false;
         main.removeCallbacks(tick);
         main.removeCallbacks(settled);
+        main.removeCallbacks(airspaceRetry);
         mapView.removeOnMapMovedListener(moved);
         // Each reinstall otherwise pins this generation's threads through its own static
         // pools, and ATAK runs out of memory after enough reloads.
@@ -954,7 +967,11 @@ public class TfrManager {
         if (fences != null)
             b.append(' ').append(fences);
         if (isAirspaceBusy())
-            b.append(" The FAA airspace service is busy; airspace is as last downloaded.");
+            b.append(airspaces.isEmpty()
+                    ? " The FAA airspace service is busy. Trying again in "
+                            + Math.max(1, (airspaceBusyUntilMs - System.currentTimeMillis())
+                                    / 1000L) + "s."
+                    : " The FAA airspace service is busy; airspace is as last downloaded.");
         return b.toString();
     }
 
@@ -1162,6 +1179,14 @@ public class TfrManager {
 
     // ---- the clock and the map ----
 
+    private final Runnable airspaceRetry = new Runnable() {
+        @Override
+        public void run() {
+            if (started)
+                maybeFetchAirspace();
+        }
+    };
+
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
@@ -1176,6 +1201,9 @@ public class TfrManager {
             final long interval = refreshMinutes() * 60L * 1000L;
             // Expiry is a clock, not a download: a fence can lapse with no network.
             checkFences();
+            // The airspace retry rides the clock, so a refusal clears itself without the
+            // operator having to move the map to find out.
+            maybeFetchAirspace();
             if (lastSuccessMs == 0 || System.currentTimeMillis() - lastSuccessMs >= interval)
                 syncNow();
             else
@@ -1313,14 +1341,22 @@ public class TfrManager {
                     airspaceBox = want;
                     airspaceFetchedMs = System.currentTimeMillis();
                     airspaceCapped = got.size() >= 4000;
+                    airspaceRetryMs = FIRST_RETRY_MS;
                     Log.d(TAG, "airspace: " + got.size() + " shelves in view");
                     rewriteOverlay();
                     post();
                 } catch (AirspaceFeed.RateLimited e) {
                     // Shared quota, not our bug and not the operator's. Keep the last good
-                    // picture and stop asking for a while; the status line says so.
-                    airspaceBusyUntilMs = System.currentTimeMillis() + 15 * 60 * 1000L;
-                    Log.d(TAG, "airspace service busy, keeping what we have");
+                    // picture, wait, and try again: the clock retries without needing the
+                    // map to move.
+                    final long wait = airspaceRetryMs;
+                    airspaceBusyUntilMs = System.currentTimeMillis() + wait;
+                    Log.d(TAG, "airspace service busy, retrying in " + (wait / 1000L) + "s");
+                    airspaceRetryMs = Math.min(MAX_RETRY_MS, airspaceRetryMs * 2);
+                    // Retry when the status line says we will, rather than waiting for
+                    // the minute clock or for the operator to move the map.
+                    main.removeCallbacks(airspaceRetry);
+                    main.postDelayed(airspaceRetry, wait + 250L);
                     post();
                 } catch (Exception e) {
                     // A failed fetch never empties anything.
