@@ -75,11 +75,11 @@ public class TfrPane implements TfrManager.Listener {
     private LinearLayout settingsContainer, typesContainer, updatesContainer, keyBody;
     private Button useZoomButton, gateButton;
     private TextView gateNow, downloadedNote;
-    private Fold gateFold, labelsFold, areaFold, whereFold, typesFold, keyFold, updatesFold,
-            fencesFold;
+    private Fold gateFold, labelsFold, areaFold, fromFold, whereFold, typesFold, keyFold,
+            updatesFold, fencesFold;
     private Button labelsGateButton;
     private TextView labelsNote;
-    private LinearLayout fencesContainer;
+    private LinearLayout fencesContainer, fromContainer;
     private LinearLayout areaContainer, whereContainer;
     private TextView areaNote;
 
@@ -138,6 +138,7 @@ public class TfrPane implements TfrManager.Listener {
         labelsGateButton = settings.findViewById(R.id.btn_labels_gate);
         labelsNote = settings.findViewById(R.id.labels_note);
         fencesContainer = settings.findViewById(R.id.fences_container);
+        fromContainer = settings.findViewById(R.id.from_container);
 
         gateFold = new Fold(settings, R.id.fold_gate_head, R.id.fold_gate_chev,
                 R.id.fold_gate_body, "fold.gate");
@@ -147,6 +148,8 @@ public class TfrPane implements TfrManager.Listener {
                 R.id.fold_fences_body, "fold.fences");
         areaFold = new Fold(settings, R.id.fold_area_head, R.id.fold_area_chev,
                 R.id.fold_area_body, "fold.area");
+        fromFold = new Fold(settings, R.id.fold_from_head, R.id.fold_from_chev,
+                R.id.fold_from_body, "fold.from");
         whereFold = new Fold(settings, R.id.fold_where_head, R.id.fold_where_chev,
                 R.id.fold_where_body, "fold.where");
         typesFold = new Fold(settings, R.id.fold_types_head, R.id.fold_types_chev,
@@ -343,6 +346,8 @@ public class TfrPane implements TfrManager.Listener {
 
         areaFold.label("Area", manager.areaLabel());
         buildArea();
+        fromFold.label("Measure from", manager.measureFromLabel());
+        buildFrom();
         whereFold.label("Where", manager.whereLabel());
         buildWhere();
 
@@ -471,14 +476,6 @@ public class TfrPane implements TfrManager.Listener {
                         manager.setArea(TfrManager.AREA_IN_VIEW, 0);
                     }
                 });
-        addChoice(areaContainer, "Measuring from: " + manager.measureFromLabel(), false,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        manager.setMeasureFrom(manager.measureFrom() == TfrManager.FROM_ME
-                                ? TfrManager.FROM_MAP_CENTER : TfrManager.FROM_ME);
-                    }
-                });
         addChoice(areaContainer, "Within " + ScaleBar.gate(manager.areaRadiusMeters())
                 + (manager.hasFix() ? " of me" : " of the map center"),
                 manager.areaMode() == TfrManager.AREA_RADIUS, new Runnable() {
@@ -490,6 +487,25 @@ public class TfrPane implements TfrManager.Listener {
         areaNote.setText(manager.hasFix() ? ""
                 : "No GPS fix, measuring from the map center.");
         areaNote.setVisibility(manager.hasFix() ? View.GONE : View.VISIBLE);
+    }
+
+    /** What the distances and the ordering are measured from. */
+    private void buildFrom() {
+        fromContainer.removeAllViews();
+        addChoice(fromContainer, "My location", manager.measureFrom() == TfrManager.FROM_ME,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        manager.setMeasureFrom(TfrManager.FROM_ME);
+                    }
+                });
+        addChoice(fromContainer, "Map center",
+                manager.measureFrom() == TfrManager.FROM_MAP_CENTER, new Runnable() {
+                    @Override
+                    public void run() {
+                        manager.setMeasureFrom(TfrManager.FROM_MAP_CENTER);
+                    }
+                });
     }
 
     /**

@@ -173,6 +173,49 @@
 
     </LinearLayout>
 
+
+    <!-- What distances and the ordering are measured from. Its own row, because inside
+         the Area body it was somewhere the operator could not find it. -->
+    <LinearLayout
+        android:id="@+id/fold_from_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+
+        <Button
+            android:id="@+id/fold_from_head"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+
+        <ImageButton
+            android:id="@+id/fold_from_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="@string/show_settings"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/fold_from_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="4dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/from_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </LinearLayout>
+
     <!-- Which places, said three ways. -->
     <LinearLayout
         android:id="@+id/fold_where_row"
