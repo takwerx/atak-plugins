@@ -185,6 +185,9 @@ public class TfrOverlay {
                                 final String notam = string(a, "notam_id");
                                 if (notam != null)
                                     item.setMetaString("tfr_notam_id", notam);
+                                final String icao = string(a, "metar_icao");
+                                if (icao != null)
+                                    item.setMetaString("metar_icao", icao);
                                 final String place = string(a, "place");
                                 if (place != null && !place.isEmpty())
                                     label = place;
@@ -227,8 +230,10 @@ public class TfrOverlay {
                             final SortedSet<MapItem> out = new TreeSet<>(hits.comparator());
                             for (MapItem m : hits) {
                                 final String notam = m.getMetaString("tfr_notam_id", null);
+                                final String icao = m.getMetaString("metar_icao", null);
                                 final String key = notam != null ? "n:" + notam
-                                        : "f:" + m.getMetaLong("featureid", -1);
+                                        : icao != null ? "m:" + icao
+                                                : "f:" + m.getMetaLong("featureid", -1);
                                 if (seen.add(key))
                                     out.add(m);
                             }

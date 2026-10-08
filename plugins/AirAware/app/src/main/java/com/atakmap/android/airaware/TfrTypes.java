@@ -17,6 +17,9 @@ public final class TfrTypes {
     public static String label(String raw) {
         if (raw == null || raw.trim().isEmpty())
             return "Other";
+        // Not an FAA restriction type: the airfield chips switch through the same filter.
+        if (MetarFeatures.SET_KEY.equals(raw))
+            return MetarFeatures.SET_NAME;
         final String r = raw.trim().toUpperCase(Locale.US);
         if ("SECURITY".equals(r))
             return "Security";

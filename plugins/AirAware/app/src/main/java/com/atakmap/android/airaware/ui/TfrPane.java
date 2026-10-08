@@ -19,6 +19,7 @@ import android.widget.TextView;
 
 import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.airaware.Metar;
 import com.atakmap.android.airaware.Tfr;
 import com.atakmap.android.airaware.TfrArea;
 import com.atakmap.android.airaware.TfrFeatures;
@@ -800,6 +801,41 @@ public class TfrPane implements TfrManager.Listener {
         detailsTitle.setText(t.place());
         detailsBody.setText(detailsText(t));
         detailsGeofence.setEnabled(!t.drawable().isEmpty());
+        detailsFaa.setEnabled(true);
+        settingsPage.setVisibility(View.GONE);
+        list.setVisibility(View.GONE);
+        detailsPage.setVisibility(View.VISIBLE);
+    }
+
+    /** A station's observation, on the same details page a restriction uses. */
+    public void showAirfield(final Metar m) {
+        if (root == null || m == null)
+            return;
+        showing = null;
+        detailsTitle.setText(m.icao);
+        final StringBuilder b = new StringBuilder();
+        b.append(m.name).append("\n\n");
+        b.append(m.categoryLabel());
+        if (!m.visibility.isEmpty())
+            b.append("   visibility ").append(m.visibility).append(" sm");
+        b.append('\n').append("Ceiling: ").append(m.ceilingLabel());
+        if (!m.layers.isEmpty())
+            b.append("\nCloud: ").append(android.text.TextUtils.join(", ", m.layers));
+        b.append("\nWind: ").append(m.windLabel());
+        final String temp = m.tempLabel();
+        if (!temp.isEmpty())
+            b.append("\nTemperature: ").append(temp);
+        final String alt = m.altimeterLabel();
+        if (!alt.isEmpty())
+            b.append("\nAltimeter: ").append(alt);
+        if (m.obsMs > 0)
+            b.append("\n\nObserved ").append(local.format(new Date(m.obsMs)));
+        if (!m.raw.isEmpty())
+            b.append("\n\n").append(m.raw);
+        detailsBody.setText(b.toString());
+        // Nothing to fence and no FAA page for a station.
+        detailsGeofence.setEnabled(false);
+        detailsFaa.setEnabled(false);
         settingsPage.setVisibility(View.GONE);
         list.setVisibility(View.GONE);
         detailsPage.setVisibility(View.VISIBLE);

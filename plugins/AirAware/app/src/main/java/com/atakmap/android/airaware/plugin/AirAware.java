@@ -188,13 +188,22 @@ public class AirAware implements IPlugin {
                 if (item == null)
                     return;
                 final String notam = item.getMetaString("tfr_notam_id", null);
-                if (notam == null)
+                if (notam != null) {
+                    final Tfr t = manager.byNotam(notam);
+                    if (t == null)
+                        return;
+                    showPane();
+                    paneUi.showDetails(t);
                     return;
-                final Tfr t = manager.byNotam(notam);
-                if (t == null)
+                }
+                final String icao = item.getMetaString("metar_icao", null);
+                if (icao == null)
+                    return;
+                final com.atakmap.android.airaware.Metar m = manager.airfield(icao);
+                if (m == null)
                     return;
                 showPane();
-                paneUi.showDetails(t);
+                paneUi.showAirfield(m);
             }
         };
         mapView.getMapEventDispatcher().addMapEventListener(

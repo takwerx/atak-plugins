@@ -133,6 +133,10 @@ public class TfrManager {
     private volatile int areaMode = AREA_IN_VIEW;
     private volatile long areaRadiusM = 80467L;
     private volatile int measureFrom = FROM_ME;
+    /** Airfield observations for where the operator is looking, and the box they cover. */
+    private volatile List<Metar> metars = Collections.emptyList();
+    private volatile double[] metarBox;
+    private volatile long metarFetchedMs;
 
     public TfrManager(MapView mapView, Context pluginContext) {
         this.mapView = mapView;
@@ -217,6 +221,7 @@ public class TfrManager {
         prefs().edit().putBoolean(PREF_ON, value).apply();
         if (on) {
             applyGate();
+            maybeFetchMetars();
             syncNow();
         } else {
             lastError = null;
@@ -260,7 +265,22 @@ public class TfrManager {
         final List<String[]> out = new ArrayList<>();
         for (int i = 0; i < order.size(); i++)
             out.add(new String[] { order.get(i), Integer.toString(counts.get(i)) });
+        // Airfield conditions switch like any other kind: the overlay keys set visibility
+        // on the same string, so it needs no special case anywhere else.
+        if (!metars.isEmpty())
+            out.add(new String[] { MetarFeatures.SET_KEY,
+                    Integer.toString(metars.size()) });
         return out;
+    }
+
+    /** One station by its identifier, for a tap on its chip. */
+    public Metar airfield(String icao) {
+        if (icao == null)
+            return null;
+        for (Metar m : metars)
+            if (icao.equals(m.icao))
+                return m;
+        return null;
     }
 
     // ---- one rule for the list and the map ----
@@ -792,6 +812,9 @@ public class TfrManager {
         // filter was set to when ATAK stopped.
         for (Tfr t : known)
             drawn.addAll(TfrFeatures.drawn(t, now, active, upcoming));
+        // The airfield chips ride in the same rewrite: one store, one locked pass, and
+        // the set they land in is switched like any other type.
+        drawn.addAll(MetarFeatures.drawn(metars));
         overlay.rewrite(drawn);
         overlay.setTypesOff(new HashSet<>(typesOff));
     }
@@ -877,9 +900,60 @@ public class TfrManager {
             if (!started)
                 return;
             applyGate();
+            maybeFetchMetars();
             changed();
         }
     };
+
+    /**
+     * Fetch airfield observations for the view, but only when the view has really moved.
+     *
+     * <p>Unlike the restrictions, which are fetched nationally because their list carries
+     * no coordinates, these are a bounding-box query -- so they follow the map. The box is
+     * padded and only refetched once the view leaves it, or the report is an hour old,
+     * because a pan of half a screen is not new weather.
+     */
+    private void maybeFetchMetars() {
+        if (!on)
+            return;
+        final GeoBounds b = mapView.getBounds();
+        if (b == null || Double.isNaN(b.getNorth()) || Double.isNaN(b.getSouth()))
+            return;
+        final double[] box = metarBox;
+        final boolean stale = System.currentTimeMillis() - metarFetchedMs > 60 * 60 * 1000L;
+        if (!stale && box != null
+                && b.getSouth() >= box[0] && b.getWest() >= box[1]
+                && b.getNorth() <= box[2] && b.getEast() <= box[3])
+            return;
+        final double padLat = Math.max(0.2, (b.getNorth() - b.getSouth()) * 0.25);
+        final double padLon = Math.max(0.2, (b.getEast() - b.getWest()) * 0.25);
+        final double[] want = {
+                b.getSouth() - padLat, b.getWest() - padLon,
+                b.getNorth() + padLat, b.getEast() + padLon
+        };
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final List<Metar> got = MetarFeed.inBox(want[0], want[1], want[2], want[3]);
+                    metars = Collections.unmodifiableList(got);
+                    metarBox = want;
+                    metarFetchedMs = System.currentTimeMillis();
+                    Log.d(TAG, "airfields: " + got.size() + " stations in view");
+                    rewriteOverlay();
+                    post();
+                } catch (Exception e) {
+                    // The restrictions are the half that matters; a failed observation
+                    // fetch leaves the last good chips up and says nothing.
+                    Log.w(TAG, "fetching airfield observations failed", e);
+                }
+            }
+        });
+    }
+
+    public List<Metar> airfields() {
+        return metars;
+    }
 
     private void changed() {
         if (listener != null)
