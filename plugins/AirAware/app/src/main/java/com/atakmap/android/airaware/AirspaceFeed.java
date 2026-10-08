@@ -83,11 +83,7 @@ public final class AirspaceFeed {
             final JSONArray features = root.optJSONArray("features");
             if (features == null || features.length() == 0)
                 break;
-            for (int i = 0; i < features.length(); i++) {
-                final Airspace a = one(features.optJSONObject(i));
-                if (a != null && a.drawable() && !a.layer().isEmpty())
-                    out.add(a);
-            }
+            out.addAll(parse(root));
             if (!root.optBoolean("exceededTransferLimit", false))
                 break;
             offset += PAGE;
@@ -154,6 +150,26 @@ public final class AirspaceFeed {
         if (!(degreesOnScreen > 0))
             return 0.0005d;
         return Math.max(0.00008d, Math.min(0.004d, degreesOnScreen / 1500d));
+    }
+
+    /**
+     * Every drawable shelf in a service answer.
+     *
+     * <p>Public because {@link AirspaceTiles} reads the same shape out of a published
+     * tile: the tiles are written as the service writes them, so one reader covers both
+     * and the two can never disagree about what a ring means.
+     */
+    public static List<Airspace> parse(JSONObject root) {
+        final List<Airspace> out = new ArrayList<>();
+        final JSONArray features = root == null ? null : root.optJSONArray("features");
+        if (features == null)
+            return out;
+        for (int i = 0; i < features.length(); i++) {
+            final Airspace a = one(features.optJSONObject(i));
+            if (a != null && a.drawable() && !a.layer().isEmpty())
+                out.add(a);
+        }
+        return out;
     }
 
     private static Airspace one(JSONObject f) {

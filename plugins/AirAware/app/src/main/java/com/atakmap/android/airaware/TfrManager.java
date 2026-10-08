@@ -54,6 +54,7 @@ public class TfrManager {
     public static final String LAYER_AIRSPACE = Airspace.LAYER_CLASSES;
     public static final String LAYER_SUA = Airspace.LAYER_SUA;
     static final String PREF_AIRSPACE_BAR_M = "airspaceBarM";
+    static final String PREF_AIRSPACE_CYCLE = "airspaceCycle";
     static final String PREF_CLASSES_OFF = "classesOff";
     static final String PREF_GATE_BAR_M = "gateBarM";
     static final String PREF_LABEL_BAR_M = "labelBarM";
@@ -112,9 +113,12 @@ public class TfrManager {
     private static final long TICK_MS = 60 * 1000L;
     /** The shortest gap between airfield fetches, however far the map is moved. */
     private static final long METAR_MIN_GAP_MS = 20 * 1000L;
-    /** The airspace quota refills by the minute, so the first retry is soon. */
-    private static final long FIRST_RETRY_MS = 20 * 1000L;
-    private static final long MAX_RETRY_MS = 15 * 60 * 1000L;
+    /**
+     * The most tiles loaded for one view. Two-degree tiles and a hundred-mile zoom gate
+     * mean a handful in practice; this is a ceiling against a view that somehow asks for
+     * the country.
+     */
+    private static final int MAX_TILES = 24;
     private static final int DEFAULT_REFRESH_MIN = 30;
 
     public interface Listener {
@@ -176,28 +180,15 @@ public class TfrManager {
      * world, so a refetch is a once-a-day thing and a pan inside the box is free.
      */
     private volatile List<Airspace> airspaces = Collections.emptyList();
-    private volatile double[] airspaceBox;
     private volatile long airspaceFetchedMs;
-    /**
-     * How finely the shapes we are holding were drawn, in degrees.
-     *
-     * <p>Kept because being inside the cached box is not the same as having shapes good
-     * enough for the zoom: the geometry fetched for a wide view stays when the operator
-     * zooms in, and against a sectional base map at Twentynine Palms that showed as
-     * straight runs and corners across the chart's smooth Class E circle.
-     */
-    private volatile double airspaceOffsetDeg = Double.MAX_VALUE;
-    /** Set while the service has refused us, so the status line can say why nothing moved. */
-    private volatile long airspaceBusyUntilMs;
-    /**
-     * How long to wait after a refusal, doubling each time up to a quarter of an hour.
-     *
-     * <p>It was a flat fifteen minutes, and on the first ever fetch that is a quarter of
-     * an hour of empty map and a message about somebody else's quota -- which is how the
-     * operator met the layer. The quota refills every minute, so the first retry should
-     * be soon and only a service that keeps saying no earns a long wait.
-     */
-    private volatile long airspaceRetryMs = FIRST_RETRY_MS;
+
+    /** Tiles the held shelves came from, so a pan inside them costs nothing. */
+    private volatile Set<String> airspaceKeys = Collections.emptySet();
+    /** The publication cycle on the phone; a new one clears the tiles. */
+    private volatile String airspaceCycle = "";
+    /** True when a tile this view needs is not downloaded and could not be fetched. */
+    private volatile boolean airspaceMissing;
+
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
     private volatile boolean airspaceHidden;
@@ -217,6 +208,7 @@ public class TfrManager {
         airfieldBarM = p.getLong(PREF_AIRFIELD_BAR_M, 48280L);
         // A hundred miles: airspace is big, and a shelf matters long before you reach it.
         airspaceBarM = p.getLong(PREF_AIRSPACE_BAR_M, 160934L);
+        airspaceCycle = p.getString(PREF_AIRSPACE_CYCLE, "");
         classesOff.addAll(p.getStringSet(PREF_CLASSES_OFF, DEFAULT_CLASSES_OFF));
         // A set, not a joined string: a type carrying the separator would come back as two
         // bogus entries and the filter would restore wrong.
@@ -261,7 +253,6 @@ public class TfrManager {
         started = false;
         main.removeCallbacks(tick);
         main.removeCallbacks(settled);
-        main.removeCallbacks(airspaceRetry);
         mapView.removeOnMapMovedListener(moved);
         // Each reinstall otherwise pins this generation's threads through its own static
         // pools, and ATAK runs out of memory after enough reloads.
@@ -578,9 +569,9 @@ public class TfrManager {
         return false;
     }
 
-    /** Whether the airspace service has turned us away, and we are waiting it out. */
+    /** True when airspace for this view has not reached the phone yet. */
     public boolean isAirspaceBusy() {
-        return System.currentTimeMillis() < airspaceBusyUntilMs;
+        return airspaceMissing;
     }
 
     /** True when the view held more shelves than one fetch will carry. */
@@ -985,12 +976,12 @@ public class TfrManager {
         final String fences = TfrWatch.line(staleFences);
         if (fences != null)
             b.append(' ').append(fences);
-        if (isAirspaceBusy())
+        // Said in what it means for the map, not in what failed: airspace is downloaded
+        // once per area and kept, so the honest sentence is which part is not here yet.
+        if (airspaceMissing && (isLayerOn(LAYER_AIRSPACE) || isLayerOn(LAYER_SUA)))
             b.append(airspaces.isEmpty()
-                    ? " The FAA airspace service is busy. Trying again in "
-                            + Math.max(1, (airspaceBusyUntilMs - System.currentTimeMillis())
-                                    / 1000L) + "s."
-                    : " The FAA airspace service is busy; airspace is as last downloaded.");
+                    ? " Airspace for here is not downloaded yet."
+                    : " Some airspace here is not downloaded yet.");
         return b.toString();
     }
 
@@ -1198,14 +1189,6 @@ public class TfrManager {
 
     // ---- the clock and the map ----
 
-    private final Runnable airspaceRetry = new Runnable() {
-        @Override
-        public void run() {
-            if (started)
-                maybeFetchAirspace();
-        }
-    };
-
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
@@ -1335,67 +1318,95 @@ public class TfrManager {
      * leaves it or the answer is a day old, and a refusal parks the layer for a quarter of
      * an hour with what it already has still on the map.
      */
+    /**
+     * Make sure the airspace tiles for this view are loaded.
+     *
+     * <p>Nothing is fetched from the FAA any more. {@link AirspaceTiles} reads
+     * two-degree tiles we publish ourselves, so there is no shared quota to spend, no
+     * rate limit to back off from, and a tile read once stays on the phone -- which is
+     * what the live fetch could never give a crew driving into a canyon.
+     *
+     * <p>The shelves held in memory are exactly the tiles the view needs, rebuilt from
+     * disk when that set changes rather than accumulated: panning the country would
+     * otherwise grow the list until ATAK ran out of memory, and re-reading a tile that
+     * is already a file is cheap. The zoom gate keeps the set small on its own -- past a
+     * hundred miles airspace is hidden anyway -- so this is only ever a handful.
+     */
     private void maybeFetchAirspace() {
-        if (isAirspaceBusy())
-            return;
         if (!isLayerOn(LAYER_AIRSPACE) && !isLayerOn(LAYER_SUA))
             return;
         final GeoBounds b = mapView.getBounds();
         if (b == null || Double.isNaN(b.getNorth()) || Double.isNaN(b.getSouth()))
             return;
-        final double span = Math.abs(b.getNorth() - b.getSouth());
-        // What this view wants. Halving is the trigger rather than any change, so a pinch
-        // does not refetch on every frame; one zoom step in is not new geometry, four are.
-        final double wantOffset = AirspaceFeed.generalization(span);
-        final boolean tooCoarse = wantOffset < airspaceOffsetDeg / 2d;
-        final double[] box = airspaceBox;
-        final boolean stale = System.currentTimeMillis() - airspaceFetchedMs > 24 * 60 * 60 * 1000L;
-        if (!stale && !tooCoarse && box != null
-                && b.getSouth() >= box[0] && b.getWest() >= box[1]
-                && b.getNorth() <= box[2] && b.getEast() <= box[3])
-            return;
-        // The pad follows the view too. A third of a degree around an eight-mile view is
-        // five times more airspace than is on screen, at the fine detail that view wants.
-        final double padLat = Math.max(0.1, span * 0.5);
-        final double padLon = Math.max(0.1, Math.abs(b.getEast() - b.getWest()) * 0.5);
-        final double[] want = {
-                b.getSouth() - padLat, b.getWest() - padLon,
-                b.getNorth() + padLat, b.getEast() + padLon
-        };
+        final double padLat = Math.max(0.1, Math.abs(b.getNorth() - b.getSouth()) * 0.25);
+        final double padLon = Math.max(0.1, Math.abs(b.getEast() - b.getWest()) * 0.25);
+        final double south = b.getSouth() - padLat;
+        final double west = b.getWest() - padLon;
+        final double north = b.getNorth() + padLat;
+        final double east = b.getEast() + padLon;
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                try {
-                    final List<Airspace> got = AirspaceFeed.inBox(want[0], want[1], want[2],
-                            want[3], wantOffset);
-                    airspaces = Collections.unmodifiableList(got);
-                    airspaceBox = want;
-                    airspaceOffsetDeg = wantOffset;
-                    airspaceFetchedMs = System.currentTimeMillis();
-                    airspaceCapped = got.size() >= 4000;
-                    airspaceRetryMs = FIRST_RETRY_MS;
-                    Log.d(TAG, "airspace: " + got.size() + " shelves in view");
-                    rewriteOverlay();
-                    post();
-                } catch (AirspaceFeed.RateLimited e) {
-                    // Shared quota, not our bug and not the operator's. Keep the last good
-                    // picture, wait, and try again: the clock retries without needing the
-                    // map to move.
-                    final long wait = airspaceRetryMs;
-                    airspaceBusyUntilMs = System.currentTimeMillis() + wait;
-                    Log.d(TAG, "airspace service busy, retrying in " + (wait / 1000L) + "s");
-                    airspaceRetryMs = Math.min(MAX_RETRY_MS, airspaceRetryMs * 2);
-                    // Retry when the status line says we will, rather than waiting for
-                    // the minute clock or for the operator to move the map.
-                    main.removeCallbacks(airspaceRetry);
-                    main.postDelayed(airspaceRetry, wait + 250L);
-                    post();
-                } catch (Exception e) {
-                    // A failed fetch never empties anything.
-                    Log.w(TAG, "fetching airspace failed", e);
-                }
+                loadTilesOnWorker(south, west, north, east);
             }
         });
+    }
+
+    /** Worker thread only: this reads and writes files. */
+    private void loadTilesOnWorker(double south, double west, double north, double east) {
+        final File dir = AirspaceTiles.dir(FileSystemUtils.getItem("tools/airaware"));
+        final AirspaceTiles.Index index = AirspaceTiles.index(dir);
+        // A new publication cycle makes every tile on the phone the wrong cycle, and the
+        // two would otherwise sit side by side with no way to tell them apart.
+        if (!index.cycle.isEmpty() && !index.cycle.equals(airspaceCycle)) {
+            if (!airspaceCycle.isEmpty()) {
+                Log.d(TAG, "airspace cycle " + airspaceCycle + " -> " + index.cycle);
+                AirspaceTiles.clear(dir);
+            }
+            airspaceCycle = index.cycle;
+            prefs().edit().putString(PREF_AIRSPACE_CYCLE, airspaceCycle).apply();
+            airspaceKeys = Collections.emptySet();
+        }
+
+        List<String> keys = AirspaceTiles.keysFor(index, south, west, north, east);
+        final boolean capped = keys.size() > MAX_TILES;
+        if (capped)
+            keys = keys.subList(0, MAX_TILES);
+        final Set<String> want = new LinkedHashSet<>(keys);
+        if (want.equals(airspaceKeys) && !airspaces.isEmpty())
+            return;
+
+        // Keyed by id: a shelf that straddles a tile boundary is written into both, and
+        // the publisher says so.
+        final Map<String, Airspace> merged = new LinkedHashMap<>();
+        boolean missed = false;
+        try {
+            for (Airspace a : AirspaceTiles.wide(dir))
+                merged.put(a.id, a);
+        } catch (Exception e) {
+            missed = true;
+            Log.d(TAG, "the wide shapes are not here yet: " + e);
+        }
+        for (String key : want) {
+            try {
+                for (Airspace a : AirspaceTiles.tile(dir, key))
+                    merged.put(a.id, a);
+            } catch (Exception e) {
+                // One tile short is a thin picture, not an empty one.
+                missed = true;
+                Log.d(TAG, "tile " + key + " is not here yet: " + e);
+            }
+        }
+
+        airspaceKeys = want;
+        airspaceCapped = capped;
+        airspaceMissing = missed;
+        airspaces = Collections.unmodifiableList(new ArrayList<>(merged.values()));
+        airspaceFetchedMs = System.currentTimeMillis();
+        Log.d(TAG, "airspace: " + airspaces.size() + " shelves from " + want.size()
+                + " tiles" + (missed ? " (some not downloaded)" : ""));
+        rewriteOverlay();
+        post();
     }
 
     private void changed() {

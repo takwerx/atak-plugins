@@ -682,16 +682,15 @@ public class TfrPane implements TfrManager.Listener {
     /**
      * What the airspace rows say when they are open.
      *
-     * <p>The shared FAA quota gets its own sentence. A layer that quietly stopped
-     * updating reads as a broken plugin, and this one is neither our fault nor the
-     * operator's -- so it says what is happening and that the map is still good.
+     * <p>Airspace that has not reached the phone gets its own sentence. A layer that is
+     * quietly thin reads as open sky, which is the one thing it must never read as.
      */
     private String airspaceStatus(boolean specialUse) {
         final String layer = specialUse ? TfrManager.LAYER_SUA : TfrManager.LAYER_AIRSPACE;
         if (!manager.isLayerOn(layer))
             return "Off. Nothing drawn.";
         if (manager.isAirspaceBusy())
-            return "The FAA airspace service is busy. Showing what is already here.";
+            return "Not downloaded for here yet. Showing what is already on this phone.";
         int n = 0;
         for (String[] row : manager.airspaceCounts(specialUse))
             if (manager.isClassOn(row[0]))
