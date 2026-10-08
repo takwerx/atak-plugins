@@ -242,6 +242,10 @@ public class TfrManager {
     private volatile boolean obstaclesHidden;
     private volatile boolean obstaclesCapped;
     private volatile boolean obstaclesMissing;
+    /** Everything the loaded tiles hold that passes the filter. */
+    private volatile List<Obstacle> obstaclesAll = Collections.emptyList();
+    /** The padded box the drawn set was picked for; panning inside it is free. */
+    private volatile double[] obstacleBox;
     private volatile long obstacleBarM = 16093L;
     private volatile double obstacleFloorFt = Obstacle.DEFAULT_MIN_AGL_FT;
     private final Set<String> obstacleGroupsOff = new LinkedHashSet<>();
@@ -1321,15 +1325,9 @@ public class TfrManager {
             drawn.addAll(AirspaceFeatures.drawn(a, solid, in3d));
         if (pills == null)
             pills = new ObstaclePills();
-        int drawnObstacles = 0;
-        for (Obstacle o : obstacles) {
-            if (drawnObstacles >= MAX_OBSTACLES)
-                break;
+        for (Obstacle o : obstacles)
             drawn.addAll(ObstacleFeatures.drawn(o, solid, pills, pluginContext,
                     DEFAULT_OBSTACLE));
-            drawnObstacles++;
-        }
-        obstaclesCapped = obstacles.size() > MAX_OBSTACLES;
         overlay.rewrite(drawn);
         overlay.setTypesOff(hiddenSets());
     }
@@ -1517,11 +1515,16 @@ public class TfrManager {
         final double west = b.getWest() - padLon;
         final double north = b.getNorth() + padLat;
         final double east = b.getEast() + padLon;
+        final double viewSouth = b.getSouth();
+        final double viewWest = b.getWest();
+        final double viewNorth = b.getNorth();
+        final double viewEast = b.getEast();
         worker.execute(new Runnable() {
             @Override
             public void run() {
                 loadTilesOnWorker(south, west, north, east);
-                loadObstaclesOnWorker(south, west, north, east);
+                loadObstaclesOnWorker(south, west, north, east,
+                        viewSouth, viewWest, viewNorth, viewEast);
             }
         });
     }
@@ -1536,7 +1539,8 @@ public class TfrManager {
      * the operator's defaults were applied.
      */
     private void loadObstaclesOnWorker(double south, double west, double north,
-            double east) {
+            double east, double viewSouth, double viewWest, double viewNorth,
+            double viewEast) {
         if (!isLayerOn(LAYER_OBSTACLES))
             return;
         final TilePack pack = ObstacleTiles.pack();
@@ -1557,29 +1561,80 @@ public class TfrManager {
         if (want.equals(obstacleKeys) && !obstacles.isEmpty())
             return;
 
-        final List<Obstacle> kept = new ArrayList<>();
-        boolean missed = false;
-        for (String key : want) {
-            try {
-                for (Obstacle o : ObstacleTiles.tile(pack, key))
-                    if (passesObstacleFilter(o))
-                        kept.add(o);
-            } catch (Exception e) {
-                missed = true;
-                Log.d(TAG, "obstacle tile " + key + " is not here yet: " + e);
+        if (!want.equals(obstacleKeys) || obstaclesAll.isEmpty()) {
+            final List<Obstacle> loaded = new ArrayList<>();
+            boolean missed = false;
+            for (String key : want) {
+                try {
+                    for (Obstacle o : ObstacleTiles.tile(pack, key))
+                        if (passesObstacleFilter(o))
+                            loaded.add(o);
+                } catch (Exception e) {
+                    missed = true;
+                    Log.d(TAG, "obstacle tile " + key + " is not here yet: " + e);
+                }
             }
+            obstacleKeys = want;
+            obstaclesMissing = missed;
+            obstaclesAll = Collections.unmodifiableList(loaded);
+            obstacleBox = null;
+            Log.d(TAG, "obstacles: " + loaded.size() + " held from " + want.size()
+                    + " tiles");
         }
-        // Tallest first, so the cap keeps what matters rather than what sorted first.
-        Collections.sort(kept, new java.util.Comparator<Obstacle>() {
+        pickObstaclesForView(viewSouth, viewWest, viewNorth, viewEast);
+    }
+
+    /**
+     * Which of the held obstacles are drawn.
+     *
+     * <p>Separate from loading because a tile is two degrees and a view can be a few
+     * hundred feet. The cap used to keep the tallest in the tile, which at a 636 ft
+     * scale bar meant four hundred towers scattered across a county and not one of them
+     * on screen -- the operator had the layer on, 4,407 loaded, and an empty map. What
+     * the cap has to keep is what is <b>near the view</b>.
+     *
+     * <p>The box is padded and remembered, so panning inside it costs nothing; only
+     * leaving it is a redraw. Without that, a view whose bounds jitter -- which is every
+     * tilted view -- rewrote the whole store twice a second.
+     */
+    private void pickObstaclesForView(double south, double west, double north,
+            double east) {
+        final double[] box = obstacleBox;
+        if (box != null && south >= box[0] && west >= box[1] && north <= box[2]
+                && east <= box[3] && !obstacles.isEmpty())
+            return;
+        final double padLat = Math.max(0.02, (north - south) * 0.6);
+        final double padLon = Math.max(0.02, (east - west) * 0.6);
+        final double[] want = { south - padLat, west - padLon, north + padLat,
+                east + padLon };
+        final double midLat = (south + north) / 2d;
+        final double midLon = (west + east) / 2d;
+        final double lonScale = Math.cos(Math.toRadians(midLat));
+
+        final List<Obstacle> inView = new ArrayList<>();
+        for (Obstacle o : obstaclesAll) {
+            if (o.lat < want[0] || o.lat > want[2] || o.lon < want[1] || o.lon > want[3])
+                continue;
+            final double dy = o.lat - midLat;
+            final double dx = (o.lon - midLon) * lonScale;
+            o.distanceM = Math.sqrt(dy * dy + dx * dx) * 111320d;
+            inView.add(o);
+        }
+        // Nearest first, so the cap keeps what is in front of the operator. Height
+        // breaks a tie, because at equal distance the taller one is the one that matters.
+        Collections.sort(inView, new java.util.Comparator<Obstacle>() {
             @Override
             public int compare(Obstacle a, Obstacle b) {
-                return Double.compare(b.aglFt, a.aglFt);
+                final int d = Double.compare(a.distanceM, b.distanceM);
+                return d != 0 ? d : Double.compare(b.aglFt, a.aglFt);
             }
         });
-        obstacleKeys = want;
-        obstaclesMissing = missed;
-        obstacles = Collections.unmodifiableList(kept);
-        Log.d(TAG, "obstacles: " + kept.size() + " from " + want.size() + " tiles");
+        obstaclesCapped = inView.size() > MAX_OBSTACLES;
+        obstacles = Collections.unmodifiableList(
+                new ArrayList<>(inView.subList(0, Math.min(MAX_OBSTACLES, inView.size()))));
+        obstacleBox = want;
+        Log.d(TAG, "obstacles: drawing " + obstacles.size() + " of " + inView.size()
+                + " in view");
         rewriteOverlay();
         post();
     }
@@ -1649,6 +1704,7 @@ public class TfrManager {
     /** The filter decides what is loaded, so changing it reloads from the tiles on disk. */
     private void refetchObstacles() {
         obstacleKeys = Collections.emptySet();
+        obstacleBox = null;
         changed();
         main.removeCallbacks(settled);
         main.postDelayed(settled, 50);
