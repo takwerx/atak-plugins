@@ -1088,8 +1088,14 @@ public final class UASFlightPlanPane implements IslandOverlay.Listener,
 
         final TerrainGrid grid = overlay.getGrid();
         final double g = overlay.getGroundMslM();
+        // No grid with a launch point on the map is not "no launch point": the
+        // terrain was refused (coarser than DTED2) or is still being read, and the
+        // line says which, so the pilot is not told to place a point that is there.
+        final int noGround = launch.getPoint() == null ? R.string.ground_none
+                : lastFail != null ? R.string.ground_unknown
+                : R.string.ground_reading;
         ground.setText(grid == null || Double.isNaN(g)
-                ? pluginContext.getString(R.string.ground_none)
+                ? pluginContext.getString(noGround)
                 : pluginContext.getString(R.string.ground_here, Units.altitudeMsl(g)));
 
 
