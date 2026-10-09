@@ -40,7 +40,9 @@ import com.atakmap.coremap.log.Log;
  * itself never gets here. Under the Android Emulator's virtio tablet the panes did not
  * scroll themselves at all (2026-09-26): the log showed every wheel over a pane arriving
  * here, vetoed, and nothing moving. So the nearest ancestor that can move that way is
- * scrolled from here instead.
+ * scrolled from here instead. On Android 15 they do scroll themselves, far too fast for a
+ * trackpad, so under the emulator the wheel over UI is now taken before any list sees it
+ * (see {@link #hideGuestPointer}).
  */
 public final class PointerRouter {
 
@@ -102,6 +104,14 @@ public final class PointerRouter {
      * top, with the none icon: it is the first view under the pointer everywhere, and its
      * answer wins. Only under the emulator: on DeX or a Chromebook Android's cursor is the
      * only cursor there is.
+     *
+     * <p>Being first under the pointer, it also takes the wheel over ATAK's UI (since 0.3).
+     * On Android 15 the emulator's lists scroll themselves, one notch per wheel event; on
+     * 14 they did not, and {@link #scrollUnder} moved them. A trackpad swipe is 20 to 40
+     * events of 1 where a mouse click is one of 8, so ATAK's Tools list ran 20 to 40 rows a
+     * swipe, its whole length, and the plugins in it only flashed past (the operator's
+     * MacBook, 2026-10-08). Over UI the event is scrolled here, by its share of a notch,
+     * and never reaches the list; over the map it passes on to the router's zoom.
      */
     private void hideGuestPointer(boolean hide) {
         if (Build.VERSION.SDK_INT < 24)
@@ -124,6 +134,20 @@ public final class PointerRouter {
                 pointerShroud.setFocusable(false);
                 pointerShroud.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
                 pointerShroud.setPointerIcon(PointerIcon.getSystemIcon(activity, PointerIcon.TYPE_NULL));
+                pointerShroud.setOnGenericMotionListener(new View.OnGenericMotionListener() {
+                    @Override
+                    public boolean onGenericMotion(View v, MotionEvent event) {
+                        if (event.getAction() != MotionEvent.ACTION_SCROLL
+                                || event.getAxisValue(MotionEvent.AXIS_VSCROLL) == 0f
+                                || !isOverUi(event.getRawX(), event.getRawY()))
+                            return false;
+                        final String scrolled = scrollUnder(event);
+                        if (verbose)
+                            Log.d(TAG, "wheel " + event.getAxisValue(MotionEvent.AXIS_VSCROLL) + " over "
+                                    + describe(lastHit) + (scrolled != null ? ", scrolled " + scrolled : ", nothing to scroll"));
+                        return true;
+                    }
+                });
                 content.addView(pointerShroud, new ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             }
@@ -295,12 +319,16 @@ public final class PointerRouter {
 
     /**
      * Scrolls the nearest view at or above {@link #lastHit} that can move the way the wheel
-     * turned, by Android's own step for one notch.
+     * turned, by Android's own step for each notch of travel.
+     *
+     * <p>Travel is counted in notches, as {@link #zoomAtCursor} counts it: under the emulator
+     * a mouse click is one event of 8 and a trackpad swipe 20 to 40 events of 1 at 60 Hz
+     * (2026-10-08). Until 0.3 the raw value was taken as notches, eight steps a click.
      *
      * @return what was scrolled and by how much, for the log; null when nothing could.
      */
     private String scrollUnder(MotionEvent event) {
-        final float notches = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+        final float notches = event.getAxisValue(MotionEvent.AXIS_VSCROLL) / notch(event);
         if (notches == 0f || lastHit == null)
             return null;
         // Wheel up (positive) brings the content above into view.

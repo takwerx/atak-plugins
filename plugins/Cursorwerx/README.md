@@ -35,7 +35,8 @@ On the map:
 In panes and menus:
 
   - The wheel scrolls the pane or list under the cursor, and never zooms the
-    map behind it.
+    map behind it. A trackpad swipe moves a list about a page, a mouse click
+    about a row.
   - A Back button on the left edge, and the Escape key, are Back.
   - Clicks land in text fields, so you can type; on an emulator whose pointer
     reaches Android as a tablet (mouse and stylus sources at once), presses
@@ -80,6 +81,15 @@ the one that matches your ATAK.
 
 _________________________________________________________________
 STATUS
+
+Version 0.3: a trackpad scrolls lists at a usable pace. On Android 15 in the
+TAKwerx ATAK Terminal one two-finger swipe ran ATAK's Tools list from end to
+end, so anything in the middle of it, Plugins and the plugins' own tools, only
+flashed past. A swipe now moves a list about a page and a mouse click about a
+row, and the map stays still while the cursor is over a list. Verified on
+ATAK-CIV 5.8.0.3 in Google's Android Emulator 37.1.11 on Android 15, debug and
+release builds, with wheel input through the emulator's own pointer device.
+ATAK's Settings pages, a separate screen, still scroll at Android's own pace.
 
 Version 0.2: the wheel zoom step is a setting (Fine to Very fast), in the
 plugin's pane and under Tool Preferences. Verified on ATAK-CIV 5.8.0.3 in the

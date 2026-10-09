@@ -42,7 +42,8 @@ used with a finger.
 
 - **The wheel scrolls the pane or list under the cursor**, and never zooms the
   map behind it. That includes the toolbar overflow, Overlay Manager, the
-  settings pages and every plugin pane.
+  settings pages and every plugin pane. On ATAK's main screen a trackpad
+  swipe moves a list about a page, and a mouse click about a row.
 - **Back:** the ‹ button on the left edge of the screen, or the Escape key on
   the keyboard, closes what a phone's Back button would close.
 - **Text fields take the click.** Click into any field, in ATAK's own settings
