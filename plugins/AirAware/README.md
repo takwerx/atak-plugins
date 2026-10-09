@@ -19,7 +19,7 @@ device, with no TAK Server and no Data Sync mission in the path.
 
 Six layers, each switched on its own from the front page:
 
-  Restrictions        FAA Temporary Flight Restrictions, drawn as 3D volumes
+  TFR                 FAA Temporary Flight Restrictions, drawn as 3D volumes
                       from the published floor to the published ceiling, red
                       when in effect and amber when scheduled.
 
@@ -43,7 +43,7 @@ Six layers, each switched on its own from the front page:
                       transmission towers, turbines and stacks — standing at
                       their published height with the height on a label.
 
-  Airfield conditions METAR observations as flight-category chips in the
+  METARs              Observations as flight-category chips in the
                       aviation convention: green VFR, blue MVFR, red IFR,
                       magenta LIFR, as published and never derived.
 

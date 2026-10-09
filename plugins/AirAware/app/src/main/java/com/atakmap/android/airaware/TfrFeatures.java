@@ -152,6 +152,36 @@ public final class TfrFeatures {
      * one edge would drag a vertex average off into the side of the shape. Falls back to
      * the average when the ring is degenerate enough to have no area.
      */
+    /**
+     * How wide the restriction is on the ground, in meters, so Go to can pick a zoom
+     * that shows the whole thing. The widest of the two axes of the first drawable
+     * area's bounding box; 0 when there is nothing to measure.
+     */
+    public static double span(Tfr t) {
+        for (TfrArea a : t.drawable()) {
+            if (a.ring.size() < 2)
+                continue;
+            double minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+            for (double[] p : a.ring) {
+                if (p[0] < minLat) minLat = p[0];
+                if (p[0] > maxLat) maxLat = p[0];
+                if (p[1] < minLon) minLon = p[1];
+                if (p[1] > maxLon) maxLon = p[1];
+            }
+            // A ring that wraps the antimeridian would measure as most of the planet.
+            // No domestic TFR does, so rather than guess at the wrap, decline to size it.
+            if (maxLon - minLon > 180)
+                continue;
+            final double mid = Math.toRadians((minLat + maxLat) / 2);
+            final double tall = (maxLat - minLat) * 111320d;
+            final double wide = (maxLon - minLon) * 111320d * Math.cos(mid);
+            final double span = Math.max(tall, wide);
+            if (span > 0)
+                return span;
+        }
+        return 0;
+    }
+
     /** The middle of a restriction's first drawable area, for Go to. {lat, lon} or null. */
     public static double[] center(Tfr t) {
         for (TfrArea a : t.drawable()) {

@@ -38,11 +38,11 @@ phone.
 
 ## Opening it
 
-<!-- PICTURE: 1_toolbar.png -->
+![The AirAware icon in ATAK's toolbar](screenshots/1_toolbar.png)
 
 Open AirAware from the ATAK toolbar. The pane opens at half width.
 
-<!-- PICTURE: 2_front_page.png -->
+![The top of the pane](screenshots/2_front_page.png)
 
 Three buttons across the top:
 
@@ -56,7 +56,7 @@ Under them, **LAYERS**, with **All on** and **All off**.
 
 ## The layers
 
-<!-- PICTURE: 3_layer_rows.png -->
+![The six layer rows](screenshots/3_layer_rows.png)
 
 One row per layer. The row itself is the switch: it reads the layer's name with
 **ON** in green or **OFF** in red, and tapping it turns the layer on or off.
@@ -68,18 +68,18 @@ The arrow on the right opens that layer's own settings and a line saying what
 it is showing right now. The arrow works while the layer is off, so a layer can
 be set up before it is switched on.
 
-<!-- PICTURE: 4_layer_expanded.png -->
+![TFR's own settings, with the layer on](screenshots/4_layer_expanded.png)
 
 Each layer carries only what belongs to it:
 
 | Layer | Its own settings |
 |---|---|
-| Restrictions | Types, Where, Area, Zoom gate, Labels |
+| TFR | Types, Where, Area, Zoom gate, Labels |
 | Airspace | Classes, Show at, 3D, Names on the map |
 | Special Use | Kinds, Show at, 3D, Names on the map |
 | UAS ceilings | Show at |
 | Obstacles | Kinds, Taller than, Show at |
-| Airfield conditions | Show at |
+| METARs | Show at |
 
 **Show at** and **Zoom gate** are read off ATAK's own scale bar. Pick the
 distance the bar has to read before the layer draws, and the layer stays out of
@@ -87,7 +87,7 @@ the way until you are close enough for it to mean something.
 
 ---
 
-## Restrictions
+## TFR
 
 Temporary Flight Restrictions as the FAA publishes them, drawn as a volume from
 the published floor to the published ceiling.
@@ -102,14 +102,14 @@ Some restrictions are published with no shape at all, as a reference to other
 airspace. There is nothing to draw for those, and the pane says so rather than
 leaving them out.
 
-<!-- PICTURE: 5_restrictions_list.png -->
+![Restrictions in view, one active and one scheduled](screenshots/5_restrictions_list.png)
 
 Under the layers is the list of what is on the map. The list and the map follow
 one rule: if a restriction is not on the map it is not in the list, and the
 status line says why — the zoom gate, the type filter, or that nothing has
 reached the phone for this area yet.
 
-<!-- PICTURE: 6_restriction_details.png -->
+![A restriction's details page](screenshots/6_restriction_details.png)
 
 Tap a row, or tap the shape on the map, for the restriction's own page: what it
 is, where, the floor and ceiling, when it runs, and the full text as the FAA
@@ -218,7 +218,7 @@ are at that point, and the nearest town.
 
 ---
 
-## Airfield conditions
+## METARs
 
 <!-- PICTURE: 19_metar.png -->
 
@@ -420,7 +420,7 @@ then **Tool Preferences**, then **AirAware**, then **Plugin Documentation**.
   on is on your device only, and your position is never sent anywhere.
 - **What it holds, it keeps.** Airspace, restrictions, obstacles and UAS
   ceilings that have reached this phone come back after a restart with no
-  network. Airfield conditions do not, on purpose.
+  network. METARs do not, on purpose.
 - **It says what it is not showing.** A trimmed list, a layer under its zoom
   gate or an area that was never downloaded is stated in words on the status
   line. A quiet map is not the same as an empty sky.

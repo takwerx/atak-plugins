@@ -1542,10 +1542,14 @@ public class TfrPane implements TfrManager.Listener {
     }
 
     /**
-     * Put a restriction in the middle of the map.
+     * Put a restriction in the middle of the map, at a zoom where it can be read.
      *
-     * <p>Pans and never zooms: the operator chose that zoom, and a Go to that also
-     * rescaled the map would throw away the view they were working in.
+     * <p>This used to pan and never zoom, on the reasoning that the operator had chosen
+     * that zoom. In the field that was wrong: a Go to from 50 miles out centers a
+     * restriction you still cannot see and whose name is under the label gate, so the
+     * tap appears to do nothing. It now lands at the Labels gate, which is the zoom the
+     * operator already set as "close enough to show names", and backs off from there
+     * only when the shape is too big to fit.
      */
     private void goTo(Tfr t) {
         final double[] c = TfrFeatures.center(t);
@@ -1558,7 +1562,57 @@ public class TfrPane implements TfrManager.Listener {
                     .show();
             return;
         }
-        mapView.getMapController().panTo(new GeoPoint(c[0], c[1]), true);
+        final GeoPoint at = new GeoPoint(c[0], c[1]);
+        final double res = goToResolution(t);
+        if (res <= 0) {
+            // The scale could not be worked out; a pan is still better than nothing.
+            mapView.getMapController().panTo(at, true);
+            return;
+        }
+        double scale = mapView.mapResolutionAsMapScale(res);
+        // Clamped without assuming which of the two is the larger number.
+        final double lo = Math.min(mapView.getMinMapScale(), mapView.getMaxMapScale());
+        final double hi = Math.max(mapView.getMinMapScale(), mapView.getMaxMapScale());
+        scale = Math.max(lo, Math.min(hi, scale));
+        mapView.getMapController().panZoomTo(at, scale, true);
+    }
+
+    /**
+     * The map resolution a Go to should land on, in meters per pixel.
+     *
+     * <p>The target is the Labels gate, so the restriction arrives with its name on it.
+     * That gate is stored as what ATAK's scale bar reads, not as a resolution, so the
+     * conversion is taken from the live pair rather than from an assumed bar width:
+     * the bar currently spans {@code barMeters} at {@code resolution}, so the bar is
+     * {@code barMeters / resolution} pixels wide whatever ATAK decided to draw.
+     *
+     * @return meters per pixel, or 0 when the map cannot be measured right now
+     */
+    private double goToResolution(Tfr t) {
+        final double nowRes = mapView.getMapResolution();
+        final double nowBar = ScaleBar.meters(mapView);
+        if (!(nowRes > 0) || !(nowBar > 0))
+            return 0;
+        final double barPixels = nowBar / nowRes;
+        if (!(barPixels > 0))
+            return 0;
+
+        final long gate = manager.labelBarMeters();
+        double res = (gate > 0 ? gate : 16093L) / barPixels;
+
+        // A restriction bigger than that has to be shown whole instead; a Go to that
+        // framed the middle of a 200 mile ring would be worse than the one before it.
+        final double span = TfrFeatures.span(t);
+        if (span > 0) {
+            // The pane covers half the screen, so the shorter side is the honest budget.
+            final int px = Math.min(mapView.getWidth(), mapView.getHeight());
+            if (px > 0) {
+                final double fit = span * 1.6d / px;   // leave the shape some margin
+                if (fit > res)
+                    res = fit;
+            }
+        }
+        return res;
     }
 
     private void open(String url) {

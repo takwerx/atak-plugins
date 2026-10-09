@@ -20,7 +20,7 @@ users, and nothing about you or your position leaves the phone.
 
 #v(6pt)
 #toolbox.side-by-side(columns: (8fr, 4fr))[
-  // SHOT 1
+  #image("1.png", width: 100%)
 ][
   Open it from the ATAK toolbar. The pane opens at half width.
 ]
@@ -46,7 +46,7 @@ users, and nothing about you or your position leaves the phone.
 = The front page
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 2
+  #image("2.png", width: 100%)
 ][
   Three buttons across the top:
 
@@ -63,7 +63,7 @@ users, and nothing about you or your position leaves the phone.
 = The layers
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 3
+  #image("3.png", width: 100%)
 ][
   One row per layer. The row itself is the switch: it reads the layer's name
   with *ON* in green or *OFF* in red, and tapping it turns the layer on or off.
@@ -81,16 +81,16 @@ users, and nothing about you or your position leaves the phone.
 = A layer's own settings
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 4
+  #image("4.png", width: 100%)
 ][
   Each layer carries only what belongs to it:
 
-  - *Restrictions:* Types, Where, Area, Zoom gate, Labels.
+  - *TFR:* Types, Where, Area, Zoom gate, Labels.
   - *Airspace:* Classes, Show at, 3D, Names on the map.
   - *Special Use:* Kinds, Show at, 3D, Names on the map.
   - *UAS ceilings:* Show at.
   - *Obstacles:* Kinds, Taller than, Show at.
-  - *Airfield conditions:* Show at.
+  - *METARs:* Show at.
 
   *Show at* and *Zoom gate* are read off ATAK's own scale bar. Pick the
   distance the bar has to read before the layer draws, and the layer stays out
@@ -99,7 +99,7 @@ users, and nothing about you or your position leaves the phone.
 ]
 
 #tak-slide[
-= Restrictions
+= TFR
 
 Temporary Flight Restrictions as the FAA publishes them, drawn as a volume
 from the published floor to the published ceiling.
@@ -121,7 +121,7 @@ from the published floor to the published ceiling.
 = Restrictions in view
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 5
+  #image("5.png", width: 100%)
 ][
   Under the layers is the list of what is on the map, newest first. Each row
   says what the restriction is and when it runs.
@@ -136,7 +136,7 @@ from the published floor to the published ceiling.
 = A restriction's details
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 6
+  #image("6.png", width: 100%)
 ][
   Tap a row, or tap the shape on the map, for the restriction's own page: what
   it is, where, the floor and ceiling, when it runs, and the full text as the
@@ -277,7 +277,7 @@ turbines and stacks.
 ]
 
 #tak-slide[
-= Airfield conditions
+= METARs
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   // SHOT 19
@@ -576,7 +576,7 @@ every color the planner puts on the map.
   is on your device only, and your position is never sent anywhere.
 - *What it holds, it keeps.* Airspace, restrictions, obstacles and UAS ceilings
   that have reached this phone come back after a restart with no network.
-  Airfield conditions do not, on purpose.
+  METARs do not, on purpose.
 - *It says what it is not showing.* A trimmed list, a layer under its zoom gate
   or an area that was never downloaded is stated in words on the status line.
   A quiet map is not the same as an empty sky.
