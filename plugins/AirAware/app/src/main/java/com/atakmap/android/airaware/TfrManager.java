@@ -2024,6 +2024,11 @@ public class TfrManager {
     }
 
     /** The map's own colors, so the map key cannot drift from what is drawn. */
+    /** What an obstacle draws in, so the map key cannot drift from the map. */
+    public int obstacleColor() {
+        return DEFAULT_OBSTACLE;
+    }
+
     public int activeColor() {
         return color(PREF_COLOR_ACTIVE, DEFAULT_ACTIVE);
     }

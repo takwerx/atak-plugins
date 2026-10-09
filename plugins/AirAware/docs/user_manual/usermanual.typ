@@ -317,7 +317,7 @@ turbines and stacks.
 = The map key
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 10
+  #image("10.png", width: 100%)
 ][
   Open *Map key* under Settings for what every color means, in the same words
   the rest of the pane uses.
@@ -559,7 +559,7 @@ every color the planner puts on the map.
 = This manual
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 11
+  #image("11.png", width: 100%)
 ][
   This guide is inside the plugin. Open it from *Settings*, then *Tool
   Preferences*, then *AirAware*, then *Plugin Documentation*.

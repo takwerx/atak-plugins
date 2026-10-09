@@ -21,6 +21,7 @@ import com.atak.plugins.impl.PluginLayoutInflater;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.android.airaware.Airspace;
 import com.atakmap.android.airaware.AirspaceFeatures;
+import com.atakmap.android.airaware.UasfmFeatures;
 import com.atakmap.android.airaware.Metar;
 import com.atakmap.android.airaware.Obstacle;
 import com.atakmap.android.airaware.UasfmCell;
@@ -1102,17 +1103,109 @@ public class TfrPane implements TfrManager.Listener {
     }
 
 
-    /** Built from the same colors the map draws with, so the two cannot drift. */
+    /**
+     * Built from the same colors the map draws with, so the two cannot drift, and it
+     * follows the layers: a layer that is off contributes nothing.
+     *
+     * <p>It used to list the two restriction colors and stop, which was right when
+     * restrictions were the only thing drawn and wrong once six layers were. A key that
+     * names a third of the map is worse than none, because it reads as complete.
+     */
     private void buildKey() {
         keyBody.removeAllViews();
-        addKeyLine("In effect now", manager.activeColor());
-        addKeyLine("Scheduled, not yet in effect", manager.upcomingColor());
-        final int noArea = countWithoutArea();
-        if (noArea > 0)
-            addKeyLine(noArea + (noArea == 1
-                    ? " restriction has no mapped area and is listed only"
-                    : " restrictions have no mapped area and are listed only"),
-                    0x00000000);
+        boolean any = false;
+
+        if (manager.isLayerOn(TfrManager.LAYER_RESTRICTIONS)) {
+            addKeyHeading("TFR");
+            addKeyLine("In effect now", manager.activeColor());
+            addKeyLine("Scheduled, not yet in effect", manager.upcomingColor());
+            final int noArea = countWithoutArea();
+            if (noArea > 0)
+                addKeyLine(noArea + (noArea == 1
+                        ? " restriction has no mapped area and is listed only"
+                        : " restrictions have no mapped area and are listed only"),
+                        0x00000000);
+            any = true;
+        }
+
+        any |= addAirspaceKey(false, "Airspace");
+        any |= addAirspaceKey(true, "Special Use");
+
+        if (manager.isLayerOn(TfrManager.LAYER_UASFM)) {
+            addKeyHeading("UAS ceilings");
+            // The bands the FAA publishes, coarsest first, each in the color the grid
+            // draws that ceiling with.
+            final int[] bands = { 400, 300, 200, 100, 0 };
+            for (int ft : bands)
+                addKeyLine(ft == 0
+                        ? "0 ft: no flight without further coordination"
+                        : ft + " ft above the ground",
+                        UasfmFeatures.color(ft));
+            any = true;
+        }
+
+        if (manager.isLayerOn(TfrManager.LAYER_OBSTACLES)) {
+            addKeyHeading("Obstacles");
+            addKeyLine("Charted obstacle, with its height above the ground",
+                    manager.obstacleColor());
+            any = true;
+        }
+
+        if (manager.isLayerOn(TfrManager.LAYER_AIRFIELDS)) {
+            addKeyHeading("METARs");
+            addKeyLine("VFR", MetarFeatures.VFR);
+            addKeyLine("MVFR", MetarFeatures.MVFR);
+            addKeyLine("IFR", MetarFeatures.IFR);
+            addKeyLine("LIFR", MetarFeatures.LIFR);
+            any = true;
+        }
+
+        if (!any)
+            addKeyLine("No layer is switched on, so nothing is drawn.", 0x00000000);
+    }
+
+    /**
+     * One airspace block, listing only the classes or kinds that are switched on.
+     *
+     * @return whether anything was added
+     */
+    private boolean addAirspaceKey(boolean specialUse, String heading) {
+        final String layer = specialUse ? TfrManager.LAYER_SUA : TfrManager.LAYER_AIRSPACE;
+        if (!manager.isLayerOn(layer))
+            return false;
+        final List<String[]> counts = manager.airspaceCounts(specialUse);
+        boolean added = false;
+        for (String[] row : counts) {
+            if (!manager.isClassOn(row[0]))
+                continue;
+            if (!added) {
+                addKeyHeading(heading);
+                added = true;
+            }
+            addKeyLine(Airspace.setName(row[0]), AirspaceFeatures.color(row[0]));
+        }
+        // Class E is two colors on the map and one row in the counts, because how low it
+        // comes down is decided per shelf rather than by its set.
+        if (added && !specialUse && manager.isClassOn("as:E"))
+            addKeyLine("Class E from 1,200 ft above the ground",
+                    AirspaceFeatures.classE1200Color());
+        if (!added) {
+            addKeyHeading(heading);
+            addKeyLine("Nothing here yet.", 0x00000000);
+        }
+        return true;
+    }
+
+    /** A small-caps heading over a group, the same shape the rest of the pane uses. */
+    private void addKeyHeading(String text) {
+        final TextView t = new TextView(pluginContext);
+        t.setText(text);
+        t.setTextSize(10f);
+        t.setAllCaps(true);
+        t.setAlpha(0.6f);
+        t.setPadding(0, keyBody.getChildCount() == 0 ? 2 : 12, 0, 2);
+        t.setTextColor(pluginContext.getResources().getColor(R.color.dim_text));
+        keyBody.addView(t);
     }
 
     private void addKeyLine(String text, int color) {

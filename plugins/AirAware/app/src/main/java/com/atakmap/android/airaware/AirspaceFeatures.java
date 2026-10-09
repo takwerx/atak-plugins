@@ -103,6 +103,15 @@ public final class AirspaceFeatures {
                 && floor.feet >= 1200;
     }
 
+    /**
+     * Class E where it comes down to 1,200 ft above the ground, which draws differently
+     * from Class E proper. The map key needs it by name because no set key carries it:
+     * it is decided per shelf from the floor.
+     */
+    public static int classE1200Color() {
+        return CLASS_E_1200;
+    }
+
     /** The color a set key draws in, which is also what the map key shows. */
     public static int color(String setKey) {
         if (setKey == null)

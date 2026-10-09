@@ -220,7 +220,7 @@ are at that point, and the nearest town.
 
 ## METARs
 
-<!-- PICTURE: 19_metar.png -->
+![Airfield chips, green for VFR](screenshots/19_metars.png)
 
 METAR observations drawn as flight-category chips in the aviation convention:
 **green** VFR, **blue** MVFR, **red** IFR, **magenta** LIFR.
@@ -249,7 +249,7 @@ Everything set once and left, on folds that stay as you leave them:
 
 At the bottom, a line saying what this phone has already downloaded.
 
-<!-- PICTURE: 10_map_key.png -->
+![The map key, following the layers that are on](screenshots/10_map_key.png)
 
 The map key follows the same rule as the list and the map: if a layer is off,
 its colors are not in the key.
@@ -404,7 +404,7 @@ transmitted. You place the call or open the form.
 
 ## This guide inside the plugin
 
-<!-- PICTURE: 11_tool_preferences.png -->
+![Settings, Tool Preferences, AirAware](screenshots/11_tool_preferences.png)
 
 The same guide is built into the plugin as a PDF. Open it from **Settings**,
 then **Tool Preferences**, then **AirAware**, then **Plugin Documentation**.
