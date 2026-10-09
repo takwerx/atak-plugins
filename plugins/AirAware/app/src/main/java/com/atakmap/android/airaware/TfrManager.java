@@ -2192,8 +2192,15 @@ public class TfrManager {
      */
     private void pickNotamsForView(double south, double west, double north, double east) {
         final double[] box = notamBox;
+        // Inside the remembered box is free -- unless the view has shrunk to a corner
+        // of it. The cap keeps the 400 nearest the middle of the view that made the
+        // box, and after zooming from a hundred miles to three, what is in front of
+        // the operator may not be among them. Seen framing the manual picture on
+        // 2026-10-09: a box picked at 112 mi still drawn at 3 mi. A view a quarter
+        // the box's width picks again.
         if (box != null && south >= box[0] && west >= box[1] && north <= box[2]
-                && east <= box[3] && !notams.isEmpty())
+                && east <= box[3] && !notams.isEmpty()
+                && (north - south) * 4d > (box[2] - box[0]))
             return;
         final double padLat = Math.max(0.02, (north - south) * 0.6);
         final double padLon = Math.max(0.02, (east - west) * 0.6);

@@ -1,12 +1,12 @@
 # AirAware for ATAK — User Guide
 
-**Version 0.5 · takwerx**
+**Version 0.6 · takwerx**
 
-**Download AirAware 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download AirAware 0.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.5/ATAK-Plugin-AirAware-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.5/ATAK-Plugin-AirAware-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.5/ATAK-Plugin-AirAware-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.6/ATAK-Plugin-AirAware-0.6--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.6/ATAK-Plugin-AirAware-0.6--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.6/ATAK-Plugin-AirAware-0.6--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/air-aware/releases
 
@@ -153,6 +153,8 @@ still matches a live restriction, with a way to remove one that does not.
 
 What is going on in the air right now that no chart shows: drone operations,
 parachute drops, towers with their lights out, cranes, closed runways.
+
+![A drone-operations area over Buena Park, a tower with its lights out](screenshots/42_notams_map.jpg)
 
 ![The NOTAM row open: Kinds, Show at and the key](screenshots/40_notam_row.png)
 

@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "AirAware",
-   plugin-version: "0.5",
+   plugin-version: "0.6",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -188,22 +188,41 @@ restriction, with a way to remove one that does not.
 What is going on in the air right now that no chart shows: drone operations,
 parachute drops, towers with their lights out, cranes, closed runways.
 
-#toolbox.side-by-side(columns: (5fr, 7fr))[
-  #image("40.png", width: 100%)
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("42.jpg", width: 100%)
 ][
   A takwerx relay reads the FAA NOTAM Management Service every three minutes
   and publishes the picture as tiles. The phone reads the tiles and never
-  holds an FAA credential. The row says how many are drawn and how old the
-  FAA picture is; if no newer picture has reached the phone, it says so.
+  holds an FAA credential.
+
+  Where the FAA gives an area, in its geometry or in its text, the plugin
+  draws it: here a drone-operations box over Buena Park and the edge of
+  another over Brea. Otherwise a NOTAM is a glyph at its point, with a label
+  saying what it is: "UAS", "Tower lights out 201'", "RWY 06/24 CLSD".
+
+  A NOTAM is a notice, not a restriction. A drone-activity NOTAM tells pilots
+  to expect drones; it does not close the airspace. Restrictions are the TFR
+  layer.
+]
+]
+
+#tak-slide[
+= NOTAM kinds and the key
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("40.png", width: 100%)
+][
+  The row says how many are drawn and how old the FAA picture is; if no newer
+  picture has reached the phone, it says so.
 
   *Kinds* sorts them the way the FAA does: *Airspace* (drones, parachute
   jumping, rockets, fireworks, aerobatics), *Obstacles* (lights out, cranes),
   *Airfields* (runways, taxiways, services), *Navigation* and *Other*, the
-  last two off by default. The key under the arrow shows each kind's color.
+  last two off by default. The key under the arrow shows each kind's color;
+  a NOTAM that has not started yet is drawn at half strength.
 
-  Where the FAA gives an area, in its geometry or in its text, the plugin
-  draws it. Otherwise a NOTAM is a glyph at its point, with a label saying
-  what it is: "UAS", "Tower lights out 303'", "RWY 06/24 CLSD".
+  *Show at* is the zoom gate, read off ATAK's scale bar: ten miles unless you
+  change it.
 ]
 ]
 
