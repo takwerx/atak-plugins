@@ -126,7 +126,7 @@ wrote it.
 
 ## Geofencing a restriction
 
-<!-- PICTURE: 37_geofence_dialog.png -->
+![Making a geofence from a restriction](screenshots/37_geofence_dialog.png)
 
 **Geofence** on a restriction's details page makes a shape you own from its
 outline and opens ATAK's own geofence settings for it, so you are warned when

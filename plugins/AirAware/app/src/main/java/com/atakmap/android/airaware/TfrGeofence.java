@@ -107,9 +107,18 @@ public final class TfrGeofence {
                 // exactly right, and where the restriction has a floor above ground the
                 // fence is deliberately bigger than the airspace. Being warned on the way
                 // up is the safe error; the other way round is not.
-                final double ceilM = meters(a.ceiling);
                 final double baseMsl = baseMslOf(shape);
-                final double wall = ceilM - baseMsl;
+                // A ceiling published above the GROUND is a height, not an altitude, and
+                // meters() cannot tell the two apart -- it sees feet either way. Read as
+                // MSL, a surface-to-3,000 ft AGL restriction came out as a fence topping
+                // at 3,000 ft MSL over 148 ft of ground: 148 ft short of the airspace,
+                // and over a 3,000 ft ridge the wall would collapse to nothing at all.
+                // That is the unsafe direction. Above the ground, the wall simply is the
+                // published height.
+                final double wall = a.ceiling.present && a.ceiling.agl
+                        && !a.ceiling.surface
+                                ? a.ceiling.feet * 0.3048d
+                                : meters(a.ceiling) - baseMsl;
                 if (wall > 1) {
                     shape.setHeight(wall);
                     shape.setHeightStyle(Polyline.HEIGHT_STYLE_POLYGON

@@ -154,7 +154,7 @@ from the published floor to the published ceiling.
 = Geofencing a restriction
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 37
+  #image("37.png", width: 100%)
 ][
   *Geofence* on a restriction's details page makes a shape you own from its
   outline and opens ATAK's own geofence settings for it, so you are warned when
