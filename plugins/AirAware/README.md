@@ -70,12 +70,17 @@ hides it and never deletes it.
 _________________________________________________________________
 STATUS
 
-Version 0.4, for ATAK-CIV 5.6.0, 5.7.0 and 5.8.0. A new icon, and a geofence
-made from a restriction is now drawn where it alerts: from the ground up to the
-published ceiling. Before, the 3D shape stood on sea level, so over high ground
-it was drawn inside the hill even though the alert itself was right.
+Version 0.6, for ATAK-CIV 5.6.0, 5.7.0 and 5.8.0. Adds the NOTAMs layer:
+what is going on in the air right now that no chart shows, read every three
+minutes from the FAA NOTAM Management Service by a takwerx relay and published
+as tiles, so the phone never holds an FAA credential. Sorted by kind, drawn as
+the area the FAA gives where it gives one, with the text as issued on the
+details page. Version 0.5 was the same layer submitted for 5.8 only, to
+photograph; it was not published.
 
-Version 0.3 was the first release.
+Version 0.4 brought a new icon and drew a geofence made from a restriction
+where it alerts, from the ground to the published ceiling. Version 0.3 was the
+first release.
 
 _________________________________________________________________
 POINT OF CONTACTS
