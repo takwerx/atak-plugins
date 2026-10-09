@@ -1347,17 +1347,21 @@ public final class PlanPane implements IslandOverlay.Listener,
                 .append(" you and does not keep anyone away.");
         final String text = b.toString();
 
+        // Every string here is resolved through pluginContext before it reaches the
+        // builder. The dialog is built on the HOST context, and ATAK cannot resolve a
+        // plugin resource id: passing R.string.* straight in threw
+        // Resources$NotFoundException and took ATAK down with it.
         new android.app.AlertDialog.Builder(host)
-                .setTitle(R.string.notify_flight_service)
+                .setTitle(pluginContext.getString(R.string.notify_flight_service))
                 .setMessage(text)
-                .setPositiveButton(R.string.file_online,
+                .setPositiveButton(pluginContext.getString(R.string.file_online),
                         new android.content.DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(android.content.DialogInterface d, int w) {
                                 openUrl("https://www.1800wxbrief.com/");
                             }
                         })
-                .setNeutralButton(R.string.call_flight_service,
+                .setNeutralButton(pluginContext.getString(R.string.call_flight_service),
                         new android.content.DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(android.content.DialogInterface d, int w) {
@@ -1368,7 +1372,7 @@ public final class PlanPane implements IslandOverlay.Listener,
                         })
                 // Copy rather than Close on the third button: the online form asks for
                 // exactly these fields, so the useful next action is to paste them in.
-                .setNegativeButton(R.string.copy_details,
+                .setNegativeButton(pluginContext.getString(R.string.copy_details),
                         new android.content.DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(android.content.DialogInterface d, int w) {

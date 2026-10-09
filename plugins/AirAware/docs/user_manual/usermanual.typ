@@ -337,7 +337,7 @@ the ceiling I was given do to it*.
 
 #v(6pt)
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  // SHOT 20
+  #image("20.png", height: 280pt)
 ][
   At the top, *AirAware layers* goes back to the layer switches. Under it the
   status line, then *Islands ON/OFF*, *Settings* and *Launch point*, and at the
@@ -528,7 +528,7 @@ every color the planner puts on the map.
 = Filing an authorization
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 35
+  #image("35.png", width: 100%)
 ][
   *File LAANC* asks which way you are filing and takes you there.
 
@@ -546,7 +546,7 @@ every color the planner puts on the map.
 = Notifying Flight Service
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 36
+  #image("36.png", height: 290pt)
 ][
   *Notify Flight Service* gathers the plan's own numbers, ready to read out or
   paste: where you are launching, the area, the ceiling, and when.

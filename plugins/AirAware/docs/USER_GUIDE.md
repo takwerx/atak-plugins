@@ -263,7 +263,7 @@ page. It answers two questions a UAS pilot has at the turnout before the radio
 call to Air Attack: **what ceiling does this mission area need**, and **what
 does the ceiling I was given do to it**.
 
-<!-- PICTURE: 20_plan_main.png -->
+![The planner's main screen](screenshots/20_plan_main.png)
 
 At the top, **‹ AirAware layers** goes back to the layer switches. Under it the
 status line, then **Islands ON/OFF**, **Settings** and **Launch point**, and at
@@ -382,7 +382,7 @@ not reach. A failed fetch never empties the map.
 
 ## Filing an authorization
 
-<!-- PICTURE: 35_laanc_dialog.png -->
+![Filing an authorization](screenshots/35_laanc_dialog.png)
 
 **File LAANC** asks which way you are filing and takes you there.
 
@@ -394,7 +394,7 @@ the second choice on the dialog.
 AirAware does not file anything for you and does not send it your plan. It
 takes you to the form.
 
-<!-- PICTURE: 36_notify_flight_service.png -->
+![What Notify Flight Service hands over](screenshots/36_notify_flight_service.png)
 
 **Notify Flight Service** gathers the plan's own numbers, ready to read out or
 paste: where you are launching, the area, the ceiling, and when. Nothing is
