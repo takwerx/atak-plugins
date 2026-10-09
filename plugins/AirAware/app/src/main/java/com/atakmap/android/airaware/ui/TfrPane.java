@@ -302,6 +302,11 @@ public class TfrPane implements TfrManager.Listener {
         keyFold.label("Map key", null);
         buildKey();
 
+        // buildFences labels its own fold, so leaving it out of the render left the
+        // Geofences row on the Settings page blank: a button with a chevron and no
+        // words on it. In layout order, between Map key and Updates.
+        buildFences();
+
         updatesFold.label("Updates", "every " + manager.refreshMinutesForDisplay() + " min");
         buildUpdates();
         downloadedNote.setText(manager.describeCacheForDisplay());
@@ -1104,8 +1109,10 @@ public class TfrPane implements TfrManager.Listener {
         addKeyLine("Scheduled, not yet in effect", manager.upcomingColor());
         final int noArea = countWithoutArea();
         if (noArea > 0)
-            addKeyLine(noArea + (noArea == 1 ? " restriction has" : " restrictions have")
-                    + " no mapped area and is listed only", 0x00000000);
+            addKeyLine(noArea + (noArea == 1
+                    ? " restriction has no mapped area and is listed only"
+                    : " restrictions have no mapped area and are listed only"),
+                    0x00000000);
     }
 
     private void addKeyLine(String text, int color) {
@@ -1326,7 +1333,7 @@ public class TfrPane implements TfrManager.Listener {
         if (!o.city.isEmpty() || !o.state.isEmpty())
             b.append("\n\n").append(o.city).append(o.city.isEmpty() ? "" : ", ")
                     .append(o.state);
-        b.append("\n\nLighting: ").append(o.lighting.isEmpty() ? "none listed" : o.lighting);
+        b.append("\n\nLighting: ").append(o.lightingDetail());
         b.append("\nSurvey: ").append("O".equals(o.verified) ? "verified" : "unverified");
         b.append("\nFAA number: ").append(o.oas);
 

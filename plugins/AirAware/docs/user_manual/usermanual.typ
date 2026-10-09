@@ -209,7 +209,7 @@ How high a drone may fly without an authorization, from the FAA's UAS Facility
 Map.
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  // SHOT 17
+  #image("17.png", width: 100%)
 ][
   A grid of squares colored by their ceiling: *green* where you have the full
   height, through to *red* where you have very little. A *0 ft* square is drawn
@@ -225,7 +225,7 @@ Map.
 = What a square says
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 7
+  #image("7.png", width: 100%)
 ][
   Tap a square for its own page: the ceiling in feet above the ground, the
   airport the square belongs to, and whether that airport is covered by LAANC.
@@ -246,7 +246,7 @@ The FAA's Digital Obstacle File: towers, wire spans, transmission lines,
 turbines and stacks.
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  // SHOT 18
+  #image("18.png", width: 100%)
 ][
   Each obstacle stands from the ground to its published top, with the tower
   symbol at the top and its height on a label above that.
@@ -264,7 +264,7 @@ turbines and stacks.
 = An obstacle's details
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 8
+  #image("8.png", width: 100%)
 ][
   Tap an obstacle for its page: height above the ground and its top above sea
   level, its lighting, whether the FAA has verified the position, how many
@@ -298,7 +298,7 @@ turbines and stacks.
 = Settings
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  // SHOT 9
+  #image("9.png", width: 100%)
 ][
   Everything set once and left, on folds that stay as you leave them:
 

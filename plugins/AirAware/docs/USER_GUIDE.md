@@ -168,7 +168,7 @@ know it is there before you go looking for the NOTAM.
 How high a drone may fly without an authorization, from the FAA's UAS Facility
 Map.
 
-<!-- PICTURE: 17_uas_grid.png -->
+![The UAS ceiling grid around Ontario International](screenshots/17_uas_grid.png)
 
 A grid of squares colored by their ceiling: **green** where you have the full
 height, through to **red** where you have very little. A **0 ft** square is
@@ -178,7 +178,7 @@ without coordinating first.
 The grid is flat on purpose. It is a rule about the ground under you, not a
 volume in the air.
 
-<!-- PICTURE: 7_uas_cell_details.png -->
+![What a UAS square says](screenshots/7_uas_cell_details.png)
 
 Tap a square for its own page: the ceiling in feet above the ground, the
 airport the square belongs to, and whether that airport is covered by LAANC.
@@ -195,7 +195,7 @@ clearance by themselves.
 The FAA's Digital Obstacle File: towers, wire spans, transmission lines,
 turbines and stacks.
 
-<!-- PICTURE: 18_obstacles.png -->
+![Charted towers with their heights](screenshots/18_obstacles.png)
 
 Each obstacle stands from the ground to its published top, with the tower
 symbol at the top and its height on a label above that. The label is height
@@ -206,7 +206,7 @@ against their own height above the ground.
 thousands, so the plugin draws the ones nearest what you are looking at and
 says in words when it has trimmed the rest.
 
-<!-- PICTURE: 8_obstacle_details.png -->
+![An obstacle's details page](screenshots/8_obstacle_details.png)
 
 Tap an obstacle for its page: height above the ground and its top above sea
 level, its lighting, whether the FAA has verified the position, how many there
@@ -236,7 +236,7 @@ conditions are shown only while they are current.
 
 ## Settings
 
-<!-- PICTURE: 9_settings.png -->
+![The Settings page](screenshots/9_settings.png)
 
 Everything set once and left, on folds that stay as you leave them:
 

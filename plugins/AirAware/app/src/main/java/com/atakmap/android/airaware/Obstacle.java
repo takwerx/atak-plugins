@@ -229,6 +229,37 @@ public final class Obstacle {
         return "lit";
     }
 
+    /**
+     * What the FAA's lighting code means, in words, for the details page.
+     *
+     * <p>{@link #lightingWords()} answers "lit or not" for a list row. This answers the
+     * question a pilot actually has at low level, which is what they are looking for in
+     * the dark: a steady red is not a white strobe. The codes are the ones in the FAA's
+     * DOF readme, column 96.
+     *
+     * <p>An unknown code is reported as itself rather than guessed at. The FAA has added
+     * codes before, and inventing a meaning for one would be worse than saying so.
+     */
+    public String lightingDetail() {
+        final String c = lighting == null ? "" : lighting.trim().toUpperCase(Locale.US);
+        if (c.isEmpty())
+            return "not recorded";
+        switch (c) {
+            case "N": return "none";
+            case "U": return "not recorded";
+            case "R": return "red";
+            case "W": return "synchronized red";
+            case "D": return "white strobe and red, medium intensity";
+            case "H": return "white strobe and red, high intensity";
+            case "M": return "white strobe, medium intensity";
+            case "S": return "white strobe, high intensity";
+            case "F": return "floodlit";
+            case "C": return "dual medium catenary, on the wire span";
+            case "L": return "lit, type not recorded";
+            default:  return "code " + c + ", not in the FAA's published list";
+        }
+    }
+
     public boolean isVerified() {
         return "O".equals(verified);
     }
