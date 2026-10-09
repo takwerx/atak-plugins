@@ -105,7 +105,7 @@ Temporary Flight Restrictions as the FAA publishes them, drawn as a volume
 from the published floor to the published ceiling.
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("12.png", width: 100%)
+  #image("12.jpg", width: 100%)
 ][
   *Red* is in effect now. *Amber* is scheduled and not yet active, so a
   restriction that starts this afternoon is visible this morning and reads
@@ -156,7 +156,7 @@ from the published floor to the published ceiling.
 Class A through G, drawn one shelf at a time.
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("14.png", width: 100%)
+  #image("14.jpg", width: 100%)
 ][
   The FAA publishes a Class B airport as a stack of rings, each starting and
   ending at a different altitude. AirAware draws each of those steps as its own
@@ -173,7 +173,7 @@ Class A through G, drawn one shelf at a time.
 = Airspace colors and classes
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("15.png", width: 100%)
+  #image("15.jpg", width: 100%)
 ][
   The colors are the sectional chart's: *blue* for Class B and D, *magenta*
   for Class C and E. Class E takes its color from how low it comes down, so
@@ -191,7 +191,7 @@ Class A through G, drawn one shelf at a time.
 = Special Use airspace
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("16.png", width: 100%)
+  #image("16.jpg", width: 100%)
 ][
   Prohibited, Restricted, Warning and Alert areas, and Military Operations
   Areas. *Kinds* picks which of those draw.
@@ -209,7 +209,7 @@ How high a drone may fly without an authorization, from the FAA's UAS Facility
 Map.
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("17.png", width: 100%)
+  #image("17.jpg", width: 100%)
 ][
   A grid of squares colored by their ceiling: *green* where you have the full
   height, through to *red* where you have very little. A *0 ft* square is drawn
@@ -246,7 +246,7 @@ The FAA's Digital Obstacle File: towers, wire spans, transmission lines,
 turbines and stacks.
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("18.png", width: 100%)
+  #image("18.jpg", width: 100%)
 ][
   Each obstacle stands from the ground to its published top, with the tower
   symbol at the top and its height on a label above that.
@@ -280,7 +280,7 @@ turbines and stacks.
 = METARs
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("19.png", width: 100%)
+  #image("19.jpg", width: 100%)
 ][
   METAR observations drawn as flight-category chips in the aviation
   convention: *green* VFR, *blue* MVFR, *red* IFR, *magenta* LIFR.
@@ -367,7 +367,7 @@ the ceiling I was given do to it*.
 = The circle
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("22.png", height: 300pt)
+  #image("22.jpg", height: 300pt)
 ][
   With no drawn area, the plan is a circle around the launch point. Set its
   size under Settings.
@@ -381,7 +381,7 @@ the ceiling I was given do to it*.
 = Drawing the area to cover
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("23.png", height: 300pt)
+  #image("23.jpg", height: 300pt)
 ][
   *Draw the area to cover* hands you ATAK's own drawing tools. Tap the map to
   place each corner, then tap the first marker to close the shape. Undo and End
@@ -429,7 +429,7 @@ your situation; the chosen one is green.
 = Islands
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("26.png", height: 300pt)
+  #image("26.jpg", height: 300pt)
 ][
   Red islands are the ground you cannot work over at your height above the
   terrain. Blue is ground under the ceiling.
@@ -443,7 +443,7 @@ your situation; the chosen one is green.
 = Obstacles in the plan
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("27.png", height: 280pt)
+  #image("27.jpg", height: 280pt)
 ][
   The planner draws the charted obstacles inside the plan area and says how many
   of them are above your ceiling.
