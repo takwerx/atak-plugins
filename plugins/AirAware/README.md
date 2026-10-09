@@ -65,10 +65,8 @@ Version 0.1. First release, submitted for ATAK-CIV 5.8.0.
 _________________________________________________________________
 POINT OF CONTACTS
 
-Andreas Johansson, TAKWERX.
-
-Issues and questions: the issue tracker on the plugin's public repository,
-github.com/takwerx/air-aware.
+Andreas Johansson, takwerx
+https://github.com/takwerx/air-aware/issues
 
 _________________________________________________________________
 PORTS REQUIRED
