@@ -1006,6 +1006,21 @@ public class TfrPane implements TfrManager.Listener {
                                 });
                     }
                 });
+        // The key, right here under the arrow: the operator looks for what a color
+        // means where the layer is, not on the Settings page (2026-10-09). One line
+        // per kind that is switched on, in the color the map draws it with.
+        final TextView heading = new TextView(pluginContext);
+        heading.setText("Key");
+        heading.setTextSize(10f);
+        heading.setAllCaps(true);
+        heading.setAlpha(0.6f);
+        heading.setPadding(0, 10, 0, 2);
+        heading.setTextColor(pluginContext.getResources().getColor(R.color.dim_text));
+        body.addView(heading);
+        for (String k : Notam.KINDS)
+            if (manager.isNotamKindOn(k))
+                addKeyLine(body, Notam.kindName(k), NotamFeatures.color(k));
+        addKeyLine(body, "Half strength: not yet in effect", 0);
     }
 
     private String notamKindsSummary() {
@@ -1401,12 +1416,17 @@ public class TfrPane implements TfrManager.Listener {
     }
 
     private void addKeyLine(String text, int color) {
+        addKeyLine(keyBody, text, color);
+    }
+
+    /** One key line, in the color the map draws that thing with, wherever it is wanted. */
+    private void addKeyLine(LinearLayout into, String text, int color) {
         final TextView t = new TextView(pluginContext);
         t.setText(text);
         t.setTextSize(13f);
         t.setPadding(0, 4, 0, 4);
         t.setTextColor(color == 0 ? pluginContext.getResources().getColor(R.color.dim_text) : color);
-        keyBody.addView(t);
+        into.addView(t);
     }
 
     private int countWithoutArea() {

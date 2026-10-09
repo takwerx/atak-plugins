@@ -286,7 +286,7 @@ public class TfrManager {
     private volatile boolean notamHidden;
     private volatile boolean notamCapped;
     private volatile boolean notamsMissing;
-    private volatile long notamBarM = 48280L;
+    private volatile long notamBarM = 16093L;
 
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
@@ -328,8 +328,9 @@ public class TfrManager {
             if (!Notam.DEFAULT_ON.contains(k))
                 kindsOff.add(k);
         notamKindsOff.addAll(p.getStringSet(PREF_NOTAM_KINDS_OFF, kindsOff));
-        // Thirty miles. A NOTAM area matters from further out than a tower does.
-        notamBarM = p.getLong(PREF_NOTAM_BAR_M, 48280L);
+        // Ten miles, the obstacles' gate: NOTAMs are as dense as towers are, and the
+        // operator wants the layers to come in together.
+        notamBarM = p.getLong(PREF_NOTAM_BAR_M, 16093L);
         classesOff.addAll(p.getStringSet(PREF_CLASSES_OFF, DEFAULT_CLASSES_OFF));
         // A set, not a joined string: a type carrying the separator would come back as two
         // bogus entries and the filter would restore wrong.

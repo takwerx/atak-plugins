@@ -186,7 +186,11 @@ public final class Notam {
      * know are spelled out.
      */
     public String label() {
-        final String[] w = text.trim().replace("\n", " ").split("\\s+");
+        // An FDC NOTAM leads with its state, "CA..ROUTE ZLA.": the keyword is after
+        // the dots. Identifiers stay the way the FAA writes them -- ZLA, FUL, RWY --
+        // and only ordinary words are given a capital and lower case.
+        final String[] w = text.trim().replaceFirst("^[A-Z]{2}\\.\\.", "")
+                .replace("\n", " ").split("\\s+");
         if (w.length == 0 || w[0].isEmpty())
             return number;
         String out;
@@ -217,13 +221,31 @@ public final class Notam {
                 out = "Flight check";
             else if (w[0].startsWith("!SUA") || body.contains("SUA "))
                 out = "Special use";
+            else if (sub.isEmpty())
+                out = w[0];
             else
-                out = cap(sub.isEmpty() ? w[0] : sub);
+                out = w.length > 2 ? sub + " " + w[2] : sub;
         } else if ("obstacle".equals(kind)) {
-            final String what = w.length > 1 && "OBST".equals(w[0]) ? w[1] : w[0];
+            // "OBST TOWER LGT (ASR 1049866) 401716N0745222W (2.8NM WNW TTN) 362.2FT
+            // (303.1FT AGL) U/S" is the common one, eleven in thirteen: the thing, what
+            // is wrong with it, and how tall it is. The pill says those three.
+            out = obstacleThing(w.length > 1 && "OBST".equals(w[0]) ? w[1] : w[0]);
+            final String body = text.toUpperCase(Locale.US);
+            if (body.contains("NOT LGTD") || body.contains("UNLIT"))
+                out += " unlit";
+            else if (body.matches("(?s).*\\bLGTS?\\b.*\\b(U/S|OTS|UNSERVICEABLE|OUT OF SERVICE)\\b.*"))
+                out += " lights out";
+            else if (body.contains("LGTD"))
+                out += " lit";
             final java.util.regex.Matcher m = java.util.regex.Pattern
-                    .compile("\\((\\d+)\\s?FT AGL\\)").matcher(text);
-            out = cap(what) + (m.find() ? " " + m.group(1) + "'" : "");
+                    .compile("\\((\\d+(?:\\.\\d+)?)\\s?FT AGL\\)").matcher(body);
+            if (m.find()) {
+                try {
+                    out += " " + Math.round(Double.parseDouble(m.group(1))) + "'";
+                } catch (NumberFormatException ignored) {
+                    // The height stays off the pill; it is on the page.
+                }
+            }
         } else {
             final StringBuilder b = new StringBuilder();
             for (int i = 0; i < Math.min(3, w.length); i++) {
@@ -233,7 +255,35 @@ public final class Notam {
             }
             out = b.toString();
         }
-        return out.length() > 22 ? out.substring(0, 21) + "…" : out;
+        out = out.replaceAll("[.,;]+$", "");
+        return out.length() > 26 ? out.substring(0, 25) + "…" : out;
+    }
+
+    /** The obstacle in a word, from the FAA's keyword after OBST. */
+    private static String obstacleThing(String word) {
+        switch (word.toUpperCase(Locale.US).replaceAll("[^A-Z]", "")) {
+            case "TOWER":
+                return "Tower";
+            case "CRANE":
+            case "MOBILE":
+                return "Crane";
+            case "WIND":
+                return "Wind turbines";
+            case "POWER":
+                return "Power line";
+            case "RIG":
+                return "Rig";
+            case "POLE":
+                return "Pole";
+            case "STACK":
+                return "Stack";
+            case "BLDG":
+                return "Building";
+            case "TREE":
+                return "Tree";
+            default:
+                return cap(word);
+        }
     }
 
     private static String cap(String s) {
