@@ -45,6 +45,7 @@ public final class TilePack {
     private final String base;
     private final String manifestName;
     private final File dir;
+    private final long manifestMaxAgeMs;
 
     /**
      * @param base the published folder, ending in a slash
@@ -53,9 +54,19 @@ public final class TilePack {
      *            clears out from under a plugin.
      */
     public TilePack(String base, String manifestName, File dir) {
+        this(base, manifestName, dir, MANIFEST_MAX_AGE_MS);
+    }
+
+    /**
+     * @param manifestMaxAgeMs how long the manifest on disk is trusted. A day for a pack
+     *            on the FAA's 56-day cycle; minutes for the NOTAMs, which the relay
+     *            republishes all day.
+     */
+    public TilePack(String base, String manifestName, File dir, long manifestMaxAgeMs) {
         this.base = base;
         this.manifestName = manifestName;
         this.dir = dir;
+        this.manifestMaxAgeMs = manifestMaxAgeMs;
         if (dir != null && !dir.exists() && !dir.mkdirs())
             Log.w(TAG, "could not make " + dir);
     }
@@ -63,9 +74,13 @@ public final class TilePack {
     /** What the manifest says exists, so a tile over empty ocean is never asked for. */
     public static class Index {
         public String cycle = "";
+        /** When the pack was built, as the builder stamps it; empty for the older packs. */
+        public String built = "";
         public int tileDegrees = 2;
         public String credit = "";
         public final Set<String> tiles = new HashSet<>();
+        /** Each tile's sha256 where the manifest carries one, so a changed tile is known. */
+        public final java.util.Map<String, String> sha = new java.util.HashMap<>();
 
         public boolean isEmpty() {
             return tiles.isEmpty();
@@ -81,7 +96,7 @@ public final class TilePack {
     public Index index() {
         final File file = new File(dir, manifestName);
         final boolean fresh = file.exists()
-                && System.currentTimeMillis() - file.lastModified() < MANIFEST_MAX_AGE_MS;
+                && System.currentTimeMillis() - file.lastModified() < manifestMaxAgeMs;
         if (!fresh) {
             try {
                 write(file, Http.get(base + manifestName));
@@ -103,13 +118,20 @@ public final class TilePack {
         final JSONObject root = new JSONObject(json);
         final Index index = new Index();
         index.cycle = root.optString("cycle", "");
-        index.tileDegrees = Math.max(1, root.optInt("tile_degrees", 2));
+        index.built = root.optString("built", "");
+        index.tileDegrees = Math.min(10, Math.max(1, root.optInt("tile_degrees", 2)));
         index.credit = root.optString("credit", "");
         final JSONObject tiles = root.optJSONObject("tiles");
         if (tiles != null) {
             final Iterator<String> keys = tiles.keys();
-            while (keys.hasNext())
-                index.tiles.add(keys.next());
+            while (keys.hasNext()) {
+                final String key = keys.next();
+                index.tiles.add(key);
+                final JSONObject entry = tiles.optJSONObject(key);
+                final String sha = entry == null ? "" : entry.optString("sha256", "");
+                if (!sha.isEmpty())
+                    index.sha.put(key, sha);
+            }
         }
         return index;
     }
@@ -141,12 +163,38 @@ public final class TilePack {
 
     /** One tile's JSON, from disk when it is there and from our storage when it is not. */
     public JSONObject tile(String key) throws IOException {
-        return json(key + ".json.gz", base + "tiles/" + key + ".json.gz");
+        return json(key + ".json.gz", base + "tiles/" + key + ".json.gz", null);
+    }
+
+    /**
+     * One tile's JSON, fetched again when the copy on disk is not the one the manifest
+     * names. For a pack that changes all day: the manifest's hash says whether the tile
+     * on disk is current, and nothing is thrown away before its replacement is in hand.
+     *
+     * @param sha the manifest's sha256 for the tile, or null to take whatever is on disk
+     */
+    public JSONObject tile(String key, String sha) throws IOException {
+        return json(key + ".json.gz", base + "tiles/" + key + ".json.gz", sha);
+    }
+
+    /** Drop tiles the manifest no longer names. For a pack that changes all day. */
+    public void prune(Index index) {
+        final File[] files = dir.listFiles();
+        if (files == null)
+            return;
+        for (File f : files) {
+            final String name = f.getName();
+            if (!name.endsWith(".json.gz"))
+                continue;
+            final String key = name.substring(0, name.length() - ".json.gz".length());
+            if (!index.tiles.contains(key) && !f.delete())
+                Log.w(TAG, "could not remove the stale tile " + name);
+        }
     }
 
     /** Any other published file in the pack, cached the same way. */
     public JSONObject file(String name) throws IOException {
-        return json(name, base + name);
+        return json(name, base + name, null);
     }
 
     /**
@@ -157,11 +205,22 @@ public final class TilePack {
      * in one go. So an operator who has been somewhere keeps it with no network, and a
      * pan back over it costs nothing.
      */
-    private JSONObject json(String name, String url) throws IOException {
+    private JSONObject json(String name, String url, String sha) throws IOException {
         final File file = new File(dir, name);
-        byte[] gz;
+        byte[] gz = null;
         if (file.exists()) {
             gz = readAll(file);
+            if (sha != null && !sha.equalsIgnoreCase(sha256(gz))) {
+                // The manifest names a newer tile. Fetch it, and only on success replace
+                // what is held: a phone with no network keeps the old one.
+                try {
+                    final byte[] fresh = Http.get(url);
+                    write(file, fresh);
+                    gz = fresh;
+                } catch (IOException e) {
+                    Log.d(TAG, "newer tile " + name + " not reachable, keeping the old: " + e);
+                }
+            }
         } else {
             gz = Http.get(url);
             write(file, gz);
@@ -199,6 +258,22 @@ public final class TilePack {
         return n;
     }
 
+    private static String sha256(byte[] body) {
+        try {
+            final java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            final byte[] d = md.digest(body);
+            final StringBuilder b = new StringBuilder(64);
+            for (byte x : d)
+                b.append(Character.forDigit((x >> 4) & 0xF, 16)).append(Character.forDigit(x & 0xF, 16));
+            return b.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return "";
+        }
+    }
+
+    /** The most a tile may inflate to. The largest real one is under 2 MB. */
+    private static final int MAX_INFLATED = 48 * 1024 * 1024;
+
     private static byte[] gunzip(byte[] gz) throws IOException {
         final ByteArrayOutputStream out = new ByteArrayOutputStream(
                 Math.max(64 * 1024, gz.length * 4));
@@ -207,8 +282,11 @@ public final class TilePack {
             in = new GZIPInputStream(new java.io.ByteArrayInputStream(gz));
             final byte[] buf = new byte[32 * 1024];
             int n;
-            while ((n = in.read(buf)) > 0)
+            while ((n = in.read(buf)) > 0) {
                 out.write(buf, 0, n);
+                if (out.size() > MAX_INFLATED)
+                    throw new IOException("tile inflates past " + MAX_INFLATED + " bytes");
+            }
         } finally {
             if (in != null) {
                 try {

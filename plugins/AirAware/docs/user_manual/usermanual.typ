@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "AirAware",
-   plugin-version: "0.4",
+   plugin-version: "0.6",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -14,7 +14,7 @@
 AirAware answers one question for anyone working under or in the air: *what is
 in the column of air I am in, and what am I allowed to do here.*
 
-Six layers draw on the map, each switched on its own. Everything is drawn on
+Seven layers draw on the map, each switched on its own. Everything is drawn on
 this device. Nothing is sent to a TAK Server, nothing is shared with other
 users, and nothing about you or your position leaves the phone.
 
@@ -86,6 +86,7 @@ users, and nothing about you or your position leaves the phone.
   Each layer carries only what belongs to it:
 
   - *TFR:* Types, Where, Area, Zoom gate, Labels.
+  - *NOTAMs:* Kinds, Show at, and the key.
   - *Airspace:* Classes, Show at, 3D, Names on the map.
   - *Special Use:* Kinds, Show at, 3D, Names on the map.
   - *UAS ceilings:* Show at.
@@ -179,6 +180,66 @@ from the published floor to the published ceiling.
 The shape sits on the map over the restriction it came from. *Geofences* under
 Settings lists what you have made and says whether each still matches a live
 restriction, with a way to remove one that does not.
+]
+
+#tak-slide[
+= NOTAMs
+
+What is going on in the air right now that no chart shows: drone operations,
+parachute drops, towers with their lights out, cranes, closed runways.
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("42.jpg", width: 100%)
+][
+  A takwerx relay reads the FAA NOTAM Management Service every three minutes
+  and publishes the picture as tiles. The phone reads the tiles and never
+  holds an FAA credential.
+
+  Where the FAA gives an area, in its geometry or in its text, the plugin
+  draws it: here a drone-operations box over Buena Park and the edge of
+  another over Brea. Otherwise a NOTAM is a glyph at its point, with a label
+  saying what it is: "UAS", "Tower lights out 201'", "RWY 06/24 CLSD".
+
+  A NOTAM is a notice, not a restriction. A drone-activity NOTAM tells pilots
+  to expect drones; it does not close the airspace. Restrictions are the TFR
+  layer.
+]
+]
+
+#tak-slide[
+= NOTAM kinds and the key
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("40.png", width: 100%)
+][
+  The row says how many are drawn and how old the FAA picture is; if no newer
+  picture has reached the phone, it says so.
+
+  *Kinds* sorts them the way the FAA does: *Airspace* (drones, parachute
+  jumping, rockets, fireworks, aerobatics), *Obstacles* (lights out, cranes),
+  *Airfields* (runways, taxiways, services), *Navigation* and *Other*, the
+  last two off by default. The key under the arrow shows each kind's color;
+  a NOTAM that has not started yet is drawn at half strength.
+
+  *Show at* is the zoom gate, read off ATAK's scale bar: ten miles unless you
+  change it.
+]
+]
+
+#tak-slide[
+= A NOTAM's details
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("41.png", width: 100%)
+][
+  Tap one for its page: the text as the FAA issued it, when it started and
+  ends, its altitudes, the kind, and the airport or center it was filed under.
+  Nothing is paraphrased; the abbreviations are the language pilots read.
+
+  A NOTAM is a notice, not a restriction. A drone-activity NOTAM tells pilots
+  to expect drones; it does not close the airspace. Restrictions are the TFR
+  layer. Always check the official NOTAM search before a flight.
+]
 ]
 
 #tak-slide[

@@ -1,10 +1,10 @@
 ATAK Plugin — AirAware
 
-**Download AirAware 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download AirAware 0.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.6/ATAK-Plugin-AirAware-0.6--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.6/ATAK-Plugin-AirAware-0.6--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.6/ATAK-Plugin-AirAware-0.6--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/air-aware/releases
 
@@ -19,11 +19,19 @@ in the column of air I am in, and what am I allowed to do here. It is built for
 wildfire aviation and UAS crews and draws everything on the operator's own
 device, with no TAK Server and no Data Sync mission in the path.
 
-Six layers, each switched on its own from the front page:
+Seven layers, each switched on its own from the front page:
 
   TFR                 FAA Temporary Flight Restrictions, drawn as 3D volumes
                       from the published floor to the published ceiling, red
                       when in effect and amber when scheduled.
+
+  NOTAMs              What is going on in the air right now that no chart
+                      shows: drone operations, parachute drops, towers with
+                      their lights out, cranes, closed runways. Read every
+                      three minutes from the FAA NOTAM Management Service by
+                      a takwerx relay and published as tiles; the phone never
+                      holds an FAA credential. Colored by kind, with the FAA
+                      text as issued on the details page.
 
   Airspace            Class A through G, one shelf per published step, so the
                       upside-down wedding cake over a Class B airport is drawn
@@ -62,12 +70,17 @@ hides it and never deletes it.
 _________________________________________________________________
 STATUS
 
-Version 0.4, for ATAK-CIV 5.6.0, 5.7.0 and 5.8.0. A new icon, and a geofence
-made from a restriction is now drawn where it alerts: from the ground up to the
-published ceiling. Before, the 3D shape stood on sea level, so over high ground
-it was drawn inside the hill even though the alert itself was right.
+Version 0.6, for ATAK-CIV 5.6.0, 5.7.0 and 5.8.0. Adds the NOTAMs layer:
+what is going on in the air right now that no chart shows, read every three
+minutes from the FAA NOTAM Management Service by a takwerx relay and published
+as tiles, so the phone never holds an FAA credential. Sorted by kind, drawn as
+the area the FAA gives where it gives one, with the text as issued on the
+details page. Version 0.5 was the same layer submitted for 5.8 only, to
+photograph; it was not published.
 
-Version 0.3 was the first release.
+Version 0.4 brought a new icon and drew a geofence made from a restriction
+where it alerts, from the ground to the published ceiling. Version 0.3 was the
+first release.
 
 _________________________________________________________________
 POINT OF CONTACTS
