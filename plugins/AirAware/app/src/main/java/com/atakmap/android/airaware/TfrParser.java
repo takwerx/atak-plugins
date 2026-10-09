@@ -313,10 +313,34 @@ public final class TfrParser {
         // itself -- KXmlParser never expands internal entities unless asked, maps external ones
         // to the empty string, and never dereferences a system id. These calls are kept for the
         // harness, where they are real; none of them is load-bearing on the phone.
-        harden(f, "http://apache.org/xml/features/disallow-doctype-decl", true);
-        harden(f, "http://xml.org/sax/features/external-general-entities", false);
-        harden(f, "http://xml.org/sax/features/external-parameter-entities", false);
-        harden(f, "http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        //
+        // Written out one call at a time rather than through a loop or a helper. Fortify
+        // follows the factory from here to parse() and reports XXE and entity expansion
+        // when it cannot see the features being set on the same object in the same
+        // method; with the calls behind harden() it could not, and flagged both on every
+        // submission. Each still needs its own try, because Android throws on the first
+        // unrecognised name and would skip the rest of a shared block.
+        try {
+            f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        } catch (Exception unsupported) {
+            // Not a feature name this parser knows. See the note above.
+        }
+        try {
+            f.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        } catch (Exception unsupported) {
+            // Not a feature name this parser knows. See the note above.
+        }
+        try {
+            f.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        } catch (Exception unsupported) {
+            // Not a feature name this parser knows. See the note above.
+        }
+        try {
+            f.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd",
+                    false);
+        } catch (Exception unsupported) {
+            // Not a feature name this parser knows. See the note above.
+        }
         // Both of these throw on Android -- setXIncludeAware unconditionally, whatever is
         // passed -- and an UnsupportedOperationException here would mean no TFR ever parsed on
         // a device, while every desktop test went on passing.
@@ -328,15 +352,6 @@ public final class TfrParser {
         }
         DocumentBuilder b = f.newDocumentBuilder();
         return b.parse(new ByteArrayInputStream(xml));
-    }
-
-    private static void harden(DocumentBuilderFactory f, String name, boolean on) {
-        try {
-            f.setFeature(name, on);
-        } catch (Exception ignored) {
-            // See read(): unknown on Android, effective on the desktop harness. A parser that
-            // will not take the hint is not a reason to refuse to parse.
-        }
     }
 
     /** First descendant with this tag, anywhere below {@code e}. */
