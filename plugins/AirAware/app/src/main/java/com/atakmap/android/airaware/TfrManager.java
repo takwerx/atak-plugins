@@ -1538,7 +1538,13 @@ public class TfrManager {
      * hundred miles airspace is hidden anyway -- so this is only ever a handful.
      */
     private void maybeFetchAirspace() {
-        if (!isLayerOn(LAYER_AIRSPACE) && !isLayerOn(LAYER_SUA))
+        // No layer check here. It used to gate the whole worker below, obstacles and UAS
+        // ceilings included, so with Airspace and Special Use both off neither of the
+        // others ever loaded: the operator had UAS ceilings on by themselves, the tiles
+        // were already on the phone, and the map stayed empty. Each loader answers for
+        // its own layer instead.
+        if (!isLayerOn(LAYER_AIRSPACE) && !isLayerOn(LAYER_SUA)
+                && !isLayerOn(LAYER_OBSTACLES) && !isLayerOn(LAYER_UASFM))
             return;
         final GeoBounds b = mapView.getBounds();
         if (b == null || Double.isNaN(b.getNorth()) || Double.isNaN(b.getSouth()))
@@ -1556,7 +1562,8 @@ public class TfrManager {
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                loadTilesOnWorker(south, west, north, east);
+                if (isLayerOn(LAYER_AIRSPACE) || isLayerOn(LAYER_SUA))
+                    loadTilesOnWorker(south, west, north, east);
                 loadObstaclesOnWorker(south, west, north, east,
                         viewSouth, viewWest, viewNorth, viewEast);
                 loadUasfmOnWorker(south, west, north, east,
