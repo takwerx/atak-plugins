@@ -220,7 +220,8 @@ public class AirAware implements IPlugin {
                 if (item.getMetaString("tfr_notam_id", null) == null
                         && item.getMetaString("metar_icao", null) == null
                         && item.getMetaString("airspace_id", null) == null
-                        && item.getMetaString("obstacle_oas", null) == null)
+                        && item.getMetaString("obstacle_oas", null) == null
+                        && item.getMetaString("uasfm_id", null) == null)
                     return false;
                 // A moment later, not now: a pick from ATAK's Select Item list closes the
                 // list and then posts its own show-details, which closed the page opened
@@ -277,13 +278,22 @@ public class AirAware implements IPlugin {
                 return;
             }
             final String oas = item.getMetaString("obstacle_oas", null);
-            if (oas == null)
+            if (oas != null) {
+                final com.atakmap.android.airaware.Obstacle o = manager.obstacleByOas(oas);
+                if (o == null)
+                    return;
+                showPane();
+                paneUi.showObstacle(o);
                 return;
-            final com.atakmap.android.airaware.Obstacle o = manager.obstacleByOas(oas);
-            if (o == null)
+            }
+            final String cell = item.getMetaString("uasfm_id", null);
+            if (cell == null)
+                return;
+            final com.atakmap.android.airaware.UasfmCell c = manager.uasfmById(cell);
+            if (c == null)
                 return;
             showPane();
-            paneUi.showObstacle(o);
+            paneUi.showUasfm(c);
         } catch (RuntimeException e) {
             Log.w(TAG, "opening the page for a tap failed", e);
         }

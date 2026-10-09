@@ -1604,10 +1604,14 @@ public class TfrManager {
         if (want.equals(obstacleKeys) && !obstacles.isEmpty())
             return;
 
-        if (!want.equals(obstacleKeys) || obstaclesAll.isEmpty()) {
+        final Set<String> have = new LinkedHashSet<>(obstacleKeys);
+        if (!have.containsAll(want) || obstaclesAll.isEmpty()) {
+            final Set<String> load = new LinkedHashSet<>(want);
+            if (have.size() + want.size() <= MAX_TILES)
+                load.addAll(have);
             final List<Obstacle> loaded = new ArrayList<>();
             boolean missed = false;
-            for (String key : want) {
+            for (String key : load) {
                 try {
                     for (Obstacle o : ObstacleTiles.tile(pack, key))
                         if (passesObstacleFilter(o))
@@ -1617,11 +1621,11 @@ public class TfrManager {
                     Log.d(TAG, "obstacle tile " + key + " is not here yet: " + e);
                 }
             }
-            obstacleKeys = want;
+            obstacleKeys = load;
             obstaclesMissing = missed;
             obstaclesAll = Collections.unmodifiableList(loaded);
             obstacleBox = null;
-            Log.d(TAG, "obstacles: " + loaded.size() + " held from " + want.size()
+            Log.d(TAG, "obstacles: " + loaded.size() + " held from " + load.size()
                     + " tiles");
         }
         pickObstaclesForView(viewSouth, viewWest, viewNorth, viewEast);
@@ -1708,19 +1712,30 @@ public class TfrManager {
         if (keys.size() > MAX_TILES)
             keys = keys.subList(0, MAX_TILES);
         final Set<String> want = new LinkedHashSet<>(keys);
-        if (!want.equals(uasfmKeys) || uasfmAll.isEmpty()) {
+        // Reload only when something we need is NOT already held. Reloading whenever the
+        // set merely differs meant zooming in threw away cells that were already in
+        // memory and read them back off disk, and every one of those ended in a full
+        // store rewrite -- 1,800 features, measured at 822 ms blocking the renderer.
+        // Zooming in is now free, and only reaching new ground costs anything.
+        final Set<String> have = new LinkedHashSet<>(uasfmKeys);
+        if (!have.containsAll(want) || uasfmAll.isEmpty()) {
+            // Keep what is held and add what is missing, unless that would grow past the
+            // tile ceiling -- then start again from what this view actually needs.
+            final Set<String> load = new LinkedHashSet<>(want);
+            if (have.size() + want.size() <= MAX_TILES)
+                load.addAll(have);
             final List<UasfmCell> loaded = new ArrayList<>();
-            for (String key : want) {
+            for (String key : load) {
                 try {
                     loaded.addAll(UasfmTiles.tile(pack, key));
                 } catch (Exception e) {
                     Log.d(TAG, "UAS ceiling tile " + key + " is not here yet: " + e);
                 }
             }
-            uasfmKeys = want;
+            uasfmKeys = load;
             uasfmAll = Collections.unmodifiableList(loaded);
             uasfmBox = null;
-            Log.d(TAG, "UAS ceilings: " + loaded.size() + " held from " + want.size()
+            Log.d(TAG, "UAS ceilings: " + loaded.size() + " held from " + load.size()
                     + " tiles");
         }
 
@@ -1777,6 +1792,16 @@ public class TfrManager {
             return null;
         for (UasfmCell c : uasfmAll)
             if (c.contains(me.getLatitude(), me.getLongitude()))
+                return c;
+        return null;
+    }
+
+    /** One cell by the id its feature carries, for a tap on the map. */
+    public UasfmCell uasfmById(String id) {
+        if (id == null)
+            return null;
+        for (UasfmCell c : uasfmAll)
+            if (id.equals(c.latIndex + "_" + c.lonIndex))
                 return c;
         return null;
     }

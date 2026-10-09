@@ -203,6 +203,9 @@ public class TfrOverlay {
                                 final String oas = string(a, "obstacle_oas");
                                 if (oas != null)
                                     item.setMetaString("obstacle_oas", oas);
+                                final String cell = string(a, "uasfm_id");
+                                if (cell != null)
+                                    item.setMetaString("uasfm_id", cell);
                                 final String place = string(a, "place");
                                 if (place != null && !place.isEmpty())
                                     label = place;
@@ -254,11 +257,13 @@ public class TfrOverlay {
                                 // pill -- so without this the chooser lists one tower
                                 // three times, the same way airspace did.
                                 final String oas = m.getMetaString("obstacle_oas", null);
+                                final String cell = m.getMetaString("uasfm_id", null);
                                 final String key = notam != null ? "n:" + notam
                                         : icao != null ? "m:" + icao
                                                 : shelf != null ? "a:" + shelf
                                                         : oas != null ? "o:" + oas
-                                                                : "f:" + m.getMetaLong("featureid", -1);
+                                                                : cell != null ? "u:" + cell
+                                                                        : "f:" + m.getMetaLong("featureid", -1);
                                 if (seen.add(key))
                                     out.add(m);
                             }
@@ -508,7 +513,41 @@ public class TfrOverlay {
      * and "we could not ask" is only known by the caller, and an empty list honored here
      * would blank the map in both cases.
      */
+    /**
+     * A cheap fingerprint of what was last written.
+     *
+     * <p>A rewrite deletes and rebuilds every set in the store and takes most of a
+     * second with the lock held -- measured at 822 ms blocking the renderer -- so one
+     * that would produce exactly what is already there is worth not doing at all. The
+     * fingerprint is over what decides the picture: how many features, which sets, and
+     * each feature's id and geometry identity.
+     */
+    private volatile long lastWriteSignature;
+
+    private static long signature(List<Drawn> drawn) {
+        long h = 1125899906842597L;
+        h = h * 31 + drawn.size();
+        for (Drawn d : drawn) {
+            h = h * 31 + (d.notamId == null ? 0 : d.notamId.hashCode());
+            h = h * 31 + (d.setKey == null ? 0 : d.setKey.hashCode());
+            h = h * 31 + (d.name == null ? 0 : d.name.hashCode());
+            h = h * 31 + Double.doubleToLongBits(d.extrude);
+            h = h * 31 + (d.altitudeMode == null ? 0 : d.altitudeMode.ordinal());
+            h = h * 31 + (d.isLabel ? 1 : 0);
+        }
+        return h;
+    }
+
     public void rewrite(List<Drawn> drawn) {
+        final long sig = signature(drawn);
+        if (sig == lastWriteSignature) {
+            // Same picture as last time. Panning inside the held tiles produces this
+            // constantly, and each one was a full delete-and-rebuild of the store. The
+            // caller pushes visibility straight after a rewrite either way, so there is
+            // nothing to do here.
+            return;
+        }
+        lastWriteSignature = sig;
         synchronized (lock) {
             if (store == null)
                 return;

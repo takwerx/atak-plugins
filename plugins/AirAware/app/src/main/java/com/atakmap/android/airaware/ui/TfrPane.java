@@ -1352,6 +1352,45 @@ public class TfrPane implements TfrManager.Listener {
         detailsPage.setVisibility(View.VISIBLE);
     }
 
+    /**
+     * One UAS grid square, on the same details page. Never ATAK's own radial.
+     *
+     * <p>The ceiling first and in the FAA's own words, because it is the whole reason
+     * the square exists, and 0 gets a sentence rather than a number: a pilot reading
+     * "0 ft" can take it for missing data, and it is the opposite -- a rule that stops
+     * them.
+     */
+    public void showUasfm(final UasfmCell c) {
+        if (root == null || c == null)
+            return;
+        showing = null;
+        detailsTitle.setText(c.ceilingFt == 0 ? "No flight without coordination"
+                : TfrVertical.comma(c.ceilingFt) + " ft AGL");
+        final StringBuilder b = new StringBuilder();
+        b.append(c.ceilingFt == 0
+                ? "The FAA grants nothing automatically in this square. Flying here"
+                        + " needs further coordination, and LAANC will not clear it.\n"
+                : "You may fly up to " + TfrVertical.comma(c.ceilingFt)
+                        + " ft above the ground here without an authorization.\n");
+        if (!c.where().isEmpty())
+            b.append("\nAirspace of: ").append(c.where()).append('\n');
+        b.append("\nLAANC: ").append(c.laanc
+                ? "covered - file in an app and it comes back in seconds"
+                : "not covered - this one goes by request, not through an app");
+        b.append("\n\nThe square is 30 arc-seconds, about half a nautical mile. The")
+                .append(" grid covers controlled airspace only: where there is no")
+                .append(" square you are in Class G and need no authorization.");
+        b.append("\n\nFAA UAS Facility Map. It says what is permitted, not what is")
+                .append(" there - check the restrictions, airspace and obstacle layers")
+                .append(" too, and always current charts and NOTAMs.");
+        detailsBody.setText(b.toString());
+        detailsGeofence.setVisibility(View.GONE);
+        detailsFaa.setVisibility(View.GONE);
+        settingsPage.setVisibility(View.GONE);
+        list.setVisibility(View.GONE);
+        detailsPage.setVisibility(View.VISIBLE);
+    }
+
     private String detailsText(final Tfr t) {
         final StringBuilder b = new StringBuilder();
         if (!t.stateName.isEmpty())
