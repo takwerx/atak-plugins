@@ -1,10 +1,10 @@
 ATAK Plugin - IPAWS Alerts
 
-**Download IPAWS Alerts 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download IPAWS Alerts 0.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.5/ATAK-Plugin-IPAWS-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.5/ATAK-Plugin-IPAWS-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.5/ATAK-Plugin-IPAWS-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.6/ATAK-Plugin-IPAWS-0.6--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.6/ATAK-Plugin-IPAWS-0.6--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.6/ATAK-Plugin-IPAWS-0.6--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/ipaws-alerts/releases
 
@@ -32,7 +32,7 @@ types on the phone, in the field, whether or not there is a server in the path.
   - Each alert type drawn in the National Weather Service's own color for it,
     the table every public weather map uses, with a map key listing only the
     types on the map.
-  - Map controls: an Alerts ON / OFF switch that shows its state, a zoom gate ("draw when the
+  - Map controls: an Alerts ON / OFF switch that shows its state (OFF on a fresh install), a zoom gate ("draw when the
     scale bar reads 5 mi or closer"), and a distance limit - within N miles of
     My Location or of the map center, or what is in view.
   - A list grouped by alert type, worst first, with how long each alert has
@@ -54,8 +54,9 @@ originators and requires a signed agreement with FEMA.
 _________________________________________________________________
 STATUS
 
-0.5. A tap on an alert on the map opens its details straight away, with no
-radial menu in between. 0.4 was the first public release.
+0.6. A fresh install starts with Alerts OFF, and a tap on an alert on the map
+opens its details straight away, with no radial menu in between. 0.4 was the
+first public release.
 
 _________________________________________________________________
 POINT OF CONTACTS

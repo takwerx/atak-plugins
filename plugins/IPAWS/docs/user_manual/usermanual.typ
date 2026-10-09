@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "IPAWS Alerts",
-   plugin-version: "0.5",
+   plugin-version: "0.6",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -40,8 +40,9 @@ messages it relays, such as Evacuation Immediate and Civil Emergency Message.
 #v(4pt)
 The main screen is three buttons and the alert list. *Alerts ON / OFF* switches
 the alerts on the map, *Settings* opens everything else, and *Notify ON / OFF*
-switches notifications. Both switches show what is: green ON, red OFF. With the
-map off the top line says "map off", so an empty map never reads as no weather.
+switches notifications. Both switches show what is: green ON, red OFF, and both
+start OFF on a new install. With the map off the top line says "map off", so an
+empty map never reads as no weather.
 ]
 
 #tak-slide[

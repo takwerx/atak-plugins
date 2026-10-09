@@ -70,8 +70,13 @@ public class Filter {
      * All ON / All OFF, Feature Layer's switch: off takes every alert off the map and
      * leaves the rest running -- the list, the poll, notifications -- and the layer is
      * hidden rather than emptied, so switching it back on is instant.
+     *
+     * <p>OFF on a fresh install (operator, 2026-10-09: "you are shipping it with all
+     * the stuff turned on, it needs to be off by default"), like Notify. A stored
+     * filter keeps whatever the operator set; {@link #fromJson} still reads a filter
+     * saved before this switch existed as on, because that phone was showing alerts.
      */
-    public boolean mapOn = true;
+    public boolean mapOn = false;
     /**
      * Zoom gate: alerts draw only while ATAK's scale bar reads this distance or less,
      * in meters. {@code Double.MAX_VALUE} is Always, the default. The bar itself, not
