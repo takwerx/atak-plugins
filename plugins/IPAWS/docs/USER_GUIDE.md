@@ -154,9 +154,7 @@ Where areas overlap, ATAK asks which alert you meant, one line each.
 
 ![Select Item over two overlapping alerts](screenshots/19_chooser.png)
 
-Tap an area for its menu; the details button opens the alert in the pane.
-
-![The radial menu on a Storm Warning](screenshots/20_radial.png)
+Tap an area and its details open in the pane, the same page the list opens.
 
 The overlay is in ATAK's **Overlay Manager** as "IPAWS Alerts", with one entry
 per severity, so you can switch the quieter ones off without opening the plugin.

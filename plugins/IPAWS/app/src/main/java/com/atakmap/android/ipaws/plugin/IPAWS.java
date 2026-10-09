@@ -2,6 +2,7 @@
 package com.atakmap.android.ipaws.plugin;
 
 import android.content.Context;
+import android.content.Intent;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
@@ -9,6 +10,8 @@ import com.atakmap.android.ipaws.AlertManager;
 import com.atakmap.android.ipaws.ui.AlertDetails;
 import com.atakmap.android.ipaws.ui.AlertDetailsReceiver;
 import com.atakmap.android.ipaws.ui.IpawsPane;
+import com.atakmap.android.ipc.AtakBroadcast;
+import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 
@@ -42,6 +45,7 @@ public class IPAWS implements IPlugin {
     /** Whether the list was up when the details opened, so closing can restore it. */
     boolean listWasVisible;
     MapView mapView;
+    private com.atakmap.android.menu.MapMenuEventListener tapOpensDetails;
 
     IServiceController serviceController;
     Context pluginContext;
@@ -122,6 +126,7 @@ public class IPAWS implements IPlugin {
             details = new AlertDetails(pluginContext, manager, detailHost());
             manager.setDetailsReceiver(
                     new AlertDetailsReceiver(mapView, manager, details));
+            registerTap();
         } else if (mapView == null) {
             Log.w(TAG, "no map view at start; the overlay cannot be attached");
         }
@@ -149,6 +154,7 @@ public class IPAWS implements IPlugin {
             }
             detailPane = null;
         }
+        unregisterTap();
         if (paneUi != null) {
             paneUi.dispose();
             paneUi = null;
@@ -164,6 +170,74 @@ public class IPAWS implements IPlugin {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
         unregisterPreferences();
+    }
+
+    /**
+     * A tap on an alert's area opens its details in the pane, never ATAK's radial
+     * (operator, 2026-10-09: "when you click an item it opens right to the side pane,
+     * removes the radial menu and then having to click on details"). ATAK asks each
+     * {@code MapMenuEventListener} before it opens a radial, and one that answers true
+     * stops it and tells ATAK the tap was handled, so no callout is left on the map.
+     * Only items carrying our overlay mark are claimed; everyone else's keep their
+     * radial. The details go through the same receiver the radial's button used, so
+     * an alert that expired since the map drew it still says so.
+     *
+     * <p>The alert's own radial stays on the item: if this listener cannot be
+     * registered, a tap still reaches the details in two steps instead of none.
+     * Atmosphere and AirAware answer taps the same way.
+     */
+    private void registerTap() {
+        tapOpensDetails = new com.atakmap.android.menu.MapMenuEventListener() {
+            @Override
+            public boolean onShowMenu(final MapItem item) {
+                if (item == null || item.getMetaString("ipaws_overlay", null) == null)
+                    return false;
+                final MapView mv = mapView;
+                if (mv == null)
+                    return false;
+                // A moment later, not now: a pick from ATAK's Select Item list closes
+                // the list and then posts its own show-details, which closed the page
+                // opened here in Atmosphere and AirAware. A plain tap does not notice
+                // the quarter second.
+                mv.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            final Intent open = new Intent(AlertDetailsReceiver.ACTION);
+                            final String id = item.getMetaString("ipaws_alert_id", null);
+                            if (id != null)
+                                open.putExtra(AlertDetailsReceiver.EXTRA_ALERT_ID, id);
+                            else
+                                open.putExtra("targetUID", item.getUID());
+                            AtakBroadcast.getInstance().sendBroadcast(open);
+                        } catch (RuntimeException e) {
+                            Log.w(TAG, "tap to details", e);
+                        }
+                    }
+                }, 250);
+                return true;
+            }
+
+            @Override
+            public void onHideMenu(MapItem item) {
+            }
+        };
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.addEventListener(tapOpensDetails);
+        else
+            Log.w(TAG, "no radial menu receiver; taps keep the alert's radial");
+    }
+
+    private void unregisterTap() {
+        if (tapOpensDetails == null)
+            return;
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.removeEventListener(tapOpensDetails);
+        tapOpensDetails = null;
     }
 
     /**

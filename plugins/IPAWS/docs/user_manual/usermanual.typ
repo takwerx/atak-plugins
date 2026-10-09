@@ -256,10 +256,10 @@ changed.
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   #image("19.jpg", width: 100%)
-  Where areas overlap, ATAK asks which alert you meant, one line each.
 ][
-  #image("20.jpg", width: 100%)
-  Tap an area for its menu. *Details* opens the alert in the pane.
+  Tap an area and its details open in the pane, the same page the list opens.
+
+  Where areas overlap, ATAK asks which alert you meant, one line each.
 ]
 
 #v(4pt)
