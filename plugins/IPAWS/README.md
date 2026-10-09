@@ -1,10 +1,10 @@
 ATAK Plugin - IPAWS Alerts
 
-**Download IPAWS Alerts 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download IPAWS Alerts 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.4/ATAK-Plugin-IPAWS-0.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.4/ATAK-Plugin-IPAWS-0.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.4/ATAK-Plugin-IPAWS-0.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.5/ATAK-Plugin-IPAWS-0.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.5/ATAK-Plugin-IPAWS-0.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/ipaws-alerts/releases/download/v0.5/ATAK-Plugin-IPAWS-0.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/ipaws-alerts/releases
 
@@ -54,7 +54,8 @@ originators and requires a signed agreement with FEMA.
 _________________________________________________________________
 STATUS
 
-0.4, first public release.
+0.5. A tap on an alert on the map opens its details straight away, with no
+radial menu in between. 0.4 was the first public release.
 
 _________________________________________________________________
 POINT OF CONTACTS
