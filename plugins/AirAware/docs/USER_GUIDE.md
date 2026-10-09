@@ -124,6 +124,31 @@ wrote it.
 
 ---
 
+## Geofencing a restriction
+
+<!-- PICTURE: 37_geofence_dialog.png -->
+
+**Geofence** on a restriction's details page makes a shape you own from its
+outline and opens ATAK's own geofence settings for it, so you are warned when
+you cross it. A restriction with more than one area asks which one first.
+
+Choose the published limits so it only alerts on something actually inside the
+airspace, or ground only if you want it whatever the altitude.
+
+> **It is a copy taken at that moment.** If the restriction moves or is lifted,
+> the geofence stays as it is until you remove it.
+
+<!-- PICTURE: 38_geofence_on_map.png -->
+
+The shape sits on the map over the restriction it came from.
+
+<!-- PICTURE: 39_geofences_fold.png -->
+
+**Geofences** under Settings lists what you have made and says whether each
+still matches a live restriction, with a way to remove one that does not.
+
+---
+
 ## Airspace
 
 Class A through G, drawn one shelf at a time.

@@ -151,6 +151,37 @@ from the published floor to the published ceiling.
 ]
 
 #tak-slide[
+= Geofencing a restriction
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  // SHOT 37
+][
+  *Geofence* on a restriction's details page makes a shape you own from its
+  outline and opens ATAK's own geofence settings for it, so you are warned when
+  you cross it. A restriction with more than one area asks which one first.
+
+  Choose the published limits so it only alerts on something actually inside
+  the airspace, or ground only if you want it whatever the altitude.
+
+  *It is a copy taken at that moment.* If the restriction moves or is lifted,
+  the geofence stays as it is until you remove it.
+]
+]
+
+#tak-slide[
+= Your geofences
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  // SHOT 38
+][
+  // SHOT 39
+]
+The shape sits on the map over the restriction it came from. *Geofences* under
+Settings lists what you have made and says whether each still matches a live
+restriction, with a way to remove one that does not.
+]
+
+#tak-slide[
 = Airspace
 
 Class A through G, drawn one shelf at a time.
