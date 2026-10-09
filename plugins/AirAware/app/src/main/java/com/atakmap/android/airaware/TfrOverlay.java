@@ -217,6 +217,9 @@ public class TfrOverlay {
                                 final String cell = string(a, "uasfm_id");
                                 if (cell != null)
                                     item.setMetaString("uasfm_id", cell);
+                                final String nms = string(a, "nms_id");
+                                if (nms != null)
+                                    item.setMetaString("nms_id", nms);
                                 final String place = string(a, "place");
                                 if (place != null && !place.isEmpty())
                                     label = place;
@@ -269,12 +272,15 @@ public class TfrOverlay {
                                 // three times, the same way airspace did.
                                 final String oas = m.getMetaString("obstacle_oas", null);
                                 final String cell = m.getMetaString("uasfm_id", null);
+                                // A NOTAM is an area, a glyph and a pill: one row.
+                                final String nms = m.getMetaString("nms_id", null);
                                 final String key = notam != null ? "n:" + notam
                                         : icao != null ? "m:" + icao
                                                 : shelf != null ? "a:" + shelf
                                                         : oas != null ? "o:" + oas
                                                                 : cell != null ? "u:" + cell
-                                                                        : "f:" + m.getMetaLong("featureid", -1);
+                                                                        : nms != null ? "x:" + nms
+                                                                                : "f:" + m.getMetaLong("featureid", -1);
                                 if (seen.add(key))
                                     out.add(m);
                             }

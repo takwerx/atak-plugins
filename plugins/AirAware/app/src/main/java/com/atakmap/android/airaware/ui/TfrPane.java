@@ -22,6 +22,8 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.airaware.Airspace;
 import com.atakmap.android.airaware.AirspaceFeatures;
 import com.atakmap.android.airaware.UasfmFeatures;
+import com.atakmap.android.airaware.Notam;
+import com.atakmap.android.airaware.NotamFeatures;
 import com.atakmap.android.airaware.Metar;
 import com.atakmap.android.airaware.Obstacle;
 import com.atakmap.android.airaware.UasfmCell;
@@ -708,6 +710,8 @@ public class TfrPane implements TfrManager.Listener {
     }
 
     private String layerStatus(String key) {
+        if (TfrManager.LAYER_NOTAMS.equals(key))
+            return notamStatus();
         if (TfrManager.LAYER_UASFM.equals(key))
             return uasfmStatus();
         if (TfrManager.LAYER_OBSTACLES.equals(key))
@@ -798,6 +802,8 @@ public class TfrPane implements TfrManager.Listener {
                 fillAirspaceControls(body, true);
             else if (TfrManager.LAYER_OBSTACLES.equals(key))
                 fillObstacleControls(body);
+            else if (TfrManager.LAYER_NOTAMS.equals(key))
+                fillNotamControls(body);
             else if (TfrManager.LAYER_UASFM.equals(key))
                 fillUasfmControls(body);
             else
@@ -936,6 +942,170 @@ public class TfrPane implements TfrManager.Listener {
                         manager.setAirspaceBarMeters(meters);
                     }
                 });
+    }
+
+    /**
+     * What the NOTAM row says when it is open: how many are drawn, and how old the
+     * relay's picture is. The age is the one number that tells a crew whether to trust
+     * it; a layer that is quietly an hour stale reads as current.
+     */
+    private String notamStatus() {
+        if (!manager.isLayerOn(TfrManager.LAYER_NOTAMS))
+            return "Off. Nothing drawn.";
+        final int n = manager.notams().size();
+        final StringBuilder b = new StringBuilder();
+        if (n == 0) {
+            int held = 0;
+            for (String[] row : manager.notamKindCounts())
+                held += Integer.parseInt(row[1]);
+            if (manager.isNotamsMissing())
+                b.append("Not downloaded for here yet");
+            else if (held > 0)
+                b.append(held).append(held == 1 ? " here, in a kind" : " here, all in kinds")
+                        .append(" switched off");
+            else
+                b.append("None in view. Zoom out to look wider");
+        } else
+            b.append(n).append(n == 1 ? " NOTAM" : " NOTAMs")
+                    .append(manager.isNotamsCapped()
+                            ? " (nearest shown, zoom in for the rest)" : "");
+        final long built = manager.notamBuiltMs();
+        if (built > 0) {
+            final long ageMin = Math.max(0L, (System.currentTimeMillis() - built) / 60000L);
+            b.append(". FAA picture ");
+            if (ageMin < 1)
+                b.append("under a minute old");
+            else if (ageMin < 90)
+                b.append(ageMin).append(" min old");
+            else
+                b.append(ageMin / 60).append(" h old");
+            if (ageMin >= 20)
+                b.append(" - no newer one has reached this phone");
+        }
+        return b.toString();
+    }
+
+    /** What belongs to the NOTAMs and nothing else. */
+    private void fillNotamControls(LinearLayout body) {
+        addValueButton(body, "Kinds", notamKindsSummary(), new Runnable() {
+            @Override
+            public void run() {
+                pickNotamKinds();
+            }
+        });
+        addValueButton(body, "Show at", ScaleBar.gate(manager.notamBarMeters()),
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        pickBarGate("Show NOTAMs when the scale bar reads",
+                                manager.notamBarMeters(), new OnGate() {
+                                    @Override
+                                    public void set(long meters) {
+                                        manager.setNotamBarMeters(meters);
+                                    }
+                                });
+                    }
+                });
+    }
+
+    private String notamKindsSummary() {
+        int on = 0;
+        for (String k : Notam.KINDS)
+            if (manager.isNotamKindOn(k))
+                on++;
+        if (on == Notam.KINDS.length)
+            return "all " + Notam.KINDS.length;
+        return on == 0 ? "none" : on + " of " + Notam.KINDS.length;
+    }
+
+    private void pickNotamKinds() {
+        final List<String[]> counts = manager.notamKindCounts();
+        final String[] labels = new String[counts.size()];
+        final boolean[] checked = new boolean[counts.size()];
+        for (int i = 0; i < counts.size(); i++) {
+            labels[i] = Notam.kindName(counts.get(i)[0]) + "  (" + counts.get(i)[1] + ")";
+            checked[i] = manager.isNotamKindOn(counts.get(i)[0]);
+        }
+        final AlertDialog d = new AlertDialog.Builder(mapView.getContext())
+                .setTitle("Which kinds of NOTAM")
+                .setMultiChoiceItems(labels, checked,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dlg, int which, boolean on) {
+                                manager.setNotamKindOn(counts.get(which)[0], on);
+                            }
+                        })
+                .setPositiveButton("Done", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dlg, int w) {
+                        render();
+                    }
+                })
+                .show();
+        fromTop(d);
+    }
+
+    /**
+     * One NOTAM, on the same details page. The text as the FAA issued it comes first
+     * and whole: the abbreviations are the language pilots read, and a paraphrase would
+     * be a second thing to get wrong.
+     */
+    public void showNotam(final Notam n) {
+        if (root == null || n == null)
+            return;
+        showing = null;
+        detailsTitle.setText(n.title());
+        final long now = System.currentTimeMillis();
+        final StringBuilder b = new StringBuilder();
+        b.append(n.text.trim()).append("\n\n");
+        if (n.isFuture(now))
+            b.append("Not yet in effect. Starts ").append(local.format(new Date(n.startMs)));
+        else if (n.startMs > 0)
+            b.append("In effect since ").append(local.format(new Date(n.startMs)));
+        else
+            b.append("In effect");
+        b.append('\n');
+        if (n.endMs == Long.MAX_VALUE)
+            b.append("Until: permanent, or until cancelled");
+        else
+            b.append("Until: ").append(local.format(new Date(n.endMs)))
+                    .append(n.estimatedEnd ? " (estimated)" : "");
+        if (!n.lower.isEmpty() || !n.upper.isEmpty())
+            b.append("\nAltitude: ").append(n.lower.isEmpty() ? "surface" : n.lower)
+                    .append(" to ").append(n.upper.isEmpty() ? "unspecified" : n.upper);
+        b.append("\n\nKind: ").append(Notam.kindName(n.kind));
+        if (!n.location.isEmpty())
+            b.append("\nLocation: ").append(n.location);
+        if (!n.classification.isEmpty())
+            b.append("\nSeries: ").append(classificationName(n.classification));
+        final long updated = Notam.parseTime(n.updated);
+        if (updated > 0)
+            b.append("\nLast changed: ").append(local.format(new Date(updated)));
+        if (!n.hasArea())
+            b.append("\n\nNo mapped area: the FAA gives this one a point only.");
+        b.append("\n\nFAA NOTAM Management Service, through takwerx. Always check the")
+                .append(" official NOTAM search before a flight.");
+        detailsBody.setText(b.toString());
+        detailsGeofence.setVisibility(View.GONE);
+        detailsFaa.setVisibility(View.GONE);
+        settingsPage.setVisibility(View.GONE);
+        list.setVisibility(View.GONE);
+        detailsPage.setVisibility(View.VISIBLE);
+    }
+
+    private static String classificationName(String c) {
+        switch (c) {
+            case "DOM":
+                return "Domestic";
+            case "FDC":
+                return "FDC (flight data center)";
+            case "MIL":
+                return "Military";
+            case "INTL":
+                return "International format";
+            default:
+                return c;
+        }
     }
 
     private String uasfmStatus() {
@@ -1161,6 +1331,15 @@ public class TfrPane implements TfrManager.Listener {
             addKeyHeading("Obstacles");
             addKeyLine("Charted obstacle, with its height above the ground",
                     manager.obstacleColor());
+            any = true;
+        }
+
+        if (manager.isLayerOn(TfrManager.LAYER_NOTAMS)) {
+            addKeyHeading("NOTAMs");
+            for (String k : Notam.KINDS)
+                if (manager.isNotamKindOn(k))
+                    addKeyLine(Notam.kindName(k), NotamFeatures.color(k));
+            addKeyLine("Not yet in effect: same color, half strength", 0x00000000);
             any = true;
         }
 

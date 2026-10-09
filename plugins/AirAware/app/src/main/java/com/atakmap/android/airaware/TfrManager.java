@@ -55,6 +55,11 @@ public class TfrManager {
     public static final String LAYER_SUA = Airspace.LAYER_SUA;
     public static final String LAYER_OBSTACLES = "obstacles";
     public static final String LAYER_UASFM = UasfmFeatures.SET_KEY;
+    public static final String LAYER_NOTAMS = "notams";
+    static final String PREF_NOTAM_KINDS_OFF = "notamKindsOff";
+    static final String PREF_NOTAM_BAR_M = "notamBarM";
+    /** Set once the NOTAM layer has been seen, so an upgrade does not switch it on. */
+    static final String PREF_NOTAMS_INTRODUCED = "notamsIntroduced";
     static final String PREF_AIRSPACE_BAR_M = "airspaceBarM";
     static final String PREF_AIRSPACE_CYCLE = "airspaceCycle";
     static final String PREF_AIRSPACE_LABELS = "airspaceLabels";
@@ -148,6 +153,8 @@ public class TfrManager {
     private static final int MAX_OBSTACLES = 400;
     /** Grid squares are one feature each and tiny; past this the view is a wash. */
     private static final int MAX_UASFM_CELLS = 1500;
+    /** NOTAMs drawn at once: nearest the middle of the view first, like the obstacles. */
+    private static final int MAX_NOTAMS = 400;
     /** Amber: a thing that sticks up, not a restriction and not weather. */
     private static final int DEFAULT_OBSTACLE = 0xFFFFB300;
     private static final int DEFAULT_REFRESH_MIN = 30;
@@ -266,6 +273,21 @@ public class TfrManager {
     private volatile boolean uasfmCapped;
     private volatile long uasfmBarM = 8047L;
 
+    // NOTAMs: every record in the held tiles, and the ones picked for the view.
+    private final Set<String> notamKindsOff = new LinkedHashSet<>();
+    private volatile List<Notam> notamsAll = Collections.emptyList();
+    private volatile List<Notam> notams = Collections.emptyList();
+    private volatile Set<String> notamKeys = Collections.emptySet();
+    private volatile double[] notamBox;
+    private volatile Map<String, Integer> notamCounts = Collections.emptyMap();
+    private volatile String notamCycle = "";
+    private volatile String notamBuilt = "";
+    private volatile long notamLoadedAt;
+    private volatile boolean notamHidden;
+    private volatile boolean notamCapped;
+    private volatile boolean notamsMissing;
+    private volatile long notamBarM = 48280L;
+
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
     private volatile boolean airspaceHidden;
@@ -301,6 +323,13 @@ public class TfrManager {
             if (!Obstacle.DEFAULT_ON.contains(g))
                 groupsOff.add(g);
         obstacleGroupsOff.addAll(p.getStringSet(PREF_OBSTACLE_GROUPS_OFF, groupsOff));
+        final Set<String> kindsOff = new LinkedHashSet<>();
+        for (String k : Notam.KINDS)
+            if (!Notam.DEFAULT_ON.contains(k))
+                kindsOff.add(k);
+        notamKindsOff.addAll(p.getStringSet(PREF_NOTAM_KINDS_OFF, kindsOff));
+        // Thirty miles. A NOTAM area matters from further out than a tower does.
+        notamBarM = p.getLong(PREF_NOTAM_BAR_M, 48280L);
         classesOff.addAll(p.getStringSet(PREF_CLASSES_OFF, DEFAULT_CLASSES_OFF));
         // A set, not a joined string: a type carrying the separator would come back as two
         // bogus entries and the filter would restore wrong.
@@ -310,6 +339,13 @@ public class TfrManager {
         areaRadiusM = p.getLong(PREF_AREA_RADIUS_M, 80467L);
         measureFrom = p.getInt(PREF_MEASURE_FROM, FROM_ME);
         layersOff.addAll(p.getStringSet(PREF_LAYERS_OFF, allLayerKeys()));
+        // The off-set is stored, so a layer that did not exist when it was saved comes
+        // back ON after an upgrade. A new layer starts off, the once, like a fresh install.
+        if (!p.getBoolean(PREF_NOTAMS_INTRODUCED, false)) {
+            layersOff.add(LAYER_NOTAMS);
+            p.edit().putBoolean(PREF_NOTAMS_INTRODUCED, true)
+                    .putStringSet(PREF_LAYERS_OFF, new HashSet<>(layersOff)).apply();
+        }
         typesOff.addAll(p.getStringSet(PREF_TYPES_OFF,
                 new HashSet<>(Collections.singletonList(DEFAULT_OFF))));
     }
@@ -512,6 +548,7 @@ public class TfrManager {
     public List<String[]> layers() {
         final List<String[]> out = new ArrayList<>();
         out.add(new String[] { LAYER_RESTRICTIONS, "TFR" });
+        out.add(new String[] { LAYER_NOTAMS, "NOTAMs" });
         out.add(new String[] { LAYER_AIRSPACE, "Airspace" });
         out.add(new String[] { LAYER_SUA, "Special Use" });
         out.add(new String[] { LAYER_UASFM, "UAS ceilings" });
@@ -605,6 +642,11 @@ public class TfrManager {
         for (String g : Obstacle.GROUPS)
             if (obstaclesGone || obstacleGroupsOff.contains(g))
                 off.add(ObstacleFeatures.SET_PREFIX + g);
+        // NOTAMs: by kind, and the whole layer by its own zoom gate.
+        final boolean notamsGone = layersOff.contains(LAYER_NOTAMS) || notamHidden;
+        for (String k : Notam.KINDS)
+            if (notamsGone || notamKindsOff.contains(k))
+                off.add(NotamFeatures.SET_PREFIX + k);
         // Airspace: the kinds switched off one at a time, plus everything belonging to a
         // layer that is off or gated out by zoom.
         off.addAll(classesOff);
@@ -1115,6 +1157,7 @@ public class TfrManager {
         airspaceHidden = airspaceBarM > 0 && bar > airspaceBarM * 1.02;
         obstaclesHidden = obstacleBarM > 0 && bar > obstacleBarM * 1.02;
         uasfmHidden = uasfmBarM > 0 && bar > uasfmBarM * 1.02;
+        notamHidden = notamBarM > 0 && bar > notamBarM * 1.02;
         // Crossing this changes which features exist, so it is a rewrite rather than a
         // visibility push -- and only on the crossing, never on an ordinary pan.
         final boolean gateVolumes = bar > VOLUME_BAR_M * 1.02;
@@ -1396,6 +1439,8 @@ public class TfrManager {
                     DEFAULT_OBSTACLE));
         for (UasfmCell c : uasfm)
             drawn.addAll(UasfmFeatures.drawn(c));
+        for (Notam n : notams)
+            drawn.addAll(NotamFeatures.drawn(n, n.isActive(now), pills, pluginContext));
         overlay.rewrite(drawn);
         overlay.setTypesOff(hiddenSets());
     }
@@ -1442,6 +1487,7 @@ public class TfrManager {
             final long interval = refreshMinutes() * 60L * 1000L;
             // Expiry is a clock, not a download: a fence can lapse with no network.
             checkFences();
+            maybeRefreshNotams();
             // The airspace retry rides the clock, so a refusal clears itself without the
             // operator having to move the map to find out.
             maybeFetchAirspace();
@@ -1578,7 +1624,8 @@ public class TfrManager {
         // were already on the phone, and the map stayed empty. Each loader answers for
         // its own layer instead.
         if (!isLayerOn(LAYER_AIRSPACE) && !isLayerOn(LAYER_SUA)
-                && !isLayerOn(LAYER_OBSTACLES) && !isLayerOn(LAYER_UASFM))
+                && !isLayerOn(LAYER_OBSTACLES) && !isLayerOn(LAYER_UASFM)
+                && !isLayerOn(LAYER_NOTAMS))
             return;
         final GeoBounds b = mapView.getBounds();
         if (b == null || Double.isNaN(b.getNorth()) || Double.isNaN(b.getSouth()))
@@ -1606,6 +1653,8 @@ public class TfrManager {
                 loadObstaclesOnWorker(south, west, north, east,
                         viewSouth, viewWest, viewNorth, viewEast);
                 loadUasfmOnWorker(south, west, north, east,
+                        viewSouth, viewWest, viewNorth, viewEast);
+                loadNotamsOnWorker(south, west, north, east,
                         viewSouth, viewWest, viewNorth, viewEast);
                 rewriteOverlay();
                 post();
@@ -2079,5 +2128,193 @@ public class TfrManager {
             if (notamId.equals(t.notamId))
                 return t;
         return null;
+    }
+
+    // ---- NOTAMs ----
+
+    /**
+     * The NOTAMs for this view, from the relay's tiles.
+     *
+     * <p>Held and drawn the way the obstacles are, with one difference: the pack changes
+     * every few minutes, so a new cycle does not clear anything. The manifest's hash per
+     * tile decides whether the copy on disk is current, a changed tile is fetched again
+     * as the view needs it, and with no network the last picture stays up.
+     */
+    private void loadNotamsOnWorker(double south, double west, double north, double east,
+            double viewSouth, double viewWest, double viewNorth, double viewEast) {
+        if (!isLayerOn(LAYER_NOTAMS))
+            return;
+        final TilePack pack = NotamTiles.pack();
+        final TilePack.Index index = pack.index();
+        if (!index.built.isEmpty())
+            notamBuilt = index.built;
+        final boolean newCycle = !index.cycle.isEmpty() && !index.cycle.equals(notamCycle);
+        if (newCycle) {
+            if (!notamCycle.isEmpty())
+                Log.d(TAG, "NOTAM cycle " + notamCycle + " -> " + index.cycle);
+            notamCycle = index.cycle;
+            pack.prune(index);
+        }
+        List<String> keys = TilePack.keysFor(index, south, west, north, east);
+        if (keys.size() > MAX_TILES)
+            keys = keys.subList(0, MAX_TILES);
+        final Set<String> want = new LinkedHashSet<>(keys);
+        final Set<String> have = new LinkedHashSet<>(notamKeys);
+        if (newCycle || !have.containsAll(want) || notamsAll.isEmpty()) {
+            final Set<String> load = new LinkedHashSet<>(want);
+            if (have.size() + want.size() <= MAX_TILES)
+                load.addAll(have);
+            final List<Notam> loaded = new ArrayList<>();
+            boolean missed = false;
+            for (String key : load) {
+                try {
+                    loaded.addAll(NotamTiles.tile(pack, key, index.sha.get(key)));
+                } catch (Exception e) {
+                    missed = true;
+                    Log.d(TAG, "NOTAM tile " + key + " is not here yet: " + e);
+                }
+            }
+            notamKeys = load;
+            notamsMissing = missed;
+            notamsAll = Collections.unmodifiableList(loaded);
+            notamBox = null;
+            notamLoadedAt = System.currentTimeMillis();
+            Log.d(TAG, "NOTAMs: " + loaded.size() + " held from " + load.size() + " tiles");
+        }
+        pickNotamsForView(viewSouth, viewWest, viewNorth, viewEast);
+    }
+
+    /**
+     * Which of the held NOTAMs are drawn: the kinds switched on, not yet ended, nearest
+     * the middle of the view first, capped. The kind filter is applied here and not when
+     * the tiles are read, so switching a kind costs a pick and not a re-read.
+     */
+    private void pickNotamsForView(double south, double west, double north, double east) {
+        final double[] box = notamBox;
+        if (box != null && south >= box[0] && west >= box[1] && north <= box[2]
+                && east <= box[3] && !notams.isEmpty())
+            return;
+        final double padLat = Math.max(0.02, (north - south) * 0.6);
+        final double padLon = Math.max(0.02, (east - west) * 0.6);
+        final double[] want = { south - padLat, west - padLon, north + padLat,
+                east + padLon };
+        final double midLat = (south + north) / 2d;
+        final double midLon = (west + east) / 2d;
+        final double lonScale = Math.cos(Math.toRadians(midLat));
+        final long now = System.currentTimeMillis();
+        final Map<String, Integer> counts = new LinkedHashMap<>();
+        for (String k : Notam.KINDS)
+            counts.put(k, 0);
+        final List<Notam> inView = new ArrayList<>();
+        for (Notam n : notamsAll) {
+            if (n.lat < want[0] || n.lat > want[2] || n.lon < want[1] || n.lon > want[3])
+                continue;
+            if (n.isExpired(now))
+                continue;
+            final Integer c = counts.get(n.kind);
+            counts.put(n.kind, c == null ? 1 : c + 1);
+            if (notamKindsOff.contains(n.kind))
+                continue;
+            final double dy = n.lat - midLat;
+            final double dx = (n.lon - midLon) * lonScale;
+            n.distanceM = Math.sqrt(dy * dy + dx * dx) * 111320d;
+            inView.add(n);
+        }
+        Collections.sort(inView, new java.util.Comparator<Notam>() {
+            @Override
+            public int compare(Notam a, Notam b) {
+                return Double.compare(a.distanceM, b.distanceM);
+            }
+        });
+        notamCapped = inView.size() > MAX_NOTAMS;
+        notams = Collections.unmodifiableList(
+                new ArrayList<>(inView.subList(0, Math.min(MAX_NOTAMS, inView.size()))));
+        notamCounts = Collections.unmodifiableMap(counts);
+        notamBox = want;
+        Log.d(TAG, "NOTAMs: drawing " + notams.size() + " of " + inView.size() + " in view");
+    }
+
+    /**
+     * Rides the clock: while the layer is on, the relay's newer picture is read every
+     * few minutes whether the map moved or not. A phone parked at an incident must see
+     * a NOTAM issued after it stopped panning.
+     */
+    private void maybeRefreshNotams() {
+        if (!isLayerOn(LAYER_NOTAMS))
+            return;
+        if (System.currentTimeMillis() - notamLoadedAt < NotamTiles.MANIFEST_AGE_MS)
+            return;
+        notamKeys = Collections.emptySet();
+        notamBox = null;
+        maybeFetchAirspace();
+    }
+
+    private void refetchNotams() {
+        notamBox = null;
+        changed();
+        main.removeCallbacks(settled);
+        main.postDelayed(settled, 50);
+    }
+
+    public List<Notam> notams() {
+        return notams;
+    }
+
+    public boolean isNotamsCapped() {
+        return notamCapped;
+    }
+
+    public boolean isNotamsMissing() {
+        return notamsMissing;
+    }
+
+    public Notam notamById(String id) {
+        if (id == null)
+            return null;
+        for (Notam n : notamsAll)
+            if (id.equals(n.id))
+                return n;
+        return null;
+    }
+
+    /** Every kind with how many are near the view, on or off, for the picker. */
+    public List<String[]> notamKindCounts() {
+        final List<String[]> out = new ArrayList<>();
+        final Map<String, Integer> counts = notamCounts;
+        for (String k : Notam.KINDS) {
+            final Integer n = counts.get(k);
+            out.add(new String[] { k, Integer.toString(n == null ? 0 : n) });
+        }
+        return out;
+    }
+
+    public boolean isNotamKindOn(String kind) {
+        return !notamKindsOff.contains(kind);
+    }
+
+    public void setNotamKindOn(String kind, boolean on) {
+        if (on)
+            notamKindsOff.remove(kind);
+        else
+            notamKindsOff.add(kind);
+        prefs().edit().putStringSet(PREF_NOTAM_KINDS_OFF, new HashSet<>(notamKindsOff)).apply();
+        overlay.setTypesOff(hiddenSets());
+        refetchNotams();
+    }
+
+    public long notamBarMeters() {
+        return notamBarM;
+    }
+
+    public void setNotamBarMeters(long m) {
+        notamBarM = m;
+        prefs().edit().putLong(PREF_NOTAM_BAR_M, m).apply();
+        applyGate();
+        changed();
+    }
+
+    /** When the relay built the picture on this phone, in millis; 0 when unknown. */
+    public long notamBuiltMs() {
+        return Notam.parseTime(notamBuilt);
     }
 }
