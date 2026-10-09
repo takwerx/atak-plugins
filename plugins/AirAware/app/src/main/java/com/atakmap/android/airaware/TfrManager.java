@@ -1562,12 +1562,19 @@ public class TfrManager {
         worker.execute(new Runnable() {
             @Override
             public void run() {
+                // All three, then ONE rewrite. Each used to rewrite the whole store as
+                // it finished, so a pass cost three full rebuilds -- and they share this
+                // single worker, so airspace finishing slowly starved the other two
+                // entirely: with every layer switched on, obstacles and UAS ceilings
+                // never drew at all.
                 if (isLayerOn(LAYER_AIRSPACE) || isLayerOn(LAYER_SUA))
                     loadTilesOnWorker(south, west, north, east);
                 loadObstaclesOnWorker(south, west, north, east,
                         viewSouth, viewWest, viewNorth, viewEast);
                 loadUasfmOnWorker(south, west, north, east,
                         viewSouth, viewWest, viewNorth, viewEast);
+                rewriteOverlay();
+                post();
             }
         });
     }
@@ -1682,8 +1689,6 @@ public class TfrManager {
         obstacleBox = want;
         Log.d(TAG, "obstacles: drawing " + obstacles.size() + " of " + inView.size()
                 + " in view");
-        rewriteOverlay();
-        post();
     }
 
     /**
@@ -1780,8 +1785,6 @@ public class TfrManager {
         uasfm = Collections.unmodifiableList(joinRuns(kept));
         uasfmBox = want2;
         Log.d(TAG, "UAS ceilings: drawing " + uasfm.size());
-        rewriteOverlay();
-        post();
     }
 
     /**
@@ -1952,8 +1955,14 @@ public class TfrManager {
         if (capped)
             keys = keys.subList(0, MAX_TILES);
         final Set<String> want = new LinkedHashSet<>(keys);
-        if (want.equals(airspaceKeys) && !airspaces.isEmpty())
+        // Only when something needed is missing. Comparing for equality meant every
+        // zoom step reloaded tiles already in memory -- the log showed 8 tiles, then 4,
+        // then 2, each with a full store rewrite behind it.
+        final Set<String> have = new LinkedHashSet<>(airspaceKeys);
+        if (have.containsAll(want) && !airspaces.isEmpty())
             return;
+        if (have.size() + want.size() <= MAX_TILES)
+            want.addAll(have);
 
         // Keyed by id: a shelf that straddles a tile boundary is written into both, and
         // the publisher says so.
@@ -1984,8 +1993,6 @@ public class TfrManager {
         airspaceFetchedMs = System.currentTimeMillis();
         Log.d(TAG, "airspace: " + airspaces.size() + " shelves from " + want.size()
                 + " tiles" + (missed ? " (some not downloaded)" : ""));
-        rewriteOverlay();
-        post();
     }
 
     private void changed() {
