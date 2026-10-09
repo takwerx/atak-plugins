@@ -105,7 +105,7 @@ Temporary Flight Restrictions as the FAA publishes them, drawn as a volume
 from the published floor to the published ceiling.
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  // SHOT 12
+  #image("12.png", width: 100%)
 ][
   *Red* is in effect now. *Amber* is scheduled and not yet active, so a
   restriction that starts this afternoon is visible this morning and reads
@@ -156,7 +156,7 @@ from the published floor to the published ceiling.
 Class A through G, drawn one shelf at a time.
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  // SHOT 14
+  #image("14.png", width: 100%)
 ][
   The FAA publishes a Class B airport as a stack of rings, each starting and
   ending at a different altitude. AirAware draws each of those steps as its own
@@ -173,7 +173,7 @@ Class A through G, drawn one shelf at a time.
 = Airspace colors and classes
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  // SHOT 15
+  #image("15.png", width: 100%)
 ][
   The colors are the sectional chart's: *blue* for Class B and D, *magenta*
   for Class C and E. Class E takes its color from how low it comes down, so
@@ -191,7 +191,7 @@ Class A through G, drawn one shelf at a time.
 = Special Use airspace
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  // SHOT 16
+  #image("16.png", width: 100%)
 ][
   Prohibited, Restricted, Warning and Alert areas, and Military Operations
   Areas. *Kinds* picks which of those draw.
@@ -280,7 +280,7 @@ turbines and stacks.
 = METARs
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  // SHOT 19
+  #image("19.png", width: 100%)
 ][
   METAR observations drawn as flight-category chips in the aviation
   convention: *green* VFR, *blue* MVFR, *red* IFR, *magenta* LIFR.

@@ -92,7 +92,7 @@ the way until you are close enough for it to mean something.
 Temporary Flight Restrictions as the FAA publishes them, drawn as a volume from
 the published floor to the published ceiling.
 
-<!-- PICTURE: 12_tfr_volume.png -->
+![A restriction in effect, surface to 3,000 ft AGL](screenshots/12_tfr_volume.png)
 
 **Red** is in effect now. **Amber** is scheduled and not yet active, so a
 restriction that starts this afternoon is visible this morning and reads
@@ -126,7 +126,7 @@ wrote it.
 
 Class A through G, drawn one shelf at a time.
 
-<!-- PICTURE: 14_airspace_3d.png -->
+![Airspace shelves standing at their published steps](screenshots/14_airspace_3d.png)
 
 The FAA publishes a Class B airport as a stack of rings, each starting and
 ending at a different altitude. AirAware draws each of those steps as its own
@@ -137,7 +137,7 @@ With **3D** on, each shelf stands between its own floor and ceiling. Tilt the
 map to see it. Airspace that goes up with no published ceiling is drawn so it
 does not swallow everything below it.
 
-<!-- PICTURE: 15_airspace_flat.png -->
+![Sectional colors: blue Class B and D, magenta Class C and E](screenshots/15_airspace_flat.png)
 
 The colors are the sectional chart's: **blue** for Class B and D, **magenta**
 for Class C and E. Class E takes its color from how low it comes down, so Class
@@ -152,7 +152,7 @@ puts each shelf's name and heights beside it.
 
 ## Special Use airspace
 
-<!-- PICTURE: 16_special_use.png -->
+![A restricted area drawn as stacked volumes](screenshots/16_special_use.png)
 
 Prohibited, Restricted, Warning and Alert areas, and Military Operations Areas.
 **Kinds** picks which of those draw.
