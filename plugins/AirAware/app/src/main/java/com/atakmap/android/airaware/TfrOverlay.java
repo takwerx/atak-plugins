@@ -578,6 +578,19 @@ public class TfrOverlay {
         final long id = store.insertFeatureSet(
                 new FeatureSet(PROVIDER, key, name, Double.MAX_VALUE, 0d));
         setKeyById.put(id, key);
+        // Born hidden. A new set defaults to visible, and a rewrite creates its sets as
+        // the features stream in, so for the length of that write everything was on the
+        // map -- including layers the operator had switched off. It showed as airspace
+        // flashing up while the planner was redrawing. pushVisibilityLocked at the end
+        // of the rewrite turns on whatever should be on.
+        try {
+            final FeatureDataStore2.FeatureSetQueryParameters p =
+                    new FeatureDataStore2.FeatureSetQueryParameters();
+            p.ids = Collections.singleton(id);
+            store.setFeatureSetsVisible(p, false);
+        } catch (Exception e) {
+            Log.w(TAG, "could not hide a new set before filling it", e);
+        }
         return id;
     }
 

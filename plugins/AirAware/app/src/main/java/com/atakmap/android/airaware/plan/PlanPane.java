@@ -1338,7 +1338,11 @@ public final class PlanPane implements IslandOverlay.Listener,
                     .append(Math.round(ceiling)).append(" ft MSL)\n");
         b.append("Times:      from now until you say otherwise\n");
         b.append("Purpose:    UAS fire mapping\n");
-        b.append("\nFlight Service: 1-877-487-6867\n");
+        b.append("\nFile at 1800wxbrief.com: UAS tab, Planning, UAS NOTAM Form.\n");
+        b.append("Or by phone to Flight Service: 1-877-487-6867\n");
+        b.append("\nFiling online needs a Flight Service account and a COA - either a")
+                .append(" public aircraft COA or Part 107 with a COA for airspace")
+                .append(" authorizations. Without one, phone it in.\n");
         b.append("\nA NOTAM tells other pilots you are there. It does not authorize")
                 .append(" you and does not keep anyone away.");
         final String text = b.toString();
@@ -1346,7 +1350,14 @@ public final class PlanPane implements IslandOverlay.Listener,
         new android.app.AlertDialog.Builder(host)
                 .setTitle(R.string.notify_flight_service)
                 .setMessage(text)
-                .setPositiveButton(R.string.call_flight_service,
+                .setPositiveButton(R.string.file_online,
+                        new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface d, int w) {
+                                openUrl("https://www.1800wxbrief.com/");
+                            }
+                        })
+                .setNeutralButton(R.string.call_flight_service,
                         new android.content.DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(android.content.DialogInterface d, int w) {
@@ -1355,7 +1366,9 @@ public final class PlanPane implements IslandOverlay.Listener,
                                         android.net.Uri.parse("tel:18774876867")), "dialer");
                             }
                         })
-                .setNeutralButton(R.string.copy_details,
+                // Copy rather than Close on the third button: the online form asks for
+                // exactly these fields, so the useful next action is to paste them in.
+                .setNegativeButton(R.string.copy_details,
                         new android.content.DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(android.content.DialogInterface d, int w) {
@@ -1367,7 +1380,6 @@ public final class PlanPane implements IslandOverlay.Listener,
                                             "NOTAM", text));
                             }
                         })
-                .setNegativeButton(R.string.close, null)
                 .show();
     }
 

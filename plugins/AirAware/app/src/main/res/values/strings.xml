@@ -164,6 +164,7 @@
     <string name="file_laanc">File LAANC</string>
     <string name="notify_flight_service">Notify Flight Service</string>
     <string name="call_flight_service">Call</string>
+    <string name="file_online">File online</string>
     <string name="copy_details">Copy</string>
     <string name="close">Close</string>
     <string name="laanc_title">File an authorization</string>
