@@ -26,8 +26,8 @@ Six layers, each switched on its own from the front page:
   Airspace            Class A through G, one shelf per published step, so the
                       upside-down wedding cake over a Class B airport is drawn
                       as the twelve shelves the FAA publishes rather than one
-                      ring. Sectional chart colours: B and D blue, C and E
-                      magenta, with Class E taking its colour from how low it
+                      ring. Sectional chart colors: B and D blue, C and E
+                      magenta, with Class E taking its color from how low it
                       comes down.
 
   Special Use         Prohibited, Restricted, Warning and Alert areas and
@@ -35,7 +35,7 @@ Six layers, each switched on its own from the front page:
                       continuous or activated by NOTAM.
 
   UAS ceilings        The FAA UAS Facility Map: how high a drone may fly
-                      without an authorization, as a grid coloured green
+                      without an authorization, as a grid colored green
                       through red. The pinned status line says it in words for
                       wherever the operator is standing.
 

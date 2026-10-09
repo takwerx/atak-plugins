@@ -96,7 +96,7 @@ public final class DofSource {
         final List<String> keys = TilePack.keysFor(index,
                 extent.bounds.getSouth(), extent.bounds.getWest(),
                 extent.bounds.getNorth(), extent.bounds.getEast());
-        final GeoPoint centre = extent.center;
+        final GeoPoint center = extent.center;
         final List<Obstacle> out = new ArrayList<>();
         Exception failure = null;
         for (String key : keys) {
@@ -107,9 +107,9 @@ public final class DofSource {
                     // the list the pilot is reading.
                     if (!extent.contains(o.lat, o.lon))
                         continue;
-                    o.distanceM = GeoCalculations.distanceTo(centre,
+                    o.distanceM = GeoCalculations.distanceTo(center,
                             new GeoPoint(o.lat, o.lon));
-                    o.bearingDeg = GeoCalculations.bearingTo(centre,
+                    o.bearingDeg = GeoCalculations.bearingTo(center,
                             new GeoPoint(o.lat, o.lon));
                     out.add(o);
                 }

@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The UAS Facility Map on the map: a grid square per cell, coloured by how high you may
+ * The UAS Facility Map on the map: a grid square per cell, colored by how high you may
  * fly there without an authorization.
  *
  * <p>Green to red, because the question is permission and not altitude: 400 ft is the
@@ -30,14 +30,14 @@ public final class UasfmFeatures {
     public static final String SET_KEY = "uasfm";
     public static final String SET_NAME = "UAS ceilings";
 
-    /** Enough to read the colour through, little enough to see the map under it. */
+    /** Enough to read the color through, little enough to see the map under it. */
     private static final int FILL_ALPHA = 0x4D;
 
     private UasfmFeatures() {
     }
 
     /**
-     * The colour for a ceiling.
+     * The color for a ceiling.
      *
      * <p>0 is the one that matters most and is the only one drawn at full strength: a
      * pilot scanning for somewhere to launch needs the squares they cannot use to be the
@@ -68,7 +68,7 @@ public final class UasfmFeatures {
 
         final Style style = new CompositeStyle(new Style[] {
                 new BasicFillStyle((FILL_ALPHA << 24) | (color & 0x00FFFFFF)),
-                // A hairline of the same colour: without it the grid reads as one blob
+                // A hairline of the same color: without it the grid reads as one blob
                 // where neighbours share a ceiling, and the cell size is the thing that
                 // tells a pilot how precise the rule is.
                 new BasicStrokeStyle((0x66 << 24) | (color & 0x00FFFFFF), 1f) });

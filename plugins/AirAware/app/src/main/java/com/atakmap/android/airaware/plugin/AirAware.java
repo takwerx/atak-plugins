@@ -36,6 +36,8 @@ public class AirAware implements IPlugin {
     public static final String ACTION_DETAILS = "com.atakmap.android.airaware.TFR_DETAILS";
     /** So a pane can be opened over adb without finding a button. */
     public static final String ACTION_SHOW = "com.atakmap.android.airaware.SHOW";
+    /** The key ATAK files this plugin's Tool Preferences entry under. */
+    private static final String PREFS_KEY = "airawarePreference";
 
     IServiceController serviceController;
     Context pluginContext;
@@ -104,11 +106,13 @@ public class AirAware implements IPlugin {
             registerReceiver();
             registerTap();
         }
+        registerPreferences();
         uiService.addToolbarItem(toolbarItem);
     }
 
     @Override
     public void onStop() {
+        unregisterPreferences();
         if (receiver != null) {
             try {
                 AtakBroadcast.getInstance().unregisterReceiver(receiver);
@@ -168,6 +172,38 @@ public class AirAware implements IPlugin {
             uiService.removeToolbarItem(toolbarItem);
         }
         paneUi = null;
+    }
+
+    /**
+     * Puts AirAware under Settings -> Tool Preferences, which is the only route to the
+     * user manual. A manual sitting in {@code assets/} with no entry here is a manual
+     * nobody can open, and that has shipped before.
+     */
+    private void registerPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment.register(
+                    new com.atakmap.app.preferences.ToolsPreferenceFragment
+                            .ToolPreference(
+                                    pluginContext.getString(R.string.app_name),
+                                    pluginContext.getString(R.string.prefs_summary),
+                                    PREFS_KEY,
+                                    // ic_toolbar, not ic_launcher: this row sits on
+                                    // ATAK's dark UI and wants the bare glyph.
+                                    pluginContext.getResources().getDrawable(
+                                            R.drawable.ic_toolbar),
+                                    new AirAwarePreferenceFragment(pluginContext)));
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not register preferences: " + notThisBuild);
+        }
+    }
+
+    private void unregisterPreferences() {
+        try {
+            com.atakmap.app.preferences.ToolsPreferenceFragment
+                    .unregister(PREFS_KEY);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not unregister preferences: " + notThisBuild);
+        }
     }
 
     private void registerReceiver() {

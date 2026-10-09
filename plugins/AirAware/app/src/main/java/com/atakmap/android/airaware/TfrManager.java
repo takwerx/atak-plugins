@@ -290,7 +290,7 @@ public class TfrManager {
         obstacleCycle = p.getString(PREF_OBSTACLE_CYCLE, "");
         uasfmCycle = p.getString(PREF_UASFM_CYCLE, "");
         // Five miles. The cells are half a nautical mile across, so any wider and
-        // the grid is a wash of colour rather than a rule you can read.
+        // the grid is a wash of color rather than a rule you can read.
         uasfmBarM = p.getLong(PREF_UASFM_BAR_M, 8047L);
         obstacleBarM = p.getLong(PREF_OBSTACLE_BAR_M, 16093L);
         obstacleFloorFt = p.getFloat(PREF_OBSTACLE_FLOOR_FT,
