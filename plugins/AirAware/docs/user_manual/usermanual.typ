@@ -172,9 +172,9 @@ from the published floor to the published ceiling.
 = Your geofences
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  // SHOT 38
+  #image("38.jpg", width: 100%)
 ][
-  // SHOT 39
+  #image("39.png", width: 100%)
 ]
 The shape sits on the map over the restriction it came from. *Geofences* under
 Settings lists what you have made and says whether each still matches a live

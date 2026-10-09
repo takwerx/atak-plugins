@@ -138,11 +138,11 @@ airspace, or ground only if you want it whatever the altitude.
 > **It is a copy taken at that moment.** If the restriction moves or is lifted,
 > the geofence stays as it is until you remove it.
 
-<!-- PICTURE: 38_geofence_on_map.png -->
+![The geofence over the restriction it came from](screenshots/38_geofence_on_map.png)
 
 The shape sits on the map over the restriction it came from.
 
-<!-- PICTURE: 39_geofences_fold.png -->
+![The geofences you have made, and how each stands](screenshots/39_geofences_fold.png)
 
 **Geofences** under Settings lists what you have made and says whether each
 still matches a live restriction, with a way to remove one that does not.

@@ -47,15 +47,34 @@ public class Tfr {
     /** The place to show. Falls back to the list prose when the XML had no city (11 of 104). */
     public String place() {
         if (city != null && !city.trim().isEmpty())
-            return city.trim();
+            return tidy(city);
         String d = description == null ? "" : description.trim();
         int comma = d.indexOf(',');
         // The list prose is "<place>, <ST>, <dates>"; the dates are not a place.
         if (comma > 0) {
             int second = d.indexOf(',', comma + 1);
-            return second > 0 ? d.substring(0, second) : d.substring(0, comma);
+            return tidy(second > 0 ? d.substring(0, second) : d.substring(0, comma));
         }
-        return d.isEmpty() ? notamId : d;
+        return d.isEmpty() ? notamId : tidy(d);
+    }
+
+    /**
+     * Drop punctuation the FAA left on the end of a place.
+     *
+     * <p>"DISNEYLAND THEME PARK, ANAHEIM," arrives with its comma, and every place the
+     * name is used then shows it: the map label read "ANAHEIM,  to 3,000 ft AGL", and a
+     * geofence cut from it was titled "ANAHEIM, (Area)".
+     */
+    private static String tidy(String s) {
+        String t = s.trim();
+        while (!t.isEmpty()) {
+            final char c = t.charAt(t.length() - 1);
+            if (c == ',' || c == ';' || c == '-' || Character.isWhitespace(c))
+                t = t.substring(0, t.length() - 1).trim();
+            else
+                break;
+        }
+        return t;
     }
 
     /** Every area that has a ring. The rest exist and are listed, but cannot be drawn. */

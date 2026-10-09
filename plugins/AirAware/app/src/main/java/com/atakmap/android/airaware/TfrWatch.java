@@ -127,8 +127,11 @@ public final class TfrWatch {
             } else if (changed(item, live)) {
                 state = State.CHANGED;
             }
-            if (state != State.CURRENT)
-                out.add(new Watched(item.getUID(), title, notam, state));
+            // Every one, current included. The Settings fold lists what the operator
+            // made and says how each stands; it used to be handed only the stale ones,
+            // so a fence that was fine did not appear at all and the page read as if
+            // nothing had been made. Callers that want only the stale ones filter.
+            out.add(new Watched(item.getUID(), title, notam, state));
         }
         return out;
     }
@@ -203,7 +206,10 @@ public final class TfrWatch {
             case CHANGED:
                 return "the restriction has changed. Make it again from the new one.";
             default:
-                return "";
+                // Said, not left blank. The Settings fold lists current fences too now,
+                // and an empty string there read as "Geofence: SOMEWHERE - " with a
+                // dangling dash and no word on how it stands.
+                return "still matches a live restriction.";
         }
     }
 }

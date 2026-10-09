@@ -194,6 +194,7 @@ public class TfrManager {
     private volatile boolean airfieldsHidden;
     /** Geofences whose restriction has expired, been lifted or changed under them. */
     private volatile List<TfrWatch.Watched> staleFences = Collections.emptyList();
+    private volatile List<TfrWatch.Watched> allFences = Collections.emptyList();
     private volatile int whereMode;
     private final Set<String> whereValues = new LinkedHashSet<>();
     private volatile int areaMode = AREA_IN_VIEW;
@@ -466,6 +467,11 @@ public class TfrManager {
         return staleFences;
     }
 
+    /** Every geofence made from a restriction, whatever state it is in. */
+    public List<TfrWatch.Watched> allFences() {
+        return allFences;
+    }
+
     /** Take one of the operator's geofences off the map, on their say-so only. */
     public void removeFence(String uid) {
         if (TfrWatch.remove(mapView, uid))
@@ -481,10 +487,16 @@ public class TfrManager {
     private void checkFences() {
         try {
             final List<TfrWatch.Watched> was = staleFences;
-            staleFences = TfrWatch.check(mapView, known, lastSuccessMs > 0 || !known.isEmpty(),
+            allFences = TfrWatch.check(mapView, known, lastSuccessMs > 0 || !known.isEmpty(),
                     System.currentTimeMillis());
+            final List<TfrWatch.Watched> stale = new ArrayList<>();
+            for (TfrWatch.Watched w : allFences)
+                if (w.state != TfrWatch.State.CURRENT)
+                    stale.add(w);
+            staleFences = stale;
             if (!staleFences.isEmpty() || !was.isEmpty())
-                Log.d(TAG, "geofences out of date: " + staleFences.size());
+                Log.d(TAG, "geofences out of date: " + staleFences.size()
+                        + " of " + allFences.size());
         } catch (Exception e) {
             Log.w(TAG, "checking geofences failed", e);
         }

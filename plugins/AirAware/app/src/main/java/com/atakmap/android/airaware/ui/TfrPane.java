@@ -320,25 +320,38 @@ public class TfrPane implements TfrManager.Listener {
      * reports what has become of the restriction and offers the removal.
      */
     private void buildFences() {
+        final List<TfrWatch.Watched> fences = manager.allFences();
         final List<TfrWatch.Watched> stale = manager.staleFences();
-        fencesFold.label("Geofences", stale.isEmpty() ? "all current"
-                : stale.size() + " out of date");
+        fencesFold.label("Geofences", fences.isEmpty() ? "none made"
+                : stale.isEmpty() ? fences.size() + ", all current"
+                        : stale.size() + " of " + fences.size() + " out of date");
         fencesContainer.removeAllViews();
-        if (stale.isEmpty()) {
+        if (fences.isEmpty()) {
             final TextView t = new TextView(pluginContext);
-            t.setText("Every geofence you made still matches a live restriction.");
+            t.setText("You have not made any. Geofence on a restriction's page makes one.");
             t.setTextSize(13f);
             t.setTextColor(pluginContext.getResources().getColor(R.color.dim_text));
             fencesContainer.addView(t);
             return;
         }
-        for (final TfrWatch.Watched w : stale) {
+        // Every one, not only the ones that have gone out of date. Listing just the
+        // stale ones meant a fence that was perfectly fine never appeared, so after
+        // making one the page still read as though nothing was there.
+        for (final TfrWatch.Watched w : fences) {
+            final boolean ok = w.state == TfrWatch.State.CURRENT;
             final TextView t = new TextView(pluginContext);
             t.setText(w.title + " - " + TfrWatch.words(w.state));
             t.setTextSize(13f);
             t.setPadding(0, 6, 0, 2);
-            t.setTextColor(pluginContext.getResources().getColor(R.color.white));
+            t.setTextColor(pluginContext.getResources().getColor(
+                    ok ? R.color.dim_text : R.color.white));
             fencesContainer.addView(t);
+
+            // Only the stale ones offer removal. A live one is removed from the map the
+            // way the operator made it, and a button here would invite clearing a fence
+            // that is still guarding something.
+            if (ok)
+                continue;
 
             final Button b = new Button(pluginContext, null, 0, R.style.TakwerxButton);
             final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
