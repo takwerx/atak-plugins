@@ -143,11 +143,14 @@ public class AirAware implements IPlugin {
             planPane.onPaneClosed();
             planPane = null;
         }
+        if (planObstacles != null) {
+            planObstacles.stop();
+            planObstacles = null;
+        }
         if (planOverlay != null) {
             planOverlay.stop();
             planOverlay = null;
         }
-        planObstacles = null;
         planTemplate = null;
         if (uiService != null) {
             // Close and forget the pane, or a reload leaves the old view on screen bound
@@ -306,6 +309,13 @@ public class AirAware implements IPlugin {
         planOverlay = new com.atakmap.android.airaware.plan.IslandOverlay(mapView);
         planObstacles = new com.atakmap.android.airaware.plan.ObstacleManager(mapView,
                 pluginContext);
+        // Both have to be started, which the plugin they came from did in its own
+        // onStart. Without it IslandOverlay.started stays false, every computeFor is
+        // refused with "UAS Flight Plan was reloaded", and because nothing is ever
+        // sampled the ground reads as "unknown until DTED2 covers it" on a phone that
+        // has DTED2. Two misleading messages, one missing call.
+        planOverlay.start();
+        planObstacles.start();
         final View root = PluginLayoutInflater.inflate(pluginContext,
                 R.layout.plan_main, null);
         planPane = new com.atakmap.android.airaware.plan.PlanPane(root, pluginContext,
