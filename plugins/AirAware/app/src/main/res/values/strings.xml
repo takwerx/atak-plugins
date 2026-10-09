@@ -3,7 +3,7 @@
     <!-- App -->
     <string name="app_name">AirAware</string>
     <!-- description -->
-    <string name="app_desc">Airspace awareness: restrictions, airspace classes, special use, UAS ceilings, obstacles and airfield conditions, with a UAS flight planner</string>
+    <string name="app_desc">Airspace awareness: restrictions, NOTAMs, airspace classes, special use, UAS ceilings, obstacles and airfield conditions, with a UAS flight planner</string>
 
     <string name="state_on_label">ON</string>
     <string name="state_off_label">OFF</string>

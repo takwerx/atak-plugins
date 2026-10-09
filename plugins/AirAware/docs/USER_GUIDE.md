@@ -1,17 +1,17 @@
 # AirAware for ATAK — User Guide
 
-**Version 0.4 · takwerx**
+**Version 0.5 · takwerx**
 
-**Download AirAware 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download AirAware 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.5/ATAK-Plugin-AirAware-0.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.5/ATAK-Plugin-AirAware-0.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.5/ATAK-Plugin-AirAware-0.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/air-aware/releases
 
 AirAware answers one question for anyone working under or in the air: **what is
-in the column of air I am in, and what am I allowed to do here.** Six layers
+in the column of air I am in, and what am I allowed to do here.** Seven layers
 draw on the map, each switched on its own, and a UAS flight planner works out
 the ceiling a mission area needs.
 
@@ -148,6 +148,46 @@ The shape sits on the map over the restriction it came from.
 still matches a live restriction, with a way to remove one that does not.
 
 ---
+
+## NOTAMs
+
+What is going on in the air right now that no chart shows: drone operations,
+parachute drops, towers with their lights out, cranes, closed runways.
+
+![The NOTAM row open: Kinds, Show at and the key](screenshots/40_notam_row.png)
+
+A takwerx relay reads the FAA NOTAM Management Service every three minutes and
+publishes the picture as tiles; the phone reads the tiles and never holds an
+FAA credential. The row says how many NOTAMs are drawn and how old the FAA
+picture is. If no newer picture has reached the phone, it says so in words.
+
+**Kinds** sorts them the way the FAA does, by the first word of the notice:
+
+- **Airspace** (orange): drone activity, parachute jumping, rockets, fireworks,
+  aerobatics, airdrops, blasting, lasers, balloons, gliders, special use areas
+  going active.
+- **Obstacles** (amber): towers with their lights out, cranes, new structures
+  not yet charted. The label says what it is, what is wrong with it and how
+  tall it is: "Tower lights out 303'".
+- **Airfields** (blue): runways and taxiways closed, lighting, services.
+- **Navigation** (gray-blue, off by default): airways, approaches,
+  departures, navaids. For pilots flying procedures.
+- **Other** (off by default): whatever fits none of those.
+
+Where the FAA gives an area, in its geometry or in its text ("3.4NM RADIUS OF
+293012N0951234W", or a list of corners), the plugin draws it. Otherwise a
+NOTAM is a glyph at its point. A NOTAM that has not started yet is drawn at
+half strength.
+
+![A NOTAM's details page](screenshots/41_notam_details.png)
+
+Tap one for its page: the text as the FAA issued it, when it started and ends,
+its altitudes, the kind, and the airport or center it was filed under. Nothing
+is paraphrased; the abbreviations are the language pilots read.
+
+> A NOTAM is a notice, not a restriction. A drone-activity NOTAM tells pilots
+> to expect drones; it does not close the airspace. Restrictions are the TFR
+> layer. Always check the official NOTAM search before a flight.
 
 ## Airspace
 

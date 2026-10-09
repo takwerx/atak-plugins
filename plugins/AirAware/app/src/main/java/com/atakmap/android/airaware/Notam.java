@@ -92,7 +92,9 @@ public final class Notam {
             return null;
         final double lat = o.optDouble("lat", Double.NaN);
         final double lon = o.optDouble("lon", Double.NaN);
-        if (Double.isNaN(lat) || Double.isNaN(lon))
+        // Finite and on the globe, or the record is dropped: a NaN or an infinity
+        // handed to the native feature store is a crash, not a bad drawing.
+        if (!finite(lat, 90d) || !finite(lon, 180d))
             return null;
         final List<double[][]> rings = new ArrayList<>();
         final JSONArray p = o.optJSONArray("p");
@@ -109,7 +111,13 @@ public final class Notam {
                         ok = false;
                         break;
                     }
-                    pts[j] = new double[] { c.optDouble(0), c.optDouble(1) };
+                    final double x = c.optDouble(0, Double.NaN);
+                    final double y = c.optDouble(1, Double.NaN);
+                    if (!finite(x, 180d) || !finite(y, 90d)) {
+                        ok = false;
+                        break;
+                    }
+                    pts[j] = new double[] { x, y };
                 }
                 if (ok)
                     rings.add(pts);
@@ -124,7 +132,18 @@ public final class Notam {
                 o.optString("up", ""), o.optString("u", ""),
                 parseTime(o.optString("s", "")), end.isEmpty() ? Long.MAX_VALUE : parseTime(end),
                 "true".equalsIgnoreCase(o.optString("est", "")), lat, lon,
-                Math.max(0d, o.optDouble("r", 0d)), rings);
+                radius(o.optDouble("r", 0d)), rings);
+    }
+
+    private static boolean finite(double v, double limit) {
+        return !Double.isNaN(v) && !Double.isInfinite(v) && Math.abs(v) <= limit;
+    }
+
+    /** A circle's radius, or 0: never negative, never infinite, never wider than a state. */
+    private static double radius(double r) {
+        if (Double.isNaN(r) || Double.isInfinite(r) || r <= 0d)
+            return 0d;
+        return Math.min(r, 500_000d);
     }
 
     /** An FAA time ("2026-10-09T13:59:00Z", with or without millis), PERM, or nothing. */

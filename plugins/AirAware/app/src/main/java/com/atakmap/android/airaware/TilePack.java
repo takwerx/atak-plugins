@@ -119,7 +119,7 @@ public final class TilePack {
         final Index index = new Index();
         index.cycle = root.optString("cycle", "");
         index.built = root.optString("built", "");
-        index.tileDegrees = Math.max(1, root.optInt("tile_degrees", 2));
+        index.tileDegrees = Math.min(10, Math.max(1, root.optInt("tile_degrees", 2)));
         index.credit = root.optString("credit", "");
         final JSONObject tiles = root.optJSONObject("tiles");
         if (tiles != null) {
@@ -271,6 +271,9 @@ public final class TilePack {
         }
     }
 
+    /** The most a tile may inflate to. The largest real one is under 2 MB. */
+    private static final int MAX_INFLATED = 48 * 1024 * 1024;
+
     private static byte[] gunzip(byte[] gz) throws IOException {
         final ByteArrayOutputStream out = new ByteArrayOutputStream(
                 Math.max(64 * 1024, gz.length * 4));
@@ -279,8 +282,11 @@ public final class TilePack {
             in = new GZIPInputStream(new java.io.ByteArrayInputStream(gz));
             final byte[] buf = new byte[32 * 1024];
             int n;
-            while ((n = in.read(buf)) > 0)
+            while ((n = in.read(buf)) > 0) {
                 out.write(buf, 0, n);
+                if (out.size() > MAX_INFLATED)
+                    throw new IOException("tile inflates past " + MAX_INFLATED + " bytes");
+            }
         } finally {
             if (in != null) {
                 try {

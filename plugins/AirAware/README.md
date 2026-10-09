@@ -1,10 +1,10 @@
 ATAK Plugin — AirAware
 
-**Download AirAware 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download AirAware 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.5/ATAK-Plugin-AirAware-0.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.5/ATAK-Plugin-AirAware-0.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.5/ATAK-Plugin-AirAware-0.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/air-aware/releases
 
@@ -19,11 +19,19 @@ in the column of air I am in, and what am I allowed to do here. It is built for
 wildfire aviation and UAS crews and draws everything on the operator's own
 device, with no TAK Server and no Data Sync mission in the path.
 
-Six layers, each switched on its own from the front page:
+Seven layers, each switched on its own from the front page:
 
   TFR                 FAA Temporary Flight Restrictions, drawn as 3D volumes
                       from the published floor to the published ceiling, red
                       when in effect and amber when scheduled.
+
+  NOTAMs              What is going on in the air right now that no chart
+                      shows: drone operations, parachute drops, towers with
+                      their lights out, cranes, closed runways. Read every
+                      three minutes from the FAA NOTAM Management Service by
+                      a takwerx relay and published as tiles; the phone never
+                      holds an FAA credential. Colored by kind, with the FAA
+                      text as issued on the details page.
 
   Airspace            Class A through G, one shelf per published step, so the
                       upside-down wedding cake over a Class B airport is drawn

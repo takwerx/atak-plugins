@@ -287,8 +287,27 @@ public class AirAware implements IPlugin {
             Log.w(TAG, "no radial menu receiver; taps keep ATAK's own menu");
     }
 
+    /**
+     * Take ATAK's own selection off the map: the focus and the callout it pins to the
+     * top ("UAS / N 34.02639 W 118.48278 / 117 ft MSL"). A pick from ATAK's Select Item
+     * list selects the item itself, before our page opens, and answering the menu
+     * question does not reach that path -- so the callout sat there after Back
+     * (operator, 2026-10-09). These two are what ATAK's own list items send.
+     */
+    public static void clearAtakSelection() {
+        try {
+            AtakBroadcast.getInstance().sendBroadcast(
+                    new Intent("com.atakmap.android.maps.UNFOCUS"));
+            AtakBroadcast.getInstance().sendBroadcast(
+                    new Intent("com.atakmap.android.maps.HIDE_DETAILS"));
+        } catch (RuntimeException e) {
+            Log.d(TAG, "could not clear ATAK's selection: " + e);
+        }
+    }
+
     /** Whatever the tapped item is, on AirAware's own page. */
     private void openFor(MapItem item) {
+        clearAtakSelection();
         try {
             final String notam = item.getMetaString("tfr_notam_id", null);
             if (notam != null) {

@@ -197,6 +197,8 @@ public class TfrPane implements TfrManager.Listener {
         detailsBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                // Back takes ATAK's pinned callout with it, whichever way the item was picked.
+                com.atakmap.android.airaware.plugin.AirAware.clearAtakSelection();
                 showList();
             }
         });
