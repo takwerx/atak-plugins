@@ -1,6 +1,6 @@
 ---
 name: plugin-ui
-description: The takwerx pane standard every ATAK plugin follows - main screen (map switch | Settings | Notify, list right under), a Settings page of drop-down rows, ON/OFF switches that show state, the zoom gate on ATAK's live scale bar, Area and Where filters, a list that follows the map and shares one rule with it, the map key and the status line that says what is not shown. The baseline a NEW plugin starts from: load it when writing a new plugin's PLAN and building its pane. Existing plugins keep what they have unless the operator asks to change them.
+description: The takwerx pane standard every ATAK plugin follows - main screen (map switch | Settings | Notify, list right under), a Settings page of drop-down rows, ON/OFF switches that show state, the zoom gate on ATAK's live scale bar, Area and Where filters, a list that follows the map and shares one rule with it, the map key, the status line that says what is not shown, and what a tap on the map opens (pane or radial). The baseline a NEW plugin starts from: load it when writing a new plugin's PLAN and building its pane. Existing plugins keep what they have unless the operator asks to change them.
 ---
 
 # The takwerx pane
@@ -517,11 +517,50 @@ switches and gates above to behave. Full machinery:
   version whenever the look changes, because styles are stored with the features.
 - Flatten nested geometry collections before inserting them.
 - A tap: `FeatureDataStoreDeepMapItemQuery` that fetches attributes by id (the
-  hit-test drops them), dedupes hits, and sets the radial menu.
+  hit-test drops them), dedupes hits, marks the item as ours, and sets a radial
+  menu as the fallback. What the tap opens is the next section.
 - **Off hides, never deletes.** Every fetched feature is written; a switched-off
   layer or kind is a hidden set (`setFeatureSetVisible` on the `visibleOnly`
   layer), so it comes back after a restart with no network, the list and details
   with it. CLAUDE.md, "Downloaded data survives a restart with no network".
+
+### A tap: straight to the pane, or a radial
+
+**Ask the operator, per kind of thing on the map, in the PLAN.** Propose this
+default:
+
+- **Things you tap to read open the plugin's own page in the pane, no radial.**
+  Alerts, zones, fires, airspace, forecasts, stations. On these the radial's only
+  useful button was Details, so it was a step in the way (operator, 2026-10-09:
+  *"when you click an item it opens right to the side pane, removes the radial
+  menu and then having to click on details"*). Atmosphere, Feature Layer's fires,
+  AirAware and IPAWS work this way.
+- **Things you act on keep a radial.** A launch point or area the operator
+  placed, a track they cut or join, a person or a site a crew drives to. The
+  radial is where Bloodhound, range and bearing, a marker here, edit and delete
+  live, and Details is one of its buttons.
+
+When it is unclear, propose the pane and say what the radial would have given.
+The operator on Atmosphere: *"if i wanted to i could just use bloodhound and
+click on it."*
+
+How (AirAware `registerTap` / `openFor`, Atmosphere `tapOpensPage`):
+
+- Register a `com.atakmap.android.menu.MapMenuEventListener` on
+  `MapMenuReceiver.getInstance()` in `onStart`, and remove it in `onStop`. ATAK
+  asks it before it opens a radial; answering `true` stops the radial **and**
+  tells ATAK the tap was handled. Listening for `ITEM_CLICK` with a blank menu
+  instead left ATAK's callout pinned to the map after Back (AirAware).
+- Claim only your own items: mark them in `featureToMapItem` (a meta value
+  such as `ipaws_overlay`) and return `false` for everything else, so other
+  plugins' items keep their radials.
+- Open the page from `postDelayed(..., 250)`, not inline. A pick from ATAK's
+  Select Item list posts its own show-details right after, and that closes a
+  page opened inline.
+- Keep the item's radial menu set. It is the fallback when there is no
+  `MapMenuReceiver`, so a tap still reaches the page in two steps.
+- Go through the same receiver the radial's Details used, so the list, the
+  radial and a tap all reach one page.
 
 ---
 
@@ -555,6 +594,8 @@ Then look at the screen and ask:
    it is hiding things?
 5. Do the list, the map and the map key show the same things?
 6. Could a firefighter read every word on it without asking what it means?
+7. Does a tap on each kind of thing on the map do what the PLAN says, pane or
+   radial, and does Back leave nothing behind on the map?
 
 ---
 
@@ -576,4 +617,5 @@ Then look at the screen and ask:
 | Status line | IPAWS `AlertManager.statusLine()`; Traffic `incidentsLine()` |
 | Notifications | IPAWS `postNotification()`, `announce()` |
 | Feature layer | IPAWS `AlertOverlay`; Atmosphere `AtmosphereFeatures` |
+| A tap opens the pane, no radial | AirAware `registerTap`, `openFor`; Atmosphere `tapOpensPage` |
 | Wide pane | IAP `IapDropDown`; Atmosphere `AtmosphereDropDown` |

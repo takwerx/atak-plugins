@@ -93,6 +93,11 @@ carries here, and fill what is already known from the operator's description:
   Settings row as `Name: value`, the zoom gate's default, Area and Where (or
   "not applicable"), and the status-line reasons. The operator should not have
   to describe the takwerx pane again; propose it and let them change it.
+- **Taps on the map** — list every kind of thing the plugin puts on the map and
+  ask the operator, for each: straight to the pane, or a radial? Propose
+  `plugin-ui`'s default (things you read open the pane; things you act on,
+  navigate to, edit or delete keep a radial) and put the question under Open
+  questions until they answer.
 - Open questions for the operator
 
 Add it by name (`git add <file>`, never `git add -A` in the notes repo).
