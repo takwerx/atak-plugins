@@ -19,9 +19,9 @@ import java.util.Locale;
  *
  * <p>There used to be two. Tapping a polygon on the map got ATAK's built-in feature
  * metadata -- no Back, and nothing like ours -- while the list got this. Two screens
- * for the same thing, and only one of them had a way out. The map now carries our own
- * radial menu, both routes call {@link #show}, and {@link #render} is the single thing
- * that turns an alert into text, so a row and the radial cannot drift apart.
+ * for the same thing, and only one of them had a way out. A tap on the map now opens
+ * this page directly, both routes call {@link #show}, and {@link #render} is the single
+ * thing that turns an alert into text, so a row and the map cannot drift apart.
  *
  * <p>Feature Layer's frame, deliberately: Back pinned top-left so it stays reachable
  * while the metadata scrolls, the alert's name beside it, what it came from underneath,

@@ -13,7 +13,9 @@ import com.atakmap.coremap.log.Log;
 /**
  * Tapping an alert on the map, into the same page the list opens.
  *
- * <p>The radial menu's details button broadcasts here with the map item's uid. The
+ * <p>A tap on an alert's area broadcasts here with the alert's id (the plugin's menu
+ * listener), and the radial's details button, kept as the fallback, with the map
+ * item's uid. The
  * item carries the alert's own id, put there when the feature was turned into a map
  * item, so the alert is found in the manager's current set rather than rebuilt from
  * the feature's attributes.
