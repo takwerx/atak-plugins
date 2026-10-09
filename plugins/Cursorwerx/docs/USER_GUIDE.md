@@ -1,12 +1,12 @@
 # Cursorwerx for ATAK — User Guide
 
-**Version 0.2 · takwerx**
+**Version 0.3 · takwerx**
 
-**Download Cursorwerx 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cursorwerx 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cursorwerx/releases/download/v0.2/ATAK-Plugin-Cursorwerx-0.2--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cursorwerx/releases/download/v0.3/ATAK-Plugin-Cursorwerx-0.3--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cursorwerx/releases/download/v0.3/ATAK-Plugin-Cursorwerx-0.3--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cursorwerx/releases/download/v0.3/ATAK-Plugin-Cursorwerx-0.3--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cursorwerx/releases
 
@@ -42,7 +42,8 @@ used with a finger.
 
 - **The wheel scrolls the pane or list under the cursor**, and never zooms the
   map behind it. That includes the toolbar overflow, Overlay Manager, the
-  settings pages and every plugin pane.
+  settings pages and every plugin pane. On ATAK's main screen a trackpad
+  swipe moves a list about a page, and a mouse click about a row.
 - **Back:** the ‹ button on the left edge of the screen, or the Escape key on
   the keyboard, closes what a phone's Back button would close.
 - **Text fields take the click.** Click into any field, in ATAK's own settings
