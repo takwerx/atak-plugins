@@ -1775,12 +1775,46 @@ public class TfrManager {
             }
         });
         uasfmCapped = inView.size() > MAX_UASFM_CELLS;
-        uasfm = Collections.unmodifiableList(new ArrayList<>(
-                inView.subList(0, Math.min(MAX_UASFM_CELLS, inView.size()))));
+        final List<UasfmCell> kept = new ArrayList<>(
+                inView.subList(0, Math.min(MAX_UASFM_CELLS, inView.size())));
+        uasfm = Collections.unmodifiableList(joinRuns(kept));
         uasfmBox = want2;
         Log.d(TAG, "UAS ceilings: drawing " + uasfm.size());
         rewriteOverlay();
         post();
+    }
+
+    /**
+     * Join neighbouring squares that give the same answer into runs.
+     *
+     * <p>The grid comes in large uniform blocks, so this is most of them: a band forty
+     * cells wide becomes one shape. The store rewrite is what made zooming stutter and
+     * it costs per feature, so this is the difference between redrawing 1,500 things and
+     * redrawing a couple of hundred. A run says exactly what its cells said; the only
+     * thing lost is the lines between them, which were never a rule.
+     */
+    private static List<UasfmCell> joinRuns(List<UasfmCell> cells) {
+        final List<UasfmCell> sorted = new ArrayList<>(cells);
+        Collections.sort(sorted, new java.util.Comparator<UasfmCell>() {
+            @Override
+            public int compare(UasfmCell a, UasfmCell b) {
+                if (a.latIndex != b.latIndex)
+                    return Integer.compare(a.latIndex, b.latIndex);
+                return Integer.compare(a.lonIndex, b.lonIndex);
+            }
+        });
+        final List<UasfmCell> runs = new ArrayList<>();
+        UasfmCell run = null;
+        for (UasfmCell c : sorted) {
+            if (run != null && run.joins(c)) {
+                run.span++;
+                continue;
+            }
+            run = new UasfmCell(c.latIndex, c.lonIndex, c.ceilingFt, c.airportId,
+                    c.airportName, c.laanc);
+            runs.add(run);
+        }
+        return runs;
     }
 
     /** The cell the operator is standing in, or null. */
@@ -1790,6 +1824,7 @@ public class TfrManager {
         final GeoPoint me = mapView.getSelfMarker().getPoint();
         if (me == null)
             return null;
+        // uasfmAll holds single cells, never runs, so this is an exact answer.
         for (UasfmCell c : uasfmAll)
             if (c.contains(me.getLatitude(), me.getLongitude()))
                 return c;

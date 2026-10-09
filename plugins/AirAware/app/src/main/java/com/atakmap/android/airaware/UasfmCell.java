@@ -19,12 +19,31 @@ public final class UasfmCell {
 
     public final int latIndex;
     public final int lonIndex;
+    /**
+     * How many cells wide this is, east from {@link #lonIndex}.
+     *
+     * <p>Normally one. Neighbouring cells that share a ceiling and an airport are joined
+     * into a run before they are drawn: the grid comes in big uniform blocks, so 1,500
+     * squares collapse to a fraction of that, and the store rewrite -- which was the
+     * thing making a zoom stutter -- shrinks with it. A run says exactly what its cells
+     * said, so nothing is lost but the internal lines.
+     */
+    public int span = 1;
     public final int ceilingFt;
     /** The airport whose airspace this cell belongs to, e.g. "ONT". */
     public final String airportId;
     public final String airportName;
     /** True when LAANC covers this airport: file in an app, rather than by request. */
     public final boolean laanc;
+
+    /** Whether another cell continues this one eastward with the same answer. */
+    public boolean joins(UasfmCell next) {
+        return next != null && next.latIndex == latIndex
+                && next.lonIndex == lonIndex + span
+                && next.ceilingFt == ceilingFt
+                && next.airportId.equals(airportId)
+                && next.laanc == laanc;
+    }
 
     public UasfmCell(int latIndex, int lonIndex, int ceilingFt, String airportId,
             String airportName, boolean laanc) {
@@ -49,7 +68,7 @@ public final class UasfmCell {
     }
 
     public double east() {
-        return (lonIndex + 1) / (double) PER_DEGREE;
+        return (lonIndex + span) / (double) PER_DEGREE;
     }
 
     public boolean contains(double lat, double lon) {
