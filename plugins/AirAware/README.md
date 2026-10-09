@@ -1,10 +1,10 @@
 ATAK Plugin — AirAware
 
-**Download AirAware 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download AirAware 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.3/ATAK-Plugin-AirAware-0.3--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.3/ATAK-Plugin-AirAware-0.3--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.3/ATAK-Plugin-AirAware-0.3--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.4/ATAK-Plugin-AirAware-0.4--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/air-aware/releases
 
@@ -62,7 +62,12 @@ hides it and never deletes it.
 _________________________________________________________________
 STATUS
 
-Version 0.3. First release, for ATAK-CIV 5.6.0, 5.7.0 and 5.8.0.
+Version 0.4, for ATAK-CIV 5.6.0, 5.7.0 and 5.8.0. A new icon, and a geofence
+made from a restriction is now drawn where it alerts: from the ground up to the
+published ceiling. Before, the 3D shape stood on sea level, so over high ground
+it was drawn inside the hill even though the alert itself was right.
+
+Version 0.3 was the first release.
 
 _________________________________________________________________
 POINT OF CONTACTS

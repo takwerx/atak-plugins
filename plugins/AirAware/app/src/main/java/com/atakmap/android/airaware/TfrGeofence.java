@@ -63,22 +63,7 @@ public final class TfrGeofence {
                     UUID.randomUUID().toString());
 
             final double floorM = withAltitude ? meters(a.floor) : Double.NaN;
-            final List<GeoPointMetaData> pts = new ArrayList<>(a.ring.size());
-            for (double[] p : a.ring) {
-                if (Double.isNaN(floorM)) {
-                    pts.add(GeoPointMetaData.wrap(new GeoPoint(p[0], p[1])));
-                } else {
-                    // USER as the altitude source, or ATAK fills the altitude in from the
-                    // terrain model and the fence is built on the ground under the ring
-                    // instead of the published floor. Measured: a surface-to-7,500 ft MSL
-                    // restriction came out as a fence from 3,027 to 10,527 ft, the right
-                    // thickness in the wrong place, because the centroid sits on a
-                    // 3,000 ft ridge.
-                    pts.add(GeoPointMetaData.wrap(new GeoPoint(p[0], p[1], floorM),
-                            GeoPointMetaData.USER, GeoPointMetaData.USER));
-                }
-            }
-            shape.setPoints(pts, new SparseArray<PointMapItem>());
+            shape.setPoints(ring(a, floorM), new SparseArray<PointMapItem>());
             shape.setClosed(true);
             shape.setTitle(title(t, a));
             // A fence must not look like the restriction it was cut from. Both are rings
@@ -124,6 +109,21 @@ public final class TfrGeofence {
                     shape.setHeightStyle(Polyline.HEIGHT_STYLE_POLYGON
                             | Polyline.HEIGHT_STYLE_OUTLINE);
                 }
+                // Then draw it where it alerts. The renderer is not the fence: an
+                // Absolute shape stands on its points' own altitudes, HAE, and rises
+                // getHeight() from the lowest of them. The points still carried the
+                // floor read as an altitude -- 0 for a surface floor -- so the drawn
+                // wall stood on the ellipsoid while the fence stood on the ground. Near
+                // the coast that is a few tens of feet nobody would see; over a 3,000 ft
+                // ridge the drawn box tops out about 3,000 ft under the ceiling it alerts
+                // at, mostly inside the hill. Standing the ring on the fence's own base
+                // puts the drawn top on the published ceiling, the same as the alert.
+                final double baseHae = haeOf(shape, baseMsl);
+                if (!Double.isNaN(baseHae))
+                    shape.setPoints(ring(a, baseHae), new SparseArray<PointMapItem>());
+                Log.i(TAG, "geofence " + t.notamId + ": base " + Math.round(baseMsl)
+                        + " m MSL, top " + Math.round(baseMsl + wall) + " m MSL, drawn from "
+                        + Math.round(baseHae) + " m HAE");
             } else {
                 // No altitude: keep it on the ground, or a shape carrying altitudes with no
                 // height sinks under terrain and vanishes as you zoom in.
@@ -171,6 +171,39 @@ public final class TfrGeofence {
             Log.w(TAG, "could not read the shape's base altitude", e);
         }
         return 0d;
+    }
+
+    /** {@code msl} at the shape's own center, as the ellipsoid height the renderer reads. */
+    private static double haeOf(DrawingShape shape, double msl) {
+        try {
+            final GeoPointMetaData c = shape.getCenter();
+            if (c != null && c.get() != null)
+                return com.atakmap.coremap.maps.conversion.EGM96.getHAE(
+                        c.get().getLatitude(), c.get().getLongitude(), msl);
+        } catch (Exception e) {
+            Log.w(TAG, "could not convert the shape's base altitude", e);
+        }
+        return Double.NaN;
+    }
+
+    /** The area's ring, flat at {@code hae}, or with no altitude at all when it is NaN. */
+    private static List<GeoPointMetaData> ring(TfrArea a, double hae) {
+        final List<GeoPointMetaData> pts = new ArrayList<>(a.ring.size());
+        for (double[] p : a.ring) {
+            if (Double.isNaN(hae)) {
+                pts.add(GeoPointMetaData.wrap(new GeoPoint(p[0], p[1])));
+            } else {
+                // USER as the altitude source, or ATAK fills the altitude in from the
+                // terrain model and the fence is built on the ground under the ring
+                // instead of the published floor. Measured: a surface-to-7,500 ft MSL
+                // restriction came out as a fence from 3,027 to 10,527 ft, the right
+                // thickness in the wrong place, because the centroid sits on a
+                // 3,000 ft ridge.
+                pts.add(GeoPointMetaData.wrap(new GeoPoint(p[0], p[1], hae),
+                        GeoPointMetaData.USER, GeoPointMetaData.USER));
+            }
+        }
+        return pts;
     }
 
     private static double meters(TfrArea.Vert v) {
