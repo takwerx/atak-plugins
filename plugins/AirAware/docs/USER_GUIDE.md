@@ -1,10 +1,12 @@
 # AirAware for ATAK — User Guide
 
-**Version 0.1 · takwerx**
+**Version 0.2 · takwerx**
 
-**Download AirAware 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download AirAware 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.1/ATAK-Plugin-AirAware-0.1--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.2/ATAK-Plugin-AirAware-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.2/ATAK-Plugin-AirAware-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.2/ATAK-Plugin-AirAware-0.2--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/air-aware/releases
 
@@ -21,8 +23,8 @@ phone.
 
 ## Before you start
 
-- **ATAK versions.** Version 0.1 is published for ATAK-CIV 5.8. A plugin built
-  for another ATAK version will not load.
+- **ATAK versions.** Version 0.2 is published for ATAK-CIV 5.6, 5.7 and 5.8.
+  A plugin built for another ATAK version will not load.
 - **Everything here is advisory.** AirAware is not a substitute for current
   charts and NOTAMs, and it is not a clearance. Check the official source
   before you fly.
