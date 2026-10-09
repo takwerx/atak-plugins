@@ -1737,12 +1737,31 @@ public class TfrManager {
             if (c.north() < want2[0] || c.south() > want2[2]
                     || c.east() < want2[1] || c.west() > want2[3])
                 continue;
-            if (inView.size() >= MAX_UASFM_CELLS)
-                break;
             inView.add(c);
         }
-        uasfmCapped = inView.size() >= MAX_UASFM_CELLS;
-        uasfm = Collections.unmodifiableList(inView);
+        // Nearest the middle of the view first, then cap. Taking the first N as they
+        // came out of the tiles drew solid blocks with whole neighbourhoods missing
+        // between them -- the same mistake the obstacles made, and worse here because a
+        // missing grid square reads as "no rule applies", which is the opposite of what
+        // a gap means.
+        final double midLat = (south + north) / 2d;
+        final double midLon = (west + east) / 2d;
+        final double lonScale = Math.cos(Math.toRadians(midLat));
+        Collections.sort(inView, new java.util.Comparator<UasfmCell>() {
+            @Override
+            public int compare(UasfmCell x, UasfmCell y) {
+                return Double.compare(distanceSq(x), distanceSq(y));
+            }
+
+            private double distanceSq(UasfmCell c) {
+                final double dy = (c.south() + c.north()) / 2d - midLat;
+                final double dx = ((c.west() + c.east()) / 2d - midLon) * lonScale;
+                return dy * dy + dx * dx;
+            }
+        });
+        uasfmCapped = inView.size() > MAX_UASFM_CELLS;
+        uasfm = Collections.unmodifiableList(new ArrayList<>(
+                inView.subList(0, Math.min(MAX_UASFM_CELLS, inView.size()))));
         uasfmBox = want2;
         Log.d(TAG, "UAS ceilings: drawing " + uasfm.size());
         rewriteOverlay();

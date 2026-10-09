@@ -928,7 +928,11 @@ public class TfrPane implements TfrManager.Listener {
         final int n = manager.uasfmDrawn().size();
         if (n == 0)
             return "No UAS grid here - outside controlled airspace";
-        return n + " squares" + (manager.isUasfmCapped() ? " (zoom in for the rest)" : "");
+        // The cap is worth spelling out: a square that is not drawn is not a square
+        // with no rule, and a half-drawn grid invites exactly that reading.
+        return manager.isUasfmCapped()
+                ? "Nearest " + n + " squares shown - zoom in for the rest"
+                : n + " squares";
     }
 
     /** What belongs to the UAS ceilings and nothing else. */
