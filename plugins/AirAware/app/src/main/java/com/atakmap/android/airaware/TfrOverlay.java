@@ -53,6 +53,16 @@ import java.util.concurrent.ThreadFactory;
 public class TfrOverlay {
 
     private static final String TAG = "TfrOverlay";
+
+    /**
+     * Past this the store is thrown away at attach and rebuilt from the tiles. A
+     * healthy store is about 10 MB: roughly 5 MB of that is Spatialite's own
+     * spatial_ref_sys table, which is a fixed floor, and the rest is the few
+     * hundred features actually on the map.
+     */
+    private static final long MAX_STORE_BYTES = 64L * 1024L * 1024L;
+
+    private volatile boolean storeWasReset;
     private static final String PROVIDER = "TFR";
     /** Appended to a type's key for the set holding that type's labels. */
     /**
@@ -159,6 +169,7 @@ public class TfrOverlay {
             File parent = storeFile.getParentFile();
             if (parent != null && !parent.isDirectory() && !parent.mkdirs())
                 Log.w(TAG, "could not make the store directory");
+            dropOversizedStore();
             store = new FeatureSetDatabase2(storeFile);
             // Visible features only. With the plain constructor the renderer keeps
             // drawing the labels of sets the operator switched off, over an empty map.
@@ -289,6 +300,51 @@ public class TfrOverlay {
             count = countFeatures();
             Log.d(TAG, "attached with " + count + " areas from the last session");
         }
+    }
+
+    /**
+     * The store is derived data, so when it has grown out of hand it is thrown away and
+     * rebuilt from the tiles on disk.
+     *
+     * <p>It grows because deleting a feature set does not take its attribute and style
+     * rows with it. Measured on a phone after a day: 2,434 live features against 31,738
+     * attribute rows, 29,304 of them orphaned, in a 33 MB file; another phone running
+     * longer reached 346 MB for the same few hundred features. Nothing the plugin can
+     * delete through the store API reaches those rows.
+     *
+     * <p>Throwing the file away is safe because the durable copy is the tile cache
+     * beside it: airspace, obstacles and UAS ceilings are all read from disk, so the
+     * picture comes back with no network. Tested on 2026-10-08 with the file deleted and
+     * both radios off: 804 features rebuilt from the tiles.
+     *
+     * <p>At attach, before the store is opened, because a live store must never be
+     * disposed: a query already running on the renderer's thread would call into a
+     * closed store and JNI aborts ATAK.
+     */
+    private void dropOversizedStore() {
+        try {
+            final long bytes = storeFile.length();
+            if (bytes <= MAX_STORE_BYTES)
+                return;
+            Log.w(TAG, "store is " + (bytes / 1048576L) + " MB, over the "
+                    + (MAX_STORE_BYTES / 1048576L) + " MB limit; rebuilding it from the"
+                    + " tiles on disk");
+            // The journal and WAL go with it, or SQLite rolls the old pages back in.
+            for (String suffix : new String[] { "", "-journal", "-wal", "-shm" }) {
+                final File f = new File(storeFile.getPath() + suffix);
+                if (f.exists() && !f.delete())
+                    Log.w(TAG, "could not delete " + f.getName());
+            }
+            storeWasReset = !storeFile.exists();
+        } catch (Exception e) {
+            // A store that is too big still works. Never fail to start over this.
+            Log.w(TAG, "could not size the store", e);
+        }
+    }
+
+    /** Whether attach threw the store away, so the caller knows to force a load. */
+    public boolean storeWasReset() {
+        return storeWasReset;
     }
 
     public void detach() {

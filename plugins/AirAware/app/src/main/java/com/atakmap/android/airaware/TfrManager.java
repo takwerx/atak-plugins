@@ -323,6 +323,9 @@ public class TfrManager {
         started = true;
         try {
             overlay.attach(isAnyLayerOn() && !gateHiding, hiddenSets());
+            if (overlay.storeWasReset())
+                Log.i(TAG, "the feature store was rebuilt; the first pass reads the"
+                        + " tiles already on disk, so this works with no network");
         } catch (Exception e) {
             Log.w(TAG, "attaching the overlay failed", e);
         }
@@ -331,12 +334,31 @@ public class TfrManager {
         // Airspace rode entirely on the map moving, so after a plugin reload the map had
         // restrictions and no airspace until the operator happened to pan -- which is
         // exactly how it looked to them, as 3D not working. The tiles are on disk, so
-        // this is a file read, not a download. A moment's delay so the map has bounds.
+        // this is a file read, not a download.
+        //
+        // Retried rather than tried once at 1500 ms. maybeFetchAirspace gives up without
+        // a word when the map has no bounds yet, and on a cold start it does not: the one
+        // attempt landed too early and nothing loaded until the operator panned. That was
+        // invisible while the store still held last session's features and ATAK drew them
+        // from disk, and it stops being invisible the moment the store is rebuilt.
         main.postDelayed(new Runnable() {
+            private int tries = 0;
+
             @Override
             public void run() {
-                if (started)
+                if (!started)
+                    return;
+                final GeoBounds b = mapView.getBounds();
+                final boolean ready = b != null && !Double.isNaN(b.getNorth())
+                        && !Double.isNaN(b.getSouth());
+                if (ready) {
                     maybeFetchAirspace();
+                    return;
+                }
+                if (++tries < 20)
+                    main.postDelayed(this, 500L);
+                else
+                    Log.w(TAG, "the map never reported bounds; waiting for a pan");
             }
         }, 1500L);
         // The store is a file, so last session's areas are already on the map. Read them
