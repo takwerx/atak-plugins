@@ -50,6 +50,10 @@
     <string name="home_forests_blocked">Offline Public Land Vector Tiles is not available on ATAK %1$s: ATAK does not start with these maps installed. Update ATAK to %2$s or newer to use them.</string>
     <string name="nifc_heading">Incident Maps (NIFC)</string>
     <string name="uaswfc_heading">Drone IR Maps (UASWFC)</string>
+    <string name="storms_heading">Disaster Aerials (NOAA)</string>
+    <string name="choose_storm">Event</string>
+    <string name="search_flights">Search</string>
+    <string name="no_storms">No disaster aerials in the catalog yet.</string>
     <string name="beacon_heading">Beacon Box Maps</string>
     <string name="download">Download</string>
     <string name="outlines_on">Outlines on</string>

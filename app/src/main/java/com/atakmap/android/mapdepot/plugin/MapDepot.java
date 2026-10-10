@@ -134,8 +134,17 @@ public class MapDepot implements IPlugin {
      * mode says which list it is showing.
      */
     private enum PackageMode {
-        FORESTS, RECMAPS
+        FORESTS, RECMAPS, STORMS
     }
+
+    /** NOAA post-disaster imagery, newest event first; see {@link Depot.Storm}. */
+    private final List<Depot.Storm> allStorms = new ArrayList<>();
+
+    /** Index into {@link #allStorms} of the event whose flights are listed. */
+    private int stormIndex;
+
+    /** When the depot built the storms section, so the list can say how fresh "newest flight" is. */
+    private String stormsBuiltAt = "";
 
     private PackageMode packageMode = PackageMode.FORESTS;
 
@@ -626,9 +635,20 @@ public class MapDepot implements IPlugin {
         seriesButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                chooseSeries();
+                if (packageMode == PackageMode.STORMS)
+                    chooseStorm();
+                else
+                    chooseSeries();
             }
         });
+
+        root.findViewById(R.id.btn_storms).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        showPackages(PackageMode.STORMS);
+                    }
+                });
         nearButton = root.findViewById(R.id.near_anchor);
         nearButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -687,6 +707,16 @@ public class MapDepot implements IPlugin {
                             @Override
                             public void onGoing(Depot.Package p) {
                                 forestStatus.setText("Going to " + p.name());
+                                // The map has moved, so "nearest" has too.
+                                // Rebuilt after the fit has settled rather
+                                // than mid-flight, and on the UI thread.
+                                forestStatus.postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        if (forestView.getVisibility() == View.VISIBLE)
+                                            applyForestFilter();
+                                    }
+                                }, 1500L);
                             }
 
                             @Override
@@ -916,6 +946,10 @@ public class MapDepot implements IPlugin {
     private List<? extends Depot.Package> sourceList() {
         if (packageMode == PackageMode.FORESTS)
             return allForests;
+        if (packageMode == PackageMode.STORMS)
+            return stormIndex < allStorms.size()
+                    ? allStorms.get(stormIndex).flights
+                    : java.util.Collections.<Depot.Package>emptyList();
         switch (series) {
             case REGIONAL:
                 return allRegional;
@@ -931,15 +965,19 @@ public class MapDepot implements IPlugin {
     /** The chooser button and the search hint follow the mode and series. */
     private void refreshSeriesControls() {
         final boolean sheets = packageMode == PackageMode.RECMAPS;
+        final boolean storms = packageMode == PackageMode.STORMS;
         final boolean located = locatedList();
-        seriesRow.setVisibility(sheets || located ? View.VISIBLE : View.GONE);
-        seriesButton.setVisibility(sheets ? View.VISIBLE : View.GONE);
+        seriesRow.setVisibility(sheets || storms || located ? View.VISIBLE : View.GONE);
+        seriesButton.setVisibility(sheets || storms ? View.VISIBLE : View.GONE);
         if (sheets)
             seriesButton.setText(seriesLabel(series, true) + "  \u25be");
+        else if (storms)
+            seriesButton.setText(stormLabel(stormIndex, true) + "  \u25be");
         nearButton.setVisibility(located ? View.VISIBLE : View.GONE);
         nearButton.setText(pluginContext.getString(
                 nearMe ? R.string.near_me : R.string.near_map));
-        forestSearch.setHint(!sheets ? R.string.search_forests
+        forestSearch.setHint(storms ? R.string.search_flights
+                : !sheets ? R.string.search_forests
                 : series == Series.DISTRICT ? R.string.search_recmaps
                         : series == Series.REGIONAL ? R.string.search_regional
                                 : R.string.search_sheets);
@@ -1000,6 +1038,42 @@ public class MapDepot implements IPlugin {
             loadFstopo();
         else
             applyForestFilter();
+    }
+
+    /** "Hurricane Erin 2025 (3)": the event, and what choosing it costs. */
+    private String stormLabel(int i, boolean withCount) {
+        if (i < 0 || i >= allStorms.size())
+            return pluginContext.getString(R.string.choose_storm);
+        final Depot.Storm s = allStorms.get(i);
+        final String label = s.name
+                + (s.year > 0 && !s.name.contains(String.valueOf(s.year))
+                        ? " " + s.year : "");
+        return withCount ? label + " (" + s.flightCount() + ")" : label;
+    }
+
+    private void chooseStorm() {
+        if (allStorms.isEmpty()) {
+            toast(pluginContext.getString(R.string.no_storms));
+            return;
+        }
+        final String[] items = new String[allStorms.size()];
+        for (int i = 0; i < items.length; i++)
+            items[i] = stormLabel(i, true);
+        new AlertDialog.Builder(hostContext())
+                .setTitle(pluginContext.getString(R.string.choose_storm))
+                .setSingleChoiceItems(items, stormIndex,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                d.dismiss();
+                                stormIndex = which;
+                                refreshSeriesControls();
+                                forestSearch.setText("");
+                                applyForestFilter();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.cancel), null)
+                .show();
     }
 
     private void loadFstopo() {
@@ -1690,7 +1764,9 @@ public class MapDepot implements IPlugin {
                 installedMaps.add(m.id);
                 mapAdapter.notifyDataSetChanged();
                 mapStatus.setText(m.name
-                        + " installed — it is in ATAK's map source list.");
+                        + (m.overlay()
+                                ? " installed — switched on over the map. Overlay Manager › Image Overlay turns it off."
+                                : " installed — it is in ATAK's map source list."));
             }
 
             @Override
@@ -1725,8 +1801,13 @@ public class MapDepot implements IPlugin {
             @Override
             public void onForests(List<Depot.Forest> fetched,
                     List<Depot.RecMap> recMaps, Depot.Sheets sheets,
-                    long savedAt) {
+                    Depot.Storms storms, long savedAt) {
                 forestsSavedAt = savedAt;
+                allStorms.clear();
+                allStorms.addAll(storms.events);
+                stormsBuiltAt = storms.builtAt;
+                if (stormIndex >= allStorms.size())
+                    stormIndex = 0;
                 Log.i(TAG, "onForests forests=" + fetched.size()
                         + " recmaps=" + recMaps.size()
                         + " regional=" + sheets.regional.size()
@@ -1742,6 +1823,7 @@ public class MapDepot implements IPlugin {
                 allK100.addAll(sheets.k100);
                 fstopoCount = sheets.fstopoCount;
                 refreshInstalledPackages();
+                refreshSeriesControls();
                 applyForestFilter();
             }
 
@@ -1761,14 +1843,13 @@ public class MapDepot implements IPlugin {
         installedPackages.addAll(PackageInstaller.installedIds(allRegional));
         installedPackages.addAll(PackageInstaller.installedIds(allK100));
         installedPackages.addAll(PackageInstaller.installedIds(allFstopo));
+        for (Depot.Storm s : allStorms)
+            installedPackages.addAll(PackageInstaller.installedIds(s.flights));
     }
 
     private void applyForestFilter() {
         refreshOutlinesButton();
         final String q = forestSearch.getText().toString().trim().toLowerCase();
-
-        packageFilter.setText(pluginContext.getString(labelFor(packageShown))
-                + " (" + shownPackages.size() + ")");
 
         shownPackages.clear();
         for (Depot.Package p : sourceList()) {
@@ -1781,6 +1862,10 @@ public class MapDepot implements IPlugin {
                 continue;
             shownPackages.add(p);
         }
+        // After the rebuild, not before it: the label used to carry the
+        // previous list's count ("Installed (50)" with four installed).
+        packageFilter.setText(pluginContext.getString(labelFor(packageShown))
+                + " (" + shownPackages.size() + ")");
         final int hidden = sortNearest();
         packageAdapter.notifyDataSetChanged();
 
@@ -1842,6 +1927,15 @@ public class MapDepot implements IPlugin {
                         db == null ? Double.MAX_VALUE : db[0]);
             }
         });
+        // The whole-event row stays first whatever the map does: it is the
+        // one most crews want, and its center is nowhere in particular.
+        for (int i = 1; i < shownPackages.size(); i++) {
+            final Depot.Package p = shownPackages.get(i);
+            if (p instanceof Depot.Flight && ((Depot.Flight) p).all) {
+                shownPackages.add(0, shownPackages.remove(i));
+                break;
+            }
+        }
         if (shownPackages.size() <= NEAREST_CAP)
             return 0;
         // The row that is downloading stays on screen whatever the map does.
@@ -1872,6 +1966,8 @@ public class MapDepot implements IPlugin {
      */
     private String statusLine(String query, int hidden) {
         final int total = sourceList().size();
+        if (packageMode == PackageMode.STORMS)
+            return stormsStatus(query, hidden, total);
         if (total == 0) {
             if (packageMode != PackageMode.RECMAPS)
                 return "No packages in the catalog yet.";
@@ -1908,12 +2004,45 @@ public class MapDepot implements IPlugin {
     }
 
     /**
+     * The flights list says which event it is showing and when the depot
+     * last looked at NOAA, because during a storm new flights land daily and
+     * "newest" is only as fresh as that.
+     */
+    private String stormsStatus(String query, int hidden, int total) {
+        final String built = stormsBuiltAt.length() >= 10
+                ? " · catalog " + Depot.prettyDate(stormsBuiltAt.substring(0, 10)) : "";
+        if (allStorms.isEmpty())
+            return "No disaster aerials in the catalog yet." + built;
+        final Depot.Storm s = allStorms.get(stormIndex);
+        int held = 0;
+        for (Depot.Package p : sourceList())
+            if (installedPackages.contains(p.id()))
+                held++;
+        if (shownPackages.isEmpty() && total > 0) {
+            if (packageShown == Shown.INSTALLED)
+                return "None of " + s.name + " installed yet." + built;
+            if (packageShown == Shown.AVAILABLE)
+                return "All of " + s.name + " is installed." + built;
+            return "Nothing matches \"" + query + "\" in " + s.name + "." + built;
+        }
+        final String what = s.detail.isEmpty() ? s.name : s.detail;
+        return what + " · " + s.span() + " · " + held + " of " + total + " installed"
+                + (hidden > 0 ? " · nearest " + shownPackages.size() + " shown" : "")
+                + built;
+    }
+
+    /**
      * Search the unit as well as the name: someone looking for a district often
      * knows the forest it sits in rather than the district's own name.
      */
     private static boolean matches(Depot.Package p, String q) {
         if (p.name().toLowerCase().contains(q))
             return true;
+        if (p instanceof Depot.Flight) {
+            final Depot.Flight f = (Depot.Flight) p;
+            return f.name.toLowerCase().contains(q) || f.date.contains(q)
+                    || f.source.toLowerCase().contains(q);
+        }
         if (p instanceof Depot.RecMap) {
             final Depot.RecMap m = (Depot.RecMap) p;
             return m.unit.toLowerCase().contains(q)
@@ -1965,7 +2094,9 @@ public class MapDepot implements IPlugin {
                 installedPackages.add(p.id());
                 packageAdapter.notifyDataSetChanged();
                 forestStatus.setText(p.name()
-                        + " installed — it is in ATAK's map layer list.");
+                        + (p instanceof Depot.Flight
+                                ? " installed — drawing over the map; tap the row to go there."
+                                : " installed — it is in ATAK's map layer list."));
             }
 
             @Override

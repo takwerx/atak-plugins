@@ -3,9 +3,9 @@
 
 #show: userguide.with(
    plugin-name: "Map Depot",
-   plugin-version: "1.11",
+   plugin-version: "1.12",
    platform: "ATAK",
-   platform-version: "5.7.0",
+   platform-version: "5.8.0",
 )
 
 #tak-slide[
@@ -29,7 +29,7 @@ itself where ATAK expects to find it.
 #toolbox.side-by-side(columns: (4fr, 8fr))[
   #image("02.png", width: 78%)
 ][
-  Six kinds of data, each on its own page:
+  Seven kinds of data, each on its own page:
 
   - *Elevation (DTED2)* -- terrain, by state or province. What viewsheds and
     elevation readouts need.
@@ -45,6 +45,8 @@ itself where ATAK expects to find it.
     neighborhood, as GeoPDFs.
   - *Drone IR Maps (UASWFC)* -- infrared products flown over a fire, as
     georeferenced PDFs and KMZs.
+  - *Disaster Aerials (NOAA)* -- the aerials NOAA flies after a hurricane,
+    flood, fire or tornado, one overlay per flight.
 ]
 ]
 
@@ -132,12 +134,16 @@ caches what it has drawn.
 #toolbox.side-by-side(columns: (7fr, 5fr))[
   #image("18.png", width: 100%)
 ][
-  Some sources are *overlays* rather than base maps: roads, labels and points
-  of interest on a transparent background, drawn over whatever is underneath.
+  Some sources are *overlays* rather than base maps: roads, labels, contour
+  lines, flood zones or radar on a transparent background, drawn over whatever
+  is underneath. The *Overlay* category lists them.
 
-  This is what makes fresh imagery usable. Aerial imagery flown after an event
-  has no street names on it. An overlay puts them back without hiding the
-  imagery underneath.
+  An overlay is something you switch on, not something you switch to.
+  Installing one switches it on over the map you already have, and any number
+  can be on at once; ATAK's Overlay Manager lists them under *Image Overlay*.
+
+  Aerial imagery flown after an event has no street names on it. *Census
+  Roads and Street Names* puts them back without hiding the imagery.
 ]
 ]
 
@@ -485,6 +491,41 @@ covers before deciding to turn it on.
 ]
 
 #tak-slide[
+= Disaster aerials (NOAA)
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("50.png", width: 92%)
+][
+  After a hurricane makes landfall, and after some floods, fires and
+  tornadoes, NOAA flies the damaged area and publishes the aerials within a
+  day or two of each flight. Map Depot lists every event published this way
+  since 2018, newest first, and every flight in it.
+
+  Each flight is an overlay: it covers the area that was flown, at 15 to 30
+  cm a pixel, and draws over whatever map you have. *All flights* installs
+  the whole event as one overlay; the flights under it install one at a
+  time, nearest the map first, with the date and the flight letter on every
+  row. Tiles stream as you pan.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("51.png", width: 92%)
+][
+  Pick the event with the button under the search box; the count is how many
+  flights it has.
+
+  Installed, a row says *tap to go there*, and tapping it takes the map to
+  the flight. *Hide* turns it off without removing it. *Remove* takes it off
+  the map and off the phone.
+
+  During a storm NOAA adds flights every day. The list says when the catalog
+  was last built; a flight flown after that appears the next day.
+]
+]
+
+#tak-slide[
 = Finding what you have installed
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
@@ -536,6 +577,8 @@ indistinguishable from data put there by hand.
 #toolbox.side-by-side(columns: (7fr, 5fr))[
   - Elevation → `atak/DTED/`, one file per one-degree square.
   - Streaming base maps → `atak/imagery/`, as map source files.
+  - Streaming overlays and disaster aerials → `atak/grg/`, as map source
+    files, so ATAK lists them under Image Overlay.
   - Offline public land vector tiles → `atak/imagery/`, as vector tile packages.
   - Forest Service map sheets → `atak/grg/`, as georeferenced PDFs.
   - Incident and drone maps → `atak/grg/` for a PDF, `atak/overlays/` for a

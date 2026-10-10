@@ -10,7 +10,9 @@
          fourth button was cut in half with nothing to scroll, and on ATAK 5.7
          it was clipped further still. A fixed column of choices silently loses
          the last one on a short pane, and would lose two when a fifth is
-         added. fillViewport keeps it looking the same when there is room. -->
+         added. fillViewport keeps it looking the same when there is room.
+         Eight buttons now: 44dp each with 2dp between them is the tallest that
+         still shows all eight on a Galaxy S10 pane (1.12). -->
     <ScrollView
         android:id="@+id/home_view"
         android:layout_width="match_parent"
@@ -27,8 +29,8 @@
             android:id="@+id/btn_dted"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="3dp"
-            android:minHeight="46dp"
+            android:layout_marginBottom="2dp"
+            android:minHeight="44dp"
             android:text="@string/elevation_heading" />
 
         <Button
@@ -36,8 +38,8 @@
             android:id="@+id/btn_maps"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="3dp"
-            android:minHeight="46dp"
+            android:layout_marginBottom="2dp"
+            android:minHeight="44dp"
             android:text="@string/maps_heading" />
 
         <Button
@@ -45,8 +47,8 @@
             android:id="@+id/btn_forests"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="3dp"
-            android:minHeight="46dp"
+            android:layout_marginBottom="2dp"
+            android:minHeight="44dp"
             android:text="@string/forests_heading" />
 
         <Button
@@ -54,8 +56,8 @@
             android:id="@+id/btn_recmaps"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="3dp"
-            android:minHeight="46dp"
+            android:layout_marginBottom="2dp"
+            android:minHeight="44dp"
             android:text="@string/recmaps_heading" />
 
         <Button
@@ -63,8 +65,8 @@
             android:id="@+id/btn_nifc"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="3dp"
-            android:minHeight="46dp"
+            android:layout_marginBottom="2dp"
+            android:minHeight="44dp"
             android:text="@string/nifc_heading" />
 
         <Button
@@ -72,16 +74,25 @@
             android:id="@+id/btn_uaswfc"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="3dp"
-            android:minHeight="46dp"
+            android:layout_marginBottom="2dp"
+            android:minHeight="44dp"
             android:text="@string/uaswfc_heading" />
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/btn_storms"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="2dp"
+            android:minHeight="44dp"
+            android:text="@string/storms_heading" />
 
         <Button
             style="@style/TakwerxButton"
             android:id="@+id/btn_beacon"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="46dp"
+            android:minHeight="44dp"
             android:text="@string/beacon_heading" />
 
         <TextView
