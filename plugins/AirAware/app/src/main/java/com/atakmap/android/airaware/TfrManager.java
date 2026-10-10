@@ -56,6 +56,12 @@ public class TfrManager {
     public static final String LAYER_OBSTACLES = "obstacles";
     public static final String LAYER_UASFM = UasfmFeatures.SET_KEY;
     public static final String LAYER_NOTAMS = "notams";
+    public static final String LAYER_NSUFR = NsufrFeatures.SET_KEY;
+    static final String PREF_NSUFR_CYCLE = "nsufrCycle";
+    static final String PREF_NSUFR_BAR_M = "nsufrBarM";
+    static final String PREF_NSUFR_3D = "nsufr3d";
+    /** Set once the National Security layer has been seen, so an upgrade does not switch it on. */
+    static final String PREF_NSUFR_INTRODUCED = "nsufrIntroduced";
     static final String PREF_NOTAM_KINDS_OFF = "notamKindsOff";
     static final String PREF_NOTAM_BAR_M = "notamBarM";
     /** Set once the NOTAM layer has been seen, so an upgrade does not switch it on. */
@@ -155,6 +161,12 @@ public class TfrManager {
     private static final int MAX_UASFM_CELLS = 1500;
     /** NOTAMs drawn at once: nearest the middle of the view first, like the obstacles. */
     private static final int MAX_NOTAMS = 400;
+    /**
+     * National Security restrictions drawn at once. 2,301 in the country and most are
+     * a fence line around one facility; the missile fields are the dense case, 495
+     * launch facilities across three states.
+     */
+    private static final int MAX_NSUFR = 300;
     /** Amber: a thing that sticks up, not a restriction and not weather. */
     private static final int DEFAULT_OBSTACLE = 0xFFFFB300;
     private static final int DEFAULT_REFRESH_MIN = 30;
@@ -288,6 +300,18 @@ public class TfrManager {
     private volatile boolean notamsMissing;
     private volatile long notamBarM = 16093L;
 
+    // National Security UAS restrictions: the whole country held, the view's picked.
+    private volatile List<Nsufr> nsufrAll = Collections.emptyList();
+    private volatile List<Nsufr> nsufr = Collections.emptyList();
+    private volatile double[] nsufrBox;
+    private volatile String nsufrCycle = "";
+    private volatile boolean nsufrHidden;
+    private volatile boolean nsufrCapped;
+    private volatile boolean nsufrMissing;
+    private volatile long nsufrBarM = 80467L;
+    /** Stood up to the published ceiling. <b>Off</b>: it is a flat prohibition. */
+    private volatile boolean nsufr3d;
+
     private volatile boolean airspaceCapped;
     private volatile long airspaceBarM = 160934L;
     private volatile boolean airspaceHidden;
@@ -331,6 +355,10 @@ public class TfrManager {
         // Ten miles, the obstacles' gate: NOTAMs are as dense as towers are, and the
         // operator wants the layers to come in together.
         notamBarM = p.getLong(PREF_NOTAM_BAR_M, 16093L);
+        // Fifty miles: a no-fly area matters from a long way out, and they are small.
+        nsufrBarM = p.getLong(PREF_NSUFR_BAR_M, 80467L);
+        nsufrCycle = p.getString(PREF_NSUFR_CYCLE, "");
+        nsufr3d = p.getBoolean(PREF_NSUFR_3D, false);
         classesOff.addAll(p.getStringSet(PREF_CLASSES_OFF, DEFAULT_CLASSES_OFF));
         // A set, not a joined string: a type carrying the separator would come back as two
         // bogus entries and the filter would restore wrong.
@@ -345,6 +373,11 @@ public class TfrManager {
         if (!p.getBoolean(PREF_NOTAMS_INTRODUCED, false)) {
             layersOff.add(LAYER_NOTAMS);
             p.edit().putBoolean(PREF_NOTAMS_INTRODUCED, true)
+                    .putStringSet(PREF_LAYERS_OFF, new HashSet<>(layersOff)).apply();
+        }
+        if (!p.getBoolean(PREF_NSUFR_INTRODUCED, false)) {
+            layersOff.add(LAYER_NSUFR);
+            p.edit().putBoolean(PREF_NSUFR_INTRODUCED, true)
                     .putStringSet(PREF_LAYERS_OFF, new HashSet<>(layersOff)).apply();
         }
         typesOff.addAll(p.getStringSet(PREF_TYPES_OFF,
@@ -553,6 +586,7 @@ public class TfrManager {
         out.add(new String[] { LAYER_AIRSPACE, "Airspace" });
         out.add(new String[] { LAYER_SUA, "Special Use" });
         out.add(new String[] { LAYER_UASFM, "UAS ceilings" });
+        out.add(new String[] { LAYER_NSUFR, "UAS No-Fly" });
         out.add(new String[] { LAYER_OBSTACLES, "Obstacles" });
         out.add(new String[] { LAYER_AIRFIELDS, "METARs" });
         return out;
@@ -639,6 +673,8 @@ public class TfrManager {
         // over Los Angeles.
         if (layersOff.contains(LAYER_UASFM) || uasfmHidden)
             off.add(UasfmFeatures.SET_KEY);
+        if (layersOff.contains(LAYER_NSUFR) || nsufrHidden)
+            off.add(NsufrFeatures.SET_KEY);
         final boolean obstaclesGone = layersOff.contains(LAYER_OBSTACLES) || obstaclesHidden;
         for (String g : Obstacle.GROUPS)
             if (obstaclesGone || obstacleGroupsOff.contains(g))
@@ -1159,6 +1195,7 @@ public class TfrManager {
         obstaclesHidden = obstacleBarM > 0 && bar > obstacleBarM * 1.02;
         uasfmHidden = uasfmBarM > 0 && bar > uasfmBarM * 1.02;
         notamHidden = notamBarM > 0 && bar > notamBarM * 1.02;
+        nsufrHidden = nsufrBarM > 0 && bar > nsufrBarM * 1.02;
         // Crossing this changes which features exist, so it is a rewrite rather than a
         // visibility push -- and only on the crossing, never on an ordinary pan.
         final boolean gateVolumes = bar > VOLUME_BAR_M * 1.02;
@@ -1220,6 +1257,16 @@ public class TfrManager {
                     : "You may fly to " + TfrVertical.comma(cell.ceilingFt)
                             + " ft AGL here without authorization.");
             b.append(' ');
+        }
+        // A standing prohibition overrides any ceiling, so it is said right after one.
+        final Nsufr noFly = isLayerOn(LAYER_NSUFR) ? nsufrHere() : null;
+        if (noFly != null) {
+            b.append(Nsufr.PENDING.equals(noFly.status)
+                    ? "A national security UAS restriction is pending here: "
+                    : Nsufr.PART_TIME.equals(noFly.status)
+                            ? "No UAS flight here when active, by national security restriction: "
+                            : "No UAS flight here, by national security restriction: ")
+                    .append(noFly.title()).append(". ");
         }
         // Everything from here to the fences belongs to the restrictions, so it is said
         // only while that layer is on. With TFR off and airspace running, the line read
@@ -1440,6 +1487,9 @@ public class TfrManager {
                     DEFAULT_OBSTACLE));
         for (UasfmCell c : uasfm)
             drawn.addAll(UasfmFeatures.drawn(c));
+        final boolean noFlySolid = solid && nsufr3d;
+        for (Nsufr n : nsufr)
+            drawn.addAll(NsufrFeatures.drawn(n, noFlySolid));
         for (Notam n : notams)
             drawn.addAll(NotamFeatures.drawn(n, n.isActive(now), pills, pluginContext));
         overlay.rewrite(drawn);
@@ -1626,7 +1676,7 @@ public class TfrManager {
         // its own layer instead.
         if (!isLayerOn(LAYER_AIRSPACE) && !isLayerOn(LAYER_SUA)
                 && !isLayerOn(LAYER_OBSTACLES) && !isLayerOn(LAYER_UASFM)
-                && !isLayerOn(LAYER_NOTAMS))
+                && !isLayerOn(LAYER_NOTAMS) && !isLayerOn(LAYER_NSUFR))
             return;
         final GeoBounds b = mapView.getBounds();
         if (b == null || Double.isNaN(b.getNorth()) || Double.isNaN(b.getSouth()))
@@ -1657,6 +1707,7 @@ public class TfrManager {
                         viewSouth, viewWest, viewNorth, viewEast);
                 loadNotamsOnWorker(south, west, north, east,
                         viewSouth, viewWest, viewNorth, viewEast);
+                loadNsufrOnWorker(viewSouth, viewWest, viewNorth, viewEast);
                 rewriteOverlay();
                 post();
             }
@@ -2318,6 +2369,165 @@ public class TfrManager {
         notamBarM = m;
         prefs().edit().putLong(PREF_NOTAM_BAR_M, m).apply();
         applyGate();
+        changed();
+    }
+
+    // ---- National Security UAS restrictions ----
+
+    /**
+     * The whole country, from one file on disk, and the view's share picked from it.
+     *
+     * <p>Worker thread only. The manifest is re-read daily and names the pack's hash,
+     * so the file is fetched again only when the FAA's layers changed, and with no
+     * network the copy on disk draws. A failed fetch never empties anything.
+     */
+    private void loadNsufrOnWorker(double viewSouth, double viewWest, double viewNorth,
+            double viewEast) {
+        if (!isLayerOn(LAYER_NSUFR))
+            return;
+        final TilePack pack = NsufrPack.pack();
+        final TilePack.Index index = pack.index();
+        final boolean newCycle = !index.cycle.isEmpty() && !index.cycle.equals(nsufrCycle);
+        if (newCycle) {
+            if (!nsufrCycle.isEmpty())
+                Log.d(TAG, "National Security cycle " + nsufrCycle + " -> " + index.cycle);
+            nsufrCycle = index.cycle;
+            prefs().edit().putString(PREF_NSUFR_CYCLE, nsufrCycle).apply();
+        }
+        if (newCycle || nsufrAll.isEmpty()) {
+            try {
+                final List<Nsufr> loaded = NsufrPack.load(pack, index);
+                if (!loaded.isEmpty()) {
+                    nsufrAll = Collections.unmodifiableList(loaded);
+                    nsufrBox = null;
+                }
+                nsufrMissing = loaded.isEmpty();
+                Log.d(TAG, "National Security restrictions: " + loaded.size() + " held");
+            } catch (Exception e) {
+                nsufrMissing = nsufrAll.isEmpty();
+                Log.d(TAG, "the National Security pack is not here yet: " + e);
+            }
+        }
+        pickNsufrForView(viewSouth, viewWest, viewNorth, viewEast);
+    }
+
+    /**
+     * Which of the held restrictions are drawn: the ones whose box touches the padded
+     * view, nearest the middle first, capped. Inside the remembered box is free unless
+     * the view has shrunk to a corner of it, the same rule the NOTAMs use.
+     */
+    private void pickNsufrForView(double south, double west, double north, double east) {
+        final double[] box = nsufrBox;
+        if (box != null && south >= box[0] && west >= box[1] && north <= box[2]
+                && east <= box[3] && !nsufr.isEmpty()
+                && (north - south) * 4d > (box[2] - box[0]))
+            return;
+        final double padLat = Math.max(0.02, (north - south) * 0.6);
+        final double padLon = Math.max(0.02, (east - west) * 0.6);
+        final double[] want = { south - padLat, west - padLon, north + padLat,
+                east + padLon };
+        final double midLat = (south + north) / 2d;
+        final double midLon = (west + east) / 2d;
+        final double lonScale = Math.cos(Math.toRadians(midLat));
+        final List<Nsufr> inView = new ArrayList<>();
+        for (Nsufr n : nsufrAll) {
+            if (Double.isNaN(n.south) || n.north < want[0] || n.south > want[2]
+                    || n.east < want[1] || n.west > want[3])
+                continue;
+            inView.add(n);
+        }
+        Collections.sort(inView, new java.util.Comparator<Nsufr>() {
+            @Override
+            public int compare(Nsufr x, Nsufr y) {
+                return Double.compare(distanceSq(x), distanceSq(y));
+            }
+
+            private double distanceSq(Nsufr n) {
+                final double dLat = (n.south + n.north) / 2d - midLat;
+                final double dLon = ((n.west + n.east) / 2d - midLon) * lonScale;
+                return dLat * dLat + dLon * dLon;
+            }
+        });
+        nsufrCapped = inView.size() > MAX_NSUFR;
+        nsufr = Collections.unmodifiableList(new ArrayList<>(
+                inView.subList(0, Math.min(MAX_NSUFR, inView.size()))));
+        nsufrBox = want;
+        Log.d(TAG, "National Security restrictions: drawing " + nsufr.size());
+    }
+
+    /** The restriction the operator is standing in, or null. */
+    public Nsufr nsufrHere() {
+        if (mapView.getSelfMarker() == null)
+            return null;
+        final GeoPoint me = mapView.getSelfMarker().getPoint();
+        if (me == null)
+            return null;
+        Nsufr best = null;
+        for (Nsufr n : nsufrAll) {
+            if (!n.contains(me.getLatitude(), me.getLongitude()))
+                continue;
+            // A standing one outranks a part-time one, which outranks a pending one.
+            if (best == null || rank(n) < rank(best))
+                best = n;
+        }
+        return best;
+    }
+
+    private static int rank(Nsufr n) {
+        return Nsufr.FULL_TIME.equals(n.status) ? 0 : Nsufr.PART_TIME.equals(n.status) ? 1 : 2;
+    }
+
+    /** One restriction by the id its feature carries, for a tap on the map. */
+    public Nsufr nsufrById(String id) {
+        if (id == null)
+            return null;
+        for (Nsufr n : nsufrAll)
+            if (id.equals(n.id))
+                return n;
+        return null;
+    }
+
+    public List<Nsufr> nsufrDrawn() {
+        return nsufr;
+    }
+
+    public boolean isNsufrCapped() {
+        return nsufrCapped;
+    }
+
+    /** True when the pack has not reached the phone at all. */
+    public boolean isNsufrMissing() {
+        return nsufrMissing && nsufrAll.isEmpty();
+    }
+
+    public long nsufrBarMeters() {
+        return nsufrBarM;
+    }
+
+    public void setNsufrBarMeters(long m) {
+        nsufrBarM = m;
+        prefs().edit().putLong(PREF_NSUFR_BAR_M, m).apply();
+        applyGate();
+        changed();
+    }
+
+    public boolean nsufr3dOn() {
+        return nsufr3d;
+    }
+
+    /** Changing this changes which features exist, so the store is rewritten. */
+    public void setNsufr3dOn(boolean value) {
+        if (nsufr3d == value)
+            return;
+        nsufr3d = value;
+        prefs().edit().putBoolean(PREF_NSUFR_3D, value).apply();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                rewriteOverlay();
+                post();
+            }
+        });
         changed();
     }
 

@@ -133,6 +133,19 @@ public final class TilePack {
                     index.sha.put(key, sha);
             }
         }
+        // A pack that is one file rather than tiles names it here, with its hash, so
+        // the file is fetched again only when it changed. Keyed by file name.
+        final JSONObject files = root.optJSONObject("files");
+        if (files != null) {
+            final Iterator<String> names = files.keys();
+            while (names.hasNext()) {
+                final String name = names.next();
+                final JSONObject entry = files.optJSONObject(name);
+                final String sha = entry == null ? "" : entry.optString("sha256", "");
+                if (!sha.isEmpty())
+                    index.sha.put(name, sha);
+            }
+        }
         return index;
     }
 
@@ -195,6 +208,16 @@ public final class TilePack {
     /** Any other published file in the pack, cached the same way. */
     public JSONObject file(String name) throws IOException {
         return json(name, base + name, null);
+    }
+
+    /**
+     * A published file fetched again when the copy on disk is not the one the manifest
+     * names, the way {@link #tile(String, String)} does for a tile.
+     *
+     * @param sha the manifest's sha256 for the file, or null to take whatever is on disk
+     */
+    public JSONObject file(String name, String sha) throws IOException {
+        return json(name, base + name, sha);
     }
 
     /**

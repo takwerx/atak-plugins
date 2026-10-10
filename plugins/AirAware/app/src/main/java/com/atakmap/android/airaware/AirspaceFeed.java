@@ -210,6 +210,14 @@ public final class AirspaceFeed {
      * there.
      */
     private static void readRings(Airspace a, JSONArray rings) {
+        readRings(a.parts, rings);
+    }
+
+    /**
+     * The same reader for any ArcGIS polygon we publish: the National Security UAS
+     * restrictions are the same {@code rings} shape, so one reader covers both.
+     */
+    static void readRings(List<Airspace.Part> parts, JSONArray rings) {
         Boolean outlineSign = null;
         Airspace.Part current = null;
         for (int i = 0; i < rings.length(); i++) {
@@ -238,11 +246,11 @@ public final class AirspaceFeed {
                 outlineSign = positive;
                 current = new Airspace.Part();
                 current.outer.addAll(pts);
-                a.parts.add(current);
+                parts.add(current);
             } else if (positive == outlineSign.booleanValue()) {
                 current = new Airspace.Part();
                 current.outer.addAll(pts);
-                a.parts.add(current);
+                parts.add(current);
             } else if (current != null) {
                 current.holes.add(pts);
             }

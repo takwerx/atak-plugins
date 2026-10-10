@@ -1,17 +1,17 @@
 # AirAware for ATAK — User Guide
 
-**Version 0.6 · takwerx**
+**Version 0.8 · takwerx**
 
-**Download AirAware 0.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download AirAware 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.6/ATAK-Plugin-AirAware-0.6--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.6/ATAK-Plugin-AirAware-0.6--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.6/ATAK-Plugin-AirAware-0.6--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/air-aware/releases/download/v0.8/ATAK-Plugin-AirAware-0.8--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/air-aware/releases/download/v0.8/ATAK-Plugin-AirAware-0.8--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/air-aware/releases/download/v0.8/ATAK-Plugin-AirAware-0.8--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/air-aware/releases
 
 AirAware answers one question for anyone working under or in the air: **what is
-in the column of air I am in, and what am I allowed to do here.** Seven layers
+in the column of air I am in, and what am I allowed to do here.** Eight layers
 draw on the map, each switched on its own, and a UAS flight planner works out
 the ceiling a mission area needs.
 
@@ -23,7 +23,7 @@ phone.
 
 ## Before you start
 
-- **ATAK versions.** Version 0.4 is published for ATAK-CIV 5.6, 5.7 and 5.8.
+- **ATAK versions.** Version 0.8 is published for ATAK-CIV 5.6, 5.7 and 5.8.
   A plugin built for another ATAK version will not load.
 - **Everything here is advisory.** AirAware is not a substitute for current
   charts and NOTAMs, and it is not a clearance. Check the official source
@@ -58,7 +58,7 @@ Under them, **LAYERS**, with **All on** and **All off**.
 
 ## The layers
 
-![The six layer rows](screenshots/3_layer_rows.png)
+![The eight layer rows](screenshots/3_layer_rows.png)
 
 One row per layer. The row itself is the switch: it reads the layer's name with
 **ON** in green or **OFF** in red, and tapping it turns the layer on or off.
@@ -80,6 +80,7 @@ Each layer carries only what belongs to it:
 | Airspace | Classes, Show at, 3D, Names on the map |
 | Special Use | Kinds, Show at, 3D, Names on the map |
 | UAS ceilings | Show at |
+| UAS No-Fly | Show at, 3D |
 | Obstacles | Kinds, Taller than, Show at |
 | METARs | Show at |
 
@@ -256,6 +257,40 @@ further coordination.
 
 These are the heights an authorization is granted against. They are not a
 clearance by themselves.
+
+---
+
+## UAS No-Fly
+
+Where no drone may fly at all: the FAA's National Security UAS Flight
+Restrictions, from the surface to 400 ft above the ground.
+
+![No-fly areas around San Diego Bay](screenshots/45_nofly_map.jpg)
+
+Military bases, Coast Guard stations, national laboratories, dams and nuclear
+sites, each drawn as a **red** ring with a light fill and the facility's name.
+A **part-time** area (orange) is closed when the facility activates it. A
+**pending** one (gray) has been announced and is not yet in force.
+
+These are not ceilings and not notices. A UAS ceiling says how high you may fly
+with an authorization; a no-fly area says there is no authorization to apply
+for. It is a prohibition under 14 CFR 99.7, and it does not expire.
+
+![The UAS No-Fly row open](screenshots/43_nofly_row.png)
+
+The whole country is one download, under two megabytes, kept on the phone and
+fetched again only when the FAA's list changes. The row says how many areas are
+in view. **Show at** is the zoom gate, read off ATAK's scale bar: fifty miles
+unless you change it, because these areas are small and matter from a long way
+out. **3D** stands each area up to its published ceiling; off unless you switch
+it on. When you are standing inside one, the pinned status line says so.
+
+![A no-fly area's details page](screenshots/44_nofly_details.png)
+
+Tap one for its page: the prohibition in plain words, the facility and the
+base, who runs it, the reason, where it is, and the point of contact the FAA
+publishes with it, which is the number to call about it. A part-time area's
+page also says how it is activated and what the FAA advises.
 
 ---
 

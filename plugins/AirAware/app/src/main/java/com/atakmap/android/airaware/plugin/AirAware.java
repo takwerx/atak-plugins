@@ -261,7 +261,8 @@ public class AirAware implements IPlugin {
                         && item.getMetaString("airspace_id", null) == null
                         && item.getMetaString("obstacle_oas", null) == null
                         && item.getMetaString("uasfm_id", null) == null
-                        && item.getMetaString("nms_id", null) == null)
+                        && item.getMetaString("nms_id", null) == null
+                        && item.getMetaString("nsufr_id", null) == null)
                     return false;
                 // A moment later, not now: a pick from ATAK's Select Item list closes the
                 // list and then posts its own show-details, which closed the page opened
@@ -352,6 +353,15 @@ public class AirAware implements IPlugin {
                     return;
                 showPane();
                 paneUi.showNotam(n);
+                return;
+            }
+            final String noFly = item.getMetaString("nsufr_id", null);
+            if (noFly != null) {
+                final com.atakmap.android.airaware.Nsufr n = manager.nsufrById(noFly);
+                if (n == null)
+                    return;
+                showPane();
+                paneUi.showNsufr(n);
                 return;
             }
             final String cell = item.getMetaString("uasfm_id", null);
