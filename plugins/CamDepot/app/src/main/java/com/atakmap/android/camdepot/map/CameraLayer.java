@@ -274,6 +274,7 @@ public final class CameraLayer {
         if (g == null)
             g = mapView.getRootGroup().addGroup(GROUP);
         this.group = g;
+        removeStrays();
         mapView.addOnMapMovedListener(moved);
         mapView.getMapEventDispatcher().addMapEventListener(
                 com.atakmap.android.maps.MapEvent.ITEM_CLICK, itemClick);
@@ -319,10 +320,39 @@ public final class CameraLayer {
      * would. Nothing new to get wrong.
      */
     public void setMapOn(boolean on) {
+        if (!on)
+            removeStrays();
         if (mapOn == on)
             return;
         mapOn = on;
         drawVisible();
+    }
+
+    /**
+     * Take off the map anything in the Cam Depot group that this layer did not put
+     * there.
+     *
+     * <p>The group is found by name, so it outlives the layer that made it. ATAK
+     * catches and logs whatever a plugin's {@code onStop} throws, so an unload that
+     * fails part way leaves every marker in the group. The next load found that
+     * group, drew its own markers on top, and OFF removed only those: the operator
+     * pressed OFF and saw every camera stay (takwerx-market#6). Every item in the
+     * group is a camera marker, so whatever {@link #markers} does not hold has no
+     * owner left.
+     */
+    private void removeStrays() {
+        final Set<MapItem> ours = Collections.newSetFromMap(
+                new java.util.IdentityHashMap<MapItem, Boolean>());
+        ours.addAll(markers.values());
+        int n = 0;
+        for (MapItem it : new ArrayList<>(group.getItems())) {
+            if (!ours.contains(it)) {
+                group.removeItem(it);
+                n++;
+            }
+        }
+        if (n > 0)
+            Log.w(TAG, "removed " + n + " camera markers left from an earlier load");
     }
 
     public boolean isMapOn() {
