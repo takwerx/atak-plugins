@@ -22,6 +22,8 @@ import com.atakmap.android.maps.MapView;
 import com.atakmap.android.airaware.Airspace;
 import com.atakmap.android.airaware.AirspaceFeatures;
 import com.atakmap.android.airaware.UasfmFeatures;
+import com.atakmap.android.airaware.Nsufr;
+import com.atakmap.android.airaware.NsufrFeatures;
 import com.atakmap.android.airaware.Notam;
 import com.atakmap.android.airaware.NotamFeatures;
 import com.atakmap.android.airaware.Metar;
@@ -716,6 +718,8 @@ public class TfrPane implements TfrManager.Listener {
             return notamStatus();
         if (TfrManager.LAYER_UASFM.equals(key))
             return uasfmStatus();
+        if (TfrManager.LAYER_NSUFR.equals(key))
+            return nsufrStatus();
         if (TfrManager.LAYER_OBSTACLES.equals(key))
             return obstaclesStatus();
         if (TfrManager.LAYER_RESTRICTIONS.equals(key))
@@ -808,6 +812,8 @@ public class TfrPane implements TfrManager.Listener {
                 fillNotamControls(body);
             else if (TfrManager.LAYER_UASFM.equals(key))
                 fillUasfmControls(body);
+            else if (TfrManager.LAYER_NSUFR.equals(key))
+                fillNsufrControls(body);
             else
                 fillAirfieldControls(body);
         }
@@ -1141,6 +1147,46 @@ public class TfrPane implements TfrManager.Listener {
                 : n + " squares";
     }
 
+    private String nsufrStatus() {
+        if (!manager.isLayerOn(TfrManager.LAYER_NSUFR))
+            return "Off. Nothing drawn.";
+        if (manager.isNsufrMissing())
+            return "Not downloaded yet. Needs a network once.";
+        final Nsufr here = manager.nsufrHere();
+        if (here != null)
+            return "You are inside " + here.title() + " (" + here.statusName().toLowerCase(Locale.US) + ")";
+        final int n = manager.nsufrDrawn().size();
+        if (n == 0)
+            return "None in view";
+        return manager.isNsufrCapped()
+                ? "Nearest " + n + " shown - zoom in for the rest"
+                : n + (n == 1 ? " area" : " areas") + " in view";
+    }
+
+    /** What belongs to the National Security restrictions and nothing else. */
+    private void fillNsufrControls(LinearLayout body) {
+        addValueButton(body, "Show at", ScaleBar.gate(manager.nsufrBarMeters()),
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        pickBarGate("Show UAS no-fly areas when the scale bar reads",
+                                manager.nsufrBarMeters(), new OnGate() {
+                                    @Override
+                                    public void set(long meters) {
+                                        manager.setNsufrBarMeters(meters);
+                                    }
+                                });
+                    }
+                });
+        addValueButton(body, "3D", manager.nsufr3dOn() ? "On" : "Off", new Runnable() {
+            @Override
+            public void run() {
+                manager.setNsufr3dOn(!manager.nsufr3dOn());
+                render();
+            }
+        });
+    }
+
     /** What belongs to the UAS ceilings and nothing else. */
     private void fillUasfmControls(LinearLayout body) {
         addValueButton(body, "Show at", ScaleBar.gate(manager.uasfmBarMeters()),
@@ -1341,6 +1387,17 @@ public class TfrPane implements TfrManager.Listener {
                         ? "0 ft: no flight without further coordination"
                         : ft + " ft above the ground",
                         UasfmFeatures.color(ft));
+            any = true;
+        }
+
+        if (manager.isLayerOn(TfrManager.LAYER_NSUFR)) {
+            addKeyHeading("UAS No-Fly");
+            addKeyLine("No UAS flight, surface to 400 ft (national security)",
+                    NsufrFeatures.color(Nsufr.FULL_TIME));
+            addKeyLine("Part-time: no UAS flight when the facility activates it",
+                    NsufrFeatures.color(Nsufr.PART_TIME));
+            addKeyLine("Pending: announced, not yet in force",
+                    NsufrFeatures.color(Nsufr.PENDING));
             any = true;
         }
 
@@ -1697,6 +1754,73 @@ public class TfrPane implements TfrManager.Listener {
         b.append("\n\nFAA UAS Facility Map. It says what is permitted, not what is")
                 .append(" there - check the restrictions, airspace and obstacle layers")
                 .append(" too, and always current charts and NOTAMs.");
+        detailsBody.setText(b.toString());
+        detailsGeofence.setVisibility(View.GONE);
+        detailsFaa.setVisibility(View.GONE);
+        settingsPage.setVisibility(View.GONE);
+        list.setVisibility(View.GONE);
+        detailsPage.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * One National Security UAS restriction, on the same details page. Never ATAK's
+     * own radial.
+     *
+     * <p>The prohibition first and in plain words, then what the FAA publishes with
+     * it: the facility, the base and who runs it, the heights, and the point of
+     * contact as published, which is the number to call about it.
+     */
+    public void showNsufr(final Nsufr n) {
+        if (root == null || n == null)
+            return;
+        showing = null;
+        detailsTitle.setText(n.title());
+        final StringBuilder b = new StringBuilder();
+        if (Nsufr.PENDING.equals(n.status))
+            b.append("Pending national security UAS restriction: announced by the FAA")
+                    .append(" and not yet in force. When it is, no UAS may fly here.\n");
+        else if (Nsufr.PART_TIME.equals(n.status))
+            b.append("Part-time national security UAS restriction: when the facility")
+                    .append(" activates it, no UAS may fly here, ").append(n.heights())
+                    .append(".\n");
+        else
+            b.append("National security UAS restriction: no UAS may fly here, ")
+                    .append(n.heights()).append(". There is no authorization to")
+                    .append(" apply for; it is a prohibition under 14 CFR 99.7.\n");
+        if (!n.alertType.isEmpty())
+            b.append("\nActivation: ").append(n.alertType).append('\n');
+        if (!n.adviseInstructions.isEmpty())
+            b.append(n.adviseInstructions).append('\n');
+        if (!n.adviseAuthority.isEmpty())
+            b.append(n.adviseAuthority).append('\n');
+        if (!n.adviseNote.isEmpty())
+            b.append(n.adviseNote).append('\n');
+        // The base, when the title is not already it (64 rows name the facility by the
+        // base's name, and many name only the base).
+        b.append('\n');
+        if (!n.base.isEmpty() && !n.base.equals(n.title()))
+            b.append("Base: ").append(n.base).append('\n');
+        if (!n.branchName().isEmpty())
+            b.append("Proponent: ").append(n.branchName());
+        if (!n.proponent.isEmpty() && !n.proponent.equalsIgnoreCase(n.branch))
+            b.append(" (").append(n.proponent).append(')');
+        if (!n.branchName().isEmpty())
+            b.append('\n');
+        if (!n.reason.isEmpty())
+            b.append("Reason: ").append(n.reason).append('\n');
+        if (!n.county.isEmpty() || !n.state.isEmpty())
+            b.append("Where: ").append(n.county)
+                    .append(n.county.isEmpty() || n.state.isEmpty() ? "" : " County, ")
+                    .append(n.state).append('\n');
+        if (!n.airspace.isEmpty())
+            b.append("Airspace: ").append(n.airspace).append('\n');
+        b.append("\nPoint of contact, as the FAA publishes it:\n")
+                .append(n.poc.isEmpty() ? "none published" : n.poc).append('\n');
+        if (!n.faaId.isEmpty())
+            b.append("\nFAA ID ").append(n.faaId).append('\n');
+        b.append("\nFAA National Security UAS Flight Restrictions, ").append(n.statusName()
+                .toLowerCase(Locale.US)).append(". No warranty of accuracy or timeliness -")
+                .append(" always check current charts and NOTAMs.");
         detailsBody.setText(b.toString());
         detailsGeofence.setVisibility(View.GONE);
         detailsFaa.setVisibility(View.GONE);

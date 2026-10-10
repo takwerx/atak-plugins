@@ -220,6 +220,9 @@ public class TfrOverlay {
                                 final String nms = string(a, "nms_id");
                                 if (nms != null)
                                     item.setMetaString("nms_id", nms);
+                                final String noFly = string(a, "nsufr_id");
+                                if (noFly != null)
+                                    item.setMetaString("nsufr_id", noFly);
                                 final String place = string(a, "place");
                                 if (place != null && !place.isEmpty())
                                     label = place;
@@ -274,13 +277,16 @@ public class TfrOverlay {
                                 final String cell = m.getMetaString("uasfm_id", null);
                                 // A NOTAM is an area, a glyph and a pill: one row.
                                 final String nms = m.getMetaString("nms_id", null);
+                                // A no-fly area is its outline, a volume and a label.
+                                final String noFly = m.getMetaString("nsufr_id", null);
                                 final String key = notam != null ? "n:" + notam
                                         : icao != null ? "m:" + icao
                                                 : shelf != null ? "a:" + shelf
                                                         : oas != null ? "o:" + oas
                                                                 : cell != null ? "u:" + cell
                                                                         : nms != null ? "x:" + nms
-                                                                                : "f:" + m.getMetaLong("featureid", -1);
+                                                                                : noFly != null ? "s:" + noFly
+                                                                                        : "f:" + m.getMetaLong("featureid", -1);
                                 if (seen.add(key))
                                     out.add(m);
                             }
