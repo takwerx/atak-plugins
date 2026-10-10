@@ -1392,7 +1392,7 @@ public class TfrPane implements TfrManager.Listener {
 
         if (manager.isLayerOn(TfrManager.LAYER_NSUFR)) {
             addKeyHeading("UAS No-Fly");
-            addKeyLine("No UAS flight, surface to 400 ft: national security restriction",
+            addKeyLine("No UAS flight, surface to 400 ft (national security)",
                     NsufrFeatures.color(Nsufr.FULL_TIME));
             addKeyLine("Part-time: no UAS flight when the facility activates it",
                     NsufrFeatures.color(Nsufr.PART_TIME));
@@ -1797,8 +1797,9 @@ public class TfrPane implements TfrManager.Listener {
             b.append(n.adviseNote).append('\n');
         // The base, when the title is not already it (64 rows name the facility by the
         // base's name, and many name only the base).
+        b.append('\n');
         if (!n.base.isEmpty() && !n.base.equals(n.title()))
-            b.append("\nBase: ").append(n.base).append('\n');
+            b.append("Base: ").append(n.base).append('\n');
         if (!n.branchName().isEmpty())
             b.append("Proponent: ").append(n.branchName());
         if (!n.proponent.isEmpty() && !n.proponent.equalsIgnoreCase(n.branch))

@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "AirAware",
-   plugin-version: "0.7",
+   plugin-version: "0.8",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -14,7 +14,7 @@
 AirAware answers one question for anyone working under or in the air: *what is
 in the column of air I am in, and what am I allowed to do here.*
 
-Seven layers draw on the map, each switched on its own. Everything is drawn on
+Eight layers draw on the map, each switched on its own. Everything is drawn on
 this device. Nothing is sent to a TAK Server, nothing is shared with other
 users, and nothing about you or your position leaves the phone.
 
@@ -90,6 +90,7 @@ users, and nothing about you or your position leaves the phone.
   - *Airspace:* Classes, Show at, 3D, Names on the map.
   - *Special Use:* Kinds, Show at, 3D, Names on the map.
   - *UAS ceilings:* Show at.
+  - *UAS No-Fly:* Show at, 3D.
   - *Obstacles:* Kinds, Taller than, Show at.
   - *METARs:* Show at.
 
@@ -328,6 +329,65 @@ Map.
 
   These are the heights an authorization is granted against. They are not a
   clearance by themselves.
+]
+]
+
+#tak-slide[
+= UAS No-Fly
+
+Where no drone may fly at all: the FAA's National Security UAS Flight
+Restrictions, from the surface to 400 ft above the ground.
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("45.jpg", width: 100%)
+][
+  Military bases, Coast Guard stations, national laboratories, dams and
+  nuclear sites, each drawn as a red ring with a light fill and the facility's
+  name. Here San Diego Bay: Naval Base Point Loma, NAS North Island, Naval
+  Base Coronado.
+
+  These are not ceilings and not notices. A UAS ceiling says how high you may
+  fly with an authorization; a no-fly area says there is no authorization to
+  apply for. It is a prohibition under 14 CFR 99.7, and it does not expire.
+
+  A part-time area (orange) is closed when the facility activates it. A
+  pending one (gray) has been announced and is not yet in force.
+]
+]
+
+#tak-slide[
+= The no-fly row
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("43.png", width: 100%)
+][
+  The whole country is one download, under two megabytes, kept on the phone
+  and fetched again only when the FAA's list changes. The row says how many
+  areas are in view.
+
+  *Show at* is the zoom gate, read off ATAK's scale bar: fifty miles unless
+  you change it, because these areas are small and matter from a long way
+  out.
+
+  *3D* stands each area up to its published ceiling. Off unless you switch it
+  on: it is a rule about the ground, and the ring already says it.
+
+  When you are standing inside one, the pinned status line says so in words.
+]
+]
+
+#tak-slide[
+= A no-fly area's details
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("44.png", width: 100%)
+][
+  Tap one for its page: the prohibition in plain words, the facility and the
+  base, who runs it, the reason, where it is, and the point of contact the FAA
+  publishes with it, which is the number to call about it.
+
+  A part-time area's page also says how it is activated and what the FAA
+  advises.
 ]
 ]
 
