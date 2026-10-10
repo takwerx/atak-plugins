@@ -255,6 +255,23 @@ public final class Depot {
         public String fileName() {
             return id + (file.endsWith(".json") ? ".json" : ".xml");
         }
+
+        /**
+         * Whether this draws on top of the map rather than being the map,
+         * which decides the folder it is installed to. ATAK treats a map
+         * source XML in {@code imagery/mobile/mapsources} as a base map,
+         * something you switch to, and the same file in {@code grg/} as an
+         * image overlay, something you switch on over whatever is selected.
+         * Measured on 5.8: the roads overlay picked from the base map list
+         * replaced the satellite imagery; moved to {@code grg/} it drew on top.
+         *
+         * The category is the catalog's word that the tiles are transparent
+         * (the ingest fetches one and measures its alpha). A streaming config
+         * carries its own overlay flag and stays where ATAK's provider reads it.
+         */
+        public boolean overlay() {
+            return "Overlay".equalsIgnoreCase(category) && !file.endsWith(".json");
+        }
     }
 
     /** One elevation cell: a one-degree square, gzipped on the wire. */
@@ -472,6 +489,28 @@ public final class Depot {
      * from the map. NaN means the catalog did not say, and such a row sorts
      * last rather than being dropped.
      */
+    /**
+     * A package that knows its own footprint. ATAK's tile sources do not: a
+     * MOBAC XYZ dataset is registered with the full extent of its projection
+     * ({@code MobacMapSourceLayerInfoSpi}), so asking the layer where a
+     * flight is answers "the world". The catalog knows, from NOAA's TileJSON.
+     */
+    public interface Bounded {
+        /** south, west, north, east in degrees; null when unknown. */
+        double[] bounds();
+    }
+
+    /**
+     * A package whose catalog entry names its digest. The package installer
+     * checks only the byte count, which is all the Forest Service gateway
+     * offers; a file the depot itself serves can do better, and a map source
+     * XML tells ATAK where to fetch tiles from, so it should.
+     */
+    public interface Digested {
+        /** Lowercase hex SHA-256, or empty when the catalog has none. */
+        String sha256();
+    }
+
     public interface Located {
         boolean located();
 
@@ -841,6 +880,302 @@ public final class Depot {
             }
         });
         return out;
+    }
+
+    // ------------------------------------------------------------ storms
+
+    /** An event slug on storms.ngs.noaa.gov, which becomes a depot path. */
+    private static final Pattern EVENT_ID = Pattern.compile("[a-z0-9_]{1,40}");
+
+    /** NOAA's tile set name, {@code 20250823b-rgb}: date, flight letter, source. */
+    private static final Pattern FLIGHT_ID =
+            Pattern.compile("\\d{8}[a-z]-[a-z0-9]{1,12}|[a-z0-9_]{1,40}-all");
+
+    /** The depot path of a generated XML, and nothing else. */
+    private static final Pattern STORM_FILE =
+            Pattern.compile("storms/v1/[a-z0-9_]{1,40}/[a-z0-9-]{1,40}\\.xml");
+
+    private static final Pattern ISO_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+
+    /**
+     * One NOAA post-disaster imagery event: a hurricane, a flood, a fire, or a
+     * year's worth of smaller ones. Its flights are the packages; the first
+     * is the whole event as one multi-layer source.
+     */
+    public static final class Storm {
+        public final String id;
+        public final String name;
+        public final int year;
+        public final String kind;
+        /** For a yearly set, the events it holds: "Texas Flooding, Maui Fire". */
+        public final String detail;
+        public final String first, last;
+        /** south, west, north, east over every flight; null when the catalog has none. */
+        public final double[] bounds;
+        /** "All flights" first, then each flight by date. */
+        public final List<Flight> flights = new ArrayList<>();
+
+        Storm(JSONObject o) {
+            id = o.optString("id");
+            if (!EVENT_ID.matcher(id).matches())
+                throw new IllegalArgumentException("invalid storm id: " + id);
+            name = o.optString("name", id);
+            year = o.optInt("year");
+            kind = o.optString("kind", "other");
+            detail = o.optString("detail", "");
+            first = o.optString("first", "");
+            last = o.optString("last", "");
+            bounds = box(o.optJSONArray("bounds"));
+
+            final JSONArray arr = o.optJSONArray("flights");
+            final List<Flight> each = new ArrayList<>();
+            if (arr != null)
+                for (int i = 0; i < arr.length(); i++) {
+                    final JSONObject f = arr.optJSONObject(i);
+                    if (f == null)
+                        continue;
+                    try {
+                        each.add(new Flight(f, this, false));
+                    } catch (IllegalArgumentException bad) {
+                        com.atakmap.coremap.log.Log.w("MapDepot",
+                                "rejected flight: " + bad.getMessage());
+                    }
+                }
+            if (each.isEmpty())
+                throw new IllegalArgumentException("storm " + id + " has no flights");
+
+            final JSONObject all = o.optJSONObject("all");
+            if (all != null) {
+                try {
+                    flights.add(new Flight(all, this, true));
+                } catch (IllegalArgumentException bad) {
+                    com.atakmap.coremap.log.Log.w("MapDepot",
+                            "rejected all-flights entry: " + bad.getMessage());
+                }
+            }
+            flights.addAll(each);
+        }
+
+        /** How many actual flights, not counting the all-in-one row. */
+        public int flightCount() {
+            int n = 0;
+            for (Flight f : flights)
+                if (!f.all)
+                    n++;
+            return n;
+        }
+
+        /** "Aug 22 – 23, 2025", or one date when there is one flight. */
+        public String span() {
+            if (!ISO_DATE.matcher(first).matches())
+                return "";
+            if (first.equals(last) || !ISO_DATE.matcher(last).matches())
+                return prettyDate(first);
+            if (first.substring(0, 7).equals(last.substring(0, 7)))
+                return monthDay(first) + " – " + last.substring(8).replaceFirst("^0", "")
+                        + ", " + first.substring(0, 4);
+            if (first.substring(0, 4).equals(last.substring(0, 4)))
+                return monthDay(first) + " – " + monthDay(last) + ", " + first.substring(0, 4);
+            return prettyDate(first) + " – " + prettyDate(last);
+        }
+    }
+
+    /**
+     * One flight's tile set as an ATAK map source, or every flight of an
+     * event as one multi-layer source. Always an overlay: a flight covers a
+     * damaged area, not a state, and lands on top of whatever map the crew
+     * already has.
+     */
+    /** TileJSON order (west, south, east, north) to south, west, north, east. */
+    static double[] box(JSONArray b) {
+        if (b == null || b.length() != 4)
+            return null;
+        final double w = b.optDouble(0), s = b.optDouble(1);
+        final double e = b.optDouble(2), n = b.optDouble(3);
+        if (Double.isNaN(w) || Double.isNaN(s) || Double.isNaN(e) || Double.isNaN(n)
+                || s >= n || w >= e || s < -90 || n > 90 || w < -180 || e > 180)
+            return null;
+        return new double[] { s, w, n, e };
+    }
+
+    public static final class Flight implements Package, Located, Bounded, Digested {
+        public final String id;
+        public final String name;
+        public final String date, letter, source;
+        public final boolean all;
+        public final String file;
+        public final long bytes;
+        public final String sha256;
+        public final double lat, lon;
+        public final Storm storm;
+        private final double[] box;
+
+        Flight(JSONObject o, Storm storm, boolean all) {
+            this.storm = storm;
+            this.all = all;
+            id = all ? storm.id + "-all" : o.optString("id");
+            if (!FLIGHT_ID.matcher(id).matches())
+                throw new IllegalArgumentException("invalid flight id: " + id);
+            name = o.optString("name", id);
+            file = o.optString("file");
+            if (!STORM_FILE.matcher(file).matches())
+                throw new IllegalArgumentException("flight " + id + " has no usable file");
+            bytes = o.optLong("bytes");
+            sha256 = o.optString("sha256");
+            date = o.optString("date", "");
+            if (!all && !ISO_DATE.matcher(date).matches())
+                throw new IllegalArgumentException("flight " + id + " has no date");
+            letter = o.optString("letter", "");
+            source = o.optString("source", "");
+
+            box = all ? storm.bounds : box(o.optJSONArray("bounds"));
+            lat = box == null ? Double.NaN : (box[0] + box[2]) / 2.0;
+            lon = box == null ? Double.NaN : (box[1] + box[3]) / 2.0;
+        }
+
+        @Override
+        public double[] bounds() {
+            return box;
+        }
+
+        @Override
+        public String sha256() {
+            return sha256;
+        }
+
+        @Override
+        public boolean located() {
+            return !Double.isNaN(lat) && !Double.isNaN(lon);
+        }
+
+        @Override
+        public double lat() {
+            return lat;
+        }
+
+        @Override
+        public double lon() {
+            return lon;
+        }
+
+        @Override
+        public String id() {
+            return id;
+        }
+
+        @Override
+        public String name() {
+            return all ? "All flights" : name;
+        }
+
+        @Override
+        public String url() {
+            return DepotClient.baseUrl() + "/" + file;
+        }
+
+        /**
+         * The XML's own {@code <name>} is the display name, and the file is
+         * named the same, because ATAK lists an image overlay by the name
+         * inside the XML and the go-to looks it up by the file.
+         */
+        @Override
+        public String fileName() {
+            return safeFileName(name, id, ".xml");
+        }
+
+        @Override
+        public String legacyFileName() {
+            return id + ".xml";
+        }
+
+        @Override
+        public String destination() {
+            return "grg";
+        }
+
+        @Override
+        public long bytes() {
+            return bytes;
+        }
+
+        @Override
+        public String describe() {
+            if (all)
+                return storm.flightCount() + " flights · " + storm.span();
+            final StringBuilder sb = new StringBuilder(prettyDate(date));
+            if (!letter.isEmpty())
+                sb.append(" · flight ").append(letter);
+            if (!source.isEmpty() && !"RGB".equalsIgnoreCase(source))
+                sb.append(" · ").append(sourceName(source));
+            return sb.toString();
+        }
+
+        private static String sourceName(String s) {
+            if ("CAP".equalsIgnoreCase(s))
+                return "Civil Air Patrol";
+            if ("MAXAR".equalsIgnoreCase(s))
+                return "Maxar satellite";
+            return s;
+        }
+    }
+
+    private static final String[] MONTHS = { "Jan", "Feb", "Mar", "Apr", "May",
+            "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+    /** "2025-08-23" to "Aug 23, 2025"; anything else comes back as it was. */
+    public static String prettyDate(String iso) {
+        if (iso == null || !ISO_DATE.matcher(iso).matches())
+            return iso == null ? "" : iso;
+        return monthDay(iso) + ", " + iso.substring(0, 4);
+    }
+
+    private static String monthDay(String iso) {
+        final int m = Integer.parseInt(iso.substring(5, 7));
+        final String d = iso.substring(8).replaceFirst("^0", "");
+        return (m >= 1 && m <= 12 ? MONTHS[m - 1] : iso.substring(5, 7)) + " " + d;
+    }
+
+    /** The storms section: when it was built, and the events newest first. */
+    public static final class Storms {
+        public final String builtAt;
+        public final List<Storm> events;
+
+        Storms(String builtAt, List<Storm> events) {
+            this.builtAt = builtAt;
+            this.events = events;
+        }
+
+        public static final Storms NONE = new Storms("", Collections.<Storm>emptyList());
+    }
+
+    public static Storms parseStorms(String json) throws Exception {
+        final JSONObject root = new JSONObject(json);
+        final JSONObject section = root.optJSONObject("storms");
+        if (section == null)
+            return Storms.NONE;
+        final JSONArray arr = section.optJSONArray("events");
+        final List<Storm> out = new ArrayList<>();
+        if (arr != null)
+            for (int i = 0; i < arr.length(); i++) {
+                final JSONObject o = arr.optJSONObject(i);
+                if (o == null)
+                    continue;
+                try {
+                    out.add(new Storm(o));
+                } catch (IllegalArgumentException bad) {
+                    com.atakmap.coremap.log.Log.w("MapDepot",
+                            "rejected storm: " + bad.getMessage());
+                }
+            }
+        // Newest first, which is the catalog's order too; sorted here so a
+        // hand-edited catalog cannot put a 2018 storm at the top.
+        Collections.sort(out, new Comparator<Storm>() {
+            @Override
+            public int compare(Storm a, Storm b) {
+                return b.last.compareTo(a.last);
+            }
+        });
+        return new Storms(section.optString("builtAt", ""), out);
     }
 
     public static List<BaseMap> parseBaseMaps(String json) throws Exception {

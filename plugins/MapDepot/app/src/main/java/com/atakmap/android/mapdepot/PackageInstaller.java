@@ -346,6 +346,17 @@ public final class PackageInstaller {
                     + ", got " + Depot.bytes(written));
         }
 
+        // And the digest, where the catalog names one. A mismatch is almost
+        // always a catalog older than the depot, as with the base maps.
+        if (pkg instanceof Depot.Digested) {
+            final String want = ((Depot.Digested) pkg).sha256();
+            if (want != null && want.length() == 64
+                    && !want.equalsIgnoreCase(sha256Of(part))) {
+                deleteQuietly(part);
+                throw new IllegalStateException(BaseMapInstaller.STALE_CATALOG);
+            }
+        }
+
         final File dest = new File(dir, pkg.fileName());
         guardInside(dir, dest);
         if (dest.exists() && !dest.delete())
@@ -592,13 +603,20 @@ public final class PackageInstaller {
         }
 
         final boolean overlay = "grg".equals(pkg.destination());
-        final String name = f.getName();
+        final double[] fit = pkg instanceof Depot.Bounded
+                ? ((Depot.Bounded) pkg).bounds() : null;
+        // A GeoPDF overlay is listed under its file name; a map source XML
+        // under the <name> inside it, which the depot writes to match the
+        // file minus its extension.
+        final String name = f.getName().toLowerCase(java.util.Locale.US).endsWith(".xml")
+                ? f.getName().substring(0, f.getName().length() - 4)
+                : f.getName();
         final String path = f.getAbsolutePath();
 
         WORKER.execute(new Runnable() {
             @Override
             public void run() {
-                if (selectOnMain(name, overlay, path)) {
+                if (selectOnMain(name, overlay, path, fit)) {
                     post(cb, pkg, "going", null);
                     return;
                 }
@@ -618,7 +636,7 @@ public final class PackageInstaller {
                         Thread.currentThread().interrupt();
                         return;
                     }
-                    if (selectOnMain(name, overlay, path)) {
+                    if (selectOnMain(name, overlay, path, fit)) {
                         polling = false;
                         post(cb, pkg, "going", null);
                         return;
@@ -636,7 +654,7 @@ public final class PackageInstaller {
      * work belongs there, and the caller is a worker, so blocking is safe.
      */
     private static boolean selectOnMain(final String name, final boolean overlay,
-            final String path) {
+            final String path, final double[] fit) {
         final java.util.concurrent.atomic.AtomicBoolean done =
                 new java.util.concurrent.atomic.AtomicBoolean(false);
         final java.util.concurrent.CountDownLatch latch =
@@ -645,7 +663,7 @@ public final class PackageInstaller {
             @Override
             public void run() {
                 try {
-                    done.set(selectDirect(name, overlay, path));
+                    done.set(selectDirect(name, overlay, path, fit));
                 } finally {
                     latch.countDown();
                 }
@@ -714,7 +732,8 @@ public final class PackageInstaller {
     /** True while the caller is polling, so the per-layer log stays quiet. */
     private static volatile boolean polling = false;
 
-    private static boolean selectDirect(String name, boolean overlay, String path) {
+    private static boolean selectDirect(String name, boolean overlay, String path,
+            double[] fit) {
         try {
             final com.atakmap.android.maps.MapView mv =
                     com.atakmap.android.maps.MapView.getMapView();
@@ -803,7 +822,19 @@ public final class PackageInstaller {
             }
             boolean zoomed = false;
             try {
-                zoomed = zoomTo(mv, layer, name);
+                // A package that knows its own box beats asking the layer: an
+                // XYZ tile source's dataset spans the whole projection, and
+                // fitting that put a flight over Hatteras on a view of the globe.
+                if (fit != null) {
+                    com.atakmap.android.util.ATAKUtilities.scaleToFit(mv,
+                            new com.atakmap.coremap.maps.coords.GeoBounds(
+                                    fit[0], fit[1], fit[2], fit[3]),
+                            mv.getWidth(), mv.getHeight());
+                    Log.d(TAG, "zoomed to " + name + " by its own bounds");
+                    zoomed = true;
+                } else {
+                    zoomed = zoomTo(mv, layer, name);
+                }
             } catch (LinkageError | RuntimeException inAtak) {
                 Log.w(TAG, "could not zoom to " + name, inAtak);
             }
@@ -1082,28 +1113,9 @@ public final class PackageInstaller {
     }
 
     private static boolean retire(Depot.Package pkg, File f) {
-        final String path = f.getAbsolutePath();
         if ("grg".equals(pkg.destination())
-                || "overlays".equals(pkg.destination())) {
-            try {
-                final android.content.Intent i = new android.content.Intent(
-                        "com.atakmap.android.importexport.DELETE_DATA");
-                i.putExtra("uri", path);
-                i.putExtra("contentType", contentTypeOf(pkg));
-                i.putExtra("mimeType", mimeTypeOf(pkg));
-                com.atakmap.android.ipc.AtakBroadcast.getInstance().sendBroadcast(i);
-
-                // Give the unload a moment to land before the file disappears.
-                // Not a fix for a race we own -- it is ATAK's -- but it is the
-                // difference between a clean removal and killing the app.
-                Thread.sleep(750L);
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-            } catch (LinkageError | RuntimeException notThisBuild) {
-                Log.w(TAG, "could not ask ATAK to unload " + f.getName()
-                        + " before deleting it: " + notThisBuild);
-            }
-        }
+                || "overlays".equals(pkg.destination()))
+            unload(f, contentTypeOf(pkg), mimeTypeOf(pkg));
 
         final boolean gone = !f.exists() || f.delete();
         // Imagery is found by a scanner, so it has to be told to look again now
@@ -1136,6 +1148,68 @@ public final class PackageInstaller {
             BaseMapInstaller.requestLayerScan(dest);
             return;
         }
+        if ("grg".equals(where)
+                && dest.getName().toLowerCase(java.util.Locale.US).endsWith(".xml"))
+            importGrg(dest);
+        else
+            importInPlace(dest);
+    }
+
+    /**
+     * Registers a map source XML in {@code grg/} as an image overlay, live.
+     *
+     * The general import broadcast ({@link #importInPlace}) sorts a file by
+     * what it looks like, and a map source XML looks like a base map: on
+     * 5.8 it went to the layers importer as "External Native Data" and came
+     * up in the base map list, with the file still sitting in grg/. The GRG
+     * component registers its own importer under "External GRG Data", the
+     * one its start-up scan of grg/ feeds, and IMPORT_DATA addresses an
+     * importer by content type -- the mirror of the DELETE_DATA {@link #unload}
+     * already sends. So the same file registers where the start-up scan
+     * would have put it, without the restart.
+     */
+    static void importGrg(File dest) {
+        try {
+            final android.content.Intent i = new android.content.Intent(
+                    "com.atakmap.android.importexport.IMPORT_DATA");
+            i.putExtra("uri", dest.getAbsolutePath());
+            i.putExtra("contentType", "External GRG Data");
+            i.putExtra("mimeType", "application/octet-stream");
+            com.atakmap.android.ipc.AtakBroadcast.getInstance().sendBroadcast(i);
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not hand " + dest.getName()
+                    + " to the GRG importer; it will appear after a restart: "
+                    + notThisBuild);
+        }
+    }
+
+    /**
+     * Asks ATAK to unload a file it imported, before the file is deleted.
+     * Shared with {@link BaseMapInstaller}, whose overlays are GRGs too.
+     */
+    static void unload(File f, String contentType, String mimeType) {
+        try {
+            final android.content.Intent i = new android.content.Intent(
+                    "com.atakmap.android.importexport.DELETE_DATA");
+            i.putExtra("uri", f.getAbsolutePath());
+            i.putExtra("contentType", contentType);
+            i.putExtra("mimeType", mimeType);
+            com.atakmap.android.ipc.AtakBroadcast.getInstance().sendBroadcast(i);
+
+            // Give the unload a moment to land before the file disappears.
+            // Not a fix for a race we own -- it is ATAK's -- but it is the
+            // difference between a clean removal and killing the app.
+            Thread.sleep(750L);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } catch (LinkageError | RuntimeException notThisBuild) {
+            Log.w(TAG, "could not ask ATAK to unload " + f.getName()
+                    + " before deleting it: " + notThisBuild);
+        }
+    }
+
+    /** Hands a file already in {@code grg/} to the import pipeline. */
+    static void importInPlace(File dest) {
         try {
             final android.content.Intent i = new android.content.Intent(
                     "com.atakmap.android.importfiles.USER_HANDLE_IMPORT_FILE_ACTION");
@@ -1149,6 +1223,21 @@ public final class PackageInstaller {
                     + " to the importer; it will appear after a restart: "
                     + notThisBuild);
         }
+    }
+
+    private static String sha256Of(File f) throws Exception {
+        final java.security.MessageDigest md =
+                java.security.MessageDigest.getInstance("SHA-256");
+        final byte[] buf = new byte[8192];
+        try (java.io.InputStream in = new java.io.FileInputStream(f)) {
+            int n;
+            while ((n = in.read(buf)) > 0)
+                md.update(buf, 0, n);
+        }
+        final StringBuilder hex = new StringBuilder();
+        for (byte b : md.digest())
+            hex.append(String.format("%02x", b));
+        return hex.toString();
     }
 
     private static void guardInside(File dir, File f) throws Exception {

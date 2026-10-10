@@ -1,12 +1,12 @@
 # Map Depot for ATAK — User Guide
 
-**Version 1.11 · takwerx**
+**Version 1.12 · takwerx**
 
-**Download Map Depot 1.11** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.11/ATAK-Plugin-MapDepot-1.11--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.11/ATAK-Plugin-MapDepot-1.11--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.11/ATAK-Plugin-MapDepot-1.11--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.12/ATAK-Plugin-MapDepot-1.12--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.12/ATAK-Plugin-MapDepot-1.12--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.12/ATAK-Plugin-MapDepot-1.12--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -73,6 +73,9 @@ The landing page offers six kinds of data, each on its own page.
   neighborhood, as GeoPDFs.
 - **Drone IR Maps (UASWFC)** — infrared flown by uncrewed aircraft, as
   georeferenced PDFs and KMZs.
+- **Disaster Aerials (NOAA)** — the high-resolution aerials NOAA flies after a
+  hurricane, flood, fire or tornado, one overlay per flight, drawn over
+  whatever map you have.
 
 ---
 
@@ -140,13 +143,21 @@ close enough to see parking spaces; **zoom 10** is regional only.
 
 ### Overlays
 
-Some sources are *overlays* rather than base maps: roads, labels and points of
-interest on a transparent background, drawn over whatever is underneath.
+Some sources are *overlays* rather than base maps: roads, labels, contour lines,
+flood zones or radar on a transparent background, drawn over whatever is
+underneath. The **Overlay** category lists them.
 
 ![A reference overlay over imagery](screenshots/18_reference_overlay.png)
 
+An overlay is something you switch **on**, not something you switch **to**.
+Installing one from Map Depot switches it on over the map you already have, and
+any number can be on at once. To turn one off or on again, open ATAK's Overlay
+Manager and look under **Image Overlay**. A base map is the opposite: one at a
+time, picked from ATAK's map list.
+
 This is what makes fresh imagery usable. Aerial imagery flown after an event has
-no street names on it. An overlay puts them back without hiding the imagery.
+no street names on it. **Census Roads and Street Names** puts them back without
+hiding the imagery, and it is public-domain data, so it goes anywhere.
 
 ---
 
@@ -322,7 +333,37 @@ The maps' own site cannot be reached from a phone, so Map Depot reads them
 from its depot, where they are mirrored with the author's permission. Maps by
 FlameMapper.
 
-## 8. Finding what you already have
+## 8. Disaster aerials (NOAA)
+
+After a hurricane makes landfall, and after some floods, fires and tornadoes,
+NOAA flies the damaged area and publishes the aerials within a day or two of
+each flight. Map Depot lists every event NOAA has published this way since
+2018, newest first, and every flight in it.
+
+![The flights of one event](screenshots/50_disaster_aerials.png)
+
+Pick the event with the button under the search box. The count is how many
+flights it has.
+
+![Choosing an event](screenshots/51_event_chooser.png)
+
+Each flight is an overlay: it covers the area that was flown, at 15 to 30 cm a
+pixel, and draws over whatever map you have. Outside the flown area your map
+shows through. The **All flights** row installs the whole event as one overlay;
+the flights under it install one at a time, nearest the map first, with the
+date, the flight letter and how far away it is on every row. Tiles stream as
+you pan, so the first look at a flight needs a connection.
+
+Installed, a row says **tap to go there**, and tapping it takes the map to the
+flight. **Hide** turns it off without removing it. **Remove** takes it off the
+map and off the phone.
+
+During a storm NOAA adds flights every day. The list says when the catalog was
+last built; a flight flown after that appears the next day.
+
+---
+
+## 9. Finding what you already have
 
 Every page has a filter button, next to **Back**, that cycles **All** →
 **Installed** → **Available**. Set to **Installed**, the page becomes a list of
@@ -359,7 +400,7 @@ on at a time.
 
 ---
 
-## 9. Removing
+## 10. Removing
 
 **Remove** appears on anything installed, and says what removing actually frees
 before it does it.
@@ -381,7 +422,7 @@ deletes nothing. A pin is a shortcut, not a download.
 
 ---
 
-## 10. Where files go
+## 11. Where files go
 
 Map Depot writes into ATAK's own folders, so what it installs is
 indistinguishable from data put there by hand.
@@ -390,6 +431,7 @@ indistinguishable from data put there by hand.
 |---|---|
 | Elevation | `atak/DTED/`, one file per one-degree square |
 | Streaming base maps | `atak/imagery/`, as map source files |
+| Streaming overlays and disaster aerials | `atak/grg/`, as map source files, so ATAK lists them under Image Overlay |
 | Offline public land vector tiles | `atak/imagery/`, as vector tile packages |
 | Forest Service map sheets | `atak/grg/`, as georeferenced PDFs |
 | Incident and drone maps (PDF) | `atak/grg/`, as georeferenced PDFs |
@@ -404,7 +446,7 @@ so no layer is left pointing at something that is gone.
 
 ---
 
-## 11. In the plugin
+## 12. In the plugin
 
 The same guide ships inside the plugin as a PDF, for when you are in the field
 without this page. In ATAK go to **Settings → Tool Preferences → Map Depot →
