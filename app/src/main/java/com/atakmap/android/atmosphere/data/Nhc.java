@@ -271,6 +271,24 @@ public final class Nhc {
         return out;
     }
 
+    /**
+     * The pane's line for storms NHC lists but publishes no forecast for:
+     * "No forecast map from NHC for Isaias and Rachel". A storm the list shows and
+     * the map does not reads as a broken layer, so the pane says why. "" when there
+     * are none.
+     */
+    public static String noForecast(List<Storm> storms) {
+        if (storms == null || storms.isEmpty())
+            return "";
+        final StringBuilder b = new StringBuilder("No forecast map from NHC for ");
+        for (int i = 0; i < storms.size(); i++) {
+            if (i > 0)
+                b.append(i == storms.size() - 1 ? " and " : ", ");
+            b.append(storms.get(i).name);
+        }
+        return b.toString();
+    }
+
     /** The feed writes its numbers as strings; take either, and -1 for neither. */
     private static int number(JSONObject o, String key) {
         final String s = o.optString(key, "").trim();
