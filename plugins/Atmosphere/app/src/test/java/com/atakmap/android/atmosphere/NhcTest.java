@@ -121,6 +121,39 @@ public class NhcTest {
                 "{\"activeStorms\":[{\"binNumber\":\"XX9\",\"name\":\"Nope\"}]}").size());
     }
 
+    @Test
+    public void aPostTropicalStormKeepsItsPositionAndSaysWhyThereIsNoMap() {
+        // Isaias on 2026-10-10 (takwerx/atmosphere#5): still in CurrentStorms.json,
+        // inland over Tennessee, while every layer of AT4 answered with no features.
+        // Its own position is all there is to draw, so it has to survive the parse.
+        final List<Nhc.Storm> storms = Nhc.parseActive("{\"activeStorms\":[{"
+                + "\"id\":\"al092026\",\"binNumber\":\"AT4\",\"name\":\"Isaias\","
+                + "\"classification\":\"PTC\",\"intensity\":\"20\",\"pressure\":\"1009\","
+                + "\"latitudeNumeric\":35,\"longitudeNumeric\":-86.7,"
+                + "\"trackCone\":null,\"forecastTrack\":null}]}");
+        assertEquals(1, storms.size());
+        final Nhc.Storm isaias = storms.get(0);
+        assertEquals("Post-Tropical Cyclone Isaias", isaias.display());
+        assertEquals(35.0, isaias.latitude, 0.001);
+        assertEquals(-86.7, isaias.longitude, 0.001);
+
+        assertEquals("No forecast map from NHC for Isaias", Nhc.noForecast(storms));
+    }
+
+    @Test
+    public void theNoForecastLineNamesEveryStormInPlainWords() {
+        assertEquals("", Nhc.noForecast(null));
+        assertEquals("", Nhc.noForecast(new java.util.ArrayList<Nhc.Storm>()));
+        final List<Nhc.Storm> three = Nhc.parseActive("{\"activeStorms\":["
+                + "{\"binNumber\":\"AT4\",\"name\":\"Isaias\"},"
+                + "{\"binNumber\":\"EP3\",\"name\":\"Rachel\"},"
+                + "{\"binNumber\":\"EP5\",\"name\":\"Simon\"}]}");
+        assertEquals("No forecast map from NHC for Isaias and Rachel",
+                Nhc.noForecast(three.subList(0, 2)));
+        assertEquals("No forecast map from NHC for Isaias, Rachel and Simon",
+                Nhc.noForecast(three));
+    }
+
     private static Nhc.Storm storm(int kt) {
         return Nhc.parseActive("{\"activeStorms\":[{\"binNumber\":\"AT1\",\"name\":\"X\","
                 + "\"classification\":\"HU\",\"intensity\":\"" + kt + "\"}]}").get(0);

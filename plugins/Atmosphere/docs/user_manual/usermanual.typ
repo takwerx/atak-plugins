@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.11",
+   plugin-version: "0.12",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -688,6 +688,8 @@ temperature as a picture, with its scale in both units.
   forecast track with its times, the cone, and the wind fields. The block
   lists every storm with its strength; *Go to* frames it, and the arrow opens
   its advisory and map choices. With no storm it says "No storms right now".
+  A storm NHC still lists but no longer forecasts, post-tropical or past its
+  final advisory, shows only a marker where it is, and the block says so.
 ]
 ]
 
