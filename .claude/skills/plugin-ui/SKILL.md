@@ -471,6 +471,32 @@ The base rules from CLAUDE.md's "Plugin UI standard", with the styles in full.
 <color name="state_off">#ff5b52</color>
 ```
 
+**Two kinds of heading.** The small-caps `TakwerxSectionHeading` above labels a
+group of controls (FEEDS, FILTERS): the buttons are what the eye lands on and
+the label only names them. A page of text is different: the sections are the
+structure, and a faint label between two paragraphs disappears. The operator on
+Fire Cast's detail page (2026-10-11): *"what it covers, and when are very faint
+... its hard to see a section change."* So every section heading on a page that
+is read (a detail page, a forecast, an alert, a station) is cyan, bold and full
+strength, in every plugin:
+
+```xml
+<style name="TakwerxPageHeading">
+    <item name="android:textSize">12sp</item>
+    <item name="android:textAllCaps">true</item>
+    <item name="android:textStyle">bold</item>
+    <item name="android:textColor">#00E5FF</item>
+    <item name="android:paddingTop">12dp</item>
+    <item name="android:paddingBottom">2dp</item>
+</style>
+```
+
+Built in code, the same: `setAllCaps(true)`, `setTextSize(12f)`,
+`setTypeface(Typeface.DEFAULT_BOLD)`, `setTextColor(0xFF00E5FF)`, no alpha. Fire
+Cast's `DetectionDetailsReceiver.headingView` is the reference. The body text
+under it stays white 14sp. This is one of the few rules that applies to existing
+plugins too: each one takes it on its next release, in its own session.
+
 - `style="@style/TakwerxButton"` on every button, with no per-button `textSize`.
 - **Never a Spinner.** Every dialog and toast uses `mapView.getContext()`, never
   the plugin context, or ATAK dies.
