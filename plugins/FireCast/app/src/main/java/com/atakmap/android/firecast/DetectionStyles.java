@@ -110,11 +110,18 @@ public final class DetectionStyles {
         // The center dot is what carries the detection at a zoom where the footprint is
         // smaller than a pixel: a 375 m box is invisible over a county. It sits in the
         // same feature, so there is still one thing to tap and one row in the chooser.
-        final Style dot = new BasicPointStyle((strokeAlpha << 24) | rgb, 6f);
+        // A GOES footprint is 2 km and up, visible at any zoom an operator works at, and
+        // on the 5.8 renderer its center point came out as a soft red disc hundreds of
+        // pixels across that hid the terrain under it (dev 1, 2026-10-11). The polar
+        // sensors keep the dot; their boxes are a pixel over a county.
+        final boolean needsDot = d.footprint.kind == Footprint.Kind.MEASURED;
+        final Style dot = needsDot ? new BasicPointStyle((strokeAlpha << 24) | rgb, 6f) : null;
         // ATAK draws a feature's name along the edge of an area unless a label style says
         // otherwise, and a thousand of those makes the map unusable.
         final Style silent = new LabelPointStyle("", 0, 0, LabelPointStyle.ScrollMode.OFF);
-        return new CompositeStyle(new Style[] { fill, stroke, dot, silent });
+        return new CompositeStyle(needsDot
+                ? new Style[] { fill, stroke, dot, silent }
+                : new Style[] { fill, stroke, silent });
     }
 
     private static Style dashed(int color, float width) {
