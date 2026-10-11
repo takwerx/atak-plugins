@@ -89,6 +89,7 @@ public class DetectionFeed {
     private FeatureDataStoreMapOverlay overlay;
     private DetectionDetailsReceiver details;
     private ActivityReceiver activity;
+    private com.atakmap.android.menu.MapMenuEventListener tapListener;
     private Listener listener;
     private boolean started;
 
@@ -155,13 +156,85 @@ public class DetectionFeed {
         final DocumentedIntentFilter af = new DocumentedIntentFilter();
         af.addAction(ActivityReceiver.ACTION, "list where fires are burning, beyond the map extent");
         AtakBroadcast.getInstance().registerReceiver(activity, af);
+        registerTap();
         main.postDelayed(timer, TICK_MS);
         refresh();
+    }
+
+    /**
+     * A tap on a detection opens its page, with no radial in between. The radial's
+     * only useful button here was Details, so it was a step in the way (operator,
+     * 2026-10-11, the same call made on Atmosphere and AirAware two days earlier).
+     *
+     * <p>ATAK asks this listener before it opens a radial; answering true stops the
+     * radial and tells ATAK the tap was handled, so it never pins its own callout to
+     * the top of the map. Only items carrying {@code firecast_uid} are claimed; every
+     * other plugin's items keep their radials. The detection's own radial stays set on
+     * the item as the fallback for an ATAK with no menu receiver.
+     */
+    private void registerTap() {
+        tapListener = new com.atakmap.android.menu.MapMenuEventListener() {
+            @Override
+            public boolean onShowMenu(final MapItem item) {
+                if (item == null || details == null)
+                    return false;
+                final String uid = item.getMetaString("firecast_uid", null);
+                if (uid == null)
+                    return false;
+                // A moment later, not now: a pick from ATAK's Select Item list closes
+                // the list and then posts its own show-details, which would close a
+                // page opened inline. A plain tap does not notice the quarter second.
+                main.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        final HeatDetection d = byUid(uid);
+                        if (d == null || details == null)
+                            return;
+                        clearAtakSelection();
+                        details.show(d);
+                    }
+                }, 250);
+                return true;
+            }
+
+            @Override
+            public void onHideMenu(MapItem item) {
+            }
+        };
+        final com.atakmap.android.menu.MapMenuReceiver menus =
+                com.atakmap.android.menu.MapMenuReceiver.getInstance();
+        if (menus != null)
+            menus.addEventListener(tapListener);
+        else
+            Log.w(TAG, "no radial menu receiver; taps keep ATAK's own menu");
+    }
+
+    /**
+     * Take ATAK's own selection off the map: the focus and the callout it pins to the
+     * top. A pick from ATAK's Select Item list selects the item itself before the page
+     * opens, and answering the menu question does not reach that path.
+     */
+    private static void clearAtakSelection() {
+        try {
+            AtakBroadcast.getInstance().sendBroadcast(
+                    new android.content.Intent("com.atakmap.android.maps.UNFOCUS"));
+            AtakBroadcast.getInstance().sendBroadcast(
+                    new android.content.Intent("com.atakmap.android.maps.HIDE_DETAILS"));
+        } catch (RuntimeException e) {
+            Log.d(TAG, "could not clear ATAK's selection: " + e);
+        }
     }
 
     public void stop() {
         started = false;
         main.removeCallbacks(timer);
+        if (tapListener != null) {
+            final com.atakmap.android.menu.MapMenuReceiver menus =
+                    com.atakmap.android.menu.MapMenuReceiver.getInstance();
+            if (menus != null)
+                menus.removeEventListener(tapListener);
+            tapListener = null;
+        }
         if (details != null) {
             try {
                 AtakBroadcast.getInstance().unregisterReceiver(details);
