@@ -137,12 +137,14 @@ public final class TropicalOverlay {
      */
     private final class Batch {
         private final int mine;
+        private final List<Nhc.Storm> storms;
         private final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
         private int outstanding = 1;
         private boolean flushed;
 
-        Batch(int mine) {
+        Batch(int mine, List<Nhc.Storm> storms) {
             this.mine = mine;
+            this.storms = new ArrayList<>(storms);
         }
 
         synchronized void expect() {
@@ -170,11 +172,71 @@ public final class TropicalOverlay {
                 public void run() {
                     if (mine != generation || !on)
                         return;
+                    final List<Nhc.Storm> bare = withoutShapes(storms);
+                    for (Nhc.Storm s : bare)
+                        addNow(s, all);
                     features.rewrite(all);
                     Log.d(TAG, "storms: wrote " + all.size() + " features in one pass");
+                    if (bare.isEmpty())
+                        return;
+                    final String why = Nhc.noForecast(bare);
+                    mapView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (mine == generation && on)
+                                status(why);
+                        }
+                    });
                 }
             });
         }
+    }
+
+    /**
+     * The storms that drew nothing, though something of theirs is switched on.
+     *
+     * <p>NHC stops publishing a forecast once a storm is post-tropical or on its
+     * final advisory, but CurrentStorms.json keeps listing it for a while. Every
+     * layer of its slot then answers with no features, so the pane listed Isaias
+     * and the map showed nothing at all (takwerx/atmosphere#5, 2026-10-10).
+     */
+    private List<Nhc.Storm> withoutShapes(List<Nhc.Storm> storms) {
+        final List<Nhc.Storm> out = new ArrayList<>();
+        for (Nhc.Storm s : storms) {
+            boolean any = false;
+            for (Nhc.Product p : Nhc.Product.values())
+                any |= isEnabled(s, p);
+            if (!any)
+                continue;
+            synchronized (extents) {
+                if (!extents.containsKey(s.bin))
+                    out.add(s);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Where a storm with no forecast is now, from the storm list itself. Drawn as
+     * the forecast's own "now" marker would be, so it reads the same as one, and
+     * only when positions are on, so turning them off still means no marker.
+     */
+    private void addNow(Nhc.Storm storm, List<AtmosphereFeatures.Drawn> out) {
+        if (!isEnabled(storm, Nhc.Product.POINTS)
+                || Double.isNaN(storm.latitude) || Double.isNaN(storm.longitude))
+            return;
+        final Icon icon = icons.labelled(storm.display(), trackColor(storm), 40);
+        if (icon == null)
+            return;
+        final AttributeSet a = attrs(storm, null);
+        a.setAttribute("Forecast", "None published by NHC");
+        out.add(new AtmosphereFeatures.Drawn(label(storm) + " - Positions",
+                storm.display(),
+                AtmosphereFeatures.point(storm.latitude, storm.longitude),
+                AtmosphereFeatures.icon(icon.getImageUri(Icon.STATE_DEFAULT),
+                        icon.getWidth(), icon.getHeight()),
+                a));
+        grow(storm.bin, new GeoPoint[] { new GeoPoint(storm.latitude, storm.longitude) });
     }
 
     /** Off the main thread, and never after stop() has shut the worker down. */
@@ -239,7 +301,7 @@ public final class TropicalOverlay {
             clearFeaturesOffMain();
             return;
         }
-        final Batch b = new Batch(generation);
+        final Batch b = new Batch(generation, storms);
         for (Nhc.Storm s : storms)
             draw(s, generation, b);
         b.done();
@@ -333,7 +395,7 @@ public final class TropicalOverlay {
                     return;
                 }
                 active.addAll(storms);
-                final Batch b = new Batch(generation);
+                final Batch b = new Batch(generation, storms);
                 for (Nhc.Storm s : storms)
                     draw(s, generation, b);
                 // The orchestrator's own count, released now that every request for

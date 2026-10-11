@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.11** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.11/ATAK-Plugin-Atmosphere-0.11--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.11/ATAK-Plugin-Atmosphere-0.11--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.11/ATAK-Plugin-Atmosphere-0.11--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -79,18 +79,20 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.11, for ATAK-CIV 5.6, 5.7 and 5.8. New: Fire Danger, the Energy Release
+0.12, for ATAK-CIV 5.6, 5.7 and 5.8. Fix: a storm the National Hurricane
+Center still lists but no longer forecasts (post-tropical, or past its final
+advisory) now shows a marker where it is, and the Hurricanes block says NHC
+publishes no forecast map for it; before, such a storm was listed and nothing
+drew (takwerx/atmosphere#5). 0.11 brought Fire Danger, the Energy Release
 Component by Predictive Service Area with each GACC's chart; California's
 utility weather stations; a Layers button in the top row; labels that stay
 level when the map turns; the smoke forecast at every zoom; fire weather zones
-outlined in purple; Atmosphere's drawn icons kept in ATAK's private storage
-rather than the shared card (takwerx/atmosphere#2). (0.10 was a picture build
-for the manual and was not published.) 0.9 brought SAWTI, lightning strike
-density and California's Public Safety Power Shutoffs. Developed on a Samsung
-Galaxy XCover Pro running ATAK-CIV 5.8.0.3 and checked on official ATAK-CIV
-5.8 with the tak.gov-signed 0.10; compiled clean against the 5.6.0.23 and
-5.7.0.14 SDKs. The manual and the user guide carry screenshots from the
-signed build.
+outlined in purple; and Atmosphere's drawn icons kept in ATAK's private
+storage rather than the shared card (takwerx/atmosphere#2). Developed on a
+Samsung Galaxy XCover Pro running ATAK-CIV 5.8.0.3; the 0.12 fix was checked
+as a release build on a development ATAK-CIV 5.8 phone; compiled clean against
+the 5.6.0.23 and 5.7.0.14 SDKs. The manual and the user guide carry
+screenshots from the signed build.
 
 Parsers for every service are covered by unit tests that run off-device
 (./gradlew testCivDebugUnitTest).
