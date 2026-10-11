@@ -1,12 +1,12 @@
 # Atmosphere for ATAK — User Guide
 
-**Version 0.12 · takwerx**
+**Version 0.13 · takwerx**
 
-**Download Atmosphere 0.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.13** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -15,7 +15,9 @@ forecast at a point, the readings from the weather stations, river gauges and
 buoys around you, and the pictures the weather services publish — radar,
 satellite, wind, rain, smoke, air quality, lightning, fire and flood outlooks,
 the Santa Ana wildfire threat, power shutoffs, flooding, waves, the sea and
-snow — each one a layer you switch on when you need it.
+snow — and what happened on the ground: storm reports, surveyed tornado paths,
+post-fire debris-flow hazard and earthquakes — each one a layer you switch on
+when you need it.
 
 <img src="screenshots/1_toolbar.png" width="640">
 
@@ -141,6 +143,8 @@ opening the plugin.
 | Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches the open ocean where no radar does |
 | Wind | Rain | The model's rain rate, light to violent, hour by hour for five days with the rate "Here"; a forecast, not radar |
 | Wind | Wind | The forecast wind as moving streaks colored by speed, with a time scrubber, heights to the jet stream, and the wind "Here" |
+| Storms | Storm Reports | Every report the NWS offices logged in the last 24, 48 or 72 hours: tornado, wind, hail, flood, rain, snow and ice, landslide; the type and size in the pill, the remarks behind a tap |
+| Storms | Tornado Paths | The tracks NWS survey teams walked in the last 30 days, 90 days or year, each line in its EF rating's color; length, width, peak wind, injuries, deaths and the survey behind a tap |
 | Fire | Fire Weather Outlook | Elevated, critical and extreme areas and dry thunderstorms, Day 1, 2, 3 or all; from Day 3 as a chance of critical |
 | Fire | Fire Weather Zones | The NWS fire weather zones with their numbers, shaded under a Red Flag Warning or a Fire Weather Watch; the zone's planning forecast behind a tap |
 | Fire | SAWTI | The Forest Service's Santa Ana Wildfire Threat Index for four Southern California zones, colored by level for each of four days; the SAWTI page behind a tap |
@@ -153,6 +157,7 @@ opening the plugin.
 | Rain and rivers | River Gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
 | Rain and rivers | Flooded Ground | Where the river model puts water over the banks, now or at the worst of the next 5 days (experimental) |
 | Rain and rivers | Streams Running High | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
+| Rain and rivers | Debris Flow | The USGS post-fire assessments: every fire of the last three years marked; zoomed in, the perimeter and each stream basin filled Low, Moderate or High for a 15-minute burst of rain, with likelihood and volume behind a tap |
 | Ocean | Buoys | Buoys and coastal stations, readings colored by sea state; tides, currents and the marine forecast behind a tap |
 | Ocean | Waves | The wave forecast: seas colored by state, the swell as moving crests, five days on the time strip, with the seas "Here" |
 | Ocean | Beach Forecast | Beach areas colored by rip current risk |
@@ -333,7 +338,66 @@ utility.
 
 <img src="screenshots/86_psps_details.png" width="420">
 
-## 9. Spot Weather Forecast
+## 9. Storm Reports, Tornado Paths, Debris Flow and Earthquakes
+
+These four are what happened, not what is forecast. Each is a national or
+worldwide file from the agency, so none of them sends your position; Debris
+Flow sends the area the map shows, because the basins are too many to fetch
+whole.
+
+**Storm Reports** draws every report the NWS offices logged in the last three
+days: a dot in its family's color (tornado red, wind orange, hail green, flood
+blue, rain teal, snow and ice violet, landslide and debris flow brown, other
+grey) with the NWS type and size in the pill, `Hail 1.75 in`, `Gust 66 mph`,
+`Tornado`. The row under the switch picks 24, 48 or 72 hours. Tap a dot for
+where, when, the office and its remarks. They are preliminary, as spotters
+and the public told the offices; the surveyed tornado paths are the next
+layer.
+
+<img src="screenshots/97_reports_layer_block.png" width="420">
+
+**Tornado Paths** draws the track a survey team walked after a tornado, as a
+line in the Damage Assessment Toolkit's color for its EF rating, from EF0 aqua
+to EF5 purple, EFU grey for a tornado with nothing to rate. The row picks the
+last 30 days, 90 days or year. Tap a line for the rating, the office, when it
+was on the ground and for how long, the path's length and width, the peak wind
+the damage implies, injuries and deaths, and the survey team's words. A path
+appears a day or more after the storm, once the office has walked it, and is
+preliminary until the office finalizes it.
+
+<img src="screenshots/98_tornado_layer_block.png" width="420">
+
+**Debris Flow** sits in the Rain and rivers group because a debris flow is a
+flood of rock and mud, and the trigger is a burst of rain over a burn. It
+draws every fire the USGS has assessed in the last three years as a marker
+with the fire's name and year. Zoom in to a few degrees and it fetches the
+fire's perimeter and each stream basin, filled in USGS's own colors: Low
+yellow, Moderate orange, High red, for one 15-minute burst of rain at the rate
+the USGS set for that fire (24 mm/h, about an inch an hour, for most). Tap a
+basin for the likelihood of a debris flow, the volume it would carry, the
+storm it is for and the fire; tap a fire marker for when it burned, when it was
+assessed and the USGS record. The status line names the fires in view and
+counts the basins by hazard, or says to zoom in. A burn stays hazardous for
+two to five years, until the slopes grow back.
+
+<img src="screenshots/99_debrisflow_layer_block.png" width="420">
+
+**Earthquakes** draws the USGS feed the way USGS's own map does: a circle sized
+by magnitude, colored by age (past hour red, past day orange, past week yellow,
+older white), the magnitude in the pill from M2.5 up. The first row picks the
+past day, week or month (the month feed carries M2.5 and up only); the second
+row, **Smallest shown**, picks All, M1+, M2.5+ or M4.5+, M2.5+ on a new
+install. For up to five of the largest quakes of M4.5 or more, the ShakeMap's
+intensity contours are drawn in USGS's intensity colors with their Roman
+numeral, VI "Strong" and so on. Tap a quake for the magnitude and its type, the
+place, the time and how long ago, the depth, how many people reported feeling
+it and how hard, the PAGER impact level, whether USGS flagged a tsunami, whether
+a seismologist has reviewed it, and the USGS event page. Worldwide, every five
+minutes.
+
+<img src="screenshots/100_quakes_layer_block.png" width="420">
+
+## 10. Spot Weather Forecast
 
 The layer draws every spot forecast request the National Weather Service has
 open, with the forecast the office wrote for each. The page lists them — All,
@@ -359,13 +423,13 @@ first; you see what came back before it is used.
 
 <img src="screenshots/61_spot_request.png" width="420"> <img src="screenshots/64_address_match.png" width="420">
 
-## 10. The user manual
+## 11. The user manual
 
 The manual is inside the plugin. Open ATAK's **Settings**, then **Tool
 Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
 **Atmosphere user manual**.
 
-## 11. What it does not do
+## 12. What it does not do
 
 - It draws no warnings, watches or advisories, except Red Flag Warnings and
   Fire Weather Watches on its fire weather zones. IPAWS Alerts does the rest.
@@ -373,10 +437,15 @@ Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
   late, not single strikes as they happen, and not a lightning safety trigger.
 - Its power shutoffs are California's three big utilities only, as Cal OES
   reports them; anywhere else, ask the utility.
+- Its storm reports are preliminary, as the offices received them, and its
+  tornado paths are each office's survey until it finalizes it; its debris-flow
+  hazard is the USGS's for one design storm, not a forecast of rain; its
+  earthquakes are USGS's feed, not an early warning. None of these is an alert.
 - It publishes nothing: no path puts anything on another phone or a server.
 - It records nothing about you: no callsign, device identifier or TAK server
   detail is ever sent. Your position leaves the device only for the forecast
   when it is set to My position, rounded to about 100 m, and for the station,
   gauge and buoy lists when they are set to My position. The Fire Weather Zones
   page finds your zone by sending the half-degree square the point is in, about
-  30 miles across, never the point.
+  30 miles across, never the point. Debris Flow sends the area the map shows,
+  padded, when it is zoomed in enough to draw basins.

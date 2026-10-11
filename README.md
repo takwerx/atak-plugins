@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.13** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -62,6 +62,16 @@ Capabilities:
     Forest Service's national service; tap an area's name for its ERC and
     Burning Index and its GACC's own ERC chart, full screen to pinch and zoom.
     Each fire weather zone gives the ERC of the area it is in.
+  - Storms after the fact: every storm report the NWS offices logged in the
+    last three days (tornado, wind, hail, flood, rain, snow, landslide), and
+    the tornado paths survey teams have walked in the last year, each line in
+    its EF rating's color with the survey behind a tap.
+  - Debris flow: the USGS post-fire assessments, every fire of the last three
+    years marked and, zoomed in, each stream basin filled Low, Moderate or
+    High for a 15-minute burst of rain, beside the river gauges and the rain.
+  - Earthquakes: the USGS feed worldwide, circles sized by magnitude and
+    colored by age the way USGS draws them, the shaking contours of the
+    largest, and the USGS record behind a tap.
   - Spot forecasts: every open request the National Weather Service has, with
     the office's forecast, newest or closest first and by type, and help
     preparing your own request.
@@ -79,20 +89,22 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.12, for ATAK-CIV 5.6, 5.7 and 5.8. Fix: a storm the National Hurricane
-Center still lists but no longer forecasts (post-tropical, or past its final
-advisory) now shows a marker where it is, and the Hurricanes block says NHC
-publishes no forecast map for it; before, such a storm was listed and nothing
-drew (takwerx/atmosphere#5). 0.11 brought Fire Danger, the Energy Release
+0.13, for ATAK-CIV 5.6, 5.7 and 5.8. New: a Storms group with Storm Reports
+(the NWS Local Storm Reports of the last three days) and Tornado Paths (the
+NWS Damage Assessment Toolkit's surveyed tracks of the last year, by EF
+rating); Debris Flow (the USGS post-fire debris-flow assessments, fires marked
+and basins by hazard) beside the river gauges; and a Ground group with
+Earthquakes (the USGS feed, ShakeMap contours for the largest). 0.12 fixed a
+storm the National Hurricane Center still lists but no longer forecasts
+(takwerx/atmosphere#5). 0.11 brought Fire Danger, the Energy Release
 Component by Predictive Service Area with each GACC's chart; California's
 utility weather stations; a Layers button in the top row; labels that stay
 level when the map turns; the smoke forecast at every zoom; fire weather zones
 outlined in purple; and Atmosphere's drawn icons kept in ATAK's private
-storage rather than the shared card (takwerx/atmosphere#2). Developed on a
-Samsung Galaxy XCover Pro running ATAK-CIV 5.8.0.3; the 0.12 fix was checked
-as a release build on a development ATAK-CIV 5.8 phone; compiled clean against
-the 5.6.0.23 and 5.7.0.14 SDKs. The manual and the user guide carry
-screenshots from the signed build.
+storage rather than the shared card (takwerx/atmosphere#2). Developed on
+Samsung Galaxy S10 and XCover Pro phones running the development ATAK-CIV
+5.8.0.3; compiled clean against the 5.6.0.23 and 5.7.0.14 SDKs. The manual
+and the user guide carry screenshots from the signed build.
 
 Parsers for every service are covered by unit tests that run off-device
 (./gradlew testCivDebugUnitTest).

@@ -65,6 +65,17 @@ public abstract class OutlookOverlay {
 
         public Area(int day, String title, String label, int color, JSONObject geometry,
                 String details, String ref) {
+            this(day, title, label, color, geometry, details, ref, null);
+        }
+
+        /**
+         * Whatever the layer needs back when it draws this area: a quake, a report,
+         * a contour's intensity. Null for a plain filled area.
+         */
+        public final Object extra;
+
+        public Area(int day, String title, String label, int color, JSONObject geometry,
+                String details, String ref, Object extra) {
             this.day = day;
             this.title = title;
             this.label = label;
@@ -72,6 +83,7 @@ public abstract class OutlookOverlay {
             this.geometry = geometry;
             this.details = details;
             this.ref = ref == null ? "" : ref;
+            this.extra = extra;
         }
     }
 
@@ -83,7 +95,9 @@ public abstract class OutlookOverlay {
     protected final EgressPolicy egress;
     private final AtmosphereFeatures features;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private final String tag, layerId, prefOn, prefDay;
+    private final String tag, layerId, prefOn, prefDay, prefChoice;
+    /** The second chip row's pick, for a layer that offers one; see {@link #choices()}. */
+    private int choice;
     /** 0 draws every day; 1 to {@link #days()} one day. Three days stacked hid each other (2026-09-26). */
     private int day = 1;
     private Listener listener;
@@ -110,8 +124,13 @@ public abstract class OutlookOverlay {
         this.layerId = layerId;
         this.prefOn = "weather.layer." + layerId + ".on";
         this.prefDay = "weather.layer." + layerId + ".day";
+        this.prefChoice = "weather.layer." + layerId + ".choice";
         final SharedPreferences p0 = MapCompat.prefs();
-        day = p0 == null ? 1 : clampDay(p0.getInt(prefDay, 1));
+        day = p0 == null ? defaultDay() : clampDay(p0.getInt(prefDay, defaultDay()));
+        final String[] cs = choices();
+        final int top = cs == null ? 0 : cs.length - 1;
+        choice = Math.max(0, Math.min(top,
+                p0 == null ? defaultChoice() : p0.getInt(prefChoice, defaultChoice())));
         this.features = new AtmosphereFeatures(mapView, pluginContext, tag, name,
                 layerId + ".sqlite", layerId, false);
         if (tapsAtLabelOnly())
@@ -126,8 +145,98 @@ public abstract class OutlookOverlay {
         return false;
     }
 
-    /** The requests, in order; each answer goes to {@link #parse(int, String)} with its index. */
+    /**
+     * The requests, in order; each answer goes to {@link #parse(int, String)} with its
+     * index. Read again before every request, so a layer may grow the list as answers
+     * come in: the next page of an ArcGIS query, or a ShakeMap's detail and then its
+     * contours.
+     */
     protected abstract String[] urls();
+
+    /** Called on main as a refresh begins, before the first request: reset any grown list here. */
+    protected void onRefreshStart() {
+    }
+
+    /** Called on main once a refresh has finished, drawn or failed. */
+    protected void onRefreshDone() {
+    }
+
+    /** A request whose answer is a megabyte or more, read with the long timeout. */
+    protected boolean large(int index) {
+        return false;
+    }
+
+    /**
+     * Whether an area is drawn on the chosen day. One day exactly by default; a layer
+     * whose row is a window ("24 h", "48 h", "72 h") says {@code a.day <= showDay}.
+     */
+    protected boolean shown(Area a, int showDay) {
+        return showDay == 0 || a.day == showDay;
+    }
+
+    /** Whether picking another day means asking the server again rather than redrawing what is held. */
+    protected boolean refetchOnDay() {
+        return false;
+    }
+
+    /**
+     * What the area becomes on the map: a filled area in the category's color by
+     * default. A layer of points or lines builds its own, and may return null to
+     * draw nothing for this one. Worker thread.
+     */
+    protected AtmosphereFeatures.Drawn drawn(Area a, Geometry g, AttributeSet s) {
+        final int c = a.color & 0x00FFFFFF;
+        final int fill = (fillAlpha(a) << 24) | c;
+        final int[] lc = labelColors(a);
+        return new AtmosphereFeatures.Drawn(setName(a), a.title, g,
+                lc == null
+                        ? AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title)
+                        : AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title,
+                                lc[0], lc[1], labelMaxResolution()), s);
+    }
+
+    /**
+     * A second chip row under the day row, or null for none: "All", "M1+", "M2.5+",
+     * "M4.5+" for the quakes. Called from the pane; a constant.
+     */
+    public String[] choices() {
+        return null;
+    }
+
+    /** The row's heading, small caps over the chips. */
+    public String choiceHeading() {
+        return "";
+    }
+
+    protected int defaultChoice() {
+        return 0;
+    }
+
+    public int choice() {
+        return choice;
+    }
+
+    /** Whether another choice means asking the server again rather than redrawing what is held. */
+    protected boolean refetchOnChoice() {
+        return false;
+    }
+
+    public void setChoice(int value) {
+        final String[] cs = choices();
+        final int v = cs == null ? 0 : Math.max(0, Math.min(cs.length - 1, value));
+        if (v == choice)
+            return;
+        choice = v;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putInt(prefChoice, v).apply();
+        if (!on)
+            return;
+        if (refetchOnChoice())
+            refresh(true);
+        else
+            rebuild(generation);
+    }
 
     protected abstract List<Area> parse(int index, String body);
 
@@ -148,6 +257,11 @@ public abstract class OutlookOverlay {
      */
     protected String setName(Area a) {
         return "Day " + a.day;
+    }
+
+    /** The day drawn on a new install, 1 to {@link #days()}. Called from the constructor: a constant. */
+    protected int defaultDay() {
+        return 1;
     }
 
     /** How many days the day row offers. Called from the constructor: a constant. */
@@ -261,7 +375,11 @@ public abstract class OutlookOverlay {
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
             p.edit().putInt(prefDay, v).apply();
-        if (on)
+        if (!on)
+            return;
+        if (refetchOnDay())
+            refresh(true);
+        else
             rebuild(generation);
     }
 
@@ -274,6 +392,7 @@ public abstract class OutlookOverlay {
             return;
         lastPoll = now;
         inFlight = true;
+        onRefreshStart();
         status(areas.isEmpty() ? "Getting the " + noun() + "…" : "");
         fetch(0, new ArrayList<Area>(), generation);
     }
@@ -288,9 +407,10 @@ public abstract class OutlookOverlay {
             inFlight = false;
             areas = got;
             rebuild(mine);
+            onRefreshDone();
             return;
         }
-        Http.get(urls[index], egress.userAgent(), new HashMap<String, String>(), new Http.Callback() {
+        final Http.Callback cb = new Http.Callback() {
             @Override
             public void onSuccess(final String body) {
                 if (mine != generation || !on) {
@@ -331,8 +451,13 @@ public abstract class OutlookOverlay {
                 inFlight = false;
                 if (mine == generation && on)
                     status(capitalize(noun()) + ": " + error);
+                onRefreshDone();
             }
-        });
+        };
+        if (large(index))
+            Http.getLarge(urls[index], egress.userAgent(), new HashMap<String, String>(), cb);
+        else
+            Http.get(urls[index], egress.userAgent(), new HashMap<String, String>(), cb);
     }
 
     private void rebuild(final int mine) {
@@ -345,30 +470,31 @@ public abstract class OutlookOverlay {
                 final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
                 final int showDay = day;
                 for (Area a : snapshot) {
-                    if (showDay != 0 && a.day != showDay)
+                    if (!shown(a, showDay))
                         continue;
                     final Geometry g;
                     try {
-                        g = GeoJson.parse(a.geometry);
+                        g = a.geometry == null ? null : GeoJson.parse(a.geometry);
                     } catch (Exception e) {
                         Log.w(tag, "unusable outlook shape", e);
                         continue;
                     }
                     if (g == null)
                         continue;
-                    final int c = a.color & 0x00FFFFFF;
                     final AttributeSet s = new AttributeSet();
                     s.setAttribute("_details", a.details);
                     s.setAttribute("Outlook", a.title);
                     if (!a.ref.isEmpty())
                         s.setAttribute("_ref", a.ref);
-                    final int fill = (fillAlpha(a) << 24) | c;
-                    final int[] lc = labelColors(a);
-                    drawn.add(new AtmosphereFeatures.Drawn(setName(a), a.title, g,
-                            lc == null
-                                    ? AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title)
-                                    : AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title,
-                                            lc[0], lc[1], labelMaxResolution()), s));
+                    final AtmosphereFeatures.Drawn d;
+                    try {
+                        d = drawn(a, g, s);
+                    } catch (RuntimeException e) {
+                        Log.w(tag, "could not draw " + a.title, e);
+                        continue;
+                    }
+                    if (d != null)
+                        drawn.add(d);
                 }
                 features.rewrite(drawn);
                 final String line = summary(snapshot);
