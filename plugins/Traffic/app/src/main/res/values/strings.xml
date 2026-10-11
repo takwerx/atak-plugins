@@ -3,7 +3,7 @@
     <!-- App -->
     <string name="app_name">Traffic</string>
     <!-- description -->
-    <string name="app_desc">Live traffic drawn over your own base map, and kept refreshing while the map sits still.</string>
+    <string name="app_desc">Live traffic and road incidents drawn over your own base map, kept current while the map sits still.</string>
 
     <string name="source_heading">Source</string>
     <string name="source_none">Choose a source</string>
@@ -19,9 +19,29 @@
     <string name="woke_fmt">Refreshed on wake at %1$s</string>
     <string name="prefs_summary">Open the Traffic user guide</string>
     <string name="manual_title">Plugin Documentation</string>
-    <string name="manual_summary">Open the Traffic user guide: turning the overlay on, what the markers mean, and how the feed refreshes</string>
+    <string name="manual_summary">Open the Traffic user guide: the traffic overlay, road incidents from every state, and how both stay current</string>
     <string name="traffic_heading">Traffic Overlay</string>
     <string name="persist_heading">Persistent Overlay</string>
     <string name="state_on_label">ON</string>
     <string name="state_off_label">OFF</string>
+    <string name="incidents_heading">511 Incidents</string>
+    <string name="incidents_loading">Loading…</string>
+    <string name="incidents_unreachable">Cannot reach the 511 server.</string>
+    <string name="incidents_not_covered">No 511 feed for this area yet.</string>
+    <string name="incidents_zoom_in">Zoom in to see incidents.</string>
+    <string name="incidents_checked_fmt">%1$s\nChecked %2$s</string>
+    <string name="incidents_stale_fmt">Server out of reach since %1$s. Showing what it last sent.</string>
+    <string name="incident_notes">Notes</string>
+    <string name="incident_units">Units</string>
+    <string name="back">Back</string>
+    <string name="settings">Settings</string>
+    <string name="incidents_settings_heading">511 Incidents</string>
+    <string name="use_this_zoom">Use this zoom</string>
+    <string name="show_settings">Show or hide</string>
+    <string name="incidents_gated_fmt">Zoom in to see incidents.\nShown at %1$s.</string>
+    <string name="use_this_extent">Use this extent</string>
+    <string name="incidents_not_picked_fmt">%1$s isn\'t one of your states.</string>
+    <string name="incidents_add_state_fmt">Add %1$s</string>
+    <string name="incidents_no_states">No states chosen. Pick yours in Settings.</string>
+    <string name="presets">Presets</string>
 </resources>

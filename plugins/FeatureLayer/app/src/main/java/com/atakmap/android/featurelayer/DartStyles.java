@@ -292,7 +292,7 @@ public final class DartStyles {
         // ATAK lays that out clear of the icon by itself.
         // The composite is PX wide and PX*(1+PAD) tall; asking for a square box squashed the
         // padded image to a third-size disc wherever the feature itself got drawn.
-        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX * (1f + PAD), 0, 0, 0f, true);
+        return new IconPointStyle(0xFFFFFFFF, "file://" + marker.getAbsolutePath(), PX, PX * (1f + PAD), 0, 0, 0f, false);
     }
 
     /**

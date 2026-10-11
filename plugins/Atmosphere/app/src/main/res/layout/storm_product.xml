@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One of a storm's maps: a plain TakwerxButton whose text goes green when it is
+     drawn, the Traffic toggle convention used everywhere else in the plugin. -->
+<Button xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/TakwerxButton"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginLeft="12dp"
+    android:layout_marginTop="4dp"
+    android:gravity="center_vertical|left"
+    android:textSize="13sp" />

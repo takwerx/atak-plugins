@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Feature Layer",
-   plugin-version: "0.10",
+   plugin-version: "0.14",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -37,19 +37,28 @@ takes any ArcGIS Online organization you sign in to.
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("2.png", height: 270pt)
 ][
-  *Pick a source* lists where layers come from.
+  *Add Layer*, on the main screen, opens the sources; *Back*, or adding a
+  layer, returns to the list. *Pick a source* lists where layers come from.
 
   *NIFC* is the live National Incident Feature Service. It needs your own NIFC
   ArcGIS login.
 
   *SARCOP Training* is NAPSG's public search-and-rescue sandbox.
 
+  *New Fire Starts* is new wildfires and prescribed fires across the country,
+  the last 24 hours, public.
+
+  *Ongoing Fires* is every fire not yet contained, from the day after it was
+  found, public.
+
+  *Fire History* is where fires have burned since 1900, public.
+
   *CA Air Intel* is statewide California fire perimeters, public.
 
   *NIFS Archive (demo)* is last year's Dragon Bravo fire, public, for trying the
   symbology without a login.
 
-  *Add your own org…* takes any ArcGIS Online organization.
+  *Add your own org...* takes any ArcGIS Online organization.
 ]
 ]
 
@@ -98,14 +107,16 @@ takes any ArcGIS Online organization you sign in to.
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   #image("7.png", height: 270pt)
 ][
-  Each layer has a row: *ON/OFF*, *Features*, *Go to*, then *Auto* (how often
-  it refreshes), *Refresh* and *Remove*. The line under the name says how many
-  features it holds, when it last refreshed, and the refresh interval.
+  Each layer is one line: its name and *ON* or *OFF*. Tap it to turn the layer
+  on or off. The arrow at the right opens its controls: how many features it
+  holds, when it last refreshed, then *Features*, *Go to*, *Auto* (how often it
+  refreshes), *Refresh* and *Remove*. The arrow works while a layer is off.
 
-  *All ON / All OFF* beside the heading works every layer at once. The row says
-  *Loading…* while a layer fetches.
+  *All ON / All OFF* beside the heading works every layer at once. A row says
+  *Loading...* while its layer fetches.
 
-  *Go to* frames the whole incident.
+  *Go to* frames the whole incident. DART, FireGuard, New Fire Starts and CA Air
+  Intel cover a state or the country and have none.
 ]
 ]
 
@@ -195,14 +206,14 @@ takes any ArcGIS Online organization you sign in to.
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
   #image("15.png", width: 100%)
 
-  *Feature* on the main pane, or *Find* inside a layer's Features, opens a
-  search inside that layer. With nothing typed, *Find* lists every kind of
+  *Find* on the main screen searches every loaded layer at once; *Find* inside
+  a layer's Features searches only that layer. With nothing typed, *Find* lists every kind of
   thing the layer holds with a count. Tap one to list its features.
 ][
   #image("16.png", width: 100%)
 
   Type a name, a number or a type for a free search across names and every
-  attribute. Each row shows what it is, when it was collected, and how far away,
+  attribute; what is named for it comes first, then what only mentions it. Each row shows what it is, when it was collected, and how far away,
   in your ATAK units, with *tap to go there*.
 ][
   #image("17.png", width: 100%)
@@ -255,7 +266,7 @@ takes any ArcGIS Online organization you sign in to.
 ][
   #image("7-2.png", width: 100%)
 
-  A DART row carries the usual controls plus a scope: what the layer fetches.
+  A DART row's controls also carry a scope: what the layer fetches.
   The default is *What is in view*; the next page says how that works.
 ]
 ]
@@ -264,7 +275,7 @@ takes any ArcGIS Online organization you sign in to.
 = DART: on the map
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("33.png", width: 100%)
+  #image("33.jpg", width: 100%)
 
   Every rig is drawn the way NIFC's own EGP viewer draws it, with its whole
   callsign above the icon. The ring says how recently it reported: green inside
@@ -277,7 +288,7 @@ takes any ArcGIS Online organization you sign in to.
   color says whose: green for the Forest Service, lime yellow-green for the
   U.S. Wildland Fire Service and BLM, grey for a rig with no agency in the feed.
 ][
-  #image("36.png", width: 100%)
+  #image("36.jpg", width: 100%)
 
   People come three ways. A yellow DART pin is a Field Maps user, the handset on
   a light disc is a Garmin inReach, the badge on a light disc is a WFTAK user. An
@@ -302,7 +313,7 @@ takes any ArcGIS Online organization you sign in to.
   in and the layer keeps what it has. A layer never draws more than 300 rigs at
   once; when there are more, the row says so and asks you to zoom in.
 ][
-  #image("34.png", width: 100%)
+  #image("34.jpg", width: 100%)
 
   Zoomed out, the callsigns come off and the discs stay, so a wide view stays
   readable. Where that happens is the *Label zoom*, on the next page.
@@ -361,7 +372,7 @@ takes any ArcGIS Online organization you sign in to.
 = FireGuard
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("45.png", width: 100%)
+  #image("45.jpg", width: 100%)
 
   *FireGuard* adds NIFC's FireGuard detections: the areas the analysts draw around
   a satellite heat detection, named by type and acreage, marked URGENT when they
@@ -478,12 +489,198 @@ takes any ArcGIS Online organization you sign in to.
 ]
 
 #tak-slide[
+= New Fire Starts
+
+  New wildfires and prescribed fires across the country, from the moment a
+  dispatch center enters them: NIFC's own "New Starts" view. A start stays until
+  it is contained, controlled or out, or for 24 hours after it was found.
+  Public, no login. *Add new starts* puts it in the list.
+
+  Each start is a marker the size of a DART one: a red flame for a wildfire, a
+  green *RX* for a prescribed fire. A flame drawn in outline is a wildfire
+  reported with no size and nothing added since. The arrow on the layer's row
+  opens a map key with all three.
+
+  Its Features list has three types, each *ON/OFF*: *Wildfire*, *Wildfire, No
+  Size Yet* and *Prescribed Fire*. No Size Yet holds starts a dispatch center
+  entered and never updated; turn it off to see only the fires someone has
+  sized.
+
+  A fire with only a number for a name, such as LAC-357251, leaves the map an
+  hour after it was found unless it has been named by then; the row's status
+  line says how many were left out.
+
+  *Where* is *Everywhere* at first, so *Find* reaches a fire wherever the map
+  is; slide it to keep only the starts within a distance of My Location or the
+  map center. *Time window* picks the last hour, 3, 6, 12
+  or 24 hours. The layer refreshes every 5 minutes.
+]
+
+#tak-slide[
+= New Fire Starts: on the map
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("51.jpg", width: 100%)
+
+  A start with its name and acres, from five miles in.
+][
+  #image("52.png", width: 100%)
+
+  The row: how many were left out, and the map key.
+][
+  #image("53.png", height: 220pt)
+
+  Its Features: time window, zoom gate, labels, and the three types.
+]
+]
+
+#tak-slide[
+= New Fire Starts: time window
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("54.png", height: 230pt)
+][
+  *Time window* keeps the starts reported in the last hour, 3, 6, 12 or 24
+  hours.
+]
+]
+
+#tak-slide[
+= Ongoing Fires
+
+  Every wildfire and prescribed fire NIFC lists as not yet contained, controlled
+  or out. It starts where New Fire Starts ends, a day after a fire was found, so
+  with both on each fire shows once. Public, no login. *Add ongoing fires* puts
+  it in the list.
+
+  The markers, the three types and *Where* work as in New Fire Starts. Labels add
+  how much is contained: "DOME - 6,760 ac - 40%". A fire stays listed until it is
+  declared contained, so one at 100% can still show.
+
+  Tap a fire on the map, from either layer, and its details open at once, with
+  no radial menu. *CAL FIRE* sits beside *Go there* when CAL FIRE runs or posts
+  the fire; it opens CAL FIRE's incident page, and CAL FIRE's acres and
+  containment are the first lines of the details. *InciWeb* is there when the
+  fire has an InciWeb page, most often a federal fire.
+]
+
+#tak-slide[
+= Ongoing Fires: a tap
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("55.jpg", width: 100%)
+
+  An ongoing fire, named with its acres.
+][
+  #image("56.png", width: 100%)
+
+  A tap opens its details. *CAL FIRE* opens the incident page; CAL FIRE's acres,
+  containment and location come first.
+]
+]
+
+#tak-slide[
+= Fire History
+
+  Where fires have burned, 1900 to today, from NIFC's interagency fire perimeter
+  history, drawn as EGP draws it. The last ten years are colored by how long ago:
+  purple under six months, blue to a year, green to two, yellow to three, orange
+  to ten. Earlier burns are one type per decade: the 2010s rust, the 2000s dark
+  brown, the 1990s tan, the 1980s teal, 1979 and earlier grey.
+
+  Each band and decade is its own type in the Features list, each ON/OFF; the
+  arrow on its row opens the map key. Burns over 20 acres are labeled "Carr Fire
+  (2018)"; a tap opens a burn's details. It loads what is in view, up to about
+  155 miles across, simplified to the zoom. *Find* searches all of it by name;
+  add a year to pick one fire: "Ranch 2007".
+]
+
+#tak-slide[
+= Fire History: key and types
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("58.png", height: 230pt)
+
+  The map key under the row's arrow.
+][
+  #image("58b.png", height: 230pt)
+
+  Its Features: each band and decade ON/OFF, with its fill.
+]
+]
+
+#tak-slide[
+= Fire History: a burn, and Find
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("59.png", width: 100%)
+
+  A tap opens a burn's details, with *Add to My Fires*.
+][
+  #image("60.png", width: 100%)
+
+  *Find* on the main screen searches every year by name; a year picks one fire.
+]
+]
+
+#tak-slide[
+= My Fires
+
+  Pick the burns that matter to your incident, then show only those.
+
+  + Open a burn's details: tap it on the map, or find it with *Find*.
+  + Tap *Add to My Fires*. The burn gets a white edge; every other fire stays
+    on the map so you can pick the next.
+  + Add the rest the same way. *Remove from My Fires* takes one off.
+  + Tap *Only My Fires OFF (3)*, under Add or under the arrow on the row. It
+    turns green, ON: only your fires show, wherever you pan. Tap again to see
+    every fire; the list is kept.
+
+  *Clear My Fires* on the row empties the list when the incident is over. The
+  map key ends with a *My Fires* line. The list is kept when ATAK restarts.
+]
+
+#tak-slide[
+= My Fires: picking
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("64.jpg", width: 100%)
+
+  A burn in My Fires has a white edge; the others stay on the map.
+][
+  #image("61.png", width: 100%)
+
+  Its details: *Remove from My Fires*, and *Only My Fires* with the count.
+]
+]
+
+#tak-slide[
+= My Fires: only yours
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("62.png", width: 100%)
+
+  *Only My Fires ON*: green.
+][
+  #image("66.jpg", width: 100%)
+
+  Only your fires on the map, wherever you pan.
+][
+  #image("63.png", width: 100%)
+
+  The row reads "My Fires"; *Clear My Fires* asks first:
+
+  #image("65.png", width: 100%)
+]
+]
+
+#tak-slide[
 = Your own organization
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   #image("26.png", width: 100%)
 
-  *Add your own org…* asks for your organization's ArcGIS address once, the one
+  *Add your own org...* asks for your organization's ArcGIS address once, the one
   you sign in with. Any ArcGIS Online organization or ArcGIS Enterprise portal
   works.
 ][
@@ -510,6 +707,18 @@ takes any ArcGIS Online organization you sign in to.
 ]
 
 #tak-slide[
+= No network
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("67.png", width: 100%)
+][
+  Everything a layer has downloaded stays on the phone, on or off, and comes
+  back after ATAK or the phone restarts. With no signal the row says so; what
+  shows is what was last downloaded.
+]
+]
+
+#tak-slide[
 = This guide, on the device
 
 #image("29.png", width: 80%)
@@ -520,6 +729,8 @@ guide as a PDF.
 = What it needs
 
 An Android device running ATAK-CIV 5.6, 5.7 or 5.8. A network connection to
-load or refresh layers; cached layers draw without one. A NIFC ArcGIS login for
+load or refresh layers. Everything downloaded stays on the phone, on or off,
+and draws after a restart without one: the row says "no network, showing what
+this phone saved". A NIFC ArcGIS login for
 NIFC incidents; the other built-in sources are public.
 ]

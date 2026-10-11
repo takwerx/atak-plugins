@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One chip of the trend strip's value picker: a TakwerxButton whose text goes green
+     when it is the value being drawn (the Traffic toggle convention, never a colored face). -->
+<Button xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/TakwerxButton"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginRight="6dp" />

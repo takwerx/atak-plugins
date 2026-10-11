@@ -159,9 +159,13 @@ public final class CameraLayer {
      * video list, and pointless work on the UI thread each time.
      */
     private final Map<String, String> videoUids = new HashMap<>();
-    /** Video entries built this pass, registered in one batch by {@link #addTick}. */
-    private final List<gov.tak.api.video.ConnectionEntry> pendingEntries =
-            new ArrayList<>();
+    /**
+     * Camera id -> video entry built this pass, registered in one batch by
+     * {@link #addTick}. Keyed by camera so a marker rebuilt before the flush
+     * replaces its own entry rather than queueing a second one.
+     */
+    private final Map<String, gov.tak.api.video.ConnectionEntry> pendingEntries =
+            new java.util.LinkedHashMap<>();
     private final Map<String, Camera> shown = new HashMap<>();
     /** Cameras waiting for a marker; drained by {@link #addTick}. */
     private final List<Camera> pending = new ArrayList<>();
@@ -386,13 +390,48 @@ public final class CameraLayer {
         final List<Camera> want = new ArrayList<>();
         // OFF wants nothing on screen; apply() then removes whatever is there.
         for (Camera c : mapOn ? selected : Collections.<Camera>emptyList()) {
-            if (view == null || view.intersects(c.lat, c.lon, c.lat, c.lon))
+            if (view == null || view.intersects(c.lat, c.lon, c.lat, c.lon)
+                    || lineInView(c, view))
                 want.add(c);
         }
         omitted = Math.max(0, want.size() - MAX_MARKERS);
         final List<Camera> draw = want.size() > MAX_MARKERS
                 ? new ArrayList<>(want.subList(0, MAX_MARKERS)) : want;
         apply(draw);
+    }
+
+    /**
+     * True when this camera's bearing is on and its line crosses {@code view}.
+     *
+     * <p>The line belongs to the marker -- ATAK drops the SensorFOV when the marker
+     * leaves the group -- so culling by the camera's own position took the line
+     * with it. A 60 km line runs far past the screen, and zooming in on what the
+     * camera is looking at pushes the camera itself out of view: the marker was
+     * removed and the line vanished exactly where the operator was looking.
+     *
+     * <p>The test is the line's bounding box (a stills camera's wedge: both
+     * edges), which can keep a camera whose line passes just outside a corner.
+     * That costs one marker; only cameras with a bearing switched on are ever
+     * tested, and there are a handful at most.
+     */
+    private boolean lineInView(Camera c, GeoBounds view) {
+        if (!requested.contains(c.id) || !c.hasFov())
+            return false;
+        final boolean still = !c.hasStream();
+        final double length = still ? STILL_FOV_RANGE_M
+                : Math.min(rangeMeters, SensorDetailHandler.MAX_SENSOR_RANGE);
+        final double half = still ? STILL_FOV_DEGREES / 2 : 0;
+        final GeoPoint origin = new GeoPoint(c.lat, c.lon);
+        double north = c.lat, south = c.lat, west = c.lon, east = c.lon;
+        for (double az : new double[] { c.pan - half, c.pan + half }) {
+            final GeoPoint end = com.atakmap.coremap.maps.coords.GeoCalculations
+                    .pointAtDistance(origin, az, length);
+            north = Math.max(north, end.getLatitude());
+            south = Math.min(south, end.getLatitude());
+            west = Math.min(west, end.getLongitude());
+            east = Math.max(east, end.getLongitude());
+        }
+        return view.intersects(north, west, south, east);
     }
 
     /** How many on-screen cameras the cap left out last pass. */
@@ -622,9 +661,16 @@ public final class CameraLayer {
             if (ce == null)
                 return;
             // Queued, not registered here. See flushVideoEntries().
-            pendingEntries.add(ce);
+            //
+            // videoUID is NOT set yet: flushVideoEntries sets it once the
+            // VideoManager holds the entry. It used to be set here, and the flush
+            // waits for the whole add queue -- about 13 s for Texas's 2,050
+            // streams -- so a radial video tap in that window named an entry
+            // ATAK did not hold and got "invalid video information". Without
+            // videoUID the radial grays its video button instead
+            // (menus/b-m-p-s-p-loc.xml: disabled='!{${videoUID}}').
+            pendingEntries.put(c.id, ce);
             videoUids.put(c.id, ce.getUID());
-            m.setMetaString("videoUID", ce.getUID());
             m.setMetaString("videoUrl", c.stream);
         } catch (LinkageError | RuntimeException e) {
             // Video is a bonus; a plugin must not fail to draw a camera over it.
@@ -798,13 +844,23 @@ public final class CameraLayer {
     private void flushVideoEntries() {
         if (pendingEntries.isEmpty())
             return;
+        final List<String> ids = new ArrayList<>(pendingEntries.keySet());
         final List<gov.tak.api.video.ConnectionEntry> batch =
-                new ArrayList<>(pendingEntries);
+                new ArrayList<>(pendingEntries.values());
         pendingEntries.clear();
         try {
             com.atakmap.android.video.manager.VideoManager.getInstance()
                     .addConnectionEntries(batch, false);
             Log.d(TAG, "registered " + batch.size() + " video entries (no persist)");
+            // Only now does each marker's video button point at something.
+            // videoUids, not the batch: the pane's Live video may have registered
+            // a newer entry for the same camera meanwhile.
+            for (String id : ids) {
+                final Marker m = markers.get(id);
+                final String uid = videoUids.get(id);
+                if (m != null && uid != null)
+                    m.setMetaString("videoUID", uid);
+            }
         } catch (LinkageError | RuntimeException e) {
             // Video is a bonus; a plugin must not fail to draw a camera over it.
             Log.w(TAG, "could not register video entries", e);

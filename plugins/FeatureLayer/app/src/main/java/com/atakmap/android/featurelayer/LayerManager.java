@@ -46,7 +46,7 @@ public class LayerManager {
     private final String clientId;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private final File root, iconDir, layersDir, stateFile;
+    private final File root, iconDir, legacyIconDir, layersDir, stateFile;
     private final Map<String, String> nwcgIcons = new HashMap<>();
     private final Map<String, String> sarcopIcons = new HashMap<>();
     private String lineGlyph, polygonGlyph;
@@ -80,7 +80,14 @@ public class LayerManager {
         this.pluginContext = pluginContext;
         this.clientId = clientId;
         root = FileSystemUtils.getItem("tools/featurelayer");
-        iconDir = new File(root, "icons");
+        // The pictures this plugin draws for itself -- symbols, labelled pills, DART discs,
+        // chooser glyphs -- go in ATAK's own private storage, not on the card. They are
+        // caches ATAK reads back by file:// in this same process; on the card they were
+        // thousands of ordinary PNGs any app could list and a gallery could index as
+        // photos (takwerx/atmosphere#2, the same fix). ATAK's context, never the plugin's:
+        // the plugin package's own files dir belongs to another uid and mkdirs there fails.
+        iconDir = new File(new File(mapView.getContext().getFilesDir(), "featurelayer"), "icons");
+        legacyIconDir = new File(root, "icons");
         layersDir = new File(root, "layers");
         stateFile = new File(root, "layers.json");
     }
@@ -115,7 +122,9 @@ public class LayerManager {
      * top"). The sort is stable, so nothing else changes place.
      */
     private static int rank(LoadedLayer l) {
-        return DartStyles.handles(l.spec) ? 0 : FireGuardStyles.handles(l.spec) ? 1 : 2;
+        // New Fire Starts sits with FireGuard: both are national "what just started" layers.
+        return DartStyles.handles(l.spec) ? 0
+                : FireGuardStyles.handles(l.spec) || NewStartsStyles.handles(l.spec) ? 1 : 2;
     }
 
     public List<LoadedLayer> snapshot() {
@@ -167,15 +176,13 @@ public class LayerManager {
         attachFollow();
         iconDir.mkdirs();
         layersDir.mkdirs();
-        // Thousands of composed PNGs and a few sqlite stores are not media: without this
-        // Android's media scanner indexed every one and fought the plugin for the disk
-        // at load (75% of a core in the 2026-09-18 14:26 ANR dump).
-        for (File d : new File[] { iconDir, layersDir }) {
-            try {
-                //noinspection ResultOfMethodCallIgnored
-                new File(d, ".nomedia").createNewFile();
-            } catch (Exception ignored) {
-            }
+        // The sqlite stores are not media: without this Android's media scanner indexed
+        // them, and the composed PNGs when they lived beside them, and fought the plugin
+        // for the disk at load (75% of a core in the 2026-09-18 14:26 ANR dump).
+        try {
+            //noinspection ResultOfMethodCallIgnored
+            new File(layersDir, ".nomedia").createNewFile();
+        } catch (Exception ignored) {
         }
         worker.execute(new Runnable() {
             @Override
@@ -194,6 +201,11 @@ public class LayerManager {
         final DocumentedIntentFilter filter = new DocumentedIntentFilter();
         filter.addAction(ACTION_DETAILS, "show the attributes of a loaded feature");
         AtakBroadcast.getInstance().registerReceiver(details, filter);
+        // A fire is tapped to be read: its details open at once, no radial (operator,
+        // 2026-10-05: "if you tap an incident it should just open up its details pane,
+        // no radial"). ATAK asks these listeners before it opens a radial; every other
+        // layer still gets its radial with Bloodhound, range and bearing, Marker here.
+        com.atakmap.android.menu.MapMenuReceiver.getInstance().addEventListener(fireTap);
         markerHere = new MarkerHereReceiver(mapView, this);
         final DocumentedIntentFilter mh = new DocumentedIntentFilter();
         mh.addAction(MarkerHereReceiver.ACTION, "drop a marker at a loaded feature");
@@ -203,12 +215,70 @@ public class LayerManager {
         startLog("start: restored " + snapshot().size() + " layers, queuing refreshes");
         for (LoadedLayer l : snapshot())
             refresh(l);
+        // After the refreshes, on the same thread: with no layers, or all of them already
+        // redrawn by this build, the old folder goes now.
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                sweepLegacyIcons();
+            }
+        });
         main.postDelayed(timer, TICK_MS);
         startLog("start: done");
     }
 
+    /**
+     * Removes the icon folder 0.11 and earlier composed on the card, once nothing draws
+     * from it. A restored layer keeps the styles it was stored with, old paths included,
+     * until a fetch rewrites it under this build's style version; deleting the folder at
+     * start would leave an offline restart with every symbol missing. So it waits until
+     * every layer has been rewritten, which online is the first round of refreshes. The
+     * folder carries a .nomedia meanwhile, so nothing indexes it. Worker thread only.
+     */
+    private void sweepLegacyIcons() {
+        if (!legacyIconDir.isDirectory())
+            return;
+        for (LoadedLayer l : snapshot())
+            if (!l.drawnByThisBuild())
+                return;
+        int gone = 0;
+        final File[] all = legacyIconDir.listFiles();
+        if (all != null)
+            for (File f : all)
+                if (f.delete())
+                    gone++;
+        //noinspection ResultOfMethodCallIgnored
+        legacyIconDir.delete();
+        startLog("old icon folder on the card removed, " + gone + " files");
+    }
+
+    private final com.atakmap.android.menu.MapMenuEventListener fireTap =
+            new com.atakmap.android.menu.MapMenuEventListener() {
+                @Override
+                public boolean onShowMenu(com.atakmap.android.maps.MapItem item) {
+                    if (item == null || details == null)
+                        return false;
+                    final LoadedLayer l = find(item.getMetaString("nifs_layer", ""));
+                    // Fires and burns are tapped to be read: New Fire Starts, Ongoing Fires,
+                    // and Fire History (operator, 2026-10-06: "clicking on these should go
+                    // to the details pane automatically").
+                    if (l == null || !(NewStartsStyles.handles(l.spec) || FireHistoryStyles.handles(l.spec)))
+                        return false;
+                    details.show(item);
+                    return true;
+                }
+
+                @Override
+                public void onHideMenu(com.atakmap.android.maps.MapItem item) {
+                }
+            };
+
     public void stop() {
         started = false;
+        try {
+            com.atakmap.android.menu.MapMenuReceiver.getInstance().removeEventListener(fireTap);
+        } catch (Exception ignored) {
+        }
         detachFollow();
         main.removeCallbacks(timer);
         try {
@@ -568,6 +638,53 @@ public class LayerManager {
         });
     }
 
+    /**
+     * The My Fires operations: each redraws on the worker and saves. It fetches only
+     * when what shows changes: Only My Fires turned on or off, or a fire added while on.
+     */
+    public static final int MY_ADD = 0, MY_REMOVE = 1, MY_ONLY_ON = 2, MY_ONLY_OFF = 3, MY_CLEAR = 4;
+
+    public void myFires(final LoadedLayer l, final int op, final com.atakmap.map.layer.feature.AttributeSet a) {
+        // The switch flips now, on the tap, so its button answers even while a fetch holds
+        // the worker; the redraw and any fetch follow in turn.
+        final boolean switchWas = l.myFiresShown();
+        if (op == MY_ONLY_ON || op == MY_ONLY_OFF)
+            l.setMyFiresOnly(op == MY_ONLY_ON);
+        l.busy = true;
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                final boolean wasShown = op == MY_ONLY_ON || op == MY_ONLY_OFF ? switchWas : l.myFiresShown();
+                try {
+                    switch (op) {
+                        case MY_ADD:
+                            l.addMyFire(a);
+                            break;
+                        case MY_REMOVE:
+                            l.removeMyFire(a);
+                            break;
+                        case MY_ONLY_ON:
+                        case MY_ONLY_OFF:
+                            l.myFiresChanged(switchWas);
+                            break;
+                        default:
+                            l.clearMyFires();
+                            break;
+                    }
+                } finally {
+                    l.busy = false;
+                    save();
+                    changed();
+                }
+                // Fetch what is now to be shown: My Fires by their extents, or the view again.
+                final boolean shown = l.myFiresShown();
+                if (shown != wasShown || (shown && op == MY_ADD))
+                    refreshNow(l);
+            }
+        });
+    }
+
     public void refresh(final LoadedLayer l) {
         if (l.refreshing)
             return;
@@ -617,6 +734,7 @@ public class LayerManager {
         });
         startLog("refreshNow " + l.spec.id + " done: " + l.status);
         save();
+        sweepLegacyIcons();
     }
 
     public void refreshAll() {
@@ -685,11 +803,20 @@ public class LayerManager {
         if (!stateFile.isFile() && !bak.isFile())
             return;
         try {
-            JSONArray arr = stateFile.isFile() ? new JSONArray(readFile(stateFile)) : new JSONArray();
+            JSONArray arr = stateFile.isFile() ? readList(stateFile) : new JSONArray();
+            if (arr == null) {
+                // Half written: kept aside, never rotated into the backup, and the backup
+                // read instead.
+                final File aside = new File(stateFile.getPath() + ".unreadable-" + System.currentTimeMillis());
+                //noinspection ResultOfMethodCallIgnored
+                stateFile.renameTo(aside);
+                startLog("restore: main list unreadable, kept as " + aside.getName());
+                arr = new JSONArray();
+            }
             if (arr.length() == 0 && bak.isFile()) {
                 // An empty list where there was one is a lost list, not a choice.
-                final JSONArray prev = new JSONArray(readFile(bak));
-                if (prev.length() > 0) {
+                final JSONArray prev = readList(bak);
+                if (prev != null && prev.length() > 0) {
                     startLog("restore: main list empty, using the backup (" + prev.length() + " layers)");
                     arr = prev;
                 }
@@ -725,10 +852,37 @@ public class LayerManager {
                     startLog("restore: attaching " + spec.id);
                     l.attach();
                     startLog("restore: attached " + spec.id);
-                    l.setVisible(o.optBoolean("visible", true));
+                    final boolean vis = o.optBoolean("visible", true);
+                    l.markVisible(vis);
                     synchronized (layers) {
                         layers.add(l);
                     }
+                    // Showing a restored layer reads its whole cached store into memory
+                    // and rewrites every feature with this build's styles, under the
+                    // layer lock: seconds on a large DART layer. Until 0.10 that ran
+                    // here, on ATAK's main thread inside onStart, and on the XCover it
+                    // was 24.6 s of main-thread time and two "ATAK isn't responding"
+                    // dialogs before any pane had opened (2026-09-21). It goes to the
+                    // worker, the way the pane's own on/off toggle already does; the
+                    // refreshes start() queues next run on the same single thread, so
+                    // each layer is shown before it is fetched. The layer is on the map
+                    // meanwhile with its cached contents as they are.
+                    l.busy = vis;
+                    worker.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                startLog("restore: showing " + spec.id);
+                                l.setVisible(vis);
+                                startLog("restore: shown " + spec.id);
+                            } catch (Exception e) {
+                                Log.w(TAG, "could not show restored " + spec.id, e);
+                            } finally {
+                                l.busy = false;
+                                changed();
+                            }
+                        }
+                    });
                 } catch (Exception e) {
                     Log.w(TAG, "could not restore " + spec.id, e);
                     // Keep it: the next save() writes it back and the next start tries
@@ -771,15 +925,24 @@ public class LayerManager {
                 for (JSONObject o : unrestored)
                     arr.put(o);
             }
-            // The previous list survives one save as a backup, and restore() falls back to
-            // it when the main file has nothing in it.
+            // Written whole to a new file and swapped in, so a kill at any moment leaves a
+            // whole list. It used to be the old list renamed to the backup and the new one
+            // written over layers.json in place: ATAK stopped mid-write on dev 1
+            // (2026-10-06 11:50) left a half file, restore could not read it and gave up,
+            // and the next save rotated the half file into the backup -- seven layers gone.
             final File bak = new File(stateFile.getPath() + ".bak");
-            if (stateFile.isFile() && stateFile.length() > 2)
+            final File tmp = new File(stateFile.getPath() + ".tmp");
+            try (FileOutputStream out = new FileOutputStream(tmp)) {
+                out.write(arr.toString(1).getBytes("UTF-8"));
+                out.getFD().sync();
+            }
+            // The previous list survives one save as the backup, but only a list that reads:
+            // a broken main file never replaces a good backup.
+            if (stateFile.isFile() && readList(stateFile) != null)
                 //noinspection ResultOfMethodCallIgnored
                 stateFile.renameTo(bak);
-            try (OutputStream out = new FileOutputStream(stateFile)) {
-                out.write(arr.toString(1).getBytes("UTF-8"));
-            }
+            if (!tmp.renameTo(stateFile))
+                Log.w(TAG, "state save: could not move the new list into place");
         } catch (Exception e) {
             Log.w(TAG, "state save failed", e);
         }
@@ -859,6 +1022,15 @@ public class LayerManager {
         }
     }
 
+    /** A saved layer list, or null when the file does not read as one. */
+    private static JSONArray readList(File f) {
+        try {
+            return new JSONArray(readFile(f));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private static String readFile(File f) throws Exception {
         try (InputStream in = new java.io.FileInputStream(f)) {
             return new String(readAll(in), "UTF-8");
@@ -877,14 +1049,28 @@ public class LayerManager {
     /** Once per service address per session: may this portal's token go there? */
     private final Map<String, Boolean> trustedBases = new HashMap<>();
 
+    /**
+     * Whether the portal's token may go to every service the layer reads: its base and,
+     * for a layer that reads more than one (Fire History), each of the others too.
+     */
     private boolean trusted(LayerSpec spec) {
-        final String key = spec.portal + " -> " + spec.base;
+        if (!trustedBase(spec.portal, spec.base))
+            return false;
+        if (spec.sourceBases != null)
+            for (String b : spec.sourceBases)
+                if (b != null && !trustedBase(spec.portal, b))
+                    return false;
+        return true;
+    }
+
+    private boolean trustedBase(String portal, String base) {
+        final String key = portal + " -> " + base;
         synchronized (trustedBases) {
             final Boolean t = trustedBases.get(key);
             if (t != null)
                 return t;
         }
-        final boolean ok = Esri.trustsServer(spec.portal, spec.base);
+        final boolean ok = Esri.trustsServer(portal, base);
         synchronized (trustedBases) {
             trustedBases.put(key, ok);
         }

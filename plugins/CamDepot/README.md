@@ -1,10 +1,10 @@
 ATAK Plugin — Cam Depot
 
-**Download Cam Depot 1.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cam Depot 1.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.4/ATAK-Plugin-CamDepot-1.4--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.4/ATAK-Plugin-CamDepot-1.4--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.4/ATAK-Plugin-CamDepot-1.4--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.5/ATAK-Plugin-CamDepot-1.5--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.5/ATAK-Plugin-CamDepot-1.5--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.5/ATAK-Plugin-CamDepot-1.5--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cam-depot/releases
 
@@ -14,8 +14,8 @@ All releases: https://github.com/takwerx/cam-depot/releases
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
 
-Public traffic and wildfire cameras on the ATAK map. About 38,000 of them across
-54 states and provinces, from state departments of transportation, the FAA, and
+Public traffic and wildfire cameras on the ATAK map. About 43,000 of them across
+55 states and provinces, from state departments of transportation, the FAA, and
 the wildfire lookout networks, browsed from a side panel and drawn on the map.
 
 Answers "what does it look like there right now" without leaving ATAK. An
@@ -25,7 +25,7 @@ ATAK's own player.
 
 Capabilities:
 
-  - About 38,000 cameras, refreshed from the publishing agencies, with roughly
+  - About 43,000 cameras, refreshed from the publishing agencies, with roughly
     9,000 carrying a playable video stream.
   - Filter by state, provider, county, distance from your position or from a
     point on the map, and by whether a camera streams, is a still, or belongs to
@@ -59,14 +59,19 @@ source submission zip).
 _________________________________________________________________
 STATUS
 
-Version 1.4: one versionCode per APK. The same plugin as 1.3, rebuilt so that
-each ATAK target's APK carries its own versionCode, the plugin version and the
-ATAK version folded into one integer, which lets an MDM hold all three builds
-and push each one as an update. Nothing else changed.
+Version 1.5: two fixes.
 
-Release candidate. Version 1.3.
+- A camera's bearing line stays on the map when you zoom in on what the camera
+  is looking at. It used to disappear as soon as the camera itself left the
+  screen.
+- Right after a state loads, a camera's video button in its radial menu stays
+  grayed out for the few seconds until ATAK can play it. It used to be live at
+  once and answer "invalid video information" when tapped in that window.
 
-Exercised on hardware: Samsung Galaxy XCover Pro (ATAK-CIV 5.8.0.3). Panel,
+Release candidate. Version 1.5.
+
+Exercised on hardware: Samsung Galaxy XCover Pro and Galaxy S10 (ATAK-CIV
+5.8.0.3). Panel,
 filters, favorites, camera imagery, live video, bearing lines and the zoom
 threshold have been run against the live catalog, as a release build with
 proguard enabled rather than a debug build only.

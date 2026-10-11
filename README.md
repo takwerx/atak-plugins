@@ -23,12 +23,15 @@ This repository is the development workspace: shared tooling, build rules, and
 every plugin side by side. Each plugin directory is pushed out to its public repo
 with `git subtree` on release.
 
-**Building your own ATAK plugin?** `skills/atak-plugin-pipeline/` is a portable
-Claude Code skill carrying this whole pipeline — scaffold, ATAK-native UI,
+**Building your own ATAK plugin?**
+[`takwerx/atak-plugin-pipeline`](https://github.com/takwerx/atak-plugin-pipeline)
+is a Claude Code skill carrying this whole pipeline — scaffold, ATAK-native UI,
 release builds, the manual and its Tool Preferences entry, the tak.gov
-source-submission zip and its gates, the public plugin repo, and the
-`versionCode` rule an MDM needs. Copy it to `~/.claude/skills/` and read its
-README. It is generic: nothing in it is specific to takwerx infrastructure.
+source-submission zip and its gates, reading what tak.gov sends back, the public
+plugin repo, and the `versionCode` rule an MDM needs. Install it with
+`git clone https://github.com/takwerx/atak-plugin-pipeline ~/.claude/skills/atak-plugin-pipeline`.
+It is generic: nothing in it is specific to takwerx infrastructure, and it
+carries no SDK. It is built here, in `skills/atak-plugin-pipeline/`.
 
 Engineering notes, release plans and handoffs live in the private sibling repo
 [`takwerx/atak-plugins-notes`](https://github.com/takwerx/atak-plugins-notes).

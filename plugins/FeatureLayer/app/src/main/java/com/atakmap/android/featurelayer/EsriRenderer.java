@@ -189,7 +189,7 @@ public class EsriRenderer {
                 final double wPt = s.optDouble("width", 0), hPt = s.optDouble("height", 0);
                 final float w = clampPx(wPt > 0 ? (float) (wPt * 4 / 3) : 28f);
                 final float h = clampPx(hPt > 0 ? (float) (hPt * 4 / 3) : w);
-                return new IconPointStyle(0xFFFFFFFF, "file://" + png.getAbsolutePath(), w, h, 0, 0, 0f, true);
+                return new IconPointStyle(0xFFFFFFFF, "file://" + png.getAbsolutePath(), w, h, 0, 0, 0f, false); // level, see NwcgStyles.point
             }
             case "esriSLS": {
                 final int color = argb(s.optJSONArray("color"), 0xFFFFFFFF);

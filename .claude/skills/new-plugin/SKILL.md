@@ -88,6 +88,16 @@ carries here, and fill what is already known from the operator's description:
   "Not applicable" is an answer; silence is not. Anything that must outlive a
   tap lives in a component, never inside a `Tool`.
 - ATAK targets to build for, and the UI surface (pane, toolbar item, radial)
+- **Pane** — load the `plugin-ui` skill and fill its shape in for this plugin:
+  the three main-row buttons, what the list lists and how it sorts, each
+  Settings row as `Name: value`, the zoom gate's default, Area and Where (or
+  "not applicable"), and the status-line reasons. The operator should not have
+  to describe the takwerx pane again; propose it and let them change it.
+- **Taps on the map** — list every kind of thing the plugin puts on the map and
+  ask the operator, for each: straight to the pane, or a radial? Propose
+  `plugin-ui`'s default (things you read open the pane; things you act on,
+  navigate to, edit or delete keep a radial) and put the question under Open
+  questions until they answer.
 - Open questions for the operator
 
 Add it by name (`git add <file>`, never `git add -A` in the notes repo).
@@ -115,4 +125,7 @@ Not this session's job, but say it once so it is not discovered at ship time:
 - `refresh_depot.py` in the notes repo must list the repo, or the Market never
   shows the plugin at all (HARD RULE 2)
 - The icons are two files, not one: `ic_launcher.png` on a dark tile,
-  `ic_toolbar.png` a bare white glyph, edge to edge at 256
+  `ic_toolbar.png` a bare white glyph, edge to edge at 256. Invoke the
+  `plugin-icon` skill rather than doing it by hand -- it carries the tool, the
+  arguments and the traps (the launcher mask clips a glyph wider than 180, and
+  the 40 px render is the only size that tells you the truth)

@@ -30,11 +30,15 @@
         android:textColor="#FFFFFF" />
   </LinearLayout>
 
+<!-- The scroller takes focus itself, or it follows a focused Button as the rows are
+     rebuilt: Back from Add Layer came out scrolled down to the last opened row. -->
 <ScrollView
     android:id="@+id/pane_scroll"
     android:layout_width="match_parent"
     android:layout_height="0dp"
-    android:layout_weight="1">
+    android:layout_weight="1"
+    android:focusableInTouchMode="true"
+    android:descendantFocusability="beforeDescendants">
 <LinearLayout
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -202,6 +206,24 @@
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF" />
+        <!-- A fire CAL FIRE runs or posts: its incident page. Gone otherwise. -->
+        <Button
+            android:id="@+id/btn_details_calfire"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="4dp"
+            android:text="CAL FIRE"
+            android:visibility="gone" />
+        <!-- A fire with an InciWeb page: opens it in the browser. Gone otherwise. -->
+        <Button
+            android:id="@+id/btn_details_inciweb"
+            style="@style/TakwerxButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="4dp"
+            android:text="InciWeb"
+            android:visibility="gone" />
         <Button
             android:id="@+id/btn_details_goto"
             style="@style/TakwerxButton"
@@ -216,6 +238,25 @@
         android:textSize="13sp"
         android:textColor="#BBBBBB"
         android:paddingBottom="6dp" />
+    <!-- A Fire History burn: Add to My Fires / Remove from My Fires, on its own line:
+         in the header it squeezed the title to one word a line. Gone otherwise. -->
+    <Button
+        android:id="@+id/btn_details_only"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:text="Add to My Fires"
+        android:visibility="gone" />
+    <!-- Only My Fires ON/OFF with the count, once My Fires has a fire. Gone otherwise. -->
+    <Button
+        android:id="@+id/btn_details_only_show"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:text="Only My Fires OFF"
+        android:visibility="gone" />
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -234,11 +275,74 @@
         android:textIsSelectable="true" />
   </LinearLayout>
 
+  <!-- The main screen is one row and the list (operator, 2026-10-05: the source row
+       made searching features something only NIFC could do, and stayed picked forever).
+       Add Layer opens its own page, Find searches every loaded layer. -->
   <LinearLayout
     android:id="@+id/main_panel"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btn_add_layer"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Add Layer" />
+        <Button
+            android:id="@+id/btn_find_all"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="4dp"
+            android:text="Find" />
+        <Button
+            android:id="@+id/btn_all"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="4dp"
+            android:text="All OFF" />
+    </LinearLayout>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingTop="8dp"
+        android:text="LAYERS"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:alpha="0.6"
+        android:textColor="#FFFFFF" />
+    <LinearLayout
+        android:id="@+id/layers_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+    <TextView
+        android:id="@+id/layers_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="#BBBBBB"
+        android:paddingTop="4dp"
+        android:text="No layers yet. Tap Add Layer." />
+  </LinearLayout>
+
+  <!-- Add Layer: where layers come from. Its own page with Back, gone once a layer is
+       added, so nothing about a source stays on the main screen. -->
+  <LinearLayout
+    android:id="@+id/add_panel"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:visibility="gone">
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -304,14 +408,13 @@
             android:layout_marginLeft="6dp"
             android:text="Find" />
         <Button
-            android:id="@+id/btn_find_feature"
+            android:id="@+id/btn_clear_search"
             style="@style/TakwerxButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginLeft="6dp"
-            android:text="Feature" />
+            android:text="Clear" />
     </LinearLayout>
-
     <LinearLayout
         android:id="@+id/dart_row"
         android:layout_width="match_parent"
@@ -335,50 +438,6 @@
             android:layout_height="wrap_content"
             android:text="FireGuard" />
     </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingTop="6dp">
-        <TextView
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="LAYERS"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:alpha="0.6"
-            android:textColor="#FFFFFF" />
-        <Button
-            android:id="@+id/btn_clear_search"
-            style="@style/TakwerxButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginRight="6dp"
-            android:text="Clear" />
-        <Button
-            android:id="@+id/btn_all"
-            style="@style/TakwerxButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="90dp"
-            android:text="All OFF" />
-    </LinearLayout>
-    <LinearLayout
-        android:id="@+id/layers_container"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical" />
-    <TextView
-        android:id="@+id/layers_empty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="13sp"
-        android:textColor="#BBBBBB"
-        android:paddingTop="4dp"
-        android:text="No layers yet. Pick a source and find something." />
   </LinearLayout>
 </LinearLayout>
 </ScrollView>

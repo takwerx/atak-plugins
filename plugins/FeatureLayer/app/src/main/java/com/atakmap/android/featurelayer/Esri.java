@@ -70,6 +70,15 @@ public final class Esri {
                     "esriGeometryPolygon", "");
         }
 
+        /**
+         * The same filter, asking the server to simplify each shape to within
+         * {@code degrees}: fire perimeters around Redding were 25 MB for a 100 km view at
+         * full detail and 1.3 MB at 0.001 degrees (about 100 m), 2026-10-06.
+         */
+        public Scope simplified(double degrees) {
+            return new Scope(geometry, type, extra + String.format(java.util.Locale.US, "&maxAllowableOffset=%.6f", degrees));
+        }
+
         String params() throws Exception {
             return "&geometry=" + enc(geometry) + "&geometryType=" + type
                     + "&inSR=4326&spatialRel=esriSpatialRelIntersects" + extra;

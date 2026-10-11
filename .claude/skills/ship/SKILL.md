@@ -101,6 +101,13 @@ main checkout; `git -C ~/GitHub/atak-plugins branch --show-current` must print
     fix is a version bump and a resubmission, never an edit to the check.
     `release-links-guard.sh` runs the same check (without `--live`) before
     the subtree push and the `gh release create`.
+12. **Manual pictures:** did this release change a screen the manual shows?
+    UI pictures (pane, dialog, menu, settings) should already be in this
+    build: they are shot on the dev phone and cropped before zipping, and
+    `submission-zip.sh` stops when screens changed with no picture. If a
+    changed screen is only visible with the map (features, overlays), the
+    signed build is where its picture comes from: say so, and the operator
+    decides whether that is a next round before shipping or after.
 
 ## Step 1 — The ship prompt (HARD STOP)
 
@@ -113,6 +120,7 @@ Present exactly this via AskUserQuestion and wait:
 > - open issues: `<count surfaced / none>` · commit scan: `<clean / acknowledged>`
 > - download links: `check-download-links PASS (<Plugin> <version>)`
 > - version code: `check-version-code PASS (<Plugin> <version> -> <code>)`, signed APKs for every target
+> - manual pictures: `<current / UI retaken on the dev build / map shots pending: which>`
 > - this will: merge the branch into `main` (merge commit), push main, subtree-push
 >   `plugins/<Name>` to `takwerx/<plugin-repo>` main, tag `v<version>` there,
 >   create its GitHub Release with the signed APKs, and refresh the depot

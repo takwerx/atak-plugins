@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SAWTI: offshore wind driving a flame. Wind strokes from
+     ic_layer_wind, the flame from ic_layer_firewx at 72 percent. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M2 8 H9 A2.2 2.2 0 1 0 6.8 5.8"/>
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M2 12.5 H11"/>
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M2 17 H8 A1.8 1.8 0 1 1 6.2 18.8"/>
+    <group android:scaleX="0.72" android:scaleY="0.72" android:translateX="8.6" android:translateY="4.1">
+        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+            android:pathData="M13 2 C13.5 5.5 11 6.5 10.5 9 C10 7.5 9 7 8 6.5 C9.5 9 6.5 11 6.5 14.5 A5.5 5.5 0 0 0 17.5 14.5 C17.5 11.5 15.5 10 15 7.5 C14.8 9 14 9.8 13.5 10.5 C14.5 7.5 12.5 4 13 2 Z M12 12 C11 13.5 10.2 14.3 10.2 15.5 A1.8 1.8 0 0 0 13.8 15.5 C13.8 14.3 13 13.5 12 12 Z"/>
+    </group>
+</vector>
