@@ -128,7 +128,7 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
             case MEASURED:
             case DERIVED:
             case NOMINAL:
-                sb.append("The fire is somewhere inside the box. The dot is the center of the box, not the fire.");
+                sb.append("Something inside this box was hot when the satellite looked. The center of the box is the center of the sensor pixel, not the fire.");
                 break;
             default:
                 sb.append("The outline is the burned or radiating ground itself, at the time of the pass.");
@@ -277,10 +277,13 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
     private TextView headingView(String text) {
         final TextView t = new TextView(view.getContext());
         t.setText(text);
+        // Cyan, bold and full strength: the faint small-caps heading of the pane's
+        // controls was too easy to read past on a page of prose, and the operator
+        // could not see where one section ended (2026-10-11).
         t.setAllCaps(true);
-        t.setTextSize(10f);
-        t.setAlpha(0.6f);
-        t.setTextColor(Color.WHITE);
+        t.setTextSize(12f);
+        t.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        t.setTextColor(0xFF00E5FF);
         t.setGravity(Gravity.START);
         final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);

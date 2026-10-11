@@ -113,7 +113,8 @@ public class Footprint {
         final double acrossScan = alongTrack / Math.max(0.15d, Math.cos(z));
         final Double satLon = subSatelliteLongitude(satellite);
         final double bearing = satLon == null ? 90d : bearingTo(lat, lon, 0d, satLon);
-        final String size = String.format(Locale.US, "%.1f km nominal at a %.1f degree view angle", nominalM / 1000d, zenithDeg);
+        // In ATAK's units, not the sensor's: a phone set to miles reads miles everywhere.
+        final String size = String.format(Locale.US, "a %s pixel straight down, seen here at a %.0f degree view angle", Units.format(nominalM), zenithDeg);
         return new Footprint(Kind.DERIVED, acrossScan, alongTrack, bearing, null,
                 satLon == null
                         ? size + "; the satellite is not one we know the slot of, so the box is drawn east-west"

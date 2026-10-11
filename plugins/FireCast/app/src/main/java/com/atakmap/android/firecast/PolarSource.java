@@ -42,7 +42,7 @@ public class PolarSource implements DetectionSource {
 
     /** Common to both: what a polar-orbiting scanner's detection does not mean. */
     private static final String[] POLAR_CAVEATS = {
-            "The fire is somewhere inside this box. The center of the box is the center of a sensor pixel, not the position of the fire.",
+            "The box is where the heat was at the time of the pass, not where the fire is now. A fire that has been running since can be well outside it.",
             "This is one look from one pass. These satellites pass a few times a day, so a fire that started since the last pass is not on the map, and one that was put out may still be.",
             "Cloud, thick smoke and heavy canopy hide fires from this sensor. Empty map does not mean empty ground.",
             "Hot bare ground, flares, industry and some metal roofs read as heat. The industrial filter catches the known ones only.",

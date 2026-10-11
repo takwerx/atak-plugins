@@ -111,7 +111,7 @@ public class GoesSource implements DetectionSource {
             d.classedNonFire = c.contains("solar") || c.contains("reflective");
         }
         final List<String> caveats = new ArrayList<>();
-        caveats.add("The fire is somewhere inside this box, which is kilometers across. GOES says a fire started and roughly where, not where its edge is.");
+        caveats.add("The box is where the heat was at this scan, not where the fire or its edge is now. GOES says a fire started and roughly where; a fire running since can be outside the box.");
         caveats.add("This box is " + fp.sizeText() + ". A crew sent to the middle of it can be a kilometer or more from the fire.");
         if (d.persistenceHours != null && d.persistenceHours < 0.5)
             caveats.add("Detected for under half an hour. A single hot scan can be a flare, a glint or a short-lived heat source as easily as a new fire.");
