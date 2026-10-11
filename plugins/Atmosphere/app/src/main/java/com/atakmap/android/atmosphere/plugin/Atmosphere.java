@@ -35,6 +35,10 @@ import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
 import com.atakmap.android.atmosphere.overlay.LightningOverlay;
 import com.atakmap.android.atmosphere.overlay.PspsOverlay;
+import com.atakmap.android.atmosphere.overlay.StormReportsOverlay;
+import com.atakmap.android.atmosphere.overlay.TornadoPathsOverlay;
+import com.atakmap.android.atmosphere.overlay.DebrisFlowOverlay;
+import com.atakmap.android.atmosphere.overlay.QuakesOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
@@ -149,6 +153,10 @@ public class Atmosphere implements IPlugin {
     private ErcOverlay erc;
     private LightningOverlay lightning;
     private PspsOverlay psps;
+    private StormReportsOverlay reports;
+    private TornadoPathsOverlay tornado;
+    private DebrisFlowOverlay debrisflow;
+    private QuakesOverlay quakes;
     private FloodOutlookOverlay flood;
     private BeachOverlay beach;
     private HighFlowOverlay highflow;
@@ -329,6 +337,14 @@ public class Atmosphere implements IPlugin {
         lightning.start();
         psps = new PspsOverlay(mapView, pluginContext, egress);
         psps.start();
+        reports = new StormReportsOverlay(mapView, pluginContext, egress);
+        reports.start();
+        tornado = new TornadoPathsOverlay(mapView, pluginContext, egress);
+        tornado.start();
+        debrisflow = new DebrisFlowOverlay(mapView, pluginContext, egress);
+        debrisflow.start();
+        quakes = new QuakesOverlay(mapView, pluginContext, egress);
+        quakes.start();
         flood = new FloodOutlookOverlay(mapView, pluginContext, egress);
         flood.start();
         beach = new BeachOverlay(mapView, pluginContext, egress);
@@ -435,6 +451,14 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setLightning(lightning);
             if (psps != null)
                 atmospherePane.setPsps(psps);
+            if (reports != null)
+                atmospherePane.setReports(reports);
+            if (tornado != null)
+                atmospherePane.setTornado(tornado);
+            if (debrisflow != null)
+                atmospherePane.setDebrisFlow(debrisflow);
+            if (quakes != null)
+                atmospherePane.setQuakes(quakes);
             if (flood != null)
                 atmospherePane.setFlood(flood);
             if (beach != null)
@@ -531,6 +555,22 @@ public class Atmosphere implements IPlugin {
         if (flood != null) {
             flood.stop();
             flood = null;
+        }
+        if (quakes != null) {
+            quakes.stop();
+            quakes = null;
+        }
+        if (debrisflow != null) {
+            debrisflow.stop();
+            debrisflow = null;
+        }
+        if (tornado != null) {
+            tornado.stop();
+            tornado = null;
+        }
+        if (reports != null) {
+            reports.stop();
+            reports = null;
         }
         if (psps != null) {
             psps.stop();
@@ -640,6 +680,14 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setLightning(lightning);
             if (psps != null)
                 atmospherePane.setPsps(psps);
+            if (reports != null)
+                atmospherePane.setReports(reports);
+            if (tornado != null)
+                atmospherePane.setTornado(tornado);
+            if (debrisflow != null)
+                atmospherePane.setDebrisFlow(debrisflow);
+            if (quakes != null)
+                atmospherePane.setQuakes(quakes);
             if (flood != null)
                 atmospherePane.setFlood(flood);
             if (beach != null)

@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.12",
+   plugin-version: "0.13",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -174,7 +174,8 @@ forecast there.
   #image("15.png", width: 100%)
 ][
   The *Layers* page lists every map layer under a heading for what it is
-  about: *Wind*, *Fire*, *Rain and rivers*, *Ocean* and *Snow*, with *Spot
+  about: *Wind*, *Storms*, *Fire*, *Rain and rivers*, *Ocean*, *Snow* and
+  *Ground*, with *Spot
   Weather Forecast* and *Weather Stations* at the top. Each row is a switch that shows
   its state, green ON or red OFF, with the layer's icon beside it. *All on*
   and *All off* switch every allowed layer at once.
@@ -295,6 +296,42 @@ it is a direction.
 
   It is a forecast, not radar. Radar is what is falling now where a radar
   can see it; Rain is what the model expects where nothing can.
+]
+]
+
+#tak-slide[
+= Storm Reports
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("97.png", width: 100%)
+][
+  *Storm Reports* draws every report the NWS offices logged in the last three
+  days: a dot in its family's color (tornado red, wind orange, hail green,
+  flood blue, rain teal, snow and ice violet, landslide and debris flow brown,
+  other grey) with the NWS type and size in the pill: "Hail 1.75 in", "Gust
+  66 mph", "Tornado". The row under the switch picks 24, 48 or 72 hours.
+
+  Tap a dot for where, when, the office and its remarks. They are preliminary,
+  as spotters and the public told the offices; the surveyed tornado paths are
+  the next layer.
+]
+]
+
+#tak-slide[
+= Tornado Paths
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("98.png", width: 100%)
+][
+  *Tornado Paths* draws the track a survey team walked after a tornado, as a
+  line in the Damage Assessment Toolkit's color for its EF rating, EF0 aqua to
+  EF5 purple, EFU grey for a tornado with nothing to rate. The row picks the
+  last 30 days, 90 days or year.
+
+  Tap a line for the rating, the office, when it was on the ground and for
+  how long, the path's length and width, the peak wind the damage implies,
+  injuries and deaths, and the survey team's words. A path appears a day or
+  more after the storm, once the office has walked it.
 ]
 ]
 
@@ -609,6 +646,27 @@ the flooded ground.
 ]
 
 #tak-slide[
+= Debris Flow
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("99.png", width: 100%)
+][
+  *Debris Flow* sits with the rivers because a debris flow is a flood of rock
+  and mud, and the trigger is a burst of rain over a burn. It marks every fire
+  the USGS has assessed in the last three years. Zoom in to a few degrees and
+  it fetches the fire's perimeter and each stream basin, filled in USGS's own
+  colors, Low yellow, Moderate orange, High red, for one 15-minute burst of
+  rain at the rate the USGS set for that fire (24 mm/h, about an inch an
+  hour, for most).
+
+  Tap a basin for the likelihood of a debris flow, the volume it would carry,
+  the storm it is for and the fire; tap a fire for when it burned, when it was
+  assessed and the USGS record. A burn stays hazardous for two to five years.
+  This layer sends the area the map shows, never your position.
+]
+]
+
+#tak-slide[
 = Waves
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
@@ -706,6 +764,27 @@ water equivalent and temperature, colored by depth.
 
 *Snow Depth* draws the daily snow analysis as a picture, in the same depth
 classes, lower 48 only.
+]
+
+#tak-slide[
+= Earthquakes
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("100.png", width: 100%)
+][
+  *Earthquakes* draws the USGS feed the way USGS's own map does: a circle
+  sized by magnitude, colored by age (past hour red, past day orange, past
+  week yellow, older white), the magnitude in the pill from M2.5 up. The first
+  row picks the past day, week or month (the month feed carries M2.5 and up
+  only); *Smallest shown* picks All, M1+, M2.5+ or M4.5+.
+
+  For up to five of the largest quakes of M4.5 or more, the ShakeMap's
+  intensity contours are drawn in USGS's intensity colors with their Roman
+  numeral. Tap a quake for the magnitude, the place, the time, the depth, how
+  many felt it and how hard, the PAGER impact level, a tsunami flag, whether a
+  seismologist has reviewed it, and the USGS event page. Worldwide, every five
+  minutes.
+]
 ]
 
 #tak-slide[
@@ -879,7 +958,10 @@ Only what you ask for:
   square the point is in, about 30 miles across, never the point. The Red Flag
   Warning and Fire Weather Watch list is one request for the whole country.
 - *SAWTI* and *PSPS* send nothing about where you are: each asks for its whole
-  set, and the SAWTI page finds your zone on this device.
+  set, and the SAWTI page finds your zone on this device. So do *Storm
+  Reports*, *Tornado Paths* and *Earthquakes*, which are whole national or
+  worldwide files; *Debris Flow* sends the area the map shows, padded, once it
+  is zoomed in enough to draw basins.
 - An *address* you type goes to the US Census Bureau, and to ATAK's own
   address finder if the Census has no answer.
 - Every request carries the plugin's name and version, which public services

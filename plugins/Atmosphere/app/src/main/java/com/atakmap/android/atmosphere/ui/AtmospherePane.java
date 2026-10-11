@@ -61,6 +61,10 @@ import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
 import com.atakmap.android.atmosphere.overlay.ErcOverlay;
 import com.atakmap.android.atmosphere.overlay.LightningOverlay;
 import com.atakmap.android.atmosphere.overlay.PspsOverlay;
+import com.atakmap.android.atmosphere.overlay.StormReportsOverlay;
+import com.atakmap.android.atmosphere.overlay.TornadoPathsOverlay;
+import com.atakmap.android.atmosphere.overlay.DebrisFlowOverlay;
+import com.atakmap.android.atmosphere.overlay.QuakesOverlay;
 import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -270,6 +274,42 @@ public final class AtmospherePane {
     private final LinearLayout pspsLegend;
     private PspsOverlay psps;
     private boolean pspsOpen = true;
+    private static final String PREF_REPORTS_OPEN = "weather.reports.open";
+    private final LinearLayout reportsSettings;
+    private final ImageButton reportsExpand;
+    private final Button reportsToggle;
+    private final TextView reportsStatus;
+    private final LinearLayout reportsLegend;
+    private final LinearLayout reportsDayRow;
+    private StormReportsOverlay reports;
+    private boolean reportsOpen = true;
+    private static final String PREF_TORNADO_OPEN = "weather.tornado.open";
+    private final LinearLayout tornadoSettings;
+    private final ImageButton tornadoExpand;
+    private final Button tornadoToggle;
+    private final TextView tornadoStatus;
+    private final LinearLayout tornadoLegend;
+    private final LinearLayout tornadoDayRow;
+    private TornadoPathsOverlay tornado;
+    private boolean tornadoOpen = true;
+    private static final String PREF_DEBRISFLOW_OPEN = "weather.debrisflow.open";
+    private final LinearLayout debrisflowSettings;
+    private final ImageButton debrisflowExpand;
+    private final Button debrisflowToggle;
+    private final TextView debrisflowStatus;
+    private final LinearLayout debrisflowLegend;
+    private DebrisFlowOverlay debrisflow;
+    private boolean debrisflowOpen = true;
+    private static final String PREF_QUAKES_OPEN = "weather.quakes.open";
+    private final LinearLayout quakesSettings;
+    private final ImageButton quakesExpand;
+    private final Button quakesToggle;
+    private final TextView quakesStatus;
+    private final LinearLayout quakesLegend;
+    private final LinearLayout quakesDayRow;
+    private final LinearLayout quakesChoiceRow;
+    private QuakesOverlay quakes;
+    private boolean quakesOpen = true;
     private static final String PREF_FIREZONES_OPEN = "weather.firezones.open";
     private final LinearLayout firezonesSettings;
     private final ImageButton firezonesExpand;
@@ -687,6 +727,30 @@ public final class AtmospherePane {
         pspsToggle = find(R.id.psps_toggle);
         pspsStatus = find(R.id.psps_status);
         pspsLegend = find(R.id.psps_legend);
+        reportsSettings = find(R.id.reports_settings);
+        reportsExpand = find(R.id.reports_expand);
+        reportsToggle = find(R.id.reports_toggle);
+        reportsStatus = find(R.id.reports_status);
+        reportsLegend = find(R.id.reports_legend);
+        reportsDayRow = find(R.id.reports_day_row);
+        tornadoSettings = find(R.id.tornado_settings);
+        tornadoExpand = find(R.id.tornado_expand);
+        tornadoToggle = find(R.id.tornado_toggle);
+        tornadoStatus = find(R.id.tornado_status);
+        tornadoLegend = find(R.id.tornado_legend);
+        tornadoDayRow = find(R.id.tornado_day_row);
+        debrisflowSettings = find(R.id.debrisflow_settings);
+        debrisflowExpand = find(R.id.debrisflow_expand);
+        debrisflowToggle = find(R.id.debrisflow_toggle);
+        debrisflowStatus = find(R.id.debrisflow_status);
+        debrisflowLegend = find(R.id.debrisflow_legend);
+        quakesSettings = find(R.id.quakes_settings);
+        quakesExpand = find(R.id.quakes_expand);
+        quakesToggle = find(R.id.quakes_toggle);
+        quakesStatus = find(R.id.quakes_status);
+        quakesLegend = find(R.id.quakes_legend);
+        quakesDayRow = find(R.id.quakes_day_row);
+        quakesChoiceRow = find(R.id.quakes_choice_row);
         firezonesSettings = find(R.id.firezones_settings);
         firezonesExpand = find(R.id.firezones_expand);
         firezonesToggle = find(R.id.firezones_toggle);
@@ -1003,6 +1067,42 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        reportsOpen = prefs == null || prefs.getBoolean(PREF_REPORTS_OPEN, true);
+        reportsExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                reportsOpen = !reportsOpen;
+                rememberFold(PREF_REPORTS_OPEN, reportsOpen);
+                updateLayerControls();
+            }
+        });
+        tornadoOpen = prefs == null || prefs.getBoolean(PREF_TORNADO_OPEN, true);
+        tornadoExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                tornadoOpen = !tornadoOpen;
+                rememberFold(PREF_TORNADO_OPEN, tornadoOpen);
+                updateLayerControls();
+            }
+        });
+        debrisflowOpen = prefs == null || prefs.getBoolean(PREF_DEBRISFLOW_OPEN, true);
+        debrisflowExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                debrisflowOpen = !debrisflowOpen;
+                rememberFold(PREF_DEBRISFLOW_OPEN, debrisflowOpen);
+                updateLayerControls();
+            }
+        });
+        quakesOpen = prefs == null || prefs.getBoolean(PREF_QUAKES_OPEN, true);
+        quakesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                quakesOpen = !quakesOpen;
+                rememberFold(PREF_QUAKES_OPEN, quakesOpen);
+                updateLayerControls();
+            }
+        });
         firezonesOpen = prefs == null || prefs.getBoolean(PREF_FIREZONES_OPEN, true);
         firezonesExpand.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1279,6 +1379,14 @@ public final class AtmospherePane {
             lightning.refresh(false);
         if (psps != null && psps.isOn())
             psps.refresh(false);
+        if (reports != null && reports.isOn())
+            reports.refresh(false);
+        if (tornado != null && tornado.isOn())
+            tornado.refresh(false);
+        if (debrisflow != null && debrisflow.isOn())
+            debrisflow.refresh(false);
+        if (quakes != null && quakes.isOn())
+            quakes.refresh(false);
         if (fireZones != null && fireZones.isOn())
             fireZones.refresh();
         if (flood != null && flood.isOn())
@@ -2014,6 +2122,82 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** Storm reports: the status line under the switch and the key. */
+    public void setReports(StormReportsOverlay overlay) {
+        reports = overlay;
+        if (reports == null)
+            return;
+        reports.setListener(new StormReportsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                reportsStatus.setText(status);
+                reportsStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        reportsLegend.removeAllViews();
+        for (String[] row : StormReportsOverlay.LEGEND)
+            reportsLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(reportsDayRow, reports);
+        updateLayerControls();
+    }
+
+    /** Tornado paths: the status line under the switch and the key. */
+    public void setTornado(TornadoPathsOverlay overlay) {
+        tornado = overlay;
+        if (tornado == null)
+            return;
+        tornado.setListener(new TornadoPathsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                tornadoStatus.setText(status);
+                tornadoStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        tornadoLegend.removeAllViews();
+        for (String[] row : TornadoPathsOverlay.LEGEND)
+            tornadoLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(tornadoDayRow, tornado);
+        updateLayerControls();
+    }
+
+    /** Debris flow: the status line under the switch and the key. */
+    public void setDebrisFlow(DebrisFlowOverlay overlay) {
+        debrisflow = overlay;
+        if (debrisflow == null)
+            return;
+        debrisflow.setListener(new DebrisFlowOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                debrisflowStatus.setText(status);
+                debrisflowStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        debrisflowLegend.removeAllViews();
+        for (String[] row : DebrisFlowOverlay.LEGEND)
+            debrisflowLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** Earthquakes: the status line under the switch and the key. */
+    public void setQuakes(QuakesOverlay overlay) {
+        quakes = overlay;
+        if (quakes == null)
+            return;
+        quakes.setListener(new QuakesOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                quakesStatus.setText(status);
+                quakesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        quakesLegend.removeAllViews();
+        for (String[] row : QuakesOverlay.LEGEND)
+            quakesLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(quakesDayRow, quakes);
+        buildChoiceRow(quakesChoiceRow, quakes);
+        updateLayerControls();
+    }
+
     /** Lightning strike density; the newest frame, its time and age on the status line. */
     public void setLightning(LightningOverlay overlay) {
         lightning = overlay;
@@ -2059,6 +2243,36 @@ public final class AtmospherePane {
                 public void onClick(View v) {
                     layer.setDay(value);
                     buildDayRow(row, layer);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
+
+    /** The second chip row of a layer that offers one: its {@code choices()}, the pick in green. */
+    private void buildChoiceRow(final LinearLayout row, final com.atakmap.android.atmosphere.overlay.OutlookOverlay layer) {
+        row.removeAllViews();
+        if (layer == null || layer.choices() == null)
+            return;
+        final String[] cs = layer.choices();
+        for (int i = 0; i < cs.length; i++) {
+            final int value = i;
+            final boolean chosen = layer.choice() == value;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(cs[i]);
+            b.setTextSize(12);
+            b.setTextColor(chosen ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    layer.setChoice(value);
+                    buildChoiceRow(row, layer);
                 }
             });
             final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
@@ -2354,6 +2568,70 @@ public final class AtmospherePane {
                     updateLayerControls();
                 } else {
                     askToAllowPsps();
+                }
+            }
+        });
+        reportsToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (reports == null)
+                    return;
+                if (reports.isOn()) {
+                    reports.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(StormReportsOverlay.LAYER_ID)) {
+                    reports.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowReports();
+                }
+            }
+        });
+        tornadoToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (tornado == null)
+                    return;
+                if (tornado.isOn()) {
+                    tornado.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(TornadoPathsOverlay.LAYER_ID)) {
+                    tornado.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowTornado();
+                }
+            }
+        });
+        debrisflowToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (debrisflow == null)
+                    return;
+                if (debrisflow.isOn()) {
+                    debrisflow.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(DebrisFlowOverlay.LAYER_ID)) {
+                    debrisflow.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowDebrisflow();
+                }
+            }
+        });
+        quakesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (quakes == null)
+                    return;
+                if (quakes.isOn()) {
+                    quakes.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(QuakesOverlay.LAYER_ID)) {
+                    quakes.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowQuakes();
                 }
             }
         });
@@ -3686,6 +3964,22 @@ public final class AtmospherePane {
             psps.setOn(on);
         else if (psps != null && on)
             blocked++;
+        if (reports != null && (!on || allowed(StormReportsOverlay.LAYER_ID)))
+            reports.setOn(on);
+        else if (reports != null && on)
+            blocked++;
+        if (tornado != null && (!on || allowed(TornadoPathsOverlay.LAYER_ID)))
+            tornado.setOn(on);
+        else if (tornado != null && on)
+            blocked++;
+        if (debrisflow != null && (!on || allowed(DebrisFlowOverlay.LAYER_ID)))
+            debrisflow.setOn(on);
+        else if (debrisflow != null && on)
+            blocked++;
+        if (quakes != null && (!on || allowed(QuakesOverlay.LAYER_ID)))
+            quakes.setOn(on);
+        else if (quakes != null && on)
+            blocked++;
         if (fireZones != null && (!on || allowed(FireZoneOverlay.LAYER_ID)))
             fireZones.setOn(on);
         else if (fireZones != null && on)
@@ -4743,6 +5037,90 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowReports() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.reports_allow_title))
+                .setMessage(pluginContext.getString(R.string.reports_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(StormReportsOverlay.LAYER_ID, true);
+                                if (reports != null)
+                                    reports.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowTornado() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.tornado_allow_title))
+                .setMessage(pluginContext.getString(R.string.tornado_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(TornadoPathsOverlay.LAYER_ID, true);
+                                if (tornado != null)
+                                    tornado.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowDebrisflow() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.debrisflow_allow_title))
+                .setMessage(pluginContext.getString(R.string.debrisflow_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(DebrisFlowOverlay.LAYER_ID, true);
+                                if (debrisflow != null)
+                                    debrisflow.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowQuakes() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.quakes_allow_title))
+                .setMessage(pluginContext.getString(R.string.quakes_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(QuakesOverlay.LAYER_ID, true);
+                                if (quakes != null)
+                                    quakes.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowLightning() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -5141,6 +5519,34 @@ public final class AtmospherePane {
         pspsExpand.setVisibility(pspsOn ? View.VISIBLE : View.GONE);
         pspsExpand.setRotation(pspsOpen ? 180f : 0f);
         pspsSettings.setVisibility(pspsOn && pspsOpen ? View.VISIBLE : View.GONE);
+        final boolean reportsOn = reports != null && reports.isOn();
+        reportsToggle.setText(reportsOn ? R.string.reports_on : R.string.reports_off);
+        reportsToggle.setTextColor(pluginContext.getResources().getColor(
+                reportsOn ? R.color.state_on : R.color.state_off));
+        reportsExpand.setVisibility(reportsOn ? View.VISIBLE : View.GONE);
+        reportsExpand.setRotation(reportsOpen ? 180f : 0f);
+        reportsSettings.setVisibility(reportsOn && reportsOpen ? View.VISIBLE : View.GONE);
+        final boolean tornadoOn = tornado != null && tornado.isOn();
+        tornadoToggle.setText(tornadoOn ? R.string.tornado_on : R.string.tornado_off);
+        tornadoToggle.setTextColor(pluginContext.getResources().getColor(
+                tornadoOn ? R.color.state_on : R.color.state_off));
+        tornadoExpand.setVisibility(tornadoOn ? View.VISIBLE : View.GONE);
+        tornadoExpand.setRotation(tornadoOpen ? 180f : 0f);
+        tornadoSettings.setVisibility(tornadoOn && tornadoOpen ? View.VISIBLE : View.GONE);
+        final boolean debrisflowOn = debrisflow != null && debrisflow.isOn();
+        debrisflowToggle.setText(debrisflowOn ? R.string.debrisflow_on : R.string.debrisflow_off);
+        debrisflowToggle.setTextColor(pluginContext.getResources().getColor(
+                debrisflowOn ? R.color.state_on : R.color.state_off));
+        debrisflowExpand.setVisibility(debrisflowOn ? View.VISIBLE : View.GONE);
+        debrisflowExpand.setRotation(debrisflowOpen ? 180f : 0f);
+        debrisflowSettings.setVisibility(debrisflowOn && debrisflowOpen ? View.VISIBLE : View.GONE);
+        final boolean quakesOn = quakes != null && quakes.isOn();
+        quakesToggle.setText(quakesOn ? R.string.quakes_on : R.string.quakes_off);
+        quakesToggle.setTextColor(pluginContext.getResources().getColor(
+                quakesOn ? R.color.state_on : R.color.state_off));
+        quakesExpand.setVisibility(quakesOn ? View.VISIBLE : View.GONE);
+        quakesExpand.setRotation(quakesOpen ? 180f : 0f);
+        quakesSettings.setVisibility(quakesOn && quakesOpen ? View.VISIBLE : View.GONE);
         final boolean firezonesOn = fireZones != null && fireZones.isOn();
         firezonesToggle.setText(firezonesOn ? R.string.firezones_on : R.string.firezones_off);
         firezonesToggle.setTextColor(pluginContext.getResources().getColor(
@@ -5278,6 +5684,26 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_psps, PspsOverlay.HOST));
+        }
+        if (reports != null && reports.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_reports, StormReportsOverlay.HOST));
+        }
+        if (tornado != null && tornado.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_tornado, TornadoPathsOverlay.HOST));
+        }
+        if (debrisflow != null && debrisflow.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_debrisflow, DebrisFlowOverlay.HOST));
+        }
+        if (quakes != null && quakes.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_quakes, QuakesOverlay.HOST));
         }
         // Synoptic asks for its credit, Cal OES that its extract is not called verified.
         if (stationLayer != null && stationLayer.isOn() && stationLayer.isUtilityOn()
