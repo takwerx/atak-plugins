@@ -180,6 +180,28 @@ public final class CamDepotPane implements CameraStore.Listener {
     /** Radius in the operator's own unit (miles / km / NM). 0 means no filter. */
     private double radiusBig = 0;
     private GeoPoint center;                  // null means "use my location"
+    /**
+     * The spot the operator wants covered, or null when the filter is off.
+     *
+     * <p>A fire report is a point on the map. With five cameras on one tower the
+     * only way to learn which of them looked at it was to switch each bearing on
+     * and off in turn. While this is set, the list and the map narrow to the
+     * cameras whose reported pan and FOV cover the point, best match first, plus
+     * two groups of maybes: PTZ cameras in range that someone could turn to it,
+     * and cameras in range that report no bearing at all.
+     *
+     * <p>Unlike {@link #center}, the coordinate itself is saved: "Map Center" is a
+     * reference that moves with the map, but this is a place, and a fire does not
+     * move because ATAK restarted.
+     */
+    private GeoPoint lookAt;
+    /** Degrees added to each side of a camera's reported wedge before it counts. */
+    private static final double LOOK_AT_SLACK_DEG = 10;
+    private Button lookAtButton, lookAtBearingsButton;
+    private TextView lookAtLabel;
+    /** The cameras the last apply() judged to see {@link #lookAt}; for Show Bearings. */
+    private final List<Camera> lastSees = new ArrayList<>();
+    private int lastPtzCould, lastNoBearing;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable refreshTick = new Runnable() {
@@ -276,6 +298,9 @@ public final class CamDepotPane implements CameraStore.Listener {
         radius = controls.findViewById(R.id.radius);
         radiusLabel = controls.findViewById(R.id.radius_label);
         zoomLabel = controls.findViewById(R.id.zoom_label);
+        lookAtLabel = controls.findViewById(R.id.look_at_label);
+        lookAtButton = controls.findViewById(R.id.look_at);
+        lookAtBearingsButton = controls.findViewById(R.id.look_at_bearings);
 
         // A ListView blocks focus to its children by default, which means an EditText
         // living in a header view never receives a keystroke -- the search box looked
@@ -687,6 +712,40 @@ public final class CamDepotPane implements CameraStore.Listener {
                     }
                 });
 
+        lookAtButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Rotates like the radius "Measuring from" button: the first tap
+                // takes the crosshair, the second clears. The pane covers the map
+                // on a phone, so the operator centers the spot first and then
+                // presses; tapping the map itself is not available while the pane
+                // is open.
+                lookAt = lookAt == null ? mapView.getPoint().get() : null;
+                updateLookAtControls();
+                apply();
+            }
+        });
+
+        lookAtBearingsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Every camera that sees the point, in one tap. The alternative was
+                // visiting each row, which is the chore this filter exists to end.
+                int n = 0;
+                for (Camera c : new ArrayList<>(lastSees)) {
+                    if (!layer.isFovShowing(c.id)) {
+                        layer.showFov(c);
+                        n++;
+                    }
+                }
+                updateBearingsOffButton();
+                Toast.makeText(mapView.getContext(), n == 0
+                        ? "Those bearings are already on"
+                        : String.format(Locale.US, "%d bearing%s on", n,
+                                n == 1 ? "" : "s"), Toast.LENGTH_SHORT).show();
+            }
+        });
+
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
@@ -736,6 +795,8 @@ public final class CamDepotPane implements CameraStore.Listener {
     // has since left.
     private static final String PREF_FROM_MAP = "camdepot_radius_from_map";
     private static final String PREF_MAP_ON = "camdepot_map_on";
+    // The POINT, as text so nothing is lost to a float. Empty means off.
+    private static final String PREF_LOOK_AT = "camdepot_look_at";
 
     /**
      * Starting points, expressed as what the scale bar would read — the same
@@ -828,6 +889,13 @@ public final class CamDepotPane implements CameraStore.Listener {
             if (p.getBoolean(PREF_FROM_MAP, false))
                 center = mapView.getPoint().get();
             setRadiusFromProgress(savedRadius);
+            final String la = p.getString(PREF_LOOK_AT, "");
+            if (!la.isEmpty()) {
+                final String[] parts = la.split(",");
+                lookAt = new GeoPoint(Double.parseDouble(parts[0]),
+                        Double.parseDouble(parts[1]));
+            }
+            updateLookAtControls();
         } catch (RuntimeException e) {
             Log.w(TAG, "could not restore the panel; starting fresh", e);
         }
@@ -840,7 +908,13 @@ public final class CamDepotPane implements CameraStore.Listener {
                 + "|" + fireOnly.isChecked() + liveOnly.isChecked()
                 + stillOnly.isChecked() + inView.isChecked() + favoritesFirst
                 + toggleOn
-                + "|" + radius.getProgress() + (center != null);
+                + "|" + radius.getProgress() + (center != null)
+                + "|" + lookAtPref();
+    }
+
+    private String lookAtPref() {
+        return lookAt == null ? "" : String.format(Locale.US, "%.6f,%.6f",
+                lookAt.getLatitude(), lookAt.getLongitude());
     }
 
     private String savedUi = "";
@@ -874,6 +948,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                     .putBoolean(PREF_MAP_ON, toggleOn)
                     .putInt(PREF_RADIUS, radius.getProgress())
                     .putBoolean(PREF_FROM_MAP, center != null)
+                    .putString(PREF_LOOK_AT, lookAtPref())
                     .apply();
         } catch (RuntimeException e) {
             Log.w(TAG, "could not remember the panel", e);
@@ -1433,8 +1508,70 @@ public final class CamDepotPane implements CameraStore.Listener {
             }
         }
 
-        sortForList(favs, sortFrom);
-        sortForList(out, sortFrom);
+        // Looking At: three groups, one rule. Everything the filters above kept is
+        // now judged against the point. A camera that sees it, a PTZ in range that
+        // could be turned to it, a camera in range that reports no bearing; the
+        // rest are dropped, from the list and from the map alike.
+        lastSees.clear();
+        lastPtzCould = 0;
+        lastNoBearing = 0;
+        List<String> heads = null;
+        List<List<Camera>> groups = null;
+        java.util.Map<String, String> notes = null;
+        GeoPoint listFrom = sortFrom;
+        if (lookAt != null) {
+            final double la = lookAt.getLatitude(), lo = lookAt.getLongitude();
+            final double range = layer.getRangeMeters();
+            final List<Camera> ptz = new ArrayList<>();
+            final List<Camera> blind = new ArrayList<>();
+            notes = new java.util.HashMap<>();
+            for (Camera c : out) {
+                if (c.metersFrom(la, lo) > range)
+                    continue;
+                if (c.sees(la, lo, LOOK_AT_SLACK_DEG)) {
+                    lastSees.add(c);
+                    notes.put(c.id, offCenterNote(c.offCenter(la, lo)));
+                } else if (c.hasFov() && c.ptz) {
+                    ptz.add(c);
+                } else if (!c.hasFov()) {
+                    blind.add(c);
+                }
+            }
+            Collections.sort(lastSees, new Comparator<Camera>() {
+                @Override
+                public int compare(Camera a, Camera b) {
+                    final int byAngle = Double.compare(
+                            Math.abs(a.offCenter(la, lo)), Math.abs(b.offCenter(la, lo)));
+                    return byAngle != 0 ? byAngle : Double.compare(
+                            a.metersFrom(la, lo), b.metersFrom(la, lo));
+                }
+            });
+            sortForList(ptz, lookAt);
+            sortForList(blind, lookAt);
+            lastPtzCould = ptz.size();
+            lastNoBearing = blind.size();
+            heads = new ArrayList<>();
+            groups = new ArrayList<>();
+            heads.add(String.format(Locale.US, "See the point (%,d)", lastSees.size()));
+            groups.add(new ArrayList<>(lastSees));
+            heads.add(String.format(Locale.US,
+                    "PTZ in range, pointed elsewhere (%,d)", ptz.size()));
+            groups.add(ptz);
+            heads.add(String.format(Locale.US,
+                    "In range, no bearing reported (%,d)", blind.size()));
+            groups.add(blind);
+            out.clear();
+            out.addAll(lastSees);
+            out.addAll(ptz);
+            out.addAll(blind);
+            // Distances in the rows measure from the point, not from the operator:
+            // the question is how far the camera is from the fire.
+            listFrom = lookAt;
+        }
+
+        sortForList(favs, listFrom);
+        if (groups == null)
+            sortForList(out, listFrom);
 
         // The count belongs on the control: a filter says what it will cost before
         // it is used, and this one's cost changes every time the map moves.
@@ -1457,7 +1594,11 @@ public final class CamDepotPane implements CameraStore.Listener {
                         out.size() + onScreenFavs)
                 : "On screen only");
 
-        adapter.setSections(favs, out, sortFrom, currentState, query);
+        if (groups != null)
+            adapter.setSections(favs, heads, groups, listFrom, notes, true);
+        else
+            adapter.setSections(favs, out, listFrom, currentState, query);
+        updateLookAtControls();
 
         // The layer takes the whole selection and decides what to draw from the
         // current viewport, so zooming in reveals cameras rather than keeping a set
@@ -1476,6 +1617,42 @@ public final class CamDepotPane implements CameraStore.Listener {
     }
 
     /** Nearest first when there is somewhere to measure from, by name otherwise. */
+    /** "8° left of center", or "dead center" inside a degree. */
+    private static String offCenterNote(double off) {
+        final long deg = Math.round(Math.abs(off));
+        if (deg == 0)
+            return "dead center";
+        return String.format(Locale.US, "%d\u00b0 %s of center", deg,
+                off < 0 ? "left" : "right");
+    }
+
+    /**
+     * The Looking At label and buttons say the state they are in, not only what a
+     * tap would do. Off: how to use it. On: what the point costs, in the three
+     * groups the list shows, so the operator can read the answer without
+     * scrolling to it.
+     */
+    private void updateLookAtControls() {
+        if (lookAtLabel == null)
+            return;
+        if (lookAt == null) {
+            lookAtLabel.setText("Off \u2014 center the map on the spot, then press "
+                    + "Look At");
+            lookAtButton.setText("Look At Map Center");
+            lookAtBearingsButton.setText("Show Bearings");
+            lookAtBearingsButton.setEnabled(false);
+            return;
+        }
+        lookAtLabel.setText(String.format(Locale.US,
+                "%,d see the point, %,d PTZ could turn to it, %,d in range report "
+                        + "no bearing", lastSees.size(), lastPtzCould, lastNoBearing));
+        lookAtButton.setText("Clear Look At");
+        final int n = lastSees.size();
+        lookAtBearingsButton.setEnabled(n > 0);
+        lookAtBearingsButton.setText(n == 0 ? "Show Bearings"
+                : String.format(Locale.US, "Show %,d Bearing%s", n, n == 1 ? "" : "s"));
+    }
+
     private static void sortForList(List<Camera> cameras, final GeoPoint from) {
         if (from != null) {
             Collections.sort(cameras, new Comparator<Camera>() {
@@ -1534,6 +1711,13 @@ public final class CamDepotPane implements CameraStore.Listener {
         final String q = search.getText().toString().trim();
         if (!q.isEmpty())
             msg.append(String.format(Locale.US, "  \u00b7  search: \u201c%s\u201d", q));
+        // Name the filter and its reach. The cutoff is the bearing line's own
+        // length, so what is counted is what a drawn bearing would show; a camera
+        // that can see further than that is not listed, and this says so.
+        if (lookAt != null)
+            msg.append(String.format(Locale.US,
+                    "\nLooking At: cameras within %s of the point, aim as of the "
+                            + "last refresh", Units.format(layer.getRangeMeters())));
         if (favoritesFirst) {
             // A favorites list that is quietly shorter than its own count reads as
             // favorites having been lost.
@@ -2215,24 +2399,51 @@ public final class CamDepotPane implements CameraStore.Listener {
          */
         void setSections(List<Camera> favorites, List<Camera> rest, GeoPoint from,
                 String state, String query) {
-            final List<Object> next = new ArrayList<>(
-                    favorites.size() + rest.size() + 2);
+            // Name the second section for what is actually in it. With a search
+            // running it spans every state, so calling it "CA cameras" would be
+            // a lie the operator can see on the rows themselves.
+            final List<String> heads = new ArrayList<>();
+            heads.add(query.isEmpty()
+                    ? String.format(Locale.US, "%s cameras (%,d)", state, rest.size())
+                    : String.format(Locale.US, "Search results (%,d)", rest.size()));
+            final List<List<Camera>> groups = new ArrayList<>();
+            groups.add(rest);
+            setSections(favorites, heads, groups, from, null, false);
+        }
+
+        /** A line under the row's usual detail, keyed by camera id. */
+        private java.util.Map<String, String> notes;
+
+        /**
+         * Favorites, then any number of named groups.
+         *
+         * <p>Group headings appear when {@code alwaysHead} says so or when there
+         * are favorites above them to separate from; a plain unpinned list has
+         * none, exactly as it was before groups existed. An empty group keeps its
+         * heading only under {@code alwaysHead}, because then the count of zero
+         * is the answer ("no PTZ in range") rather than clutter.
+         */
+        void setSections(List<Camera> favorites, List<String> heads,
+                List<List<Camera>> groups, GeoPoint from,
+                java.util.Map<String, String> notes, boolean alwaysHead) {
+            final List<Object> next = new ArrayList<>();
             if (!favorites.isEmpty()) {
                 next.add(String.format(Locale.US, "Favorites (%,d)",
                         favorites.size()));
                 next.addAll(favorites);
-                // Name the second section for what is actually in it. With a search
-                // running it spans every state, so calling it "CA cameras" would be
-                // a lie the operator can see on the rows themselves.
-                next.add(query.isEmpty()
-                        ? String.format(Locale.US, "%s cameras (%,d)", state,
-                                rest.size())
-                        : String.format(Locale.US, "Search results (%,d)",
-                                rest.size()));
             }
-            next.addAll(rest);
+            final boolean head = alwaysHead || !favorites.isEmpty();
+            for (int i = 0; i < groups.size(); i++) {
+                final List<Camera> g = groups.get(i);
+                if (g.isEmpty() && !alwaysHead)
+                    continue;
+                if (head)
+                    next.add(heads.get(i));
+                next.addAll(g);
+            }
             this.rows = next;
             this.from = from;
+            this.notes = notes;
             notifyDataSetChanged();
         }
 
@@ -2306,6 +2517,9 @@ public final class CamDepotPane implements CameraStore.Listener {
                 d.append("  \u25b6 live");
             if (c.offline)
                 d.append("  OFFLINE");
+            final String note = notes == null ? null : notes.get(c.id);
+            if (note != null)
+                d.append("  \u00b7  ").append(note);
             detail.setText(d.toString());
 
             final GradientDrawable g = new GradientDrawable();

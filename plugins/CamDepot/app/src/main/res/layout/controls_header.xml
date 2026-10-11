@@ -177,6 +177,47 @@
             android:text="Presets" />
     </LinearLayout>
 
+    <!-- Which cameras cover a spot. A fire report is a point on the map, and with
+         five cameras on one tower the only way to learn which one looks at it
+         was to switch each bearing on and off. This asks the question once: the
+         list narrows to the cameras whose reported pan and FOV cover the map
+         center, best match first, with the PTZ cameras that could be turned to
+         it and the nearby cameras that report no bearing in their own groups. -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Looking at a point"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:paddingTop="6dp"
+        android:alpha="0.6" />
+
+    <TextView
+        android:id="@+id/look_at_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/look_at"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/look_at_bearings"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
