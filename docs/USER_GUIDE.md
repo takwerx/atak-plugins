@@ -1,12 +1,12 @@
 # Atmosphere for ATAK — User Guide
 
-**Version 0.11 · takwerx**
+**Version 0.12 · takwerx**
 
-**Download Atmosphere 0.11** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.11/ATAK-Plugin-Atmosphere-0.11--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.11/ATAK-Plugin-Atmosphere-0.11--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.11/ATAK-Plugin-Atmosphere-0.11--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -157,7 +157,7 @@ opening the plugin.
 | Ocean | Waves | The wave forecast: seas colored by state, the swell as moving crests, five days on the time strip, with the seas "Here" |
 | Ocean | Beach Forecast | Beach areas colored by rip current risk |
 | Ocean | Sea Temperature | Sea surface temperature as a picture |
-| Ocean | Hurricanes | Active storms: track, cone, wind fields, advisory |
+| Ocean | Hurricanes | Active storms: track, cone, wind fields, advisory; a storm NHC no longer forecasts shows only where it is |
 | Snow | Avalanche | Forecast zones by danger rating, travel advice behind a tap |
 | Snow | Snow Stations | Mountain snow stations: depth, water equivalent, temperature |
 | Snow | Snow Depth | The daily snow analysis as a picture |
