@@ -139,6 +139,45 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         return false;
     }
 
+    private static final java.util.regex.Pattern URL =
+            java.util.regex.Pattern.compile("https?://[^\\s]+");
+
+    /**
+     * Every web address in the page opens in the browser. Through ATAK's own context
+     * with a new task, because a plugin context cannot start an activity (operator,
+     * 2026-10-12: "make the hyperlinks work for the events page").
+     */
+    private static CharSequence linked(String body) {
+        if (body == null || !body.contains("http"))
+            return body == null ? "" : body;
+        final android.text.SpannableString out = new android.text.SpannableString(body);
+        final java.util.regex.Matcher m = URL.matcher(body);
+        while (m.find()) {
+            String url = m.group();
+            int end = m.end();
+            while (end > m.start() && ".,;)".indexOf(url.charAt(url.length() - 1)) >= 0) {
+                url = url.substring(0, url.length() - 1);
+                end--;
+            }
+            final String target = url;
+            out.setSpan(new android.text.style.ClickableSpan() {
+                @Override
+                public void onClick(android.view.View widget) {
+                    final Context ctx = com.atakmap.android.atmosphere.compat.MapCompat.atakContext();
+                    if (ctx == null)
+                        return;
+                    try {
+                        ctx.startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(target))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    } catch (RuntimeException e) {
+                        Log.w(TAG, "no browser for " + target, e);
+                    }
+                }
+            }, m.start(), end, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return out;
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         final String uid = intent.getStringExtra("targetUID");
@@ -156,7 +195,9 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
                 .setText(title.isEmpty() ? "Storm" : title);
         ((TextView) view.findViewById(R.id.details_subtitle))
                 .setText(item.getMetaString("storm_set", ""));
-        ((TextView) view.findViewById(R.id.details_attributes)).setText(body);
+        final TextView attributes = view.findViewById(R.id.details_attributes);
+        attributes.setText(linked(body));
+        attributes.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
         // A fire's page carries the one action its marker is for: bring the map to the
         // burn and let the layer draw its basins.
         final android.widget.Button action = view.findViewById(R.id.details_action);
