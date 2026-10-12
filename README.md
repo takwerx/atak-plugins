@@ -1,10 +1,10 @@
 ATAK Plugin — Cam Depot
 
-**Download Cam Depot 1.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cam Depot 1.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.6/ATAK-Plugin-CamDepot-1.6--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.6/ATAK-Plugin-CamDepot-1.6--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.6/ATAK-Plugin-CamDepot-1.6--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.7/ATAK-Plugin-CamDepot-1.7--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.7/ATAK-Plugin-CamDepot-1.7--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.7/ATAK-Plugin-CamDepot-1.7--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cam-depot/releases
 
@@ -59,7 +59,7 @@ source submission zip).
 _________________________________________________________________
 STATUS
 
-Version 1.6: Suggest Cameras, and a shorter pane.
+Version 1.7: Suggest Cameras, and a shorter pane.
 
 - Suggest Cameras: tap a point on the map and the list narrows to the cameras
   whose reported aim covers it, nearest first, with the pan-tilt-zoom cameras
@@ -72,7 +72,7 @@ Version 1.6: Suggest Cameras, and a shorter pane.
   once and left on a Settings page of rows that read their value.
 - Turning many bearing lines on at once no longer stalls ATAK.
 
-Release candidate. Version 1.6.
+Release candidate. Version 1.7.
 
 Exercised on hardware: Samsung Galaxy XCover Pro and Galaxy S10 (ATAK-CIV
 5.8.0.3). Panel,
