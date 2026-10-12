@@ -358,7 +358,11 @@ public final class RainPage {
         final StringBuilder period = new StringBuilder();
         for (String l : report.period)
             period.append(period.length() > 0 ? " " : "").append(l);
-        periodLine.setText(period.toString());
+        // Plain words first, the office's line after: "2 DAY PRECIPITATION TOTALS AS OF
+        // 1234 PM SUNDAY" read as a season to the operator (2026-10-11: "thats like the
+        // last how much time for the year?").
+        periodLine.setText("Inches of rain, each gauge's own total for the period the office"
+                + " names: " + (period.length() > 0 ? period : "see the report as written"));
         final int n = report.rowCount();
         if (n == 0) {
             status.setText("The report has no gauge table in it; read it as written below.");
@@ -603,6 +607,8 @@ public final class RainPage {
         final StringBuilder v = new StringBuilder();
         for (int i = 0; i < r.values.length; i++)
             v.append(i > 0 ? "  " : "").append(String.format(Locale.US, "%5s", r.values[i]));
+        if (r.values.length == 1)
+            v.append(Double.isNaN(r.inches) ? (r.values[0].equals("T") ? " trace" : "") : " in");
         values.setText(v.toString());
         values.setTextColor(Double.isNaN(r.inches) ? 0xFFA0A0A0 : RainGaugesOverlay.color(r.inches));
         row.addView(values);
