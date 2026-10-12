@@ -22,4 +22,7 @@
     <string name="manual_title">Plugin Documentation</string>
     <string name="manual_summary">Open the Cam Depot user guide: finding cameras, favorites, live video, and what the bearing line means</string>
     <string name="prefs_summary">Public camera networks on the map</string>
+    <string name="back">Back</string>
+    <string name="settings">Settings</string>
+    <string name="show_settings">Show settings</string>
 </resources>

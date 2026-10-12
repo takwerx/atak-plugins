@@ -88,6 +88,53 @@ public final class Camera {
         return !Double.isNaN(pan) && !Double.isNaN(fov) && fov > 0;
     }
 
+    /** Initial bearing from this camera to a point, degrees true, 0 to 360. */
+    public double bearingTo(double toLat, double toLon) {
+        final double p1 = Math.toRadians(lat), p2 = Math.toRadians(toLat);
+        final double dl = Math.toRadians(toLon - lon);
+        final double y = Math.sin(dl) * Math.cos(p2);
+        final double x = Math.cos(p1) * Math.sin(p2)
+                - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+        final double b = Math.toDegrees(Math.atan2(y, x));
+        return (b + 360) % 360;
+    }
+
+    /**
+     * How far off this camera's center line a point sits, in signed degrees.
+     *
+     * <p>Negative means the point is to the left of where the camera looks
+     * (counterclockwise from its pan), positive to the right. NaN when the camera
+     * reports no pan.
+     */
+    public double offCenter(double toLat, double toLon) {
+        if (Double.isNaN(pan))
+            return Double.NaN;
+        double d = bearingTo(toLat, toLon) - pan;
+        while (d <= -180)
+            d += 360;
+        while (d > 180)
+            d -= 360;
+        return d;
+    }
+
+    /**
+     * True when the point lies inside this camera's reported wedge, widened by
+     * {@code slackDeg} on each side. False for a camera with no bearing.
+     */
+    public boolean sees(double toLat, double toLon, double slackDeg) {
+        if (!hasFov())
+            return false;
+        final double off = Math.abs(offCenter(toLat, toLon));
+        // Inside the lens, and not at its edge. A Mobotix fixed camera claims 90
+        // degrees, and a point 39 degrees off its center sat in a dark corner of
+        // the frame while the rule said "sees it" (Chino Hills Fixed South,
+        // 2026-10-11). Past 30 degrees off center a picture is not an answer.
+        return off <= fov / 2 + slackDeg && off <= MAX_OFF_CENTER_DEG;
+    }
+
+    /** Degrees off center beyond which a camera is not said to see a point. */
+    public static final double MAX_OFF_CENTER_DEG = 30;
+
     /** Great-circle distance in meters, for the radius filters. */
     public double metersFrom(double fromLat, double fromLon) {
         final double R = 6371008.8;
