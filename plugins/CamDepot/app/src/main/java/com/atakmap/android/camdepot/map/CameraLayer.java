@@ -6,6 +6,7 @@ import com.atakmap.coremap.maps.assets.Icon;
 import com.atakmap.android.maps.MapGroup;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.camdepot.plugin.R;
 import com.atakmap.android.maps.Marker;
 import com.atakmap.android.util.ATAKUtilities;
 import com.atakmap.coremap.log.Log;
@@ -1601,6 +1602,7 @@ public final class CameraLayer {
     // ---- the Look At point ---------------------------------------------
 
     private Marker lookAtMarker;
+    private static final int HALO_COLOR = 0xFF00E5FF;
 
     /**
      * Mark the point Look At is judging cameras against, so the operator can
@@ -1622,12 +1624,27 @@ public final class CameraLayer {
                 m.setMetaBoolean("removable", false);
                 m.setMetaBoolean("movable", false);
                 m.setMetaBoolean("editable", false);
-                m.setMetaInteger("color", 0xFFFFC107);
-                m.setIcon(new Icon.Builder()
-                        .setImageUri(Icon.STATE_DEFAULT, "asset:/icons/reference_point.png")
-                        .setAnchor(Icon.ANCHOR_CENTER, Icon.ANCHOR_CENTER)
-                        .setColor(Icon.STATE_DEFAULT, 0xFFFFC107)
-                        .build());
+                m.setMetaInteger("color", HALO_COLOR);
+                // Or ATAK's icon adapter swaps in its own glyph for the type and
+                // the composed one never shows: a tiny tinted crosshair was what
+                // drew, three builds running (2026-10-11).
+                m.setMetaBoolean("adapt_marker_icon", false);
+                // The word and a cyan target as one bitmap, sized from ATAK's own
+                // label font, AirAware's launch marker's way: a plain drawable
+                // drew tiny and the label small (operator, 2026-10-11).
+                final SuggestIcon.Composed composed =
+                        SuggestIcon.compose(pluginContext, "SUGGEST");
+                if (composed != null) {
+                    m.setIcon(new Icon.Builder()
+                            .setImageUri(Icon.STATE_DEFAULT, composed.uri)
+                            .setSize(composed.widthDp, composed.heightDp)
+                            .setAnchor(composed.anchorXDp, composed.anchorYDp)
+                            .setColor(Icon.STATE_DEFAULT, 0xFFFFFFFF)
+                            .build());
+                    m.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);
+                } else {
+                    m.setIcon(icon(R.drawable.ic_suggest));
+                }
                 m.setZOrder(-1000);
                 lookAtMarker = m;
                 group.addItem(m);
@@ -1638,7 +1655,7 @@ public final class CameraLayer {
             }
             lookAtMarker.setVisible(true);
         } catch (LinkageError | RuntimeException e) {
-            Log.w(TAG, "could not place the Look At marker", e);
+            Log.w(TAG, "could not place the Suggest marker", e);
         }
     }
 
@@ -1649,7 +1666,7 @@ public final class CameraLayer {
             if (lookAtMarker.getGroup() != null)
                 group.removeItem(lookAtMarker);
         } catch (LinkageError | RuntimeException e) {
-            Log.w(TAG, "could not remove the Look At marker", e);
+            Log.w(TAG, "could not remove the Suggest marker", e);
         }
         lookAtMarker = null;
     }
