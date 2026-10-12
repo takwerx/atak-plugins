@@ -89,6 +89,7 @@
     <string name="spot_layer_allow_text">Atmosphere will ask the National Weather Service for the open spot forecast requests and draw them on the map. Your position is not sent. Server: mapservices.weather.noaa.gov</string>
     <string name="back">Back</string>
     <string name="show_area">Show the area</string>
+    <string name="hide_area">Hide the area</string>
     <string name="heading_details">Details</string>
     <string name="wind_here">Here: %1$s from %2$d\u00b0 %3$s</string>
     <string name="wind_here_unknown">Here: outside the area being drawn</string>

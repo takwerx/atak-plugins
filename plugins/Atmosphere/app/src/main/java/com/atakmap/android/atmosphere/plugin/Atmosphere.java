@@ -433,9 +433,14 @@ public class Atmosphere implements IPlugin {
                     }
 
                     @Override
-                    public void showFire(String ref) {
+                    public void showFire(String ref, boolean show) {
                         if (debrisflow != null)
-                            debrisflow.showFire(ref);
+                            debrisflow.showFire(ref, show);
+                    }
+
+                    @Override
+                    public boolean isFireShown(String ref) {
+                        return debrisflow != null && debrisflow.isFireShown(ref);
                     }
 
                     @Override

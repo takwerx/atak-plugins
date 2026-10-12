@@ -71,6 +71,24 @@ public final class DebrisFlow {
                 + "&outSR=4326&geometryPrecision=4&maxAllowableOffset=0.0005&f=geojson";
     }
 
+    /** The fire id a by-fire query URL was built for, or "" for any other URL. */
+    public static String fireIdOf(String url) {
+        if (url == null)
+            return "";
+        final int i = url.indexOf("where=");
+        if (i < 0)
+            return "";
+        final int j = url.indexOf('&', i);
+        try {
+            final String where = java.net.URLDecoder.decode(url.substring(i + 6, j < 0 ? url.length() : j), "UTF-8");
+            if (!where.startsWith("fire_id='") || !where.endsWith("'"))
+                return "";
+            return where.substring(9, where.length() - 1).replace("''", "'");
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     /** One fire's basins, by its id, from a row offset. */
     public static String basinsForFireUrl(String fireId, int offset) {
         return BASE + "4/query?" + fireWhere(fireId)
