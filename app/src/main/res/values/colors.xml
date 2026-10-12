@@ -7,5 +7,8 @@
     <!-- Toggle and selected-chip text, the same green Traffic uses: a pure #00ff00 glares on dark. -->
     <color name="state_on">#3ddc61</color>
     <color name="state_off">#ff5b52</color>
+    <!-- Group headings on the Layers page: cyan at full strength, so they stand out from
+         the rows (operator, 2026-10-11: "they are so faint man lets make them cyan"). -->
+    <color name="group_heading">#00e5ff</color>
 
 </resources>

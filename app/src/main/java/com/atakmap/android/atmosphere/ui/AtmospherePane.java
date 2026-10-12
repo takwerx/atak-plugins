@@ -179,7 +179,7 @@ public final class AtmospherePane {
     private static final int[] TAB_NAMES = { R.string.tab_forecast, R.string.tab_layers,
             R.string.tab_spots, R.string.tab_zones, R.string.tab_sawti, R.string.tab_erc,
             R.string.tab_stations,
-            R.string.tab_gauges, R.string.tab_buoys };
+            R.string.tab_gauges, R.string.tab_buoys, R.string.tab_reports };
     /** Where the Layers page sits in {@link #TAB_NAMES} and the pager. */
     private static final int LAYERS_PAGE = 1;
     private final View[] pages;
@@ -191,6 +191,8 @@ public final class AtmospherePane {
     private final SawtiPage sawtiPage;
     /** One area's fire danger with its GACC chart, opened wide from a tap on the map. */
     private final ErcPage ercPage;
+    /** The storm reports as a list, the map layer's own data narrowed by where and type. */
+    private final ReportsPage reportsPage;
     private final Button refreshButton;
     private final Button settingsButton;
     private final TextView positionText;
@@ -583,6 +585,44 @@ public final class AtmospherePane {
             }
         });
         ercPage = new ErcPage(pluginContext, egress);
+        reportsPage = new ReportsPage(pluginContext, MapView.getMapView(), egress,
+                new ReportsPage.Host() {
+                    @Override
+                    public UnitSystem units() {
+                        return units;
+                    }
+
+                    @Override
+                    public GeoPoint point() {
+                        return AtmospherePane.this.point();
+                    }
+
+                    @Override
+                    public String pointLabel() {
+                        return modeLabel();
+                    }
+
+                    @Override
+                    public void askToAllowReports() {
+                        AtmospherePane.this.askToAllowReports();
+                    }
+
+                    @Override
+                    public void setReportsOn(boolean on) {
+                        if (reports != null) {
+                            reports.setOn(on);
+                            updateLayerControls();
+                        }
+                    }
+
+                    @Override
+                    public void setTornadoOn(boolean on) {
+                        if (tornado != null) {
+                            tornado.setOn(on);
+                            updateLayerControls();
+                        }
+                    }
+                });
         sawtiPage = new SawtiPage(pluginContext, mapView(), egress, new SawtiPage.Host() {
             @Override
             public GeoPoint point() {
@@ -626,7 +666,8 @@ public final class AtmospherePane {
                 ercPage.view(),
                 stationPage.view(),
                 gaugePage.view(),
-                buoyPage.view()
+                buoyPage.view(),
+                reportsPage.view()
         };
         pager = root.findViewById(R.id.pager);
         pagePrev = root.findViewById(R.id.page_prev);
@@ -1407,6 +1448,8 @@ public final class AtmospherePane {
             sst.refresh(false);
         if (pages[pager.getCurrentItem()] == spotPage.view())
             spotPage.onShown();
+        if (pages[pager.getCurrentItem()] == reportsPage.view())
+            reportsPage.onShown();
         if (pages[pager.getCurrentItem()] == zonePage.view())
             zonePage.onShown();
         if (pages[pager.getCurrentItem()] == sawtiPage.view())
@@ -1462,6 +1505,8 @@ public final class AtmospherePane {
                 updatePageDots(position);
                 if (pages[position] == spotPage.view())
                     spotPage.onShown();
+                if (pages[position] == reportsPage.view())
+                    reportsPage.onShown();
                 if (pages[position] == zonePage.view())
                     zonePage.onShown();
                 if (pages[position] == sawtiPage.view())
@@ -2138,6 +2183,22 @@ public final class AtmospherePane {
         for (String[] row : StormReportsOverlay.LEGEND)
             reportsLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
         buildDayRow(reportsDayRow, reports);
+        reportsPage.setOverlay(reports);
+        reports.setDataListener(new Runnable() {
+            @Override
+            public void run() {
+                buildDayRow(reportsDayRow, reports);
+                reportsPage.onDataChanged();
+            }
+        });
+        final View openList = find(R.id.reports_open_list);
+        if (openList != null)
+            openList.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openPage(reportsPage.view());
+                }
+            });
         updateLayerControls();
     }
 
@@ -2157,6 +2218,14 @@ public final class AtmospherePane {
         for (String[] row : TornadoPathsOverlay.LEGEND)
             tornadoLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
         buildDayRow(tornadoDayRow, tornado);
+        reportsPage.setPathsOverlay(tornado);
+        tornado.setDataListener(new Runnable() {
+            @Override
+            public void run() {
+                buildDayRow(tornadoDayRow, tornado);
+                reportsPage.onDataChanged();
+            }
+        });
         updateLayerControls();
     }
 
@@ -6193,6 +6262,7 @@ public final class AtmospherePane {
     public void dispose() {
         onClosed();
         spotPage.dispose();
+        reportsPage.dispose();
         zonePage.dispose();
         sawtiPage.dispose();
     }
@@ -6393,6 +6463,8 @@ public final class AtmospherePane {
                 zonePage.pointChanged(pages[pager.getCurrentItem()] == zonePage.view());
             if (sawtiPage != null && pager != null)
                 sawtiPage.pointChanged(pages[pager.getCurrentItem()] == sawtiPage.view());
+
+                reportsPage.pointChanged();
         }
     };
 
@@ -6577,6 +6649,8 @@ public final class AtmospherePane {
             zonePage.pointChanged(pages[pager.getCurrentItem()] == zonePage.view());
         if (sawtiPage != null && pager != null)
             sawtiPage.pointChanged(pages[pager.getCurrentItem()] == sawtiPage.view());
+
+            reportsPage.pointChanged();
         if (selected == null) {
             statusText.setText(R.string.no_sources);
             return;

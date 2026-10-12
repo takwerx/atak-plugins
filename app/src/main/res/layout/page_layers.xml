@@ -475,7 +475,7 @@
                 android:text="@string/group_wind"
                 android:textSize="10sp"
                 android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:textColor="@color/group_heading" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -628,7 +628,7 @@
                 android:text="@string/group_storms"
                 android:textSize="10sp"
                 android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:textColor="@color/group_heading" />
 
             <!-- Storm Reports: what the NWS offices logged in the last three days, a dot per report in its family's color; 24, 48 or 72 hours. -->
             <LinearLayout
@@ -679,6 +679,14 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:orientation="horizontal" />
+
+                <Button
+                    android:id="@+id/reports_open_list"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/reports_open_list" />
 
                 <TextView
                     android:id="@+id/reports_status"
@@ -773,7 +781,7 @@
                 android:text="@string/group_fire"
                 android:textSize="10sp"
                 android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:textColor="@color/group_heading" />
 
             <!-- SPC's fire weather outlook, days 1-3, in SPC's colors. Not
                  time-enabled; on beside anything. -->
@@ -1405,7 +1413,7 @@
                 android:text="@string/group_rain"
                 android:textSize="10sp"
                 android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:textColor="@color/group_heading" />
 
             <!-- A layer is a row: the toggle, and a chevron when it has settings to
                  show. The chevron folds the settings away while the layer stays on,
@@ -2145,7 +2153,7 @@
                 android:text="@string/group_ocean"
                 android:textSize="10sp"
                 android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:textColor="@color/group_heading" />
 
             <!-- Buoys and coastal stations from NDBC. The file is national and fetched whole,
                  so this layer sends nothing about where the operator is. -->
@@ -2644,7 +2652,7 @@
                 android:text="@string/group_snow"
                 android:textSize="10sp"
                 android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:textColor="@color/group_heading" />
 
             <!-- Avalanche forecast zones, filled in the danger color the center
                  publishes; gray off season so the map still says where a forecast
@@ -2849,7 +2857,7 @@
                 android:text="@string/group_ground"
                 android:textSize="10sp"
                 android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:textColor="@color/group_heading" />
 
             <!-- Earthquakes: the USGS feed, circles by magnitude and age, ShakeMap contours for the largest. -->
             <LinearLayout
