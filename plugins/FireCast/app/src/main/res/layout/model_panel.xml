@@ -31,28 +31,22 @@
             android:layout_marginLeft="6dp"
             android:text="Clear all" />
     </LinearLayout>
-    <LinearLayout
+    <!-- Settings read "Name: value" and get a row each, so the value never runs off
+         the button (operator, 2026-10-12). -->
+    <Button
+        android:id="@+id/btn_conditions"
+        style="@style/TakwerxButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:baselineAligned="false"
-        android:paddingTop="6dp">
-        <Button
-            android:id="@+id/btn_conditions"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Conditions: As observed" />
-        <Button
-            android:id="@+id/btn_station"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
-            android:text="Station: automatic" />
-    </LinearLayout>
+        android:layout_marginTop="6dp"
+        android:text="Conditions: As observed" />
+    <Button
+        android:id="@+id/btn_station"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Station: automatic" />
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -75,6 +69,13 @@
             android:layout_marginLeft="6dp"
             android:text="Started: not known" />
     </LinearLayout>
+    <Button
+        android:id="@+id/btn_horizon"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Horizon: 1 hour" />
     <Button
         android:id="@+id/btn_run"
         style="@style/TakwerxButton"

@@ -143,8 +143,8 @@ public final class Landscape {
                 int r;
                 while ((r = in.read(buf)) > 0) {
                     total += r;
-                    if (total > 4L * 1024 * 1024)
-                        throw new IllegalStateException("LANDFIRE grid over 4 MB");
+                    if (total > 8L * 1024 * 1024)
+                        throw new IllegalStateException("LANDFIRE grid over 8 MB");
                     out.write(buf, 0, r);
                 }
             } finally {

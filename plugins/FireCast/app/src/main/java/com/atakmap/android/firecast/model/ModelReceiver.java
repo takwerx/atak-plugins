@@ -76,6 +76,25 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 model.drawPerimeter();
             }
         });
+        view.findViewById(R.id.btn_horizon).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final String[] labels = { "1 hour, at 20, 40 and 60 minutes (15 m cells, 5 mi reach)",
+                        "3 hours, every half hour (30 m cells, 12 mi reach)" };
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("How far ahead")
+                        .setSingleChoiceItems(labels, model.horizonMinutes() >= 180 ? 1 : 0, new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                                model.setHorizonMinutes(which == 1 ? 180 : 60);
+                                render();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
         view.findViewById(R.id.btn_started).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -212,6 +231,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         final com.atakmap.coremap.maps.coords.GeoPoint start = model.startPoint();
         ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && (start != null || model.perimeter() != null));
         ((Button) view.findViewById(R.id.btn_perimeter)).setText(model.perimeter() != null ? "Perimeter: drawn (tap to drop)" : "Draw perimeter");
+        ((Button) view.findViewById(R.id.btn_horizon)).setText(model.horizonMinutes() >= 180 ? "Horizon: 3 hours" : "Horizon: 1 hour");
         final int ago = model.startedMinutesAgo();
         ((Button) view.findViewById(R.id.btn_started)).setText(ago == 0 ? "Started: not known" : "Started: " + ago + " min ago");
         ((Button) view.findViewById(R.id.btn_conditions)).setText("Conditions: " + FireModel.conditionsLabel(model.conditions()));
@@ -285,8 +305,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         final Behave.Result o = r.result;
         final StringBuilder goes = new StringBuilder();
         if (r.ground != null) {
-            for (int i = 0; i < FireModel.STEPS_MIN.length; i++) {
-                final int min = FireModel.STEPS_MIN[i];
+            for (int i = 0; i < r.steps.length; i++) {
+                final int min = r.steps[i];
                 goes.append(clock(r.ranAt + min * 60000L)).append(" (").append(min).append(" min): ").append(acres(r.acres(min)))
                         .append(", farthest ").append(Units.format(r.headM(min)))
                         .append(" to the ").append(Units.compass(r.headDeg(min)));
@@ -324,7 +344,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             goes.append("Head runs toward ").append(Units.compass(o.headingDeg))
                     .append(String.format(Locale.US, " (%.0f°)", o.headingDeg))
                     .append(" at ").append(rate(o.rosFtPerMin)).append(".\n");
-            for (int min : FireModel.STEPS_MIN)
+            for (int min : r.steps)
                 goes.append(min).append(" min: ").append(acres(r.acres(min)))
                         .append(", head ").append(Units.format(r.headM(min)))
                         .append(" from the start, ").append(Units.format(o.aFtPerMin * min * 2 * 0.3048d)).append(" wide.\n");

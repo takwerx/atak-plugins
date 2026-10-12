@@ -63,6 +63,25 @@ public final class FireModel {
 
     private static final String TAG = "FireCast";
     public static final int[] STEPS_MIN = { 20, 40, 60 };
+    /** The 3 hour card: half-hour steps, the way the Cal OES product reads. */
+    public static final int[] STEPS_3H = { 30, 60, 90, 120, 150, 180 };
+    private static final String PREF_HORIZON = "model.horizonMin";
+
+    /** Minutes the next run projects: 60 or 180. */
+    public int horizonMinutes() {
+        return prefs.getInt(PREF_HORIZON, 60);
+    }
+
+    public void setHorizonMinutes(int m) {
+        prefs.edit().putInt(PREF_HORIZON, m).apply();
+    }
+
+    /** The color of a step's ring: red for the first, through orange to yellow for the last. */
+    static int stepColor(int i, int n) {
+        final double f = n <= 1 ? 0 : i / (double) (n - 1);
+        final int r = 0xFF, g = (int) Math.round(0x2A + (0xD6 - 0x2A) * f), b = 0x00;
+        return (r << 16) | (g << 8) | b;
+    }
     /** The ground fetched around a start, each way. 4 km holds an hour of anything short of a wind-driven grass run. */
     static final double HALF_KM = 4;
     private static final double FT_TO_M = 0.3048d;
@@ -96,6 +115,10 @@ public final class FireModel {
         public String problem;
         /** The feature set that draws this run, 0 until drawn. */
         public long fsid;
+        /** The steps this run was projected at, minutes. */
+        public int[] steps = STEPS_MIN;
+        /** The cell the ground run used, meters: 15 for an hour, 30 for three. */
+        public double cellM = 15;
         /** The run across the ground, or null when it was the one-point ellipse. */
         public Spread.Result ground;
         /** Why it was the ellipse, when it was. */
@@ -133,7 +156,7 @@ public final class FireModel {
             if (perimeter != null)
                 sb.append(", from a perimeter");
             if (structures != null)
-                sb.append(", ").append(structures[STEPS_MIN.length - 1]).append(" bldg");
+                sb.append(", ").append(structures[steps.length - 1]).append(" bldg");
             if (!COND_OBSERVED.equals(conditions))
                 sb.append(", ").append(conditionsLabel(conditions).toLowerCase(Locale.US));
             return sb.toString();
@@ -655,6 +678,10 @@ public final class FireModel {
                 r.lon = lon;
                 r.ranAt = System.currentTimeMillis();
                 r.perimeter = perimeter;
+                final boolean threeHours = horizonMinutes() >= 180;
+                r.steps = threeHours ? STEPS_3H : STEPS_MIN;
+                r.halfKm = threeHours ? 10 : HALF_KM;
+                r.cellM = threeHours ? 30 : 15;
                 final int ago = startedMinutesAgo();
                 r.startedAt = ago > 0 ? r.ranAt - ago * 60000L : 0;
                 try {
@@ -929,7 +956,7 @@ public final class FireModel {
             final double elapsedMin = (r.ranAt - r.startedAt) / 60000d;
             final double observedAcres = Spread.ringAcres(r.perimeter);
             if (elapsedMin >= 5 && observedAcres > 0.1) {
-                final Spread.Result trial = Spread.run(land, r.lat, r.lon, r.halfKm, elapsedMin, behavior, null, 1d, null, r.startedAt);
+                final Spread.Result trial = Spread.run(land, r.lat, r.lon, r.halfKm, elapsedMin, behavior, null, 1d, null, r.startedAt, r.cellM);
                 final double modeled = trial.acres(elapsedMin);
                 if (modeled > 0.05) {
                     final double raw = Math.sqrt(observedAcres / modeled);
@@ -948,8 +975,8 @@ public final class FireModel {
                 return r.windField.at(lat, lon, whenMillis);
             }
         };
-        final Spread.Result g = Spread.run(land, r.lat, r.lon, r.halfKm, STEPS_MIN[STEPS_MIN.length - 1],
-                behavior, r.perimeter, r.rateScale, field, r.ranAt);
+        final Spread.Result g = Spread.run(land, r.lat, r.lon, r.halfKm, r.steps[r.steps.length - 1],
+                behavior, r.perimeter, r.rateScale, field, r.ranAt, r.cellM);
         Log.d(TAG, "ground run: " + g.cellsSeen + " cells reached of " + g.cellsBurnable + " burnable, "
                 + g.fuelsCrossed + " fuels, " + (System.currentTimeMillis() - t0) + " ms");
         if (g.cellsSeen < 2) {
@@ -976,7 +1003,7 @@ public final class FireModel {
         final Spread.Result g = r.ground;
         // The box the hour ring fits in, a cell of margin each way.
         double s = Double.MAX_VALUE, w = Double.MAX_VALUE, n = -Double.MAX_VALUE, e = -Double.MAX_VALUE;
-        final int last = STEPS_MIN[STEPS_MIN.length - 1];
+        final int last = r.steps[r.steps.length - 1];
         for (int y = 0; y < g.ny; y++)
             for (int x = 0; x < g.nx; x++) {
                 if (g.arrival[y * g.nx + x] > last)
@@ -998,8 +1025,8 @@ public final class FireModel {
             r.structureNote = "Structures not counted: the building inventory could not be reached.";
             return;
         }
-        final int[] count = new int[STEPS_MIN.length], homes = new int[STEPS_MIN.length];
-        final double[] people = new double[STEPS_MIN.length];
+        final int[] count = new int[r.steps.length], homes = new int[r.steps.length];
+        final double[] people = new double[r.steps.length];
         for (Structures.Building b : buildings) {
             final int x = (int) Math.floor((b.lon - g.lon0) / g.dLon), y = (int) Math.floor((b.lat - g.lat0) / g.dLat);
             if (x < 0 || y < 0 || x >= g.nx || y >= g.ny)
@@ -1013,8 +1040,8 @@ public final class FireModel {
                     if (xx >= 0 && yy >= 0 && xx < g.nx && yy < g.ny)
                         t = Math.min(t, g.arrival[yy * g.nx + xx]);
                 }
-            for (int i = 0; i < STEPS_MIN.length; i++) {
-                if (t <= STEPS_MIN[i]) {
+            for (int i = 0; i < r.steps.length; i++) {
+                if (t <= r.steps[i]) {
                     count[i]++;
                     if (b.residential())
                         homes[i]++;
@@ -1028,7 +1055,7 @@ public final class FireModel {
         r.structureNote = buildings.size() >= Structures.MAX
                 ? "The inventory stopped at " + Structures.MAX + " buildings, so these counts are a floor."
                 : null;
-        Log.d(TAG, "structures: " + buildings.size() + " in the box, " + count[STEPS_MIN.length - 1] + " reached in the hour");
+        Log.d(TAG, "structures: " + buildings.size() + " in the box, " + count[r.steps.length - 1] + " reached by the last step");
     }
 
     /** The one judgment on a run's numbers: no spread is a sentence, not a zero. */
@@ -1046,7 +1073,7 @@ public final class FireModel {
         if (r == null || r.result == null)
             return;
         try {
-            final double reachM = Math.max(60, r.headM(STEPS_MIN[STEPS_MIN.length - 1]) * 1.3d);
+            final double reachM = Math.max(60, r.headM(r.steps[r.steps.length - 1]) * 1.3d);
             final double dLat = reachM / 111320d;
             final double dLon = reachM / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(r.lat))));
             final GeoPoint[] corners = {
@@ -1180,21 +1207,21 @@ public final class FireModel {
                         r.label(), Double.MAX_VALUE, 0d));
                 store.setFeatureSetVisible(fsid, r.visible);
                 r.fsid = fsid;
-                // Largest first so the 20 minute ring draws on top of the 60.
-                final int[] colors = { 0xFFD600, 0xFF8A00, 0xFF2A00 };
-                for (int i = STEPS_MIN.length - 1; i >= 0; i--) {
+                // Largest first so the first ring draws on top of the last.
+                for (int i = r.steps.length - 1; i >= 0; i--) {
+                    final int color = stepColor(i, r.steps.length);
                     final Style style = new CompositeStyle(new Style[] {
-                            new BasicFillStyle((0x30 << 24) | colors[i]),
-                            new BasicStrokeStyle(0xFF000000 | colors[i], 3f) });
+                            new BasicFillStyle((0x30 << 24) | color),
+                            new BasicStrokeStyle(0xFF000000 | color, 3f) });
                     final List<Polygon> shapes = new ArrayList<>();
                     if (r.ground != null)
-                        shapes.addAll(r.ground.rings(STEPS_MIN[i]));
+                        shapes.addAll(r.ground.rings(r.steps[i]));
                     else
-                        shapes.add(ellipse(r, STEPS_MIN[i]));
+                        shapes.add(ellipse(r, r.steps[i]));
                     for (Polygon p : shapes) {
                         final AttributeSet a = new AttributeSet();
-                        a.setAttribute("_title", STEPS_MIN[i] + " min");
-                        store.insertFeature(new Feature(fsid, STEPS_MIN[i] + " min", p, style, a,
+                        a.setAttribute("_title", r.steps[i] + " min");
+                        store.insertFeature(new Feature(fsid, r.steps[i] + " min", p, style, a,
                                 Feature.AltitudeMode.ClampToGround, 0d));
                     }
                 }
@@ -1347,7 +1374,11 @@ public final class FireModel {
                     .put("tenMeterWind", r.tenMeterWind).put("moistureNote", r.moistureNote);
             o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions)
                     .put("visible", r.visible).put("ground", r.ground != null).put("halfKm", r.halfKm)
-                    .put("startedAt", r.startedAt).put("rateScale", r.rateScale);
+                    .put("startedAt", r.startedAt).put("rateScale", r.rateScale).put("cellM", r.cellM);
+            final org.json.JSONArray stepsA = new org.json.JSONArray();
+            for (int m : r.steps)
+                stepsA.put(m);
+            o.put("steps", stepsA);
             if (r.calibrationNote != null)
                 o.put("calibrationNote", r.calibrationNote);
 
@@ -1359,7 +1390,7 @@ public final class FireModel {
             }
             if (r.structures != null) {
                 final org.json.JSONArray st = new org.json.JSONArray(), hm = new org.json.JSONArray(), pp = new org.json.JSONArray();
-                for (int i = 0; i < STEPS_MIN.length; i++) {
+                for (int i = 0; i < r.steps.length; i++) {
                     st.put(r.structures[i]);
                     hm.put(r.homes[i]);
                     pp.put(r.people[i]);
@@ -1448,6 +1479,13 @@ public final class FireModel {
             r.visible = o.optBoolean("visible", true);
             r.halfKm = o.optDouble("halfKm", HALF_KM);
             r.startedAt = o.optLong("startedAt", 0);
+            r.cellM = o.optDouble("cellM", 15);
+            final org.json.JSONArray stepsA = o.optJSONArray("steps");
+            if (stepsA != null && stepsA.length() > 0) {
+                r.steps = new int[stepsA.length()];
+                for (int i = 0; i < stepsA.length(); i++)
+                    r.steps[i] = stepsA.optInt(i);
+            }
             r.rateScale = o.optDouble("rateScale", 1);
             r.calibrationNote = o.optString("calibrationNote", null);
 
@@ -1469,11 +1507,11 @@ public final class FireModel {
                 // building counts are kept from the run, not fetched again.
                 final org.json.JSONArray st = o.optJSONArray("structures"), hm = o.optJSONArray("homes"), pp = o.optJSONArray("people");
                 acrossTheGroundNoStructures(r);
-                if (st != null && hm != null && pp != null && st.length() == STEPS_MIN.length) {
-                    r.structures = new int[STEPS_MIN.length];
-                    r.homes = new int[STEPS_MIN.length];
-                    r.people = new double[STEPS_MIN.length];
-                    for (int i = 0; i < STEPS_MIN.length; i++) {
+                if (st != null && hm != null && pp != null && st.length() == r.steps.length) {
+                    r.structures = new int[r.steps.length];
+                    r.homes = new int[r.steps.length];
+                    r.people = new double[r.steps.length];
+                    for (int i = 0; i < r.steps.length; i++) {
                         r.structures[i] = st.optInt(i);
                         r.homes[i] = hm.optInt(i);
                         r.people[i] = pp.optDouble(i, 0);

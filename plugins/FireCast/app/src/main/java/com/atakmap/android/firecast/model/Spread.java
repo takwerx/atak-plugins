@@ -179,9 +179,16 @@ public final class Spread {
      */
     public static Result run(Landscape land, double lat, double lon, double halfKm, double maxMin, Behavior behavior,
             double[][] seedRing, double rateScale, Wind wind, long startMs) {
-        // Half the grid's own 30 m: the fuel is sampled nearest, so the run follows the
-        // same ground, but the front moves in finer steps and the rings come out smooth.
-        final double cell = 15d;
+        return run(land, lat, lon, halfKm, maxMin, behavior, seedRing, rateScale, wind, startMs, 15d);
+    }
+
+    /** @param cellM the cell, meters: 15 follows the ground finely for an hour; 30 keeps three hours over 20 km affordable */
+    public static Result run(Landscape land, double lat, double lon, double halfKm, double maxMin, Behavior behavior,
+            double[][] seedRing, double rateScale, Wind wind, long startMs, double cellM) {
+        // 15 m is half the grid's own 30 m: the fuel is sampled nearest, so the run
+        // follows the same ground, but the front moves in finer steps and the rings
+        // come out smooth. Three hours over 20 km runs at 30 m.
+        final double cell = cellM;
         final int half = (int) Math.round(halfKm * 1000d / cell);
         final int nx = 2 * half + 1, ny = nx;
         final double mPerDegLat = 111320d, mPerDegLon = 111320d * Math.max(0.02d, Math.cos(Math.toRadians(lat)));
@@ -454,12 +461,13 @@ public final class Spread {
     }
 
     private static double[] flameByStep(Cell[] cells, float[] arrival) {
-        final double[] out = new double[FireModel.STEPS_MIN.length];
+        final int[] steps = { 20, 40, 60, 90, 120, 150, 180 };
+        final double[] out = new double[steps.length];
         for (int i = 0; i < cells.length; i++) {
             if (cells[i] == BARRIER || arrival[i] == Float.POSITIVE_INFINITY)
                 continue;
-            for (int s = 0; s < FireModel.STEPS_MIN.length; s++)
-                if (arrival[i] <= FireModel.STEPS_MIN[s] && cells[i].flameFt > out[s])
+            for (int s = 0; s < steps.length; s++)
+                if (arrival[i] <= steps[s] && cells[i].flameFt > out[s])
                     out[s] = cells[i].flameFt;
         }
         return out;
