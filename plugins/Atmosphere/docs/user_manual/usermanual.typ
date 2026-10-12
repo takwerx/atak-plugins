@@ -658,10 +658,12 @@ only.
 #tak-slide[
 = Rain Gauges
 
-*Rain Gauges* draws the USGS rain gauges around the map, a dot in the color
-of its last 24 hours with the inches in the pill, and the forecast office's
-own report gauges beside them, dark-ringed. Tap one for the day by the hour,
-or the report's line. The map's extent is sent, never your position.
+*Rain Gauges* draws three kinds of gauge, each a dot in the color of its
+last 24 hours with the inches in the pill: the USGS gauges around the map
+(white ring, the day by the hour on tap), the CoCoRaHS volunteer gauges of
+the state under the map (cyan ring, read once a day around 7 am), and the
+forecast office's own report gauges (dark ring). The map's extent and the
+state's code are sent, never your position.
 
 The *Rain Gauges* page shows the office's rainfall report for the point in
 the top row: its gauges with their inches for the period the office names,
@@ -1041,8 +1043,9 @@ Only what you ask for:
   set, and the SAWTI page finds your zone on this device. So do *Storm
   Reports*, *Tornado Paths* and *Earthquakes*, which are whole national or
   worldwide files; *Debris Flow*, *Rain Totals* and *Rain Gauges* send the
-  area the map shows, padded; *Fuel Moisture* sends the two-letter code of the
-  state under the map center, found on this device. The office's rainfall report and the synopsis
+  area the map shows, padded; *Fuel Moisture* and the *Rain Gauges* volunteer
+  reports send the two-letter code of the state under the map center, found
+  on this device. The office's rainfall report and the synopsis
   find the office by the half-degree square the point is in, and only while
   NWS is the forecast service.
 - An *address* you type goes to the US Census Bureau, and to ATAK's own
