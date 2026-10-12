@@ -651,16 +651,10 @@ public final class FireModel {
             final double dLon = reachM / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(r.lat))));
             final GeoPoint[] corners = {
                     new GeoPoint(r.lat - dLat, r.lon - dLon), new GeoPoint(r.lat + dLat, r.lon + dLon) };
-            // The page covers the right half, so the fit is asked of the left half only.
+            // The same fit the detection page's Go to uses; nothing cleverer, the half
+            // screen arithmetic sent the map somewhere else entirely (dev 1, 2026-10-11).
             com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, corners, 0d,
-                    mapView.getWidth() / 2, mapView.getHeight());
-            final PointF at = mapView.forward(new GeoPoint(r.lat, r.lon));
-            final float w = mapView.getWidth(), h = mapView.getHeight();
-            if (at != null && w > 0 && h > 0) {
-                final GeoPointMetaData c = mapView.inverseWithElevation(at.x + w / 4f, h / 2f);
-                if (c != null && c.get() != null && c.get().isValid())
-                    mapView.getMapController().panTo(c.get(), true);
-            }
+                    mapView.getWidth(), mapView.getHeight());
         } catch (Exception e) {
             Log.w(TAG, "go to run failed", e);
         }
