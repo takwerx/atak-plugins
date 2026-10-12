@@ -63,6 +63,12 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
     /** What the basins were last asked for: west, south, east, north; null for none. */
     private volatile double[] asked;
     private volatile boolean zoomedOut = true;
+    /**
+     * The one fire whose basins are asked for, from its page's Show the area; null
+     * for every burn in view. Cleared when the map settles with the fire out of view.
+     */
+    private volatile DebrisFlow.Fire focus;
+    private volatile String askedFocus = "";
     private volatile boolean dirty;
     private volatile int received;
     /** Written on the worker as the fires arrive, read there as the basins do. */
@@ -113,7 +119,17 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
         if (!value) {
             asked = null;
             dirty = false;
+            focus = null;
+            askedFocus = "";
         }
+    }
+
+    /** Whether the focus fire is still on screen; off screen, the view's burns take over. */
+    private boolean focusInView() {
+        final DebrisFlow.Fire f = focus;
+        final double[] x = extent();
+        return f != null && x != null && f.lon >= x[0] && f.lon <= x[2] && f.lat >= x[1]
+                && f.lat <= x[3];
     }
 
     /** What a fire's marker carries so its details page can bring the map to it. */
@@ -135,6 +151,7 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
             return false;
         for (DebrisFlow.Fire f : fires)
             if (ref.equals(fireRef(f))) {
+                focus = f.id.isEmpty() ? null : f;
                 try {
                     mapView.getMapController().panZoomTo(new GeoPoint(f.lat, f.lon),
                             mapView.mapResolutionAsMapScale(FIRE_VIEW_RESOLUTION), true);
@@ -162,6 +179,13 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
         final double[] x = extent();
         if (x == null)
             return false;
+        if (focus != null && !focusInView())
+            focus = null;
+        final String f = focus == null ? "" : focus.id;
+        if (!f.equals(askedFocus))
+            return true;
+        if (focus != null)
+            return false;
         final boolean wide = x[2] - x[0] > MAX_SPAN_LON;
         if (wide != zoomedOut)
             return true;
@@ -188,6 +212,15 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
         final double[] box = { Math.max(-180, x[0] - padX), Math.max(-89, x[1] - padY),
                 Math.min(180, x[2] + padX), Math.min(89, x[3] + padY) };
         asked = box;
+        if (focus != null && !focusInView())
+            focus = null;
+        final DebrisFlow.Fire f = focus;
+        askedFocus = f == null ? "" : f.id;
+        if (f != null) {
+            urls.add(DebrisFlow.perimetersForFireUrl(f.id));
+            urls.add(DebrisFlow.basinsForFireUrl(f.id, 0));
+            return;
+        }
         final String since = TornadoPaths.ymd(System.currentTimeMillis() - DebrisFlow.KEEP_MS);
         urls.add(DebrisFlow.perimetersUrl(box[0], box[1], box[2], box[3], since));
         urls.add(DebrisFlow.basinsUrl(box[0], box[1], box[2], box[3], since, 0));
@@ -308,7 +341,10 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
         received += got.size();
         if (!got.isEmpty() && com.atakmap.android.atmosphere.data.StormReports.exceeded(body)) {
             final double[] a = asked;
-            if (a != null)
+            final DebrisFlow.Fire ff = focus;
+            if (ff != null && ff.id.equals(askedFocus))
+                urls.add(DebrisFlow.basinsForFireUrl(ff.id, received));
+            else if (a != null)
                 urls.add(DebrisFlow.basinsUrl(a[0], a[1], a[2], a[3],
                         TornadoPaths.ymd(now - DebrisFlow.KEEP_MS), received));
         }
@@ -383,7 +419,12 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
         else if (basins == 0)
             b.append("No post-fire assessment here. ").append(firesNational)
                     .append(" fires assessed in the last three years are marked.");
-        else {
+        else if (focus != null && focus.id.equals(askedFocus)) {
+            b.append("Showing the ").append(focus.name).append(" fire only: ").append(basins)
+                    .append(" basins, ").append(counts[2]).append(" high, ").append(counts[1])
+                    .append(" moderate, ").append(counts[0])
+                    .append(" low. Pan away from it for every burn in view.");
+        } else {
             if (!inView.isEmpty()) {
                 b.append("Fires here: ");
                 int i = 0;
