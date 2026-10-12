@@ -84,8 +84,10 @@ Capabilities:
     closest first, any mix of types; a row flies to it and opens it.
   - Rain that fell: the NWS rainfall picture for the last hour to seven days
     in the service's own colors with a transparency slider; the USGS rain
-    gauges with their 24 hour totals; and the forecast office's own rainfall
-    report as a list, most rain first or closest, its gauges on the map too.
+    gauges with their 24 hour totals and the CoCoRaHS volunteer gauges of the
+    state under the map with their morning reading; and the forecast office's
+    own rainfall report as a list, most rain first or closest, its gauges on
+    the map too.
   - The forecaster's synopsis on the Forecast page, from the Area Forecast
     Discussion for the office covering the point, the other sections a tap
     away.

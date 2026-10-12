@@ -3,7 +3,11 @@ package com.atakmap.android.atmosphere.overlay;
 import android.content.Context;
 
 import com.atakmap.android.atmosphere.compat.GeneratedFiles;
+import com.atakmap.android.atmosphere.data.CocoRahs;
+import com.atakmap.android.atmosphere.data.States;
 import com.atakmap.android.atmosphere.data.UsgsRain;
+import com.atakmap.coremap.log.Log;
+import com.atakmap.coremap.maps.coords.GeoPoint;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.maps.assets.Icon;
@@ -21,6 +25,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Locale;
 
 /**
@@ -45,7 +50,10 @@ public final class RainGaugesOverlay extends OutlookOverlay {
     public static final String[][] LEGEND = {
             { "No rain in 24 h", "#FFB0BEC5" }, { "Under 0.25 in", "#FF00A0FF" },
             { "0.25 to 1 in", "#FF00DC00" }, { "1 to 2 in", "#FF008D00" },
-            { "2 to 4 in", "#FFE7B400" }, { "4 in or more", "#FFE60000" } };
+            { "2 to 4 in", "#FFE7B400" }, { "4 in or more", "#FFE60000" },
+            { "White ring: USGS gauge, last 24 h. Dark ring: the office's report. Cyan ring:"
+                    + " CoCoRaHS volunteer, 24 h to about 7 am", "0" } };
+    private static final int COCORAHS_RING = 0xFF00E5FF;
 
     public static int color(double inches) {
         if (inches < 0.005)
@@ -79,6 +87,13 @@ public final class RainGaugesOverlay extends OutlookOverlay {
     private volatile String reportOffice = "";
     private final DotIcons icons;
     private volatile String url = "";
+    /** The requests of one refresh: the USGS box, then CoCoRaHS today and yesterday. */
+    private final List<String> chain = new CopyOnWriteArrayList<>();
+    private final Context pluginContext;
+    private States states;
+    private volatile String state = "";
+    private volatile int cocorahsCount;
+    private List<CocoRahs.Report> cocorahsSeen = new ArrayList<>();
     private volatile double[] asked;
     private volatile boolean zoomedOut = true;
     private volatile boolean dirty;
@@ -87,7 +102,7 @@ public final class RainGaugesOverlay extends OutlookOverlay {
     private final Runnable settled = new Runnable() {
         @Override
         public void run() {
-            if (isOn() && needsNewAsk())
+            if (isOn() && (needsNewAsk() || stateChanged()))
                 refresh(true);
         }
     };
@@ -102,7 +117,35 @@ public final class RainGaugesOverlay extends OutlookOverlay {
 
     public RainGaugesOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
         super(mapView, pluginContext, egress, TAG, LAYER_ID, "Rain Gauges");
+        this.pluginContext = pluginContext;
         icons = new DotIcons(GeneratedFiles.icons("dots"));
+    }
+
+    private States loadStates() {
+        try (java.io.InputStream in = pluginContext.getAssets().open("us_states.json")) {
+            final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            final byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0)
+                out.write(buf, 0, n);
+            return States.parse(out.toString("UTF-8"));
+        } catch (Exception e) {
+            Log.w(TAG, "state outlines unreadable", e);
+            return null;
+        }
+    }
+
+    /** The state under the map center, or "" at sea or abroad. */
+    private String stateAtCenter() {
+        if (states == null)
+            states = loadStates();
+        if (states == null)
+            return "";
+        final GeoPoint c = mapView.getCenterPoint().get();
+        if (c == null || !c.isValid())
+            return "";
+        final String s = states.at(c.getLatitude(), c.getLongitude());
+        return s == null ? "" : s;
     }
 
     /** The gauges held, most rain first. Main thread. */
@@ -195,18 +238,36 @@ public final class RainGaugesOverlay extends OutlookOverlay {
     @Override
     protected void onRefreshStart() {
         dirty = false;
+        cocorahsSeen = new ArrayList<>();
+        chain.clear();
         final double[] x = extent();
         zoomedOut = x == null || x[2] - x[0] > MAX_SPAN_LON;
         if (zoomedOut) {
             asked = null;
             url = "";
-            return;
+        } else {
+            final double padX = (x[2] - x[0]) * 0.5, padY = (x[3] - x[1]) * 0.5;
+            final double[] box = { Math.max(-180, x[0] - padX), Math.max(-89, x[1] - padY),
+                    Math.min(180, x[2] + padX), Math.min(89, x[3] + padY) };
+            asked = box;
+            url = UsgsRain.url(box[0], box[1], box[2], box[3]);
+            chain.add(url);
         }
-        final double padX = (x[2] - x[0]) * 0.5, padY = (x[3] - x[1]) * 0.5;
-        final double[] box = { Math.max(-180, x[0] - padX), Math.max(-89, x[1] - padY),
-                Math.min(180, x[2] + padX), Math.min(89, x[3] + padY) };
-        asked = box;
-        url = UsgsRain.url(box[0], box[1], box[2], box[3]);
+        // The volunteers' reports for the state under the map, today's and yesterday's:
+        // a report is read around 7 am, so before mid-morning today's file is thin.
+        final String st = stateAtCenter();
+        state = st;
+        if (!st.isEmpty()) {
+            final long now = System.currentTimeMillis();
+            chain.add(CocoRahs.url(st, new Date(now)));
+            chain.add(CocoRahs.url(st, new Date(now - 24L * 60 * 60 * 1000)));
+        }
+    }
+
+    /** Whether the map center has moved into another state since the last ask. */
+    private boolean stateChanged() {
+        final String st = stateAtCenter();
+        return !st.isEmpty() && !st.equals(state);
     }
 
     @Override
@@ -219,15 +280,19 @@ public final class RainGaugesOverlay extends OutlookOverlay {
 
     @Override
     public void refresh(boolean force) {
-        if (force && isOn() && needsNewAsk())
+        if (force && isOn() && (needsNewAsk() || stateChanged()))
             dirty = true;
         super.refresh(force);
     }
 
     @Override
     protected String[] urls() {
-        final String u = url;
-        return u.isEmpty() ? new String[0] : new String[] { u };
+        return chain.toArray(new String[0]);
+    }
+
+    @Override
+    protected boolean optional(int index) {
+        return true;
     }
 
     @Override
@@ -247,12 +312,16 @@ public final class RainGaugesOverlay extends OutlookOverlay {
 
     @Override
     protected String setName(Area a) {
-        return a.extra instanceof ReportGauge ? "NWS Report Gauges" : "USGS Rain Gauges";
+        return a.extra instanceof ReportGauge ? "NWS Report Gauges"
+                : a.extra instanceof CocoRahs.Report ? "CoCoRaHS Gauges" : "USGS Rain Gauges";
     }
 
     @Override
     protected List<Area> parse(int index, String body) {
         final List<Area> out = new ArrayList<>();
+        final String asked = index < chain.size() ? chain.get(index) : "";
+        if (asked.contains(CocoRahs.HOST))
+            return parseCocoRahs(body);
         final List<UsgsRain.Gauge> got = UsgsRain.parse(body);
         gauges = got;
         for (UsgsRain.Gauge g : got) {
@@ -266,6 +335,41 @@ public final class RainGaugesOverlay extends OutlookOverlay {
             out.add(new Area(1, inches(g.total) + " - " + g.name, "USGS", color(g.total), geom,
                     details(g), "", g));
         }
+        return out;
+    }
+
+    /**
+     * Today's file then yesterday's: the second answer only adds stations the first did
+     * not have, so a station that reported both mornings draws today's.
+     */
+    private List<Area> parseCocoRahs(String body) {
+        final List<Area> out = new ArrayList<>();
+        final List<CocoRahs.Report> got = CocoRahs.parse(body);
+        final java.util.Set<String> have = new java.util.HashSet<>();
+        for (CocoRahs.Report r : cocorahsSeen)
+            have.add(r.station);
+        for (CocoRahs.Report r : got) {
+            if (!have.add(r.station))
+                continue;
+            cocorahsSeen.add(r);
+            final JSONObject geom = new JSONObject();
+            try {
+                geom.put("type", "Point");
+                geom.put("coordinates", new JSONArray().put(r.lon).put(r.lat));
+            } catch (Exception e) {
+                continue;
+            }
+            final String amount = r.trace ? "Trace" : inches(r.inches);
+            final StringBuilder d = new StringBuilder();
+            d.append(amount).append(" in the 24 hours to ").append(r.time).append(' ').append(r.date);
+            d.append('\n').append(r.name).append(" (").append(r.station).append(')');
+            d.append("\nRead by a CoCoRaHS volunteer from a 4-inch gauge; the network asks that"
+                    + " its reports be credited.");
+            d.append("\nFrom: CoCoRaHS, the Community Collaborative Rain, Hail and Snow Network");
+            out.add(new Area(1, amount + " - " + r.name, "CoCoRaHS", color(r.inches), geom,
+                    d.toString(), "", r));
+        }
+        cocorahsCount = cocorahsSeen.size();
         return out;
     }
 
@@ -303,6 +407,16 @@ public final class RainGaugesOverlay extends OutlookOverlay {
                     AtmosphereFeatures.icon(icon.getImageUri(Icon.STATE_DEFAULT), icon.getWidth(),
                             icon.getHeight()), s);
         }
+        if (a.extra instanceof CocoRahs.Report) {
+            final CocoRahs.Report r = (CocoRahs.Report) a.extra;
+            final Icon icon = icons.labelled(r.trace ? "T" : inches(r.inches), a.color,
+                    COCORAHS_RING, 14);
+            if (icon == null)
+                return null;
+            return new AtmosphereFeatures.Drawn(setName(a), a.title, g,
+                    AtmosphereFeatures.icon(icon.getImageUri(Icon.STATE_DEFAULT), icon.getWidth(),
+                            icon.getHeight()), s);
+        }
         if (!(a.extra instanceof UsgsRain.Gauge))
             return null;
         final UsgsRain.Gauge gauge = (UsgsRain.Gauge) a.extra;
@@ -316,20 +430,37 @@ public final class RainGaugesOverlay extends OutlookOverlay {
 
     @Override
     protected String summary(List<Area> areas) {
-        if (zoomedOut)
-            return "Zoom in to see the rain gauges.";
-        int n = 0;
+        int n = 0, volunteers = 0;
         UsgsRain.Gauge top = null;
-        for (Area a : areas)
+        CocoRahs.Report wettest = null;
+        for (Area a : areas) {
+            if (a.extra instanceof CocoRahs.Report) {
+                volunteers++;
+                final CocoRahs.Report r = (CocoRahs.Report) a.extra;
+                if (wettest == null || r.inches > wettest.inches)
+                    wettest = r;
+            }
             if (a.extra instanceof UsgsRain.Gauge) {
                 n++;
                 final UsgsRain.Gauge g = (UsgsRain.Gauge) a.extra;
                 if (top == null || g.total > top.total)
                     top = g;
             }
+        }
         final int fromReport = reportGauges.size();
         final StringBuilder b = new StringBuilder();
-        if (n == 0)
+        if (volunteers > 0) {
+            b.append(volunteers).append(" CoCoRaHS volunteer gauges in ").append(state)
+                    .append(", 24 h to about 7 am, cyan-ringed.");
+            if (wettest != null && wettest.inches > 0.004)
+                b.append(" Most: ").append(inches(wettest.inches)).append(" at ")
+                        .append(wettest.name).append('.');
+            b.append(' ');
+        } else if (!state.isEmpty())
+            b.append("No CoCoRaHS volunteer reports in ").append(state).append(" today or yesterday. ");
+        if (zoomedOut)
+            b.append("Zoom in for the USGS gauges.");
+        else if (n == 0)
             b.append("No USGS rain gauges around here.");
         else {
             b.append(n).append(n == 1 ? " USGS gauge" : " USGS gauges").append(" around the map, last 24 h.");

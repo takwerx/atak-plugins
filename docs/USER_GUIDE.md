@@ -165,7 +165,7 @@ opening the plugin.
 | Rain and rivers | River Gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
 | Rain and rivers | Flooded Ground | Where the river model puts water over the banks, now or at the worst of the next 5 days (experimental) |
 | Rain and rivers | Rain Totals | The rain that fell, as a picture: the NWS radar estimate for the last 1 h, 6 h, 24 h or 3 days, the gauge-corrected analysis for 7 days, in the NWS colors, with a transparency slider |
-| Rain and rivers | Rain Gauges | USGS rain gauges around the map with their 24 h totals, and the forecast office's own rainfall report gauges, inches in the pill; the day by the hour and the report's line behind a tap |
+| Rain and rivers | Rain Gauges | USGS rain gauges around the map with their 24 h totals, the CoCoRaHS volunteer gauges of the state under the map with their morning reading, and the forecast office's own rainfall report gauges, inches in the pill; the day by the hour, the report, or the volunteer's reading behind a tap |
 | Rain and rivers | Streams Running High | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
 | Rain and rivers | Debris Flow | The USGS post-fire assessments: every fire of the last three years marked; zoomed in, the perimeter and each stream basin filled Low, Moderate or High for a 15-minute burst of rain, with likelihood and volume behind a tap |
 | Ocean | Buoys | Buoys and coastal stations, readings colored by sea state; tides, currents and the marine forecast behind a tap |
@@ -450,12 +450,18 @@ on how much: in the mountains it reads low, in a downpour high. Use it for
 where it poured and a gauge for how much. The **Transparency** slider lets the
 map show through. Lower 48 only.
 
-**Rain Gauges** draws the USGS rain gauges around the map, a dot in the color of
-its last 24 hours with the inches in the pill, and, once the Rain Gauges page
-has fetched the forecast office's own rainfall report, that report's gauges
-too, dark-ringed. Tap one for the day by the hour, or the report's line. The
-map's extent is sent, not your position; the gauges are asked for again when
-the map settles outside what was asked.
+**Rain Gauges** draws three kinds of gauge, each a dot in the color of its
+last 24 hours with the inches in the pill. White-ringed: the USGS rain gauges
+around the map, the day by the hour behind a tap. Cyan-ringed: the CoCoRaHS
+volunteer gauges of the state under the map center, each read once a day
+around 7 am, so the number is the 24 hours to that morning; today's reports
+and yesterday's are both asked for, and a station that reported both mornings
+shows today's. Dark-ringed: the forecast office's own rainfall report gauges,
+once the Rain Gauges page has fetched the report. The USGS gauges are asked for
+the map's extent, padded, and asked again when the map settles outside it;
+CoCoRaHS is asked by state. Your position is not sent. Northern California
+has no office report and few USGS rain gauges, so the volunteers are most of
+what draws there.
 
 **The Rain Gauges page** shows the forecast office's rainfall report for the
 point in the pane's top row: the gauges the office lists, with their inches for
@@ -522,7 +528,8 @@ Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
   gauge and buoy lists when they are set to My position. The Fire Weather Zones
   page finds your zone by sending the half-degree square the point is in, about
   30 miles across, never the point. Debris Flow, Rain Totals and Rain Gauges
-  send the area the map shows, padded. Fuel Moisture sends the two-letter code
-  of the state under the map center, found on this device. The office's rainfall report and the
+  send the area the map shows, padded. Fuel Moisture and the Rain Gauges
+  volunteer reports send the two-letter code of the state under the map
+  center, found on this device. The office's rainfall report and the
   synopsis find the office by the same half-degree square, and only while NWS
   is the forecast service.
