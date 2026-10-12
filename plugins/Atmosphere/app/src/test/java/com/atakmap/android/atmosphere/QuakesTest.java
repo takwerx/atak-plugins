@@ -61,8 +61,9 @@ public class QuakesTest {
         final List<Quakes.Contour> c = Quakes.parseContours(contours);
         assertEquals(1, c.size());
         assertEquals(5.0, c.get(0).mmi, 1e-9);
-        assertTrue(Quakes.url(1).endsWith("all_day.geojson"));
-        assertTrue(Quakes.url(2).endsWith("all_week.geojson"));
-        assertTrue(Quakes.url(3).endsWith("2.5_month.geojson"));
+        assertTrue(Quakes.url(1).endsWith("all_hour.geojson"));
+        assertTrue(Quakes.url(2).endsWith("all_day.geojson"));
+        assertTrue(Quakes.url(3).endsWith("all_week.geojson"));
+        assertTrue(Quakes.url(4).endsWith("2.5_month.geojson"));
     }
 }
