@@ -61,6 +61,22 @@ public final class RainGaugesOverlay extends OutlookOverlay {
         return 0xFFE60000;
     }
 
+    /** A gauge from the forecast office's rainfall report, placed by the Rain Gauges page. */
+    public static final class ReportGauge {
+        public final String name, details;
+        public final double lat, lon, inches;
+
+        public ReportGauge(String name, double lat, double lon, double inches, String details) {
+            this.name = name;
+            this.lat = lat;
+            this.lon = lon;
+            this.inches = inches;
+            this.details = details;
+        }
+    }
+
+    private volatile List<ReportGauge> reportGauges = new ArrayList<>();
+    private volatile String reportOffice = "";
     private final DotIcons icons;
     private volatile String url = "";
     private volatile double[] asked;
@@ -103,6 +119,31 @@ public final class RainGaugesOverlay extends OutlookOverlay {
 
     public boolean zoomedOut() {
         return zoomedOut;
+    }
+
+    /** The office's report gauges, placed; drawn beside the USGS ones while the layer is on. */
+    public void setReportGauges(String office, List<ReportGauge> gauges) {
+        reportOffice = office == null ? "" : office;
+        reportGauges = new ArrayList<>(gauges);
+        redraw();
+    }
+
+    @Override
+    protected List<Area> extraAreas() {
+        final List<Area> out = new ArrayList<>();
+        for (ReportGauge g : reportGauges) {
+            final JSONObject geom = new JSONObject();
+            try {
+                geom.put("type", "Point");
+                geom.put("coordinates", new JSONArray().put(g.lon).put(g.lat));
+            } catch (Exception e) {
+                continue;
+            }
+            final double v = Double.isNaN(g.inches) ? 0 : g.inches;
+            out.add(new Area(1, (Double.isNaN(g.inches) ? "Trace" : inches(g.inches)) + " - " + g.name,
+                    "NWS Report", color(v), geom, g.details, "", g));
+        }
+        return out;
     }
 
     @Override
@@ -206,7 +247,7 @@ public final class RainGaugesOverlay extends OutlookOverlay {
 
     @Override
     protected String setName(Area a) {
-        return "USGS Rain Gauges";
+        return a.extra instanceof ReportGauge ? "NWS Report Gauges" : "USGS Rain Gauges";
     }
 
     @Override
@@ -252,6 +293,16 @@ public final class RainGaugesOverlay extends OutlookOverlay {
 
     @Override
     protected AtmosphereFeatures.Drawn drawn(Area a, Geometry g, AttributeSet s) {
+        if (a.extra instanceof ReportGauge) {
+            final ReportGauge r = (ReportGauge) a.extra;
+            final Icon icon = icons.labelled(Double.isNaN(r.inches) ? "T" : inches(r.inches), a.color,
+                    0xFF202020, 12);
+            if (icon == null)
+                return null;
+            return new AtmosphereFeatures.Drawn(setName(a), a.title, g,
+                    AtmosphereFeatures.icon(icon.getImageUri(Icon.STATE_DEFAULT), icon.getWidth(),
+                            icon.getHeight()), s);
+        }
         if (!(a.extra instanceof UsgsRain.Gauge))
             return null;
         final UsgsRain.Gauge gauge = (UsgsRain.Gauge) a.extra;
@@ -276,14 +327,20 @@ public final class RainGaugesOverlay extends OutlookOverlay {
                 if (top == null || g.total > top.total)
                     top = g;
             }
-        if (n == 0)
-            return "No USGS rain gauges around here. The NWS office's report on the Rain Gauges page"
-                    + " may list others.";
+        final int fromReport = reportGauges.size();
         final StringBuilder b = new StringBuilder();
-        b.append(n).append(n == 1 ? " USGS gauge" : " USGS gauges").append(" around the map, last 24 h.");
-        if (top != null && top.total > 0.004)
-            b.append(" Most: ").append(inches(top.total)).append(" at ").append(top.name).append('.');
-        b.append("\nUSGS runs few gauges in some areas; the office's report lists the rest.");
+        if (n == 0)
+            b.append("No USGS rain gauges around here.");
+        else {
+            b.append(n).append(n == 1 ? " USGS gauge" : " USGS gauges").append(" around the map, last 24 h.");
+            if (top != null && top.total > 0.004)
+                b.append(" Most: ").append(inches(top.total)).append(" at ").append(top.name).append('.');
+        }
+        if (fromReport > 0)
+            b.append(" Plus ").append(fromReport).append(" from the ").append(reportOffice)
+                    .append(" office's report, dark-ringed.");
+        else
+            b.append("\nOpen the Rain Gauges page and the office's report gauges draw here too.");
         return b.toString();
     }
 
