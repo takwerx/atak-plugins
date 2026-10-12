@@ -5798,7 +5798,7 @@ public final class AtmospherePane {
      * be a very long side pane window"). The page is flat, a heading then its
      * blocks, so the members of a group are the siblings up to the next heading.
      */
-    private static final int[] GROUP_NAMES = { R.string.group_wind, R.string.group_storms,
+    private static final int[] GROUP_NAMES = { R.string.group_points, R.string.group_wind, R.string.group_storms,
             R.string.group_fire, R.string.group_rain, R.string.group_ocean, R.string.group_snow,
             R.string.group_ground };
     private final java.util.Map<Integer, TextView> groupHeads = new java.util.LinkedHashMap<>();
@@ -5857,18 +5857,46 @@ public final class AtmospherePane {
         return "weather.group." + pluginContext.getResources().getResourceEntryName(nameId) + ".open";
     }
 
+    /** Layer switches under a view that read ON: every layer toggle says "<Name> ON" or "OFF". */
+    private static int countOn(View v) {
+        if (v instanceof Button) {
+            final CharSequence t = ((Button) v).getText();
+            return t != null && t.toString().endsWith(" ON") ? 1 : 0;
+        }
+        int n = 0;
+        if (v instanceof android.view.ViewGroup) {
+            final android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++)
+                n += countOn(g.getChildAt(i));
+        }
+        return n;
+    }
+
+    /**
+     * A heading reads bigger than a section heading, folds its group, and turns
+     * green with a count when any layer under it is on, so the state of a folded
+     * group is known at a glance (operator, 2026-10-12: "you sort of know right off
+     * the bat if something is on").
+     */
     private void applyGroupFolds() {
         final SharedPreferences p = MapCompat.prefs();
         for (java.util.Map.Entry<Integer, TextView> e : groupHeads.entrySet()) {
             final boolean open = p == null || p.getBoolean(groupPref(e.getKey()), true);
-            e.getValue().setText(pluginContext.getString(e.getKey()) + (open ? "  \u25BE" : "  \u25B8"));
-            for (View v : groupMembers.get(e.getKey()))
+            int on = 0;
+            for (View v : groupMembers.get(e.getKey())) {
                 v.setVisibility(open ? View.VISIBLE : View.GONE);
+                on += countOn(v);
+            }
+            final TextView h = e.getValue();
+            h.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);
+            h.setText(pluginContext.getString(e.getKey()) + (open ? "  \u25BE" : "  \u25B8")
+                    + (on > 0 ? "   " + on + " ON" : ""));
+            h.setTextColor(on > 0 ? pluginContext.getResources().getColor(R.color.state_on)
+                    : 0xFF00E5FF);
         }
     }
 
     private void updateLayerControls() {
-        applyGroupFolds();
         final boolean radarOn = radar != null && radar.isOn();
         final boolean windOn = wind != null && wind.isOn();
         radarToggle.setText(radarOn ? R.string.radar_on : R.string.radar_off);
@@ -6205,6 +6233,7 @@ public final class AtmospherePane {
             hostScrubberIn(radarSettings);
         scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn || rainOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
+        applyGroupFolds();
     }
 
     /**
