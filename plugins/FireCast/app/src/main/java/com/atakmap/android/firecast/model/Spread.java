@@ -378,40 +378,63 @@ public final class Spread {
                     }
                 }
             }
-            // Chain: each segment's start keyed by its quantized point; walk end to start.
-            final Map<Long, List<double[][]>> byStart = new HashMap<>();
-            for (double[][] s : segs) {
-                final long k = q(s[0]);
-                List<double[][]> l = byStart.get(k);
-                if (l == null)
-                    byStart.put(k, l = new ArrayList<>());
-                l.add(s);
+            // Chain by shared endpoints, whichever way round each segment was emitted:
+            // from a segment's far end, find the unused segment touching it, step to its
+            // other end, until the start point comes round again.
+            final Map<Long, List<Integer>> atPoint = new HashMap<>();
+            for (int i = 0; i < segs.size(); i++) {
+                for (int e = 0; e < 2; e++) {
+                    final long k = q(segs.get(i)[e]);
+                    List<Integer> l = atPoint.get(k);
+                    if (l == null)
+                        atPoint.put(k, l = new ArrayList<>());
+                    l.add(i);
+                }
             }
+            final boolean[] used = new boolean[segs.size()];
             final List<List<double[]>> loops = new ArrayList<>();
-            final java.util.Set<double[][]> used = new java.util.HashSet<>();
-            for (double[][] s0 : segs) {
-                if (used.contains(s0))
+            for (int i0 = 0; i0 < segs.size(); i0++) {
+                if (used[i0])
                     continue;
                 final List<double[]> loop = new ArrayList<>();
-                double[][] s = s0;
+                int i = i0;
+                double[] at = segs.get(i)[0];
+                double[] to = segs.get(i)[1];
+                used[i] = true;
+                loop.add(at);
                 int guard = 0;
-                while (s != null && !used.contains(s) && guard++ < 2_000_000) {
-                    used.add(s);
-                    loop.add(s[0]);
-                    final List<double[][]> cands = byStart.get(q(s[1]));
-                    double[][] nextSeg = null;
+                while (guard++ < 4_000_000) {
+                    loop.add(to);
+                    final List<Integer> cands = atPoint.get(q(to));
+                    int next = -1;
                     if (cands != null)
-                        for (double[][] c : cands)
-                            if (!used.contains(c)) {
-                                nextSeg = c;
+                        for (int c : cands)
+                            if (!used[c]) {
+                                next = c;
                                 break;
                             }
-                    s = nextSeg;
+                    if (next < 0)
+                        break;
+                    used[next] = true;
+                    final double[][] sg = segs.get(next);
+                    to = q(sg[0]) == q(to) ? sg[1] : sg[0];
+                    if (q(to) == q(loop.get(0)))
+                        break;
                 }
-                if (loop.size() >= 3 && signedArea(loop) > 0)
-                    loops.add(smooth(smooth(loop)));
+                if (loop.size() >= 3)
+                    loops.add(loop);
             }
-            return loops;
+            // The outer rings are the ones wound the same way as the largest; the rest
+            // are holes, islands of ground that did not burn, left out for now.
+            double largest = 0;
+            for (List<double[]> l : loops)
+                if (Math.abs(signedArea(l)) > Math.abs(largest))
+                    largest = signedArea(l);
+            final List<List<double[]>> out = new ArrayList<>();
+            for (List<double[]> l : loops)
+                if (Math.abs(signedArea(l)) >= 0.5 && Math.signum(signedArea(l)) == Math.signum(largest))
+                    out.add(smooth(smooth(l)));
+            return out;
         }
 
         private static double lerp(float a, float b, float t) {
