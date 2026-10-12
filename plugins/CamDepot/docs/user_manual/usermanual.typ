@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Cam Depot",
-   plugin-version: "1.5",
+   plugin-version: "1.7",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -36,83 +36,174 @@ them, keeps them current, and puts them where you are looking.
 ]
 
 #tak-slide[
-= Finding cameras
+= The panel
 
 The panel is the control. The map shows exactly what the panel selects, never
 the whole catalog.
 
 #v(6pt)
-#toolbox.side-by-side(columns: (7fr, 5fr))[
-  #image("2.png", width: 100%)
+#toolbox.side-by-side(columns: (4fr, 8fr))[
+  #image("30.png", width: 100%)
 ][
-  *State* picks the state or province, and *Provider* narrows to one agency
-  within it.
+  The main screen is what you use in the field.
 
-  *County* narrows further still, and takes as many counties as you want at
-  once.
+  *Cameras ON / OFF* is the map's switch. *Settings* opens everything that is
+  set once and left. *Favorites* pins the cameras you starred.
 
-  *On screen only* narrows the list to whatever is in the current map view.
+  *Suggest Cameras* finds the cameras that cover a spot. See _Suggest Cameras_.
 
-  *ON / OFF*, top right above *Sync*, is the map's switch. See _Drawing on
-  the map_.
+  *Search* finds a camera by name, in every state at once. *On screen only*
+  narrows the list to the map view. *Turn off N bearings* puts every bearing
+  line away.
+
+  The status line says how many cameras are up and matching, and whether the
+  map is drawing everything.
 ]
 ]
 
 #tak-slide[
-== State, provider, county
+= Settings
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
-  #image("3.png", width: 100%)
-
-  Fifty-four states and provinces, listed alphabetically.
+  #image("31.png", width: 100%)
 ][
-  #image("4.png", width: 100%)
-
-  Each agency says how many cameras it has *before* you pick it.
+  #image("31b.png", width: 100%)
 ][
-  #image("5.png", width: 100%)
+  Every row reads its own value while it is closed, so the page is a summary of
+  how the panel is set. Tap a row to open it.
 
-  Counties tick on and off. Pick as many as the job covers.
-]
-
-#v(6pt)
-Counties come from Census boundaries rather than from the camera feeds, so they
-work on every camera in the United States, not only the ones whose agency
-happened to publish a county.
-]
-
-#tak-slide[
-== A filter says what it costs
-
-#toolbox.side-by-side(columns: (7fr, 5fr))[
-  #image("6.png", width: 100%)
-][
-  Nothing in this panel makes you guess. The county button counts what you
-  picked, and the line above counts what is left: three counties of California,
-  and 193 cameras of 4,644.
-
-  Every filter behaves this way, so you can see what one will cost before you
-  use it and what it cost afterwards.
+  *Sync Cameras*, last, re-reads the catalog and reloads the state without
+  restarting ATAK. Use it when a camera you expect is missing, or when video
+  that worked yesterday does not connect today.
 ]
 ]
 
 #tak-slide[
-== Following the map
+== Where
 
-*On screen only* limits the list to the cameras inside the current map view, and
-keeps following as you pan and zoom. Move the map and the list moves with it.
+#toolbox.side-by-side(columns: (4fr, 8fr))[
+  #image("32.png", width: 100%)
+][
+  *State* picks the state or province, 54 of them, and *Provider* narrows to
+  one agency within it. *County* takes as many counties as the job covers.
+
+  #v(6pt)
+  #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+    #image("3.png", width: 100%)
+  ][
+    #image("4.png", width: 100%)
+  ][
+    #image("5.png", width: 100%)
+  ]
+
+  #v(4pt)
+  Each agency says how many cameras it has *before* you pick it. Counties come
+  from Census boundaries, so they work on every camera in the United States.
+]
+]
+
+#tak-slide[
+== Show, Distance
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("33.png", width: 100%)
+][
+  #image("34.png", width: 100%)
+][
+  *Video*, *Still* and *Fire* each carry their own count. Tick more to show
+  more; none ticked means everything.
+
+  #v(6pt)
+  The distance slider runs to 50 in ATAK's units. *Measuring from* rotates
+  between your own position and the map center. *Use this extent* takes the
+  radius from what is on screen. *Presets* names the one in force.
+]
+]
+
+#tak-slide[
+== Suggest reach, Zoom gate
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("35.png", width: 100%)
+][
+  #image("36.png", width: 100%)
+][
+  *Suggest reach* is how far out a camera is trusted to see a point. 10 miles
+  to start with; the picker offers 2, 5, 10, 20 and 40 miles, or the bearing
+  line's length.
+
+  #v(6pt)
+  *Zoom gate*: cameras draw only when you are zoomed in past a threshold you
+  choose. *Use this zoom* makes the current view the threshold; *Presets*
+  offers a few starting points in plain terms.
+]
+]
+
+#tak-slide[
+= Suggest Cameras
+
+You have a point on the map and a tower with five cameras on it. Which one is
+looking that way? Suggest Cameras answers it in one tap instead of turning five
+bearings on and off.
 
 #v(6pt)
-#image("20.jpg", width: 74%)
+#toolbox.side-by-side(columns: (4fr, 8fr))[
+  #image("37.png", width: 100%)
+][
+  Tap *Suggest Cameras*, then tap the point on the map. A cyan marker lands
+  where you tapped, and the list narrows to the cameras that cover it.
 
-#v(4pt)
-The count on the control and the count in the status line are the same number as
-what is drawn on the map -- twenty-two here. This is the fastest way to answer
-"what is near this spot": put the spot on screen, and the panel is already the
-answer. It follows the map rather than your own position, so it works just as
-well for an area you are not standing in.
+  *Clear Suggestion* takes the marker off the map and gives the full list
+  back. The point, the marker and the bearing lines all come back after
+  restarting ATAK.
 
-Leave it off and the list stays the whole state, however far the map wanders.
+  #v(6pt)
+  #image("38.png", width: 100%)
+]
+]
+
+#tak-slide[
+== Three groups, nearest first
+
+#toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
+  #image("40.png", width: 100%)
+][
+  #image("40b.png", width: 100%)
+][
+  *Suggested* are cameras whose reported aim covers the point: inside their lens
+and within 30 degrees of its center. Each row says how far the camera is from
+the point and how far off center the point sits, so you can judge the edge
+cases yourself.
+
+*Could be turned to it* are pan-tilt-zoom cameras within reach that are aimed
+somewhere else; someone at the agency can swing them. *No bearing reported* are
+cameras within reach that never say where they look, most highway cameras among
+them.
+
+  The map keeps every camera; only the list narrows. A camera's aim is as of
+  the last catalog refresh. Tap a row to see its picture; that is the final
+  word on what it sees.
+]
+]
+
+#tak-slide[
+== Bearings in one tap, and a point you can move
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("41.png", width: 100%)
+
+  #v(4pt)
+  *N Bearings OFF* turns on the bearing line of every suggested camera at
+  once and reads *N Bearings ON* in green. Tap it again to take them down.
+  Lines you turned on by hand on other cameras are left alone.
+][
+  #image("42.png", width: 100%)
+
+  #v(4pt)
+  Press the marker and drag it. Where it lands, the counts recompute, and if
+  the bearings were on they move with it: off the cameras that dropped out, on
+  to the ones that came in.
+]
 ]
 
 #tak-slide[
@@ -153,68 +244,6 @@ says so rather than looking complete.
 ]
 
 #tak-slide[
-= Choosing what to show
-
-#toolbox.side-by-side(columns: (12fr,))[
-  #image("8.png", width: 100%)
-]
-
-#v(4pt)
-*Video*, *Still* and *Fire* each carry their own count for the state you are in,
-so you can see what a filter will leave you before you tick it. A filter with
-nothing behind it is disabled rather than left to be discovered.
-
-]
-
-#tak-slide[
-= Distance from a point
-
-Everything within a set distance, and nothing beyond it.
-
-#v(6pt)
-#toolbox.side-by-side(columns: (7fr, 5fr))[
-  #image("9.png", width: 100%)
-][
-  The slider runs to 50 in whatever units ATAK is set to, and the label above it
-  always reads the current distance and the point it is measured from.
-
-  *Measuring from* rotates between your own position and the center of the map,
-  and says which one is in force rather than only offering to change it.
-
-  *Use this extent* takes the radius from what is on screen, so "everything I am
-  looking at" is one tap rather than a guess at a number.
-
-  *Presets* offers Off, 2, 5, 10, 25 and 50, and names the one in force. Drag the
-  slider to something in between and it reads *Presets* again, because no preset
-  is active any more.
-]
-]
-
-#tak-slide[
-// Deliberately bold text rather than a heading. The template builds its Contents
-// page from #outline(), and a heading on THIS slide makes that page appear
-// carrying a single stray entry -- checked by demoting it, and by trying both
-// heading levels. Not worth fighting the template for a subheading.
-*It follows, and it is remembered*
-
-#v(6pt)
-#toolbox.side-by-side(columns: (5fr, 7fr))[
-  #image("9a.png", width: 92%)
-][
-  Measured from *My Location* the circle travels with you, so a radius set at the
-  start of a drive still means the same thing an hour later.
-
-  Measured from *Map Center* it follows the map. Pan somewhere else and the list
-  is about where you are now looking.
-
-  Both the distance and the point it is measured from survive restarting ATAK,
-  along with the rest of the panel.
-
-  Distances follow whatever units ATAK is set to.
-]
-]
-
-#tak-slide[
 = Favorites
 
 #toolbox.side-by-side(columns: (7fr, 5fr))[
@@ -231,20 +260,9 @@ Everything within a set distance, and nothing beyond it.
 #tak-slide[
 == Favorites First
 
-#toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("12a.png", width: 100%)
-
-  Tapping *Favorites* turns the button gold and pins them.
-][
-  #image("12b.png", width: 100%)
-
-  They sit in their own section, with the whole state still below.
-]
-
-#v(6pt)
-Favorites are not tied to a state. A lookout in California and a highway camera
-in Ontario sit in the same list. Favorites First keeps the handful of cameras
-you actually watch within reach without giving up the rest of the catalog.
+Tapping *Favorites* turns the star gold and pins them in their own section,
+with the whole state still below. Favorites are not tied to a state: a lookout
+in California and a highway camera in Ontario sit in the same list.
 
 #v(6pt)
 *While Favorites First is on, a favorite ignores every filter.* State, county,
@@ -351,9 +369,9 @@ looking at something else does not put it away.
 #image("16b.png", width: 74%)
 
 #v(4pt)
-Bearings go on one camera at a time, so the panel has one control to put them all
-away. It carries the count, is greyed out when there are none, and clears lines on
-cameras that are currently off screen as well as the ones in front of you.
+*Turn off N bearings*, beside _On screen only_ on the main screen, puts every
+line away at once. It carries the count and is greyed out when there are none.
+Suggest Cameras has its own switch for the suggested cameras' lines.
 ]
 
 #tak-slide[
@@ -364,7 +382,7 @@ The line is the *direction* the camera points. It is not how wide it sees.
 A camera's pane reports both -- *Bearing 355°T   Field of View 62.8°* -- but only
 the bearing is drawn. A field of view is a wedge, and sixteen hundred overlapping
 wedges is a map you cannot read, so Cam Depot draws the direction and leaves the
-width as a number.
+width as a number. Suggest Cameras is where the width is used.
 
 #v(6pt)
 Opening a stills camera that reports a bearing shows its line automatically for
@@ -384,77 +402,17 @@ the recent past.
 #tak-slide[
 = Drawing on the map
 
-Thirty-eight thousand markers would be unreadable, so Cam Depot draws cameras
-only when you are zoomed in past a threshold you choose.
-
-#v(6pt)
 #toolbox.side-by-side(columns: (7fr, 5fr))[
-  #image("10a.png", width: 100%)
-
-  #v(4pt)
-  *Use this zoom* takes whatever you are looking at right now and makes it the
-  threshold -- you set it by example rather than by picking a number.
+  #image("17.jpg", width: 100%)
 ][
-  #image("10.png", width: 100%)
+  Past the zoom gate, the cameras draw. If more match than can be drawn
+  legibly, the status line says how many were left off and to zoom in. It
+  will not quietly show you part of the picture.
 
-  #v(4pt)
-  *Presets* offers a few starting points described in plain terms, from a city
-  block to a region.
+  *Cameras OFF* takes every camera off the map and changes nothing else: the
+  filters, the list and any bearings you asked for stay as they are, so ON
+  puts back exactly what was there. The switch is remembered across restarts.
 ]
-]
-
-#tak-slide[
-== The panel always says what the map is doing
-
-#toolbox.side-by-side(columns: (7fr, 5fr))[
-  #image("17.jpg", width: 78%)
-][
-  #image("17a.png", width: 100%)
-
-  #v(6pt)
-  Which it is doing: drawn at this scale or closer, what the scale bar reads
-  now, and whether anything is currently hidden.
-
-  If more cameras match than can be drawn legibly, the panel says how many were
-  left off and to zoom in. It will not quietly show you part of the picture.
-]
-]
-
-#tak-slide[
-== On and off
-
-#toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("23.png", width: 100%)
-
-  #v(4pt)
-  *ON*, in green, draws the cameras the panel selects. This is how the plugin
-  has always behaved, and it is where the switch starts.
-][
-  #image("23a.png", width: 100%)
-
-  #v(4pt)
-  *OFF*, in red, takes every one of them off the map and changes nothing else:
-  the filters, the list and any bearings you asked for stay as they are, so ON
-  puts back exactly what was there.
-]
-
-#v(6pt)
-The switch sits at the top right of the panel, above *Sync*, and stays in view
-however far the panel is scrolled. Use it to clear the map for a moment without
-losing the setup. The status line says "Map: off" while it is off, and the
-switch is remembered across restarts.
-]
-
-#tak-slide[
-= Keeping up to date
-
-The catalog changes: agencies are added, cameras come and go, and stream
-addresses move. *Sync* re-reads the catalog and reloads the state from scratch,
-so a catalog that changed while the plugin was running is picked up without
-restarting ATAK.
-
-Use it when a camera you expect is missing, or when video that worked yesterday
-does not connect today. It takes a few seconds.
 ]
 
 #tak-slide[
