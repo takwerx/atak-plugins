@@ -22,7 +22,7 @@
     <string name="hide_hours_table">Hide hourly table</string>
     <string name="heading_sun_moon">Sun and moon</string>
     <string name="heading_layers">Layers</string>
-    <string name="group_points">Spots and Stations</string>
+    <string name="group_points">Spot Forecasts and Stations</string>
     <string name="group_wind">Wind</string>
     <string name="group_fire">Fire</string>
     <string name="group_rain">Rain and rivers</string>

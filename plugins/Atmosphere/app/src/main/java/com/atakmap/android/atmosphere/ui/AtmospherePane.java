@@ -5801,6 +5801,10 @@ public final class AtmospherePane {
     private static final int[] GROUP_NAMES = { R.string.group_points, R.string.group_wind, R.string.group_storms,
             R.string.group_fire, R.string.group_rain, R.string.group_ocean, R.string.group_snow,
             R.string.group_ground };
+    /** Each group's icon, the one its first layer wears, so the heading reads like its rows. */
+    private static final int[] GROUP_ICONS = { R.drawable.ic_layer_spot, R.drawable.ic_layer_wind,
+            R.drawable.ic_layer_reports, R.drawable.ic_layer_firewx, R.drawable.ic_layer_rain,
+            R.drawable.ic_layer_waves, R.drawable.ic_layer_snow, R.drawable.ic_layer_quakes };
     private final java.util.Map<Integer, TextView> groupHeads = new java.util.LinkedHashMap<>();
     private final java.util.Map<Integer, java.util.List<View>> groupMembers = new java.util.LinkedHashMap<>();
 
@@ -5835,6 +5839,17 @@ public final class AtmospherePane {
                 current = key;
                 groupHeads.put(key, (TextView) child);
                 groupMembers.put(key, new java.util.ArrayList<View>());
+                for (int g = 0; g < GROUP_NAMES.length; g++)
+                    if (GROUP_NAMES[g] == key) {
+                        final android.graphics.drawable.Drawable icon =
+                                pluginContext.getResources().getDrawable(GROUP_ICONS[g]);
+                        if (icon != null) {
+                            icon.setBounds(0, 0, dp(26), dp(26));
+                            ((TextView) child).setCompoundDrawables(icon, null, null, null);
+                            ((TextView) child).setCompoundDrawablePadding(dp(10));
+                            ((TextView) child).setGravity(android.view.Gravity.CENTER_VERTICAL);
+                        }
+                    }
                 final int k = key;
                 child.setClickable(true);
                 child.setOnClickListener(new View.OnClickListener() {
