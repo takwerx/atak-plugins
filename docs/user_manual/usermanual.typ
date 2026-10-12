@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Map Depot",
-   plugin-version: "1.12",
+   plugin-version: "1.13",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -146,6 +146,15 @@ caches what it has drawn.
 
   Aerial imagery flown after an event has no street names on it. *Google
   Roads and Labels (overlay)* puts them back without hiding the imagery.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("52.png", width: 92%)
+][
+  The overlay list under its headings, roads first. An added row carries
+  *Hide* and *Remove*; Hide switches the overlay off and keeps it.
 ]
 ]
 
@@ -493,7 +502,7 @@ covers before deciding to turn it on.
 ]
 
 #tak-slide[
-= Disaster aerials
+= Disaster Aerials
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("50.png", width: 92%)
@@ -511,10 +520,11 @@ covers before deciding to turn it on.
   first; the button on the right switches to nearest the map or nearest you.
   Tap a row before adding it and the map goes to where the flight is.
 
-  Two buttons on every flight: *Add online* streams the imagery as you pan,
-  nothing lands on the phone; *Download offline*, with its size on it, keeps
-  a copy of the flight on the phone for when there is no signal, built on
-  the server at about 60 cm a pixel and kept under about 500 MB.
+  Two buttons on every flight: *Add Online* streams the imagery as you pan,
+  nothing lands on the phone; *Download*, with the copy's size in the row,
+  keeps a copy of the flight on the phone for when there is no signal, built
+  on the server at the flight's own detail and kept under about 500 MB.
+  Either way the button reads *Remove* once it is on the phone.
 ]
 ]
 
@@ -533,6 +543,26 @@ covers before deciding to turn it on.
   During a storm NOAA adds flights every day. The list says when the catalog
   was last built; a flight flown after that appears the next day, its
   offline copy the morning after.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("53.jpg", width: 100%)
+][
+  *Outlines On*: every flight on the phone gets an orange box, so the imagery
+  can be found on the map before zooming in. Two NOAA flights along the
+  Florida panhandle here.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("54.jpg", width: 100%)
+][
+  A flight has no street names on it. With the Google roads overlay added
+  from Streaming Base Maps, names and house numbers draw over the imagery,
+  which is how a crew finds an address in it.
 ]
 ]
 

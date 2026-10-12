@@ -1,10 +1,10 @@
 ATAK Plugin — Map Depot
 
-**Download Map Depot 1.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.13** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.12/ATAK-Plugin-MapDepot-1.12--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.12/ATAK-Plugin-MapDepot-1.12--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.12/ATAK-Plugin-MapDepot-1.12--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -88,6 +88,11 @@ fires.
 
 _________________________________________________________________
 STATUS
+
+Version 1.13: pictures from the signed build in the guide and manual
+(outlines, a flight with the roads overlay on top, the sectioned overlay
+list); the offline copy's digest check reshaped for the static scan; no
+change in what the plugin does.
 
 Version 1.12: Disaster Aerials, a new section listing post-disaster imagery
 by event from NOAA, the Civil Air Patrol and Maxar, each flight an overlay

@@ -1,12 +1,12 @@
 # Map Depot for ATAK — User Guide
 
-**Version 1.12 · takwerx**
+**Version 1.13 · takwerx**
 
-**Download Map Depot 1.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.13** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.12/ATAK-Plugin-MapDepot-1.12--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.12/ATAK-Plugin-MapDepot-1.12--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.12/ATAK-Plugin-MapDepot-1.12--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -341,7 +341,7 @@ The maps' own site cannot be reached from a phone, so Map Depot reads them
 from its depot, where they are mirrored with the author's permission. Maps by
 FlameMapper.
 
-## 8. Disaster aerials
+## 8. Disaster Aerials
 
 After a hurricane makes landfall, and after some floods, fires and tornadoes,
 the damaged area gets flown, and the imagery is public within a day or two.
@@ -376,23 +376,31 @@ adding it and the map goes to where the flight is.
 
 A flight row has two buttons, and they are different things:
 
-- **Add online** switches the flight on as a streaming overlay. Nothing of
-  any size lands on the phone; the tiles come from NOAA as you pan, like any
-  streaming map, so it needs a connection. Once added the button reads
-  Remove online.
-- **Download offline**, with the size on it, puts a copy of the flight on the
-  phone for when there is no signal. It is a real download, a few tens to a
-  few hundred MB, built on the Map Depot server at about 60 cm a pixel; a long
-  flight is built a step coarser to stay under about 500 MB, and the row says
-  so. It draws by itself, with or without the online layer, and comes back
-  after a restart with no network. Once downloaded the button reads Remove
-  offline.
+- **Add Online** switches the flight on as a streaming overlay. Nothing of
+  any size lands on the phone; the tiles come from the agency as you pan,
+  like any streaming map, so it needs a connection. Once added the button
+  reads Remove.
+- **Download**, with the copy's size in the row text, puts a copy of the
+  flight on the phone for when there is no signal. It is a real download, a
+  few tens to a few hundred MB, built on the Map Depot server at the flight's
+  own detail where that fits; a long flight is built a step coarser to stay
+  under about 500 MB, and the row says so. It draws by itself, with or
+  without the online layer, and comes back after a restart with no network.
+  Once downloaded the button reads Remove.
 
 Added or downloaded, a row says **tap to go there**, and tapping it takes the
 map to the flight. **Hide** turns it off without removing it. **Outlines** at
 the left of the status line draws an orange box with the flight's name around
 every flight on the phone, so you can see where the imagery is before you zoom
 in. The boxes are listed in Overlay Manager as Disaster Aerial Outlines.
+
+![Outlines on: two flights boxed over the base map](screenshots/53_flight_outlines.jpg)
+
+A flight has no street names on it. Add the Google roads overlay from
+Streaming Base Maps and the names and house numbers draw over the imagery,
+which is how a crew finds an address in it.
+
+![A flight with the roads overlay on top](screenshots/54_roads_over_flight.jpg)
 
 During a storm NOAA adds flights every day. The list says when the catalog was
 last built; a flight flown after that appears the next day, and its offline
