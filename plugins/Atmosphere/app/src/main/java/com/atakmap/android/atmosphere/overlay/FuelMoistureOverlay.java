@@ -26,7 +26,7 @@ import java.util.Locale;
  * centered on, a dot colored by its newest live fuel's moisture against the chaparral
  * thresholds, the fuel and its percent in the pill, every fuel the site samples behind
  * a tap. The day row picks how old a sample may be (30 days, 90 days, a year); the
- * second row picks live fuels, dead fuels or either.
+ * second row picks live fuels, dead fuels or both.
  *
  * <p>One request per state, the state found on the phone from the map center with the
  * outlines the plugin ships; asked again when the map settles in another state. Nothing
@@ -42,7 +42,7 @@ public final class FuelMoistureOverlay extends OutlookOverlay {
     private static final long DAY_MS = 24L * 60 * 60 * 1000;
     private static final long[] WINDOW_MS = { 30 * DAY_MS, 90 * DAY_MS, 365 * DAY_MS };
     private static final String[] WINDOWS = { "30 days", "90 days", "1 year" };
-    private static final String[] KINDS = { "Live fuels", "Dead fuels", "Either" };
+    private static final String[] KINDS = { "Live fuels", "Dead fuels", "Both" };
 
     /** The key. */
     public static final String[][] LEGEND = {

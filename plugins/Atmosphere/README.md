@@ -66,7 +66,7 @@ Capabilities:
     Database in the state under the map, the newest sample's moisture in
     the pill and colored critical to low on the live fuel or timelag class's
     own breaks, every fuel sampled there
-    behind a tap; live fuels, dead fuels or either, 30 days to a year back.
+    behind a tap; live fuels, dead fuels or both, 30 days to a year back.
   - The wind as a heat map: the speed the streaks are drawn from as a colored
     field under them, in the same bands as the key, with one switch.
   - Storms after the fact: every storm report the NWS offices logged in the
