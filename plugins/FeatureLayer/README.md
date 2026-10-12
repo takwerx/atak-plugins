@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.15** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.15/ATAK-Plugin-FeatureLayer-0.15--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.15/ATAK-Plugin-FeatureLayer-0.15--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.15/ATAK-Plugin-FeatureLayer-0.15--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -61,6 +61,13 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 
 _________________________________________________________________
 STATUS
+
+0.15, boundaries. A built-in Boundaries source, public, no sign-in: county,
+city and tribal land boundaries from the Census Bureau, one or more states at
+a time, every boundary in a state or only the ones picked by name. Each area
+carries its name on the map, and the layer's status line says which county or
+city the phone is in. Reference data: fetched once, kept on the phone, back
+after a restart with no network.
 
 0.14, the guide's pictures for 0.13, and two fixes. Every picture of a
 changed screen retaken on official ATAK. Find puts names that start with the
