@@ -83,7 +83,9 @@ public final class FireModel {
         /** The moistures used, percent: 1 h, 10 h, 100 h, live herb, live woody. */
         public double m1, m10, m100, mHerb, mWoody;
         public double windMph, windFromDeg;
+        public boolean tenMeterWind;
         public String windNote;
+        public String moistureNote;
         public double canopyHeightFt, crownRatio;
         public Behave.Result result;
         public String fuelName;
@@ -474,6 +476,25 @@ public final class FireModel {
                     }
                     try {
                         r.stations = Weather.within(lat, lon, 50);
+                    } catch (Exception e) {
+                        Log.w(TAG, "RAWS failed", e);
+                    }
+                    try {
+                        // The NWS networks: airports, utilities, citizens, in the valleys
+                        // the RAWS are not. A RAWS already listed is left out by name.
+                        for (Weather.Reading n : Weather.nwsNear(lat, lon, r.startElevFt, 10)) {
+                            boolean dup = false;
+                            for (Weather.Reading s : r.stations)
+                                if (s.station.equalsIgnoreCase(n.station)
+                                        && com.atakmap.android.firecast.DetectionFeed.metersBetween(new double[] { s.latitude, s.longitude }, n.latitude, n.longitude) < 1500)
+                                    dup = true;
+                            if (!dup)
+                                r.stations.add(n);
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "NWS stations failed", e);
+                    }
+                    try {
                         final String want = station();
                         for (Weather.Reading s : r.stations)
                             if (!want.isEmpty() && want.equals(s.wxId))
@@ -515,14 +536,22 @@ public final class FireModel {
             r.m1 = 4;
             r.m10 = 5;
             r.m100 = 7;
+            r.moistureNote = "Dry day preset.";
         } else if (w != null && !Double.isNaN(w.fuelMoisture) && w.fuelMoisture > 0 && w.fuelMoisture < 40) {
             r.m10 = w.fuelMoisture;
             r.m1 = Math.max(2, w.fuelMoisture - 1);
             r.m100 = w.fuelMoisture + 2;
+            r.moistureNote = "The 10 h is the station's fuel stick.";
+        } else if (w != null && !Double.isNaN(Weather.fineFuelMoisture(w.relativeHumidity, w.airTempF))) {
+            r.m1 = Weather.fineFuelMoisture(w.relativeHumidity, w.airTempF);
+            r.m10 = r.m1 + 1;
+            r.m100 = r.m1 + 3;
+            r.moistureNote = "The 1 h is estimated from the station's humidity and temperature; it has no fuel stick.";
         } else {
             r.m1 = 4;
             r.m10 = 5;
             r.m100 = 7;
+            r.moistureNote = "Dry-season defaults; no station reading to go on.";
         }
         r.mHerb = 30;
         r.mWoody = 60;
@@ -533,7 +562,8 @@ public final class FireModel {
         } else if (w != null && w.hasWind()) {
             r.windMph = w.windMph;
             r.windFromDeg = w.windFromDeg;
-            r.windNote = w.station + ", " + Units.format(w.distanceM) + " away" + heightNote(r, w);
+            r.tenMeterWind = w.tenMeterWind;
+            r.windNote = w.station + " (" + w.source + "), " + Units.format(w.distanceM) + " away" + heightNote(r, w);
         } else {
             r.windMph = 0;
             r.windFromDeg = 0;
@@ -542,7 +572,7 @@ public final class FireModel {
         r.canopyHeightFt = r.site.coverPct >= 10 ? 30 : 0;
         r.crownRatio = r.site.coverPct >= 10 ? 0.5 : 0;
         r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
-                r.windMph, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
+                r.windMph, r.tenMeterWind, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
                 r.site.coverPct, r.canopyHeightFt, r.crownRatio);
         finish(r);
     }
@@ -728,7 +758,8 @@ public final class FireModel {
             o.put("fuelModel", r.site.fuelModel).put("slopeDeg", r.site.slopeDeg)
                     .put("aspectDeg", r.site.aspectDeg).put("coverPct", r.site.coverPct);
             o.put("m1", r.m1).put("m10", r.m10).put("m100", r.m100).put("mHerb", r.mHerb).put("mWoody", r.mWoody);
-            o.put("windMph", r.windMph).put("windFromDeg", r.windFromDeg).put("windNote", r.windNote);
+            o.put("windMph", r.windMph).put("windFromDeg", r.windFromDeg).put("windNote", r.windNote)
+                    .put("tenMeterWind", r.tenMeterWind).put("moistureNote", r.moistureNote);
             o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions);
             if (r.weather != null) {
                 o.put("station", r.weather.station).put("observedAt", r.weather.observedAt)
@@ -783,12 +814,14 @@ public final class FireModel {
             r.windMph = o.optDouble("windMph", 0);
             r.windFromDeg = o.optDouble("windFromDeg", 0);
             r.windNote = o.optString("windNote", "");
+            r.tenMeterWind = o.optBoolean("tenMeterWind", false);
+            r.moistureNote = o.optString("moistureNote", "");
             r.canopyHeightFt = o.optDouble("canopyHeightFt", 0);
             r.crownRatio = o.optDouble("crownRatio", 0);
             r.conditions = o.optString("conditions", COND_OBSERVED);
             r.fuelName = Behave.name(r.site.fuelModel);
             r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
-                    r.windMph, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
+                    r.windMph, r.tenMeterWind, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
                     r.site.coverPct, r.canopyHeightFt, r.crownRatio);
             finish(r);
             if (r.problem != null)

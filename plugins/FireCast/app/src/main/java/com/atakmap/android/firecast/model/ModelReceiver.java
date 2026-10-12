@@ -72,7 +72,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 int current = 0;
                 for (int i = 0; i < list.size(); i++) {
                     final Weather.Reading s = list.get(i);
-                    labels[1 + i] = s.station + " · " + Units.format(s.distanceM)
+                    labels[1 + i] = s.station + " (" + s.source + ") · " + Units.format(s.distanceM)
                             + (s.elevationFt > 0 && r != null && !Double.isNaN(r.startElevFt)
                                     ? String.format(Locale.US, " · %+,.0f ft", s.elevationFt - r.startElevFt) : "")
                             + String.format(Locale.US, " · %.0f mph from %s", s.windMph, Units.compass(s.windFromDeg))
@@ -213,8 +213,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                     r.site.slopeDeg, Units.compass(r.site.aspectDeg), r.site.aspectDeg, r.site.coverPct));
         }
         if (r.result != null || r.windNote != null) {
-            in.append(String.format(Locale.US, "Wind %.0f mph from %s (%.0f°) at 20 ft",
-                    r.windMph, Units.compass(r.windFromDeg), r.windFromDeg));
+            in.append(String.format(Locale.US, "Wind %.0f mph from %s (%.0f°) at %s",
+                    r.windMph, Units.compass(r.windFromDeg), r.windFromDeg, r.tenMeterWind ? "10 m" : "20 ft"));
             if (r.windNote != null)
                 in.append(": ").append(r.windNote);
             in.append(".\n");
@@ -233,10 +233,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             }
             in.append(String.format(Locale.US, "Fuel moisture 1 h %.0f%%, 10 h %.0f%%, 100 h %.0f%%, live herb %.0f%%, live woody %.0f%%.",
                     r.m1, r.m10, r.m100, r.mHerb, r.mWoody));
-            if (r.weather != null && !Double.isNaN(r.weather.fuelMoisture) && r.weather.fuelMoisture > 0)
-                in.append(" The 10 h is the station's fuel stick.");
-            else
-                in.append(" Dry-season defaults; no station fuel stick.");
+            if (r.moistureNote != null)
+                in.append(' ').append(r.moistureNote);
         }
         section("What went in", in.toString());
         section("When", FireModel.stamp(r.ranAt) + " run");

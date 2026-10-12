@@ -26,6 +26,10 @@ public final class Weather {
     public static final class Reading {
         public final String station;
         public final String wxId;
+        /** "RAWS" or "NWS": where the reading came from, for the page and the picker. */
+        public final String source;
+        /** True when the wind is a 10 m reading (NWS networks), false for a RAWS 20 ft wind. */
+        public final boolean tenMeterWind;
         /** Feet above sea level, as the layer carries it. */
         public final int elevationFt;
         public final double latitude, longitude;
@@ -36,6 +40,8 @@ public final class Weather {
         public double distanceM;
 
         Reading(JSONObject a) {
+            source = "RAWS";
+            tenMeterWind = false;
             station = str(a, "StationName");
             wxId = str(a, "WXID");
             elevationFt = a.optInt("Elevation", 0);
@@ -50,9 +56,125 @@ public final class Weather {
             fuelMoisture = number(a.optString("FuelMoisture", ""));
         }
 
+        /** An NWS observation station with its latest reading. */
+        Reading(String id, String name, double lat, double lon, int elevationFt, long observedAt,
+                double windMph, double gustMph, double windFromDeg, double rh, double tempF) {
+            source = "NWS";
+            tenMeterWind = true;
+            station = name;
+            wxId = id;
+            latitude = lat;
+            longitude = lon;
+            this.elevationFt = elevationFt;
+            this.observedAt = observedAt;
+            this.windMph = windMph;
+            this.gustMph = gustMph;
+            this.windFromDeg = windFromDeg;
+            relativeHumidity = rh;
+            airTempF = tempF;
+            fuelMoisture = Double.NaN;
+        }
+
         public boolean hasWind() {
             return !Double.isNaN(windMph) && !Double.isNaN(windFromDeg);
         }
+    }
+
+    /**
+     * The NWS observation stations near a point with their latest reading: airports,
+     * the utility networks (Edison, SDG&amp;E, PG&amp;E), citizen stations, and the RAWS
+     * again under their NWS ids. These sit low, along the lines and in the valleys,
+     * where the RAWS do not. One request for the list, then one per station for the
+     * nearest {@code max} by distance and height. Worker thread.
+     */
+    public static java.util.List<Reading> nwsNear(double lat, double lon, double pointElevFt, int max) throws Exception {
+        final String listUrl = String.format(Locale.US, "https://api.weather.gov/points/%.4f,%.4f/stations", lat, lon);
+        final JSONArray feats = new JSONObject(Esri.get(listUrl)).optJSONArray("features");
+        final java.util.List<Object[]> near = new java.util.ArrayList<>();
+        for (int i = 0; feats != null && i < feats.length(); i++) {
+            final JSONObject f = feats.getJSONObject(i);
+            final JSONObject p = f.optJSONObject("properties");
+            final JSONObject g = f.optJSONObject("geometry");
+            if (p == null || g == null)
+                continue;
+            final JSONArray c = g.optJSONArray("coordinates");
+            if (c == null || c.length() < 2)
+                continue;
+            final double slon = c.getDouble(0), slat = c.getDouble(1);
+            final String id = p.optString("stationIdentifier", "");
+            // The id goes into a URL path below; only a plain station id is allowed to.
+            if (id.isEmpty() || !id.matches("[A-Za-z0-9_-]{1,16}"))
+                continue;
+            final JSONObject e = p.optJSONObject("elevation");
+            final double elevM = e == null ? Double.NaN : e.optDouble("value", Double.NaN);
+            final int elevFt = Double.isNaN(elevM) ? 0 : (int) Math.round(elevM / 0.3048d);
+            final double distM = com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(
+                    new com.atakmap.coremap.maps.coords.GeoPoint(lat, lon),
+                    new com.atakmap.coremap.maps.coords.GeoPoint(slat, slon));
+            final double score = distM / 1609.344d
+                    + (Double.isNaN(pointElevFt) || elevFt <= 0 ? 0 : Math.abs(elevFt - pointElevFt) / 100d);
+            near.add(new Object[] { score, id, p.optString("name", id), slat, slon, elevFt, distM });
+        }
+        java.util.Collections.sort(near, new java.util.Comparator<Object[]>() {
+            @Override
+            public int compare(Object[] a, Object[] b) {
+                return Double.compare((Double) a[0], (Double) b[0]);
+            }
+        });
+        final java.util.List<Reading> out = new java.util.ArrayList<>();
+        for (int i = 0; i < near.size() && out.size() < max; i++) {
+            final Object[] s = near.get(i);
+            try {
+                final JSONObject o = new JSONObject(Esri.get("https://api.weather.gov/stations/"
+                        + Esri.enc((String) s[1]) + "/observations/latest")).optJSONObject("properties");
+                if (o == null)
+                    continue;
+                final double windKmh = quantity(o, "windSpeed"), gustKmh = quantity(o, "windGust");
+                final double dir = quantity(o, "windDirection"), rh = quantity(o, "relativeHumidity");
+                final double tempC = quantity(o, "temperature");
+                if (Double.isNaN(windKmh) || Double.isNaN(dir))
+                    continue;
+                long at = 0;
+                try {
+                    at = com.atakmap.coremap.maps.time.CoordinatedTime.fromCot(o.optString("timestamp", "")).getMilliseconds();
+                } catch (Exception ignored) {
+                }
+                final Reading r = new Reading((String) s[1], (String) s[2], (Double) s[3], (Double) s[4], (Integer) s[5], at,
+                        windKmh / 1.609344d, Double.isNaN(gustKmh) ? Double.NaN : gustKmh / 1.609344d, dir, rh,
+                        Double.isNaN(tempC) ? Double.NaN : tempC * 9d / 5d + 32d);
+                r.distanceM = (Double) s[6];
+                out.add(r);
+            } catch (Exception e) {
+                // One station down is not a reason to lose the rest.
+            }
+        }
+        return out;
+    }
+
+    /** An NWS {unitCode, value} quantity's value, NaN when null or missing. */
+    private static double quantity(JSONObject o, String key) {
+        final JSONObject q = o.optJSONObject(key);
+        if (q == null || q.isNull("value"))
+            return Double.NaN;
+        return q.optDouble("value", Double.NaN);
+    }
+
+    /**
+     * Fine dead fuel moisture from humidity and temperature, percent: the NFDRS
+     * equilibrium moisture content (Simard 1968), for a station with no fuel stick.
+     */
+    public static double fineFuelMoisture(double rh, double tempF) {
+        if (Double.isNaN(rh) || Double.isNaN(tempF))
+            return Double.NaN;
+        final double h = Math.max(0, Math.min(100, rh)), t = tempF;
+        final double emc;
+        if (h < 10)
+            emc = 0.03229 + 0.281073 * h - 0.000578 * h * t;
+        else if (h < 50)
+            emc = 2.22749 + 0.160107 * h - 0.01478 * t;
+        else
+            emc = 21.0606 + 0.005565 * h * h - 0.00035 * h * t - 0.483199 * h;
+        return Math.max(1, Math.min(35, emc));
     }
 
     private Weather() {

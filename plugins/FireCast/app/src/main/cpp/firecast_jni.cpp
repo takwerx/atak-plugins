@@ -16,7 +16,7 @@ extern "C" {
 // Inputs, in the order the Java side sends them:
 //   fuelModel  FBFM40/13 number (LANDFIRE's own codes: 101 GR1 ... 204 SB4)
 //   m1, m10, m100, mHerb, mWoody   percent
-//   windMph    20 ft wind speed, miles per hour
+//   windMph    wind speed, miles per hour, at 20 ft (windHeight 0) or 10 m (windHeight 1)
 //   windFrom   degrees clockwise from north the wind comes FROM (probed 2026-10-11:
 //              wind from 0 on flat ground sends the fire toward 180)
 //   slopeDeg, aspectDeg  degrees
@@ -29,7 +29,7 @@ extern "C" {
 JNIEXPORT jdoubleArray JNICALL
 Java_com_atakmap_android_firecast_model_Behave_surfaceRun(JNIEnv* env, jclass,
         jint fuelModel, jdouble m1, jdouble m10, jdouble m100, jdouble mHerb, jdouble mWoody,
-        jdouble windMph, jdouble windFrom, jdouble slopeDeg, jdouble aspectDeg,
+        jdouble windMph, jint windHeight, jdouble windFrom, jdouble slopeDeg, jdouble aspectDeg,
         jdouble coverPct, jdouble heightFt, jdouble crownRatio) {
     // The fuel model table has 256 slots and the library indexes it unchecked.
     if (fuelModel <= 0 || fuelModel >= 256)
@@ -41,7 +41,8 @@ Java_com_atakmap_android_firecast_model_Behave_surfaceRun(JNIEnv* env, jclass,
     try {
         Surface s(fuelModels());
         s.updateSurfaceInputs(fuelModel, m1, m10, m100, mHerb, mWoody, FractionUnits::Percent,
-                windMph, SpeedUnits::MilesPerHour, WindHeightInputMode::TwentyFoot,
+                windMph, SpeedUnits::MilesPerHour,
+                windHeight == 1 ? WindHeightInputMode::TenMeter : WindHeightInputMode::TwentyFoot,
                 windFrom, WindAndSpreadOrientationMode::RelativeToNorth,
                 slopeDeg, SlopeUnits::Degrees, aspectDeg,
                 coverPct, FractionUnits::Percent, heightFt, LengthUnits::Feet,

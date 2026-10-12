@@ -64,17 +64,18 @@ public final class Behave {
 
     /**
      * @param fuelModel  LANDFIRE's FBFM40 (or FBFM13) code
-     * @param windMph    20 ft wind, miles per hour
+     * @param windMph    wind, miles per hour, at 20 ft or at 10 m
+     * @param tenMeter   true when the wind was measured at 10 m (NWS networks), false for 20 ft (RAWS)
      * @param windFromDeg degrees the wind comes from, clockwise from north
      * @return the run, or null when the library is missing or refused the inputs
      */
     public static Result surface(int fuelModel, double m1, double m10, double m100,
-            double mHerb, double mWoody, double windMph, double windFromDeg,
+            double mHerb, double mWoody, double windMph, boolean tenMeter, double windFromDeg,
             double slopeDeg, double aspectDeg, double coverPct, double heightFt, double crownRatio) {
         if (!load() || !validFuelModel(fuelModel))
             return null;
         final double[] v = surfaceRun(fuelModel, m1, m10, m100, mHerb, mWoody,
-                windMph, windFromDeg, slopeDeg, aspectDeg, coverPct, heightFt, crownRatio);
+                windMph, tenMeter ? 1 : 0, windFromDeg, slopeDeg, aspectDeg, coverPct, heightFt, crownRatio);
         return v == null || v.length < 11 ? null : new Result(v);
     }
 
@@ -100,7 +101,7 @@ public final class Behave {
     }
 
     private static native double[] surfaceRun(int fuelModel, double m1, double m10, double m100,
-            double mHerb, double mWoody, double windMph, double windFrom, double slopeDeg,
+            double mHerb, double mWoody, double windMph, int windHeight, double windFrom, double slopeDeg,
             double aspectDeg, double coverPct, double heightFt, double crownRatio);
 
     private static native String fuelName(int fuelModel);
