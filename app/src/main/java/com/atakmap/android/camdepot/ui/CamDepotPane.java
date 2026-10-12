@@ -995,12 +995,11 @@ public final class CamDepotPane implements CameraStore.Listener {
                 // Every camera that sees the point, in one tap. The alternative was
                 // visiting each row, which is the chore this filter exists to end.
                 int n = 0;
-                // The real lens out to the reach, not a center line: the point
-                // is inside the wedge, and that is the whole claim.
                 for (Camera c : new ArrayList<>(lastSees)) {
-                    if (!layer.isFovShowing(c.id))
+                    if (!layer.isFovShowing(c.id)) {
+                        layer.showFov(c);
                         n++;
-                    layer.showFovWedge(c, lookReachMeters());
+                    }
                 }
                 updateBearingsOffButton();
                 Toast.makeText(mapView.getContext(), n == 0
