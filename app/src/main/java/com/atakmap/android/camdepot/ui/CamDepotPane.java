@@ -245,8 +245,13 @@ public final class CamDepotPane implements CameraStore.Listener {
      * move because ATAK restarted.
      */
     private GeoPoint lookAt;
-    /** Degrees added to each side of a camera's reported wedge before it counts. */
-    private static final double LOOK_AT_SLACK_DEG = 10;
+    /**
+     * Degrees added to each side of a camera's reported wedge before it counts.
+     * Zero: it was 10, and a camera 39 degrees off its center got in on the slack
+     * alone, which the operator read as "not even close" (2026-10-11). Inside the
+     * reported lens or not at all.
+     */
+    private static final double LOOK_AT_SLACK_DEG = 0;
     private Button lookAtButton, lookAtBearingsButton, lookReachButton;
     /**
      * True while the next tap on the map is the point. The map's "center" was
@@ -990,11 +995,12 @@ public final class CamDepotPane implements CameraStore.Listener {
                 // Every camera that sees the point, in one tap. The alternative was
                 // visiting each row, which is the chore this filter exists to end.
                 int n = 0;
+                // The real lens out to the reach, not a center line: the point
+                // is inside the wedge, and that is the whole claim.
                 for (Camera c : new ArrayList<>(lastSees)) {
-                    if (!layer.isFovShowing(c.id)) {
-                        layer.showFov(c);
+                    if (!layer.isFovShowing(c.id))
                         n++;
-                    }
+                    layer.showFovWedge(c, lookReachMeters());
                 }
                 updateBearingsOffButton();
                 Toast.makeText(mapView.getContext(), n == 0

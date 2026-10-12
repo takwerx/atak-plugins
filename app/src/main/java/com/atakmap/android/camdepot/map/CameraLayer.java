@@ -1097,17 +1097,22 @@ public final class CameraLayer {
         if (c == null || !c.hasFov())
             return;
         final boolean still = !c.hasStream();
-        final double extent = still ? STILL_FOV_RANGE_M
+        final boolean wedge = wedges.contains(c.id);
+        final double extent = wedge ? Math.min(wedgeRangeM,
+                        SensorDetailHandler.MAX_SENSOR_RANGE)
+                : still ? STILL_FOV_RANGE_M
                 : Math.min(rangeMeters, SensorDetailHandler.MAX_SENSOR_RANGE);
         try {
             final com.atakmap.android.maps.SensorFOV f =
                     SensorDetailHandler.addFovToMap(m,
                             c.pan,
-                            still ? STILL_FOV_DEGREES : 0,  // wedge, or a bearing line
+                            // The real lens, a fixed wedge for stills, or a line.
+                            wedge ? c.fov : still ? STILL_FOV_DEGREES : 0,
                             extent,
                             // Line: alpha 0, no fill, per the operator's CoT.
-                            // Wedge: translucent white, like Quick Pic's.
-                            still ? new float[] { 1f, 1f, 1f, 0.25f }
+                            // Wedge: translucent, like Quick Pic's.
+                            wedge ? new float[] { 1f, 0.6f, 0f, 0.2f }
+                                  : still ? new float[] { 1f, 1f, 1f, 0.25f }
                                   : new float[] { 1f, 1f, 1f, 0f },
                             // The sixth argument is VISIBLE, not labels.
                             //
@@ -1142,8 +1147,8 @@ public final class CameraLayer {
                 Log.w(TAG, "ATAK declined to create a SensorFOV for " + c.id);
                 return;
             }
-            f.setStrokeWeight(still ? 2.0 : 5.0);
-            f.setStrokeColor(still ? 0xFFFFFFFF : LINE_COLOR);
+            f.setStrokeWeight(wedge || still ? 2.0 : 5.0);
+            f.setStrokeColor(wedge ? LINE_COLOR : still ? 0xFFFFFFFF : LINE_COLOR);
             f.setRangeLineStrokeWeight(1.0);
             f.setRangeLineStrokeColor(0xFF000000);
         } catch (LinkageError | RuntimeException e) {
@@ -1366,6 +1371,7 @@ public final class CameraLayer {
     public void hideFov(String id) {
         requested.remove(id);
         showing.remove(id);
+        wedges.remove(id);
         final Marker m = markers.get(id);
         if (m == null)
             return;
@@ -1523,6 +1529,23 @@ public final class CameraLayer {
      * one of them.
      */
     private final Set<String> requested = new HashSet<>();
+    /**
+     * Cameras drawn as their real lens, not a center line. Look At's Show N
+     * Bearings uses it: a center line 12 degrees off a fire that is well inside
+     * a 63 degree lens reads as "not looking at it" (operator, 2026-10-11). The
+     * wedge is the camera's reported FOV out to {@link #wedgeRangeM}.
+     */
+    private final Set<String> wedges = new HashSet<>();
+    private double wedgeRangeM = 32187;
+
+    /** Show this camera's lens as a wedge out to {@code rangeM}. */
+    public void showFovWedge(Camera c, double rangeM) {
+        if (c == null || !c.hasFov())
+            return;
+        wedgeRangeM = rangeM;
+        wedges.add(c.id);
+        showFov(c);
+    }
 
     public boolean isFovShowing(String id) {
         return requested.contains(id);
