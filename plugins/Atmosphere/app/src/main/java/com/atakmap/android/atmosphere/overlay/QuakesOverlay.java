@@ -157,8 +157,8 @@ public final class QuakesOverlay extends OutlookOverlay {
                 d.append("\nWhen: ").append(StormReportsOverlay.when(q.time)).append(" (")
                         .append(StormReportsOverlay.ago(q.time)).append(')');
                 if (!Double.isNaN(q.depthKm))
-                    d.append("\nDepth: ").append(String.format(Locale.US, "%.1f km (%.1f mi)",
-                            q.depthKm, q.depthKm * 0.621371));
+                    d.append("\nDepth: ").append(String.format(Locale.US, "%.1f mi (%.1f km)",
+                            q.depthKm * 0.621371, q.depthKm));
                 if (q.felt > 0)
                     d.append("\nFelt: ").append(q.felt).append(q.felt == 1 ? " report" : " reports")
                             .append(Double.isNaN(q.cdi) ? ""

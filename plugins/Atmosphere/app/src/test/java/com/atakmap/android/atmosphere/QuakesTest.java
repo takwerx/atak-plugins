@@ -29,6 +29,8 @@ public class QuakesTest {
         final List<Quakes.Quake> q = Quakes.parse(FEED);
         assertEquals(2, q.size());
         assertEquals("M 3.5", q.get(0).magnitude());
+        assertEquals("19 mi SW of Dana Point, CA", q.get(0).place);
+        assertEquals("Olancha, CA", Quakes.placeInMiles("Olancha, CA"));
         assertEquals(11.3, q.get(0).depthKm, 1e-9);
         assertEquals(126, q.get(0).felt);
         assertFalse(q.get(0).shakeMap);
