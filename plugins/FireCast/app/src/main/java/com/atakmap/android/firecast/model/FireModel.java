@@ -142,6 +142,8 @@ public final class FireModel {
         public int[] structures, homes;
         public double[] people;
         public String structureNote;
+        /** Schools, hospitals, care homes, stations and the like the fire reaches: [kind, lat, lon, step index]. */
+        public java.util.List<Object[]> critical = new java.util.ArrayList<>();
         /** On the map, or hidden by its switch. Hidden is not deleted. */
         public boolean visible = true;
 
@@ -1027,6 +1029,7 @@ public final class FireModel {
         }
         final int[] count = new int[r.steps.length], homes = new int[r.steps.length];
         final double[] people = new double[r.steps.length];
+        final java.util.List<Object[]> critical = new java.util.ArrayList<>();
         for (Structures.Building b : buildings) {
             final int x = (int) Math.floor((b.lon - g.lon0) / g.dLon), y = (int) Math.floor((b.lat - g.lat0) / g.dLat);
             if (x < 0 || y < 0 || x >= g.nx || y >= g.ny)
@@ -1040,15 +1043,28 @@ public final class FireModel {
                     if (xx >= 0 && yy >= 0 && xx < g.nx && yy < g.ny)
                         t = Math.min(t, g.arrival[yy * g.nx + xx]);
                 }
+            int firstStep = -1;
             for (int i = 0; i < r.steps.length; i++) {
                 if (t <= r.steps[i]) {
+                    if (firstStep < 0)
+                        firstStep = i;
                     count[i]++;
                     if (b.residential())
                         homes[i]++;
                     people[i] += b.population;
                 }
             }
+            final String kind = firstStep < 0 ? null : b.critical();
+            if (kind != null && critical.size() < 40)
+                critical.add(new Object[] { kind, b.lat, b.lon, firstStep });
         }
+        java.util.Collections.sort(critical, new java.util.Comparator<Object[]>() {
+            @Override
+            public int compare(Object[] a, Object[] b) {
+                return Integer.compare((Integer) a[3], (Integer) b[3]);
+            }
+        });
+        r.critical = critical;
         r.structures = count;
         r.homes = homes;
         r.people = people;
@@ -1399,6 +1415,10 @@ public final class FireModel {
             }
             if (r.structureNote != null)
                 o.put("structureNote", r.structureNote);
+            final org.json.JSONArray cr = new org.json.JSONArray();
+            for (Object[] c : r.critical)
+                cr.put(new org.json.JSONArray().put(c[0]).put(c[1]).put(c[2]).put(c[3]));
+            o.put("critical", cr);
             if (r.weather != null) {
                 // Android's org.json refuses NaN; a station without a reading has them.
                 o.put("station", r.weather.station).put("observedAt", r.weather.observedAt);
@@ -1518,6 +1538,13 @@ public final class FireModel {
                     }
                 }
                 r.structureNote = o.optString("structureNote", null);
+                final org.json.JSONArray cr = o.optJSONArray("critical");
+                if (cr != null)
+                    for (int i = 0; i < cr.length(); i++) {
+                        final org.json.JSONArray c = cr.optJSONArray(i);
+                        if (c != null && c.length() == 4)
+                            r.critical.add(new Object[] { c.optString(0), c.optDouble(1), c.optDouble(2), c.optInt(3) });
+                    }
             }
             return r;
         } catch (Exception e) {

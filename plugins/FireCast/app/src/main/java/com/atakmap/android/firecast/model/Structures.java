@@ -25,14 +25,51 @@ public final class Structures {
         public final double lat, lon;
         /** FEMA's top-level class: Residential, Commercial, Industrial, Education, Government, Assembly, Agriculture, Utility, Unclassified. */
         public final String occupancy;
+        /** FEMA's primary occupancy, "Pre-K - 12 Schools", "Hospital", "Nursing Home", "Emergency Response"... */
+        public final String primary;
         /** Median population estimate for the building; 0 when FEMA has none. */
         public final double population;
 
-        Building(double lat, double lon, String occupancy, double population) {
+        Building(double lat, double lon, String occupancy, String primary, double population) {
             this.lat = lat;
             this.lon = lon;
             this.occupancy = occupancy;
+            this.primary = primary == null ? "" : primary.trim();
             this.population = population;
+        }
+
+        /**
+         * What a crew wants named, not counted: where people are gathered, kept, or
+         * cannot leave on their own, and the places that answer the call. FEMA's
+         * occupancy words, as the inventory writes them.
+         */
+        public String critical() {
+            final String p = primary.toLowerCase(java.util.Locale.US);
+            if (p.contains("school"))
+                return "School";
+            if (p.contains("college") || p.contains("universit"))
+                return "College";
+            if (p.contains("educational"))
+                return "Educational building";
+            if (p.contains("hospital"))
+                return "Hospital";
+            if (p.contains("nursing"))
+                return "Nursing home";
+            if (p.contains("medical") || p.contains("clinic"))
+                return "Clinic";
+            if (p.contains("emergency response"))
+                return "Fire or police station";
+            if (p.contains("institutional dormitory"))
+                return "Dormitory or care home";
+            if (p.contains("temporary lodging"))
+                return "Hotel or motel";
+            if (p.contains("religious"))
+                return "Church";
+            if (p.contains("community center"))
+                return "Community center";
+            if (p.contains("energy") || p.contains("water") || p.contains("wastewater"))
+                return "Utility site";
+            return null;
         }
 
         public boolean residential() {
@@ -51,7 +88,7 @@ public final class Structures {
             final String url = LAYER + "/query?where=" + Esri.enc("1=1")
                     + "&geometry=" + Esri.enc(String.format(Locale.US, "%.5f,%.5f,%.5f,%.5f", west, south, east, north))
                     + "&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects"
-                    + "&outFields=" + Esri.enc("OCC_CLS,LATITUDE,LONGITUDE,POP_MEDIAN")
+                    + "&outFields=" + Esri.enc("OCC_CLS,PRIM_OCC,LATITUDE,LONGITUDE,POP_MEDIAN")
                     + "&returnGeometry=false&orderByFields=OBJECTID&resultRecordCount=2000&resultOffset=" + offset + "&f=json";
             final JSONObject d = new JSONObject(Esri.get(url));
             if (d.has("error"))
@@ -66,7 +103,7 @@ public final class Structures {
                 final double lat = a.optDouble("LATITUDE", Double.NaN), lon = a.optDouble("LONGITUDE", Double.NaN);
                 if (Double.isNaN(lat) || Double.isNaN(lon))
                     continue;
-                out.add(new Building(lat, lon, a.optString("OCC_CLS", ""), a.optDouble("POP_MEDIAN", 0)));
+                out.add(new Building(lat, lon, a.optString("OCC_CLS", ""), a.optString("PRIM_OCC", ""), a.optDouble("POP_MEDIAN", 0)));
             }
             if (!d.optBoolean("exceededTransferLimit", false) && feats.length() < 2000)
                 break;

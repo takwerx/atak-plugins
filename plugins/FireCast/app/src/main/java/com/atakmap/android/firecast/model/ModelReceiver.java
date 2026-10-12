@@ -303,6 +303,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             return;
         }
         final Behave.Result o = r.result;
+        if (r.ground != null)
+            body.addView(stepTable(r));
         final StringBuilder goes = new StringBuilder();
         if (r.ground != null) {
             for (int i = 0; i < r.steps.length; i++) {
@@ -432,6 +434,67 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         if (a < 10)
             return String.format(Locale.US, "%.1f acres", a);
         return String.format(Locale.US, "%,.0f acres", a);
+    }
+
+    /** The card: a row per step with the clock, acres, structures and people, its color at the left. */
+    private View stepTable(FireModel.Run r) {
+        final android.widget.TableLayout t = new android.widget.TableLayout(view.getContext());
+        t.setStretchAllColumns(false);
+        t.setColumnStretchable(1, true);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(8);
+        t.setLayoutParams(lp);
+        t.addView(tableRow(0, "", "ETA", "Acres", r.structures != null ? "Bldgs" : "", r.structures != null ? "People" : "", true));
+        for (int i = 0; i < r.steps.length; i++) {
+            final int min = r.steps[i];
+            t.addView(tableRow(0xFF000000 | FireModel.stepColor(i, r.steps.length),
+                    "", clock(r.ranAt + min * 60000L) + "  (" + min + " min)",
+                    acresShort(r.acres(min)),
+                    r.structures == null ? "" : String.valueOf(r.structures[i]),
+                    r.people == null ? "" : (r.people[i] < 1 ? "0" : String.valueOf(Math.round(r.people[i]))), false));
+        }
+        if (!r.critical.isEmpty()) {
+            final StringBuilder sb = new StringBuilder();
+            final double[] from = { r.lat, r.lon };
+            for (Object[] c : r.critical)
+                sb.append(c[0]).append(", ").append(Units.rangeBearing(from, (Double) c[1], (Double) c[2]))
+                        .append(" of the start, by ").append(clock(r.ranAt + r.steps[(Integer) c[3]] * 60000L)).append('\n');
+            final LinearLayout wrap = new LinearLayout(view.getContext());
+            wrap.setOrientation(LinearLayout.VERTICAL);
+            wrap.addView(t);
+            wrap.addView(headingView("Places to call first"));
+            wrap.addView(bodyView(sb.toString().trim()));
+            return wrap;
+        }
+        return t;
+    }
+
+    private android.widget.TableRow tableRow(int color, String swatch, String eta, String acres, String bldgs, String people, boolean head) {
+        final android.widget.TableRow row = new android.widget.TableRow(view.getContext());
+        final View sw = new View(view.getContext());
+        final android.widget.TableRow.LayoutParams swp = new android.widget.TableRow.LayoutParams(dp(14), dp(14));
+        swp.rightMargin = dp(8);
+        swp.gravity = Gravity.CENTER_VERTICAL;
+        sw.setLayoutParams(swp);
+        if (color != 0)
+            sw.setBackgroundColor(color);
+        row.addView(sw);
+        for (String s : new String[] { eta, acres, bldgs, people }) {
+            final TextView c = new TextView(view.getContext());
+            c.setText(s);
+            c.setTextSize(head ? 12f : 15f);
+            c.setTextColor(head ? 0xFF00E5FF : Color.WHITE);
+            if (head)
+                c.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            c.setPadding(0, dp(3), dp(14), dp(3));
+            row.addView(c);
+        }
+        return row;
+    }
+
+    private static String acresShort(double a) {
+        return a < 10 ? String.format(Locale.US, "%.1f", a) : String.format(Locale.US, "%,.0f", a);
     }
 
     private static String rate(double ftPerMin) {
