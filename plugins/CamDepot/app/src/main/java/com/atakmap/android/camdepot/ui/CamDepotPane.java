@@ -1817,10 +1817,12 @@ public final class CamDepotPane implements CameraStore.Listener {
         if (lookAt == null) {
             lookAtLabel.setVisibility(View.GONE);
             lookAtButton.setText("Look At Map Center");
-            lookAtBearingsButton.setText("Show Bearings");
-            lookAtBearingsButton.setEnabled(false);
+            // Gone, not greyed: a grey "Show Bearings" above a grey "No bearings
+            // shown" read as two switches saying no (operator, 2026-10-11).
+            lookAtBearingsButton.setVisibility(View.GONE);
             return;
         }
+        lookAtBearingsButton.setVisibility(View.VISIBLE);
         lookAtLabel.setVisibility(View.VISIBLE);
         lookAtLabel.setText(String.format(Locale.US,
                 "%,d see the point, %,d PTZ could turn to it, %,d in range report "
@@ -1828,7 +1830,7 @@ public final class CamDepotPane implements CameraStore.Listener {
         lookAtButton.setText("Clear Look At");
         final int n = lastSees.size();
         lookAtBearingsButton.setEnabled(n > 0);
-        lookAtBearingsButton.setText(n == 0 ? "Show Bearings"
+        lookAtBearingsButton.setText(n == 0 ? "None See the Point"
                 : String.format(Locale.US, "Show %,d Bearing%s", n, n == 1 ? "" : "s"));
     }
 
