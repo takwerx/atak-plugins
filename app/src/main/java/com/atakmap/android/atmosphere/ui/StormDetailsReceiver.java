@@ -42,8 +42,11 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
 
     private final View view;
 
+    private final Context pluginContext;
+
     public StormDetailsReceiver(MapView mapView, Context pluginContext) {
         super(mapView);
+        this.pluginContext = pluginContext;
         this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.storm_details, null);
         // Back closes the details and leaves the map where it is; ATAK's own close is
         // not where a thumb expects it.
@@ -74,8 +77,11 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         /** A Predictive Service Area opens its fire danger and its GACC's chart ("SC08"). */
         void openErc(String code);
 
-        /** A debris-flow fire's "Show the area": the map goes to the burn and its basins draw. */
-        void showFire(String ref);
+        /** A debris-flow fire's Show the area / Hide the area: its basins drawn or taken off. */
+        void showFire(String ref, boolean show);
+
+        /** Whether that fire's area is drawn now, for the button's label. */
+        boolean isFireShown(String ref);
     }
 
     private static SpotOpener spotOpener;
@@ -157,12 +163,14 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         final String ref = item.getMetaString("atmosphereRef", "");
         if (action != null) {
             if (ref.startsWith("fire:") && spotOpener != null) {
+                final boolean shownNow = spotOpener.isFireShown(ref);
+                action.setText(pluginContext.getString(shownNow ? R.string.hide_area : R.string.show_area));
                 action.setVisibility(android.view.View.VISIBLE);
                 action.setOnClickListener(new android.view.View.OnClickListener() {
                     @Override
                     public void onClick(android.view.View v) {
                         closeDropDown();
-                        spotOpener.showFire(ref);
+                        spotOpener.showFire(ref, !shownNow);
                     }
                 });
             } else

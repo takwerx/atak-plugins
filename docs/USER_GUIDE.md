@@ -167,7 +167,7 @@ opening the plugin.
 | Rain and rivers | Rain Totals | The rain that fell, as a picture: the NWS radar estimate for the last 1 h, 6 h, 24 h or 3 days, the gauge-corrected analysis for 7 days, in the NWS colors, with a transparency slider |
 | Rain and rivers | Rain Gauges | USGS rain gauges around the map with their 24 h totals, the CoCoRaHS volunteer gauges of the states under the map with their morning reading, and the forecast office's own rainfall report gauges, inches in the pill; the day by the hour, the report, or the volunteer's reading behind a tap |
 | Rain and rivers | Streams Running High | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
-| Rain and rivers | Debris Flow | The USGS post-fire assessments: every fire of the last three years marked; zoomed in, the perimeter and each stream basin filled Low, Moderate or High for a 15-minute burst of rain, with likelihood and volume behind a tap |
+| Rain and rivers | Debris Flow | The USGS post-fire assessments: every fire of the last three years marked; a fire's page shows or hides its perimeter and stream basins, filled Low, Moderate or High for a 15-minute burst of rain, with likelihood and volume behind a tap |
 | Ocean | Buoys | Buoys and coastal stations, readings colored by sea state; tides, currents and the marine forecast behind a tap |
 | Ocean | Waves | The wave forecast: seas colored by state, the swell as moving crests, five days on the time strip, with the seas "Here" |
 | Ocean | Beach Forecast | Beach areas colored by rip current risk |
@@ -410,18 +410,19 @@ preliminary until the office finalizes it.
 **Debris Flow** sits in the Rain and rivers group because a debris flow is a
 flood of rock and mud, and the trigger is a burst of rain over a burn. It
 draws every fire the USGS has assessed in the last three years as a marker
-with the fire's name and year. Tap a marker for the fire's page, and **Show
-the area** on it brings the map to that burn and draws that fire's perimeter
-and basins only, until you pan away from it. Zoomed in to a few degrees by
-hand, it fetches every assessed fire in view: the perimeter and each stream
-basin, filled in USGS's own colors: Low
+with the fire's name and year, and that is all it draws on its own. Tap a
+marker for the fire's page, and **Show the area** on it brings the map to that
+burn and draws that fire's perimeter and each stream basin, filled in USGS's
+own colors: Low
 yellow, Moderate orange, High red, for one 15-minute burst of rain at the rate
 the USGS set for that fire (24 mm/h, about an inch an hour, for most). Tap a
 basin for the likelihood of a debris flow, the volume it would carry, the
 storm it is for and the fire; tap a fire marker for when it burned, when it was
-assessed and the USGS record. The status line names the fires in view and
-counts the basins by hazard, or says to zoom in. A burn stays hazardous for
-two to five years, until the slopes grow back.
+assessed and the USGS record. **Hide the area** on the same page takes the
+basins off again; more than one fire can be shown at once, and the set is
+remembered. The status line names the fires shown and counts their basins by
+hazard. A burn stays hazardous for two to five years, until the slopes grow
+back.
 
 <img src="screenshots/99_debrisflow_layer_block.png" width="420">
 

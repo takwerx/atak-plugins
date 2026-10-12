@@ -1,16 +1,15 @@
 package com.atakmap.android.atmosphere.overlay;
 
 import android.content.Context;
+import com.atakmap.android.atmosphere.compat.MapCompat;
+import android.content.SharedPreferences;
 
 import com.atakmap.android.atmosphere.compat.GeneratedFiles;
 import com.atakmap.android.atmosphere.data.DebrisFlow;
-import com.atakmap.android.atmosphere.data.TornadoPaths;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.maps.assets.Icon;
-import com.atakmap.coremap.maps.coords.GeoBounds;
 import com.atakmap.coremap.maps.coords.GeoPoint;
-import com.atakmap.map.AtakMapView;
 import com.atakmap.map.layer.feature.AttributeSet;
 import com.atakmap.map.layer.feature.geometry.Geometry;
 
@@ -22,6 +21,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -34,11 +35,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * and mud and the trigger is a burst of rain over a burn (operator, 2026-10-11:
  * "isnt that similar to flooding? they are related").
  *
- * <p>The fires are one national request. The basins are 86,000 polygons
- * nationally, so they are asked for the map's extent only, padded, and asked again
- * when the map settles somewhere outside what was asked. <b>The map's extent
- * leaves the device; the position does not.</b> Over about four degrees wide only
- * the markers draw and the status says to zoom in.
+ * <p>The fires are one national request and the only thing the layer draws on its
+ * own. The basins are 86,000 polygons nationally and come in for one fire at a
+ * time, when its page's Show the area asks for them, by the fire's id; the page
+ * hides them again. Nothing about the phone leaves (operator, 2026-10-12: "these
+ * do not come on automatically by any means no zoom etc ... just the dots show up").
  */
 public final class DebrisFlowOverlay extends OutlookOverlay {
 
@@ -60,79 +61,37 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
 
     private final DotIcons icons;
     private final List<String> urls = new CopyOnWriteArrayList<>();
-    /** What the basins were last asked for: west, south, east, north; null for none. */
-    private volatile double[] asked;
-    private volatile boolean zoomedOut = true;
-    /**
-     * The one fire whose basins are asked for, from its page's Show the area; null
-     * for every burn in view. Cleared when the map settles with the fire out of view.
-     */
-    private volatile DebrisFlow.Fire focus;
-    private volatile String askedFocus = "";
-    private volatile boolean dirty;
-    private volatile int received;
+    private static final String PREF_SHOWN = "weather.layer.debrisflow.shown";
+    /** The fires whose perimeter and basins are drawn, by id, in the order asked. */
+    private final List<String> shown = new CopyOnWriteArrayList<>();
+    /** Basins received so far per fire, for the service's 2,000-row pages. */
+    private final Map<String, Integer> received = new ConcurrentHashMap<>();
     /** Written on the worker as the fires arrive, read there as the basins do. */
     private List<DebrisFlow.Fire> fires = new ArrayList<>();
     private volatile int firesNational;
-
-    private final Runnable settled = new Runnable() {
-        @Override
-        public void run() {
-            if (!isOn())
-                return;
-            if (needsNewAsk())
-                refresh(true);
-        }
-    };
-
-    private final AtakMapView.OnMapMovedListener moved = new AtakMapView.OnMapMovedListener() {
-        @Override
-        public void onMapMoved(AtakMapView v, boolean animate) {
-            // The GL thread; nothing of the map or the pane is touched here.
-            mapView.removeCallbacks(settled);
-            mapView.postDelayed(settled, SETTLE_MS);
-        }
-    };
 
     public DebrisFlowOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
         super(mapView, pluginContext, egress, TAG, LAYER_ID, "Debris Flow");
         icons = new DotIcons(GeneratedFiles.icons("dots"));
         urls.add(DebrisFlow.FIRES_URL);
+        final SharedPreferences prefs = MapCompat.prefs();
+        final String saved = prefs == null ? "" : prefs.getString(PREF_SHOWN, "");
+        for (String id : saved.split("\\|"))
+            if (!id.isEmpty())
+                shown.add(id);
     }
 
-    @Override
-    public void start() {
-        super.start();
-        mapView.addOnMapMovedListener(moved);
+    private void rememberShown() {
+        final SharedPreferences prefs = MapCompat.prefs();
+        if (prefs == null)
+            return;
+        final StringBuilder b = new StringBuilder();
+        for (String id : shown)
+            b.append(b.length() > 0 ? "|" : "").append(id);
+        prefs.edit().putString(PREF_SHOWN, b.toString()).apply();
     }
 
-    @Override
-    public void stop() {
-        mapView.removeOnMapMovedListener(moved);
-        mapView.removeCallbacks(settled);
-        super.stop();
-    }
-
-    @Override
-    public void setOn(boolean value) {
-        super.setOn(value);
-        if (!value) {
-            asked = null;
-            dirty = false;
-            focus = null;
-            askedFocus = "";
-        }
-    }
-
-    /** Whether the focus fire is still on screen; off screen, the view's burns take over. */
-    private boolean focusInView() {
-        final DebrisFlow.Fire f = focus;
-        final double[] x = extent();
-        return f != null && x != null && f.lon >= x[0] && f.lon <= x[2] && f.lat >= x[1]
-                && f.lat <= x[3];
-    }
-
-    /** What a fire's marker carries so its details page can bring the map to it. */
+    /** What a fire's marker carries so its details page can show or hide its area. */
     static String fireRef(DebrisFlow.Fire f) {
         return "fire:" + (f.id.isEmpty() ? String.format(Locale.US, "%.4f,%.4f", f.lat, f.lon) : f.id);
     }
@@ -140,107 +99,54 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
     /** Screen meters per pixel that puts a burn's basins on screen: a 5 to 10 mile scale bar. */
     private static final double FIRE_VIEW_RESOLUTION = 30d;
 
-    /**
-     * Brings the map to a fire from its details page, close enough that the layer
-     * fetches and draws its perimeter and basins once the map settles (operator,
-     * 2026-10-12: "at first it is just the icon ... then in there you have a button
-     * for show the area for that incident").
-     */
-    public boolean showFire(String ref) {
-        if (ref == null || !isOn())
-            return false;
+    private DebrisFlow.Fire fireFor(String ref) {
+        if (ref == null)
+            return null;
         for (DebrisFlow.Fire f : fires)
-            if (ref.equals(fireRef(f))) {
-                focus = f.id.isEmpty() ? null : f;
-                try {
-                    mapView.getMapController().panZoomTo(new GeoPoint(f.lat, f.lon),
-                            mapView.mapResolutionAsMapScale(FIRE_VIEW_RESOLUTION), true);
-                } catch (LinkageError | RuntimeException e) {
-                    mapView.getMapController().panTo(new GeoPoint(f.lat, f.lon), true);
-                }
-                return true;
+            if (ref.equals(fireRef(f)))
+                return f;
+        return null;
+    }
+
+    /** Whether a fire's area is drawn, for its page's button. */
+    public boolean isFireShown(String ref) {
+        final DebrisFlow.Fire f = fireFor(ref);
+        return f != null && shown.contains(f.id);
+    }
+
+    /**
+     * Show the area, from a fire's page: the map goes to the burn and its perimeter
+     * and basins are fetched by the fire's id and drawn, beside any other fire already
+     * shown. Hide the area takes them off again. The set is remembered.
+     */
+    public boolean showFire(String ref, boolean show) {
+        final DebrisFlow.Fire f = fireFor(ref);
+        if (f == null || f.id.isEmpty() || !isOn())
+            return false;
+        if (show && !shown.contains(f.id)) {
+            shown.add(f.id);
+            try {
+                mapView.getMapController().panZoomTo(new GeoPoint(f.lat, f.lon),
+                        mapView.mapResolutionAsMapScale(FIRE_VIEW_RESOLUTION), true);
+            } catch (LinkageError | RuntimeException e) {
+                mapView.getMapController().panTo(new GeoPoint(f.lat, f.lon), true);
             }
-        return false;
-    }
-
-    /** The map's extent, {west, south, east, north}, or null when it cannot be read. */
-    private double[] extent() {
-        final GeoBounds b = mapView.getBounds();
-        if (b == null)
-            return null;
-        final double w = b.getWest(), s = b.getSouth(), e = b.getEast(), n = b.getNorth();
-        if (Double.isNaN(w) || Double.isNaN(s) || Double.isNaN(e) || Double.isNaN(n) || e <= w
-                || n <= s)
-            return null;
-        return new double[] { w, s, e, n };
-    }
-
-    private boolean needsNewAsk() {
-        final double[] x = extent();
-        if (x == null)
-            return false;
-        if (focus != null && !focusInView())
-            focus = null;
-        final String f = focus == null ? "" : focus.id;
-        if (!f.equals(askedFocus))
-            return true;
-        if (focus != null)
-            return false;
-        final boolean wide = x[2] - x[0] > MAX_SPAN_LON;
-        if (wide != zoomedOut)
-            return true;
-        if (wide)
-            return false;
-        final double[] a = asked;
-        return a == null || x[0] < a[0] || x[1] < a[1] || x[2] > a[2] || x[3] > a[3];
+        } else if (!show)
+            shown.remove(f.id);
+        rememberShown();
+        refresh(true);
+        return true;
     }
 
     @Override
     protected void onRefreshStart() {
         urls.clear();
+        received.clear();
         urls.add(DebrisFlow.FIRES_URL);
-        received = 0;
-        dirty = false;
-        final double[] x = extent();
-        zoomedOut = x == null || x[2] - x[0] > MAX_SPAN_LON;
-        if (zoomedOut) {
-            asked = null;
-            return;
+        for (String id : shown) {
+            urls.add(DebrisFlow.perimetersForFireUrl(id));
+            urls.add(DebrisFlow.basinsForFireUrl(id, 0));
         }
-        // Half the view again on every side, so a nudge does not ask again.
-        final double padX = (x[2] - x[0]) * 0.5, padY = (x[3] - x[1]) * 0.5;
-        final double[] box = { Math.max(-180, x[0] - padX), Math.max(-89, x[1] - padY),
-                Math.min(180, x[2] + padX), Math.min(89, x[3] + padY) };
-        asked = box;
-        if (focus != null && !focusInView())
-            focus = null;
-        final DebrisFlow.Fire f = focus;
-        askedFocus = f == null ? "" : f.id;
-        if (f != null) {
-            urls.add(DebrisFlow.perimetersForFireUrl(f.id));
-            urls.add(DebrisFlow.basinsForFireUrl(f.id, 0));
-            return;
-        }
-        final String since = TornadoPaths.ymd(System.currentTimeMillis() - DebrisFlow.KEEP_MS);
-        urls.add(DebrisFlow.perimetersUrl(box[0], box[1], box[2], box[3], since));
-        urls.add(DebrisFlow.basinsUrl(box[0], box[1], box[2], box[3], since, 0));
-    }
-
-    @Override
-    protected void onRefreshDone() {
-        if (dirty) {
-            dirty = false;
-            refresh(true);
-        }
-    }
-
-    @Override
-    public void refresh(boolean force) {
-        // A move that lands while an answer is on its way is not lost: it is asked
-        // for once this one is drawn.
-        if (force && isOn() && needsNewAsk())
-            dirty = true;
-        super.refresh(force);
     }
 
     @Override
@@ -255,7 +161,7 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
 
     @Override
     protected boolean large(int index) {
-        return index >= 2;
+        return index > 0;
     }
 
     @Override
@@ -308,8 +214,9 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
                 if (!f.rainfall.isEmpty())
                     d.append("\nDesign storm: a 15-minute burst at ")
                             .append(DebrisFlow.rainfallWords(f.rainfall));
-                d.append("\nShow the area draws the perimeter and the basins, each filled by how"
-                        + " likely a debris flow is and how much it would carry in that storm.");
+                d.append("\nShow the area draws this fire's perimeter and basins, each filled by"
+                        + " how likely a debris flow is and how much it would carry in that storm;"
+                        + " Hide the area takes them off.");
                 if (!f.url.isEmpty())
                     d.append("\nUSGS record: ").append(f.url);
                 d.append("\nFrom: USGS Landslide Hazards Program, emergency assessment");
@@ -325,7 +232,8 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
             }
             return out;
         }
-        if (index == 1) {
+        final String askedUrl = index < urls.size() ? urls.get(index) : "";
+        if (askedUrl.contains("/9/query")) {
             for (DebrisFlow.Perimeter p : DebrisFlow.parsePerimeters(body)) {
                 final double[] at = DebrisFlow.firstPoint(p.geometry);
                 final DebrisFlow.Fire f = at == null ? null
@@ -338,16 +246,12 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
             return out;
         }
         final List<DebrisFlow.Basin> got = DebrisFlow.parseBasins(body);
-        received += got.size();
-        if (!got.isEmpty() && com.atakmap.android.atmosphere.data.StormReports.exceeded(body)) {
-            final double[] a = asked;
-            final DebrisFlow.Fire ff = focus;
-            if (ff != null && ff.id.equals(askedFocus))
-                urls.add(DebrisFlow.basinsForFireUrl(ff.id, received));
-            else if (a != null)
-                urls.add(DebrisFlow.basinsUrl(a[0], a[1], a[2], a[3],
-                        TornadoPaths.ymd(now - DebrisFlow.KEEP_MS), received));
-        }
+        final String fireId = DebrisFlow.fireIdOf(askedUrl);
+        final int have = (received.containsKey(fireId) ? received.get(fireId) : 0) + got.size();
+        received.put(fireId, have);
+        if (!got.isEmpty() && !fireId.isEmpty()
+                && com.atakmap.android.atmosphere.data.StormReports.exceeded(body))
+            urls.add(DebrisFlow.basinsForFireUrl(fireId, have));
         for (DebrisFlow.Basin b : got) {
             if (b.hazard < 0)
                 continue;
@@ -399,46 +303,28 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
     @Override
     protected String summary(List<Area> areas) {
         final StringBuilder b = new StringBuilder();
-        final Set<String> inView = new LinkedHashSet<>();
+        final Set<String> names = new LinkedHashSet<>();
         int[] counts = new int[3];
         int basins = 0;
-        final double[] a = asked;
-        for (Area x : areas) {
+        for (Area x : areas)
             if (x.extra instanceof DebrisFlow.Basin) {
                 basins++;
                 counts[((DebrisFlow.Basin) x.extra).hazard]++;
-            } else if (x.extra instanceof DebrisFlow.Fire && a != null) {
-                final DebrisFlow.Fire f = (DebrisFlow.Fire) x.extra;
-                if (f.lon >= a[0] && f.lon <= a[2] && f.lat >= a[1] && f.lat <= a[3])
-                    inView.add(f.name);
             }
-        }
-        if (zoomedOut)
-            b.append("Zoom in to see the basins. ").append(firesNational)
-                    .append(" fires assessed in the last three years are marked.");
-        else if (basins == 0)
-            b.append("No post-fire assessment here. ").append(firesNational)
-                    .append(" fires assessed in the last three years are marked.");
-        else if (focus != null && focus.id.equals(askedFocus)) {
-            b.append("Showing the ").append(focus.name).append(" fire only: ").append(basins)
-                    .append(" basins, ").append(counts[2]).append(" high, ").append(counts[1])
-                    .append(" moderate, ").append(counts[0])
-                    .append(" low. Pan away from it for every burn in view.");
-        } else {
-            if (!inView.isEmpty()) {
-                b.append("Fires here: ");
-                int i = 0;
-                for (String n : inView) {
-                    if (i++ == 4) {
-                        b.append(" and ").append(inView.size() - 4).append(" more");
-                        break;
-                    }
-                    b.append(i > 1 ? ", " : "").append(n);
-                }
-                b.append(". ");
-            }
-            b.append(basins).append(" basins: ").append(counts[2]).append(" high, ")
-                    .append(counts[1]).append(" moderate, ").append(counts[0]).append(" low.");
+        for (DebrisFlow.Fire f : fires)
+            if (shown.contains(f.id))
+                names.add(f.name);
+        b.append(firesNational).append(" fires assessed in the last three years are marked.");
+        if (names.isEmpty())
+            b.append(" Tap a fire, then Show the area for its basins.");
+        else {
+            b.append(" Showing ");
+            int i = 0;
+            for (String n : names)
+                b.append(i++ > 0 ? ", " : "").append(n);
+            b.append(": ").append(basins).append(" basins, ").append(counts[2]).append(" high, ")
+                    .append(counts[1]).append(" moderate, ").append(counts[0])
+                    .append(" low. A fire's page hides its area again.");
         }
         b.append("\nHazard for one 15-minute burst of rain at the rate the USGS set for each fire;"
                 + " the burn stays hazardous for two to five years.");
