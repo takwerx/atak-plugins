@@ -124,8 +124,16 @@ public final class Camera {
     public boolean sees(double toLat, double toLon, double slackDeg) {
         if (!hasFov())
             return false;
-        return Math.abs(offCenter(toLat, toLon)) <= fov / 2 + slackDeg;
+        final double off = Math.abs(offCenter(toLat, toLon));
+        // Inside the lens, and not at its edge. A Mobotix fixed camera claims 90
+        // degrees, and a point 39 degrees off its center sat in a dark corner of
+        // the frame while the rule said "sees it" (Chino Hills Fixed South,
+        // 2026-10-11). Past 30 degrees off center a picture is not an answer.
+        return off <= fov / 2 + slackDeg && off <= MAX_OFF_CENTER_DEG;
     }
+
+    /** Degrees off center beyond which a camera is not said to see a point. */
+    public static final double MAX_OFF_CENTER_DEG = 30;
 
     /** Great-circle distance in meters, for the radius filters. */
     public double metersFrom(double fromLat, double fromLon) {
