@@ -57,6 +57,28 @@ public final class DebrisFlow {
                 + (offset > 0 ? "&resultOffset=" + offset : "");
     }
 
+    private static String fireWhere(String fireId) {
+        try {
+            return "where=" + java.net.URLEncoder.encode("fire_id='" + fireId.replace("'", "''") + "'", "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** One fire's perimeter, by its id, wherever it is. */
+    public static String perimetersForFireUrl(String fireId) {
+        return BASE + "9/query?" + fireWhere(fireId) + "&outFields=fire_id,start_date,assessment_date"
+                + "&outSR=4326&geometryPrecision=4&maxAllowableOffset=0.0005&f=geojson";
+    }
+
+    /** One fire's basins, by its id, from a row offset. */
+    public static String basinsForFireUrl(String fireId, int offset) {
+        return BASE + "4/query?" + fireWhere(fireId)
+                + "&outFields=BCH_Legend,BP_Legend,BV_Legend,fire_id,start_date,assessment_date"
+                + "&outSR=4326&geometryPrecision=4&maxAllowableOffset=0.0003&f=geojson"
+                + (offset > 0 ? "&resultOffset=" + offset : "");
+    }
+
     /** USGS's own: Low yellow, Moderate orange, High red. */
     public static final String[] HAZARDS = { "Low", "Moderate", "High" };
     public static final int[] COLORS = { 0xFFFFFF00, 0xFFFFAA00, 0xFFFF0000 };
