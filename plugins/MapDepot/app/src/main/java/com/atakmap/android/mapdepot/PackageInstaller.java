@@ -1260,17 +1260,29 @@ public final class PackageInstaller {
         }
     }
 
+    /**
+     * Same shape as RegionInstaller.inflate: the last chunk is held back and
+     * handed to digest(byte[]), because tak.gov's Fortify reads a bare
+     * digest() after an update loop as a digest with no data (the 1.12 scan
+     * flagged this method in its while-loop form).
+     */
     private static String sha256Of(File f) throws Exception {
         final java.security.MessageDigest md =
                 java.security.MessageDigest.getInstance("SHA-256");
         final byte[] buf = new byte[8192];
+        byte[] last;
         try (java.io.InputStream in = new java.io.FileInputStream(f)) {
-            int n;
-            while ((n = in.read(buf)) > 0)
-                md.update(buf, 0, n);
+            int n = in.read(buf);
+            if (n <= 0)
+                throw new IllegalStateException("empty download");
+            last = java.util.Arrays.copyOf(buf, n);
+            while ((n = in.read(buf)) > 0) {
+                md.update(last);
+                last = java.util.Arrays.copyOf(buf, n);
+            }
         }
         final StringBuilder hex = new StringBuilder();
-        for (byte b : md.digest())
+        for (byte b : md.digest(last))
             hex.append(String.format("%02x", b));
         return hex.toString();
     }
