@@ -723,6 +723,12 @@ public final class FireModel {
             r.groundNote = "The ground run did not take: the start sits on ground that does not burn. This is the one-fuel ellipse.";
             return;
         }
+        if (g.cellsSeen <= 4) {
+            r.problem = "The fire cannot leave the start: LANDFIRE marks the ground around it as urban, paved or bare in "
+                    + "30 m cells, and this model does not spot across that. Move the start onto open fuel, "
+                    + "or a few hundred feet into the brush, and run again.";
+            return;
+        }
         r.ground = g;
         if (!skipStructures)
             countStructures(r);

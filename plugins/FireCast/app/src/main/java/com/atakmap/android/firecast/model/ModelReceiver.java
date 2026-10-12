@@ -148,8 +148,16 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
     }
 
+    private FireModel.Run lastSeen;
+
     @Override
     public void onModelChanged() {
+        // A run that just finished is the one to look at.
+        final FireModel.Run newest = model.last();
+        if (newest != null && newest != lastSeen) {
+            lastSeen = newest;
+            shown = newest;
+        }
         if (isVisible())
             render();
     }
