@@ -341,10 +341,10 @@ public final class CamDepotPane implements CameraStore.Listener {
      * How far a camera is trusted to see the point, in the operator's big unit.
      * 0 means the bearing line's length. The first cut used the bearing line (37
      * mi) and a point near Keller Peak got 33 cameras "seeing" it, most of them
-     * 20-30 mi out with a wide lens: true, and useless. 20 mi is the operator's
-     * number (2026-10-11): the cameras sit on ridge tops and a column carries.
+     * 20-30 mi out with a wide lens: true, and useless. 10 mi is the operator's
+     * number (2026-10-11, after a day at 20: "20 miles too far").
      */
-    private double lookReachBig = 20;
+    private double lookReachBig = 10;
     private static final int[] LOOK_REACH_PRESETS = { 2, 5, 10, 20, 40, 0 };
     private TextView lookAtLabel;
     /** The cameras the last apply() judged to see {@link #lookAt}; for Show Bearings. */
@@ -1063,7 +1063,7 @@ public final class CamDepotPane implements CameraStore.Listener {
     private static final String PREF_LOOK_REACH = "camdepot_look_reach_big";
     /** Bumped when the default changes, so a phone still on the old default moves. */
     private static final String PREF_LOOK_REACH_GEN = "camdepot_look_reach_gen";
-    private static final int LOOK_REACH_GEN = 2;
+    private static final int LOOK_REACH_GEN = 3;
 
     /**
      * Starting points, expressed as what the scale bar would read — the same
@@ -1156,12 +1156,13 @@ public final class CamDepotPane implements CameraStore.Listener {
             if (p.getBoolean(PREF_FROM_MAP, false))
                 center = mapView.getPoint().get();
             setRadiusFromProgress(savedRadius);
-            lookReachBig = p.getFloat(PREF_LOOK_REACH, 20f);
-            // The first build defaulted to 10 and saved it. Once, move that to 20;
-            // a value the operator picked themselves is any other number.
+            lookReachBig = p.getFloat(PREF_LOOK_REACH, 10f);
+            // The default was 10, then 20 for an afternoon, and is 10 again. A
+            // phone still carrying the 20 default moves back once; a value the
+            // operator picked themselves is any other number.
             if (p.getInt(PREF_LOOK_REACH_GEN, 1) < LOOK_REACH_GEN) {
-                if (Math.round(lookReachBig) == 10)
-                    lookReachBig = 20;
+                if (Math.round(lookReachBig) == 20)
+                    lookReachBig = 10;
                 p.edit().putInt(PREF_LOOK_REACH_GEN, LOOK_REACH_GEN).apply();
             }
             final String la = p.getString(PREF_LOOK_AT, "");
