@@ -736,6 +736,7 @@ public final class AtmospherePane {
                 reportsPage.view(),
                 rainPage.view()
         };
+        wireGroupFolds(pages[LAYERS_PAGE]);
         pager = root.findViewById(R.id.pager);
         pagePrev = root.findViewById(R.id.page_prev);
         pageNext = root.findViewById(R.id.page_next);
@@ -5791,7 +5792,83 @@ public final class AtmospherePane {
                 .show();
     }
 
+    /**
+     * The Layers page's groups fold: a tap on a group heading hides or shows every
+     * block under it, remembered per group (operator, 2026-10-12: "it's getting to
+     * be a very long side pane window"). The page is flat, a heading then its
+     * blocks, so the members of a group are the siblings up to the next heading.
+     */
+    private static final int[] GROUP_NAMES = { R.string.group_wind, R.string.group_storms,
+            R.string.group_fire, R.string.group_rain, R.string.group_ocean, R.string.group_snow,
+            R.string.group_ground };
+    private final java.util.Map<Integer, TextView> groupHeads = new java.util.LinkedHashMap<>();
+    private final java.util.Map<Integer, java.util.List<View>> groupMembers = new java.util.LinkedHashMap<>();
+
+    private static TextView findHeading(View v, String text) {
+        if (v instanceof TextView && text.contentEquals(((TextView) v).getText()))
+            return (TextView) v;
+        if (v instanceof android.view.ViewGroup) {
+            final android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                final TextView t = findHeading(g.getChildAt(i), text);
+                if (t != null)
+                    return t;
+            }
+        }
+        return null;
+    }
+
+    private void wireGroupFolds(View layersPage) {
+        final TextView first = findHeading(layersPage, pluginContext.getString(GROUP_NAMES[0]));
+        if (first == null || !(first.getParent() instanceof android.view.ViewGroup))
+            return;
+        final android.view.ViewGroup parent = (android.view.ViewGroup) first.getParent();
+        final java.util.Map<String, Integer> byText = new java.util.HashMap<>();
+        for (int id : GROUP_NAMES)
+            byText.put(pluginContext.getString(id), id);
+        Integer current = null;
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            final View child = parent.getChildAt(i);
+            final Integer key = child instanceof TextView
+                    ? byText.get(((TextView) child).getText().toString()) : null;
+            if (key != null) {
+                current = key;
+                groupHeads.put(key, (TextView) child);
+                groupMembers.put(key, new java.util.ArrayList<View>());
+                final int k = key;
+                child.setClickable(true);
+                child.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        final SharedPreferences p = MapCompat.prefs();
+                        final boolean open = p == null || p.getBoolean(groupPref(k), true);
+                        if (p != null)
+                            p.edit().putBoolean(groupPref(k), !open).apply();
+                        applyGroupFolds();
+                    }
+                });
+            } else if (current != null)
+                groupMembers.get(current).add(child);
+        }
+        applyGroupFolds();
+    }
+
+    private String groupPref(int nameId) {
+        return "weather.group." + pluginContext.getResources().getResourceEntryName(nameId) + ".open";
+    }
+
+    private void applyGroupFolds() {
+        final SharedPreferences p = MapCompat.prefs();
+        for (java.util.Map.Entry<Integer, TextView> e : groupHeads.entrySet()) {
+            final boolean open = p == null || p.getBoolean(groupPref(e.getKey()), true);
+            e.getValue().setText(pluginContext.getString(e.getKey()) + (open ? "  \u25BE" : "  \u25B8"));
+            for (View v : groupMembers.get(e.getKey()))
+                v.setVisibility(open ? View.VISIBLE : View.GONE);
+        }
+    }
+
     private void updateLayerControls() {
+        applyGroupFolds();
         final boolean radarOn = radar != null && radar.isOn();
         final boolean windOn = wind != null && wind.isOn();
         radarToggle.setText(radarOn ? R.string.radar_on : R.string.radar_off);
