@@ -433,6 +433,12 @@ public class Atmosphere implements IPlugin {
                     }
 
                     @Override
+                    public void showFire(String ref) {
+                        if (debrisflow != null)
+                            debrisflow.showFire(ref);
+                    }
+
+                    @Override
                     public void openBuoy(String id) {
                         if (atmospherePane == null)
                             showPane();

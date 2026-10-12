@@ -9,6 +9,7 @@ import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.maps.assets.Icon;
 import com.atakmap.coremap.maps.coords.GeoBounds;
+import com.atakmap.coremap.maps.coords.GeoPoint;
 import com.atakmap.map.AtakMapView;
 import com.atakmap.map.layer.feature.AttributeSet;
 import com.atakmap.map.layer.feature.geometry.Geometry;
@@ -113,6 +114,36 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
             asked = null;
             dirty = false;
         }
+    }
+
+    /** What a fire's marker carries so its details page can bring the map to it. */
+    static String fireRef(DebrisFlow.Fire f) {
+        return "fire:" + (f.id.isEmpty() ? String.format(Locale.US, "%.4f,%.4f", f.lat, f.lon) : f.id);
+    }
+
+    /** Screen meters per pixel that puts a burn's basins on screen: a 5 to 10 mile scale bar. */
+    private static final double FIRE_VIEW_RESOLUTION = 30d;
+
+    /**
+     * Brings the map to a fire from its details page, close enough that the layer
+     * fetches and draws its perimeter and basins once the map settles (operator,
+     * 2026-10-12: "at first it is just the icon ... then in there you have a button
+     * for show the area for that incident").
+     */
+    public boolean showFire(String ref) {
+        if (ref == null || !isOn())
+            return false;
+        for (DebrisFlow.Fire f : fires)
+            if (ref.equals(fireRef(f))) {
+                try {
+                    mapView.getMapController().panZoomTo(new GeoPoint(f.lat, f.lon),
+                            mapView.mapResolutionAsMapScale(FIRE_VIEW_RESOLUTION), true);
+                } catch (LinkageError | RuntimeException e) {
+                    mapView.getMapController().panTo(new GeoPoint(f.lat, f.lon), true);
+                }
+                return true;
+            }
+        return false;
     }
 
     /** The map's extent, {west, south, east, north}, or null when it cannot be read. */
@@ -244,8 +275,8 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
                 if (!f.rainfall.isEmpty())
                     d.append("\nDesign storm: a 15-minute burst at ")
                             .append(DebrisFlow.rainfallWords(f.rainfall));
-                d.append("\nZoom in for the basins: each is filled by how likely a debris flow is"
-                        + " and how much it would carry in that storm.");
+                d.append("\nShow the area draws the perimeter and the basins, each filled by how"
+                        + " likely a debris flow is and how much it would carry in that storm.");
                 if (!f.url.isEmpty())
                     d.append("\nUSGS record: ").append(f.url);
                 d.append("\nFrom: USGS Landslide Hazards Program, emergency assessment");
@@ -256,7 +287,8 @@ public final class DebrisFlowOverlay extends OutlookOverlay {
                 } catch (Exception e) {
                     continue;
                 }
-                out.add(new Area(1, title, FIRES, DebrisFlow.FIRE_COLOR, g, d.toString(), "", f));
+                out.add(new Area(1, title, FIRES, DebrisFlow.FIRE_COLOR, g, d.toString(),
+                        fireRef(f), f));
             }
             return out;
         }

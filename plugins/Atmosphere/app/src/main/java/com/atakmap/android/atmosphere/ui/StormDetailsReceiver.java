@@ -73,6 +73,9 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
 
         /** A Predictive Service Area opens its fire danger and its GACC's chart ("SC08"). */
         void openErc(String code);
+
+        /** A debris-flow fire's "Show the area": the map goes to the burn and its basins draw. */
+        void showFire(String ref);
     }
 
     private static SpotOpener spotOpener;
@@ -148,6 +151,23 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         ((TextView) view.findViewById(R.id.details_subtitle))
                 .setText(item.getMetaString("storm_set", ""));
         ((TextView) view.findViewById(R.id.details_attributes)).setText(body);
+        // A fire's page carries the one action its marker is for: bring the map to the
+        // burn and let the layer draw its basins.
+        final android.widget.Button action = view.findViewById(R.id.details_action);
+        final String ref = item.getMetaString("atmosphereRef", "");
+        if (action != null) {
+            if (ref.startsWith("fire:") && spotOpener != null) {
+                action.setVisibility(android.view.View.VISIBLE);
+                action.setOnClickListener(new android.view.View.OnClickListener() {
+                    @Override
+                    public void onClick(android.view.View v) {
+                        closeDropDown();
+                        spotOpener.showFire(ref);
+                    }
+                });
+            } else
+                action.setVisibility(android.view.View.GONE);
+        }
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
     }
 
