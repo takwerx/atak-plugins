@@ -233,10 +233,24 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         final Behave.Result o = r.result;
         final StringBuilder goes = new StringBuilder();
         if (r.ground != null) {
-            for (int min : FireModel.STEPS_MIN)
-                goes.append(min).append(" min: ").append(acres(r.acres(min)))
+            for (int i = 0; i < FireModel.STEPS_MIN.length; i++) {
+                final int min = FireModel.STEPS_MIN[i];
+                goes.append(clock(r.ranAt + min * 60000L)).append(" (").append(min).append(" min): ").append(acres(r.acres(min)))
                         .append(", farthest ").append(Units.format(r.headM(min)))
-                        .append(" to the ").append(Units.compass(r.headDeg(min))).append(".\n");
+                        .append(" to the ").append(Units.compass(r.headDeg(min)));
+                if (r.structures != null) {
+                    goes.append("; ").append(r.structures[i]).append(r.structures[i] == 1 ? " structure" : " structures");
+                    if (r.homes[i] > 0)
+                        goes.append(" (").append(r.homes[i]).append(r.homes[i] == 1 ? " home)" : " homes)");
+                    if (r.people[i] >= 1)
+                        goes.append(", about ").append(Math.round(r.people[i])).append(" people");
+                }
+                goes.append(".\n");
+            }
+            if (r.structureNote != null)
+                goes.append(r.structureNote).append('\n');
+            else if (r.structures != null)
+                goes.append("Structures and people from FEMA's national building inventory; a building counts when the fire reaches the ground beside it.\n");
             goes.append(String.format(Locale.US, "Across the ground: %d fuel%s crossed in %d cells of 30 m; roads, water and bare ground stop it. "
                     + "At the start the head would run toward %s at %s.",
                     r.ground.fuelsCrossed, r.ground.fuelsCrossed == 1 ? "" : "s", r.ground.cellsSeen,
@@ -307,6 +321,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         }
         section("What went in", in.toString());
         section("When", FireModel.stamp(r.ranAt) + " run");
+    }
+
+    private static String clock(long t) {
+        return new java.text.SimpleDateFormat("HH:mm", Locale.US).format(new java.util.Date(t));
     }
 
     private static String acres(double a) {

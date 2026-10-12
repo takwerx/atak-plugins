@@ -102,6 +102,10 @@ public final class FireModel {
         public String groundNote;
         /** The grid's reach each way from the start, km. */
         public double halfKm = HALF_KM;
+        /** Buildings reached by each step, homes among them, and people, from FEMA's inventory; null when not fetched. */
+        public int[] structures, homes;
+        public double[] people;
+        public String structureNote;
         /** On the map, or hidden by its switch. Hidden is not deleted. */
         public boolean visible = true;
 
@@ -113,6 +117,8 @@ public final class FireModel {
             if (result != null)
                 sb.append(String.format(Locale.US, ", %.0f mph from %s, %s in 1 h", windMph, Units.compass(windFromDeg),
                         acres(60) < 10 ? String.format(Locale.US, "%.1f ac", acres(60)) : String.format(Locale.US, "%,.0f ac", acres(60))));
+            if (structures != null)
+                sb.append(", ").append(structures[STEPS_MIN.length - 1]).append(" bldg");
             if (!COND_OBSERVED.equals(conditions))
                 sb.append(", ").append(conditionsLabel(conditions).toLowerCase(Locale.US));
             return sb.toString();
@@ -658,6 +664,17 @@ public final class FireModel {
      * cell by cell. Falls back to the ellipse, and says so, when the ground cannot
      * be had (no network and nothing on disk). Worker thread.
      */
+    private void acrossTheGroundNoStructures(final Run r) {
+        skipStructures = true;
+        try {
+            acrossTheGround(r);
+        } finally {
+            skipStructures = false;
+        }
+    }
+
+    private boolean skipStructures;
+
     private void acrossTheGround(final Run r) {
         final Landscape land;
         try {
@@ -689,6 +706,72 @@ public final class FireModel {
             return;
         }
         r.ground = g;
+        if (!skipStructures)
+            countStructures(r);
+    }
+
+    /**
+     * What the fire reaches: FEMA's building inventory inside the hour's reach, each
+     * building placed in the step its cell is reached. Worker thread; a failed fetch
+     * leaves the counts out and says so, never zero.
+     */
+    private void countStructures(Run r) {
+        final Spread.Result g = r.ground;
+        // The box the hour ring fits in, a cell of margin each way.
+        double s = Double.MAX_VALUE, w = Double.MAX_VALUE, n = -Double.MAX_VALUE, e = -Double.MAX_VALUE;
+        final int last = STEPS_MIN[STEPS_MIN.length - 1];
+        for (int y = 0; y < g.ny; y++)
+            for (int x = 0; x < g.nx; x++) {
+                if (g.arrival[y * g.nx + x] > last)
+                    continue;
+                s = Math.min(s, g.lat0 + y * g.dLat);
+                n = Math.max(n, g.lat0 + (y + 1) * g.dLat);
+                w = Math.min(w, g.lon0 + x * g.dLon);
+                e = Math.max(e, g.lon0 + (x + 1) * g.dLon);
+            }
+        if (s > n) {
+            r.structureNote = "Nothing reached in the hour.";
+            return;
+        }
+        final List<Structures.Building> buildings;
+        try {
+            buildings = Structures.within(s - g.dLat, w - g.dLon, n + g.dLat, e + g.dLon);
+        } catch (Exception ex) {
+            Log.w(TAG, "structures failed", ex);
+            r.structureNote = "Structures not counted: the building inventory could not be reached.";
+            return;
+        }
+        final int[] count = new int[STEPS_MIN.length], homes = new int[STEPS_MIN.length];
+        final double[] people = new double[STEPS_MIN.length];
+        for (Structures.Building b : buildings) {
+            final int x = (int) Math.floor((b.lon - g.lon0) / g.dLon), y = (int) Math.floor((b.lat - g.lat0) / g.dLat);
+            if (x < 0 || y < 0 || x >= g.nx || y >= g.ny)
+                continue;
+            // A building's own cell is urban and never burns; the fire reaches the
+            // building when it reaches any cell touching it.
+            float t = Float.POSITIVE_INFINITY;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++) {
+                    final int xx = x + dx, yy = y + dy;
+                    if (xx >= 0 && yy >= 0 && xx < g.nx && yy < g.ny)
+                        t = Math.min(t, g.arrival[yy * g.nx + xx]);
+                }
+            for (int i = 0; i < STEPS_MIN.length; i++) {
+                if (t <= STEPS_MIN[i]) {
+                    count[i]++;
+                    if (b.residential())
+                        homes[i]++;
+                    people[i] += b.population;
+                }
+            }
+        }
+        r.structures = count;
+        r.homes = homes;
+        r.people = people;
+        r.structureNote = buildings.size() >= Structures.MAX
+                ? "The inventory stopped at " + Structures.MAX + " buildings, so these counts are a floor."
+                : null;
+        Log.d(TAG, "structures: " + buildings.size() + " in the box, " + count[STEPS_MIN.length - 1] + " reached in the hour");
     }
 
     /** The one judgment on a run's numbers: no spread is a sentence, not a zero. */
@@ -996,6 +1079,17 @@ public final class FireModel {
                     .put("tenMeterWind", r.tenMeterWind).put("moistureNote", r.moistureNote);
             o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions)
                     .put("visible", r.visible).put("ground", r.ground != null).put("halfKm", r.halfKm);
+            if (r.structures != null) {
+                final org.json.JSONArray st = new org.json.JSONArray(), hm = new org.json.JSONArray(), pp = new org.json.JSONArray();
+                for (int i = 0; i < STEPS_MIN.length; i++) {
+                    st.put(r.structures[i]);
+                    hm.put(r.homes[i]);
+                    pp.put(r.people[i]);
+                }
+                o.put("structures", st).put("homes", hm).put("people", pp);
+            }
+            if (r.structureNote != null)
+                o.put("structureNote", r.structureNote);
             if (r.weather != null) {
                 o.put("station", r.weather.station).put("observedAt", r.weather.observedAt)
                         .put("rh", r.weather.relativeHumidity).put("tempF", r.weather.airTempF)
@@ -1079,8 +1173,23 @@ public final class FireModel {
             finish(r);
             if (r.problem != null)
                 return null;
-            if (o.optBoolean("ground", false))
-                acrossTheGround(r);   // the grids are on disk, so this needs no network
+            if (o.optBoolean("ground", false)) {
+                // The grids are on disk, so the ground run needs no network; the
+                // building counts are kept from the run, not fetched again.
+                final org.json.JSONArray st = o.optJSONArray("structures"), hm = o.optJSONArray("homes"), pp = o.optJSONArray("people");
+                acrossTheGroundNoStructures(r);
+                if (st != null && hm != null && pp != null && st.length() == STEPS_MIN.length) {
+                    r.structures = new int[STEPS_MIN.length];
+                    r.homes = new int[STEPS_MIN.length];
+                    r.people = new double[STEPS_MIN.length];
+                    for (int i = 0; i < STEPS_MIN.length; i++) {
+                        r.structures[i] = st.optInt(i);
+                        r.homes[i] = hm.optInt(i);
+                        r.people[i] = pp.optDouble(i, 0);
+                    }
+                }
+                r.structureNote = o.optString("structureNote", null);
+            }
             return r;
         } catch (Exception e) {
             Log.w(TAG, "could not read a saved model run", e);
