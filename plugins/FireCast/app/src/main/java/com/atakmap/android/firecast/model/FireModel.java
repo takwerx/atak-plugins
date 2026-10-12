@@ -347,6 +347,10 @@ public final class FireModel {
         try {
             synchronized (lock) {
                 attachLocked();
+                // The store is rebuilt from the save file below; whatever the last
+                // session left in it would otherwise sit beside the rebuilt sets as
+                // rings no row owns and no Delete can reach (dev 1, 2026-10-11).
+                dropAllLocked();
             }
         } catch (Exception e) {
             Log.e(TAG, "could not put the model layer on the map", e);
@@ -769,10 +773,17 @@ public final class FireModel {
     private void dropLocked(Run r) {
         if (store == null || r == null || r.fsid <= 0)
             return;
+        boolean bulk = false;
         try {
+            store.acquireModifyLock(true);
+            bulk = true;
             store.deleteFeatureSet(r.fsid);
+            Log.d(TAG, "model run dropped: set " + r.fsid);
         } catch (Exception e) {
             Log.w(TAG, "model drop failed", e);
+        } finally {
+            if (bulk)
+                store.releaseModifyLock();
         }
         r.fsid = 0;
     }
@@ -781,7 +792,10 @@ public final class FireModel {
     private void dropAllLocked() {
         if (store == null)
             return;
+        boolean bulk = false;
         try {
+            store.acquireModifyLock(true);
+            bulk = true;
             final List<Long> old = new ArrayList<>();
             final FeatureSetCursor c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
             try {
@@ -792,8 +806,12 @@ public final class FireModel {
             }
             for (Long id : old)
                 store.deleteFeatureSet(id);
+            Log.d(TAG, "model store emptied: " + old.size() + " sets");
         } catch (Exception e) {
             Log.w(TAG, "model drop all failed", e);
+        } finally {
+            if (bulk)
+                store.releaseModifyLock();
         }
     }
 
