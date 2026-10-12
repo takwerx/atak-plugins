@@ -659,7 +659,7 @@ only.
 = Rain Gauges
 
 *Rain Gauges* draws three kinds of gauge, each a dot in the color of its
-last 24 hours with the inches in the pill: the USGS gauges around the map
+last 24 hours with the name and the inches in the pill: the USGS gauges around the map
 (white ring, the day by the hour on tap), the CoCoRaHS volunteer gauges of
 the state under the map (cyan ring, read once a day around 7 am), and the
 forecast office's own report gauges (dark ring). The map's extent and the

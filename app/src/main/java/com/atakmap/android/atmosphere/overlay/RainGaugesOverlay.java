@@ -423,8 +423,8 @@ public final class RainGaugesOverlay extends OutlookOverlay {
     protected AtmosphereFeatures.Drawn drawn(Area a, Geometry g, AttributeSet s) {
         if (a.extra instanceof ReportGauge) {
             final ReportGauge r = (ReportGauge) a.extra;
-            final Icon icon = icons.labelled(Double.isNaN(r.inches) ? "T" : inches(r.inches), a.color,
-                    0xFF202020, 12);
+            final Icon icon = icons.labelled(pill(r.name, Double.isNaN(r.inches) ? "T" : inches(r.inches)),
+                    a.color, 0xFF202020, 12);
             if (icon == null)
                 return null;
             return new AtmosphereFeatures.Drawn(setName(a), a.title, g,
@@ -433,7 +433,7 @@ public final class RainGaugesOverlay extends OutlookOverlay {
         }
         if (a.extra instanceof CocoRahs.Report) {
             final CocoRahs.Report r = (CocoRahs.Report) a.extra;
-            final Icon icon = icons.labelled(r.trace ? "T" : inches(r.inches), a.color,
+            final Icon icon = icons.labelled(pill(r.name, r.trace ? "T" : inches(r.inches)), a.color,
                     COCORAHS_RING, 14);
             if (icon == null)
                 return null;
@@ -444,12 +444,26 @@ public final class RainGaugesOverlay extends OutlookOverlay {
         if (!(a.extra instanceof UsgsRain.Gauge))
             return null;
         final UsgsRain.Gauge gauge = (UsgsRain.Gauge) a.extra;
-        final Icon icon = icons.labelled(inches(gauge.total), a.color, 0xFFFFFFFF, 14);
+        final Icon icon = icons.labelled(pill(gauge.name, inches(gauge.total)), a.color, 0xFFFFFFFF, 14);
         if (icon == null)
             return null;
         return new AtmosphereFeatures.Drawn(setName(a), a.title, g,
                 AtmosphereFeatures.icon(icon.getImageUri(Icon.STATE_DEFAULT), icon.getWidth(),
                         icon.getHeight()), s);
+    }
+
+    /**
+     * The pill: the gauge's name then the inches, so two gauges with the same amount
+     * read apart on the map (operator, 2026-10-12: "it has to zoom way in if you're not
+     * going to attach a name to the label"). Long USGS names are cut to the first words.
+     */
+    static String pill(String name, String amount) {
+        String n = name == null ? "" : name.trim();
+        if (n.length() > 24) {
+            final int sp = n.lastIndexOf(' ', 24);
+            n = (sp > 8 ? n.substring(0, sp) : n.substring(0, 24)).trim();
+        }
+        return n.isEmpty() ? amount : n + " " + amount;
     }
 
     @Override

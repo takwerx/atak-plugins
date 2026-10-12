@@ -451,7 +451,8 @@ where it poured and a gauge for how much. The **Transparency** slider lets the
 map show through. Lower 48 only.
 
 **Rain Gauges** draws three kinds of gauge, each a dot in the color of its
-last 24 hours with the inches in the pill. White-ringed: the USGS rain gauges
+last 24 hours with the gauge's name and the inches in the pill, "Palomar CRS
+6.20 in". White-ringed: the USGS rain gauges
 around the map, the day by the hour behind a tap. Cyan-ringed: the CoCoRaHS
 volunteer gauges of the states under the map (the center and the corners, so a
 state line shows both sides), each read once a day
