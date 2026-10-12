@@ -613,14 +613,10 @@ public class DetectionFeed {
      * detection that is not there.
      */
     private static Geometry footprintGeometry(HeatDetection d) {
-        final Geometry fp = d.footprint.geometry(d.lat, d.lon);
-        if (d.footprint.kind == Footprint.Kind.MAPPED)
-            return fp;
-        final com.atakmap.map.layer.feature.geometry.GeometryCollection gc =
-                new com.atakmap.map.layer.feature.geometry.GeometryCollection(2);
-        gc.addGeometry(fp);
-        gc.addGeometry(new com.atakmap.map.layer.feature.geometry.Point(d.lon, d.lat));
-        return gc;
+        // The footprint alone. A center Point used to ride along in a collection so the
+        // detection had a mark at any zoom; without a point style the renderer would
+        // give that Point its default 32 px icon, so the Point goes with the dot.
+        return d.footprint.geometry(d.lat, d.lon);
     }
 
     /**
