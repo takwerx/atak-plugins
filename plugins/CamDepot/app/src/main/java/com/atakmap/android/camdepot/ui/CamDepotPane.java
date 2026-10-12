@@ -249,6 +249,90 @@ public final class CamDepotPane implements CameraStore.Listener {
     private static final double LOOK_AT_SLACK_DEG = 10;
     private Button lookAtButton, lookAtBearingsButton, lookReachButton;
     /**
+     * True while the next tap on the map is the point. The map's "center" was
+     * tried first and is wrong with the pane open: ATAK's focus point is the
+     * center of the whole screen, under the pane, not the crosshair on the half
+     * the operator can see, so the point landed miles from the fire they had
+     * framed (2026-10-11). ATAK's own tools take a tap: push the dispatcher's
+     * listeners, own MAP_CLICK and ITEM_CLICK, pop them when done
+     * (RangeAndBearingEndpointMoveTool is the reference).
+     */
+    private boolean picking;
+    private final com.atakmap.android.maps.MapEventDispatcher.MapEventDispatchListener
+            pickListener = new com.atakmap.android.maps.MapEventDispatcher
+                    .MapEventDispatchListener() {
+        @Override
+        public void onMapEvent(com.atakmap.android.maps.MapEvent event) {
+            GeoPoint gp = null;
+            if (com.atakmap.android.maps.MapEvent.MAP_CLICK.equals(event.getType())) {
+                final android.graphics.PointF pf = event.getPointF();
+                if (pf != null)
+                    gp = mapView.inverseWithElevation(pf.x, pf.y).get();
+            } else if (com.atakmap.android.maps.MapEvent.ITEM_CLICK
+                    .equals(event.getType())) {
+                // A tap on the fire's own marker is the best answer there is.
+                final com.atakmap.android.maps.MapItem item = event.getItem();
+                if (item instanceof com.atakmap.android.maps.PointMapItem)
+                    gp = ((com.atakmap.android.maps.PointMapItem) item).getPoint();
+                else if (item instanceof com.atakmap.android.maps.Shape)
+                    gp = ((com.atakmap.android.maps.Shape) item).getClickPoint();
+                // Let the dispatcher treat an unhandled item tap as a map tap.
+                event.getExtras().putBoolean("eventNotHandled", gp == null);
+            }
+            if (gp == null)
+                return;
+            final GeoPoint chosen = gp;
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    endPick();
+                    lookAt = chosen;
+                    updateLookAtControls();
+                    apply();
+                }
+            });
+        }
+    };
+
+    private void beginPick() {
+        if (picking)
+            return;
+        picking = true;
+        try {
+            final com.atakmap.android.maps.MapEventDispatcher d =
+                    mapView.getMapEventDispatcher();
+            d.pushListeners();
+            d.clearListeners(com.atakmap.android.maps.MapEvent.MAP_CLICK);
+            d.clearListeners(com.atakmap.android.maps.MapEvent.ITEM_CLICK);
+            d.clearListeners(com.atakmap.android.maps.MapEvent.ITEM_LONG_PRESS);
+            d.addMapEventListener(com.atakmap.android.maps.MapEvent.MAP_CLICK,
+                    pickListener);
+            d.addMapEventListener(com.atakmap.android.maps.MapEvent.ITEM_CLICK,
+                    pickListener);
+            mapView.getMapTouchController().setToolActive(true);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not take the map for a tap", e);
+            picking = false;
+            return;
+        }
+        Toast.makeText(mapView.getContext(), "Tap the fire on the map",
+                Toast.LENGTH_SHORT).show();
+        updateLookAtControls();
+    }
+
+    private void endPick() {
+        if (!picking)
+            return;
+        picking = false;
+        try {
+            mapView.getMapEventDispatcher().popListeners();
+            mapView.getMapTouchController().setToolActive(false);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "could not give the map back", e);
+        }
+        updateLookAtControls();
+    }
+    /**
      * How far a camera is trusted to see the point, in the operator's big unit.
      * 0 means the bearing line's length. The first cut used the bearing line (37
      * mi) and a point near Keller Peak got 33 cameras "seeing" it, most of them
@@ -479,6 +563,7 @@ public final class CamDepotPane implements CameraStore.Listener {
     }
 
     public void dispose() {
+        endPick();
         handler.removeCallbacks(refreshTick);
         handler.removeCallbacks(labelTick);
         mapView.removeOnMapMovedListener(zoomWatch);
@@ -853,14 +938,19 @@ public final class CamDepotPane implements CameraStore.Listener {
         lookAtButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // Rotates like the radius "Measuring from" button: the first tap
-                // takes the crosshair, the second clears. The pane covers the map
-                // on a phone, so the operator centers the spot first and then
-                // presses; tapping the map itself is not available while the pane
-                // is open.
-                lookAt = lookAt == null ? mapView.getPoint().get() : null;
-                updateLookAtControls();
-                apply();
+                // Three states: off (tap to start picking), picking (tap to
+                // cancel), on (tap to clear).
+                if (picking) {
+                    endPick();
+                    return;
+                }
+                if (lookAt != null) {
+                    lookAt = null;
+                    updateLookAtControls();
+                    apply();
+                    return;
+                }
+                beginPick();
             }
         });
 
@@ -1826,7 +1916,8 @@ public final class CamDepotPane implements CameraStore.Listener {
             return;
         if (lookAt == null) {
             lookAtLabel.setVisibility(View.GONE);
-            lookAtButton.setText("Look At Map Center");
+            lookAtButton.setText(picking ? "Tap the Map\u2026 (Cancel)"
+                    : "Look At a Point");
             // Gone, not greyed: a grey "Show Bearings" above a grey "No bearings
             // shown" read as two switches saying no (operator, 2026-10-11).
             lookAtBearingsButton.setVisibility(View.GONE);
