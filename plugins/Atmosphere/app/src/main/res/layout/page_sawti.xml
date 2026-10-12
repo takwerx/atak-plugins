@@ -16,13 +16,10 @@
         android:paddingBottom="8dp">
 
         <TextView
+            style="@style/TakwerxSectionHeading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/heading_sawti"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:paddingTop="8dp"
-            android:alpha="0.6" />
+            android:text="@string/heading_sawti" />
 
         <!-- Before the operator has allowed it: what it is and one button. -->
         <LinearLayout
@@ -103,13 +100,11 @@
                 android:orientation="horizontal" />
 
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="@string/heading_sawti_event"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="@string/heading_sawti_event" />
 
             <TextView
                 android:id="@+id/sawti_event"
@@ -120,13 +115,11 @@
                 android:text="" />
 
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="@string/heading_sawti_actions"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="@string/heading_sawti_actions" />
 
             <TextView
                 android:id="@+id/sawti_actions"
@@ -143,13 +136,11 @@
                 android:orientation="vertical" />
 
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="@string/heading_sawti_table"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="@string/heading_sawti_table" />
 
             <LinearLayout
                 android:id="@+id/sawti_table"

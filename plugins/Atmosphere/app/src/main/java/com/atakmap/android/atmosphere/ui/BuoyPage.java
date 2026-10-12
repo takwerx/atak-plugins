@@ -760,10 +760,10 @@ public final class BuoyPage {
         row.setOrientation(LinearLayout.VERTICAL);
         row.setPadding(0, dp(5), 0, dp(1));
         final TextView l = new TextView(pluginContext);
-        l.setTextSize(10);
+        l.setTextSize(12f);
         l.setAllCaps(true);
-        l.setAlpha(0.6f);
-        l.setTextColor(0xFFFFFFFF);
+        l.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        l.setTextColor(0xFF00E5FF);
         l.setText(label);
         final TextView v = new TextView(pluginContext);
         v.setTextSize(15);

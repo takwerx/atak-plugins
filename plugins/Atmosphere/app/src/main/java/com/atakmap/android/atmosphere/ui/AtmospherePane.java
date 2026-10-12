@@ -4749,10 +4749,10 @@ public final class AtmospherePane {
     /** A small caps heading inside the guide, the pane's own convention. */
     private View guideHeading(String text) {
         final TextView t = new TextView(pluginContext);
-        t.setTextColor(Color.WHITE);
-        t.setTextSize(10);
+        t.setTextColor(0xFF00E5FF);
+        t.setTextSize(12f);
         t.setAllCaps(true);
-        t.setAlpha(0.6f);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
         t.setPadding(0, dp(10), 0, dp(2));
         t.setText(text);
         return t;

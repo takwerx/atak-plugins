@@ -16,13 +16,10 @@
         android:paddingBottom="8dp">
 
         <TextView
+            style="@style/TakwerxSectionHeading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/heading_spot"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:paddingTop="8dp"
-            android:alpha="0.6" />
+            android:text="@string/heading_spot" />
 
         <!-- Before the operator has allowed it: what it is and one button. -->
         <LinearLayout
@@ -270,13 +267,11 @@
                 android:text="" />
 
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="@string/heading_spot_forecast"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="@string/heading_spot_forecast" />
 
             <!-- The product as NWS wrote it: fixed-width tables of 66 columns, so it
                  scrolls sideways in a half-width pane rather than wrapping into

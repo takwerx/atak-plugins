@@ -42,12 +42,10 @@
         android:paddingBottom="6dp" />
 
     <TextView
+        style="@style/TakwerxSectionHeading"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/heading_details"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:alpha="0.6"
         android:textColor="@color/white" />
 
     <ScrollView

@@ -10,5 +10,9 @@
     <!-- Group headings on the Layers page: cyan at full strength, so they stand out from
          the rows (operator, 2026-10-11: "they are so faint man lets make them cyan"). -->
     <color name="group_heading">#00e5ff</color>
+    <!-- Every section heading in the pane, the small caps over a block: the same cyan,
+         so the sections stand out from their rows (operator, 2026-10-11: "its a new rule
+         where like these sections pop out a bit like the headers"). -->
+    <color name="section_heading">#00e5ff</color>
 
 </resources>
