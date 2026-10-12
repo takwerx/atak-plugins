@@ -35,10 +35,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Feeds"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:alpha="0.6"
-        android:textColor="#FFFFFF" />
+        style="@style/TakwerxSectionHeading" />
 
     <!-- One button per feed, each carrying its own count: a control says what it costs
          before it is used. Filled in by the pane, because the feed list is code. -->
@@ -54,10 +51,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Filters"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:alpha="0.6"
-        android:textColor="#FFFFFF"
+        style="@style/TakwerxSectionHeading"
         android:paddingTop="4dp" />
 
     <LinearLayout
@@ -125,11 +119,6 @@
         android:id="@+id/list_heading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:alpha="0.6"
-        android:textColor="#FFFFFF"
-        android:paddingTop="8dp"
-        android:paddingBottom="2dp"
+        style="@style/TakwerxSectionHeading"
         android:text="In view" />
 </LinearLayout>

@@ -125,6 +125,17 @@
     <!-- Every button in this plugin. ATAK's own darkButton sets vertical padding only,
          which lets a short label render wider than its own background, and 44dp is a
          touch target for a gloved hand on a vehicle mount. -->
+    <!-- Every section heading, on the pane and on a page: cyan, bold, full strength.
+         Faint small caps disappeared between controls and between paragraphs alike
+         (operator, 2026-10-11). The takwerx standard, plugin-ui skill. -->
+    <style name="TakwerxSectionHeading">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">#00E5FF</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">2dp</item>
+    </style>
     <style name="TakwerxButton" parent="@style/darkButton">
         <item name="android:paddingLeft">12dp</item>
         <item name="android:paddingRight">12dp</item>
