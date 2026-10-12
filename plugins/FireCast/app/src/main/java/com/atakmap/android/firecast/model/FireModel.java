@@ -641,6 +641,31 @@ public final class FireModel {
                     r.fuelName == null || r.fuelName.isEmpty() ? "this fuel" : r.fuelName.split(" ")[0]);
     }
 
+    /** Frames a run's hour ring on the map, in the half of the screen the page leaves open. */
+    public void goTo(Run r) {
+        if (r == null || r.result == null)
+            return;
+        try {
+            final double reachM = Math.max(60, r.headM(STEPS_MIN[STEPS_MIN.length - 1]) * 1.3d);
+            final double dLat = reachM / 111320d;
+            final double dLon = reachM / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(r.lat))));
+            final GeoPoint[] corners = {
+                    new GeoPoint(r.lat - dLat, r.lon - dLon), new GeoPoint(r.lat + dLat, r.lon + dLon) };
+            // The page covers the right half, so the fit is asked of the left half only.
+            com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, corners, 0d,
+                    mapView.getWidth() / 2, mapView.getHeight());
+            final PointF at = mapView.forward(new GeoPoint(r.lat, r.lon));
+            final float w = mapView.getWidth(), h = mapView.getHeight();
+            if (at != null && w > 0 && h > 0) {
+                final GeoPointMetaData c = mapView.inverseWithElevation(at.x + w / 4f, h / 2f);
+                if (c != null && c.get() != null && c.get().isValid())
+                    mapView.getMapController().panTo(c.get(), true);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "go to run failed", e);
+        }
+    }
+
     /** The run's map switch: hides or shows its set, never deletes it. */
     public void setVisible(final Run r, final boolean on) {
         r.visible = on;

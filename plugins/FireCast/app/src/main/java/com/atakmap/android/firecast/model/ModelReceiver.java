@@ -192,7 +192,11 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 name.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
+                        // The row goes there and opens its details, like every takwerx list.
                         shown = x;
+                        if (!x.visible)
+                            model.setVisible(x, true);
+                        model.goTo(x);
                         render();
                     }
                 });
