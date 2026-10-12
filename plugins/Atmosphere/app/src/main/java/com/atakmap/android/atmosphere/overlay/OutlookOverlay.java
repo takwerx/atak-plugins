@@ -101,6 +101,8 @@ public abstract class OutlookOverlay {
     /** 0 draws every day; 1 to {@link #days()} one day. Three days stacked hid each other (2026-09-26). */
     private int day = 1;
     private Listener listener;
+    /** Told on main whenever what is drawn changed: a fetch landed, a filter moved, the layer went off. */
+    private Runnable dataListener;
     private boolean started, on, inFlight;
     private long lastPoll;
     private int generation;
@@ -196,6 +198,19 @@ public abstract class OutlookOverlay {
     }
 
     /**
+     * Everything an area becomes on the map, for a layer that draws two things for
+     * one record: a path and the pill at its start. {@link #drawn} alone by default.
+     * Worker thread.
+     */
+    protected List<AtmosphereFeatures.Drawn> drawnAll(Area a, Geometry g, AttributeSet s) {
+        final AtmosphereFeatures.Drawn d = drawn(a, g, s);
+        final List<AtmosphereFeatures.Drawn> out = new ArrayList<>(1);
+        if (d != null)
+            out.add(d);
+        return out;
+    }
+
+    /**
      * A second chip row under the day row, or null for none: "All", "M1+", "M2.5+",
      * "M4.5+" for the quakes. Called from the pane; a constant.
      */
@@ -219,6 +234,12 @@ public abstract class OutlookOverlay {
     /** Whether another choice means asking the server again rather than redrawing what is held. */
     protected boolean refetchOnChoice() {
         return false;
+    }
+
+    /** Draw what is held again, under the current filters; no request. */
+    protected void redraw() {
+        if (on)
+            rebuild(generation);
     }
 
     public void setChoice(int value) {
@@ -315,6 +336,20 @@ public abstract class OutlookOverlay {
         listener = l;
     }
 
+    public void setDataListener(Runnable r) {
+        dataListener = r;
+    }
+
+    /** The areas drawn right now: in the window, under every filter. Main thread. */
+    public List<Area> shownAreas() {
+        final List<Area> out = new ArrayList<>();
+        final int d = day;
+        for (Area a : areas)
+            if (shown(a, d))
+                out.add(a);
+        return out;
+    }
+
     public void start() {
         started = true;
         features.attach();
@@ -355,6 +390,8 @@ public abstract class OutlookOverlay {
             areas = new ArrayList<>();
             drawNothing();
             status("");
+            if (dataListener != null)
+                dataListener.run();
         }
     }
 
@@ -486,15 +523,11 @@ public abstract class OutlookOverlay {
                     s.setAttribute("Outlook", a.title);
                     if (!a.ref.isEmpty())
                         s.setAttribute("_ref", a.ref);
-                    final AtmosphereFeatures.Drawn d;
                     try {
-                        d = drawn(a, g, s);
+                        drawn.addAll(drawnAll(a, g, s));
                     } catch (RuntimeException e) {
                         Log.w(tag, "could not draw " + a.title, e);
-                        continue;
                     }
-                    if (d != null)
-                        drawn.add(d);
                 }
                 features.rewrite(drawn);
                 final String line = summary(snapshot);
@@ -505,6 +538,8 @@ public abstract class OutlookOverlay {
                             return;
                         Log.d(tag, "drew " + drawn.size() + " areas: " + line);
                         status(line);
+                        if (dataListener != null)
+                            dataListener.run();
                     }
                 });
             }

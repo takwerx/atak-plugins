@@ -2,7 +2,10 @@ package com.atakmap.android.atmosphere.overlay;
 
 import android.content.Context;
 
+import com.atakmap.android.atmosphere.compat.GeneratedFiles;
+import com.atakmap.android.atmosphere.data.DebrisFlow;
 import com.atakmap.android.atmosphere.data.TornadoPaths;
+import com.atakmap.coremap.maps.assets.Icon;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.map.layer.feature.AttributeSet;
@@ -27,7 +30,7 @@ public final class TornadoPathsOverlay extends OutlookOverlay {
     public static final String LAYER_ID = "tornado";
     public static final String HOST = TornadoPaths.HOST;
     private static final String TAG = "AtmosphereTornado";
-    private static final String[] WINDOWS = { "30 days", "90 days", "1 year" };
+    private static final String[] WINDOWS = { "2 days", "7 days", "30 days", "1 year" };
     private static final long DAY_MS = 24L * 60 * 60 * 1000;
 
     /** The key: each rating with its color. */
@@ -40,12 +43,14 @@ public final class TornadoPathsOverlay extends OutlookOverlay {
                     String.valueOf(TornadoPaths.COLORS[i]) };
     }
 
+    private final DotIcons icons;
     private final List<String> pages = new CopyOnWriteArrayList<>();
     private volatile String since = TornadoPaths.ymd(System.currentTimeMillis() - 366 * DAY_MS);
     private volatile int received;
 
     public TornadoPathsOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
         super(mapView, pluginContext, egress, TAG, LAYER_ID, "Tornado Paths");
+        icons = new DotIcons(GeneratedFiles.icons("dots"));
         pages.add(TornadoPaths.url(since, 0));
     }
 
@@ -78,13 +83,24 @@ public final class TornadoPathsOverlay extends OutlookOverlay {
     }
 
     @Override
+    public int days() {
+        return 4;
+    }
+
+    /** 30 days on a new install: two days is often empty, since a survey takes a day or more. */
+    @Override
+    protected int defaultDay() {
+        return 3;
+    }
+
+    @Override
     public boolean allDays() {
         return false;
     }
 
     @Override
     public String dayLabel(int day) {
-        return WINDOWS[Math.max(1, Math.min(3, day)) - 1];
+        return WINDOWS[Math.max(1, Math.min(4, day)) - 1];
     }
 
     @Override
@@ -107,7 +123,8 @@ public final class TornadoPathsOverlay extends OutlookOverlay {
         final long now = System.currentTimeMillis();
         for (TornadoPaths.Track t : got) {
             final long age = now - (t.stormDate > 0 ? t.stormDate : t.start);
-            final int day = age <= 30 * DAY_MS ? 1 : age <= 90 * DAY_MS ? 2 : 3;
+            final int day = age <= 2 * DAY_MS ? 1 : age <= 7 * DAY_MS ? 2
+                    : age <= 30 * DAY_MS ? 3 : 4;
             final String rating = TornadoPaths.rating(t.rating);
             final String title = rating + (t.event.isEmpty() ? "" : " " + t.event);
             final StringBuilder d = new StringBuilder();
@@ -140,14 +157,37 @@ public final class TornadoPathsOverlay extends OutlookOverlay {
         return out;
     }
 
+    /**
+     * The path as an unlabeled line, and a level pill at the touchdown. A label along
+     * the line rode at the line's angle and read sideways (operator, 2026-10-11: "im
+     * not sure if along the line is best"); labels stay level, in a pill above a mark.
+     */
     @Override
-    protected AtmosphereFeatures.Drawn drawn(Area a, Geometry g, AttributeSet s) {
+    protected List<AtmosphereFeatures.Drawn> drawnAll(Area a, Geometry g, AttributeSet s) {
+        final List<AtmosphereFeatures.Drawn> out = new ArrayList<>(2);
         if (!(a.extra instanceof TornadoPaths.Track))
-            return null;
+            return out;
         final TornadoPaths.Track t = (TornadoPaths.Track) a.extra;
         final float weight = 3f + Math.max(0, t.efNum) * 0.75f;
-        return new AtmosphereFeatures.Drawn(setName(a), a.title, g,
-                AtmosphereFeatures.stroke(a.title, a.color, weight, true), s);
+        out.add(new AtmosphereFeatures.Drawn(setName(a), a.title, g,
+                AtmosphereFeatures.stroke(a.title, a.color, weight, false), s));
+        final double[] start = DebrisFlow.firstPoint(t.geometry);
+        final Icon icon = start == null ? null : icons.labelled(a.title, a.color, 0xFFFFFFFF, 12);
+        if (icon != null) {
+            final AttributeSet s2 = new AttributeSet();
+            s2.setAttribute("_details", a.details);
+            s2.setAttribute("Outlook", a.title);
+            out.add(new AtmosphereFeatures.Drawn(setName(a), a.title,
+                    AtmosphereFeatures.point(start[0], start[1]),
+                    AtmosphereFeatures.icon(icon.getImageUri(Icon.STATE_DEFAULT), icon.getWidth(),
+                            icon.getHeight()), s2));
+        }
+        return out;
+    }
+
+    @Override
+    protected AtmosphereFeatures.Drawn drawn(Area a, Geometry g, AttributeSet s) {
+        return null;
     }
 
     @Override

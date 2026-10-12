@@ -47,14 +47,75 @@ public final class StormReportsOverlay extends OutlookOverlay {
                     String.valueOf(StormReports.COLORS[i]) };
     }
 
+    private static final String PREF_FAMILIES = "weather.layer.reports.families";
+    /** Every family's bit set. */
+    public static final int ALL_FAMILIES = (1 << StormReports.FAMILIES.length) - 1;
+
     private final DotIcons icons;
     private final List<String> pages = new CopyOnWriteArrayList<>();
     private volatile int received;
+    /** The families drawn and listed, one bit each; the page and the map share it. */
+    private volatile int families = ALL_FAMILIES;
 
     public StormReportsOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
         super(mapView, pluginContext, egress, TAG, LAYER_ID, "Storm Reports");
         icons = new DotIcons(GeneratedFiles.icons("dots"));
         pages.add(StormReports.url(0));
+        final android.content.SharedPreferences p = com.atakmap.android.atmosphere.compat.MapCompat.prefs();
+        families = p == null ? ALL_FAMILIES : p.getInt(PREF_FAMILIES, ALL_FAMILIES) & ALL_FAMILIES;
+    }
+
+    public int families() {
+        return families;
+    }
+
+    public boolean allFamilies() {
+        return families == ALL_FAMILIES;
+    }
+
+    public boolean showsFamily(int family) {
+        return (families & (1 << family)) != 0;
+    }
+
+    /** The families for the map and the list, one bit each; redrawn from what is held. */
+    public void setFamilies(int mask) {
+        final int v = mask & ALL_FAMILIES;
+        if (v == families)
+            return;
+        families = v;
+        final android.content.SharedPreferences p = com.atakmap.android.atmosphere.compat.MapCompat.prefs();
+        if (p != null)
+            p.edit().putInt(PREF_FAMILIES, v).apply();
+        redraw();
+    }
+
+    /**
+     * The reports in the window and family, newest first: what the map draws and
+     * what the Storm Reports page lists, one rule for both.
+     */
+    public List<StormReports.Report> reports() {
+        final List<StormReports.Report> out = new ArrayList<>();
+        final int window = day();
+        for (Area a : areas())
+            if (shown(a, window) && a.extra instanceof StormReports.Report)
+                out.add((StormReports.Report) a.extra);
+        java.util.Collections.sort(out, new java.util.Comparator<StormReports.Report>() {
+            @Override
+            public int compare(StormReports.Report x, StormReports.Report y) {
+                return Long.compare(y.time, x.time);
+            }
+        });
+        return out;
+    }
+
+    /** The reports in the window of every family, for counting each before one is picked. */
+    public List<StormReports.Report> reportsAnyFamily() {
+        final List<StormReports.Report> out = new ArrayList<>();
+        final int window = day();
+        for (Area a : areas())
+            if (a.day <= window && a.extra instanceof StormReports.Report)
+                out.add((StormReports.Report) a.extra);
+        return out;
     }
 
     @Override
@@ -91,7 +152,10 @@ public final class StormReportsOverlay extends OutlookOverlay {
 
     @Override
     protected boolean shown(Area a, int showDay) {
-        return a.day <= showDay;
+        if (a.day > showDay)
+            return false;
+        return !(a.extra instanceof StormReports.Report)
+                || showsFamily(((StormReports.Report) a.extra).family);
     }
 
     @Override
@@ -112,15 +176,6 @@ public final class StormReportsOverlay extends OutlookOverlay {
             final int day = age <= StormReports.DAY_MS ? 1
                     : age <= 2 * StormReports.DAY_MS ? 2 : 3;
             final String where = r.place + (r.state.isEmpty() ? "" : ", " + r.state);
-            final StringBuilder d = new StringBuilder();
-            d.append(r.label()).append("\nWhere: ").append(where)
-                    .append("\nWhen: ").append(when(r.time));
-            if (!r.office.isEmpty())
-                d.append("\nOffice: ").append(r.office);
-            if (!r.remarks.isEmpty())
-                d.append("\nRemarks: ").append(r.remarks);
-            d.append("\nType as logged: ").append(r.type)
-                    .append("\nFrom: NWS Local Storm Reports, preliminary");
             final JSONObject g = new JSONObject();
             try {
                 g.put("type", "Point");
@@ -129,7 +184,7 @@ public final class StormReportsOverlay extends OutlookOverlay {
                 continue;
             }
             out.add(new Area(day, r.label() + ", " + where, StormReports.FAMILIES[r.family],
-                    StormReports.COLORS[r.family], g, d.toString(), "", r));
+                    StormReports.COLORS[r.family], g, details(r), "", r));
         }
         return out;
     }
@@ -178,6 +233,16 @@ public final class StormReportsOverlay extends OutlookOverlay {
             if (newest > 0)
                 b.append(" Newest ").append(ago(newest)).append('.');
         }
+        if (!allFamilies()) {
+            b.append(" Showing ");
+            boolean first = true;
+            for (int i = 0; i < StormReports.FAMILIES.length; i++)
+                if (showsFamily(i)) {
+                    b.append(first ? "" : ", ").append(StormReports.FAMILIES[i]);
+                    first = false;
+                }
+            b.append(first ? "no families." : " only.");
+        }
         b.append("\nPreliminary, as spotters and the public told the offices; surveyed tornado"
                 + " paths are the Tornado Paths layer.");
         return b.toString();
@@ -186,6 +251,22 @@ public final class StormReportsOverlay extends OutlookOverlay {
     @Override
     protected String noun() {
         return "storm reports";
+    }
+
+
+    /** Everything the office logged about one report, as the details page and the map show it. */
+    public static String details(StormReports.Report r) {
+        final String where = r.place + (r.state.isEmpty() ? "" : ", " + r.state);
+        final StringBuilder d = new StringBuilder();
+        d.append(r.label()).append("\nWhere: ").append(where)
+                .append("\nWhen: ").append(when(r.time));
+        if (!r.office.isEmpty())
+            d.append("\nOffice: ").append(r.office);
+        if (!r.remarks.isEmpty())
+            d.append("\nRemarks: ").append(r.remarks);
+        d.append("\nType as logged: ").append(r.type)
+                .append("\nFrom: NWS Local Storm Reports, preliminary");
+        return d.toString();
     }
 
     static String when(long millis) {
