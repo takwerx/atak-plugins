@@ -660,6 +660,11 @@ public final class AtmospherePane {
             }
 
             @Override
+            public boolean nwsPicked() {
+                return selected != null && "nws".equals(selected.id);
+            }
+
+            @Override
             public void askToAllowGauges() {
                 askToAllowRaingauges();
             }
@@ -772,6 +777,11 @@ public final class AtmospherePane {
                     @Override
                     public String pointLabel() {
                         return modeLabel();
+                    }
+
+                    @Override
+                    public boolean nwsPicked() {
+                        return selected != null && "nws".equals(selected.id);
                     }
                 });
         layersAttribution = find(R.id.layers_attribution);

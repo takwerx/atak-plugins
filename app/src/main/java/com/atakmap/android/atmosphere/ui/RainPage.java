@@ -61,6 +61,9 @@ public final class RainPage {
 
         String pointLabel();
 
+        /** Whether NWS is the picked forecast service: the office lookups go to its host. */
+        boolean nwsPicked();
+
         void askToAllowGauges();
 
         void setGaugesOn(boolean on);
@@ -257,6 +260,14 @@ public final class RainPage {
     // ---- the office's report --------------------------------------------------------------
 
     private void fetchReport(boolean force) {
+        // The office and its report come from api.weather.gov, the forecast's own host
+        // only while NWS is the picked service; picking it is the allow (security
+        // review, 2026-10-11).
+        if (!host.nwsPicked()) {
+            status.setText("Pick NWS as the forecast service in Forecast settings to see the"
+                    + " office's rainfall report.");
+            return;
+        }
         final GeoPoint p = host.point();
         if (p == null) {
             status.setText("No position yet for " + host.pointLabel().toLowerCase(Locale.US) + ".");
@@ -319,7 +330,15 @@ public final class RainPage {
                     public void onSuccess(String product) {
                         if (mine != generation)
                             return;
-                        report = RainReports.parse(Cwf.parseText(product));
+                        // The product is free text from 33 offices; a parser slip reads as
+                        // "unreadable", never as ATAK going down on the main thread.
+                        try {
+                            report = RainReports.parse(Cwf.parseText(product));
+                        } catch (RuntimeException e) {
+                            Log.w(TAG, "rainfall report unreadable", e);
+                            status.setText("The " + office + " office's report could not be read.");
+                            return;
+                        }
                         fetchedAt = System.currentTimeMillis();
                         queueLocations();
                         renderReport();
