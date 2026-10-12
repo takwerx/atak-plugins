@@ -234,7 +234,12 @@ public final class PackageInstaller {
             for (String candidate : new String[] {
                     pkg.fileName(), pkg.legacyFileName() }) {
                 final Long len = names.get(candidate);
-                if (len != null && (pkg.bytes() <= 0 || len == pkg.bytes())) {
+                // An offline copy counts when it is there, whatever build:
+                // the depot rebuilds copies and a size that no longer matched
+                // turned a 349 MB file on the phone back into "Download"
+                // (2026-10-11). The digest is checked at download, not here.
+                if (len != null && (pkg.bytes() <= 0 || len == pkg.bytes()
+                        || pkg instanceof Depot.Pack)) {
                     out.add(pkg.id());
                     break;
                 }
@@ -266,7 +271,8 @@ public final class PackageInstaller {
                 Log.w(TAG, "ignoring " + candidate + ": " + escapes);
                 continue;
             }
-            if (f.isFile() && (pkg.bytes() <= 0 || f.length() == pkg.bytes()))
+            if (f.isFile() && (pkg.bytes() <= 0 || f.length() == pkg.bytes()
+                    || pkg instanceof Depot.Pack))
                 return f;
         }
         return null;

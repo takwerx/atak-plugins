@@ -45,8 +45,8 @@ itself where ATAK expects to find it.
     neighborhood, as GeoPDFs.
   - *Drone IR Maps (UASWFC)* -- infrared products flown over a fire, as
     georeferenced PDFs and KMZs.
-  - *Disaster Aerials (NOAA)* -- the aerials NOAA flies after a hurricane,
-    flood, fire or tornado, one overlay per flight.
+  - *Disaster Aerials* -- the imagery flown after a hurricane, flood, fire
+    or tornado by NOAA, the Civil Air Patrol and Maxar, one overlay per flight.
 ]
 ]
 
@@ -493,15 +493,18 @@ covers before deciding to turn it on.
 ]
 
 #tak-slide[
-= Disaster aerials (NOAA)
+= Disaster aerials
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("50.png", width: 92%)
 ][
   After a hurricane makes landfall, and after some floods, fires and
-  tornadoes, NOAA flies the damaged area and publishes the aerials within a
-  day or two of each flight. Map Depot lists NOAA's events from this year
-  and last, newest first, and every flight in each.
+  tornadoes, the damaged area gets flown and the imagery is public within a
+  day or two. Map Depot lists three sources in one list, this year and
+  last, newest first: NOAA's aerial flights, the Civil Air Patrol's flights
+  for FEMA, and Maxar's satellite releases with the cloud cover on the row.
+  What an agency publishes is listed, not graded; the crew judges. The
+  event button starts on All Events and says which agency each event is from.
 
   Each flight is an overlay: it covers the area that was flown, at 15 to 30
   cm a pixel, and draws over whatever map you have. Flights are listed newest

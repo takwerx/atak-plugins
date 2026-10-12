@@ -36,16 +36,19 @@ nothing has to be imported by hand afterwards:
     disaster aerial, and the row carries a Hide/Show switch; a base map
     installs into the map source folder, where it is one more map to pick.
 
-  * Disaster aerials. The high-resolution aerials NOAA's National Geodetic
-    Survey flies after a hurricane, flood, fire or tornado, one overlay per
-    flight and one for the whole event, for NOAA's events of this year and
-    last. Each flight can be added as a streaming overlay or
-    downloaded as an offline copy, an MBTiles pack the depot builds from
-    NOAA's tiles at about 60 cm a pixel and keeps under about 500 MB, which
-    draws with no signal. The catalog is rebuilt nightly from NOAA's own
-    flight index, so flights added during a storm appear the next day and
-    their offline copies the morning after. Orange outlines show where each
-    flight on the phone is.
+  * Disaster aerials. Post-event imagery from three sources in one list,
+    events of this year and last: NOAA's National Geodetic Survey flights
+    (15-30 cm), the Civil Air Patrol's flights for FEMA served by FEMA's
+    GeoPlatform (down to 9 cm), and Maxar Open Data satellite releases served
+    by Esri's Living Atlas (30 cm, CC BY-NC, before and after, cloud cover on
+    the row). Everything an agency publishes is listed, not graded. One
+    overlay per flight. Each flight can be added as a streaming overlay or
+    downloaded as an offline copy, an MBTiles pack the depot builds from the
+    agency's own tiles or image service at the flight's full detail, or a
+    step coarser to stay under about 500 MB, which draws with no signal. The
+    catalog is rebuilt nightly from each agency's own index, so flights added
+    during a storm appear the next day and their offline copies the morning
+    after. Outlines show where each flight on the phone is.
 
   * Offline public land vector tiles. US Forest Service vector basemap packages, one per
     national forest or grassland, fetched directly from ArcGIS Online.
@@ -86,9 +89,10 @@ fires.
 _________________________________________________________________
 STATUS
 
-Version 1.12: Disaster Aerials (NOAA), a new section listing NOAA's
-post-disaster flights by event, each an overlay that draws over whatever map
-is selected. Streaming overlays now install into ATAK's grg folder, so they
+Version 1.12: Disaster Aerials, a new section listing post-disaster imagery
+by event from NOAA, the Civil Air Patrol and Maxar, each flight an overlay
+that draws over whatever map is selected, streamed or as an offline copy on
+the phone. Streaming overlays now install into ATAK's grg folder, so they
 switch on over the map instead of replacing it (before 1.12 picking one from
 the map list turned the imagery off). Three map sources by Joseph Elfelt
 (mappingsupport.com) join the catalog: USGS contour lines, NRL 133 Cities
