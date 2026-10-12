@@ -35,20 +35,61 @@ public final class FuelMoisture {
         return "https://" + HOST + "/api/FMR/site_location_v2?input=" + state;
     }
 
-    /** The live fuel thresholds, percent, and their colors: critical, high, moderate, low. */
+    /** The live fuel thresholds, percent, and the colors: critical, high, moderate, low. */
     public static final int[] THRESHOLDS = { 60, 79, 99 };
+    /**
+     * Dead fuel thresholds by timelag class, percent: the upper edge of critical, high
+     * and moderate. There is no national table; these are the conservative figures the
+     * Texas A&M Forest Service pocket cards and the Oklahoma Mesonet burn window publish
+     * (10 h critical at 6, 100 h at 10, 1000 h at 13; 15 the 10 h burn ceiling), checked
+     * 2026-10-12. Duff has no published scale.
+     */
+    public static final int[] DEAD_1_10_H = { 6, 9, 15 };
+    public static final int[] DEAD_100_H = { 10, 13, 18 };
+    public static final int[] DEAD_1000_H = { 13, 16, 22 };
     public static final int[] COLORS = { 0xFFE53935, 0xFFFF9800, 0xFFFFEB3B, 0xFF43A047 };
     public static final String[] LEVELS = { "Critical", "High", "Moderate", "Low" };
     public static final int DEAD_COLOR = 0xFFB0B0B0;
 
+    /** The level, 0 critical to 3 low, of a live fuel. */
     public static int level(double pct) {
-        if (pct <= THRESHOLDS[0])
+        return level(THRESHOLDS, pct);
+    }
+
+    private static int level(int[] t, double pct) {
+        if (pct <= t[0])
             return 0;
-        if (pct <= THRESHOLDS[1])
+        if (pct <= t[1])
             return 1;
-        if (pct <= THRESHOLDS[2])
+        if (pct <= t[2])
             return 2;
         return 3;
+    }
+
+    /** The thresholds a fuel is rated on, or null for one with no published scale (duff). */
+    public static int[] thresholds(String fuel) {
+        final String f = fuel == null ? "" : fuel.trim();
+        if (!isDead(f))
+            return THRESHOLDS;
+        if (f.equals("1-Hour") || f.equals("10-Hour"))
+            return DEAD_1_10_H;
+        if (f.equals("100-Hour"))
+            return DEAD_100_H;
+        if (f.equals("1000-Hour"))
+            return DEAD_1000_H;
+        return null;
+    }
+
+    /** The level of any fuel, or -1 for one with no scale. */
+    public static int level(String fuel, double pct) {
+        final int[] t = thresholds(fuel);
+        return t == null ? -1 : level(t, pct);
+    }
+
+    /** The color a sample draws in. */
+    public static int color(String fuel, double pct) {
+        final int l = level(fuel, pct);
+        return l < 0 ? DEAD_COLOR : COLORS[l];
     }
 
     public static boolean isDead(String fuel) {

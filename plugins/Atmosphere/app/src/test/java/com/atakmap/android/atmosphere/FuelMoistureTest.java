@@ -51,6 +51,15 @@ public class FuelMoistureTest {
         assertTrue(FuelMoisture.isDead("10-Hour"));
         assertTrue(FuelMoisture.isDead("Duff"));
         assertFalse(FuelMoisture.isDead("Sagebrush, Big"));
-        assertNull(FuelMoisture.parse(BODY).get(0).newest(0).fuel.isEmpty() ? "" : null);
+        assertEquals(0, FuelMoisture.level("10-Hour", 6));
+        assertEquals(1, FuelMoisture.level("1-Hour", 7));
+        assertEquals(3, FuelMoisture.level("10-Hour", 16));
+        assertEquals(0, FuelMoisture.level("100-Hour", 10));
+        assertEquals(2, FuelMoisture.level("1000-Hour", 20));
+        assertEquals(3, FuelMoisture.level("1000-Hour", 23));
+        assertEquals(-1, FuelMoisture.level("Duff", 30));
+        assertEquals(FuelMoisture.DEAD_COLOR, FuelMoisture.color("Duff", 30));
+        assertEquals(FuelMoisture.COLORS[0], FuelMoisture.color("Chamise", 55));
+        assertNull(FuelMoisture.thresholds("Duff"));
     }
 }

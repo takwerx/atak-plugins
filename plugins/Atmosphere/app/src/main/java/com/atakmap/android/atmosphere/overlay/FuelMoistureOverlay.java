@@ -46,14 +46,17 @@ public final class FuelMoistureOverlay extends OutlookOverlay {
 
     /** The key. */
     public static final String[][] LEGEND = {
-            { "Critical: 60% and under", String.valueOf(FuelMoisture.COLORS[0]) },
-            { "High: 61 to 79%", String.valueOf(FuelMoisture.COLORS[1]) },
-            { "Moderate: 80 to 99%", String.valueOf(FuelMoisture.COLORS[2]) },
-            { "Low: 100% and over", String.valueOf(FuelMoisture.COLORS[3]) },
-            { "Dead fuel (1 to 1000 hour, duff): another scale, not colored",
-                    String.valueOf(FuelMoisture.DEAD_COLOR) },
-            { "Live fuel moisture is water as a percent of the plant's dry weight; the pill"
-                    + " names the fuel. Thresholds are the chaparral ones", "0" } };
+            { "Critical", String.valueOf(FuelMoisture.COLORS[0]) },
+            { "High", String.valueOf(FuelMoisture.COLORS[1]) },
+            { "Moderate", String.valueOf(FuelMoisture.COLORS[2]) },
+            { "Low", String.valueOf(FuelMoisture.COLORS[3]) },
+            { "Live fuels: critical at 60% and under, high to 79, moderate to 99, low from 100"
+                    + " (the chaparral thresholds)", "0" },
+            { "Dead 1 and 10 hour: 6 / 9 / 15. 100 hour: 10 / 13 / 18. 1000 hour: 13 / 16 / 22"
+                    + " (Texas A&M and Oklahoma Mesonet figures; no national table)", "0" },
+            { "Duff: no published scale", String.valueOf(FuelMoisture.DEAD_COLOR) },
+            { "Moisture is water as a percent of the fuel's dry weight; the pill names the fuel",
+                    "0" } };
 
     private final Context pluginContext;
     private final DotIcons icons;
@@ -227,9 +230,10 @@ public final class FuelMoistureOverlay extends OutlookOverlay {
             for (FuelMoisture.Sample s : site.samples) {
                 d.append('\n').append(s.fuel).append(": ")
                         .append(String.format(Locale.US, "%.0f%%", s.pct));
-                if (!s.dead())
-                    d.append(" (").append(FuelMoisture.LEVELS[FuelMoisture.level(s.pct)]
-                            .toLowerCase(Locale.US)).append(')');
+                final int level = FuelMoisture.level(s.fuel, s.pct);
+                if (level >= 0)
+                    d.append(" (").append(FuelMoisture.LEVELS[level].toLowerCase(Locale.US))
+                            .append(')');
                 d.append(", ").append(StormReportsOverlay.when(s.sampledAt)).append(" (")
                         .append(StormReportsOverlay.ago(s.sampledAt)).append(')');
                 if (s.firstYear > 0)
@@ -255,8 +259,7 @@ public final class FuelMoistureOverlay extends OutlookOverlay {
         final FuelMoisture.Sample pick = pick(a);
         if (pick == null)
             return null;
-        final int color = pick.dead() ? FuelMoisture.DEAD_COLOR
-                : FuelMoisture.COLORS[FuelMoisture.level(pick.pct)];
+        final int color = FuelMoisture.color(pick.fuel, pick.pct);
         final String pill = FuelMoisture.shortFuel(pick.fuel)
                 + String.format(Locale.US, " %.0f%%", pick.pct);
         final Icon icon = icons.labelled(pill, color, 0xFF202020, 14);
@@ -277,7 +280,11 @@ public final class FuelMoistureOverlay extends OutlookOverlay {
             if (s == null)
                 continue;
             n++;
-            if (!s.dead() && (driest == null || s.pct < driest.pct)) {
+            if (driest == null || FuelMoisture.level(s.fuel, s.pct) >= 0
+                    && (FuelMoisture.level(driest.fuel, driest.pct) < 0
+                            || FuelMoisture.level(s.fuel, s.pct) < FuelMoisture.level(driest.fuel, driest.pct)
+                            || FuelMoisture.level(s.fuel, s.pct) == FuelMoisture.level(driest.fuel, driest.pct)
+                                    && s.pct < driest.pct)) {
                 driest = s;
                 driestAt = a.title;
             }
@@ -293,7 +300,7 @@ public final class FuelMoistureOverlay extends OutlookOverlay {
                     .append(sites == 1 ? " site has" : " sites have").append(" a ").append(kind)
                     .append(" sample from the last ").append(span).append('.');
             if (driest != null)
-                b.append(" Driest live fuel: ").append(driest.fuel).append(' ')
+                b.append(" Driest: ").append(driest.fuel).append(' ')
                         .append(String.format(Locale.US, "%.0f%%", driest.pct)).append(" at ")
                         .append(driestAt).append(", ").append(StormReportsOverlay.ago(driest.sampledAt))
                         .append('.');

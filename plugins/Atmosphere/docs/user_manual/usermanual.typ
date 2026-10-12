@@ -543,8 +543,9 @@ the map center, a dot colored by its newest live fuel's moisture, the fuel and
 percent in the pill (*Chamise 58%*). Live fuel moisture is water as a percent
 of the plant's dry weight, so it runs past 100; the colors are the chaparral
 thresholds: 60% and under critical, 61 to 79 high, 80 to 99 moderate, 100 and
-over low. Dead fuel classes (1 to 1000 hour, duff) are another scale and draw
-grey.
+over low. Dead fuels are rated on their own breaks, the Texas A&M and Oklahoma
+Mesonet figures (1 and 10 hour 6 / 9 / 15, 100 hour 10 / 13 / 18, 1000 hour
+13 / 16 / 22); duff has no published scale and draws grey.
 
 The first row picks how old a sample may be, *30 days*, *90 days* or *1 year*;
 *Show* picks *Live fuels*, *Dead fuels* or *Either*. Tap a dot for every fuel
