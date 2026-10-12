@@ -285,7 +285,8 @@ it is a direction.
   #image("23.png", width: 100%)
 ][
   *Wind* draws the forecast wind as moving streaks colored by speed, with the
-  key under the time strip in mph, kt or km/h.
+  key under the time strip in mph, kt or km/h. *Heat map* under the key draws
+  the same speed as a colored field beneath the streaks, in the key's colors.
 
   The line under it reads the wind *Here*, at the pane's point: speed and
   where it comes from. Outside the area being drawn it says so.
@@ -534,6 +535,25 @@ numbers only.
 ]
 
 #tak-slide[
+= Fuel Moisture
+
+*Fuel Moisture* draws the fuel samples crews cut and weigh every week or two:
+every sampling site of the National Fuel Moisture Database in the state under
+the map center, a dot colored by its newest live fuel's moisture, the fuel and
+percent in the pill (*Chamise 58%*). Live fuel moisture is water as a percent
+of the plant's dry weight, so it runs past 100; the colors are the chaparral
+thresholds: 60% and under critical, 61 to 79 high, 80 to 99 moderate, 100 and
+over low. Dead fuel classes (1 to 1000 hour, duff) are another scale and draw
+grey.
+
+The first row picks how old a sample may be, *30 days*, *90 days* or *1 year*;
+*Show* picks *Live fuels*, *Dead fuels* or *Either*. Tap a dot for every fuel
+the site samples with its last value, date and years. Moving the map into
+another state asks for that state. The database is the US Forest Service's,
+through San Jose State University's fuel moisture portal.
+]
+
+#tak-slide[
 = Lightning
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
@@ -644,8 +664,9 @@ or the report's line. The map's extent is sent, never your position.
 
 The *Rain Gauges* page shows the office's rainfall report for the point in
 the top row: its gauges with their inches for the period the office names,
-*Most rain first* or *Closest* with the miles on each row, and the report
-as written behind a button; under it the USGS gauges with Go to.
+*Most rain first* or *Closest* with the miles on each row, a green *Go to*
+under every gauge the page could place, and the report as written behind a
+button; under it the USGS gauges with Go to.
 Thirty-three offices publish such a report; the page says so when the one
 here does not. It needs NWS as the forecast service.
 ]
@@ -1019,7 +1040,8 @@ Only what you ask for:
   set, and the SAWTI page finds your zone on this device. So do *Storm
   Reports*, *Tornado Paths* and *Earthquakes*, which are whole national or
   worldwide files; *Debris Flow*, *Rain Totals* and *Rain Gauges* send the
-  area the map shows, padded. The office's rainfall report and the synopsis
+  area the map shows, padded; *Fuel Moisture* sends the two-letter code of the
+  state under the map center, found on this device. The office's rainfall report and the synopsis
   find the office by the half-degree square the point is in, and only while
   NWS is the forecast service.
 - An *address* you type goes to the US Census Bureau, and to ATAK's own

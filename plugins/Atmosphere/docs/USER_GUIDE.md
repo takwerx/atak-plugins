@@ -149,13 +149,14 @@ opening the plugin.
 | Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber |
 | Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches the open ocean where no radar does |
 | Wind | Rain | The model's rain rate, light to violent, hour by hour for five days with the rate "Here"; a forecast, not radar |
-| Wind | Wind | The forecast wind as moving streaks colored by speed, with a time scrubber, heights to the jet stream, and the wind "Here" |
+| Wind | Wind | The forecast wind as moving streaks colored by speed, or as a heat map under them in the same colors, with a time scrubber, heights to the jet stream, and the wind "Here" |
 | Storms | Storm Reports | Every report the NWS offices logged in the last 24, 48 or 72 hours: tornado, wind, hail, flood, rain, snow and ice, landslide; the type and size in the pill, the remarks behind a tap |
 | Storms | Tornado Paths | The tracks NWS survey teams walked in the last 2 days, 7 days, 30 days or year, each line in its EF rating's color with a pill at the touchdown; length, width, peak wind, injuries, deaths and the survey behind a tap |
 | Fire | Fire Weather Outlook | Elevated, critical and extreme areas and dry thunderstorms, Day 1, 2, 3 or all; from Day 3 as a chance of critical |
 | Fire | Fire Weather Zones | The NWS fire weather zones with their numbers, shaded under a Red Flag Warning or a Fire Weather Watch; the zone's planning forecast behind a tap |
 | Fire | SAWTI | The Forest Service's Santa Ana Wildfire Threat Index for four Southern California zones, colored by level for each of four days; the SAWTI page behind a tap |
 | Fire | Fire Danger | Every Predictive Service Area in the lower 48 shaded by its Energy Release Component, observed yesterday or forecast today; the GACC's ERC chart behind a tap on an area's name |
+| Fire | Fuel Moisture | Every fuel sampling site in the state under the map, a dot colored by its newest live fuel's moisture (critical, high, moderate, low) with the fuel and percent in the pill; every fuel sampled there, with dates, behind a tap; 30 days, 90 days or a year back; live fuels, dead fuels or either |
 | Fire | Lightning | NOAA's lightning strike density, the newest 15 minutes, in five bands from under 1 to over 150 strikes in a 5-mile square |
 | Fire | PSPS | California's Public Safety Power Shutoffs from Cal OES: counties warned, power off, power back on |
 | Fire | Smoke | Forecast smoke at the ground or through the whole sky, with the amount "Here"; the same forecast at every zoom, so the smoke keeps its shape as you zoom |
@@ -271,7 +272,7 @@ the Fire Danger page.
 
 <img src="screenshots/96_zone_erc_block.png" width="420">
 
-## 8. SAWTI, Fire Danger, Lightning and PSPS
+## 8. SAWTI, Fire Danger, Fuel Moisture, Lightning and PSPS
 
 **SAWTI** draws the US Forest Service's Santa Ana Wildfire Threat Index for its
 four Southern California zones: LA-Ventura, Orange-Inland Empire, San Diego and
@@ -323,6 +324,22 @@ percentile above it. The Southern and Eastern Areas no longer publish ERC
 charts; their areas show the numbers only.
 
 <img src="screenshots/94_erc_page.png" width="420"> <img src="screenshots/95_erc_chart_full.png" width="420">
+
+**Fuel Moisture** draws the fuel samples crews cut and weigh every week or
+two: every sampling site of the National Fuel Moisture Database in the state
+under the map center, a dot colored by its newest live fuel's moisture and the
+fuel and percent in the pill, `Chamise 58%`. Live fuel moisture is water as a
+percent of the plant's dry weight, so it runs past 100; the colors are the
+chaparral thresholds, 60% and under critical (red), 61 to 79 high (orange),
+80 to 99 moderate (yellow), 100 and over low (green). The dead fuel classes
+(1 to 1000 hour, duff) run on another scale and draw grey. The first row picks
+how old a sample may be, **30 days**, **90 days** or **1 year**; **Show** picks
+**Live fuels**, **Dead fuels** or **Either**, the pill always the newest of
+that kind. The status line counts the sites and names the driest live fuel in
+the state. Tap a dot for every fuel the site samples, each with its last value,
+date and the years it has been sampled. Moving the map into another state asks
+for that state. The database is the US Forest Service's; the samples reach the
+plugin through San Jose State University's fuel moisture portal.
 
 **Lightning** draws NOAA's lightning strike density: how many strikes the
 ground networks counted in each 5-mile square in 15 minutes, from yellow (under
@@ -440,8 +457,12 @@ the map settles outside what was asked.
 point in the pane's top row: the gauges the office lists, with their inches for
 the period the office names (during a storm a day or two; the line under the
 office says which), **Most rain first** or **Closest** to your point, with the
-miles on each row, the gauges the report gives no location for under their
-own heading, and the whole report as the office wrote it behind a button.
+miles on each row and a green **Go to** under every gauge the page could
+place (the row flies the map there), the gauges nothing could place under their
+own heading, and the whole report as the office wrote it behind a button. A
+gauge is placed once, by its name against NIFC's RAWS and by its id against
+NWS, and kept; the ones nothing can place are the counties' own flood-control
+gauges.
 Under it, the USGS gauges around the map with Go to. Thirty-three offices
 publish such a report, Los Angeles and San Diego among them; the page says so
 when the office here does not. It needs NWS as the forecast service.
@@ -497,6 +518,7 @@ Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
   gauge and buoy lists when they are set to My position. The Fire Weather Zones
   page finds your zone by sending the half-degree square the point is in, about
   30 miles across, never the point. Debris Flow, Rain Totals and Rain Gauges
-  send the area the map shows, padded. The office's rainfall report and the
+  send the area the map shows, padded. Fuel Moisture sends the two-letter code
+  of the state under the map center, found on this device. The office's rainfall report and the
   synopsis find the office by the same half-degree square, and only while NWS
   is the forecast service.

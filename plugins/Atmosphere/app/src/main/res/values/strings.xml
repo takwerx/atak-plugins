@@ -160,6 +160,12 @@
     <string name="quakes_allow_text">Atmosphere will ask the USGS for its feed of recent earthquakes, worldwide, and for the shaking maps of the largest, and draw them on the map. Your position is not sent.\n\nServer: earthquake.usgs.gov</string>
     <string name="credit_quakes">Earthquakes and ShakeMaps from the USGS Earthquake Hazards Program (%1$s)</string>
     <string name="quakes_floor_heading">Smallest shown</string>
+    <string name="fuel_on">Fuel Moisture ON</string>
+    <string name="fuel_off">Fuel Moisture OFF</string>
+    <string name="fuel_allow_title">Show fuel moisture samples?</string>
+    <string name="fuel_allow_text">Atmosphere will ask San Jose State University\'s fuel moisture portal, which serves the US Forest Service\'s National Fuel Moisture Database, for every sampling site in the state the map is centered on, once an hour and again when the map moves to another state. The state\'s two-letter code is sent, never a position.\n\nServer: www.nfmdb.org</string>
+    <string name="credit_fuel">Fuel moisture samples from the National Fuel Moisture Database (USDA Forest Service), through San Jose State University\'s portal (%1$s)</string>
+    <string name="fuel_floor_heading">Show</string>
     <string name="credit_psps">Public Safety Power Shutoffs from the California Governor\'s Office of Emergency Services (Cal OES), as reported by PG&amp;E, SCE and SDG&amp;E (%1$s)</string>
     <string name="credit_firewx">Fire weather outlook from the NOAA Storm Prediction Center (%1$s)</string>
     <string name="flood_on">Flash Flood Outlook ON</string>
@@ -266,6 +272,8 @@
     <string name="allow">Allow</string>
     <string name="wind_on">Wind ON</string>
     <string name="wind_off">Wind OFF</string>
+    <string name="wind_heat_on">Heat map ON</string>
+    <string name="wind_heat_off">Heat map OFF</string>
     <string name="wind_allow_title">Allow wind</string>
     <string name="wind_allow_text">Wind comes from the US National Weather Service, drawn as moving air over the map.\n\nTurning it on lets Atmosphere ask them for wind over the part of the map you are looking at. Nothing else about you is sent.\n\nServer: nomads.ncep.noaa.gov</string>
     <string name="smoke_on">Smoke ON</string>
