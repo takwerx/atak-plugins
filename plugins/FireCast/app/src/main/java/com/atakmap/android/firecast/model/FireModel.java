@@ -100,6 +100,13 @@ public final class FireModel {
         public Spread.Result ground;
         /** Why it was the ellipse, when it was. */
         public String groundNote;
+        /** The perimeter the run began from, [lat, lon] pairs, or null for a point start. */
+        public double[][] perimeter;
+        /** When the fire started, epoch ms, or 0 for unknown; with a perimeter it calibrates the run. */
+        public long startedAt;
+        /** The rate multiplier calibration settled on; 1 when there was none. */
+        public double rateScale = 1;
+        public String calibrationNote;
         /** The grid's reach each way from the start, km. */
         public double halfKm = HALF_KM;
         /** Buildings reached by each step, homes among them, and people, from FEMA's inventory; null when not fetched. */
@@ -117,6 +124,8 @@ public final class FireModel {
             if (result != null)
                 sb.append(String.format(Locale.US, ", %.0f mph from %s, %s in 1 h", windMph, Units.compass(windFromDeg),
                         acres(60) < 10 ? String.format(Locale.US, "%.1f ac", acres(60)) : String.format(Locale.US, "%,.0f ac", acres(60))));
+            if (perimeter != null)
+                sb.append(", from a perimeter");
             if (structures != null)
                 sb.append(", ").append(structures[STEPS_MIN.length - 1]).append(" bldg");
             if (!COND_OBSERVED.equals(conditions))
@@ -206,6 +215,78 @@ public final class FireModel {
     private MapGroup group;
     private Marker marker;
     private Runnable onPlaced;
+    private PerimeterPicker perimeterPicker;
+    /** The drawn perimeter waiting for a run, or null. */
+    private volatile double[][] perimeter;
+    private static final String PREF_PERIMETER = "model.perimeter", PREF_STARTED = "model.startedMin";
+
+    public double[][] perimeter() {
+        return perimeter;
+    }
+
+    /** Minutes ago the fire started, as the operator set it; 0 for unknown. */
+    public int startedMinutesAgo() {
+        return prefs.getInt(PREF_STARTED, 0);
+    }
+
+    public void setStartedMinutesAgo(int m) {
+        prefs.edit().putInt(PREF_STARTED, m).apply();
+    }
+
+    /** Hands the operator ATAK's polygon tool; the shape they close becomes the perimeter. */
+    public void drawPerimeter() {
+        if (perimeterPicker == null)
+            perimeterPicker = new PerimeterPicker(mapView, new PerimeterPicker.Callback() {
+                @Override
+                public void onPerimeter(GeoPoint[] ring) {
+                    setPerimeter(ring);
+                    if (onPlaced != null)
+                        onPlaced.run();
+                }
+
+                @Override
+                public void onCancelled(String reason) {
+                    status = reason == null ? "" : reason;
+                    changed();
+                }
+            });
+        perimeterPicker.start();
+    }
+
+    private void setPerimeter(GeoPoint[] ring) {
+        final double[][] r = new double[ring.length][];
+        for (int i = 0; i < ring.length; i++)
+            r[i] = new double[] { ring[i].getLatitude(), ring[i].getLongitude() };
+        perimeter = r;
+        try {
+            final org.json.JSONArray a = new org.json.JSONArray();
+            for (double[] p : r)
+                a.put(new org.json.JSONArray().put(p[0]).put(p[1]));
+            prefs.edit().putString(PREF_PERIMETER, a.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    public void clearPerimeter() {
+        perimeter = null;
+        prefs.edit().remove(PREF_PERIMETER).apply();
+        if (perimeterPicker != null)
+            perimeterPicker.clearDrawn();
+    }
+
+    /** Runs from the perimeter's middle with everything inside it already burning. */
+    public boolean runFromPerimeter() {
+        final double[][] ring = perimeter;
+        if (ring == null || ring.length < 3)
+            return false;
+        double lat = 0, lon = 0;
+        for (double[] p : ring) {
+            lat += p[0];
+            lon += p[1];
+        }
+        run(lat / ring.length, lon / ring.length);
+        return true;
+    }
 
     public void setOnPlaced(Runnable r) {
         onPlaced = r;
@@ -392,6 +473,19 @@ public final class FireModel {
         final float lat = prefs.getFloat(PREF_LAT, Float.NaN), lon = prefs.getFloat(PREF_LON, Float.NaN);
         if (!Float.isNaN(lat) && !Float.isNaN(lon))
             place(new GeoPoint(lat, lon));
+        try {
+            final String saved = prefs.getString(PREF_PERIMETER, null);
+            if (saved != null) {
+                final org.json.JSONArray a = new org.json.JSONArray(saved);
+                final double[][] r = new double[a.length()][];
+                for (int i = 0; i < a.length(); i++)
+                    r[i] = new double[] { a.getJSONArray(i).getDouble(0), a.getJSONArray(i).getDouble(1) };
+                if (r.length >= 3)
+                    perimeter = r;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "saved perimeter unreadable", e);
+        }
         worker.execute(new Runnable() {
             @Override
             public void run() {
@@ -403,6 +497,10 @@ public final class FireModel {
     public void stop() {
         started = false;
         cancelPick();
+        if (perimeterPicker != null) {
+            perimeterPicker.dispose();
+            perimeterPicker = null;
+        }
         removeMarker();
         if (group != null) {
             try {
@@ -550,6 +648,9 @@ public final class FireModel {
                 r.lat = lat;
                 r.lon = lon;
                 r.ranAt = System.currentTimeMillis();
+                r.perimeter = perimeter;
+                final int ago = startedMinutesAgo();
+                r.startedAt = ago > 0 ? r.ranAt - ago * 60000L : 0;
                 try {
                     r.site = Landfire.at(lat, lon);
                 } catch (Exception e) {
@@ -698,6 +799,10 @@ public final class FireModel {
         finish(r);
     }
 
+    static String acresText(double a) {
+        return a < 10 ? String.format(Locale.US, "%.1f acres", a) : String.format(Locale.US, "%,.0f acres", a);
+    }
+
     /** ", 2,100 ft above the start" when the station's height is far from the start's; "" otherwise. */
     static String heightNote(Run r, Weather.Reading w) {
         if (w == null || Double.isNaN(r.startElevFt) || w.elevationFt <= 0)
@@ -736,8 +841,7 @@ public final class FireModel {
             return;
         }
         final long t0 = System.currentTimeMillis();
-        final Spread.Result g = Spread.run(land, r.lat, r.lon, r.halfKm, STEPS_MIN[STEPS_MIN.length - 1],
-                new Spread.Behavior() {
+        final Spread.Behavior behavior = new Spread.Behavior() {
                     @Override
                     public double[] run(int fuelModel, double slopeDeg, double aspectDeg) {
                         final double cover = r.site.coverPct;
@@ -753,7 +857,33 @@ public final class FireModel {
                         final double spotM = Behave.spotDistanceM(b.flameLengthFt, wind20, r.canopyHeightFt);
                         return new double[] { b.rosFtPerMin, b.headingDeg, b.aFtPerMin, b.bFtPerMin, b.cFtPerMin, b.flameLengthFt, spotM };
                     }
-                });
+                };
+        // Calibration: with a perimeter and a start time, the model is run from the
+        // perimeter's middle for the time elapsed, and the ratio of what the fire has
+        // actually covered to what the model would have gives the rate scale, by the
+        // square root since area grows with the square of the rate. Clamped: a fire
+        // that has done ten times the model is a wind the station did not see, and
+        // the page says so rather than a number nobody should trust.
+        r.rateScale = 1;
+        if (r.perimeter != null && r.startedAt > 0) {
+            final double elapsedMin = (r.ranAt - r.startedAt) / 60000d;
+            final double observedAcres = Spread.ringAcres(r.perimeter);
+            if (elapsedMin >= 5 && observedAcres > 0.1) {
+                final Spread.Result trial = Spread.run(land, r.lat, r.lon, r.halfKm, elapsedMin, behavior);
+                final double modeled = trial.acres(elapsedMin);
+                if (modeled > 0.05) {
+                    final double raw = Math.sqrt(observedAcres / modeled);
+                    r.rateScale = Math.max(0.3, Math.min(3, raw));
+                    r.calibrationNote = String.format(Locale.US,
+                            "Calibrated: the fire has covered %s in %.0f min where the model would have covered %s, so its rates are scaled %.1fx%s.",
+                            acresText(observedAcres), elapsedMin, acresText(modeled), r.rateScale,
+                            raw > 3 ? " (held at 3x; the fire is running far ahead of these conditions)"
+                                    : raw < 0.3 ? " (held at 0.3x; the fire is far behind these conditions)" : "");
+                }
+            }
+        }
+        final Spread.Result g = Spread.run(land, r.lat, r.lon, r.halfKm, STEPS_MIN[STEPS_MIN.length - 1],
+                behavior, r.perimeter, r.rateScale);
         Log.d(TAG, "ground run: " + g.cellsSeen + " cells reached of " + g.cellsBurnable + " burnable, "
                 + g.fuelsCrossed + " fuels, " + (System.currentTimeMillis() - t0) + " ms");
         if (g.cellsSeen < 2) {
@@ -1150,7 +1280,16 @@ public final class FireModel {
             o.put("windMph", r.windMph).put("windFromDeg", r.windFromDeg).put("windNote", r.windNote)
                     .put("tenMeterWind", r.tenMeterWind).put("moistureNote", r.moistureNote);
             o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions)
-                    .put("visible", r.visible).put("ground", r.ground != null).put("halfKm", r.halfKm);
+                    .put("visible", r.visible).put("ground", r.ground != null).put("halfKm", r.halfKm)
+                    .put("startedAt", r.startedAt).put("rateScale", r.rateScale);
+            if (r.calibrationNote != null)
+                o.put("calibrationNote", r.calibrationNote);
+            if (r.perimeter != null) {
+                final org.json.JSONArray pa = new org.json.JSONArray();
+                for (double[] p : r.perimeter)
+                    pa.put(new org.json.JSONArray().put(p[0]).put(p[1]));
+                o.put("perimeter", pa);
+            }
             if (r.structures != null) {
                 final org.json.JSONArray st = new org.json.JSONArray(), hm = new org.json.JSONArray(), pp = new org.json.JSONArray();
                 for (int i = 0; i < STEPS_MIN.length; i++) {
@@ -1241,6 +1380,15 @@ public final class FireModel {
             r.conditions = o.optString("conditions", COND_OBSERVED);
             r.visible = o.optBoolean("visible", true);
             r.halfKm = o.optDouble("halfKm", HALF_KM);
+            r.startedAt = o.optLong("startedAt", 0);
+            r.rateScale = o.optDouble("rateScale", 1);
+            r.calibrationNote = o.optString("calibrationNote", null);
+            final org.json.JSONArray pa = o.optJSONArray("perimeter");
+            if (pa != null && pa.length() >= 3) {
+                r.perimeter = new double[pa.length()][];
+                for (int i = 0; i < pa.length(); i++)
+                    r.perimeter[i] = new double[] { pa.getJSONArray(i).getDouble(0), pa.getJSONArray(i).getDouble(1) };
+            }
             r.fuelName = Behave.name(r.site.fuelModel);
             r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
                     r.windMph, r.tenMeterWind, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,

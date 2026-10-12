@@ -150,6 +150,16 @@ public final class Spread {
      * @param maxMin  arrivals past this are not followed
      */
     public static Result run(Landscape land, double lat, double lon, double halfKm, double maxMin, Behavior behavior) {
+        return run(land, lat, lon, halfKm, maxMin, behavior, null, 1d);
+    }
+
+    /**
+     * @param seedRing  a perimeter, [lat, lon] pairs: every cell inside it burns at time 0,
+     *                  in place of the single start cell; null for a point start
+     * @param rateScale a multiplier on every cell's rate, from calibration; 1 for none
+     */
+    public static Result run(Landscape land, double lat, double lon, double halfKm, double maxMin, Behavior behavior,
+            double[][] seedRing, double rateScale) {
         // Half the grid's own 30 m: the fuel is sampled nearest, so the run follows the
         // same ground, but the front moves in finer steps and the rings come out smooth.
         final double cell = 15d;
@@ -189,7 +199,7 @@ public final class Spread {
                     else {
                         final double b = r[3], cc = r[4];
                         final double ecc = b > 0 ? Math.max(0, Math.min(0.98, cc / b)) : 0;
-                        c = new Cell(r[0] * 0.3048d, r[1], ecc, r[5], r.length > 6 ? r[6] : 0);
+                        c = new Cell(r[0] * 0.3048d * rateScale, r[1], ecc, r[5], r.length > 6 ? r[6] : 0);
                     }
                     byKind.put(key, c);
                 }
@@ -206,7 +216,22 @@ public final class Spread {
         java.util.Arrays.fill(arrival, Float.POSITIVE_INFINITY);
         final int start = half * nx + half;
         double offsetM = 0, offsetDeg = 0;
-        if (cells[start] == BARRIER) {
+        if (seedRing != null && seedRing.length >= 3) {
+            // Everything inside the perimeter is burning now. Walls inside it are not
+            // (a house already lost is not a source); the edge cells carry the fire out.
+            int lit = 0;
+            for (int y = 0; y < ny; y++)
+                for (int x = 0; x < nx; x++) {
+                    if (cells[y * nx + x] == BARRIER)
+                        continue;
+                    if (inside(seedRing, lat0 + (y + 0.5) * dLat, lon0 + (x + 0.5) * dLon)) {
+                        arrival[y * nx + x] = 0;
+                        lit++;
+                    }
+                }
+            if (lit == 0 && cells[start] != BARRIER)
+                arrival[start] = 0;
+        } else if (cells[start] == BARRIER) {
             // Light the nearest burnable cell instead of refusing: the tap was on a road
             // or a roof. Up to 8 cells (120 m) away, and the result says how far.
             int best = -1;
@@ -349,6 +374,30 @@ public final class Spread {
         if (evt == 7296)
             return 101;   // GR1
         return -1;        // 7300 and anything else developed: a wall
+    }
+
+    /** Point in polygon, ring as [lat, lon] pairs, even-odd. */
+    static boolean inside(double[][] ring, double lat, double lon) {
+        boolean in = false;
+        for (int i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            final double yi = ring[i][0], xi = ring[i][1], yj = ring[j][0], xj = ring[j][1];
+            if ((yi > lat) != (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)
+                in = !in;
+        }
+        return in;
+    }
+
+    /** A ring's area in acres, degrees in, by the shoelace on a local flat ground. */
+    static double ringAcres(double[][] ring) {
+        if (ring == null || ring.length < 3)
+            return 0;
+        final double lat = ring[0][0];
+        final double mLat = 111320d, mLon = 111320d * Math.max(0.02d, Math.cos(Math.toRadians(lat)));
+        double a = 0;
+        for (int i = 0, j = ring.length - 1; i < ring.length; j = i++)
+            a += (ring[j][1] - ring[0][1]) * mLon * (ring[i][0] - ring[0][0]) * mLat
+                    - (ring[i][1] - ring[0][1]) * mLon * (ring[j][0] - ring[0][0]) * mLat;
+        return Math.abs(a) / 2d / 4046.856d;
     }
 
     /** The ellipse's rate in a direction: the head rate at the heading, backing behind. */

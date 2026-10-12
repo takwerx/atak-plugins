@@ -59,9 +59,46 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         view.findViewById(R.id.btn_run).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!model.runFromStart())
+                if (model.perimeter() != null ? !model.runFromPerimeter() : !model.runFromStart())
                     return;
                 render();
+            }
+        });
+        view.findViewById(R.id.btn_perimeter).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (model.perimeter() != null) {
+                    model.clearPerimeter();
+                    render();
+                    return;
+                }
+                closeDropDown();
+                model.drawPerimeter();
+            }
+        });
+        view.findViewById(R.id.btn_started).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final int[] mins = { 0, 10, 20, 30, 45, 60, 90, 120, 180 };
+                final String[] labels = new String[mins.length];
+                int current = 0;
+                for (int i = 0; i < mins.length; i++) {
+                    labels[i] = mins[i] == 0 ? "Not known" : mins[i] + " min ago";
+                    if (mins[i] == model.startedMinutesAgo())
+                        current = i;
+                }
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("When did it start?")
+                        .setSingleChoiceItems(labels, current, new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                                model.setStartedMinutesAgo(mins[which]);
+                                render();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
             }
         });
         view.findViewById(R.id.btn_station).setOnClickListener(new View.OnClickListener() {
@@ -172,7 +209,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             shown = model.last();
         final FireModel.Run r = shown;
         final com.atakmap.coremap.maps.coords.GeoPoint start = model.startPoint();
-        ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && start != null);
+        ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && (start != null || model.perimeter() != null));
+        ((Button) view.findViewById(R.id.btn_perimeter)).setText(model.perimeter() != null ? "Perimeter: drawn (tap to drop)" : "Draw perimeter");
+        final int ago = model.startedMinutesAgo();
+        ((Button) view.findViewById(R.id.btn_started)).setText(ago == 0 ? "Started: not known" : "Started: " + ago + " min ago");
         ((Button) view.findViewById(R.id.btn_conditions)).setText("Conditions: " + FireModel.conditionsLabel(model.conditions()));
         String stationLabel = "Station: automatic";
         if (!model.station().isEmpty()) {
@@ -187,8 +227,9 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             section("Running", model.status());
             return;
         }
-        if (start == null) {
-            section("Fire model", "Tap Place start, then tap the map where the fire starts. Move the marker if it "
+        if (start == null && model.perimeter() == null) {
+            section("Fire model", "Tap Place start, then tap the map where the fire starts. Or Draw perimeter and trace the fire's "
+                    + "edge as you find it; say when it started and the run is scaled to what it has already done. Move the marker if it "
                     + "needs to be exact (drag it, or Fine Adjust on its menu), pick the conditions, then Run model. "
                     + "Where the fire is at 20, 40 and 60 minutes is drawn on the map, with everything the run assumed.");
             return;
@@ -261,7 +302,11 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 goes.append("Embers carry up to ").append(Units.format(r.ground.maxSpotM))
                         .append(" downwind (Albini); the fire crossed a road or a block that way ")
                         .append(r.ground.spotCrossings).append(r.ground.spotCrossings == 1 ? " time.\n" : " times.\n");
-            if (r.ground.startOffsetM > 0)
+            if (r.calibrationNote != null)
+                goes.append(r.calibrationNote).append('\n');
+            if (r.perimeter != null)
+                goes.append("Run from the drawn perimeter: everything inside it was burning at the start.\n");
+            if (r.ground.startOffsetM > 0 && r.perimeter == null)
                 goes.append("The start itself is on ground LANDFIRE marks as not burnable (a road, a roof, bare ground), so the run began "
                         + "from the nearest fuel, ").append(Units.format(r.ground.startOffsetM)).append(" to the ")
                         .append(Units.compass(r.ground.startOffsetDeg)).append(".\n");
