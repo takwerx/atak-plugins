@@ -557,7 +557,7 @@ public final class CamDepotPane implements CameraStore.Listener {
         distanceFold.label("Distance", radiusBig <= 0 ? "Off, the whole state"
                 : String.format(Locale.US, "Within %.0f %s of %s", radiusBig,
                         Units.bigLabel(), center == null ? "My Location" : "Map Center"));
-        reachFold.label("Look At reach", lookReachLabel(lookReachBig));
+        reachFold.label("Suggest reach", lookReachLabel(lookReachBig));
         lookReachButton.setText("Within " + lookReachLabel(lookReachBig).toLowerCase(Locale.US));
         final double limit = layer.getMaxResolution();
         gateFold.label("Zoom gate", limit == Double.MAX_VALUE ? "Always drawn"
@@ -970,7 +970,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                 }
                 final String[] arr = names.toArray(new String[0]);
                 new AlertDialog.Builder(mapView.getContext())
-                        .setTitle("A camera is trusted to see the point within")
+                        .setTitle("Suggest cameras within")
                         .setSingleChoiceItems(arr, checked,
                                 new android.content.DialogInterface.OnClickListener() {
                                     @Override
@@ -1852,13 +1852,13 @@ public final class CamDepotPane implements CameraStore.Listener {
             lastNoBearing = blind.size();
             heads = new ArrayList<>();
             groups = new ArrayList<>();
-            heads.add(String.format(Locale.US, "See the point (%,d)", lastSees.size()));
+            heads.add(String.format(Locale.US, "Suggested (%,d)", lastSees.size()));
             groups.add(new ArrayList<>(lastSees));
             heads.add(String.format(Locale.US,
-                    "PTZ in range, pointed elsewhere (%,d)", ptz.size()));
+                    "Could be turned to it (%,d)", ptz.size()));
             groups.add(ptz);
             heads.add(String.format(Locale.US,
-                    "In range, no bearing reported (%,d)", blind.size()));
+                    "No bearing reported (%,d)", blind.size()));
             groups.add(blind);
             out.clear();
             out.addAll(lastSees);
@@ -1945,7 +1945,7 @@ public final class CamDepotPane implements CameraStore.Listener {
         if (lookAt == null) {
             lookAtLabel.setVisibility(View.GONE);
             lookAtButton.setText(picking ? "Tap the Map\u2026 (Cancel)"
-                    : "Look At a Point");
+                    : "Suggest Cameras");
             // Gone, not greyed: a grey "Show Bearings" above a grey "No bearings
             // shown" read as two switches saying no (operator, 2026-10-11).
             lookAtBearingsButton.setVisibility(View.GONE);
@@ -1954,13 +1954,13 @@ public final class CamDepotPane implements CameraStore.Listener {
         lookAtBearingsButton.setVisibility(View.VISIBLE);
         lookAtLabel.setVisibility(View.VISIBLE);
         lookAtLabel.setText(String.format(Locale.US,
-                "%,d see the point, %,d PTZ could turn to it, %,d in range report "
-                        + "no bearing", lastSees.size(), lastPtzCould, lastNoBearing));
-        lookAtButton.setText("Clear Look At");
+                "%,d suggested, %,d could be turned to it, %,d in range report no "
+                        + "bearing", lastSees.size(), lastPtzCould, lastNoBearing));
+        lookAtButton.setText("Clear Suggestion");
         final int n = lastSees.size();
         lookAtBearingsButton.setEnabled(n > 0);
         if (n == 0) {
-            lookAtBearingsButton.setText("None See the Point");
+            lookAtBearingsButton.setText("None to Suggest");
             lookAtBearingsButton.setTextColor(0xFFFFFFFF);
             return;
         }
@@ -2045,7 +2045,7 @@ public final class CamDepotPane implements CameraStore.Listener {
         // that can see further than that is not listed, and this says so.
         if (lookAt != null)
             msg.append(String.format(Locale.US,
-                    "\nLooking At: cameras within %s of the point, aim as of the "
+                    "\nSuggesting cameras within %s of the point, aim as of the "
                             + "last refresh", Units.format(lookReachMeters())));
         if (favoritesFirst) {
             // A favorites list that is quietly shorter than its own count reads as
