@@ -26,7 +26,7 @@ public final class Weather {
     public static final class Reading {
         public final String station;
         public final String wxId;
-        /** "RAWS" or "NWS": where the reading came from, for the page and the picker. */
+        /** "RAWS", "NWS" (an observation station) or "NWS forecast" (the grid at the point). */
         public final String source;
         /** True when the wind is a 10 m reading (NWS networks), false for a RAWS 20 ft wind. */
         public final boolean tenMeterWind;
@@ -56,10 +56,10 @@ public final class Weather {
             fuelMoisture = number(a.optString("FuelMoisture", ""));
         }
 
-        /** An NWS observation station with its latest reading. */
-        Reading(String id, String name, double lat, double lon, int elevationFt, long observedAt,
+        /** An NWS observation station with its latest reading, or the forecast grid at the point. */
+        Reading(String source, String id, String name, double lat, double lon, int elevationFt, long observedAt,
                 double windMph, double gustMph, double windFromDeg, double rh, double tempF) {
-            source = "NWS";
+            this.source = source;
             tenMeterWind = true;
             station = name;
             wxId = id;
@@ -139,7 +139,7 @@ public final class Weather {
                     at = com.atakmap.coremap.maps.time.CoordinatedTime.fromCot(o.optString("timestamp", "")).getMilliseconds();
                 } catch (Exception ignored) {
                 }
-                final Reading r = new Reading((String) s[1], (String) s[2], (Double) s[3], (Double) s[4], (Integer) s[5], at,
+                final Reading r = new Reading("NWS", (String) s[1], (String) s[2], (Double) s[3], (Double) s[4], (Integer) s[5], at,
                         windKmh / 1.609344d, Double.isNaN(gustKmh) ? Double.NaN : gustKmh / 1.609344d, dir, rh,
                         Double.isNaN(tempC) ? Double.NaN : tempC * 9d / 5d + 32d);
                 r.distanceM = (Double) s[6];
@@ -149,6 +149,90 @@ public final class Weather {
             }
         }
         return out;
+    }
+
+    /**
+     * The NWS forecast grid's values at the point for a moment: 10 m wind, gust,
+     * humidity and temperature from the 2.5 km grid the local office edits. Two
+     * requests: the point, then the grid it names. A 20 ft wind sits in the grid
+     * for some offices and not others (LOX has none, 2026-10-12), so the 10 m wind
+     * is used, which the engine scales. Worker thread; null when the grid has no wind.
+     */
+    public static Reading forecastAt(double lat, double lon, long whenMillis) throws Exception {
+        final JSONObject pt = new JSONObject(Esri.get(String.format(Locale.US,
+                "https://api.weather.gov/points/%.4f,%.4f", lat, lon))).optJSONObject("properties");
+        if (pt == null)
+            return null;
+        final String gridUrl = pt.optString("forecastGridData", "");
+        if (!gridUrl.startsWith("https://api.weather.gov/gridpoints/"))
+            return null;
+        final JSONObject g = new JSONObject(Esri.get(gridUrl)).optJSONObject("properties");
+        if (g == null)
+            return null;
+        final double windKmh = seriesAt(g, "windSpeed", whenMillis), dir = seriesAt(g, "windDirection", whenMillis);
+        final double gustKmh = seriesAt(g, "windGust", whenMillis), rh = seriesAt(g, "relativeHumidity", whenMillis);
+        final double tempC = seriesAt(g, "temperature", whenMillis);
+        if (Double.isNaN(windKmh) || Double.isNaN(dir))
+            return null;
+        final JSONObject el = g.optJSONObject("elevation");
+        final double elevM = el == null ? Double.NaN : el.optDouble("value", Double.NaN);
+        final Reading r = new Reading("NWS forecast", "FORECAST", "NWS forecast for this spot", lat, lon,
+                Double.isNaN(elevM) ? 0 : (int) Math.round(elevM / 0.3048d), whenMillis,
+                windKmh / 1.609344d, Double.isNaN(gustKmh) ? Double.NaN : gustKmh / 1.609344d, dir, rh,
+                Double.isNaN(tempC) ? Double.NaN : tempC * 9d / 5d + 32d);
+        r.distanceM = 0;
+        return r;
+    }
+
+    /** The value of a grid series that covers a moment, else the last one that started before it; NaN for none. */
+    static double seriesAt(JSONObject g, String key, long when) {
+        final JSONObject s = g.optJSONObject(key);
+        final JSONArray vals = s == null ? null : s.optJSONArray("values");
+        if (vals == null)
+            return Double.NaN;
+        double best = Double.NaN;
+        long bestStart = Long.MIN_VALUE;
+        for (int i = 0; i < vals.length(); i++) {
+            final JSONObject v = vals.optJSONObject(i);
+            if (v == null || v.isNull("value"))
+                continue;
+            final String vt = v.optString("validTime", "");
+            final int slash = vt.indexOf('/');
+            if (slash < 0)
+                continue;
+            final long start, end;
+            try {
+                start = com.atakmap.coremap.maps.time.CoordinatedTime.fromCot(vt.substring(0, slash)).getMilliseconds();
+                end = start + isoDurationMillis(vt.substring(slash + 1));
+            } catch (Exception e) {
+                continue;
+            }
+            if (start <= when && when < end)
+                return v.optDouble("value", Double.NaN);
+            if (start <= when && start > bestStart) {
+                bestStart = start;
+                best = v.optDouble("value", Double.NaN);
+            }
+        }
+        return best;
+    }
+
+    /** "PT5H", "PT30M", "P1DT6H" to milliseconds. */
+    static long isoDurationMillis(String d) {
+        long ms = 0;
+        final java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("P(?:(\\d+)D)?(?:T(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?)?").matcher(d.trim());
+        if (!m.matches())
+            return 3600000L;
+        if (m.group(1) != null)
+            ms += Long.parseLong(m.group(1)) * 86400000L;
+        if (m.group(2) != null)
+            ms += Long.parseLong(m.group(2)) * 3600000L;
+        if (m.group(3) != null)
+            ms += Long.parseLong(m.group(3)) * 60000L;
+        if (m.group(4) != null)
+            ms += Long.parseLong(m.group(4)) * 1000L;
+        return ms == 0 ? 3600000L : ms;
     }
 
     /** An NWS {unitCode, value} quantity's value, NaN when null or missing. */

@@ -74,10 +74,11 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 int current = 0;
                 for (int i = 0; i < list.size(); i++) {
                     final Weather.Reading s = list.get(i);
-                    labels[1 + i] = s.station + " (" + s.source + ") · " + Units.format(s.distanceM)
+                    labels[1 + i] = s.station + " (" + s.source + ")" + ("NWS forecast".equals(s.source) ? "" : " · " + Units.format(s.distanceM))
                             + (s.elevationFt > 0 && r != null && !Double.isNaN(r.startElevFt)
                                     ? String.format(Locale.US, " · %+,.0f ft", s.elevationFt - r.startElevFt) : "")
                             + String.format(Locale.US, " · %.0f mph from %s", s.windMph, Units.compass(s.windFromDeg))
+                            + (Double.isNaN(s.gustMph) || s.gustMph <= s.windMph ? "" : String.format(Locale.US, " gust %.0f", s.gustMph))
                             + (Double.isNaN(s.relativeHumidity) ? "" : String.format(Locale.US, " · RH %.0f%%", s.relativeHumidity));
                     if (s.wxId.equals(model.station()))
                         current = 1 + i;
@@ -101,8 +102,9 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         view.findViewById(R.id.btn_conditions).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final String[] keys = { FireModel.COND_OBSERVED, FireModel.COND_DRY, FireModel.COND_DRY_WINDY };
-                final String[] labels = { "As observed at the nearest station",
+                final String[] keys = { FireModel.COND_OBSERVED, FireModel.COND_GUST, FireModel.COND_DRY, FireModel.COND_DRY_WINDY };
+                final String[] labels = { "As observed at the station picked",
+                        "As observed, but at the gust",
                         "Dry day: 1 h 4%, 10 h 5%, 100 h 7%, wind as observed",
                         "Dry and 20 mph wind" };
                 int current = 0;

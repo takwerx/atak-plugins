@@ -167,7 +167,7 @@ public final class FireModel {
     private boolean started;
 
     /** What the run assumes about the day: the station as read, or a dry preset. */
-    public static final String COND_OBSERVED = "observed", COND_DRY = "dry", COND_DRY_WINDY = "drywindy";
+    public static final String COND_OBSERVED = "observed", COND_GUST = "gust", COND_DRY = "dry", COND_DRY_WINDY = "drywindy";
     private final android.content.SharedPreferences prefs;
     private static final String PREF_COND = "model.conditions", PREF_LAT = "model.startLat", PREF_LON = "model.startLon";
     private static final String PREF_STATION = "model.station";
@@ -190,6 +190,8 @@ public final class FireModel {
     }
 
     public static String conditionsLabel(String c) {
+        if (COND_GUST.equals(c))
+            return "As observed, gusts";
         if (COND_DRY.equals(c))
             return "Dry day";
         if (COND_DRY_WINDY.equals(c))
@@ -583,12 +585,26 @@ public final class FireModel {
                         Log.w(TAG, "NWS stations failed", e);
                     }
                     try {
+                        final Weather.Reading fc = Weather.forecastAt(lat, lon, r.ranAt);
+                        if (fc != null)
+                            r.stations.add(0, fc);
+                    } catch (Exception e) {
+                        Log.w(TAG, "NWS forecast grid failed", e);
+                    }
+                    try {
                         final String want = station();
                         for (Weather.Reading s : r.stations)
                             if (!want.isEmpty() && want.equals(s.wxId))
                                 r.weather = s;
-                        if (r.weather == null)
-                            r.weather = Weather.representative(r.stations, r.startElevFt);
+                        if (r.weather == null) {
+                            final java.util.List<Weather.Reading> observed = new java.util.ArrayList<>();
+                            for (Weather.Reading s : r.stations)
+                                if (!"NWS forecast".equals(s.source))
+                                    observed.add(s);
+                            r.weather = Weather.representative(observed, r.startElevFt);
+                            if (r.weather == null && !r.stations.isEmpty())
+                                r.weather = r.stations.get(0);
+                        }
                     } catch (Exception e) {
                         Log.w(TAG, "RAWS failed", e);
                     }
@@ -628,7 +644,7 @@ public final class FireModel {
         // Fuel moisture: the nearest station's 10-hour stick when it has one, dry fall
         // defaults when it does not. Live fuels at cured-season values.
         final Weather.Reading w = r.weather;
-        final boolean dry = !COND_OBSERVED.equals(r.conditions);
+        final boolean dry = COND_DRY.equals(r.conditions) || COND_DRY_WINDY.equals(r.conditions);
         if (dry) {
             r.m1 = 4;
             r.m10 = 5;
@@ -656,11 +672,19 @@ public final class FireModel {
             r.windMph = 20;
             r.windFromDeg = w != null && w.hasWind() ? w.windFromDeg : 0;
             r.windNote = "preset 20 mph" + (w != null && w.hasWind() ? ", from the direction " + w.station + " reads" : ", from the north");
+        } else if (COND_GUST.equals(r.conditions) && w != null && w.hasWind()) {
+            final boolean hasGust = !Double.isNaN(w.gustMph) && w.gustMph > w.windMph;
+            r.windMph = hasGust ? w.gustMph : w.windMph;
+            r.windFromDeg = w.windFromDeg;
+            r.tenMeterWind = w.tenMeterWind;
+            r.windNote = (hasGust ? "the gust at " : "no gust reported, the wind at ") + w.station + " (" + w.source + ")"
+                    + ("NWS forecast".equals(w.source) ? "" : ", " + Units.format(w.distanceM) + " away") + heightNote(r, w);
         } else if (w != null && w.hasWind()) {
             r.windMph = w.windMph;
             r.windFromDeg = w.windFromDeg;
             r.tenMeterWind = w.tenMeterWind;
-            r.windNote = w.station + " (" + w.source + "), " + Units.format(w.distanceM) + " away" + heightNote(r, w);
+            r.windNote = w.station + " (" + w.source + ")"
+                    + ("NWS forecast".equals(w.source) ? ", at this spot" : ", " + Units.format(w.distanceM) + " away") + heightNote(r, w);
         } else {
             r.windMph = 0;
             r.windFromDeg = 0;
