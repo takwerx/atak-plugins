@@ -143,4 +143,18 @@
         <item name="android:ellipsize">end</item>
     </style>
 
+    <!--
+        Section heading, per the plugin-ui rule of 2026-10-11: cyan, bold and full
+        strength, so a section change is seen rather than hunted for. The faint
+        10sp small caps it replaces were easy to scroll straight past.
+    -->
+    <style name="TakwerxPageHeading">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">#00E5FF</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">2dp</item>
+    </style>
+
 </resources>
