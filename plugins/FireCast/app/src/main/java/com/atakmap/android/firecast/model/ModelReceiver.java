@@ -124,8 +124,30 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         view.findViewById(R.id.btn_clear).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                model.clear();
-                render();
+                final java.util.List<FireModel.Run> runs = model.runs();
+                if (runs.isEmpty()) {
+                    model.clearAll();
+                    render();
+                    return;
+                }
+                final String[] labels = new String[runs.size() + 1];
+                for (int i = 0; i < runs.size(); i++)
+                    labels[i] = runs.get(i).label();
+                labels[runs.size()] = "All runs and the start marker";
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("Clear which run?")
+                        .setItems(labels, new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface dialog, int which) {
+                                if (which == runs.size())
+                                    model.clearAll();
+                                else
+                                    model.clear(runs.get(which));
+                                render();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
             }
         });
     }
@@ -197,6 +219,15 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         section("How hard it burns", flame);
 
         inputs(r);
+
+        final java.util.List<FireModel.Run> runs = model.runs();
+        if (runs.size() > 1) {
+            final StringBuilder sb = new StringBuilder();
+            for (FireModel.Run x : runs)
+                sb.append(x == r ? "This one: " : "").append(x.label()).append('\n');
+            sb.append("Each run is its own layer under Fire Cast fire model in Overlay Manager; Clear takes one off.");
+            section("Runs on the map", sb.toString().trim());
+        }
 
         section("What this does not mean",
                 "One fuel, one slope and one wind for the whole run, read at the start point. Real fire crosses "

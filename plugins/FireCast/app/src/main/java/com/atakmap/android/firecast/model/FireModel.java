@@ -92,6 +92,20 @@ public final class FireModel {
         public String conditions = COND_OBSERVED;
         /** Why there is no result, when there is none. */
         public String problem;
+        /** The feature set that draws this run, 0 until drawn. */
+        public long fsid;
+
+        /** "20:43 run, SH2, 10 mph from SE": how a run is named in a list. */
+        public String label() {
+            final StringBuilder sb = new StringBuilder(stamp(ranAt)).append(" run");
+            if (fuelName != null && !fuelName.isEmpty())
+                sb.append(", ").append(fuelName.split(" ")[0]);
+            if (result != null)
+                sb.append(String.format(Locale.US, ", %.0f mph from %s", windMph, Units.compass(windFromDeg)));
+            if (!COND_OBSERVED.equals(conditions))
+                sb.append(", ").append(conditionsLabel(conditions).toLowerCase(Locale.US));
+            return sb.toString();
+        }
 
         /** Head fire distance at a time, meters. */
         public double headM(int minutes) {
@@ -109,6 +123,9 @@ public final class FireModel {
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
     private volatile Run last;
+    /** Every run on the map, newest first; each is its own feature set and its own layer in Overlay Manager. */
+    private final List<Run> runs = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private static final int MAX_RUNS = 10;
     private volatile boolean running;
     private volatile String conditionsForRun = COND_OBSERVED;
     private volatile String status = "";
@@ -306,6 +323,11 @@ public final class FireModel {
 
     public Run last() {
         return last;
+    }
+
+    /** The runs on the map, newest first. */
+    public List<Run> runs() {
+        return new ArrayList<>(runs);
     }
 
     public boolean isRunning() {
@@ -508,10 +530,19 @@ public final class FireModel {
                 }
                 last = r;
                 status = r.problem != null ? r.problem : "Model on the map";
-                synchronized (lock) {
-                    drawLocked(r);
+                if (r.problem == null) {
+                    synchronized (lock) {
+                        drawLocked(r);
+                    }
+                    runs.add(0, r);
+                    while (runs.size() > MAX_RUNS) {
+                        final Run old = runs.remove(runs.size() - 1);
+                        synchronized (lock) {
+                            dropLocked(old);
+                        }
+                    }
+                    save();
                 }
-                save(r);
                 running = false;
                 changed();
             }
@@ -597,8 +628,26 @@ public final class FireModel {
                     r.fuelName == null || r.fuelName.isEmpty() ? "this fuel" : r.fuelName.split(" ")[0]);
     }
 
-    /** Takes the run off the map and forgets it: the operator's own Clear. */
-    public void clear() {
+    /** Takes one run off the map and forgets it: the operator's own Clear. */
+    public void clear(final Run r) {
+        runs.remove(r);
+        if (last == r)
+            last = runs.isEmpty() ? null : runs.get(0);
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock) {
+                    dropLocked(r);
+                }
+                save();
+                changed();
+            }
+        });
+    }
+
+    /** Takes every run and the start marker off the map and forgets them all. */
+    public void clearAll() {
+        runs.clear();
         last = null;
         status = "";
         removeMarker();
@@ -607,7 +656,7 @@ public final class FireModel {
             @Override
             public void run() {
                 synchronized (lock) {
-                    drawLocked(null);
+                    dropAllLocked();
                 }
                 if (saveFile.isFile() && !saveFile.delete())
                     Log.w(TAG, "could not delete " + saveFile);
@@ -652,26 +701,19 @@ public final class FireModel {
         store = null;
     }
 
-    /** Replaces whatever is drawn with this run's ellipses; null empties it. Lock held. */
+    /** Draws this run's ellipses as a feature set of their own, beside the other runs. Lock held. */
     private void drawLocked(Run r) {
-        if (store == null)
+        if (store == null || r == null || r.result == null || r.problem != null)
             return;
         boolean bulk = false;
         try {
             store.acquireModifyLock(true);
             bulk = true;
-            final List<Long> old = new ArrayList<>();
-            final FeatureSetCursor c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
-            try {
-                while (c.moveToNext())
-                    old.add(c.getId());
-            } finally {
-                c.close();
-            }
-            if (r != null && r.result != null && r.problem == null) {
+            {
                 final long fsid = store.insertFeatureSet(new FeatureSet("Fire Cast", "Fire model",
-                        "Fire model " + stamp(r.ranAt), Double.MAX_VALUE, 0d));
+                        r.label(), Double.MAX_VALUE, 0d));
                 store.setFeatureSetVisible(fsid, true);
+                r.fsid = fsid;
                 // Largest first so the 20 minute ring draws on top of the 60.
                 final int[] colors = { 0xFFD600, 0xFF8A00, 0xFF2A00 };
                 for (int i = STEPS_MIN.length - 1; i >= 0; i--) {
@@ -685,13 +727,43 @@ public final class FireModel {
                             Feature.AltitudeMode.ClampToGround, 0d));
                 }
             }
-            for (Long id : old)
-                store.deleteFeatureSet(id);
         } catch (Exception e) {
             Log.w(TAG, "model draw failed", e);
         } finally {
             if (bulk)
                 store.releaseModifyLock();
+        }
+    }
+
+    /** Takes one run's set out of the store. Lock held. */
+    private void dropLocked(Run r) {
+        if (store == null || r == null || r.fsid <= 0)
+            return;
+        try {
+            store.deleteFeatureSet(r.fsid);
+        } catch (Exception e) {
+            Log.w(TAG, "model drop failed", e);
+        }
+        r.fsid = 0;
+    }
+
+    /** Empties the store. Lock held. */
+    private void dropAllLocked() {
+        if (store == null)
+            return;
+        try {
+            final List<Long> old = new ArrayList<>();
+            final FeatureSetCursor c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
+            try {
+                while (c.moveToNext())
+                    old.add(c.getId());
+            } finally {
+                c.close();
+            }
+            for (Long id : old)
+                store.deleteFeatureSet(id);
+        } catch (Exception e) {
+            Log.w(TAG, "model drop all failed", e);
         }
     }
 
@@ -749,10 +821,32 @@ public final class FireModel {
 
     // ---- the last run survives a restart ------------------------------------------
 
-    private void save(Run r) {
-        if (r == null || r.result == null || r.problem != null)
-            return;
+    private void save() {
         try {
+            final org.json.JSONArray all = new org.json.JSONArray();
+            for (Run r : runs)
+                if (r.result != null && r.problem == null)
+                    all.put(toJson(r));
+            final JSONObject out = new JSONObject().put("runs", all);
+            final File tmp = new File(root, "model.json.tmp");
+            final java.io.Writer w = new java.io.OutputStreamWriter(
+                    new java.io.FileOutputStream(tmp), java.nio.charset.StandardCharsets.UTF_8);
+            try {
+                w.write(out.toString());
+            } finally {
+                w.close();
+            }
+            if (!tmp.renameTo(saveFile)) {
+                saveFile.delete();
+                tmp.renameTo(saveFile);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "could not save the model runs", e);
+        }
+    }
+
+    private static JSONObject toJson(Run r) throws Exception {
+        {
             final JSONObject o = new JSONObject();
             o.put("lat", r.lat).put("lon", r.lon).put("ranAt", r.ranAt);
             o.put("fuelModel", r.site.fuelModel).put("slopeDeg", r.site.slopeDeg)
@@ -766,20 +860,7 @@ public final class FireModel {
                         .put("rh", r.weather.relativeHumidity).put("tempF", r.weather.airTempF)
                         .put("gustMph", r.weather.gustMph).put("stationM", r.weather.distanceM);
             }
-            final File tmp = new File(root, "model.json.tmp");
-            final java.io.Writer w = new java.io.OutputStreamWriter(
-                    new java.io.FileOutputStream(tmp), java.nio.charset.StandardCharsets.UTF_8);
-            try {
-                w.write(o.toString());
-            } finally {
-                w.close();
-            }
-            if (!tmp.renameTo(saveFile)) {
-                saveFile.delete();
-                tmp.renameTo(saveFile);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "could not save the model run", e);
+            return o;
         }
     }
 
@@ -799,7 +880,36 @@ public final class FireModel {
             } finally {
                 rd.close();
             }
-            final JSONObject o = new JSONObject(sb.toString());
+            final JSONObject file = new JSONObject(sb.toString());
+            org.json.JSONArray arr = file.optJSONArray("runs");
+            if (arr == null)
+                arr = new org.json.JSONArray().put(file);   // the single-run file from before
+            final List<Run> read = new ArrayList<>();
+            for (int i = 0; i < arr.length(); i++)
+                read.add(fromJson(arr.getJSONObject(i)));
+            if (!runs.isEmpty())
+                return;   // a run finished first
+            for (Run r : read) {
+                if (r == null)
+                    continue;
+                synchronized (lock) {
+                    drawLocked(r);
+                }
+                runs.add(r);
+            }
+            if (!runs.isEmpty()) {
+                last = runs.get(0);
+                status = "Model on the map, " + stamp(last.ranAt) + " run";
+            }
+            changed();
+        } catch (Exception e) {
+            Log.w(TAG, "could not read the saved model runs", e);
+        }
+    }
+
+    /** One saved run back through the library; null when it does not come out. */
+    private static Run fromJson(JSONObject o) {
+        try {
             final Run r = new Run();
             r.lat = o.getDouble("lat");
             r.lon = o.getDouble("lon");
@@ -824,18 +934,10 @@ public final class FireModel {
                     r.windMph, r.tenMeterWind, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
                     r.site.coverPct, r.canopyHeightFt, r.crownRatio);
             finish(r);
-            if (r.problem != null)
-                return;
-            if (last != null)
-                return;
-            last = r;
-            status = "Model on the map, " + stamp(r.ranAt) + " run";
-            synchronized (lock) {
-                drawLocked(r);
-            }
-            changed();
+            return r.problem != null ? null : r;
         } catch (Exception e) {
-            Log.w(TAG, "could not read the saved model run", e);
+            Log.w(TAG, "could not read a saved model run", e);
+            return null;
         }
     }
 
