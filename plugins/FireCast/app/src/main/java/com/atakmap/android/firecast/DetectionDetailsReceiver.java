@@ -56,6 +56,7 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
             @Override
             public void onClick(View v) {
                 closeDropDown();
+                feed.reopenPane();
             }
         });
         view.findViewById(R.id.btn_goto).setOnClickListener(new View.OnClickListener() {

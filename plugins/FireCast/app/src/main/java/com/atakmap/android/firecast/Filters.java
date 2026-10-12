@@ -30,6 +30,14 @@ public class Filters {
     public boolean showMaskAreas = false;
     /** Minutes between automatic refreshes; 0 is manual only. */
     public int refreshMinutes = 10;
+    /** {@link #AREA_VIEW} or {@link #AREA_RADIUS}: the area the map and the list answer. */
+    public String area = AREA_VIEW;
+    /** The radius, meters, when the area is a circle around the operator. */
+    public double areaM = Units.bigToMeters(25);
+
+    public static final String AREA_VIEW = "view", AREA_RADIUS = "radius";
+    /** Radius presets in the operator's large unit, so the list reads in one unit. */
+    public static final int[] AREA_CHOICES = { 5, 15, 25, 50 };
 
     public static final int[] WINDOW_CHOICES = { 3, 6, 12, 24, 48, 72 };
     public static final int[] REFRESH_CHOICES = { 0, 5, 10, 15, 30, 60 };
@@ -44,6 +52,12 @@ public class Filters {
         industrial = prefs.getInt("industrial", INDUSTRIAL_FLAG);
         showMaskAreas = prefs.getBoolean("showMaskAreas", false);
         refreshMinutes = prefs.getInt("refreshMinutes", 10);
+        area = prefs.getString("area", AREA_VIEW);
+        areaM = prefs.getFloat("areaM", (float) Units.bigToMeters(25));
+    }
+
+    public boolean areaIsRadius() {
+        return AREA_RADIUS.equals(area);
     }
 
     public boolean isOn(String sourceId) {
@@ -65,6 +79,8 @@ public class Filters {
                 .putInt("industrial", industrial)
                 .putBoolean("showMaskAreas", showMaskAreas)
                 .putInt("refreshMinutes", refreshMinutes)
+                .putString("area", area)
+                .putFloat("areaM", (float) areaM)
                 .apply();
     }
 
@@ -113,6 +129,13 @@ public class Filters {
 
     public String industrialLabel() {
         return industrial == INDUSTRIAL_HIDE ? "Industrial hidden" : "Industrial flagged";
+    }
+
+    /** The Area row's head, "Name: value", the way every takwerx Settings row reads. */
+    public String areaLabel() {
+        return areaIsRadius()
+                ? "Area: Within " + Units.formatBig(areaM) + " of My Location"
+                : "Area: What is in view";
     }
 
     public String refreshLabel() {

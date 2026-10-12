@@ -70,6 +70,12 @@ public class FireCast implements IPlugin {
         mapView = MapView.getMapView();
         if (mapView != null && feed == null) {
             feed = new DetectionFeed(mapView, pluginContext);
+            feed.setPaneOpener(new Runnable() {
+                @Override
+                public void run() {
+                    showPane();
+                }
+            });
             feed.start();
         }
     }

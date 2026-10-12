@@ -54,11 +54,21 @@
         style="@style/TakwerxSectionHeading"
         android:paddingTop="4dp" />
 
+    <!-- The area the map and the list answer: what is in view, or a circle around the
+         operator. The same Area control every takwerx plugin carries. -->
+    <Button
+        android:id="@+id/btn_area"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Area: What is in view" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="2dp">
+        android:paddingTop="6dp">
         <Button
             android:id="@+id/btn_window"
             style="@style/TakwerxButton"

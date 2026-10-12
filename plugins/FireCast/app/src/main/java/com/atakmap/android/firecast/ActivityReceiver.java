@@ -74,6 +74,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
             @Override
             public void onClick(View v) {
                 closeDropDown();
+                feed.reopenPane();
             }
         });
         view.findViewById(R.id.btn_reload).setOnClickListener(new View.OnClickListener() {
@@ -112,8 +113,10 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         }
         closeDropDown();
         // The map has moved somewhere new, so ask for that area now rather than waiting
-        // out the tick that would have noticed.
+        // out the tick that would have noticed; and the pane comes back with the list
+        // for the place just flown to.
         feed.refresh();
+        feed.reopenPane();
     }
 
     private void pickState() {

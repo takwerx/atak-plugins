@@ -90,6 +90,10 @@ public class DetectionFeed {
     private DetectionDetailsReceiver details;
     private ActivityReceiver activity;
     private com.atakmap.android.menu.MapMenuEventListener tapListener;
+    /** True when the area is a radius but there is no GPS fix, so it is measured from the map center. */
+    public volatile boolean noFix;
+    private long lastMoveFetch;
+    private static final long MOVE_FETCH_GAP_MS = 3000L;
     private Listener listener;
     private boolean started;
 
@@ -122,6 +126,26 @@ public class DetectionFeed {
         this.state = mapView.getContext().getSharedPreferences("firecast", Context.MODE_PRIVATE);
         this.filters = new Filters(state);
         this.lastRefresh = state.getLong("lastRefresh", 0L);
+    }
+
+    private Runnable paneOpener;
+
+    /** How the plugin shows its pane; a page's Back goes back to it. */
+    public void setPaneOpener(Runnable r) {
+        paneOpener = r;
+    }
+
+    /**
+     * Back on a page returns to the pane, not to the bare map. The pages are drop-downs
+     * and the pane is a Pane, so ATAK closes the pane when a page opens and nothing
+     * reopens it by itself (operator, 2026-10-11: "back does not go back to list").
+     * Posted, so the drop-down has finished closing before the pane is asked for.
+     */
+    public void reopenPane() {
+        final Runnable r = paneOpener;
+        if (r == null)
+            return;
+        main.postDelayed(r, 150);
     }
 
     public void setListener(Listener l) {
@@ -157,8 +181,51 @@ public class DetectionFeed {
         af.addAction(ActivityReceiver.ACTION, "list where fires are burning, beyond the map extent");
         AtakBroadcast.getInstance().registerReceiver(activity, af);
         registerTap();
+        mapView.addOnMapMovedListener(moved);
         main.postDelayed(timer, TICK_MS);
         refresh();
+    }
+
+    /**
+     * The map follows a pan on its own. {@code onMapMoved} runs on ATAK's GL thread,
+     * where touching a View or a map item is a native crash with no Java stack, so it
+     * only reschedules a settle on main; the work happens 400 ms after the last move.
+     */
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener moved =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView v, boolean animate) {
+                    main.removeCallbacks(settled);
+                    main.postDelayed(settled, 400);
+                }
+            };
+    private final Runnable settled = new Runnable() {
+        @Override
+        public void run() {
+            if (started)
+                followScope();
+        }
+    };
+
+    /**
+     * Re-reads what is in the area and fetches again only when the area left the box
+     * the last fetch covered. A move the rate limit drops is picked up by the minute
+     * tick, which asks the same question, so the list is never stale past a minute.
+     * Main thread. Also what a change of Area calls.
+     */
+    public void followScope() {
+        changed();
+        final long now = System.currentTimeMillis();
+        if (refreshing || now - lastMoveFetch < MOVE_FETCH_GAP_MS)
+            return;
+        try {
+            if (movedOffTheBox()) {
+                lastMoveFetch = now;
+                refresh();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "follow failed", e);
+        }
     }
 
     /**
@@ -228,6 +295,11 @@ public class DetectionFeed {
     public void stop() {
         started = false;
         main.removeCallbacks(timer);
+        main.removeCallbacks(settled);
+        try {
+            mapView.removeOnMapMovedListener(moved);
+        } catch (Exception ignored) {
+        }
         if (tapListener != null) {
             final com.atakmap.android.menu.MapMenuReceiver menus =
                     com.atakmap.android.menu.MapMenuReceiver.getInstance();
@@ -380,11 +452,70 @@ public class DetectionFeed {
         final Esri.Box fetchedFor = box;
         if (fetchedFor == null)
             return true;
-        final Esri.Box view = viewBox();
+        final Esri.Box view = scopeBox();
         if (view == null)
             return false;
         return !(fetchedFor.south <= view.south && fetchedFor.north >= view.north
                 && fetchedFor.west <= view.west && fetchedFor.east >= view.east);
+    }
+
+    // ---- the area: what is in view, or a circle around the operator -------------
+
+    /** The operator's own position, or null without a fix. A point at 0,0 is not a fix. */
+    private double[] ownPosition() {
+        try {
+            final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
+            final com.atakmap.coremap.maps.coords.GeoPoint p = self == null ? null : self.getPoint();
+            if (p == null || !p.isValid()
+                    || (Math.abs(p.getLatitude()) < 0.01 && Math.abs(p.getLongitude()) < 0.01))
+                return null;
+            return new double[] { p.getLatitude(), p.getLongitude() };
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Where a radius is measured from: the operator, or the map center with no fix. */
+    private double[] areaPoint() {
+        final double[] me = ownPosition();
+        noFix = me == null;
+        if (me != null)
+            return me;
+        final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+        if (c == null || !c.isValid())
+            return null;
+        return new double[] { c.getLatitude(), c.getLongitude() };
+    }
+
+    /** The box the area occupies: the view, or the square around the radius. */
+    private Esri.Box scopeBox() {
+        if (!filters.areaIsRadius())
+            return viewBox();
+        final double[] p = areaPoint();
+        if (p == null)
+            return null;
+        final double dLat = filters.areaM / 111320d;
+        final double dLon = filters.areaM / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(p[0]))));
+        return new Esri.Box(Math.max(-90, p[0] - dLat), Math.max(-180, p[1] - dLon),
+                Math.min(90, p[0] + dLat), Math.min(180, p[1] + dLon));
+    }
+
+    /** Distance from the area's point, meters, or -1 when there is no point. */
+    public double distanceM(HeatDetection d) {
+        final double[] p = areaPoint();
+        if (p == null)
+            return -1;
+        return com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(
+                new com.atakmap.coremap.maps.coords.GeoPoint(p[0], p[1]),
+                new com.atakmap.coremap.maps.coords.GeoPoint(d.lat, d.lon));
+    }
+
+    /** The area in words for the status line: "the area on screen", "within 25 mi of you". */
+    public String areaText() {
+        if (!filters.areaIsRadius())
+            return "the area on screen";
+        return "within " + Units.formatBig(filters.areaM)
+                + (noFix ? " of the map center, no GPS fix" : " of you");
     }
 
     /** What the operator can see right now, as a box; null when the map cannot say. */
@@ -410,7 +541,7 @@ public class DetectionFeed {
 
     /** The area a refresh asks for: what is on screen, with a margin, within sane limits. */
     private Esri.Box refreshBox() {
-        Esri.Box b = viewBox();
+        Esri.Box b = scopeBox();
         if (b == null) {
             // No usable extent: a box around wherever the self marker or the map center is.
             final com.atakmap.coremap.maps.coords.GeoPoint p = mapView.getPoint().get();
@@ -787,9 +918,42 @@ public class DetectionFeed {
      * list, and the one thing an operator wants from it is what is in front of them.
      */
     public List<HeatDetection> inView(int max) {
-        final Esri.Box view = viewBox();
+        final List<HeatDetection> out = inArea();
+        if (filters.areaIsRadius())
+            sortNearestFirst(out);
+        else
+            sortNewestFirst(out);
+        return out.size() > max ? new ArrayList<>(out.subList(0, max)) : out;
+    }
+
+    /** How many pass the filters inside the area, before any list cap. */
+    public int inViewCount() {
+        return inArea().size();
+    }
+
+    /**
+     * One rule for the list: inside the view, or inside the radius. The map draws the
+     * fetched box, which is the area grown by a margin, so what the list names is on
+     * the map and a little more besides.
+     */
+    private List<HeatDetection> inArea() {
         final long now = System.currentTimeMillis();
         final List<HeatDetection> out = new ArrayList<>();
+        if (filters.areaIsRadius()) {
+            final double[] p = areaPoint();
+            final com.atakmap.coremap.maps.coords.GeoPoint from = p == null ? null
+                    : new com.atakmap.coremap.maps.coords.GeoPoint(p[0], p[1]);
+            for (HeatDetection d : all) {
+                if (!filters.shows(d, now))
+                    continue;
+                if (from != null && com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(from,
+                        new com.atakmap.coremap.maps.coords.GeoPoint(d.lat, d.lon)) > filters.areaM)
+                    continue;
+                out.add(d);
+            }
+            return out;
+        }
+        final Esri.Box view = viewBox();
         for (HeatDetection d : all) {
             if (!filters.shows(d, now))
                 continue;
@@ -797,19 +961,27 @@ public class DetectionFeed {
                 continue;
             out.add(d);
         }
-        sortNewestFirst(out);
-        return out.size() > max ? new ArrayList<>(out.subList(0, max)) : out;
+        return out;
     }
 
-    /** How many pass the filters inside the current view, before any list cap. */
-    public int inViewCount() {
-        final Esri.Box view = viewBox();
-        final long now = System.currentTimeMillis();
-        int n = 0;
-        for (HeatDetection d : all)
-            if (filters.shows(d, now) && (view == null || view.contains(d.lat, d.lon)))
-                n++;
-        return n;
+    private void sortNearestFirst(List<HeatDetection> list) {
+        final double[] p = areaPoint();
+        if (p == null) {
+            sortNewestFirst(list);
+            return;
+        }
+        final com.atakmap.coremap.maps.coords.GeoPoint from =
+                new com.atakmap.coremap.maps.coords.GeoPoint(p[0], p[1]);
+        final Map<HeatDetection, Double> dist = new HashMap<>();
+        for (HeatDetection d : list)
+            dist.put(d, com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(from,
+                    new com.atakmap.coremap.maps.coords.GeoPoint(d.lat, d.lon)));
+        Collections.sort(list, new Comparator<HeatDetection>() {
+            @Override
+            public int compare(HeatDetection a, HeatDetection b) {
+                return Double.compare(dist.get(a), dist.get(b));
+            }
+        });
     }
 
     private static void sortNewestFirst(List<HeatDetection> list) {

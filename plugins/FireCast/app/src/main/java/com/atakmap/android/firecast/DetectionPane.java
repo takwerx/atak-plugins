@@ -124,6 +124,35 @@ public class DetectionPane implements DetectionFeed.Listener {
     }
 
     private void wireFilters() {
+        header.findViewById(R.id.btn_area).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final Filters f = feed.filters;
+                final String[] labels = new String[1 + Filters.AREA_CHOICES.length];
+                labels[0] = "What is in view";
+                int current = 0;
+                for (int i = 0; i < Filters.AREA_CHOICES.length; i++) {
+                    final double m = Units.bigToMeters(Filters.AREA_CHOICES[i]);
+                    labels[1 + i] = "Within " + Filters.AREA_CHOICES[i] + " " + Units.bigLabel() + " of My Location";
+                    if (f.areaIsRadius() && Math.abs(m - f.areaM) < 1)
+                        current = 1 + i;
+                }
+                choose("Area", labels, current, new Chosen() {
+                    @Override
+                    public void at(int which) {
+                        if (which == 0) {
+                            f.area = Filters.AREA_VIEW;
+                        } else {
+                            f.area = Filters.AREA_RADIUS;
+                            f.areaM = Units.bigToMeters(Filters.AREA_CHOICES[which - 1]);
+                        }
+                        f.save();
+                        refreshUi();
+                        feed.followScope();
+                    }
+                });
+            }
+        });
         header.findViewById(R.id.btn_activity).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -264,6 +293,7 @@ public class DetectionPane implements DetectionFeed.Listener {
             b.setTextColor(on ? 0xFF4CD964 : 0xFFFF5A5A);
         }
 
+        ((Button) header.findViewById(R.id.btn_area)).setText(feed.filters.areaLabel());
         ((Button) header.findViewById(R.id.btn_window)).setText("Last " + feed.filters.windowLabel());
         ((Button) header.findViewById(R.id.btn_confidence)).setText(feed.filters.confidenceLabel());
         ((Button) header.findViewById(R.id.btn_industrial)).setText(
@@ -287,7 +317,7 @@ public class DetectionPane implements DetectionFeed.Listener {
             d.append("Fetched ").append(age).append("just now".equals(age) ? "" : " ago");
         }
         if (feed.box != null)
-            d.append(d.length() == 0 ? "For " : ", for ").append("the area on screen");
+            d.append(d.length() == 0 ? "For " : ", for ").append(feed.areaText());
         if (feed.clamped)
             d.append(". The map is zoomed out past the area a fetch covers, so this is the middle of the view");
         if (feed.capped)
@@ -306,14 +336,17 @@ public class DetectionPane implements DetectionFeed.Listener {
         rows = feed.inView(MAX_ROWS);
         final int inView = feed.inViewCount();
         final TextView heading = header.findViewById(R.id.list_heading);
+        final boolean radius = feed.filters.areaIsRadius();
+        final String name = radius ? "Within " + Units.formatBig(feed.filters.areaM) : "In view";
         if (feed.fetchedTotal() == 0)
-            heading.setText("In view");
+            heading.setText(name);
         else if (inView == 0)
-            heading.setText("In view — none here; pan or widen the time window");
+            heading.setText(name + " — none here; " + (radius ? "widen the area" : "pan") + " or widen the time window");
         else if (inView > rows.size())
-            heading.setText("In view — newest " + count(rows.size()) + " of " + count(inView) + ", zoom in to narrow");
+            heading.setText(name + " — " + (radius ? "nearest " : "newest ") + count(rows.size()) + " of " + count(inView)
+                    + (radius ? ", narrow the area" : ", zoom in to narrow"));
         else
-            heading.setText("In view — " + count(inView));
+            heading.setText(name + " — " + count(inView));
         adapter.notifyDataSetChanged();
     }
 
@@ -363,7 +396,13 @@ public class DetectionPane implements DetectionFeed.Listener {
             if (d.suspect())
                 title.append("  (industrial)");
             ((TextView) v.findViewById(R.id.row_title)).setText(title.toString());
-            final StringBuilder sub = new StringBuilder(d.footprint.sizeText());
+            final StringBuilder sub = new StringBuilder();
+            if (feed.filters.areaIsRadius()) {
+                final double m = feed.distanceM(d);
+                if (m >= 0)
+                    sub.append(Units.format(m)).append(" away · ");
+            }
+            sub.append(d.footprint.sizeText());
             if (d.frpMw != null)
                 sub.append(" · ").append(d.frpText());
             sub.append(" · ").append(d.sensor);
