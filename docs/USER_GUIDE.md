@@ -44,22 +44,45 @@ showing. A line at the top of the panel says so while it works.
 
 ---
 
-## 2. Finding cameras
+## 2. The panel
 
 The panel is the control. The map shows exactly what the panel selects, never the
 whole catalog.
 
-![The top of the panel](screenshots/2_panel_top.png)
+![The main screen](screenshots/30_main_screen.png)
+
+The main screen is what you use in the field:
+
+- **Cameras ON / OFF** is the map's switch. Green draws the cameras the panel
+  selects; red takes them off the map and changes nothing else.
+- **Settings** opens everything that is set once and left: where, what kind,
+  distance, how far Suggest Cameras reaches, and the zoom gate.
+- **Favorites** pins the cameras you starred above the list.
+- **Suggest Cameras** finds the cameras that cover a spot. See [Suggest
+  Cameras](#4-suggest-cameras).
+- **Search** finds a camera by name, in every state at once.
+- **On screen only** narrows the list to the current map view and follows it.
+- **No bearings shown / Turn off N bearings** puts every bearing line away.
+
+The status line above it all says how many cameras are up and matching, what
+Suggest Cameras is doing, and whether the map is drawing everything.
+
+---
+
+## 3. Settings
+
+![The Settings page](screenshots/31_settings_top.png)
+
+Every row reads its own value while it is closed, so the page is a summary of
+how the panel is set. Tap a row to open it.
+
+### Where
+
+![The Where row](screenshots/32_where_open.png)
 
 - **State** — the state or province, 54 of them.
 - **Provider** — one agency within it.
 - **County** — as many counties as the job covers.
-- **On screen only** — just what is in the current map view.
-
-The **ON / OFF** button at the top right, above **Sync**, is the map's switch.
-It is covered under [Drawing on the map](#9-drawing-on-the-map).
-
-### State and provider
 
 ![The state picker](screenshots/3_state_picker.png)
 
@@ -68,35 +91,120 @@ It is covered under [Drawing on the map](#9-drawing-on-the-map).
 Every agency says how many cameras it has **before** you pick it, so you can see
 what a filter will cost rather than toggling it and watching a total move.
 
-### Counties, several at a time
-
 ![Picking counties](screenshots/5_county_multiselect.png)
 
-Counties tick on and off — pick as many as you need. They come from Census
-boundaries rather than from the camera feeds, so they work on every camera in the
-United States, not only the ones whose agency happened to publish a county.
+Counties tick on and off. They come from Census boundaries rather than from the
+camera feeds, so they work on every camera in the United States, not only the
+ones whose agency happened to publish a county.
 
-Afterwards the button counts what you picked and the line above counts what is
-left:
+### Show
 
-![Three counties, 193 cameras of 4,644](screenshots/6_filter_says_its_cost.png)
+![The Show row](screenshots/33_show_open.png)
 
-### On screen only
+**Video**, **Still** and **Fire** each carry their own count for the state you
+are in. Tick more to show more; none ticked means everything.
 
-**On screen only** limits the list to the cameras inside the current map view,
-and keeps following as you pan and zoom. Move the map and the list moves with it.
+### Distance
 
-![On screen only, with its count](screenshots/23_on_screen_only.jpg)
+![The Distance row](screenshots/34_distance_open.png)
 
-The count on the control, the count in the status line and what is drawn on the
-map are the same number. This is the fastest way to answer "what is near this
-spot" — put the spot on screen, and the panel is already the answer. It follows
-the map rather than your own position, so it works just as well for an area you
-are not standing in.
+The slider runs to 50 in whatever units ATAK is set to, and the label above it
+always reads the current distance and the point it is measured from.
+
+- **Measuring from** rotates between your own position and the center of the map,
+  and says which one is in force.
+- **Use this extent** takes the radius from what is on screen.
+- **Presets** offers Off, 2, 5, 10, 25 and 50, and names the one in force.
+
+Measured from *My Location* the circle travels with you. Measured from *Map
+Center* it follows the map. Both survive restarting ATAK.
+
+### Suggest reach
+
+![The Suggest reach row](screenshots/35_reach_open.png)
+
+How far out a camera is trusted to see a point. Suggest Cameras lists only
+cameras this close, nearest first. 10 miles to start with; the picker offers 2,
+5, 10, 20 and 40 miles, or the length of the bearing line.
+
+![The reach picker](screenshots/35b_reach_picker.png)
+
+### Zoom gate
+
+![The Zoom gate row](screenshots/36_zoom_gate_open.png)
+
+Thirty-eight thousand markers would be unreadable, so cameras draw only when you
+are zoomed in past a threshold you choose. **Use this zoom** takes whatever you
+are looking at now and makes it the threshold. **Presets** offers a few starting
+points in plain terms.
+
+![Zoom presets](screenshots/10_zoom_presets.png)
+
+### Sync Cameras
+
+The catalog changes: agencies are added, cameras come and go, and stream
+addresses move. **Sync Cameras** re-reads the catalog and reloads the state from
+scratch, without restarting ATAK. Use it when a camera you expect is missing, or
+when video that worked yesterday does not connect today.
 
 ---
 
-## 3. Finding one camera by name
+## 4. Suggest Cameras
+
+You have a point on the map and a tower with five cameras on it. Which one is
+looking that way? Suggest Cameras answers it in one tap instead of turning five
+bearings on and off.
+
+![Suggest Cameras, waiting for a tap](screenshots/37_tap_the_map.png)
+
+Tap **Suggest Cameras**, then tap the point on the map. A cyan marker lands
+where you tapped.
+
+![The Suggest marker on the map](screenshots/38_suggest_marker.png)
+
+The list narrows to three groups, nearest first:
+
+![Suggested cameras](screenshots/40_suggested_rows.png)
+
+- **Suggested** — cameras whose reported aim covers the point: inside their lens
+  and within 30 degrees of its center. Each row says how far the camera is from
+  the point and how far off center the point sits, so you can judge the edge
+  cases yourself.
+- **Could be turned to it** — pan-tilt-zoom cameras within reach that are aimed
+  somewhere else. Someone at the agency can swing them.
+- **No bearing reported** — cameras within reach that never say where they look,
+  most highway cameras among them.
+
+![Could be turned to it](screenshots/40b_could_be_turned.png)
+
+The map keeps every camera; only the list narrows.
+
+### Bearings in one tap
+
+![Bearings on for every suggested camera](screenshots/41_bearings_on.png)
+
+**N Bearings OFF** turns on the bearing line of every suggested camera at once
+and reads **N Bearings ON** in green. Tap it again to take them down. Lines you
+turned on by hand on other cameras are left alone.
+
+### Move the point
+
+![The point dragged, the suggestion moved](screenshots/42_dragged.png)
+
+Press the marker and drag it. Where it lands, the counts recompute, and if the
+bearings were on they move with it: off the cameras that dropped out, on to the
+ones that came in.
+
+**Clear Suggestion** takes the marker off the map and gives the full list back.
+The point, the marker and the bearing lines all come back after restarting ATAK.
+
+A camera's aim is as of the last catalog refresh, every few seconds, so a camera
+someone just swung may still show its old direction for a moment. Tap a row to
+see its picture; that is the final word on what it sees.
+
+---
+
+## 5. Finding one camera by name
 
 Typing in the search box searches **every state at once**, not only the one in the
 dropdown. Here "pitts" finds a wildfire lookout in California and a highway camera
@@ -105,10 +213,8 @@ in Kansas together, 1,300 miles apart.
 ![Searching across states](screenshots/7_search_across_states.png)
 
 Camera names are the agency's own — "I-40/75 @ West Hills", "Keller Peak 1" — so
-a road number, a landmark or a peak name will usually find it.
-
-**Clear** sits beside the box and lights up only while something is in it, so a
-live Clear button is the panel telling you a search is still filtering the list.
+a road number, a landmark or a peak name will usually find it. **Clear** lights up
+only while something is in the box.
 
 ### Reading a row
 
@@ -117,75 +223,33 @@ lookout, **blue** for a department of transportation or FAA camera. Under the
 name are the state, the agency, the county and the distance, and a small
 ▶ **live** marks a camera that streams.
 
-**Go to** moves the map to that camera and zooms in close enough to see the road
-it is watching. Tapping the row itself opens the camera.
+**Go to** moves the map to that camera. Tapping the row itself opens the camera.
+
+### On screen only
+
+**On screen only** limits the list to the cameras inside the current map view,
+and keeps following as you pan and zoom.
+
+![On screen only, with its count](screenshots/23_on_screen_only.jpg)
 
 ---
 
-## 4. Narrowing further
-
-![Video, Still and Fire, each with its count](screenshots/8_show_filters.png)
-
-**Video**, **Still** and **Fire** each carry their own count for the state you
-are in. A filter with nothing behind it is disabled rather than left to be
-discovered.
-
-![The radius slider](screenshots/9_radius_from_a_point.png)
-
-### Distance from a point
-
-![The distance controls](screenshots/9_radius_from_a_point.png)
-
-The slider runs to 50 in whatever units ATAK is set to, and the label above it
-always reads the current distance and the point it is measured from.
-
-- **Measuring from** rotates between your own position and the center of the map,
-  and says which one is in force rather than only offering to change it.
-- **Use this extent** takes the radius from what is on screen, so "everything I am
-  looking at" is one tap rather than a guess at a number.
-- **Presets** offers Off, 2, 5, 10, 25 and 50, and names the one in force. Drag the
-  slider to something in between and it reads **Presets** again.
-
-![Radius presets](screenshots/26_radius_presets.png)
-
-**It follows.** Measured from *My Location* the circle travels with you, so a
-radius set at the start of a drive still means the same thing an hour later.
-Measured from *Map Center* it follows the map — pan somewhere else and the list is
-about where you are now looking. Both survive restarting ATAK.
-
----
-
-## 5. Favorites
+## 6. Favorites
 
 The star at the end of each row marks a camera as a favorite. Favorites are kept
 on the device and survive restarting ATAK.
 
 ![Two cameras starred](screenshots/12_favorites_starred.png)
 
-Tapping **Favorites** turns the button gold and pins them:
+Tapping **Favorites** turns the star gold and pins them in their own section,
+with the whole state still below. Favorites are not tied to a state.
 
-![Favorites First turned on](screenshots/13_favorites_first_on.png)
-
-They get their own section, with the whole state still below it:
-
-![Favorites pinned above the full list](screenshots/14_favorites_pinned.png)
-
-Favorites are not tied to a state. A lookout in California and a highway camera in
-Ontario sit in the same list, so the handful you actually watch stays within reach
-without giving up the rest of the catalog.
-
-**While Favorites First is on, a favorite ignores every filter.** State, county,
-radius and the Show boxes all pass it by, and it stays on the map whatever the
-panel says — which is the point: a camera you starred does not vanish because of a
-setting you left on an hour ago. The status line says so. Turn Favorites First off
-and they become ordinary cameras again, filtered like everything else.
-
-The same star appears in the camera's own pane, so you can mark one while you are
-looking at it.
+**While Favorites First is on, a favorite ignores every filter** and stays on
+the map whatever the panel says. The status line says so.
 
 ---
 
-## 6. Opening a camera
+## 7. Opening a camera
 
 Tapping a camera, in the list or on the map, opens it in a side pane so the map
 stays live behind it.
@@ -194,147 +258,70 @@ stays live behind it.
 
 The pane names the camera, then says the agency, whether it is online, whether it
 steers, and the county — then shows the latest picture. **Refresh** fetches a new
-frame; while one is on its way the pane says *Fetching the latest picture…*
-rather than sitting blank, because a slow agency and a broken one look identical
-otherwise.
+frame; while one is on its way the pane says *Fetching the latest picture…*.
 
 Pictures are current to within about a minute on most networks. Some agencies
-publish on their own cycle: British Columbia refreshes its whole province every
-few minutes, so a picture there can be a few minutes old even when everything is
-working.
-
-A few cameras publish live video and no picture at all — all of Maryland works
-this way. Those say so, and point you at the video button.
+publish on their own cycle. A few cameras publish live video and no picture at
+all; those say so.
 
 ---
 
-## 7. Live video
+## 8. Live video
 
 Where the agency publishes a stream, **Live video** plays it in ATAK's own player.
-
-Not every camera has one. A camera that only publishes pictures says
-**Video (still only)** rather than offering a button that cannot work. Of the
-43,000 cameras in the catalog, about 16,500 stream.
-
-Streams are checked before they are published, so a camera that offers video was
-serving video when the catalog was built. Agencies do have outages; when one does,
-its cameras keep their video button rather than silently losing it, and they come
-back when the agency does.
+A camera that only publishes pictures says **Video (still only)**. Of the 43,000
+cameras in the catalog, about 16,500 stream.
 
 ![Live video in ATAK's player](screenshots/17_live_video.jpg)
 
-It plays in ATAK's own player, with its snapshot and record controls. The overlay
-across the picture is the agency's, not ours.
-
-Closing the video returns you to the map. The toolbar icon reopens the panel.
-
 ### Which cameras stream
-
-The map says so before you open anything.
 
 | Streams | Stills only |
 |---|---|
 | ![Streaming camera icon](screenshots/24_icon_streaming.jpg) | ![Stills camera icon](screenshots/25_icon_stills.jpg) |
 | ATAK's own camcorder | A plain camera |
 
-The list says it a second way, with ▶ **live** under the name.
-
 ---
 
-## 8. Bearings
+## 9. Bearings
 
 Cameras that report which way they are pointing can draw a bearing line on the
 map, labeled with its azimuth.
 
 ![A bearing line at 355°T](screenshots/16_bearing_line.jpg)
 
-**Show bearing** turns it on, and the marker turns orange while it is on. On a
-steerable camera the line follows the camera as it moves, updating every few
-seconds. A bearing stays on when you pan away from its camera and comes back with
-it, so looking at something else does not put it away.
-
-Bearings go on one camera at a time, so the panel has one control to put them all
-away:
-
-![Turn off all bearings](screenshots/27_turn_off_bearings.png)
-
-It carries the count, is greyed out when there are none, and clears lines on
-cameras that are currently off screen as well as the ones in front of you.
+**Show bearing** in a camera's pane turns it on, and the marker turns orange
+while it is on. On a steerable camera the line follows the camera as it moves. A
+bearing stays on when you pan away and comes back with it.
 
 ![The button flips to Hide bearing](screenshots/17_hide_bearing.png)
 
+**Turn off N bearings**, beside *On screen only*, puts every line away at once.
+
 ### What the line is, and is not
 
-The line is the **direction** the camera points. It is not how wide it sees.
-
-A camera's pane reports both — **Bearing 355°T   Field of View 62.8°** — but only
-the bearing is drawn. A field of view is a wedge, and sixteen hundred overlapping
-wedges is a map you cannot read, so Cam Depot draws the direction and leaves the
-width as a number.
-
-Opening a stills camera that reports a bearing shows its line automatically for as
-long as the picture is open, then puts it away again. A camera that publishes no
-bearing says *No bearing reported* rather than drawing a line that would be a
-guess.
+The line is the **direction** the camera points, not how wide it sees. A camera's
+pane reports both. Suggest Cameras uses the width; the map draws the direction,
+because sixteen hundred overlapping wedges is a map you cannot read.
 
 > On the wildfire networks the bearing runs ahead of the picture. The agency
 > reports where a camera is pointing immediately and publishes its image twenty to
-> thirty seconds later. The line is the truth; the picture is the recent past.
+> thirty seconds later.
 
 ---
 
-## 9. Drawing on the map
+## 10. Drawing on the map
 
-Thirty-eight thousand markers would be unreadable, so Cam Depot draws cameras only
-when you are zoomed in past a threshold you choose.
-
-![The draw threshold](screenshots/11_draw_threshold.png)
-
-**Use this zoom** takes whatever you are looking at right now and makes it the
-threshold — you set it by example rather than by picking a number. **Presets**
-offers a few starting points described in plain terms:
-
-![Zoom presets](screenshots/10_zoom_presets.png)
-
-Past the threshold, the cameras draw:
+Past the zoom gate, the cameras draw:
 
 ![Cameras drawn on the map](screenshots/18_cameras_on_map.jpg)
 
-And the panel always says what the map is doing:
+If more cameras match than can be drawn legibly, the status line says how many
+were left off and to zoom in. It will not quietly show you part of the picture.
 
-![The status line](screenshots/19_map_status_line.png)
-
-If more cameras match than can be drawn legibly, the panel says how many were left
-off and to zoom in. It will not quietly show you part of the picture.
-
-### On and off
-
-The **ON / OFF** button at the top right of the panel is the map's switch. It
-stays in view however far the panel is scrolled.
-
-![The map on](screenshots/28_map_on.png)
-
-**ON**, in green, draws the cameras the panel selects, which is how the plugin
-has always behaved. **OFF**, in red, takes every one of them off the map and
-changes nothing else: the filters, the list and any bearings you asked for stay
-as they are, so ON puts back exactly what was there.
-
-![The map off](screenshots/29_map_off.png)
-
-Use it to clear the map for a moment without losing the setup. The status line
-says "Map: off" while it is off, and the switch is remembered across restarts.
-
----
-
-## 10. Keeping up to date
-
-The catalog changes: agencies are added, cameras come and go, and stream addresses
-move. **Sync** re-reads the catalog and reloads the state from scratch, so a
-catalog that changed while the plugin was running is picked up without restarting
-ATAK.
-
-Use it when a camera you expect is missing, or when video that worked yesterday
-does not connect today. It takes a few seconds.
+**Cameras OFF** takes every camera off the map and changes nothing else: the
+filters, the list and any bearings you asked for stay as they are, so ON puts
+back exactly what was there. The switch is remembered across restarts.
 
 ---
 
@@ -342,29 +329,21 @@ does not connect today. It takes a few seconds.
 
 Cam Depot does not talk to twenty agencies from your device. One service collects
 from them, checks what it collected, and publishes a single catalog that every
-device reads. That keeps a tablet off the hook for a six-megabyte download, and
-keeps one polite poller in front of each agency instead of hundreds.
+device reads.
 
 **Camera pictures and video are fetched straight from the agency by your device.**
 They do not travel through anything of ours.
-
-The catalog covers the wildfire lookout networks, the FAA weather cameras, and the
-departments of transportation of most states and several Canadian provinces.
-Coverage grows as agencies are added.
 
 ---
 
 ## 12. In the plugin
 
-The same guide ships inside the plugin as a PDF, for when you are in the field
-without this page. In ATAK go to **Settings → Tool Preferences → Cam Depot →
-Plugin Documentation**.
+The same guide ships inside the plugin as a PDF. In ATAK go to **Settings → Tool
+Preferences → Cam Depot → Plugin Documentation**.
 
 ![Cam Depot in Tool Preferences](screenshots/20_tool_preferences.png)
 
 ![Plugin Documentation](screenshots/21_plugin_documentation.png)
-
-![The manual open on the device](screenshots/22_manual_on_the_device.png)
 
 ---
 
