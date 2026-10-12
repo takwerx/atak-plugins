@@ -139,11 +139,13 @@ caches what it has drawn.
   is underneath. The *Overlay* category lists them.
 
   An overlay is something you switch on, not something you switch to.
-  Installing one switches it on over the map you already have, and any number
-  can be on at once; ATAK's Overlay Manager lists them under *Image Overlay*.
+  Adding one switches it on over the map you already have, and over any
+  disaster aerial, and any number can be on at once. The list is sectioned,
+  roads and points of interest first, and each added row keeps a *Hide*
+  button, so nobody has to find it under Overlay Manager.
 
-  Aerial imagery flown after an event has no street names on it. *Census
-  Roads and Street Names* puts them back without hiding the imagery.
+  Aerial imagery flown after an event has no street names on it. *Google
+  Roads and Labels (overlay)* puts them back without hiding the imagery.
 ]
 ]
 
@@ -498,14 +500,18 @@ covers before deciding to turn it on.
 ][
   After a hurricane makes landfall, and after some floods, fires and
   tornadoes, NOAA flies the damaged area and publishes the aerials within a
-  day or two of each flight. Map Depot lists every event published this way
-  since 2018, newest first, and every flight in it.
+  day or two of each flight. Map Depot lists NOAA's events from this year
+  and last, newest first, and every flight in each.
 
   Each flight is an overlay: it covers the area that was flown, at 15 to 30
-  cm a pixel, and draws over whatever map you have. *All flights* installs
-  the whole event as one overlay; the flights under it install one at a
-  time, nearest the map first, with the date and the flight letter on every
-  row. Tiles stream as you pan.
+  cm a pixel, and draws over whatever map you have. Flights are listed newest
+  first; the button on the right switches to nearest the map or nearest you.
+  Tap a row before adding it and the map goes to where the flight is.
+
+  Two buttons on every flight: *Add online* streams the imagery as you pan,
+  nothing lands on the phone; *Download offline*, with its size on it, keeps
+  a copy of the flight on the phone for when there is no signal, built on
+  the server at about 60 cm a pixel and kept under about 500 MB.
 ]
 ]
 
@@ -516,12 +522,14 @@ covers before deciding to turn it on.
   Pick the event with the button under the search box; the count is how many
   flights it has.
 
-  Installed, a row says *tap to go there*, and tapping it takes the map to
-  the flight. *Hide* turns it off without removing it. *Remove* takes it off
-  the map and off the phone.
+  Added or downloaded, a row says *tap to go there*, and tapping it takes
+  the map to the flight. *Hide* turns it off without removing it. *Outlines*
+  draws an orange box with the flight's name around every flight on the
+  phone, so the imagery can be found before zooming in.
 
   During a storm NOAA adds flights every day. The list says when the catalog
-  was last built; a flight flown after that appears the next day.
+  was last built; a flight flown after that appears the next day, its
+  offline copy the morning after.
 ]
 ]
 
@@ -578,7 +586,8 @@ indistinguishable from data put there by hand.
   - Elevation → `atak/DTED/`, one file per one-degree square.
   - Streaming base maps → `atak/imagery/`, as map source files.
   - Streaming overlays and disaster aerials → `atak/grg/`, as map source
-    files, so ATAK lists them under Image Overlay.
+    files, so ATAK lists them under Image Overlay; offline copies of
+    flights as MBTiles in the same folder.
   - Offline public land vector tiles → `atak/imagery/`, as vector tile packages.
   - Forest Service map sheets → `atak/grg/`, as georeferenced PDFs.
   - Incident and drone maps → `atak/grg/` for a PDF, `atak/overlays/` for a

@@ -139,6 +139,36 @@ public final class DepotClient {
         void onError(String message);
     }
 
+    public interface StormsCallback {
+        /** From the saved copy on this phone; never the network. */
+        void onStorms(Depot.Storms storms);
+    }
+
+    /**
+     * The storms section of the catalog saved on this phone, read without
+     * asking the depot, so the flight outlines can be drawn at start before
+     * the pane has been opened. Answers nothing when there is no saved copy.
+     */
+    public void cachedStorms(final StormsCallback cb) {
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final Depot.Storms storms =
+                            Depot.parseStorms(read(new File(cacheDir, CATALOG)));
+                    main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            cb.onStorms(storms);
+                        }
+                    });
+                } catch (Exception none) {
+                    Log.d(TAG, "no saved catalog for the outlines: " + describe(none));
+                }
+            }
+        });
+    }
+
     public interface SheetFileCallback {
         void onSheets(List<Depot.RecMap> sheets);
 
