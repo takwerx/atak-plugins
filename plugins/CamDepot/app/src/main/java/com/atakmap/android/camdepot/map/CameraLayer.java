@@ -933,8 +933,33 @@ public final class CameraLayer {
         }
     }
 
+    /**
+     * The camera's point with the terrain's elevation under it, when the phone
+     * has terrain data; a plain lat/lon otherwise.
+     *
+     * <p>Not for the icon: ATAK clamps a marker to the ground either way. It is
+     * for the bearing label. GLSensorFOV draws the bearing text twice, on a
+     * left-edge and a right-edge line, and ends one at the marker's own
+     * altitude and the other at a computed one. With no altitude on the marker
+     * those two lines drape differently over terrain and the two copies of
+     * "359°T" land a few pixels apart along the line: the smeared label the
+     * operator saw on the XCover (which has DTED) and never on the S10 (which
+     * does not), 2026-10-11. With a real altitude the two lines agree.
+     */
+    private static GeoPoint grounded(double lat, double lon) {
+        try {
+            final double hae = com.atakmap.map.elevation.ElevationManager
+                    .getElevation(lat, lon, null);
+            if (!Double.isNaN(hae))
+                return new GeoPoint(lat, lon, hae);
+        } catch (LinkageError | RuntimeException e) {
+            // No terrain, or an engine that will not say: the flat point is fine.
+        }
+        return new GeoPoint(lat, lon);
+    }
+
     private Marker create(Camera c) {
-        final Marker m = new Marker(new GeoPoint(c.lat, c.lon), UID_PREFIX + c.id);
+        final Marker m = new Marker(grounded(c.lat, c.lon), UID_PREFIX + c.id);
         // A generic sensor point: ATAK has an icon for it, so the plugin does not
         // have to ship one to be usable on day one.
         // The radial menu is chosen by CoT type: ATAK's MenuMapAdapter looks up
