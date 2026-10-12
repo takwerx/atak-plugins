@@ -476,7 +476,7 @@ public class DetectionFeed {
     }
 
     /** Where a radius is measured from: the operator, or the map center with no fix. */
-    private double[] areaPoint() {
+    public double[] areaPoint() {
         final double[] me = ownPosition();
         noFix = me == null;
         if (me != null)
@@ -492,12 +492,22 @@ public class DetectionFeed {
         if (!filters.areaIsRadius())
             return viewBox();
         final double[] p = areaPoint();
-        if (p == null)
-            return null;
-        final double dLat = filters.areaM / 111320d;
-        final double dLon = filters.areaM / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(p[0]))));
+        return p == null ? null : boxAround(p, filters.areaM);
+    }
+
+    /** The square that holds a circle of that radius around a point. */
+    public static Esri.Box boxAround(double[] p, double meters) {
+        final double dLat = meters / 111320d;
+        final double dLon = meters / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(p[0]))));
         return new Esri.Box(Math.max(-90, p[0] - dLat), Math.max(-180, p[1] - dLon),
                 Math.min(90, p[0] + dLat), Math.min(180, p[1] + dLon));
+    }
+
+    /** Meters between a point and a position. */
+    public static double metersBetween(double[] p, double lat, double lon) {
+        return com.atakmap.coremap.maps.coords.GeoCalculations.distanceTo(
+                new com.atakmap.coremap.maps.coords.GeoPoint(p[0], p[1]),
+                new com.atakmap.coremap.maps.coords.GeoPoint(lat, lon));
     }
 
     /** Distance from the area's point, meters, or -1 when there is no point. */
@@ -519,7 +529,7 @@ public class DetectionFeed {
     }
 
     /** What the operator can see right now, as a box; null when the map cannot say. */
-    private Esri.Box viewBox() {
+    public Esri.Box viewBox() {
         try {
             final GeoBounds b = mapView.getBounds();
             if (b == null)
@@ -570,6 +580,11 @@ public class DetectionFeed {
         if (refreshing)
             return;
         final Esri.Box want = refreshBox();
+        // Marked now, on the caller's thread, so a pane that redraws before the worker
+        // picks this up says "looking" rather than "none here".
+        refreshing = true;
+        status = "refreshing";
+        changed();
         worker.execute(new Runnable() {
             @Override
             public void run() {

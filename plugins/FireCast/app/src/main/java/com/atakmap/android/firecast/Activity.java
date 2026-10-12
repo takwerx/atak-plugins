@@ -60,9 +60,10 @@ public class Activity {
             return state != null ? "Unnamed, " + state : "Unnamed";
         }
 
+        /** The peak heat, named: "peak 16 MW" rather than a bare number nobody can place. */
         public String powerText() {
-            return peakMw >= 100 ? String.format(Locale.US, "%.0f MW", peakMw)
-                    : String.format(Locale.US, "%.1f MW", peakMw);
+            return "peak " + (peakMw >= 100 ? String.format(Locale.US, "%.0f MW", peakMw)
+                    : String.format(Locale.US, "%.1f MW", peakMw));
         }
 
         /**
@@ -115,15 +116,17 @@ public class Activity {
      * Active fires in the window, strongest first.
      *
      * @param state two-letter state to limit to, or null for everywhere the feed covers
+     * @param box   the area to limit to, or null for everywhere; the service does the
+     *              clipping, so a box costs nothing more than the whole country
      */
-    public static List<Fire> fires(long sinceMillis, String state) throws Exception {
+    public static List<Fire> fires(long sinceMillis, String state, Esri.Box box) throws Exception {
         final String scope = window(sinceMillis)
                 + (state == null ? "" : " AND state = " + sql(state));
         final List<Fire> out = new ArrayList<>();
         // Named incidents group by their name; a fire the feed has not tied to an incident
         // groups by the id GOES follows it with.
-        out.addAll(grouped(scope + " AND known_incident_name IS NOT NULL", "known_incident_name,state"));
-        out.addAll(grouped(scope + " AND known_incident_name IS NULL", "feature_tracking_id,state"));
+        out.addAll(grouped(scope + " AND known_incident_name IS NOT NULL", "known_incident_name,state", box));
+        out.addAll(grouped(scope + " AND known_incident_name IS NULL", "feature_tracking_id,state", box));
         // Established fires first, then by power. Sorting on power alone put a single
         // hot scan above every named incident in the country.
         Collections.sort(out, new Comparator<Fire>() {
@@ -137,11 +140,14 @@ public class Activity {
         return out;
     }
 
-    private static List<Fire> grouped(String where, String groupBy) throws Exception {
+    private static List<Fire> grouped(String where, String groupBy, Esri.Box box) throws Exception {
         final String url = Sources.GOES + "/query?where=" + Esri.enc(where)
                 + "&outStatistics=" + Esri.enc(STATS)
                 + "&groupByFieldsForStatistics=" + Esri.enc(groupBy)
                 + "&orderByFields=" + Esri.enc("peak DESC")
+                + (box == null ? "" : "&geometry=" + Esri.enc(String.format(java.util.Locale.US,
+                        "%.5f,%.5f,%.5f,%.5f", box.west, box.south, box.east, box.north))
+                        + "&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects")
                 + "&returnGeometry=false&f=json";
         final JSONObject d = new JSONObject(Esri.get(url));
         if (d.has("error"))

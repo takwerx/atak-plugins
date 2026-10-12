@@ -163,8 +163,9 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
     private String heat(HeatDetection d) {
         final List<String> parts = new ArrayList<>();
         if (d.frpMw != null)
-            parts.add("Fire radiative power " + d.frpText()
-                    + " - the energy the sensor saw radiating, a rough measure of how hard it is burning.");
+            parts.add("Heat " + d.frpNumber()
+                    + " - fire radiative power, the energy the sensor saw radiating from the pixel."
+                    + " A burn pile reads a few MW, a running wildfire hundreds; cloud or smoke makes it read low.");
         if (d.brightnessK != null)
             parts.add("Brightness temperature " + d.brightnessText()
                     + " - the whole pixel's apparent temperature, not the flame's.");

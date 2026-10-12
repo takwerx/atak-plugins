@@ -123,6 +123,13 @@ public class HeatDetection {
     public String frpText() {
         if (frpMw == null)
             return "no power reading";
+        return "heat " + frpNumber();
+    }
+
+    /** The bare megawatts, for a sentence that already names what it is. */
+    public String frpNumber() {
+        if (frpMw == null)
+            return "none";
         return frpMw >= 100 ? String.format(Locale.US, "%.0f MW", frpMw)
                 : String.format(Locale.US, "%.1f MW", frpMw);
     }

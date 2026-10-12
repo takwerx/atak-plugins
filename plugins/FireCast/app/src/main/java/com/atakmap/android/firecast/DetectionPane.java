@@ -46,6 +46,49 @@ public class DetectionPane implements DetectionFeed.Listener {
     private final List<Button> sourceButtons = new ArrayList<>();
 
     private List<HeatDetection> rows = new ArrayList<>();
+    private final android.content.SharedPreferences prefs;
+    private Fold feeds, filters, key;
+
+    /**
+     * One drop-down row: a head reading "Name: value", an arrow, and a body hidden until
+     * opened. Open or closed is remembered per row, closed to begin with, so the pane
+     * opens as a summary with the list right under it (plugin-ui skill).
+     */
+    private final class Fold {
+        final Button head;
+        final android.widget.ImageButton chevron;
+        final View body;
+        final String pref;
+        boolean open;
+
+        Fold(int headId, int chevronId, int bodyId, String pref) {
+            head = header.findViewById(headId);
+            chevron = header.findViewById(chevronId);
+            body = header.findViewById(bodyId);
+            this.pref = pref;
+            open = prefs.getBoolean(pref, false);
+            final View.OnClickListener flip = new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    open = !open;
+                    prefs.edit().putBoolean(Fold.this.pref, open).apply();
+                    show();
+                }
+            };
+            head.setOnClickListener(flip);
+            chevron.setOnClickListener(flip);
+            show();
+        }
+
+        void label(String name, String value) {
+            head.setText(value == null ? name : name + ": " + value);
+        }
+
+        void show() {
+            chevron.setRotation(open ? 180f : 0f);
+            body.setVisibility(open ? View.VISIBLE : View.GONE);
+        }
+    }
 
     public DetectionPane(MapView mapView, Context pluginContext, DetectionFeed feed) {
         this.mapView = mapView;
@@ -54,6 +97,10 @@ public class DetectionPane implements DetectionFeed.Listener {
         this.root = PluginLayoutInflater.inflate(pluginContext, R.layout.main_layout, null);
         this.list = (ListView) root;
         this.header = PluginLayoutInflater.inflate(pluginContext, R.layout.pane_header, null);
+        this.prefs = mapView.getContext().getSharedPreferences("firecast", Context.MODE_PRIVATE);
+        feeds = new Fold(R.id.fold_feeds_head, R.id.fold_feeds_chev, R.id.source_buttons, "fold.feeds");
+        filters = new Fold(R.id.fold_filters_head, R.id.fold_filters_chev, R.id.fold_filters_body, "fold.filters");
+        key = new Fold(R.id.fold_key_head, R.id.fold_key_chev, R.id.legend, "fold.key");
         list.addHeaderView(header, null, false);
         list.setAdapter(adapter);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -66,8 +113,60 @@ public class DetectionPane implements DetectionFeed.Listener {
             }
         });
         buildSourceButtons();
+        buildKey();
         wireFilters();
         refreshUi();
+    }
+
+    /**
+     * The map key: a swatch per color, drawn the way the map draws it (a filled box
+     * with its outline) from the same color function, so the key and the map cannot
+     * disagree. Static for the plugin's life; age bands do not change.
+     */
+    private void buildKey() {
+        final LinearLayout key = header.findViewById(R.id.legend);
+        key.removeAllViews();
+        final long h = 3600000L;
+        final long[] ages = { 0, 1 * h, 3 * h, 6 * h, 12 * h, 24 * h };
+        for (long age : ages)
+            key.addView(keyRow(DetectionStyles.ageColor(age), false, DetectionStyles.ageBand(age)));
+        key.addView(keyRow(DetectionStyles.burnScarColor(), false, "Burned ground, mapped from a pass (RADR)"));
+        key.addView(keyRow(DetectionStyles.suspectColor(), true, "Known industrial heat source"));
+        final TextView note = new TextView(mapView.getContext());
+        note.setText("Each box is the ground a detection covers. The fire was somewhere inside it when the satellite looked.");
+        note.setTextSize(12f);
+        note.setTextColor(0xFFBBBBBB);
+        note.setPadding(0, dp(6), 0, 0);
+        key.addView(note);
+    }
+
+    private View keyRow(int rgb, boolean dashed, String text) {
+        final LinearLayout row = new LinearLayout(mapView.getContext());
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(3), 0, dp(3));
+        final View swatch = new View(mapView.getContext());
+        final android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor((0x60 << 24) | rgb);
+        if (dashed)
+            d.setStroke(dp(2), 0xFF000000 | rgb, dp(5), dp(3));
+        else
+            d.setStroke(dp(2), 0xFF000000 | rgb);
+        swatch.setBackground(d);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(28), dp(20));
+        lp.rightMargin = dp(10);
+        swatch.setLayoutParams(lp);
+        row.addView(swatch);
+        final TextView t = new TextView(mapView.getContext());
+        t.setText(text);
+        t.setTextSize(14f);
+        t.setTextColor(Color.WHITE);
+        row.addView(t);
+        return row;
+    }
+
+    private int dp(int v) {
+        return Math.round(v * mapView.getResources().getDisplayMetrics().density);
     }
 
     public View view() {
@@ -293,6 +392,16 @@ public class DetectionPane implements DetectionFeed.Listener {
             b.setTextColor(on ? 0xFF4CD964 : 0xFFFF5A5A);
         }
 
+        final StringBuilder on = new StringBuilder();
+        for (DetectionSource s : feed.sources())
+            if (feed.filters.isOn(s.id()))
+                on.append(on.length() == 0 ? "" : ", ").append(s.title());
+        feeds.label("Feeds", on.length() == 0 ? "none on" : on.toString());
+        filters.label("Filters", (feed.filters.areaIsRadius() ? "within " + Units.formatBig(feed.filters.areaM) : "in view")
+                + ", last " + feed.filters.windowLabel()
+                + (feed.filters.minConfidence == 0 ? "" : ", " + feed.filters.confidenceLabel().toLowerCase(Locale.US))
+                + (feed.filters.industrial == Filters.INDUSTRIAL_HIDE ? ", industrial hidden" : ""));
+        key.label("Map key", null);
         ((Button) header.findViewById(R.id.btn_area)).setText(feed.filters.areaLabel());
         ((Button) header.findViewById(R.id.btn_window)).setText("Last " + feed.filters.windowLabel());
         ((Button) header.findViewById(R.id.btn_confidence)).setText(feed.filters.confidenceLabel());
@@ -328,17 +437,17 @@ public class DetectionPane implements DetectionFeed.Listener {
             d.append(". ").append(feed.status);
         detail.setText(d.toString());
 
-        ((TextView) header.findViewById(R.id.legend)).setText(
-                "Color is age: red within the hour, through orange and amber to gray past a day. "
-                        + "Each box is the ground that detection covers - the fire is somewhere inside it. "
-                        + "Dashed violet is a known industrial heat source.");
-
         rows = feed.inView(MAX_ROWS);
         final int inView = feed.inViewCount();
         final TextView heading = header.findViewById(R.id.list_heading);
         final boolean radius = feed.filters.areaIsRadius();
         final String name = radius ? "Within " + Units.formatBig(feed.filters.areaM) : "In view";
-        if (feed.fetchedTotal() == 0)
+        // While a fetch is running an empty list is not "nothing here", it is "not yet":
+        // after a fly-to the pane comes back on a new area before the answer does, and
+        // "none here" for five seconds read as broken (operator, 2026-10-11).
+        if (feed.refreshing && inView == 0)
+            heading.setText(name + " — looking…");
+        else if (feed.fetchedTotal() == 0)
             heading.setText(name);
         else if (inView == 0)
             heading.setText(name + " — none here; " + (radius ? "widen the area" : "pan") + " or widen the time window");
@@ -398,9 +507,10 @@ public class DetectionPane implements DetectionFeed.Listener {
             ((TextView) v.findViewById(R.id.row_title)).setText(title.toString());
             final StringBuilder sub = new StringBuilder();
             if (feed.filters.areaIsRadius()) {
-                final double m = feed.distanceM(d);
-                if (m >= 0)
-                    sub.append(Units.format(m)).append(" away · ");
+                final double[] from = feed.areaPoint();
+                if (from != null)
+                    sub.append(Units.rangeBearing(from, d.lat, d.lon))
+                            .append(feed.noFix ? " of map center · " : " of you · ");
             }
             sub.append(d.footprint.sizeText());
             if (d.frpMw != null)

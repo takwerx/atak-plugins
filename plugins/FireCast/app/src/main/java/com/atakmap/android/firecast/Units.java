@@ -97,6 +97,21 @@ public final class Units {
         return num + " " + bigLabel();
     }
 
+    /** "12 mi NW": how far and which way from a point, the way an operator says it. */
+    public static String rangeBearing(double[] from, double lat, double lon) {
+        final double m = DetectionFeed.metersBetween(from, lat, lon);
+        final double deg = Footprint.bearingTo(from[0], from[1], lat, lon);
+        return format(m) + " " + compass(deg);
+    }
+
+    /** Sixteen-point compass name for a bearing in degrees clockwise from north. */
+    public static String compass(double deg) {
+        final String[] names = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+                "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
+        final double d = ((deg % 360) + 360) % 360;
+        return names[(int) Math.round(d / 22.5d) % 16];
+    }
+
     /** Convert a count of {@link #bigSpan()} units into meters. */
     public static double bigToMeters(double n) {
         try {

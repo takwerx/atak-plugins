@@ -43,6 +43,15 @@ public final class DetectionStyles {
     private static final short DASH = (short) 0xF0F0;
 
     /** The age band's color, no alpha. */
+    /** The map key's colors, from the same constants the map draws with. */
+    public static int suspectColor() {
+        return SUSPECT;
+    }
+
+    public static int burnScarColor() {
+        return BURN_SCAR;
+    }
+
     public static int ageColor(long ageMillis) {
         final long h = ageMillis / 3600000L;
         if (ageMillis == Long.MAX_VALUE)

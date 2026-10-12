@@ -55,12 +55,52 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     /** Null is everywhere the feed covers. */
     private String state;
     private boolean loading;
+    /** The box the last load answered, so a pan inside it does not ask again. */
+    private Esri.Box loadedBox;
+    /** The map followed while the panel is open on What is in view. GL thread: post only. */
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener moved =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView v, boolean animate) {
+                    main.removeCallbacks(settled);
+                    main.postDelayed(settled, 500);
+                }
+            };
+    private final Runnable settled = new Runnable() {
+        @Override
+        public void run() {
+            if (!AREA_VIEW.equals(area) || loading || !isVisible())
+                return;
+            final Esri.Box now = feed.viewBox();
+            final Esri.Box was = loadedBox;
+            if (now == null)
+                return;
+            // Inside the box already answered, and not much smaller than it: nothing new.
+            if (was != null && was.contains(now.south, now.west) && was.contains(now.north, now.east)
+                    && now.spanLon() > was.spanLon() * 0.5)
+                return;
+            load();
+        }
+    };
+    /** The area the list answers: {@link #AREA_ANY}, {@link #AREA_VIEW} or {@link #AREA_RADIUS}. */
+    private String area;
+    private double areaM;
+    private static final String AREA_ANY = "any", AREA_VIEW = "view", AREA_RADIUS = "radius";
+    /** Wider than the pane's: this list is for finding a fire, not reading the one in front of you. */
+    private static final int[] AREA_CHOICES = { 25, 50, 100, 200 };
+    private final android.content.SharedPreferences prefs;
+    /** The point the last load measured from, for the distance on each row; null for none. */
+    private double[] from;
+    private boolean noFix;
 
     public ActivityReceiver(MapView mapView, Context pluginContext, DetectionFeed feed) {
         super(mapView);
         this.pluginContext = pluginContext;
         this.feed = feed;
         this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.activity_panel, null);
+        this.prefs = mapView.getContext().getSharedPreferences("firecast", Context.MODE_PRIVATE);
+        area = prefs.getString("activity.area", AREA_ANY);
+        areaM = prefs.getFloat("activity.areaM", (float) Units.bigToMeters(50));
         this.list = view.findViewById(R.id.activity_list);
         list.setAdapter(adapter);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -89,6 +129,60 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                 pickState();
             }
         });
+        view.findViewById(R.id.btn_area).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickArea();
+            }
+        });
+        labelButtons();
+    }
+
+    private void labelButtons() {
+        ((Button) view.findViewById(R.id.btn_where)).setText(state == null ? "Where: Any state" : "Where: " + state);
+        ((Button) view.findViewById(R.id.btn_area)).setText("Area: " + areaName());
+    }
+
+    private String areaName() {
+        if (AREA_VIEW.equals(area))
+            return "What is in view";
+        if (AREA_RADIUS.equals(area))
+            return "Within " + Units.formatBig(areaM) + " of My Location";
+        return "Lower 48";
+    }
+
+    /** The same Area control as the pane, with Lower 48 in place of Everything. */
+    private void pickArea() {
+        final String[] labels = new String[2 + AREA_CHOICES.length];
+        labels[0] = "Lower 48";
+        labels[1] = "What is in view";
+        int current = AREA_VIEW.equals(area) ? 1 : 0;
+        for (int i = 0; i < AREA_CHOICES.length; i++) {
+            labels[2 + i] = "Within " + AREA_CHOICES[i] + " " + Units.bigLabel() + " of My Location";
+            if (AREA_RADIUS.equals(area) && Math.abs(Units.bigToMeters(AREA_CHOICES[i]) - areaM) < 1)
+                current = 2 + i;
+        }
+        new AlertDialog.Builder(getMapView().getContext())
+                .setTitle("Area")
+                .setSingleChoiceItems(labels, current, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        if (which == 0)
+                            area = AREA_ANY;
+                        else if (which == 1)
+                            area = AREA_VIEW;
+                        else {
+                            area = AREA_RADIUS;
+                            areaM = Units.bigToMeters(AREA_CHOICES[which - 2]);
+                        }
+                        prefs.edit().putString("activity.area", area).putFloat("activity.areaM", (float) areaM).apply();
+                        labelButtons();
+                        load();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     @Override
@@ -121,7 +215,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
 
     private void pickState() {
         final List<String> options = new ArrayList<>();
-        options.add("Anywhere");
+        options.add("Any state");
         options.addAll(states);
         int current = 0;
         for (int i = 0; i < states.size(); i++)
@@ -135,8 +229,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                             public void onClick(DialogInterface dialog, int which) {
                                 dialog.dismiss();
                                 state = which == 0 ? null : options.get(which);
-                                ((Button) view.findViewById(R.id.btn_where))
-                                        .setText(state == null ? "Anywhere" : state);
+                                labelButtons();
                                 load();
                             }
                         })
@@ -152,6 +245,25 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         status("Looking…");
         final long since = feed.filters.since(System.currentTimeMillis());
         final String want = state;
+        // The area, read on main where the map can be asked. A radius is a box to the
+        // service and a circle here; the view is the view.
+        Esri.Box box = null;
+        from = null;
+        noFix = false;
+        if (AREA_VIEW.equals(area)) {
+            box = feed.viewBox();
+            loadedBox = box;
+            from = feed.areaPoint();
+            noFix = feed.noFix;
+        } else if (AREA_RADIUS.equals(area)) {
+            from = feed.areaPoint();
+            noFix = feed.noFix;
+            if (from != null)
+                box = DetectionFeed.boxAround(from, areaM);
+        }
+        final Esri.Box wantBox = box;
+        final double[] measureFrom = from;
+        final double within = AREA_RADIUS.equals(area) ? areaM : -1;
         worker.execute(new Runnable() {
             @Override
             public void run() {
@@ -159,7 +271,14 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                 List<String> foundStates = null;
                 String error = null;
                 try {
-                    found = Activity.fires(since, want);
+                    found = Activity.fires(since, want, wantBox);
+                    if (within > 0 && measureFrom != null) {
+                        final List<Activity.Fire> inside = new ArrayList<>();
+                        for (Activity.Fire f : found)
+                            if (DetectionFeed.metersBetween(measureFrom, f.lat, f.lon) <= within)
+                                inside.add(f);
+                        found = inside;
+                    }
                     // The state list is only worth rebuilding while looking everywhere;
                     // inside one state the feed would only ever name that one.
                     if (want == null)
@@ -191,7 +310,12 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     }
 
     private void describe() {
-        final String where = state == null ? "the lower 48" : state;
+        String where = state == null ? "the lower 48" : state;
+        if (AREA_VIEW.equals(area))
+            where = "the area on screen" + (state == null ? "" : " in " + state);
+        else if (AREA_RADIUS.equals(area))
+            where = "within " + Units.formatBig(areaM) + (noFix ? " of the map center (no GPS fix)" : " of you")
+                    + (state == null ? "" : " in " + state);
         if (fires.isEmpty()) {
             status("Nothing burning in " + where + " in the last " + feed.filters.windowLabel()
                     + " that GOES has seen.");
@@ -208,11 +332,8 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         sb.append(established).append(established == 1 ? " fire in " : " fires in ").append(where)
                 .append(", last ").append(feed.filters.windowLabel()).append('.');
         if (onceOnly > 0)
-            sb.append(" Then ").append(onceOnly)
-                    .append(onceOnly == 1 ? " place seen hot once" : " places seen hot once")
-                    .append(", which at this time of year is often a burn pile or a harvest fire.");
-        sb.append(" From GOES, which covers the lower 48 only — Alaska, Hawaii and outside"
-                + " the US will not appear here.");
+            sb.append(' ').append(onceOnly).append(" seen once, often a burn pile.");
+        sb.append(" MW is heat seen from space. GOES, lower 48 only.");
         status(sb.toString());
     }
 
@@ -258,6 +379,9 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                 sb.append(" · ").append(f.hits).append(" detections");
             if (f.last > 0)
                 sb.append(" · last ").append(ago(f.last));
+            if (from != null)
+                sb.append(" · ").append(Units.rangeBearing(from, f.lat, f.lon))
+                        .append(noFix ? " of map center" : " of you");
             ((TextView) v.findViewById(R.id.fire_detail)).setText(sb.toString());
             ((TextView) v.findViewById(R.id.fire_power)).setText(f.powerText());
             return v;
@@ -277,6 +401,15 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
 
     @Override
     public void onDropDownVisible(boolean v) {
+        try {
+            if (v)
+                getMapView().addOnMapMovedListener(moved);
+            else {
+                getMapView().removeOnMapMovedListener(moved);
+                main.removeCallbacks(settled);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -285,6 +418,11 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
 
     @Override
     public void onDropDownClose() {
+        try {
+            getMapView().removeOnMapMovedListener(moved);
+        } catch (Exception ignored) {
+        }
+        main.removeCallbacks(settled);
     }
 
     @Override

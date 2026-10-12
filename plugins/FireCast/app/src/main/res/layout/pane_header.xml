@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    The pane's header, above the list: the status, the one button for finding a fire
+    that is not on screen, and three drop-down rows (Feeds, Filters, Map key) that stay
+    closed so the list is right there. The takwerx drop-down row: a head reading
+    "Name: value", an arrow, a body hidden until opened (plugin-ui skill).
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -28,15 +34,32 @@
         style="@style/TakwerxButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
+        android:layout_marginBottom="2dp"
         android:text="Where is it burning?" />
 
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- Feeds -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Feeds"
-        style="@style/TakwerxSectionHeading" />
-
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+        <Button
+            android:id="@+id/fold_feeds_head"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Feeds" />
+        <ImageButton
+            android:id="@+id/fold_feeds_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="Show feeds"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
     <!-- One button per feed, each carrying its own count: a control says what it costs
          before it is used. Filled in by the pane, because the feed list is code. -->
     <LinearLayout
@@ -44,86 +67,136 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingTop="2dp"
-        android:paddingBottom="4dp" />
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Filters"
-        style="@style/TakwerxSectionHeading"
-        android:paddingTop="4dp" />
-
-    <!-- The area the map and the list answer: what is in view, or a circle around the
-         operator. The same Area control every takwerx plugin carries. -->
-    <Button
-        android:id="@+id/btn_area"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:text="Area: What is in view" />
-
+    <!-- Filters -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="6dp">
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
         <Button
-            android:id="@+id/btn_window"
+            android:id="@+id/fold_filters_head"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:text="Last 24 h" />
+            android:text="Filters" />
+        <ImageButton
+            android:id="@+id/fold_filters_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="Show filters"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/fold_filters_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone">
+
+        <!-- The area the map and the list answer: what is in view, or a circle around
+             the operator. The same Area control every takwerx plugin carries. -->
         <Button
-            android:id="@+id/btn_confidence"
+            android:id="@+id/btn_area"
             style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
-            android:text="Any confidence" />
+            android:text="Area: What is in view" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="6dp">
+            <Button
+                android:id="@+id/btn_window"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Last 24 h" />
+            <Button
+                android:id="@+id/btn_confidence"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:text="Any confidence" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="6dp">
+            <Button
+                android:id="@+id/btn_industrial"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Industrial flagged" />
+            <Button
+                android:id="@+id/btn_refresh_every"
+                style="@style/TakwerxButton"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:text="Refresh: 10 min" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_refresh"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Refresh now" />
     </LinearLayout>
 
+    <!-- Map key -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="6dp">
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
         <Button
-            android:id="@+id/btn_industrial"
+            android:id="@+id/fold_key_head"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:text="Industrial flagged" />
-        <Button
-            android:id="@+id/btn_refresh_every"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
-            android:text="Refresh: 10 min" />
+            android:text="Map key" />
+        <ImageButton
+            android:id="@+id/fold_key_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="Show map key"
+            android:src="@drawable/ic_expand" />
     </LinearLayout>
-
-    <Button
-        android:id="@+id/btn_refresh"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Refresh now" />
-
-    <TextView
+    <!-- Built in code from the colors the map draws with, so the two cannot drift. -->
+    <LinearLayout
         android:id="@+id/legend"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="12sp"
-        android:textColor="#BBBBBB"
-        android:paddingTop="8dp"
-        android:paddingBottom="2dp" />
+        android:orientation="vertical"
+        android:paddingTop="6dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/list_heading"

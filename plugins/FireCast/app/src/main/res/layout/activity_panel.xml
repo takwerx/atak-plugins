@@ -16,20 +16,37 @@
             android:layout_height="wrap_content"
             android:text="Back" />
         <Button
+            android:id="@+id/btn_reload"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="Reload" />
+    </LinearLayout>
+    <!-- Area and Where are separate filters, as on every takwerx pane: an area is a
+         place on the map, Where is a named state. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false"
+        android:paddingTop="6dp">
+        <Button
+            android:id="@+id/btn_area"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Area: Lower 48" />
+        <Button
             android:id="@+id/btn_where"
             style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:layout_marginLeft="6dp"
-            android:text="Anywhere" />
-        <Button
-            android:id="@+id/btn_reload"
-            style="@style/TakwerxButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
-            android:text="Reload" />
+            android:text="Where: Any state" />
     </LinearLayout>
     <TextView
         android:id="@+id/activity_status"
