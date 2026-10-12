@@ -548,7 +548,7 @@ Mesonet figures (1 and 10 hour 6 / 9 / 15, 100 hour 10 / 13 / 18, 1000 hour
 13 / 16 / 22); duff has no published scale and draws grey.
 
 The first row picks how old a sample may be, *30 days*, *90 days* or *1 year*;
-*Show* picks *Live fuels*, *Dead fuels* or *Either*. Tap a dot for every fuel
+*Show* picks *Live fuels*, *Dead fuels* or *Both*. Tap a dot for every fuel
 the site samples with its last value, date and years. Moving the map into
 another state asks for that state. The database is the US Forest Service's,
 through San Jose State University's fuel moisture portal.
