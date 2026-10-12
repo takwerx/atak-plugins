@@ -64,14 +64,24 @@ public class GoesSource implements DetectionSource {
         final List<HeatDetection> out = new ArrayList<>();
         Esri.query(Sources.GOES, where(sinceMillis), box, "acq_date_time DESC", 1000, max, new Esri.FeatureSink() {
             @Override
-            public void feature(JSONObject a, Geometry g) {
-                if (!(g instanceof Point))
-                    return;
-                final Point p = (Point) g;
-                out.add(read(a, p.getY(), p.getX()));
+            public void feature(JSONObject a, Geometry g, JSONObject raw) {
+                final HeatDetection d = read(a, g, raw);
+                if (d != null)
+                    out.add(d);
             }
         });
         return out;
+    }
+
+    @Override
+    public HeatDetection read(JSONObject a, Geometry g, JSONObject raw) {
+        if (!(g instanceof Point))
+            return null;
+        final Point p = (Point) g;
+        final HeatDetection d = read(a, p.getY(), p.getX());
+        if (d != null)
+            d.record = PolarSource.record(a, raw);
+        return d;
     }
 
     private HeatDetection read(JSONObject a, double lat, double lon) {

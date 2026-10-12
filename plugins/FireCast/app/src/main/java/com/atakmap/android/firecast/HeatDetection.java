@@ -67,6 +67,8 @@ public class HeatDetection {
 
     /** Every field the service served, for the bottom of the detail panel. */
     public AttributeSet raw;
+    /** The attributes and geometry exactly as served, so the detection can be saved and read back. */
+    public org.json.JSONObject record;
 
     public HeatDetection(String sourceId, String sourceTitle, String sensor, double lat, double lon,
             long acquired, Footprint footprint) {

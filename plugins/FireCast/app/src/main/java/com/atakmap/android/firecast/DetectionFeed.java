@@ -77,7 +77,10 @@ public class DetectionFeed {
     private final Context pluginContext;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private final File root, storeFile;
+    private final File root, storeFile, saveFile;
+    /** When the store was last written, so ages can be repainted before they go stale. */
+    private volatile long lastDraw;
+    private static final long REPAINT_MS = 15 * 60000L;
     private final SharedPreferences state;
     private final List<DetectionSource> sources = Sources.all();
     private final IndustrialMask mask = new IndustrialMask();
@@ -123,6 +126,7 @@ public class DetectionFeed {
         this.pluginContext = pluginContext;
         this.root = FileSystemUtils.getItem("tools/firecast");
         this.storeFile = new File(root, "detections.sqlite");
+        this.saveFile = new File(root, "detections.json");
         this.state = mapView.getContext().getSharedPreferences("firecast", Context.MODE_PRIVATE);
         this.filters = new Filters(state);
         this.lastRefresh = state.getLong("lastRefresh", 0L);
@@ -183,7 +187,141 @@ public class DetectionFeed {
         registerTap();
         mapView.addOnMapMovedListener(moved);
         main.postDelayed(timer, TICK_MS);
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                restore();
+            }
+        });
         refresh();
+    }
+
+    // ---- what the phone saved: the last fetch, read back at start --------------------
+
+    /**
+     * Rebuilds the detections from the file the last fetch wrote, so that after a
+     * restart with no network the list, the counts and a tap on a box all work from
+     * what the phone holds; the map already came back from the store on its own. Each
+     * record goes through the same reader a fetch used (CLAUDE.md, "Downloaded data
+     * survives a restart with no network"). Worker thread, queued ahead of the first
+     * fetch on the same worker.
+     */
+    private void restore() {
+        if (!saveFile.isFile())
+            return;
+        try {
+            final org.json.JSONObject saved = new org.json.JSONObject(readText(saveFile));
+            final List<HeatDetection> read = new ArrayList<>();
+            final org.json.JSONObject bySource = saved.optJSONObject("sources");
+            for (DetectionSource s : sources) {
+                final org.json.JSONArray records = bySource == null ? null : bySource.optJSONArray(s.id());
+                for (int i = 0; records != null && i < records.length(); i++) {
+                    final org.json.JSONObject r = records.optJSONObject(i);
+                    if (r == null)
+                        continue;
+                    final org.json.JSONObject a = r.optJSONObject("attributes"), geom = r.optJSONObject("geometry");
+                    if (a == null || geom == null)
+                        continue;
+                    final Geometry g = Esri.fromEsriJson(geom);
+                    final HeatDetection d = g == null ? null : s.read(a, g, geom);
+                    if (d == null)
+                        continue;
+                    d.inIndustrialMask = r.optBoolean("industrial", false);
+                    read.add(d);
+                }
+            }
+            if (!all.isEmpty())
+                return;   // a fetch finished first; what it brought is newer
+            final Map<String, HeatDetection> index = new HashMap<>();
+            for (HeatDetection d : read)
+                index.put(d.uid(), d);
+            final Map<String, Integer> counts = new LinkedHashMap<>(), got = new LinkedHashMap<>();
+            final org.json.JSONObject av = saved.optJSONObject("available"), fe = saved.optJSONObject("fetched");
+            for (DetectionSource s : sources) {
+                if (av != null && av.has(s.id()))
+                    counts.put(s.id(), av.optInt(s.id()));
+                if (fe != null && fe.has(s.id()))
+                    got.put(s.id(), fe.optInt(s.id()));
+            }
+            final org.json.JSONArray b = saved.optJSONArray("box");
+            all = read;
+            byUid = index;
+            available = counts;
+            fetched = got;
+            capped = saved.optBoolean("capped", false);
+            if (b != null && b.length() == 4)
+                box = new Esri.Box(b.getDouble(0), b.getDouble(1), b.getDouble(2), b.getDouble(3));
+            Log.d(TAG, "restored " + read.size() + " detections saved " + (lastRefresh > 0
+                    ? ((System.currentTimeMillis() - lastRefresh) / 60000L) + " min ago" : "earlier"));
+            changed();
+        } catch (Exception e) {
+            Log.w(TAG, "could not read the saved detections", e);
+        }
+    }
+
+    private static String readText(File f) throws java.io.IOException {
+        final StringBuilder sb = new StringBuilder();
+        final java.io.Reader r = new java.io.InputStreamReader(
+                new java.io.FileInputStream(f), java.nio.charset.StandardCharsets.UTF_8);
+        try {
+            final char[] buf = new char[8192];
+            int n;
+            while ((n = r.read(buf)) > 0)
+                sb.append(buf, 0, n);
+        } finally {
+            r.close();
+        }
+        return sb.toString();
+    }
+
+    /** Writes what a fetch brought, every source, to a temp file then into place. Worker thread. */
+    private void save() {
+        try {
+            final org.json.JSONObject out = new org.json.JSONObject();
+            final org.json.JSONObject bySource = new org.json.JSONObject();
+            for (HeatDetection d : all) {
+                if (d.record == null)
+                    continue;
+                org.json.JSONArray arr = bySource.optJSONArray(d.sourceId);
+                if (arr == null) {
+                    arr = new org.json.JSONArray();
+                    bySource.put(d.sourceId, arr);
+                }
+                final org.json.JSONObject r = new org.json.JSONObject();
+                r.put("attributes", d.record.opt("attributes"));
+                r.put("geometry", d.record.opt("geometry"));
+                if (d.inIndustrialMask)
+                    r.put("industrial", true);
+                arr.put(r);
+            }
+            out.put("sources", bySource);
+            final org.json.JSONObject av = new org.json.JSONObject(), fe = new org.json.JSONObject();
+            for (Map.Entry<String, Integer> e : available.entrySet())
+                av.put(e.getKey(), e.getValue());
+            for (Map.Entry<String, Integer> e : fetched.entrySet())
+                fe.put(e.getKey(), e.getValue());
+            out.put("available", av);
+            out.put("fetched", fe);
+            out.put("capped", capped);
+            final Esri.Box b = box;
+            if (b != null)
+                out.put("box", new org.json.JSONArray().put(b.south).put(b.west).put(b.north).put(b.east));
+            final File tmp = new File(root, "detections.json.tmp");
+            final java.io.Writer w = new java.io.OutputStreamWriter(
+                    new java.io.FileOutputStream(tmp), java.nio.charset.StandardCharsets.UTF_8);
+            try {
+                w.write(out.toString());
+            } finally {
+                w.close();
+            }
+            if (!tmp.renameTo(saveFile)) {
+                saveFile.delete();
+                if (!tmp.renameTo(saveFile))
+                    Log.w(TAG, "could not move the saved detections into place");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "could not save the detections", e);
+        }
     }
 
     /**
@@ -438,6 +576,8 @@ public class DetectionFeed {
                         && now - lastRefresh >= filters.refreshMinutes * 60000L;
                 if (!refreshing && (due || movedOffTheBox()))
                     refresh();
+                else if (!refreshing && !all.isEmpty() && now - lastDraw > REPAINT_MS)
+                    redraw();   // colors are age, and age moves while the data does not
             } catch (Exception e) {
                 Log.w(TAG, "tick failed", e);
             }
@@ -616,6 +756,7 @@ public class DetectionFeed {
         final Map<String, Integer> counts = new LinkedHashMap<>();
         final Map<String, Integer> got = new LinkedHashMap<>();
         final List<String> problems = new ArrayList<>();
+        final java.util.Set<String> failed = new java.util.HashSet<>();
         boolean anyWorked = false, anyCapped = false;
         for (DetectionSource s : sources) {
             if (!started)
@@ -646,11 +787,25 @@ public class DetectionFeed {
             } catch (Exception e) {
                 Log.w(TAG, s.id() + " fetch failed", e);
                 problems.add(s.title() + ": " + message(e));
+                failed.add(s.id());
             }
         }
         if (!started) {
             refreshing = false;
             return;
+        }
+        // A feed that did not answer keeps what it last gave: a partial fetch merges
+        // with what is held rather than deleting the feeds that failed.
+        if (!failed.isEmpty()) {
+            for (HeatDetection d : all)
+                if (failed.contains(d.sourceId))
+                    gathered.add(d);
+            for (String id : failed) {
+                if (available.containsKey(id))
+                    counts.put(id, available.get(id));
+                if (fetched.containsKey(id))
+                    got.put(id, fetched.get(id));
+            }
         }
         if (!anyWorked && !problems.isEmpty()) {
             // Nothing new arrived. The map keeps the last good set rather than going blank,
@@ -683,6 +838,7 @@ public class DetectionFeed {
         synchronized (lock) {
             drawLocked();
         }
+        save();
         refreshing = false;
         status = problems.isEmpty() ? "ok" : "partial: " + problems.get(0);
         changed();
@@ -705,6 +861,13 @@ public class DetectionFeed {
         final long now = System.currentTimeMillis();
         final long window = filters.windowMillis();
         final List<HeatDetection> source = all;
+        // Nothing in memory while the store holds the last picture means the file has
+        // not been read back yet, not that there is nothing to show. Drawing now would
+        // delete every set and leave the map blank until the network returns.
+        if (source.isEmpty() && lastRefresh > 0 && countFeatures() > 0) {
+            Log.d(TAG, "draw skipped: memory empty, store holds the last picture");
+            return;
+        }
         boolean bulk = false;
         try {
             // Bulk mode: one content-changed notification at the end rather than one per
@@ -741,6 +904,7 @@ public class DetectionFeed {
                 }
             }
             shownCount = drawn;
+            lastDraw = now;
             Log.d(TAG, "drew " + drawn + " of " + source.size() + " fetched");
         } catch (Exception e) {
             Log.w(TAG, "draw failed", e);

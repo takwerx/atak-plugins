@@ -38,6 +38,13 @@ public interface DetectionSource {
      * @return what the feed served, oldest or newest in no particular order
      */
     List<HeatDetection> fetch(Esri.Box box, long sinceMillis, int max) throws Exception;
+    /**
+     * One record, as the service served it, as a detection; null when it cannot be one.
+     * The same reader serves a fetch and the file the last fetch was saved to, so what
+     * comes back after a restart with no network is what was on the map before it.
+     */
+    HeatDetection read(org.json.JSONObject attributes,
+            com.atakmap.map.layer.feature.geometry.Geometry geometry, org.json.JSONObject esriGeometry);
 
     /**
      * How many the feed holds for that box and window, without fetching them. Used to

@@ -76,7 +76,7 @@ public class IndustrialMask {
         final List<Geometry> fetchedShapes = new ArrayList<>();
         Esri.query(Sources.INDUSTRIAL_MASK, "1=1", box, "OBJECTID ASC", 2000, 0, new Esri.FeatureSink() {
             @Override
-            public void feature(JSONObject attributes, Geometry g) {
+            public void feature(JSONObject attributes, Geometry g, JSONObject raw) {
                 collect(g, fetched);
                 fetchedShapes.add(g);
             }

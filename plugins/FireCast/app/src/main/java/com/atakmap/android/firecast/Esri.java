@@ -31,7 +31,8 @@ public final class Esri {
 
     /** What a query page hands back: one feature at a time. */
     public interface FeatureSink {
-        void feature(JSONObject attributes, Geometry geometry) throws Exception;
+        /** @param esriGeometry the geometry exactly as the service served it, for saving */
+        void feature(JSONObject attributes, Geometry geometry, JSONObject esriGeometry) throws Exception;
     }
 
     /** South, west, north, east in degrees: the box a query is limited to. */
@@ -120,7 +121,7 @@ public final class Esri {
                 final Geometry g = fromEsriJson(geom);
                 if (g == null)
                     continue;
-                sink.feature(props, g);
+                sink.feature(props, g, geom);
                 count++;
             }
             final boolean more = page.optBoolean("exceededTransferLimit", false);

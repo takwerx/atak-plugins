@@ -58,14 +58,24 @@ public class RadrSource implements DetectionSource {
         final List<HeatDetection> out = new ArrayList<>();
         Esri.query(Sources.RADR, where(sinceMillis), box, "datetime DESC", 200, max, new Esri.FeatureSink() {
             @Override
-            public void feature(JSONObject a, Geometry g) {
-                final Envelope e = g.getEnvelope();
-                if (e == null || Double.isNaN(e.minX))
-                    return;
-                out.add(read(a, g, (e.minY + e.maxY) / 2d, (e.minX + e.maxX) / 2d));
+            public void feature(JSONObject a, Geometry g, JSONObject raw) {
+                final HeatDetection d = read(a, g, raw);
+                if (d != null)
+                    out.add(d);
             }
         });
         return out;
+    }
+
+    @Override
+    public HeatDetection read(JSONObject a, Geometry g, JSONObject raw) {
+        final Envelope e = g == null ? null : g.getEnvelope();
+        if (e == null || Double.isNaN(e.minX))
+            return null;
+        final HeatDetection d = read(a, g, (e.minY + e.maxY) / 2d, (e.minX + e.maxX) / 2d);
+        if (d != null)
+            d.record = PolarSource.record(a, raw);
+        return d;
     }
 
     private HeatDetection read(JSONObject a, Geometry g, double lat, double lon) {

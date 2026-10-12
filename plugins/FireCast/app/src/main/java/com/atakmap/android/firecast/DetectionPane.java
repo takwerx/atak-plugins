@@ -432,7 +432,7 @@ public class DetectionPane implements DetectionFeed.Listener {
         if (feed.capped)
             d.append(". More were available than are drawn - zoom in to see all of them");
         if (feed.status != null && feed.status.startsWith("no update"))
-            d.append(". Last try failed, so this is the previous set: ").append(feed.status.substring(9).trim());
+            d.append(". Could not reach the servers; showing what this phone saved");
         else if (feed.status != null && feed.status.startsWith("partial"))
             d.append(". ").append(feed.status);
         detail.setText(d.toString());
