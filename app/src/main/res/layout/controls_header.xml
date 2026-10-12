@@ -48,13 +48,10 @@
         android:layout_height="wrap_content" />
 
     <TextView
+        style="@style/TakwerxPageHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Where"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
+        android:text="Where" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -84,13 +81,10 @@
 
 
     <TextView
+        style="@style/TakwerxPageHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Show"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
+        android:text="Show" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -120,13 +114,10 @@
     </LinearLayout>
 
     <TextView
+        style="@style/TakwerxPageHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Distance from a point"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
+        android:text="Distance from a point" />
 
     <TextView
         android:id="@+id/radius_label"
@@ -184,13 +175,10 @@
          center, best match first, with the PTZ cameras that could be turned to
          it and the nearby cameras that report no bearing in their own groups. -->
     <TextView
+        style="@style/TakwerxPageHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Looking at a point"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
+        android:text="Looking at a point" />
 
     <TextView
         android:id="@+id/look_at_label"
@@ -219,13 +207,10 @@
     </LinearLayout>
 
     <TextView
+        style="@style/TakwerxPageHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Draw on the map"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
+        android:text="Draw on the map" />
 
     <TextView
         android:id="@+id/zoom_label"
@@ -260,13 +245,10 @@
          ticks the box and the answer is immediately below their thumb, rather
          than a scroll away past four other groups. -->
     <TextView
+        style="@style/TakwerxPageHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Find a camera by name"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="6dp"
-        android:alpha="0.6" />
+        android:text="Find a camera by name" />
 
     <!-- Clear sits beside the box rather than being an X inside it, and it is
          disabled while the box is empty. That makes it the indicator as well as the
@@ -307,12 +289,9 @@
         android:text="On screen only" />
 
     <TextView
+        style="@style/TakwerxPageHeading"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Cameras"
-        android:textSize="10sp"
-        android:textAllCaps="true"
-        android:paddingTop="8dp"
-        android:alpha="0.6" />
+        android:text="Cameras" />
 
 </LinearLayout>
