@@ -156,7 +156,7 @@ opening the plugin.
 | Fire | Fire Weather Zones | The NWS fire weather zones with their numbers, shaded under a Red Flag Warning or a Fire Weather Watch; the zone's planning forecast behind a tap |
 | Fire | SAWTI | The Forest Service's Santa Ana Wildfire Threat Index for four Southern California zones, colored by level for each of four days; the SAWTI page behind a tap |
 | Fire | Fire Danger | Every Predictive Service Area in the lower 48 shaded by its Energy Release Component, observed yesterday or forecast today; the GACC's ERC chart behind a tap on an area's name |
-| Fire | Fuel Moisture | Every fuel sampling site in the state under the map, a dot colored by its newest live fuel's moisture (critical, high, moderate, low) with the fuel and percent in the pill; every fuel sampled there, with dates, behind a tap; 30 days, 90 days or a year back; live fuels, dead fuels or either |
+| Fire | Fuel Moisture | Every fuel sampling site in the state under the map, a dot colored by its newest sample's moisture (critical, high, moderate, low, on the live-fuel or the timelag class's own breaks) with the fuel and percent in the pill; every fuel sampled there, with dates, behind a tap; 30 days, 90 days or a year back; live fuels, dead fuels or either |
 | Fire | Lightning | NOAA's lightning strike density, the newest 15 minutes, in five bands from under 1 to over 150 strikes in a 5-mile square |
 | Fire | PSPS | California's Public Safety Power Shutoffs from Cal OES: counties warned, power off, power back on |
 | Fire | Smoke | Forecast smoke at the ground or through the whole sky, with the amount "Here"; the same forecast at every zoom, so the smoke keeps its shape as you zoom |
@@ -332,7 +332,11 @@ fuel and percent in the pill, `Chamise 58%`. Live fuel moisture is water as a
 percent of the plant's dry weight, so it runs past 100; the colors are the
 chaparral thresholds, 60% and under critical (red), 61 to 79 high (orange),
 80 to 99 moderate (yellow), 100 and over low (green). The dead fuel classes
-(1 to 1000 hour, duff) run on another scale and draw grey. The first row picks
+are rated on their own breaks, the conservative figures the Texas A&M Forest
+Service pocket cards and the Oklahoma Mesonet burn window publish, since no
+national table exists: 1 and 10 hour fuels 6 / 9 / 15, 100 hour 10 / 13 / 18,
+1000 hour 13 / 16 / 22, each the top of critical, high and moderate. Duff has
+no published scale and draws grey. The first row picks
 how old a sample may be, **30 days**, **90 days** or **1 year**; **Show** picks
 **Live fuels**, **Dead fuels** or **Either**, the pill always the newest of
 that kind. The status line counts the sites and names the driest live fuel in

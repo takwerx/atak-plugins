@@ -63,8 +63,9 @@ Capabilities:
     Burning Index and its GACC's own ERC chart, full screen to pinch and zoom.
     Each fire weather zone gives the ERC of the area it is in.
   - Fuel moisture samples: every sampling site of the National Fuel Moisture
-    Database in the state under the map, the newest live fuel's moisture in
-    the pill and colored by the chaparral thresholds, every fuel sampled there
+    Database in the state under the map, the newest sample's moisture in
+    the pill and colored critical to low on the live fuel or timelag class's
+    own breaks, every fuel sampled there
     behind a tap; live fuels, dead fuels or either, 30 days to a year back.
   - The wind as a heat map: the speed the streaks are drawn from as a colored
     field under them, in the same bands as the key, with one switch.
