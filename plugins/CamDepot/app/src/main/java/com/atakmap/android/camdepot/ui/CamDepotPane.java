@@ -1003,6 +1003,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                 }
                 updateBearingsOffButton();
                 updateLookAtControls();
+                rememberUi();
             }
         });
 
@@ -1058,6 +1059,15 @@ public final class CamDepotPane implements CameraStore.Listener {
     // The POINT, as text so nothing is lost to a float. Empty means off.
     private static final String PREF_LOOK_AT = "camdepot_look_at";
     private static final String PREF_LOOK_REACH = "camdepot_look_reach_big";
+    /** The Look At bearings switch was ON when the pane was last used. */
+    private static final String PREF_LOOK_LINES = "camdepot_look_lines_on";
+    /**
+     * Set at start from the pref and consumed by the first apply() that has
+     * cameras for the point: the lines come back on as they were (operator,
+     * 2026-10-11: "have it restart as it was last on"). The cameras arrive
+     * after the pane is built, so the restore cannot happen in restoreUi().
+     */
+    private boolean restoreLookLines;
     /** Bumped when the default changes, so a phone still on the old default moves. */
     private static final String PREF_LOOK_REACH_GEN = "camdepot_look_reach_gen";
     private static final int LOOK_REACH_GEN = 3;
@@ -1168,6 +1178,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                 lookAt = new GeoPoint(Double.parseDouble(parts[0]),
                         Double.parseDouble(parts[1]));
                 layer.showLookAtMarker(lookAt);
+                restoreLookLines = p.getBoolean(PREF_LOOK_LINES, false);
             }
             updateLookAtControls();
         } catch (RuntimeException e) {
@@ -1183,7 +1194,8 @@ public final class CamDepotPane implements CameraStore.Listener {
                 + stillOnly.isChecked() + inView.isChecked() + favoritesFirst
                 + toggleOn
                 + "|" + radius.getProgress() + (center != null)
-                + "|" + lookAtPref() + "|" + lookReachBig;
+                + "|" + lookAtPref() + "|" + lookReachBig
+                + "|" + (lookAt != null && lookAtBearingsOn());
     }
 
     /** The reach in meters: the preset, or the bearing line's length for 0. */
@@ -1235,6 +1247,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                     .putBoolean(PREF_FROM_MAP, center != null)
                     .putString(PREF_LOOK_AT, lookAtPref())
                     .putFloat(PREF_LOOK_REACH, (float) lookReachBig)
+                    .putBoolean(PREF_LOOK_LINES, lookAt != null && lookAtBearingsOn())
                     .apply();
         } catch (RuntimeException e) {
             Log.w(TAG, "could not remember the panel", e);
@@ -1881,6 +1894,12 @@ public final class CamDepotPane implements CameraStore.Listener {
                         out.size() + onScreenFavs)
                 : "On screen only");
 
+        if (restoreLookLines && !lastSees.isEmpty()) {
+            restoreLookLines = false;
+            for (Camera c : new ArrayList<>(lastSees))
+                layer.showFov(c);
+            updateBearingsOffButton();
+        }
         if (groups != null)
             adapter.setSections(favs, heads, groups, listFrom, notes, true);
         else
