@@ -994,20 +994,19 @@ public final class CamDepotPane implements CameraStore.Listener {
         lookAtBearingsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // Every camera that sees the point, in one tap. The alternative was
-                // visiting each row, which is the chore this filter exists to end.
-                int n = 0;
+                // A switch for the lines of every camera that sees the point:
+                // the label says what IS (Bearings ON / OFF), the tap flips it.
+                // It read "Show 5 Bearings" before and after the tap, so nothing
+                // on the pane said the lines were on (operator, 2026-10-11).
+                final boolean allOn = lookAtBearingsOn();
                 for (Camera c : new ArrayList<>(lastSees)) {
-                    if (!layer.isFovShowing(c.id)) {
+                    if (allOn)
+                        layer.hideFov(c.id);
+                    else
                         layer.showFov(c);
-                        n++;
-                    }
                 }
                 updateBearingsOffButton();
-                Toast.makeText(mapView.getContext(), n == 0
-                        ? "Those bearings are already on"
-                        : String.format(Locale.US, "%d bearing%s on", n,
-                                n == 1 ? "" : "s"), Toast.LENGTH_SHORT).show();
+                updateLookAtControls();
             }
         });
 
@@ -1312,6 +1311,8 @@ public final class CamDepotPane implements CameraStore.Listener {
      * to "is anything still drawn out there".
      */
     private void updateBearingsOffButton() {
+        if (lookAtLabel != null && lastSees != null)
+            updateLookAtControls();
         final int n = layer.fovCount();
         bearingsOffButton.setEnabled(n > 0);
         bearingsOffButton.setText(n == 0 ? "No bearings shown"
@@ -1943,8 +1944,27 @@ public final class CamDepotPane implements CameraStore.Listener {
         lookAtButton.setText("Clear Look At");
         final int n = lastSees.size();
         lookAtBearingsButton.setEnabled(n > 0);
-        lookAtBearingsButton.setText(n == 0 ? "None See the Point"
-                : String.format(Locale.US, "Show %,d Bearing%s", n, n == 1 ? "" : "s"));
+        if (n == 0) {
+            lookAtBearingsButton.setText("None See the Point");
+            lookAtBearingsButton.setTextColor(0xFFFFFFFF);
+            return;
+        }
+        final boolean on = lookAtBearingsOn();
+        lookAtBearingsButton.setText(String.format(Locale.US, "%,d Bearing%s %s",
+                n, n == 1 ? "" : "s", on ? "ON" : "OFF"));
+        lookAtBearingsButton.setTextColor(pluginContext.getResources().getColor(
+                on ? R.color.state_on : R.color.state_off));
+    }
+
+    /** True when every camera that sees the point has its line on. */
+    private boolean lookAtBearingsOn() {
+        if (lastSees.isEmpty())
+            return false;
+        for (Camera c : lastSees) {
+            if (!layer.isFovShowing(c.id))
+                return false;
+        }
+        return true;
     }
 
     private static void sortForList(List<Camera> cameras, final GeoPoint from) {
