@@ -66,6 +66,11 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <TextView
+                style="@style/TakwerxSectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/group_points" />
 
             <!-- Spot forecasts on the map, drawn the way NWS's own Spot Forecast
                  Monitor draws them. Not time-enabled; on beside anything. -->
