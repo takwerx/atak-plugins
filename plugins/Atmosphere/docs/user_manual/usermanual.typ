@@ -668,8 +668,9 @@ state's code are sent, never your position.
 The *Rain Gauges* page shows the office's rainfall report for the point in
 the top row: its gauges with their inches for the period the office names,
 *Most rain first* or *Closest* with the miles on each row, a green *Go to*
-under every gauge the page could place, and the report as written behind a
-button; under it the USGS gauges with Go to.
+under every gauge the page could place (the row flies in close and opens the
+gauge's details, *Back* and *Go to* at the top), and the report as written
+behind a button; under it the USGS gauges, the same on tap.
 Thirty-three offices publish such a report; the page says so when the one
 here does not. It needs NWS as the forecast service.
 ]

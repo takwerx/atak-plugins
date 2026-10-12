@@ -76,6 +76,10 @@ public final class RainPage {
     private final EgressPolicy egress;
     private final Host host;
     private final ScrollView root;
+    /** The list, and the one gauge opened from it; one shows at a time. */
+    private final LinearLayout body, detail;
+    private final TextView detailTitle, detailFacts;
+    private Runnable detailGoTo;
     private final TextView officeLine, periodLine, status, reportText;
     private final Button sortWritten, sortMost, showReport;
     private final LinearLayout rows, gaugeRows;
@@ -109,10 +113,47 @@ public final class RainPage {
         this.egress = egress;
         this.host = host;
         root = new ScrollView(pluginContext);
-        final LinearLayout body = new LinearLayout(pluginContext);
+        final LinearLayout page = new LinearLayout(pluginContext);
+        page.setOrientation(LinearLayout.VERTICAL);
+        root.addView(page);
+        body = new LinearLayout(pluginContext);
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(0, 0, 0, dp(8));
-        root.addView(body);
+        page.addView(body);
+        // One gauge: Back and Go to, the name, then what is known about it (operator,
+        // 2026-10-12: "I said go and it just hovered over a map and I don't know which
+        // one is which at that zoom level").
+        detail = new LinearLayout(pluginContext);
+        detail.setOrientation(LinearLayout.VERTICAL);
+        detail.setPadding(0, 0, 0, dp(8));
+        detail.setVisibility(View.GONE);
+        final LinearLayout bar = row();
+        final Button back = chip(pluginContext.getString(R.string.back));
+        final Button goTo = chip(pluginContext.getString(R.string.go_to));
+        bar.addView(back, weight(1f, true));
+        bar.addView(goTo, weight(1f, false));
+        detail.addView(bar);
+        detailTitle = text(17, true);
+        detailTitle.setPadding(0, dp(8), 0, 0);
+        detail.addView(detailTitle);
+        detailFacts = text(14, false);
+        detailFacts.setPadding(0, dp(4), 0, 0);
+        detailFacts.setLineSpacing(dp(2), 1f);
+        detail.addView(detailFacts);
+        page.addView(detail);
+        back.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                closeDetail();
+            }
+        });
+        goTo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (detailGoTo != null)
+                    detailGoTo.run();
+            }
+        });
 
         body.addView(heading(pluginContext.getString(R.string.rain_office_heading)));
         officeLine = text(15, true);
@@ -296,6 +337,8 @@ public final class RainPage {
                     return;
                 }
                 officeCell = cell;
+                if (!cwa.equals(office))
+                    closeDetail();
                 office = cwa;
                 fetchLatest(mine);
             }
@@ -778,21 +821,64 @@ public final class RainPage {
             col.addView(go);
             row.setClickable(true);
             row.setBackgroundResource(R.drawable.btn_gray);
+            final String dist = distance;
             row.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     flyTo(at[0], at[1]);
+                    openDetail(r.name, reportFacts(r, dist), new Runnable() {
+                        @Override
+                        public void run() {
+                            flyTo(at[0], at[1]);
+                        }
+                    });
                 }
             });
         }
         return row;
     }
 
+    /** What the office's report says about one gauge, in lines. */
+    private String reportFacts(RainReports.Row r, String distance) {
+        final StringBuilder b = new StringBuilder();
+        if (r.values.length == 1)
+            b.append(Double.isNaN(r.inches) ? (r.values[0].equals("T") ? "A trace" : r.values[0])
+                    : r.values[0] + " in");
+        else
+            b.append(join(" ", r.values));
+        if (report != null && !report.period.isEmpty())
+            b.append('\n').append(join(" ", report.period.toArray(new String[0])));
+        if (!distance.isEmpty())
+            b.append("\nDistance: ").append(distance);
+        if (!r.id.isEmpty())
+            b.append("\nGauge id: ").append(r.id);
+        if (r.elevationFt != Integer.MIN_VALUE)
+            b.append("\nElevation: ").append(String.format(Locale.US, "%,d ft", r.elevationFt));
+        b.append("\nFrom the ").append(office.isEmpty() ? "forecast office's" : office + " office's")
+                .append(" rainfall report, as written.");
+        return b.toString();
+    }
+
+    private void openDetail(String title, String facts, Runnable goTo) {
+        detailTitle.setText(title);
+        detailFacts.setText(facts);
+        detailGoTo = goTo;
+        body.setVisibility(View.GONE);
+        detail.setVisibility(View.VISIBLE);
+        root.scrollTo(0, 0);
+    }
+
+    private void closeDetail() {
+        detailGoTo = null;
+        detail.setVisibility(View.GONE);
+        body.setVisibility(View.VISIBLE);
+    }
+
     /** Pans and zooms the map to a gauge, falling back to a plain pan. */
     private void flyTo(double lat, double lon) {
         try {
             mapView.getMapController().panZoomTo(new GeoPoint(lat, lon),
-                    mapView.mapResolutionAsMapScale(20d), true);
+                    mapView.mapResolutionAsMapScale(8d), true);
         } catch (LinkageError | RuntimeException e) {
             Log.w(TAG, "panZoomTo failed; plain pan", e);
             mapView.getMapController().panTo(new GeoPoint(lat, lon), true);
@@ -857,6 +943,12 @@ public final class RainPage {
                 @Override
                 public void onClick(View v) {
                     flyTo(g.lat, g.lon);
+                    openDetail(g.name, RainGaugesOverlay.details(g), new Runnable() {
+                        @Override
+                        public void run() {
+                            flyTo(g.lat, g.lon);
+                        }
+                    });
                 }
             });
             gaugeRows.addView(row);

@@ -469,7 +469,9 @@ point in the pane's top row: the gauges the office lists, with their inches for
 the period the office names (during a storm a day or two; the line under the
 office says which), **Most rain first** or **Closest** to your point, with the
 miles on each row and a green **Go to** under every gauge the page could
-place (the row flies the map there), the gauges nothing could place under their
+place (the row flies the map in close and opens the gauge's details, the
+inches, period, id and elevation, with **Back** and **Go to** at the top; the
+USGS rows below do the same), the gauges nothing could place under their
 own heading, and the whole report as the office wrote it behind a button. A
 gauge is placed once, by its name against NIFC's RAWS and by its id against
 NWS, and kept; the ones nothing can place are the counties' own flood-control
