@@ -608,9 +608,12 @@ public final class PackageInstaller {
         // A GeoPDF overlay is listed under its file name; a map source XML
         // under the <name> inside it, which the depot writes to match the
         // file minus its extension.
-        final String name = f.getName().toLowerCase(java.util.Locale.US).endsWith(".xml")
+        final String lower = f.getName().toLowerCase(java.util.Locale.US);
+        final String name = lower.endsWith(".xml")
                 ? f.getName().substring(0, f.getName().length() - 4)
-                : f.getName();
+                : lower.endsWith(".mbtiles")
+                        ? f.getName().substring(0, f.getName().length() - 8)
+                        : f.getName();
         final String path = f.getAbsolutePath();
 
         WORKER.execute(new Runnable() {
@@ -776,7 +779,9 @@ public final class PackageInstaller {
                                             + " cannot list selections: " + inAtak);
                                 return false;
                             }
-                            final boolean hit = opts != null && opts.contains(name);
+                            final boolean hit = opts != null
+                                    && (opts.contains(name)
+                                            || opts.contains(new File(path).getName()));
                             // Once, or when it succeeds. This runs once a second
                             // for as long as the wait lasts, and on a build that
                             // can never register the file it produced 3,534 lines
@@ -861,6 +866,26 @@ public final class PackageInstaller {
             return shown || zoomed;
         } catch (LinkageError | RuntimeException notThisBuild) {
             Log.w(TAG, "could not select directly", notThisBuild);
+            return false;
+        }
+    }
+
+    /** Fits the map to a box the catalog gave, without touching any layer. */
+    public static boolean showBounds(double[] fit) {
+        if (fit == null)
+            return false;
+        try {
+            final com.atakmap.android.maps.MapView mv =
+                    com.atakmap.android.maps.MapView.getMapView();
+            if (mv == null)
+                return false;
+            com.atakmap.android.util.ATAKUtilities.scaleToFit(mv,
+                    new com.atakmap.coremap.maps.coords.GeoBounds(
+                            fit[0], fit[1], fit[2], fit[3]),
+                    mv.getWidth(), mv.getHeight());
+            return true;
+        } catch (LinkageError | RuntimeException inAtak) {
+            Log.w(TAG, "could not show bounds", inAtak);
             return false;
         }
     }
@@ -1056,7 +1081,11 @@ public final class PackageInstaller {
 
     private static com.atakmap.android.hierarchy.action.Visibility visibility(
             Depot.Package pkg) {
-        final File f = held(pkg);
+        return visibilityOf(held(pkg));
+    }
+
+    /** ATAK's on/off handle for a file it has imported, or null. */
+    static com.atakmap.android.hierarchy.action.Visibility visibilityOf(File f) {
         if (f == null)
             return null;
         try {
@@ -1148,8 +1177,8 @@ public final class PackageInstaller {
             BaseMapInstaller.requestLayerScan(dest);
             return;
         }
-        if ("grg".equals(where)
-                && dest.getName().toLowerCase(java.util.Locale.US).endsWith(".xml"))
+        final String lower = dest.getName().toLowerCase(java.util.Locale.US);
+        if ("grg".equals(where) && (lower.endsWith(".xml") || lower.endsWith(".mbtiles")))
             importGrg(dest);
         else
             importInPlace(dest);

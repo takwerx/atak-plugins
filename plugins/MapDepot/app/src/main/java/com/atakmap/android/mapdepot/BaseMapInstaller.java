@@ -101,6 +101,35 @@ public final class BaseMapInstaller {
         }
     }
 
+    /**
+     * Whether an added overlay is drawing, or null when ATAK will not say
+     * (not an overlay, not added, or not registered yet). The roads overlay
+     * lives under Overlay Manager > Image Overlay, which nobody looks for;
+     * the operator (2026-10-11): "people are not going to know where to turn
+     * that off". So the row carries the switch.
+     */
+    public static Boolean isVisible(Depot.BaseMap map) {
+        if (!map.overlay())
+            return null;
+        final com.atakmap.android.hierarchy.action.Visibility v =
+                PackageInstaller.visibilityOf(new File(dirFor(map), map.fileName()));
+        return v == null ? null : Boolean.valueOf(v.isVisible());
+    }
+
+    public static boolean setVisible(Depot.BaseMap map, boolean visible) {
+        final com.atakmap.android.hierarchy.action.Visibility v =
+                PackageInstaller.visibilityOf(new File(dirFor(map), map.fileName()));
+        if (v == null)
+            return false;
+        try {
+            return v.setVisible(visible);
+        } catch (RuntimeException notThisBuild) {
+            Log.w(TAG, "could not set visibility on " + map.fileName() + ": "
+                    + notThisBuild);
+            return false;
+        }
+    }
+
     /** Whether this source is already on the device at the right size. */
     public static boolean isInstalled(Depot.BaseMap map) {
         final File f = new File(dirFor(map), map.fileName());

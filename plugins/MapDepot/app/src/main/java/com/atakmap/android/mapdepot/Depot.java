@@ -204,6 +204,10 @@ public final class Depot {
         public final String id;
         public final String name;
         public final String category;
+        /** For overlays: the heading it is listed under, "Roads, streets and POI" first. */
+        public final String group;
+        /** A heading row in the list, not a map: name only, no buttons. */
+        public final boolean header;
         public final String description;
         public final String provider;
         public final String host;
@@ -220,6 +224,8 @@ public final class Depot {
 
             name = o.optString("name", id);
             category = o.optString("category", "Other");
+            group = o.optString("group", "");
+            header = false;
             description = o.optString("description", "");
             provider = o.optString("provider", "");
             host = o.optString("host", "");
@@ -232,6 +238,27 @@ public final class Depot {
             if (file.isEmpty() || sha256.length() != 64)
                 throw new IllegalArgumentException(
                         "base map " + id + " has no file or digest");
+        }
+
+        private BaseMap(String heading) {
+            id = "header:" + heading;
+            name = heading;
+            category = "";
+            group = heading;
+            header = true;
+            description = "";
+            provider = "";
+            host = "";
+            rights = "";
+            maxZoom = "";
+            file = "";
+            bytes = 0L;
+            sha256 = "";
+        }
+
+        /** A heading row for the sectioned overlay list. */
+        public static BaseMap heading(String title) {
+            return new BaseMap(title);
         }
 
         /** What the row says under the name: where the tiles come from. */
@@ -893,7 +920,7 @@ public final class Depot {
 
     /** The depot path of a generated XML, and nothing else. */
     private static final Pattern STORM_FILE =
-            Pattern.compile("storms/v1/[a-z0-9_]{1,40}/[a-z0-9-]{1,40}\\.xml");
+            Pattern.compile("storms/v1/[a-z0-9_]{1,40}/[a-z0-9-]{1,40}\\.(xml|mbtiles)");
 
     private static final Pattern ISO_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
 
@@ -912,8 +939,8 @@ public final class Depot {
         public final String first, last;
         /** south, west, north, east over every flight; null when the catalog has none. */
         public final double[] bounds;
-        /** "All flights" first, then each flight by date. */
-        public final List<Flight> flights = new ArrayList<>();
+        /** Each flight by date. A flight's offline copy is {@link Flight#pack}. */
+        public final List<Package> flights = new ArrayList<>();
 
         Storm(JSONObject o) {
             id = o.optString("id");
@@ -944,23 +971,26 @@ public final class Depot {
             if (each.isEmpty())
                 throw new IllegalArgumentException("storm " + id + " has no flights");
 
-            final JSONObject all = o.optJSONObject("all");
-            if (all != null) {
-                try {
-                    flights.add(new Flight(all, this, true));
-                } catch (IllegalArgumentException bad) {
-                    com.atakmap.coremap.log.Log.w("MapDepot",
-                            "rejected all-flights entry: " + bad.getMessage());
-                }
-            }
+            // No "All flights" row: the operator found it confusing beside the
+            // flights it duplicates (2026-10-11). The catalog may still carry
+            // an "all" entry for older plugins; it is ignored here.
             flights.addAll(each);
+        }
+
+        /** The offline copies the depot has built for this event's flights. */
+        public List<Pack> packs() {
+            final List<Pack> out = new ArrayList<>();
+            for (Package p : flights)
+                if (p instanceof Flight && ((Flight) p).pack != null)
+                    out.add(((Flight) p).pack);
+            return out;
         }
 
         /** How many actual flights, not counting the all-in-one row. */
         public int flightCount() {
             int n = 0;
-            for (Flight f : flights)
-                if (!f.all)
+            for (Package p : flights)
+                if (p instanceof Flight && !((Flight) p).all)
                     n++;
             return n;
         }
@@ -1009,6 +1039,8 @@ public final class Depot {
         public final double lat, lon;
         public final Storm storm;
         private final double[] box;
+        /** The offline copy of this flight, when the depot has built one. */
+        public final Pack pack;
 
         Flight(JSONObject o, Storm storm, boolean all) {
             this.storm = storm;
@@ -1031,6 +1063,18 @@ public final class Depot {
             box = all ? storm.bounds : box(o.optJSONArray("bounds"));
             lat = box == null ? Double.NaN : (box[0] + box[2]) / 2.0;
             lon = box == null ? Double.NaN : (box[1] + box[3]) / 2.0;
+
+            Pack p = null;
+            final JSONObject pk = all ? null : o.optJSONObject("pack");
+            if (pk != null) {
+                try {
+                    p = new Pack(pk, this);
+                } catch (IllegalArgumentException bad) {
+                    com.atakmap.coremap.log.Log.w("MapDepot",
+                            "rejected pack for " + id + ": " + bad.getMessage());
+                }
+            }
+            pack = p;
         }
 
         @Override
@@ -1101,12 +1145,15 @@ public final class Depot {
         @Override
         public String describe() {
             if (all)
-                return storm.flightCount() + " flights · " + storm.span();
+                return storm.flightCount() + " flights · " + storm.span()
+                        + " · streams as you pan";
             final StringBuilder sb = new StringBuilder(prettyDate(date));
             if (!letter.isEmpty())
                 sb.append(" · flight ").append(letter);
             if (!source.isEmpty() && !"RGB".equalsIgnoreCase(source))
                 sb.append(" · ").append(sourceName(source));
+            if (pack != null)
+                sb.append(" · offline copy ").append(Depot.bytes(pack.bytes));
             return sb.toString();
         }
 
@@ -1116,6 +1163,121 @@ public final class Depot {
             if ("MAXAR".equalsIgnoreCase(s))
                 return "Maxar satellite";
             return s;
+        }
+    }
+
+    /**
+     * A flight's tiles, harvested into one MBTiles file so the flight draws
+     * with no signal. Lands in {@code grg/} beside the streamed flight, in
+     * the stack the roads overlay draws over.
+     */
+    public static final class Pack implements Package, Located, Bounded, Digested {
+        public final Flight flight;
+        public final String file;
+        public final long bytes;
+        public final String sha256;
+        public final int maxZoom;
+        public final int tiles;
+
+        Pack(JSONObject o, Flight flight) {
+            this.flight = flight;
+            file = o.optString("file");
+            if (!STORM_FILE.matcher(file).matches() || !file.endsWith(".mbtiles"))
+                throw new IllegalArgumentException("no usable pack file");
+            bytes = o.optLong("bytes");
+            sha256 = o.optString("sha256");
+            maxZoom = o.optInt("maxZoom");
+            tiles = o.optInt("tiles");
+            if (bytes <= 0 || sha256.length() != 64)
+                throw new IllegalArgumentException("pack has no size or digest");
+        }
+
+        @Override
+        public boolean located() {
+            return flight.located();
+        }
+
+        @Override
+        public double lat() {
+            return flight.lat;
+        }
+
+        @Override
+        public double lon() {
+            return flight.lon;
+        }
+
+        @Override
+        public double[] bounds() {
+            return flight.bounds();
+        }
+
+        @Override
+        public String sha256() {
+            return sha256;
+        }
+
+        @Override
+        public String id() {
+            return flight.id + "-pack";
+        }
+
+        /** Indented under its flight; the em space survives the TextView. */
+        @Override
+        public String name() {
+            return "\u2003Offline copy";
+        }
+
+        @Override
+        public String url() {
+            return DepotClient.baseUrl() + "/" + file;
+        }
+
+        /** Stem equals the MBTiles metadata name, which is what ATAK lists. */
+        @Override
+        public String fileName() {
+            return safeFileName(flight.name + " offline", id(), ".mbtiles");
+        }
+
+        @Override
+        public String legacyFileName() {
+            return id() + ".mbtiles";
+        }
+
+        /**
+         * grg, like the streamed flight: ATAK draws the Imagery tab's local
+         * rasters above the GRG stack, so an offline copy filed as imagery
+         * buried the roads overlay (2026-10-11, Port St. Joe). In the GRG
+         * stack the roads GRG draws over it, which is the whole point of a
+         * roads overlay on fresh imagery, and what Joe Elfelt's setup does.
+         */
+        @Override
+        public String destination() {
+            return "grg";
+        }
+
+        @Override
+        public long bytes() {
+            return bytes;
+        }
+
+        @Override
+        public String describe() {
+            return Depot.bytes(bytes) + " · " + detail(maxZoom) + " · works with no signal";
+        }
+
+        /** What a pixel covers at the pack's deepest zoom, in words a crew reads. */
+        private static String detail(int z) {
+            switch (z) {
+                case 20: return "15 cm detail";
+                case 19: return "30 cm detail";
+                case 18: return "60 cm detail";
+                case 17: return "1.2 m detail";
+                case 16: return "2.4 m detail";
+                case 15: return "4 m detail, context only";
+                case 14: return "8 m detail, context only";
+                default: return "zoom " + z;
+            }
         }
     }
 
