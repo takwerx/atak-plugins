@@ -165,7 +165,7 @@ opening the plugin.
 | Rain and rivers | River Gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
 | Rain and rivers | Flooded Ground | Where the river model puts water over the banks, now or at the worst of the next 5 days (experimental) |
 | Rain and rivers | Rain Totals | The rain that fell, as a picture: the NWS radar estimate for the last 1 h, 6 h, 24 h or 3 days, the gauge-corrected analysis for 7 days, in the NWS colors, with a transparency slider |
-| Rain and rivers | Rain Gauges | USGS rain gauges around the map with their 24 h totals, the CoCoRaHS volunteer gauges of the state under the map with their morning reading, and the forecast office's own rainfall report gauges, inches in the pill; the day by the hour, the report, or the volunteer's reading behind a tap |
+| Rain and rivers | Rain Gauges | USGS rain gauges around the map with their 24 h totals, the CoCoRaHS volunteer gauges of the states under the map with their morning reading, and the forecast office's own rainfall report gauges, inches in the pill; the day by the hour, the report, or the volunteer's reading behind a tap |
 | Rain and rivers | Streams Running High | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
 | Rain and rivers | Debris Flow | The USGS post-fire assessments: every fire of the last three years marked; zoomed in, the perimeter and each stream basin filled Low, Moderate or High for a 15-minute burst of rain, with likelihood and volume behind a tap |
 | Ocean | Buoys | Buoys and coastal stations, readings colored by sea state; tides, currents and the marine forecast behind a tap |
@@ -453,7 +453,8 @@ map show through. Lower 48 only.
 **Rain Gauges** draws three kinds of gauge, each a dot in the color of its
 last 24 hours with the inches in the pill. White-ringed: the USGS rain gauges
 around the map, the day by the hour behind a tap. Cyan-ringed: the CoCoRaHS
-volunteer gauges of the state under the map center, each read once a day
+volunteer gauges of the states under the map (the center and the corners, so a
+state line shows both sides), each read once a day
 around 7 am, so the number is the 24 hours to that morning; today's reports
 and yesterday's are both asked for, and a station that reported both mornings
 shows today's. Dark-ringed: the forecast office's own rainfall report gauges,
