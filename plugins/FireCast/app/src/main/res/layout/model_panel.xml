@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The model page. Back, Place start and Clear all are pinned; everything else, the
+     settings and the run's text, is one scroller, so the output is always reachable
+     (operator, 2026-10-12: "now I can't scroll up and see the output"). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -31,58 +34,6 @@
             android:layout_marginLeft="6dp"
             android:text="Clear all" />
     </LinearLayout>
-    <!-- Settings read "Name: value" and get a row each, so the value never runs off
-         the button (operator, 2026-10-12). -->
-    <Button
-        android:id="@+id/btn_conditions"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Conditions: As observed" />
-    <Button
-        android:id="@+id/btn_station"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Station: automatic" />
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:baselineAligned="false"
-        android:paddingTop="6dp">
-        <Button
-            android:id="@+id/btn_perimeter"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Draw perimeter" />
-        <Button
-            android:id="@+id/btn_started"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
-            android:text="Started: not known" />
-    </LinearLayout>
-    <Button
-        android:id="@+id/btn_horizon"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Horizon: 1 hour" />
-    <Button
-        android:id="@+id/btn_run"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Run model" />
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -90,10 +41,81 @@
         android:focusableInTouchMode="true"
         android:descendantFocusability="beforeDescendants">
         <LinearLayout
-            android:id="@+id/model_body"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="12dp" />
+            android:paddingBottom="12dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false"
+                android:paddingTop="6dp">
+                <Button
+                    android:id="@+id/btn_conditions"
+                    style="@style/TakwerxTileButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Conditions:\nAs observed" />
+                <Button
+                    android:id="@+id/btn_station"
+                    style="@style/TakwerxTileButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="6dp"
+                    android:text="Station:\nautomatic" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false"
+                android:paddingTop="6dp">
+                <Button
+                    android:id="@+id/btn_perimeter"
+                    style="@style/TakwerxTileButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Draw perimeter" />
+                <Button
+                    android:id="@+id/btn_started"
+                    style="@style/TakwerxTileButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="6dp"
+                    android:text="Started:\nnot known" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false"
+                android:paddingTop="6dp">
+                <Button
+                    android:id="@+id/btn_horizon"
+                    style="@style/TakwerxTileButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Horizon:\n1 hour" />
+                <Button
+                    android:id="@+id/btn_run"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="match_parent"
+                    android:layout_marginLeft="6dp"
+                    android:text="Run model" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/model_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
     </ScrollView>
 </LinearLayout>

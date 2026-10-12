@@ -230,18 +230,18 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         final FireModel.Run r = shown;
         final com.atakmap.coremap.maps.coords.GeoPoint start = model.startPoint();
         ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && (start != null || model.perimeter() != null));
-        ((Button) view.findViewById(R.id.btn_perimeter)).setText(model.perimeter() != null ? "Perimeter: drawn (tap to drop)" : "Draw perimeter");
-        ((Button) view.findViewById(R.id.btn_horizon)).setText(model.horizonMinutes() >= 180 ? "Horizon: 3 hours" : "Horizon: 1 hour");
+        ((Button) view.findViewById(R.id.btn_perimeter)).setText(model.perimeter() != null ? "Perimeter:\ndrawn, tap to drop" : "Draw perimeter");
+        ((Button) view.findViewById(R.id.btn_horizon)).setText(model.horizonMinutes() >= 180 ? "Horizon:\n3 hours" : "Horizon:\n1 hour");
         final int ago = model.startedMinutesAgo();
-        ((Button) view.findViewById(R.id.btn_started)).setText(ago == 0 ? "Started: not known" : "Started: " + ago + " min ago");
-        ((Button) view.findViewById(R.id.btn_conditions)).setText("Conditions: " + FireModel.conditionsLabel(model.conditions()));
-        String stationLabel = "Station: automatic";
+        ((Button) view.findViewById(R.id.btn_started)).setText(ago == 0 ? "Started:\nnot known" : "Started:\n" + ago + " min ago");
+        ((Button) view.findViewById(R.id.btn_conditions)).setText("Conditions:\n" + FireModel.conditionsLabel(model.conditions()));
+        String stationLabel = "Station:\nautomatic";
         if (!model.station().isEmpty()) {
-            stationLabel = "Station: " + model.station();
+            stationLabel = "Station:\n" + model.station();
             if (r != null)
                 for (Weather.Reading s : r.stations)
                     if (s.wxId.equals(model.station()))
-                        stationLabel = "Station: " + s.station;
+                        stationLabel = "Station:\n" + s.station;
         }
         ((Button) view.findViewById(R.id.btn_station)).setText(stationLabel);
         if (model.isRunning()) {

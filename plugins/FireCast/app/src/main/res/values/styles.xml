@@ -147,6 +147,14 @@
         <item name="android:scaleType">centerInside</item>
         <item name="android:padding">9dp</item>
     </style>
+    <!-- A button that shares a row and carries "Name: value": two lines at 13sp, the
+         way Atmosphere tightened its pairs, so the value stays on the button. -->
+    <style name="TakwerxTileButton" parent="@style/TakwerxButton">
+        <item name="android:textSize">13sp</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:minHeight">52dp</item>
+    </style>
     <style name="TakwerxButton" parent="@style/darkButton">
         <item name="android:paddingLeft">12dp</item>
         <item name="android:paddingRight">12dp</item>
