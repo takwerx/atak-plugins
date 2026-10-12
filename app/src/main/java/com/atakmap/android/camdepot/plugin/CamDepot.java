@@ -275,6 +275,9 @@ public class CamDepot implements IPlugin {
                     .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
                     .build();
         }
+        // On the main screen every time; a reused pane otherwise reopens on
+        // Settings if that is where it was left.
+        content.showMain();
         if (!uiService.isPaneVisible(pane))
             uiService.showPane(pane, null);
     }
