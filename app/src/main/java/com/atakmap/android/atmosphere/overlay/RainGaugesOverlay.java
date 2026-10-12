@@ -52,7 +52,7 @@ public final class RainGaugesOverlay extends OutlookOverlay {
             { "0.25 to 1 in", "#FF00DC00" }, { "1 to 2 in", "#FF008D00" },
             { "2 to 4 in", "#FFE7B400" }, { "4 in or more", "#FFE60000" },
             { "White ring: USGS gauge, last 24 h. Dark ring: the office's report. Cyan ring:"
-                    + " CoCoRaHS volunteer, 24 h to about 7 am", "0" } };
+                    + " CoCoRaHS volunteer, 24 h to about 7 am", "#00000000" } };
     private static final int COCORAHS_RING = 0xFF00E5FF;
 
     public static int color(double inches) {
