@@ -103,7 +103,8 @@ public final class FireModel {
             if (fuelName != null && !fuelName.isEmpty())
                 sb.append(", ").append(fuelName.split(" ")[0]);
             if (result != null)
-                sb.append(String.format(Locale.US, ", %.0f mph from %s", windMph, Units.compass(windFromDeg)));
+                sb.append(String.format(Locale.US, ", %.0f mph from %s, %s in 1 h", windMph, Units.compass(windFromDeg),
+                        acres(60) < 10 ? String.format(Locale.US, "%.1f ac", acres(60)) : String.format(Locale.US, "%,.0f ac", acres(60))));
             if (!COND_OBSERVED.equals(conditions))
                 sb.append(", ").append(conditionsLabel(conditions).toLowerCase(Locale.US));
             return sb.toString();
@@ -112,6 +113,12 @@ public final class FireModel {
         /** Head fire distance at a time, meters. */
         public double headM(int minutes) {
             return (result.bFtPerMin + result.cFtPerMin) * minutes * FT_TO_M;
+        }
+
+        /** The ellipse's area at a time, acres: pi a b with both axes growing with time. */
+        public double acres(int minutes) {
+            final double a = result.aFtPerMin * minutes, b = result.bFtPerMin * minutes;
+            return Math.PI * a * b / 43560d;
         }
     }
 
@@ -413,7 +420,7 @@ public final class FireModel {
                     return;
                 Log.d(TAG, "pick tap: " + event.getType() + (event.getPointF() == null ? " (no point, used the finger)" : ""));
                 place(new GeoPoint(gp.get().getLatitude(), gp.get().getLongitude()));
-                showStart();
+                // The map stays where the operator left it (they said so, 2026-10-11).
                 if (onPlaced != null)
                     onPlaced.run();
             }

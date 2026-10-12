@@ -232,7 +232,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 .append(String.format(Locale.US, " (%.0f°)", o.headingDeg))
                 .append(" at ").append(rate(o.rosFtPerMin)).append(".\n");
         for (int min : FireModel.STEPS_MIN)
-            goes.append(min).append(" min: head ").append(Units.format(r.headM(min)))
+            goes.append(min).append(" min: ").append(acres(r.acres(min)))
+                    .append(", head ").append(Units.format(r.headM(min)))
                     .append(" from the start, ").append(Units.format(o.aFtPerMin * min * 2 * 0.3048d)).append(" wide.\n");
         goes.append("Backing ").append(rate(o.backingFtPerMin)).append(", flanks ").append(rate(o.flankingFtPerMin)).append('.');
         section("Where it goes", goes.toString());
@@ -286,6 +287,14 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         }
         section("What went in", in.toString());
         section("When", FireModel.stamp(r.ranAt) + " run");
+    }
+
+    private static String acres(double a) {
+        if (a < 0.1)
+            return "under a tenth of an acre";
+        if (a < 10)
+            return String.format(Locale.US, "%.1f acres", a);
+        return String.format(Locale.US, "%,.0f acres", a);
     }
 
     private static String rate(double ftPerMin) {
