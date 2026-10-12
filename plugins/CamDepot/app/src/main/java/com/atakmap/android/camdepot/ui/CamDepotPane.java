@@ -135,8 +135,58 @@ public final class CamDepotPane implements CameraStore.Listener {
     private final SeekBar radius;
     private final TextView radiusLabel, zoomLabel;
     private final ListView list;
-    /** Holds the filter controls; they are a header view, not part of the pane. */
+    /** The main screen's controls; they are the list's header view. */
     private final View controls;
+    /** The Settings page's rows, inflated into the page's scroller. */
+    private final View settings;
+    /** The Settings page itself, shown in the list's place while it is open. */
+    private final View settingsPage;
+    private Fold whereFold, showFold, distanceFold, gateFold, catalogFold;
+
+    /**
+     * One Settings row: a head naming the setting and its value, an arrow, a body
+     * of controls. Open or closed is remembered per row and everything starts
+     * closed, so a closed page reads as a summary of every setting. The
+     * plugin-ui drop-down, as IPAWS and Feature Layer have it.
+     */
+    private final class Fold {
+        final Button head;
+        final android.widget.ImageButton chevron;
+        final View body;
+        final String pref;
+        boolean open;
+
+        Fold(View page, int headId, int chevronId, int bodyId, String pref) {
+            head = page.findViewById(headId);
+            chevron = page.findViewById(chevronId);
+            body = page.findViewById(bodyId);
+            this.pref = pref;
+            final android.content.SharedPreferences p = prefs();
+            open = p != null && p.getBoolean(pref, false);
+            final View.OnClickListener flip = new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    open = !open;
+                    final android.content.SharedPreferences p = prefs();
+                    if (p != null)
+                        p.edit().putBoolean(Fold.this.pref, open).apply();
+                    show();
+                }
+            };
+            head.setOnClickListener(flip);
+            chevron.setOnClickListener(flip);
+            show();
+        }
+
+        void label(String name, String value) {
+            head.setText(value == null ? name : name + ": " + value);
+        }
+
+        void show() {
+            chevron.setRotation(open ? 180f : 0f);
+            body.setVisibility(open ? View.VISIBLE : View.GONE);
+        }
+    }
     private final CameraAdapter adapter;
 
     /**
@@ -275,7 +325,6 @@ public final class CamDepotPane implements CameraStore.Listener {
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.main_layout, null);
         status = root.findViewById(R.id.status);
         statusColor = status.getCurrentTextColor();
-        toggle = root.findViewById(R.id.toggle);
         list = root.findViewById(R.id.cameras);
         legend(root.findViewById(R.id.legend));
 
@@ -284,23 +333,28 @@ public final class CamDepotPane implements CameraStore.Listener {
         controls = PluginLayoutInflater.inflate(pluginContext,
                 R.layout.controls_header, null);
         list.addHeaderView(controls, null, false);
-        favoritesButton = controls.findViewById(R.id.favorites);
-        bearingsOffButton = controls.findViewById(R.id.bearings_off);
-        stateButton = controls.findViewById(R.id.state);
-        providerButton = controls.findViewById(R.id.provider);
-        countyButton = controls.findViewById(R.id.county);
-        search = controls.findViewById(R.id.search);
-        searchClear = controls.findViewById(R.id.search_clear);
-        inView = controls.findViewById(R.id.in_view);
-        fireOnly = controls.findViewById(R.id.fire_only);
-        liveOnly = controls.findViewById(R.id.live_only);
-        stillOnly = controls.findViewById(R.id.still_only);
-        radius = controls.findViewById(R.id.radius);
-        radiusLabel = controls.findViewById(R.id.radius_label);
-        zoomLabel = controls.findViewById(R.id.zoom_label);
-        lookAtLabel = controls.findViewById(R.id.look_at_label);
-        lookAtButton = controls.findViewById(R.id.look_at);
-        lookAtBearingsButton = controls.findViewById(R.id.look_at_bearings);
+        settings = PluginLayoutInflater.inflate(pluginContext,
+                R.layout.settings_controls, null);
+        settingsPage = root.findViewById(R.id.settings_page);
+        ((ViewGroup) root.findViewById(R.id.settings_container)).addView(settings);
+        toggle = find(R.id.toggle);
+        favoritesButton = find(R.id.favorites);
+        bearingsOffButton = find(R.id.bearings_off);
+        stateButton = find(R.id.state);
+        providerButton = find(R.id.provider);
+        countyButton = find(R.id.county);
+        search = find(R.id.search);
+        searchClear = find(R.id.search_clear);
+        inView = find(R.id.in_view);
+        fireOnly = find(R.id.fire_only);
+        liveOnly = find(R.id.live_only);
+        stillOnly = find(R.id.still_only);
+        radius = find(R.id.radius);
+        radiusLabel = find(R.id.radius_label);
+        zoomLabel = find(R.id.zoom_label);
+        lookAtLabel = find(R.id.look_at_label);
+        lookAtButton = find(R.id.look_at);
+        lookAtBearingsButton = find(R.id.look_at_bearings);
 
         // A ListView blocks focus to its children by default, which means an EditText
         // living in a header view never receives a keystroke -- the search box looked
@@ -317,6 +371,32 @@ public final class CamDepotPane implements CameraStore.Listener {
         restoreUi();
 
         wire();
+        whereFold = new Fold(settings, R.id.fold_where_head, R.id.fold_where_chev,
+                R.id.fold_where_body, "camdepot.fold.where");
+        showFold = new Fold(settings, R.id.fold_show_head, R.id.fold_show_chev,
+                R.id.fold_show_body, "camdepot.fold.show");
+        distanceFold = new Fold(settings, R.id.fold_distance_head,
+                R.id.fold_distance_chev, R.id.fold_distance_body,
+                "camdepot.fold.distance");
+        gateFold = new Fold(settings, R.id.fold_gate_head, R.id.fold_gate_chev,
+                R.id.fold_gate_body, "camdepot.fold.gate");
+        catalogFold = new Fold(settings, R.id.fold_catalog_head,
+                R.id.fold_catalog_chev, R.id.fold_catalog_body,
+                "camdepot.fold.catalog");
+        catalogFold.label("Catalog", null);
+        find(R.id.btn_settings).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showSettings(true);
+            }
+        });
+        root.findViewById(R.id.btn_settings_back).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        showSettings(false);
+                    }
+                });
         updateFavoritesButton();
         updateBearingsOffButton();
         updateToggleButton();
@@ -338,6 +418,51 @@ public final class CamDepotPane implements CameraStore.Listener {
 
     public View getView() {
         return root;
+    }
+
+    /** A control by id, wherever it lives: the main screen's header or Settings. */
+    private <T extends View> T find(int id) {
+        final T v = controls.findViewById(id);
+        return v != null ? v : (T) settings.findViewById(id);
+    }
+
+    /** The settings page in place of the list, or the list back. */
+    private void showSettings(boolean open) {
+        settingsPage.setVisibility(open ? View.VISIBLE : View.GONE);
+        list.setVisibility(open ? View.GONE : View.VISIBLE);
+        if (open)
+            updateFoldHeads();
+    }
+
+    /** The pane opens on the main screen every time, never on Settings. */
+    public void showMain() {
+        showSettings(false);
+    }
+
+    /**
+     * Each Settings row's head says what it is set to, so the closed page is a
+     * summary. Re-read after anything that changes a setting.
+     */
+    private void updateFoldHeads() {
+        if (whereFold == null)
+            return;
+        whereFold.label("Where", stateButton.getText() + ", "
+                + providerButton.getText() + ", " + countyButton.getText());
+        final List<String> kinds = new ArrayList<>();
+        if (liveOnly.isChecked())
+            kinds.add("Video");
+        if (stillOnly.isChecked())
+            kinds.add("Still");
+        if (fireOnly.isChecked())
+            kinds.add("Fire");
+        showFold.label("Show", kinds.isEmpty() ? "Everything"
+                : android.text.TextUtils.join(", ", kinds));
+        distanceFold.label("Distance", radiusBig <= 0 ? "Off, the whole state"
+                : String.format(Locale.US, "Within %.0f %s of %s", radiusBig,
+                        Units.bigLabel(), center == null ? "My Location" : "Map Center"));
+        final double limit = layer.getMaxResolution();
+        gateFold.label("Zoom gate", limit == Double.MAX_VALUE ? "Always drawn"
+                : ScaleBar.describe(limit * scaleBarPixels()) + " or closer");
     }
 
     public void dispose() {
@@ -483,7 +608,7 @@ public final class CamDepotPane implements CameraStore.Listener {
             }
         });
 
-        controls.findViewById(R.id.resync).setOnClickListener(
+        find(R.id.resync).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -601,7 +726,7 @@ public final class CamDepotPane implements CameraStore.Listener {
             }
         });
 
-        controls.findViewById(R.id.zoom_set).setOnClickListener(
+        find(R.id.zoom_set).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -611,7 +736,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                     }
                 });
 
-        controls.findViewById(R.id.zoom_preset).setOnClickListener(
+        find(R.id.zoom_preset).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -639,7 +764,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                     }
                 });
 
-        radiusFromButton = controls.findViewById(R.id.pick_point);
+        radiusFromButton = find(R.id.pick_point);
         radiusFromButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -653,7 +778,7 @@ public final class CamDepotPane implements CameraStore.Listener {
             }
         });
 
-        radiusPresetButton = controls.findViewById(R.id.radius_preset);
+        radiusPresetButton = find(R.id.radius_preset);
         radiusPresetButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -681,7 +806,7 @@ public final class CamDepotPane implements CameraStore.Listener {
             }
         });
 
-        controls.findViewById(R.id.radius_extent).setOnClickListener(
+        find(R.id.radius_extent).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -1034,7 +1159,7 @@ public final class CamDepotPane implements CameraStore.Listener {
      * does to the map is {@link CameraLayer#setMapOn}.
      */
     private void updateToggleButton() {
-        toggle.setText(toggleOn ? R.string.toggle_on : R.string.toggle_off);
+        toggle.setText(toggleOn ? "Cameras ON" : "Cameras OFF");
         toggle.setTextColor(pluginContext.getResources().getColor(
                 toggleOn ? R.color.state_on : R.color.state_off));
     }
@@ -1202,6 +1327,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                 "Drawn at %s or closer  ·  scale bar now: %s%s",
                 at, bar,
                 mapView.getMapResolution() <= limit ? "" : "  — hidden"));
+        updateFoldHeads();
     }
 
     /** Pixels the scale bar spans, derived so the quoted threshold matches its text. */
@@ -1231,6 +1357,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                         center == null ? "My Location" : "Map Center"));
         updateRadiusFromButton();
         updateRadiusPresetButton();
+        updateFoldHeads();
     }
 
     /**
@@ -1609,6 +1736,7 @@ public final class CamDepotPane implements CameraStore.Listener {
         layer.show(drawn);
 
         rememberUi();
+        updateFoldHeads();
 
         lastFavorites = favs.size();
         lastMatched = out.size();
@@ -1636,13 +1764,13 @@ public final class CamDepotPane implements CameraStore.Listener {
         if (lookAtLabel == null)
             return;
         if (lookAt == null) {
-            lookAtLabel.setText("Off \u2014 center the map on the spot, then press "
-                    + "Look At");
+            lookAtLabel.setVisibility(View.GONE);
             lookAtButton.setText("Look At Map Center");
             lookAtBearingsButton.setText("Show Bearings");
             lookAtBearingsButton.setEnabled(false);
             return;
         }
+        lookAtLabel.setVisibility(View.VISIBLE);
         lookAtLabel.setText(String.format(Locale.US,
                 "%,d see the point, %,d PTZ could turn to it, %,d in range report "
                         + "no bearing", lastSees.size(), lastPtzCould, lastNoBearing));

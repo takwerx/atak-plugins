@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The filter controls. Added to the camera ListView with addHeaderView() rather
-     than sitting above it in the pane: a ListView cannot live inside a ScrollView,
-     and once these controls had section headings they were taller than a phone pane,
-     so the list was pushed off-screen with nothing able to scroll it. As a header
-     view the whole panel is a single scroller. -->
+<!-- The main screen: what is used in the field, then the list. Everything set
+     once and left (where, what kind, radius, zoom gate, sync) is on the Settings
+     page, so the list sits right under the buttons instead of three screens of
+     controls down. Added to the ListView with addHeaderView() so the whole
+     screen is one scroller; click positions are offset by getHeaderViewsCount(). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <!-- First control in the panel, above Where, because it is the one filter that
-         is not about where you are: it spans every state. -->
+    <!-- Cameras ON/OFF | Settings | Favorites: the plugin-ui row. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -20,152 +19,28 @@
 
         <Button
             style="@style/TakwerxButton"
+            android:id="@+id/toggle"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+
+        <!-- Only as wide as its word: the two beside it carry a state and a count,
+             and at half-pane width three equal thirds cut "Favorites (9)" short. -->
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/btn_settings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:text="@string/settings" />
+
+        <Button
+            style="@style/TakwerxButton"
             android:id="@+id/favorites"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="wrap_content" />
-
-        <!-- Re-reads the catalog and reloads the state from scratch. The shards are
-             cached hard, so a catalog that changes under a running plugin was only
-             picked up by force-stopping ATAK. -->
-        <Button
-            style="@style/TakwerxButton"
-            android:id="@+id/resync"
-            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/resync" />
-    </LinearLayout>
-
-    <!-- Turns off every bearing line at once. Bearings go on one camera at a time,
-         from the camera's pane or from ATAK's radial, so there was no way to put a
-         session's worth of them away short of visiting each camera again. Disabled
-         while none are on, and carrying the count, so it says what it will do before
-         it is pressed. -->
-    <Button
-        style="@style/TakwerxButton"
-        android:id="@+id/bearings_off"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-    <TextView
-        style="@style/TakwerxPageHeading"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Where" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-        style="@style/TakwerxButton"
-            android:id="@+id/state"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content" />
-
-        <Button
-        style="@style/TakwerxButton"
-            android:id="@+id/provider"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content" />
-    </LinearLayout>
-
-    <Button
-        style="@style/TakwerxButton"
-        android:id="@+id/county"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-
-    <TextView
-        style="@style/TakwerxPageHeading"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Show" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <CheckBox
-            android:id="@+id/live_only"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Video" />
-
-        <CheckBox
-            android:id="@+id/still_only"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Still" />
-
-        <CheckBox
-            android:id="@+id/fire_only"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Fire" />
-    </LinearLayout>
-
-    <TextView
-        style="@style/TakwerxPageHeading"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Distance from a point" />
-
-    <TextView
-        android:id="@+id/radius_label"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-    <!-- Full width, one unit a step, to 50.
-         The original covered 0 to 400 across the width of a phone pane, about two
-         miles a pixel, so choosing 5 was a fight and everything useful lived in
-         the first eighth of the track. 100 was better and still too coarse to
-         control by thumb. Nothing here needs more: past 50 the state filter is
-         what is actually selecting, and "Off, the whole state" is the other end. -->
-    <SeekBar
-        android:id="@+id/radius"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:max="50" />
-
-    <!-- Says which point it measures from, rather than only offering to change it.
-         The old button read "From me" whether the radius was measured from the
-         operator or from the map centre, so the one thing it could not tell you
-         was the state it was in. -->
-    <Button
-        style="@style/TakwerxButton"
-        android:id="@+id/pick_point"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-            style="@style/TakwerxButton"
-            android:id="@+id/radius_extent"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Use this extent" />
-
-        <Button
-            style="@style/TakwerxButton"
-            android:id="@+id/radius_preset"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Presets" />
+            android:layout_marginLeft="6dp" />
     </LinearLayout>
 
     <!-- Which cameras cover a spot. A fire report is a point on the map, and with
@@ -173,23 +48,14 @@
          was to switch each bearing on and off. This asks the question once: the
          list narrows to the cameras whose reported pan and FOV cover the map
          center, best match first, with the PTZ cameras that could be turned to
-         it and the nearby cameras that report no bearing in their own groups. -->
-    <TextView
-        style="@style/TakwerxPageHeading"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Looking at a point" />
-
-    <TextView
-        android:id="@+id/look_at_label"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
+         it and the nearby cameras that report no bearing in their own groups.
+         In the field, so on the main screen. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:baselineAligned="false">
+        android:baselineAligned="false"
+        android:layout_marginTop="6dp">
 
         <Button
             style="@style/TakwerxButton"
@@ -203,63 +69,29 @@
             android:id="@+id/look_at_bearings"
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp" />
     </LinearLayout>
 
+    <!-- What the point costs, in the three groups the list shows. Gone while the
+         filter is off. -->
     <TextView
-        style="@style/TakwerxPageHeading"
+        android:id="@+id/look_at_label"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Draw on the map" />
+        android:textSize="13sp"
+        android:paddingTop="4dp"
+        android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/zoom_label"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-        style="@style/TakwerxButton"
-            android:id="@+id/zoom_set"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Use this zoom" />
-
-        <Button
-        style="@style/TakwerxButton"
-            android:id="@+id/zoom_preset"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Presets" />
-    </LinearLayout>
-
-    <!-- Search and "On screen only" sit directly above the list, not up with the
-         state and county buttons. Both of them change what the NEXT few inches of
-         screen contain, so they belong beside it: the operator types a name or
-         ticks the box and the answer is immediately below their thumb, rather
-         than a scroll away past four other groups. -->
-    <TextView
-        style="@style/TakwerxPageHeading"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Find a camera by name" />
-
-    <!-- Clear sits beside the box rather than being an X inside it, and it is
-         disabled while the box is empty. That makes it the indicator as well as the
-         control: a live Clear button is the panel saying a search is filtering the
-         list. An operator lost time to a search left in the box from earlier, with
-         nothing on screen to say so. -->
+    <!-- Search sits directly above the list because it changes what the next few
+         inches of screen contain. Clear beside the box is the indicator as well
+         as the control: a live Clear is the panel saying a search is on. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:baselineAligned="false">
+        android:baselineAligned="false"
+        android:layout_marginTop="4dp">
 
         <EditText
             android:id="@+id/search"
@@ -280,13 +112,30 @@
             android:text="@string/clear" />
     </LinearLayout>
 
-    <!-- Follows the map the way ATAK's Overlay Manager does. Under Where because
-         that is what it filters on: not what a camera is, but where you are looking. -->
-    <CheckBox
-        android:id="@+id/in_view"
+    <!-- Follows the map the way ATAK's Overlay Manager does, beside the one other
+         thing done to the map from here: taking every bearing line down at once.
+         Bearings go on one camera at a time, so there was no way to put a
+         session's worth of them away. Disabled while none are on, with the count. -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="On screen only" />
+        android:orientation="horizontal"
+        android:baselineAligned="false"
+        android:gravity="center_vertical">
+
+        <CheckBox
+            android:id="@+id/in_view"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="On screen only" />
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/bearings_off"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
 
     <TextView
         style="@style/TakwerxPageHeading"
