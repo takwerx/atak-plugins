@@ -141,7 +141,7 @@ public final class CamDepotPane implements CameraStore.Listener {
     private final View settings;
     /** The Settings page itself, shown in the list's place while it is open. */
     private final View settingsPage;
-    private Fold whereFold, showFold, distanceFold, gateFold, catalogFold;
+    private Fold whereFold, showFold, distanceFold, reachFold, gateFold, catalogFold;
 
     /**
      * One Settings row: a head naming the setting and its value, an arrow, a body
@@ -247,7 +247,16 @@ public final class CamDepotPane implements CameraStore.Listener {
     private GeoPoint lookAt;
     /** Degrees added to each side of a camera's reported wedge before it counts. */
     private static final double LOOK_AT_SLACK_DEG = 10;
-    private Button lookAtButton, lookAtBearingsButton;
+    private Button lookAtButton, lookAtBearingsButton, lookReachButton;
+    /**
+     * How far a camera is trusted to see the point, in the operator's big unit.
+     * 0 means the bearing line's length. The first cut used the bearing line (37
+     * mi) and a point near Keller Peak got 33 cameras "seeing" it, most of them
+     * 20-30 mi out with a wide lens: true, and useless. 10 mi is where a camera
+     * still shows a column rather than a haze.
+     */
+    private double lookReachBig = 10;
+    private static final int[] LOOK_REACH_PRESETS = { 2, 5, 10, 20, 40, 0 };
     private TextView lookAtLabel;
     /** The cameras the last apply() judged to see {@link #lookAt}; for Show Bearings. */
     private final List<Camera> lastSees = new ArrayList<>();
@@ -378,6 +387,8 @@ public final class CamDepotPane implements CameraStore.Listener {
         distanceFold = new Fold(settings, R.id.fold_distance_head,
                 R.id.fold_distance_chev, R.id.fold_distance_body,
                 "camdepot.fold.distance");
+        reachFold = new Fold(settings, R.id.fold_reach_head, R.id.fold_reach_chev,
+                R.id.fold_reach_body, "camdepot.fold.reach");
         gateFold = new Fold(settings, R.id.fold_gate_head, R.id.fold_gate_chev,
                 R.id.fold_gate_body, "camdepot.fold.gate");
         catalogFold = new Fold(settings, R.id.fold_catalog_head,
@@ -460,6 +471,8 @@ public final class CamDepotPane implements CameraStore.Listener {
         distanceFold.label("Distance", radiusBig <= 0 ? "Off, the whole state"
                 : String.format(Locale.US, "Within %.0f %s of %s", radiusBig,
                         Units.bigLabel(), center == null ? "My Location" : "Map Center"));
+        reachFold.label("Look At reach", lookReachLabel(lookReachBig));
+        lookReachButton.setText("Within " + lookReachLabel(lookReachBig).toLowerCase(Locale.US));
         final double limit = layer.getMaxResolution();
         gateFold.label("Zoom gate", limit == Double.MAX_VALUE ? "Always drawn"
                 : ScaleBar.describe(limit * scaleBarPixels()) + " or closer");
@@ -851,6 +864,36 @@ public final class CamDepotPane implements CameraStore.Listener {
             }
         });
 
+        lookReachButton = find(R.id.look_reach);
+        lookReachButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final List<String> names = new ArrayList<>();
+                int checked = -1;
+                for (int i = 0; i < LOOK_REACH_PRESETS.length; i++) {
+                    names.add(lookReachLabel(LOOK_REACH_PRESETS[i]));
+                    if (Math.round(lookReachBig) == LOOK_REACH_PRESETS[i])
+                        checked = i;
+                }
+                final String[] arr = names.toArray(new String[0]);
+                new AlertDialog.Builder(mapView.getContext())
+                        .setTitle("A camera is trusted to see the point within")
+                        .setSingleChoiceItems(arr, checked,
+                                new android.content.DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(
+                                            android.content.DialogInterface d, int w) {
+                                        d.dismiss();
+                                        lookReachBig = LOOK_REACH_PRESETS[w];
+                                        updateFoldHeads();
+                                        apply();
+                                    }
+                                })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+
         lookAtBearingsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -922,6 +965,7 @@ public final class CamDepotPane implements CameraStore.Listener {
     private static final String PREF_MAP_ON = "camdepot_map_on";
     // The POINT, as text so nothing is lost to a float. Empty means off.
     private static final String PREF_LOOK_AT = "camdepot_look_at";
+    private static final String PREF_LOOK_REACH = "camdepot_look_reach_big";
 
     /**
      * Starting points, expressed as what the scale bar would read — the same
@@ -1014,6 +1058,7 @@ public final class CamDepotPane implements CameraStore.Listener {
             if (p.getBoolean(PREF_FROM_MAP, false))
                 center = mapView.getPoint().get();
             setRadiusFromProgress(savedRadius);
+            lookReachBig = p.getFloat(PREF_LOOK_REACH, 10f);
             final String la = p.getString(PREF_LOOK_AT, "");
             if (!la.isEmpty()) {
                 final String[] parts = la.split(",");
@@ -1034,7 +1079,18 @@ public final class CamDepotPane implements CameraStore.Listener {
                 + stillOnly.isChecked() + inView.isChecked() + favoritesFirst
                 + toggleOn
                 + "|" + radius.getProgress() + (center != null)
-                + "|" + lookAtPref();
+                + "|" + lookAtPref() + "|" + lookReachBig;
+    }
+
+    /** The reach in meters: the preset, or the bearing line's length for 0. */
+    private double lookReachMeters() {
+        return lookReachBig > 0 ? Units.bigToMeters(lookReachBig)
+                : layer.getRangeMeters();
+    }
+
+    private String lookReachLabel(double big) {
+        return big <= 0 ? "The bearing line's length"
+                : String.format(Locale.US, "%.0f %s", big, Units.bigLabel());
     }
 
     private String lookAtPref() {
@@ -1074,6 +1130,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                     .putInt(PREF_RADIUS, radius.getProgress())
                     .putBoolean(PREF_FROM_MAP, center != null)
                     .putString(PREF_LOOK_AT, lookAtPref())
+                    .putFloat(PREF_LOOK_REACH, (float) lookReachBig)
                     .apply();
         } catch (RuntimeException e) {
             Log.w(TAG, "could not remember the panel", e);
@@ -1648,7 +1705,7 @@ public final class CamDepotPane implements CameraStore.Listener {
         GeoPoint listFrom = sortFrom;
         if (lookAt != null) {
             final double la = lookAt.getLatitude(), lo = lookAt.getLongitude();
-            final double range = layer.getRangeMeters();
+            final double range = lookReachMeters();
             final List<Camera> ptz = new ArrayList<>();
             final List<Camera> blind = new ArrayList<>();
             notes = new java.util.HashMap<>();
@@ -1664,15 +1721,9 @@ public final class CamDepotPane implements CameraStore.Listener {
                     blind.add(c);
                 }
             }
-            Collections.sort(lastSees, new Comparator<Camera>() {
-                @Override
-                public int compare(Camera a, Camera b) {
-                    final int byAngle = Double.compare(
-                            Math.abs(a.offCenter(la, lo)), Math.abs(b.offCenter(la, lo)));
-                    return byAngle != 0 ? byAngle : Double.compare(
-                            a.metersFrom(la, lo), b.metersFrom(la, lo));
-                }
-            });
+            // Nearest first. The best angle is not the best picture: a camera 2 mi
+            // out at the edge of its lens beats one dead center 25 mi away.
+            sortForList(lastSees, lookAt);
             sortForList(ptz, lookAt);
             sortForList(blind, lookAt);
             lastPtzCould = ptz.size();
@@ -1845,7 +1896,7 @@ public final class CamDepotPane implements CameraStore.Listener {
         if (lookAt != null)
             msg.append(String.format(Locale.US,
                     "\nLooking At: cameras within %s of the point, aim as of the "
-                            + "last refresh", Units.format(layer.getRangeMeters())));
+                            + "last refresh", Units.format(lookReachMeters())));
         if (favoritesFirst) {
             // A favorites list that is quietly shorter than its own count reads as
             // favorites having been lost.

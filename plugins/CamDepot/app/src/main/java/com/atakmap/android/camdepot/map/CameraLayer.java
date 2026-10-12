@@ -1045,8 +1045,17 @@ public final class CameraLayer {
         // The line itself.
         m.setMetaDouble(SensorDetailHandler.STROKE_WEIGHT, 5.0);
         m.setMetaInteger(SensorDetailHandler.STROKE_COLOR, LINE_COLOR);
-        // Range rings off; the line carries its bearing as a label instead.
-        m.setMetaInteger(SensorDetailHandler.RANGE_LINES_ATTRIBUTE, 0);
+        // ONE range line, at the far end. This is the spacing in meters, and 0 is
+        // not "none": GLSensorFOV clamps anything under 50 m up to 50 m and, with
+        // labels on, builds a GLBatchLineString every 50 m of the cone's length.
+        // A 60 km line is 1,200 of them, rebuilt on the GL thread at every
+        // metrics change; 33 bearings at once was 40,000 and an ANR on
+        // 2026-10-11 ("Input dispatching timed out", GLSensorFOV.computeRangeLines
+        // on the GL thread with the main thread waiting on its hit test). A
+        // spacing equal to the extent passes both clamps and yields one line.
+        m.setMetaInteger(SensorDetailHandler.RANGE_LINES_ATTRIBUTE,
+                (int) Math.round(Math.min(rangeMeters,
+                        SensorDetailHandler.MAX_SENSOR_RANGE)));
         m.setMetaBoolean(SensorDetailHandler.DISPLAY_LABELS, true);
         m.setMetaDouble(SensorDetailHandler.RANGE_LINES_STROKE_WEIGHT, 1.0);
         m.setMetaInteger(SensorDetailHandler.RANGE_LINES_STROKE_COLOR, 0xFF000000);
@@ -1088,14 +1097,14 @@ public final class CameraLayer {
         if (c == null || !c.hasFov())
             return;
         final boolean still = !c.hasStream();
+        final double extent = still ? STILL_FOV_RANGE_M
+                : Math.min(rangeMeters, SensorDetailHandler.MAX_SENSOR_RANGE);
         try {
             final com.atakmap.android.maps.SensorFOV f =
                     SensorDetailHandler.addFovToMap(m,
                             c.pan,
                             still ? STILL_FOV_DEGREES : 0,  // wedge, or a bearing line
-                            still ? STILL_FOV_RANGE_M
-                                  : Math.min(rangeMeters,
-                                          SensorDetailHandler.MAX_SENSOR_RANGE),
+                            extent,
                             // Line: alpha 0, no fill, per the operator's CoT.
                             // Wedge: translucent white, like Quick Pic's.
                             still ? new float[] { 1f, 1f, 1f, 0.25f }
@@ -1118,20 +1127,17 @@ public final class CameraLayer {
                             // pan put the line back -- bearings floating over a map
                             // with no markers on it.
                             visible && isWithinZoom(),
-                            // Labels on, range rings off.
-                            //
-                            // With bLabels true and rangeLines 0, ATAK writes the
-                            // bearing along the line itself -- so the operator reads
-                            // the azimuth off the map instead of opening the sensor
-                            // pane to find it. The six-argument form we used before
-                            // hard-codes these to false and 100, which is why the line
-                            // was unlabeled and carried range rings nobody asked for.
+                            // Labels on: ATAK writes the bearing along the line
+                            // itself, so the operator reads the azimuth off the map
+                            // instead of opening the sensor pane to find it.
                             //
                             // The azimuth is true north as it arrives: ALERT's pan was
                             // verified against view.line at a median of 0.00 degrees
                             // across 1,298 cameras, so nothing is corrected here.
                             true,
-                            0.0);
+                            // Range-line SPACING, not a count, and 0 means 50 m
+                            // (see the marker metadata above): one line, at the end.
+                            extent);
             if (f == null) {
                 Log.w(TAG, "ATAK declined to create a SensorFOV for " + c.id);
                 return;

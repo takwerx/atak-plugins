@@ -211,6 +211,53 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/fold_reach_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="6dp">
+
+        <Button
+            android:id="@+id/fold_reach_head"
+            style="@style/TakwerxButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+
+        <ImageButton
+            android:id="@+id/fold_reach_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="@string/show_settings"
+            android:src="@drawable/ic_expand" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/fold_reach_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="4dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:text="How far out a camera is trusted to see the point. Look At lists only cameras this close, nearest first." />
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/look_reach"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/fold_gate_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
