@@ -1,10 +1,10 @@
 ATAK Plugin — Cam Depot
 
-**Download Cam Depot 1.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cam Depot 1.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.5/ATAK-Plugin-CamDepot-1.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.5/ATAK-Plugin-CamDepot-1.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.5/ATAK-Plugin-CamDepot-1.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.6/ATAK-Plugin-CamDepot-1.6--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.6/ATAK-Plugin-CamDepot-1.6--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.6/ATAK-Plugin-CamDepot-1.6--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cam-depot/releases
 
@@ -59,16 +59,20 @@ source submission zip).
 _________________________________________________________________
 STATUS
 
-Version 1.5: two fixes.
+Version 1.6: Suggest Cameras, and a shorter pane.
 
-- A camera's bearing line stays on the map when you zoom in on what the camera
-  is looking at. It used to disappear as soon as the camera itself left the
-  screen.
-- Right after a state loads, a camera's video button in its radial menu stays
-  grayed out for the few seconds until ATAK can play it. It used to be live at
-  once and answer "invalid video information" when tapped in that window.
+- Suggest Cameras: tap a point on the map and the list narrows to the cameras
+  whose reported aim covers it, nearest first, with the pan-tilt-zoom cameras
+  that could be turned to it and the nearby cameras that report no aim in
+  their own groups. One switch turns every suggested camera's bearing line on
+  or off, and the point, its marker and the lines come back after a restart.
+  Settings carries how far out a camera is trusted (10 miles by default).
+- The pane is the main screen and a Settings page: Cameras ON/OFF, Settings
+  and Favorites, Suggest Cameras, search and the list, with everything set
+  once and left on a Settings page of rows that read their value.
+- Turning many bearing lines on at once no longer stalls ATAK.
 
-Release candidate. Version 1.5.
+Release candidate. Version 1.6.
 
 Exercised on hardware: Samsung Galaxy XCover Pro and Galaxy S10 (ATAK-CIV
 5.8.0.3). Panel,
