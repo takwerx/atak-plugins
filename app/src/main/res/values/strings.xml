@@ -162,7 +162,7 @@
     <string name="quakes_allow_title">Show earthquakes?</string>
     <string name="quakes_allow_text">Atmosphere will ask the USGS for its feed of recent earthquakes, worldwide, and for the shaking maps of the largest, and draw them on the map. Your position is not sent.\n\nServer: earthquake.usgs.gov</string>
     <string name="credit_quakes">Earthquakes and ShakeMaps from the USGS Earthquake Hazards Program (%1$s)</string>
-    <string name="quakes_floor_heading">Smallest shown</string>
+    <string name="quakes_floor_heading">Magnitude</string>
     <string name="fuel_on">Fuel Moisture ON</string>
     <string name="fuel_off">Fuel Moisture OFF</string>
     <string name="fuel_allow_title">Show fuel moisture samples?</string>

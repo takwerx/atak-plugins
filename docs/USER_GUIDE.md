@@ -428,9 +428,9 @@ back.
 
 **Earthquakes** draws the USGS feed the way USGS's own map does: a circle sized
 by magnitude, colored by age (past hour red, past day orange, past week yellow,
-older white), the magnitude in the pill from M2.5 up. The first row picks the
+older white), the magnitude in the pill on every one. The first row picks the
 past day, week or month (the month feed carries M2.5 and up only); the second
-row, **Smallest shown**, picks All, M1+, M2.5+ or M4.5+, M2.5+ on a new
+row, **Magnitude**, picks All, M1+, M2.5+ or M4.5+, M2.5+ on a new
 install. For up to five of the largest quakes of M4.5 or more, the ShakeMap's
 intensity contours are drawn in USGS's intensity colors with their Roman
 numeral, VI "Strong" and so on. Tap a quake for the magnitude and its type, the

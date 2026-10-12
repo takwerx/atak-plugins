@@ -382,6 +382,8 @@ public abstract class OutlookOverlay {
     }
 
     public void setOn(boolean value) {
+        Log.d(tag, layerId + ": setOn(" + value + ") started=" + started + " on=" + on + " inFlight="
+                + inFlight);
         if (!started || on == value)
             return;
         on = value;
@@ -430,8 +432,11 @@ public abstract class OutlookOverlay {
 
     /** Ask for every layer, one after another, unless that was done very recently. */
     public void refresh(boolean force) {
-        if (!on || !started || inFlight)
+        if (!on || !started || inFlight) {
+            Log.d(tag, layerId + ": refresh skipped, on=" + on + " started=" + started + " inFlight="
+                    + inFlight);
             return;
+        }
         final long now = System.currentTimeMillis();
         if (!force && now - lastPoll < REFRESH_MS)
             return;
@@ -448,6 +453,7 @@ public abstract class OutlookOverlay {
             return;
         }
         final String[] urls = urls();
+        Log.d(tag, layerId + ": fetch " + index + " of " + urls.length);
         if (index >= urls.length) {
             inFlight = false;
             areas = got;
