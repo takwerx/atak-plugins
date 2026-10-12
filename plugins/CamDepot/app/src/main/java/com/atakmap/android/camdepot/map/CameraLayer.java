@@ -1598,6 +1598,62 @@ public final class CameraLayer {
         m.refresh(mapView.getMapEventDispatcher(), null, getClass());
     }
 
+    // ---- the Look At point ---------------------------------------------
+
+    private Marker lookAtMarker;
+
+    /**
+     * Mark the point Look At is judging cameras against, so the operator can
+     * see exactly where the tap landed (2026-10-11: "add a marker that gets
+     * placed and then cleared so you know exactly where I pressed"). ATAK's
+     * own reference-point icon, in the plugin's own group, never shared as
+     * CoT: it is this phone's question, not a map object for the fleet.
+     */
+    public void showLookAtMarker(GeoPoint p) {
+        if (p == null)
+            return;
+        try {
+            if (lookAtMarker == null) {
+                final Marker m = new Marker(p, UID_PREFIX + "lookat");
+                m.setType("b-m-p-s-p-i");
+                m.setTitle("Look At");
+                m.setMetaString("callsign", "Look At");
+                m.setMetaBoolean("nevercot", true);
+                m.setMetaBoolean("removable", false);
+                m.setMetaBoolean("movable", false);
+                m.setMetaBoolean("editable", false);
+                m.setMetaInteger("color", 0xFFFFC107);
+                m.setIcon(new Icon.Builder()
+                        .setImageUri(Icon.STATE_DEFAULT, "asset:/icons/reference_point.png")
+                        .setAnchor(Icon.ANCHOR_CENTER, Icon.ANCHOR_CENTER)
+                        .setColor(Icon.STATE_DEFAULT, 0xFFFFC107)
+                        .build());
+                m.setZOrder(-1000);
+                lookAtMarker = m;
+                group.addItem(m);
+            } else {
+                lookAtMarker.setPoint(p);
+                if (lookAtMarker.getGroup() == null)
+                    group.addItem(lookAtMarker);
+            }
+            lookAtMarker.setVisible(true);
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "could not place the Look At marker", e);
+        }
+    }
+
+    public void hideLookAtMarker() {
+        if (lookAtMarker == null)
+            return;
+        try {
+            if (lookAtMarker.getGroup() != null)
+                group.removeItem(lookAtMarker);
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "could not remove the Look At marker", e);
+        }
+        lookAtMarker = null;
+    }
+
     // ---- navigation -------------------------------------------------------
 
     /**

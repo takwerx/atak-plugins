@@ -292,6 +292,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                 public void run() {
                     endPick();
                     lookAt = chosen;
+                    layer.showLookAtMarker(lookAt);
                     updateLookAtControls();
                     apply();
                 }
@@ -951,6 +952,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                 }
                 if (lookAt != null) {
                     lookAt = null;
+                    layer.hideLookAtMarker();
                     updateLookAtControls();
                     apply();
                     return;
@@ -1170,6 +1172,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                 final String[] parts = la.split(",");
                 lookAt = new GeoPoint(Double.parseDouble(parts[0]),
                         Double.parseDouble(parts[1]));
+                layer.showLookAtMarker(lookAt);
             }
             updateLookAtControls();
         } catch (RuntimeException e) {
