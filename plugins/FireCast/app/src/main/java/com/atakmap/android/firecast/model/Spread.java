@@ -104,21 +104,22 @@ public final class Spread {
             return new double[] { best, bearing };
         }
 
-        /** The ground reached by a time as rings, in degrees, outer boundaries only. */
+        /**
+         * The ground reached by a time as rings, in degrees: the contour of the arrival
+         * field at that time, run between cell centers and smoothed, so it reads as a
+         * fire's edge and not as the cells under it. Outer boundaries only.
+         */
         public List<Polygon> rings(double minutes) {
-            final boolean[] in = new boolean[nx * ny];
-            for (int i = 0; i < in.length; i++)
-                in[i] = arrival[i] <= minutes;
-            final List<List<double[]>> loops = Contour.trace(in, nx, ny);
+            final List<List<double[]>> loops = Isoline.trace(arrival, nx, ny, (float) minutes);
             final List<Polygon> out = new ArrayList<>();
             for (List<double[]> loop : loops) {
-                if (loop.size() < 4)
+                if (loop.size() < 3)
                     continue;
                 final LineString ring = new LineString(2);
                 for (double[] p : loop)
-                    ring.addPoint(lon0 + p[0] * dLon, lat0 + p[1] * dLat);
+                    ring.addPoint(lon0 + (p[0] + 0.5) * dLon, lat0 + (p[1] + 0.5) * dLat);
                 final double[] f = loop.get(0);
-                ring.addPoint(lon0 + f[0] * dLon, lat0 + f[1] * dLat);
+                ring.addPoint(lon0 + (f[0] + 0.5) * dLon, lat0 + (f[1] + 0.5) * dLat);
                 final Polygon poly = new Polygon(2);
                 poly.addRing(ring);
                 out.add(poly);
@@ -141,7 +142,9 @@ public final class Spread {
      * @param maxMin  arrivals past this are not followed
      */
     public static Result run(Landscape land, double lat, double lon, double halfKm, double maxMin, Behavior behavior) {
-        final double cell = 30d;
+        // Half the grid's own 30 m: the fuel is sampled nearest, so the run follows the
+        // same ground, but the front moves in finer steps and the rings come out smooth.
+        final double cell = 15d;
         final int half = (int) Math.round(halfKm * 1000d / cell);
         final int nx = 2 * half + 1, ny = nx;
         final double mPerDegLat = 111320d, mPerDegLon = 111320d * Math.max(0.02d, Math.cos(Math.toRadians(lat)));
@@ -283,6 +286,130 @@ public final class Spread {
                     out[s] = cells[i].flameFt;
         }
         return out;
+    }
+
+    /**
+     * Marching squares over the arrival field: the line where arrival equals a time,
+     * crossing each cell edge at the interpolated point, chained into loops and
+     * rounded off. Coordinates are cell indices of cell centers.
+     */
+    static final class Isoline {
+        static List<List<double[]>> trace(float[] arrival, int nx, int ny, float t) {
+            // Unreached cells count as far, so the line falls between a reached cell and
+            // its unreached neighbor rather than at infinity.
+            final float far = t * 3f;
+            final float[] f = new float[arrival.length];
+            for (int i = 0; i < f.length; i++)
+                f[i] = arrival[i] > far ? far : arrival[i];
+            final Map<Long, double[]> segStart = new HashMap<>();
+            final List<double[][]> segs = new ArrayList<>();
+            for (int y = 0; y < ny - 1; y++) {
+                for (int x = 0; x < nx - 1; x++) {
+                    final float a = f[y * nx + x], b = f[y * nx + x + 1], c = f[(y + 1) * nx + x + 1], d = f[(y + 1) * nx + x];
+                    final int code = (a <= t ? 1 : 0) | (b <= t ? 2 : 0) | (c <= t ? 4 : 0) | (d <= t ? 8 : 0);
+                    if (code == 0 || code == 15)
+                        continue;
+                    // Edge crossings: bottom (a-b), right (b-c), top (d-c), left (a-d).
+                    final double[] pb = { x + lerp(a, b, t), y }, pr = { x + 1, y + lerp(b, c, t) };
+                    final double[] pt = { x + lerp(d, c, t), y + 1 }, pl = { x, y + lerp(a, d, t) };
+                    switch (code) {
+                        case 1: seg(segs, pl, pb); break;
+                        case 2: seg(segs, pb, pr); break;
+                        case 3: seg(segs, pl, pr); break;
+                        case 4: seg(segs, pr, pt); break;
+                        case 5: {
+                            final boolean center = (a + b + c + d) / 4f <= t;
+                            if (center) { seg(segs, pl, pt); seg(segs, pr, pb); }
+                            else { seg(segs, pl, pb); seg(segs, pr, pt); }
+                            break;
+                        }
+                        case 6: seg(segs, pb, pt); break;
+                        case 7: seg(segs, pl, pt); break;
+                        case 8: seg(segs, pt, pl); break;
+                        case 9: seg(segs, pt, pb); break;
+                        case 10: {
+                            final boolean center = (a + b + c + d) / 4f <= t;
+                            if (center) { seg(segs, pb, pl); seg(segs, pt, pr); }
+                            else { seg(segs, pb, pr); seg(segs, pt, pl); }
+                            break;
+                        }
+                        case 11: seg(segs, pt, pr); break;
+                        case 12: seg(segs, pr, pl); break;
+                        case 13: seg(segs, pr, pb); break;
+                        case 14: seg(segs, pb, pl); break;
+                        default: break;
+                    }
+                }
+            }
+            // Chain: each segment's start keyed by its quantized point; walk end to start.
+            final Map<Long, List<double[][]>> byStart = new HashMap<>();
+            for (double[][] s : segs) {
+                final long k = q(s[0]);
+                List<double[][]> l = byStart.get(k);
+                if (l == null)
+                    byStart.put(k, l = new ArrayList<>());
+                l.add(s);
+            }
+            final List<List<double[]>> loops = new ArrayList<>();
+            final java.util.Set<double[][]> used = new java.util.HashSet<>();
+            for (double[][] s0 : segs) {
+                if (used.contains(s0))
+                    continue;
+                final List<double[]> loop = new ArrayList<>();
+                double[][] s = s0;
+                int guard = 0;
+                while (s != null && !used.contains(s) && guard++ < 2_000_000) {
+                    used.add(s);
+                    loop.add(s[0]);
+                    final List<double[][]> cands = byStart.get(q(s[1]));
+                    double[][] nextSeg = null;
+                    if (cands != null)
+                        for (double[][] c : cands)
+                            if (!used.contains(c)) {
+                                nextSeg = c;
+                                break;
+                            }
+                    s = nextSeg;
+                }
+                if (loop.size() >= 3 && signedArea(loop) > 0)
+                    loops.add(smooth(smooth(loop)));
+            }
+            return loops;
+        }
+
+        private static double lerp(float a, float b, float t) {
+            if (a == b)
+                return 0.5;
+            return Math.max(0, Math.min(1, (t - a) / (b - a)));
+        }
+
+        private static void seg(List<double[][]> segs, double[] p, double[] q) {
+            segs.add(new double[][] { p, q });
+        }
+
+        private static long q(double[] p) {
+            return (Math.round(p[0] * 64) << 32) ^ (Math.round(p[1] * 64) & 0xFFFFFFFFL);
+        }
+
+        private static double signedArea(List<double[]> loop) {
+            double a = 0;
+            for (int i = 0; i < loop.size(); i++) {
+                final double[] p = loop.get(i), r = loop.get((i + 1) % loop.size());
+                a += p[0] * r[1] - r[0] * p[1];
+            }
+            return a / 2d;
+        }
+
+        /** Chaikin's corner cutting, one pass: the ring loses its corners, keeps its size. */
+        private static List<double[]> smooth(List<double[]> loop) {
+            final List<double[]> out = new ArrayList<>(loop.size() * 2);
+            for (int i = 0; i < loop.size(); i++) {
+                final double[] p = loop.get(i), r = loop.get((i + 1) % loop.size());
+                out.add(new double[] { 0.75 * p[0] + 0.25 * r[0], 0.75 * p[1] + 0.25 * r[1] });
+                out.add(new double[] { 0.25 * p[0] + 0.75 * r[0], 0.25 * p[1] + 0.75 * r[1] });
+            }
+            return out;
+        }
     }
 
     /**
