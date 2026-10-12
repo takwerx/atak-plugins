@@ -418,9 +418,12 @@ public final class CameraLayer {
         if (!requested.contains(c.id) || !c.hasFov())
             return false;
         final boolean still = !c.hasStream();
-        final double length = still ? STILL_FOV_RANGE_M
+        final boolean wedge = wedges.contains(c.id);
+        final double length = wedge ? Math.min(wedgeRangeM,
+                        SensorDetailHandler.MAX_SENSOR_RANGE)
+                : still ? STILL_FOV_RANGE_M
                 : Math.min(rangeMeters, SensorDetailHandler.MAX_SENSOR_RANGE);
-        final double half = still ? STILL_FOV_DEGREES / 2 : 0;
+        final double half = wedge ? c.fov / 2 : still ? STILL_FOV_DEGREES / 2 : 0;
         final GeoPoint origin = new GeoPoint(c.lat, c.lon);
         double north = c.lat, south = c.lat, west = c.lon, east = c.lon;
         for (double az : new double[] { c.pan - half, c.pan + half }) {
