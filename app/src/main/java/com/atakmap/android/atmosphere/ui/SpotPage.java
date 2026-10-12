@@ -1616,9 +1616,10 @@ public final class SpotPage {
     private TextView heading(int res) {
         final TextView h = new TextView(pluginContext);
         h.setText(res);
-        h.setTextSize(10);
+        h.setTextSize(12f);
         h.setAllCaps(true);
-        h.setAlpha(0.6f);
+        h.setTypeface(Typeface.DEFAULT_BOLD);
+        h.setTextColor(0xFF00E5FF);
         h.setPadding(0, dp(10), 0, dp(2));
         return h;
     }

@@ -709,9 +709,10 @@ public final class RainPage {
     private TextView heading(String words) {
         final TextView t = new TextView(pluginContext);
         t.setText(words);
-        t.setTextSize(10);
+        t.setTextSize(12f);
         t.setAllCaps(true);
-        t.setAlpha(0.6f);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setTextColor(0xFF00E5FF);
         t.setPadding(0, dp(8), 0, 0);
         return t;
     }

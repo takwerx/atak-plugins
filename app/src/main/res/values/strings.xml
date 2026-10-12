@@ -226,7 +226,7 @@
     <string name="rain_office_heading">The NWS office\'s rainfall report</string>
     <string name="rain_gauges_heading">USGS gauges around the map</string>
     <string name="tab_rain">Rain Gauges</string>
-    <string name="heading_discussion">Forecast discussion</string>
+    <string name="heading_discussion">Synopsis</string>
     <string name="raintotals_opacity_heading">Transparency</string>
     <string name="raintotals_off">Rain Totals OFF</string>
     <string name="raintotals_allow_title">Show rain totals?</string>

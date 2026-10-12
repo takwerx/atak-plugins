@@ -62,9 +62,10 @@ public final class DiscussionBlock {
         this.host = host;
         final TextView heading = new TextView(pluginContext);
         heading.setText(pluginContext.getString(R.string.heading_discussion));
-        heading.setTextSize(10);
+        heading.setTextSize(12f);
         heading.setAllCaps(true);
-        heading.setAlpha(0.6f);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        heading.setTextColor(0xFF00E5FF);
         heading.setPadding(0, dp(8), 0, 0);
         container.addView(heading);
         officeLine = text(13, true);
