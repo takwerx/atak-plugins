@@ -1,10 +1,10 @@
 ATAK Plugin — Map Depot
 
-**Download Map Depot 1.11** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.13** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.11/ATAK-Plugin-MapDepot-1.11--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.11/ATAK-Plugin-MapDepot-1.11--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.11/ATAK-Plugin-MapDepot-1.11--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -19,7 +19,7 @@ Map Depot downloads map data from inside ATAK. Without it, getting elevation or 
 map source onto a device means a web browser, the Downloads folder, and the Import
 Manager -- a sequence that is awkward on a phone and impossible with gloves on.
 
-Six kinds of data, each installed into the directory ATAK already scans, so
+Seven kinds of data, each installed into the directory ATAK already scans, so
 nothing has to be imported by hand afterwards:
 
   * Elevation. DTED2 by state or province. Every cell is verified against a
@@ -29,7 +29,26 @@ nothing has to be imported by hand afterwards:
 
   * Streaming base maps. MOBAC map source XML and streaming vector tile configs
     -- satellite, street, topographic, nautical, and transparent overlays such as
-    BLM roads and trails, FEMA flood hazard zones and current fire perimeters.
+    Google roads and labels, USGS contours, BLM roads and trails, FEMA flood
+    hazard zones, NEXRAD radar and current fire perimeters, sectioned by
+    kind with roads and points of interest first. An overlay installs into
+    ATAK's grg folder, where ATAK draws it over the base map and over any
+    disaster aerial, and the row carries a Hide/Show switch; a base map
+    installs into the map source folder, where it is one more map to pick.
+
+  * Disaster aerials. Post-event imagery from three sources in one list,
+    events of this year and last: NOAA's National Geodetic Survey flights
+    (15-30 cm), the Civil Air Patrol's flights for FEMA served by FEMA's
+    GeoPlatform (down to 9 cm), and Maxar Open Data satellite releases served
+    by Esri's Living Atlas (30 cm, CC BY-NC, before and after, cloud cover on
+    the row). Everything an agency publishes is listed, not graded. One
+    overlay per flight. Each flight can be added as a streaming overlay or
+    downloaded as an offline copy, an MBTiles pack the depot builds from the
+    agency's own tiles or image service at the flight's full detail, or a
+    step coarser to stay under about 500 MB, which draws with no signal. The
+    catalog is rebuilt nightly from each agency's own index, so flights added
+    during a storm appear the next day and their offline copies the morning
+    after. Outlines show where each flight on the phone is.
 
   * Offline public land vector tiles. US Forest Service vector basemap packages, one per
     national forest or grassland, fetched directly from ArcGIS Online.
@@ -69,6 +88,20 @@ fires.
 
 _________________________________________________________________
 STATUS
+
+Version 1.13: pictures from the signed build in the guide and manual
+(outlines, a flight with the roads overlay on top, the sectioned overlay
+list); the offline copy's digest check reshaped for the static scan; no
+change in what the plugin does.
+
+Version 1.12: Disaster Aerials, a new section listing post-disaster imagery
+by event from NOAA, the Civil Air Patrol and Maxar, each flight an overlay
+that draws over whatever map is selected, streamed or as an offline copy on
+the phone. Streaming overlays now install into ATAK's grg folder, so they
+switch on over the map instead of replacing it (before 1.12 picking one from
+the map list turned the imagery off). Three map sources by Joseph Elfelt
+(mappingsupport.com) join the catalog: USGS contour lines, NRL 133 Cities
+aerials and NEXRAD radar.
 
 Version 1.11: the plugin's lists come back with no network. The incident map
 list shows the maps on the phone and the pinned fires instead of an empty list,
