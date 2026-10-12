@@ -410,8 +410,10 @@ preliminary until the office finalizes it.
 **Debris Flow** sits in the Rain and rivers group because a debris flow is a
 flood of rock and mud, and the trigger is a burst of rain over a burn. It
 draws every fire the USGS has assessed in the last three years as a marker
-with the fire's name and year. Zoom in to a few degrees and it fetches the
-fire's perimeter and each stream basin, filled in USGS's own colors: Low
+with the fire's name and year. Tap a marker for the fire's page, and **Show
+the area** on it brings the map to the burn; zoomed in to a few degrees,
+whether by that button or by hand, it fetches the fire's perimeter and each
+stream basin, filled in USGS's own colors: Low
 yellow, Moderate orange, High red, for one 15-minute burst of rain at the rate
 the USGS set for that fire (24 mm/h, about an inch an hour, for most). Tap a
 basin for the likelihood of a debris flow, the volume it would carry, the
