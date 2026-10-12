@@ -155,6 +155,14 @@ public abstract class OutlookOverlay {
      */
     protected abstract String[] urls();
 
+    /**
+     * Areas a layer draws beside what it fetched: what another page handed it. Read
+     * on the worker at every rebuild; the rain gauges draw the office's report this way.
+     */
+    protected List<Area> extraAreas() {
+        return java.util.Collections.emptyList();
+    }
+
     /** Called on main as a refresh begins, before the first request: reset any grown list here. */
     protected void onRefreshStart() {
     }
@@ -499,6 +507,7 @@ public abstract class OutlookOverlay {
 
     private void rebuild(final int mine) {
         final List<Area> snapshot = new ArrayList<>(areas);
+        snapshot.addAll(extraAreas());
         worker.execute(new Runnable() {
             @Override
             public void run() {
