@@ -72,6 +72,16 @@ Capabilities:
   - Earthquakes: the USGS feed worldwide, circles sized by magnitude and
     colored by age the way USGS draws them, the shaking contours of the
     largest, and the USGS record behind a tap.
+  - Storm Reports as a page: the reports and the tornado paths in one list,
+    nationwide, near the pane's point, on the map or by state, newest or
+    closest first, any mix of types; a row flies to it and opens it.
+  - Rain that fell: the NWS rainfall picture for the last hour to seven days
+    in the service's own colors with a transparency slider; the USGS rain
+    gauges with their 24 hour totals; and the forecast office's own rainfall
+    report as a list, most rain first or closest, its gauges on the map too.
+  - The forecaster's synopsis on the Forecast page, from the Area Forecast
+    Discussion for the office covering the point, the other sections a tap
+    away.
   - Spot forecasts: every open request the National Weather Service has, with
     the office's forecast, newest or closest first and by type, and help
     preparing your own request.
@@ -94,7 +104,12 @@ STATUS
 NWS Damage Assessment Toolkit's surveyed tracks of the last year, by EF
 rating); Debris Flow (the USGS post-fire debris-flow assessments, fires marked
 and basins by hazard) beside the river gauges; and a Ground group with
-Earthquakes (the USGS feed, ShakeMap contours for the largest). 0.12 fixed a
+Earthquakes (the USGS feed, ShakeMap contours for the largest); a Storm
+Reports page listing reports and paths by where and type; Rain Totals (the NWS
+MRMS radar estimate and the RFC gauge-corrected analysis as a picture) and Rain
+Gauges (USGS gauges and the forecast office's rainfall report, on the map and
+as a list); the forecaster's synopsis on the Forecast page; and every section
+heading in the house cyan. 0.12 fixed a
 storm the National Hurricane Center still lists but no longer forecasts
 (takwerx/atmosphere#5). 0.11 brought Fire Danger, the Energy Release
 Component by Predictive Service Area with each GACC's chart; California's
