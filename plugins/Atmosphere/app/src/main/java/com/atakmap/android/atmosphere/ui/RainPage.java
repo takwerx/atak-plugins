@@ -631,7 +631,36 @@ public final class RainPage {
         values.setText(v.toString());
         values.setTextColor(Double.isNaN(r.inches) ? 0xFFA0A0A0 : RainGaugesOverlay.color(r.inches));
         row.addView(values);
+        // Once the gauge is placed, a green Go to under the name, and the row flies there
+        // (operator, 2026-10-11: "the little green Go to under it so I can go to the gauge").
+        final double[] at = place(r);
+        if (at != null) {
+            final TextView go = text(13, true);
+            go.setText(pluginContext.getString(R.string.go_to));
+            go.setTextColor(pluginContext.getResources().getColor(R.color.state_on));
+            go.setPadding(0, dp(2), 0, 0);
+            col.addView(go);
+            row.setClickable(true);
+            row.setBackgroundResource(R.drawable.btn_gray);
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    flyTo(at[0], at[1]);
+                }
+            });
+        }
         return row;
+    }
+
+    /** Pans and zooms the map to a gauge, falling back to a plain pan. */
+    private void flyTo(double lat, double lon) {
+        try {
+            mapView.getMapController().panZoomTo(new GeoPoint(lat, lon),
+                    mapView.mapResolutionAsMapScale(20d), true);
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "panZoomTo failed; plain pan", e);
+            mapView.getMapController().panTo(new GeoPoint(lat, lon), true);
+        }
     }
 
     // ---- the USGS gauges ------------------------------------------------------------------
@@ -691,13 +720,7 @@ public final class RainPage {
             row.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    try {
-                        mapView.getMapController().panZoomTo(new GeoPoint(g.lat, g.lon),
-                                mapView.mapResolutionAsMapScale(20d), true);
-                    } catch (LinkageError | RuntimeException e) {
-                        Log.w(TAG, "panZoomTo failed; plain pan", e);
-                        mapView.getMapController().panTo(new GeoPoint(g.lat, g.lon), true);
-                    }
+                    flyTo(g.lat, g.lon);
                 }
             });
             gaugeRows.addView(row);
