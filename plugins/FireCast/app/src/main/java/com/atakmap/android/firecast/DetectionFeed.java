@@ -152,6 +152,21 @@ public class DetectionFeed {
         main.postDelayed(r, 150);
     }
 
+    /**
+     * Shows or hides the detection layer without touching the store: while the fire
+     * model waits for a tap the footprints must not catch it (a tap on a GOES box opened
+     * the box instead of starting the run, dev 1, 2026-10-11).
+     */
+    public void setLayerVisible(boolean visible) {
+        try {
+            final FeatureLayer3 l = layer;
+            if (l != null)
+                l.setVisible(visible);
+        } catch (Exception e) {
+            Log.w(TAG, "layer visibility", e);
+        }
+    }
+
     public void setListener(Listener l) {
         listener = l;
     }

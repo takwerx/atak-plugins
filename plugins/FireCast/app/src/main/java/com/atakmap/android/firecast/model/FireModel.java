@@ -1,0 +1,818 @@
+package com.atakmap.android.firecast.model;
+
+import android.content.Context;
+import android.graphics.PointF;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.KeyEvent;
+import android.view.View;
+
+import com.atakmap.android.features.FeatureDataStoreDeepMapItemQuery;
+import com.atakmap.android.features.FeatureDataStoreMapOverlay;
+import com.atakmap.android.firecast.Units;
+import com.atakmap.android.maps.MapEvent;
+import com.atakmap.android.maps.MapEventDispatcher;
+import com.atakmap.android.maps.DefaultMapGroup;
+import com.atakmap.android.maps.MapGroup;
+import com.atakmap.android.maps.MapItem;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.android.maps.Marker;
+import com.atakmap.android.toolbar.widgets.TextContainer;
+import com.atakmap.coremap.filesystem.FileSystemUtils;
+import com.atakmap.coremap.log.Log;
+import com.atakmap.coremap.maps.coords.GeoPoint;
+import com.atakmap.coremap.maps.coords.GeoPointMetaData;
+import com.atakmap.map.layer.feature.AttributeSet;
+import com.atakmap.map.layer.feature.Feature;
+import com.atakmap.map.layer.feature.FeatureDataStore2;
+import com.atakmap.map.layer.feature.FeatureLayer3;
+import com.atakmap.map.layer.feature.FeatureSet;
+import com.atakmap.map.layer.feature.FeatureSetCursor;
+import com.atakmap.map.layer.feature.datastore.FeatureSetDatabase2;
+import com.atakmap.map.layer.feature.geometry.LineString;
+import com.atakmap.map.layer.feature.geometry.Polygon;
+import com.atakmap.map.layer.feature.style.BasicFillStyle;
+import com.atakmap.map.layer.feature.style.BasicStrokeStyle;
+import com.atakmap.map.layer.feature.style.CompositeStyle;
+import com.atakmap.map.layer.feature.style.Style;
+
+import org.json.JSONObject;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * A fire behavior run from a point the operator taps: where the fire is at 20, 40 and
+ * 60 minutes, drawn on the map, with every input named on a page.
+ *
+ * <p>Proof of concept, 2026-10-11. One fuel model, one slope, one wind for the whole
+ * run, read at the ignition: LANDFIRE for the ground, the nearest RAWS for the weather.
+ * The engine is the Fire Lab's behave library ({@link Behave}); the shape is its own
+ * fire ellipse with the ignition at the rear focus. A real run over terrain, fuel
+ * changes and a wind field is the server version; this one is what a crew can get
+ * at the fire with no signal, once the ground around it has been fetched.
+ *
+ * <p>Lives for the plugin's life, never inside a Tool: the run finishes and draws
+ * whether the pane is open or not, and the last run comes back after a restart.
+ */
+public final class FireModel {
+
+    private static final String TAG = "FireCast";
+    public static final int[] STEPS_MIN = { 20, 40, 60 };
+    private static final double FT_TO_M = 0.3048d;
+
+    public interface Listener {
+        /** Main thread. */
+        void onModelChanged();
+    }
+
+    /** Everything about one run: where, what went in, what came out. */
+    public static final class Run {
+        public double lat, lon;
+        public long ranAt;
+        public Landfire.Site site;
+        public Weather.Reading weather;
+        /** Every station with wind within reach, closest first, for the picker. */
+        public java.util.List<Weather.Reading> stations = new java.util.ArrayList<>();
+        /** The start's height above sea level, feet; NaN when the phone has no terrain here. */
+        public double startElevFt = Double.NaN;
+        /** The moistures used, percent: 1 h, 10 h, 100 h, live herb, live woody. */
+        public double m1, m10, m100, mHerb, mWoody;
+        public double windMph, windFromDeg;
+        public String windNote;
+        public double canopyHeightFt, crownRatio;
+        public Behave.Result result;
+        public String fuelName;
+        public String conditions = COND_OBSERVED;
+        /** Why there is no result, when there is none. */
+        public String problem;
+
+        /** Head fire distance at a time, meters. */
+        public double headM(int minutes) {
+            return (result.bFtPerMin + result.cFtPerMin) * minutes * FT_TO_M;
+        }
+    }
+
+    private final MapView mapView;
+    private final Context pluginContext;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private final File root, storeFile, saveFile;
+    private final Object lock = new Object();
+    private FeatureSetDatabase2 store;
+    private FeatureLayer3 layer;
+    private FeatureDataStoreMapOverlay overlay;
+    private volatile Run last;
+    private volatile boolean running;
+    private volatile String conditionsForRun = COND_OBSERVED;
+    private volatile String status = "";
+    private Listener listener;
+    private boolean started;
+
+    /** What the run assumes about the day: the station as read, or a dry preset. */
+    public static final String COND_OBSERVED = "observed", COND_DRY = "dry", COND_DRY_WINDY = "drywindy";
+    private final android.content.SharedPreferences prefs;
+    private static final String PREF_COND = "model.conditions", PREF_LAT = "model.startLat", PREF_LON = "model.startLon";
+    private static final String PREF_STATION = "model.station";
+
+    /** The station the operator picked by id, or "" for the representative one. */
+    public String station() {
+        return prefs.getString(PREF_STATION, "");
+    }
+
+    public void setStation(String wxId) {
+        prefs.edit().putString(PREF_STATION, wxId == null ? "" : wxId).apply();
+    }
+
+    public String conditions() {
+        return prefs.getString(PREF_COND, COND_OBSERVED);
+    }
+
+    public void setConditions(String c) {
+        prefs.edit().putString(PREF_COND, c).apply();
+    }
+
+    public static String conditionsLabel(String c) {
+        if (COND_DRY.equals(c))
+            return "Dry day";
+        if (COND_DRY_WINDY.equals(c))
+            return "Dry and 20 mph";
+        return "As observed";
+    }
+
+    // the start marker: an ordinary ATAK marker, so Move and Fine Adjust on its radial
+    // are ATAK's own, and the model reads wherever it was left
+    private static final String GROUP = "Fire Cast";
+    private static final String MARKER_UID = "firecast.model.start";
+    private MapGroup group;
+    private Marker marker;
+    private Runnable onPlaced;
+
+    public void setOnPlaced(Runnable r) {
+        onPlaced = r;
+    }
+
+    /** Where the start marker is, or null when there is none. */
+    public GeoPoint startPoint() {
+        return marker == null ? null : marker.getPoint();
+    }
+
+    /** Puts the start marker here, or moves it; remembered so it is back after a restart. */
+    public void place(GeoPoint p) {
+        prefs.edit().putFloat(PREF_LAT, (float) p.getLatitude())
+                .putFloat(PREF_LON, (float) p.getLongitude()).apply();
+        if (marker == null) {
+            marker = new Marker(p, MARKER_UID);
+            marker.setType("b-m-p-s-m");
+            marker.setTitle("Fire start");
+            marker.setMetaString("callsign", "Fire start");
+            // Working mark, not a report: not saved by ATAK, not sent to anyone.
+            marker.setMetaBoolean("archive", false);
+            marker.setMetaBoolean("removable", true);
+            marker.setMetaBoolean("editable", true);
+            marker.setMovable(true);
+            marker.setClickable(true);
+            // Cyan, like the rest of the plugin's own marks, so it reads against tan ground.
+            marker.setMetaInteger("color", 0xFF00E5FF);
+            marker.setMetaString("how", "h-g-i-g-o");
+            // ATAK's own spot-marker icon: an explicit asset icon drew nothing (dev 1,
+            // 2026-10-11); the default dot draws and takes the color meta.
+            group().addItem(marker);
+        } else {
+            marker.setPoint(p);
+        }
+        // The marker had left its group between the restart and the tap ("in group
+        // false", dev 1, 2026-10-11); whatever took it out, it goes back in.
+        if (marker.getGroup() == null)
+            group().addItem(marker);
+        try {
+            final PointF at = mapView.forward(marker.getPoint());
+            Log.d(TAG, "start marker placed; on screen at " + (at == null ? "?" : Math.round(at.x) + "," + Math.round(at.y))
+                    + " of " + mapView.getWidth() + "x" + mapView.getHeight() + "; in group " + (marker.getGroup() != null)
+                    + "; group in root " + (mapView.getRootGroup().findMapGroup(GROUP) != null));
+        } catch (Exception e) {
+            Log.w(TAG, "start marker check", e);
+        }
+    }
+
+    /**
+     * Brings the start into the half of the screen the page does not cover. The page
+     * reopens over the right half the moment the start is placed, and a tap made there
+     * put the marker straight under it (dev 1, 2026-10-11).
+     */
+    private void showStart() {
+        final Marker m = marker;
+        if (m == null)
+            return;
+        try {
+            final PointF at = mapView.forward(m.getPoint());
+            final float w = mapView.getWidth(), h = mapView.getHeight();
+            if (at == null || w <= 0 || h <= 0)
+                return;
+            // Where the map center has to go so the marker lands a quarter of the way in.
+            final GeoPointMetaData c = mapView.inverseWithElevation(at.x + w / 4f, h / 2f);
+            if (c != null && c.get() != null && c.get().isValid())
+                mapView.getMapController().panTo(c.get(), true);
+        } catch (Exception e) {
+            Log.w(TAG, "could not pan to the start", e);
+        }
+    }
+
+    private void removeMarker() {
+        if (marker == null)
+            return;
+        try {
+            if (marker.getGroup() != null)
+                marker.removeFromGroup();
+        } catch (RuntimeException ignored) {
+        }
+        marker = null;
+    }
+
+    private MapGroup group() {
+        if (group != null && mapView.getRootGroup().findMapGroup(GROUP) == null) {
+            mapView.getRootGroup().addGroup(group);
+            return group;
+        }
+        if (group != null)
+            return group;
+        MapGroup g = mapView.getRootGroup().findMapGroup(GROUP);
+        if (g == null) {
+            g = new DefaultMapGroup(GROUP);
+            mapView.getRootGroup().addGroup(g);
+        }
+        group = g;
+        return g;
+    }
+    /** Run around the pick: the plugin hides its other layer so the tap reaches the map. */
+    private Runnable onPickStart, onPickEnd;
+
+    public void setPickHooks(Runnable onStart, Runnable onEnd) {
+        onPickStart = onStart;
+        onPickEnd = onEnd;
+    }
+
+    private void layerVisible(boolean v) {
+        try {
+            final FeatureLayer3 l = layer;
+            if (l != null)
+                l.setVisible(v);
+        } catch (Exception ignored) {
+        }
+    }
+
+    // the tap
+    private boolean picking;
+    private MapEventDispatcher.MapEventDispatchListener tapListener;
+    /** Where the finger last lifted, for an item click ATAK delivers with no point. */
+    private volatile PointF lastUp;
+    private final View.OnTouchListener touchWatcher = new View.OnTouchListener() {
+        @Override
+        public boolean onTouch(View v, android.view.MotionEvent e) {
+            if (e.getActionMasked() == android.view.MotionEvent.ACTION_UP
+                    || e.getActionMasked() == android.view.MotionEvent.ACTION_DOWN)
+                lastUp = new PointF(e.getX(), e.getY());
+            return false;   // watched, never taken
+        }
+    };
+    private final View.OnKeyListener backListener = new View.OnKeyListener() {
+        @Override
+        public boolean onKey(View v, int keyCode, KeyEvent event) {
+            if (keyCode != KeyEvent.KEYCODE_BACK)
+                return false;
+            cancelPick();
+            return true;
+        }
+    };
+
+    public FireModel(MapView mapView, Context pluginContext) {
+        this.mapView = mapView;
+        this.pluginContext = pluginContext;
+        this.root = FileSystemUtils.getItem("tools/firecast");
+        this.storeFile = new File(root, "model.sqlite");
+        this.saveFile = new File(root, "model.json");
+        this.prefs = mapView.getContext().getSharedPreferences("firecast", Context.MODE_PRIVATE);
+    }
+
+    public void setListener(Listener l) {
+        listener = l;
+    }
+
+    public Run last() {
+        return last;
+    }
+
+    public boolean isRunning() {
+        return running;
+    }
+
+    public String status() {
+        return status;
+    }
+
+    public void start() {
+        started = true;
+        if (!root.isDirectory() && !root.mkdirs())
+            Log.w(TAG, "could not create " + root);
+        try {
+            synchronized (lock) {
+                attachLocked();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "could not put the model layer on the map", e);
+        }
+        final float lat = prefs.getFloat(PREF_LAT, Float.NaN), lon = prefs.getFloat(PREF_LON, Float.NaN);
+        if (!Float.isNaN(lat) && !Float.isNaN(lon))
+            place(new GeoPoint(lat, lon));
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                restore();
+            }
+        });
+    }
+
+    public void stop() {
+        started = false;
+        cancelPick();
+        removeMarker();
+        if (group != null) {
+            try {
+                mapView.getRootGroup().removeGroup(group);
+            } catch (RuntimeException ignored) {
+            }
+            group = null;
+        }
+        synchronized (lock) {
+            detachLocked();
+        }
+        worker.shutdownNow();
+    }
+
+    // ---- the tap ------------------------------------------------------------------
+
+    /** Waits for one tap on the map and puts the start marker there. */
+    public void pickStart() {
+        if (picking)
+            cancelPick();
+        if (running)
+            return;
+        final MapEventDispatcher d = mapView.getMapEventDispatcher();
+        d.pushListeners();
+        d.clearListeners(MapEvent.MAP_CLICK);
+        d.clearListeners(MapEvent.MAP_LONG_PRESS);
+        d.clearListeners(MapEvent.ITEM_CLICK);
+        tapListener = new MapEventDispatcher.MapEventDispatchListener() {
+            @Override
+            public void onMapEvent(MapEvent event) {
+                // A tap on another plugin's shape arrives as an item click, and one of
+                // ATAK's two paths for that carries no point; the finger's last position
+                // is the same tap.
+                PointF pf = event.getPointF();
+                if (pf == null)
+                    pf = lastUp;
+                if (pf == null)
+                    return;
+                final GeoPointMetaData gp = mapView.inverseWithElevation(pf.x, pf.y);
+                cancelPick();
+                if (gp == null || gp.get() == null || !gp.get().isValid())
+                    return;
+                Log.d(TAG, "pick tap: " + event.getType() + (event.getPointF() == null ? " (no point, used the finger)" : ""));
+                place(new GeoPoint(gp.get().getLatitude(), gp.get().getLongitude()));
+                showStart();
+                if (onPlaced != null)
+                    onPlaced.run();
+            }
+        };
+        d.addMapEventListener(MapEvent.MAP_CLICK, tapListener);
+        d.addMapEventListener(MapEvent.ITEM_CLICK, tapListener);
+        lastUp = null;
+        mapView.addOnTouchListener(touchWatcher);
+        mapView.addOnKeyListener(backListener);
+        // Nothing of ours under the finger: the footprints and the last run step aside
+        // so the tap is a tap on the ground, not a pick of an item.
+        layerVisible(false);
+        if (onPickStart != null)
+            onPickStart.run();
+        // Other plugins' items are under the finger too, and ATAK's touch controller
+        // opens its "select item" list when a tap hits more than one. Off while picking.
+        try {
+            mapView.getMapTouchController().skipDeconfliction(true);
+        } catch (Exception ignored) {
+        }
+        TextContainer.getInstance().displayPrompt("Tap the map where the fire starts. Move it after if it needs to be exact.");
+        picking = true;
+    }
+
+    /** Stops waiting for a tap and gives ATAK its listeners back; not optional. */
+    public void cancelPick() {
+        if (!picking)
+            return;
+        picking = false;
+        TextContainer.getInstance().closePrompt();
+        final MapEventDispatcher d = mapView.getMapEventDispatcher();
+        if (tapListener != null) {
+            d.removeMapEventListener(MapEvent.MAP_CLICK, tapListener);
+            d.removeMapEventListener(MapEvent.ITEM_CLICK, tapListener);
+            tapListener = null;
+        }
+        d.popListeners();
+        mapView.removeOnKeyListener(backListener);
+        mapView.removeOnTouchListener(touchWatcher);
+        layerVisible(true);
+        if (onPickEnd != null)
+            onPickEnd.run();
+        try {
+            mapView.getMapTouchController().skipDeconfliction(false);
+        } catch (Exception ignored) {
+        }
+    }
+
+    // ---- the run ------------------------------------------------------------------
+
+    /** Runs from wherever the start marker is now. */
+    public boolean runFromStart() {
+        final GeoPoint p = startPoint();
+        if (p == null)
+            return false;
+        run(p.getLatitude(), p.getLongitude());
+        return true;
+    }
+
+    /** Fetches the ground and the weather, runs the model, draws. Any thread. */
+    public void run(final double lat, final double lon) {
+        if (running)
+            return;
+        running = true;
+        conditionsForRun = conditions();
+        status = "Reading the ground and the weather…";
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                final Run r = new Run();
+                r.lat = lat;
+                r.lon = lon;
+                r.ranAt = System.currentTimeMillis();
+                try {
+                    r.site = Landfire.at(lat, lon);
+                } catch (Exception e) {
+                    Log.w(TAG, "LANDFIRE failed", e);
+                    r.problem = "Could not read the fuel and slope here (LANDFIRE did not answer).";
+                }
+                if (r.problem == null) {
+                    try {
+                        final double hae = com.atakmap.map.elevation.ElevationManager.getElevation(lat, lon, null);
+                        if (!Double.isNaN(hae))
+                            r.startElevFt = hae / FT_TO_M;
+                    } catch (Throwable t) {
+                        Log.w(TAG, "no terrain height at the start: " + t);
+                    }
+                    try {
+                        r.stations = Weather.within(lat, lon, 50);
+                        final String want = station();
+                        for (Weather.Reading s : r.stations)
+                            if (!want.isEmpty() && want.equals(s.wxId))
+                                r.weather = s;
+                        if (r.weather == null)
+                            r.weather = Weather.representative(r.stations, r.startElevFt);
+                    } catch (Exception e) {
+                        Log.w(TAG, "RAWS failed", e);
+                    }
+                    compute(r);
+                }
+                last = r;
+                status = r.problem != null ? r.problem : "Model on the map";
+                synchronized (lock) {
+                    drawLocked(r);
+                }
+                save(r);
+                running = false;
+                changed();
+            }
+        });
+    }
+
+    /** Model inputs from the site and the reading, with the assumptions written down. */
+    private void compute(Run r) {
+        r.conditions = conditionsForRun;
+        if (!r.site.burnable()) {
+            r.fuelName = r.site.fuelModel < 0 ? "unknown" : Behave.name(r.site.fuelModel);
+            r.problem = "LANDFIRE says this ground does not burn (" + (r.fuelName.isEmpty()
+                    ? "code " + r.site.fuelModel : r.fuelName) + "). Tap on wildland fuel.";
+            return;
+        }
+        r.fuelName = Behave.name(r.site.fuelModel);
+        // Fuel moisture: the nearest station's 10-hour stick when it has one, dry fall
+        // defaults when it does not. Live fuels at cured-season values.
+        final Weather.Reading w = r.weather;
+        final boolean dry = !COND_OBSERVED.equals(r.conditions);
+        if (dry) {
+            r.m1 = 4;
+            r.m10 = 5;
+            r.m100 = 7;
+        } else if (w != null && !Double.isNaN(w.fuelMoisture) && w.fuelMoisture > 0 && w.fuelMoisture < 40) {
+            r.m10 = w.fuelMoisture;
+            r.m1 = Math.max(2, w.fuelMoisture - 1);
+            r.m100 = w.fuelMoisture + 2;
+        } else {
+            r.m1 = 4;
+            r.m10 = 5;
+            r.m100 = 7;
+        }
+        r.mHerb = 30;
+        r.mWoody = 60;
+        if (COND_DRY_WINDY.equals(r.conditions)) {
+            r.windMph = 20;
+            r.windFromDeg = w != null && w.hasWind() ? w.windFromDeg : 0;
+            r.windNote = "preset 20 mph" + (w != null && w.hasWind() ? ", from the direction " + w.station + " reads" : ", from the north");
+        } else if (w != null && w.hasWind()) {
+            r.windMph = w.windMph;
+            r.windFromDeg = w.windFromDeg;
+            r.windNote = w.station + ", " + Units.format(w.distanceM) + " away" + heightNote(r, w);
+        } else {
+            r.windMph = 0;
+            r.windFromDeg = 0;
+            r.windNote = "no station with a wind reading within 50 mi; run with no wind";
+        }
+        r.canopyHeightFt = r.site.coverPct >= 10 ? 30 : 0;
+        r.crownRatio = r.site.coverPct >= 10 ? 0.5 : 0;
+        r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
+                r.windMph, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
+                r.site.coverPct, r.canopyHeightFt, r.crownRatio);
+        finish(r);
+    }
+
+    /** ", 2,100 ft above the start" when the station's height is far from the start's; "" otherwise. */
+    static String heightNote(Run r, Weather.Reading w) {
+        if (w == null || Double.isNaN(r.startElevFt) || w.elevationFt <= 0)
+            return "";
+        final double d = w.elevationFt - r.startElevFt;
+        if (Math.abs(d) < 300)
+            return "";
+        return String.format(Locale.US, ", %,.0f ft %s the start", Math.abs(d), d > 0 ? "above" : "below");
+    }
+
+    /** The one judgment on a run's numbers: no spread is a sentence, not a zero. */
+    private static void finish(Run r) {
+        if (r.result == null)
+            r.problem = "The fire model did not run.";
+        else if (r.result.rosFtPerMin < 0.05)
+            r.problem = String.format(Locale.US, "Will not carry fire here as it stands: fuel moisture %.0f%% in %s is past "
+                    + "what this fuel burns at. Try Conditions: Dry day to see what a dry day does.", r.m1,
+                    r.fuelName == null || r.fuelName.isEmpty() ? "this fuel" : r.fuelName.split(" ")[0]);
+    }
+
+    /** Takes the run off the map and forgets it: the operator's own Clear. */
+    public void clear() {
+        last = null;
+        status = "";
+        removeMarker();
+        prefs.edit().remove(PREF_LAT).remove(PREF_LON).apply();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock) {
+                    drawLocked(null);
+                }
+                if (saveFile.isFile() && !saveFile.delete())
+                    Log.w(TAG, "could not delete " + saveFile);
+                changed();
+            }
+        });
+    }
+
+    // ---- the map ------------------------------------------------------------------
+
+    private void attachLocked() throws Exception {
+        store = new FeatureSetDatabase2(storeFile);
+        final FeatureDataStore2.FeatureQueryParameters visibleOnly = new FeatureDataStore2.FeatureQueryParameters();
+        visibleOnly.visibleOnly = true;
+        layer = new FeatureLayer3("Fire Cast fire model", store, visibleOnly);
+        final FeatureDataStoreDeepMapItemQuery query = new FeatureDataStoreDeepMapItemQuery(layer) {
+            @Override
+            protected MapItem featureToMapItem(Feature feature) {
+                final MapItem item = super.featureToMapItem(feature);
+                item.setMetaString("title", feature.getName());
+                item.setMetaString("callsign", feature.getName());
+                return item;
+            }
+        };
+        overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
+                "Fire Cast fire model", "file://asset/nothing", query, null, null);
+        mapView.getMapOverlayManager().addFilesOverlay(overlay);
+        mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+    }
+
+    private void detachLocked() {
+        try {
+            if (layer != null)
+                mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+            if (overlay != null)
+                mapView.getMapOverlayManager().removeOverlay(overlay);
+        } catch (Exception e) {
+            Log.w(TAG, "model detach failed", e);
+        }
+        layer = null;
+        overlay = null;
+        store = null;
+    }
+
+    /** Replaces whatever is drawn with this run's ellipses; null empties it. Lock held. */
+    private void drawLocked(Run r) {
+        if (store == null)
+            return;
+        boolean bulk = false;
+        try {
+            store.acquireModifyLock(true);
+            bulk = true;
+            final List<Long> old = new ArrayList<>();
+            final FeatureSetCursor c = store.queryFeatureSets(new FeatureDataStore2.FeatureSetQueryParameters());
+            try {
+                while (c.moveToNext())
+                    old.add(c.getId());
+            } finally {
+                c.close();
+            }
+            if (r != null && r.result != null && r.problem == null) {
+                final long fsid = store.insertFeatureSet(new FeatureSet("Fire Cast", "Fire model",
+                        "Fire model " + stamp(r.ranAt), Double.MAX_VALUE, 0d));
+                store.setFeatureSetVisible(fsid, true);
+                // Largest first so the 20 minute ring draws on top of the 60.
+                final int[] colors = { 0xFFD600, 0xFF8A00, 0xFF2A00 };
+                for (int i = STEPS_MIN.length - 1; i >= 0; i--) {
+                    final Polygon p = ellipse(r, STEPS_MIN[i]);
+                    final Style style = new CompositeStyle(new Style[] {
+                            new BasicFillStyle((0x30 << 24) | colors[i]),
+                            new BasicStrokeStyle(0xFF000000 | colors[i], 3f) });
+                    final AttributeSet a = new AttributeSet();
+                    a.setAttribute("_title", STEPS_MIN[i] + " min");
+                    store.insertFeature(new Feature(fsid, STEPS_MIN[i] + " min", p, style, a,
+                            Feature.AltitudeMode.ClampToGround, 0d));
+                }
+            }
+            for (Long id : old)
+                store.deleteFeatureSet(id);
+        } catch (Exception e) {
+            Log.w(TAG, "model draw failed", e);
+        } finally {
+            if (bulk)
+                store.releaseModifyLock();
+        }
+    }
+
+    /**
+     * The fire ellipse at a time: semi-major b along the heading, semi-minor a across,
+     * center c ahead of the ignition, all from the library per minute of spread.
+     */
+    static Polygon ellipse(Run r, int minutes) {
+        final double a = r.result.aFtPerMin * minutes * FT_TO_M;
+        final double b = r.result.bFtPerMin * minutes * FT_TO_M;
+        final double c = r.result.cFtPerMin * minutes * FT_TO_M;
+        final double th = Math.toRadians(r.result.headingDeg);
+        final double mPerDegLat = 111320d;
+        final double mPerDegLon = 111320d * Math.max(0.02d, Math.cos(Math.toRadians(r.lat)));
+        // Center of the ellipse: c along the heading from the ignition.
+        final double cx = r.lon + c * Math.sin(th) / mPerDegLon;
+        final double cy = r.lat + c * Math.cos(th) / mPerDegLat;
+        final LineString ring = new LineString(2);
+        final int n = 72;
+        double x0 = 0, y0 = 0;
+        for (int i = 0; i < n; i++) {
+            final double phi = 2 * Math.PI * i / n;
+            final double along = b * Math.cos(phi), across = a * Math.sin(phi);
+            final double east = along * Math.sin(th) + across * Math.cos(th);
+            final double north = along * Math.cos(th) - across * Math.sin(th);
+            final double x = cx + east / mPerDegLon, y = cy + north / mPerDegLat;
+            if (i == 0) {
+                x0 = x;
+                y0 = y;
+            }
+            ring.addPoint(x, y);
+        }
+        ring.addPoint(x0, y0);
+        final Polygon p = new Polygon(2);
+        p.addRing(ring);
+        return p;
+    }
+
+    private static Polygon circle(double lat, double lon, double radiusM) {
+        final double mPerDegLat = 111320d;
+        final double mPerDegLon = 111320d * Math.max(0.02d, Math.cos(Math.toRadians(lat)));
+        final LineString ring = new LineString(2);
+        for (int i = 0; i <= 24; i++) {
+            final double phi = 2 * Math.PI * (i % 24) / 24;
+            ring.addPoint(lon + radiusM * Math.sin(phi) / mPerDegLon, lat + radiusM * Math.cos(phi) / mPerDegLat);
+        }
+        final Polygon p = new Polygon(2);
+        p.addRing(ring);
+        return p;
+    }
+
+    static String stamp(long t) {
+        return new java.text.SimpleDateFormat("HH:mm", Locale.US).format(new java.util.Date(t));
+    }
+
+    // ---- the last run survives a restart ------------------------------------------
+
+    private void save(Run r) {
+        if (r == null || r.result == null || r.problem != null)
+            return;
+        try {
+            final JSONObject o = new JSONObject();
+            o.put("lat", r.lat).put("lon", r.lon).put("ranAt", r.ranAt);
+            o.put("fuelModel", r.site.fuelModel).put("slopeDeg", r.site.slopeDeg)
+                    .put("aspectDeg", r.site.aspectDeg).put("coverPct", r.site.coverPct);
+            o.put("m1", r.m1).put("m10", r.m10).put("m100", r.m100).put("mHerb", r.mHerb).put("mWoody", r.mWoody);
+            o.put("windMph", r.windMph).put("windFromDeg", r.windFromDeg).put("windNote", r.windNote);
+            o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions);
+            if (r.weather != null) {
+                o.put("station", r.weather.station).put("observedAt", r.weather.observedAt)
+                        .put("rh", r.weather.relativeHumidity).put("tempF", r.weather.airTempF)
+                        .put("gustMph", r.weather.gustMph).put("stationM", r.weather.distanceM);
+            }
+            final File tmp = new File(root, "model.json.tmp");
+            final java.io.Writer w = new java.io.OutputStreamWriter(
+                    new java.io.FileOutputStream(tmp), java.nio.charset.StandardCharsets.UTF_8);
+            try {
+                w.write(o.toString());
+            } finally {
+                w.close();
+            }
+            if (!tmp.renameTo(saveFile)) {
+                saveFile.delete();
+                tmp.renameTo(saveFile);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "could not save the model run", e);
+        }
+    }
+
+    /** Reruns the saved inputs through the library; the numbers come out the same. Worker. */
+    private void restore() {
+        if (!saveFile.isFile())
+            return;
+        try {
+            final StringBuilder sb = new StringBuilder();
+            final java.io.Reader rd = new java.io.InputStreamReader(
+                    new java.io.FileInputStream(saveFile), java.nio.charset.StandardCharsets.UTF_8);
+            try {
+                final char[] buf = new char[4096];
+                int n;
+                while ((n = rd.read(buf)) > 0)
+                    sb.append(buf, 0, n);
+            } finally {
+                rd.close();
+            }
+            final JSONObject o = new JSONObject(sb.toString());
+            final Run r = new Run();
+            r.lat = o.getDouble("lat");
+            r.lon = o.getDouble("lon");
+            r.ranAt = o.optLong("ranAt", 0L);
+            r.site = new Landfire.Site(o.getInt("fuelModel"), o.optDouble("slopeDeg", 0),
+                    o.optDouble("aspectDeg", 0), o.optDouble("coverPct", 0));
+            r.m1 = o.optDouble("m1", 4);
+            r.m10 = o.optDouble("m10", 5);
+            r.m100 = o.optDouble("m100", 7);
+            r.mHerb = o.optDouble("mHerb", 30);
+            r.mWoody = o.optDouble("mWoody", 60);
+            r.windMph = o.optDouble("windMph", 0);
+            r.windFromDeg = o.optDouble("windFromDeg", 0);
+            r.windNote = o.optString("windNote", "");
+            r.canopyHeightFt = o.optDouble("canopyHeightFt", 0);
+            r.crownRatio = o.optDouble("crownRatio", 0);
+            r.conditions = o.optString("conditions", COND_OBSERVED);
+            r.fuelName = Behave.name(r.site.fuelModel);
+            r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
+                    r.windMph, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
+                    r.site.coverPct, r.canopyHeightFt, r.crownRatio);
+            finish(r);
+            if (r.problem != null)
+                return;
+            if (last != null)
+                return;
+            last = r;
+            status = "Model on the map, " + stamp(r.ranAt) + " run";
+            synchronized (lock) {
+                drawLocked(r);
+            }
+            changed();
+        } catch (Exception e) {
+            Log.w(TAG, "could not read the saved model run", e);
+        }
+    }
+
+    private void changed() {
+        main.post(new Runnable() {
+            @Override
+            public void run() {
+                if (listener != null)
+                    listener.onModelChanged();
+            }
+        });
+    }
+}

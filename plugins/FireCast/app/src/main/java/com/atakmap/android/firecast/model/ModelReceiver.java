@@ -1,0 +1,315 @@
+package com.atakmap.android.firecast.model;
+
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Color;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import com.atak.plugins.impl.PluginLayoutInflater;
+import com.atakmap.android.dropdown.DropDown.OnStateListener;
+import com.atakmap.android.dropdown.DropDownReceiver;
+import com.atakmap.android.firecast.Units;
+import com.atakmap.android.firecast.plugin.R;
+import com.atakmap.android.maps.MapView;
+
+import java.util.Locale;
+
+/**
+ * The fire model page: what the run says, what went into it, and what it assumes.
+ * Opened from the pane's Fire model button; Back returns to the pane.
+ */
+public class ModelReceiver extends DropDownReceiver implements OnStateListener, FireModel.Listener {
+
+    public static final String ACTION = "com.atakmap.android.firecast.MODEL";
+
+    private final Context pluginContext;
+    private final FireModel model;
+    private final Runnable reopenPane;
+    private final View view;
+    private final LinearLayout body;
+
+    public ModelReceiver(MapView mapView, Context pluginContext, FireModel model, Runnable reopenPane) {
+        super(mapView);
+        this.pluginContext = pluginContext;
+        this.model = model;
+        this.reopenPane = reopenPane;
+        this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.model_panel, null);
+        this.body = view.findViewById(R.id.model_body);
+        view.findViewById(R.id.btn_back).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                closeDropDown();
+                reopenPane.run();
+            }
+        });
+        view.findViewById(R.id.btn_place).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // The page gives way to the map so the tap lands on it.
+                closeDropDown();
+                model.pickStart();
+            }
+        });
+        view.findViewById(R.id.btn_run).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!model.runFromStart())
+                    return;
+                render();
+            }
+        });
+        view.findViewById(R.id.btn_station).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final FireModel.Run r = model.last();
+                final java.util.List<Weather.Reading> list = r == null ? new java.util.ArrayList<Weather.Reading>() : r.stations;
+                final String[] labels = new String[1 + list.size()];
+                labels[0] = "Closest at about the start's height (automatic)";
+                int current = 0;
+                for (int i = 0; i < list.size(); i++) {
+                    final Weather.Reading s = list.get(i);
+                    labels[1 + i] = s.station + " · " + Units.format(s.distanceM)
+                            + (s.elevationFt > 0 && r != null && !Double.isNaN(r.startElevFt)
+                                    ? String.format(Locale.US, " · %+,.0f ft", s.elevationFt - r.startElevFt) : "")
+                            + String.format(Locale.US, " · %.0f mph from %s", s.windMph, Units.compass(s.windFromDeg))
+                            + (Double.isNaN(s.relativeHumidity) ? "" : String.format(Locale.US, " · RH %.0f%%", s.relativeHumidity));
+                    if (s.wxId.equals(model.station()))
+                        current = 1 + i;
+                }
+                if (list.isEmpty())
+                    labels[0] = "Run once to list the stations near the start";
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("Weather station")
+                        .setSingleChoiceItems(labels, current, new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                                model.setStation(which == 0 ? "" : list.get(which - 1).wxId);
+                                render();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+        view.findViewById(R.id.btn_conditions).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final String[] keys = { FireModel.COND_OBSERVED, FireModel.COND_DRY, FireModel.COND_DRY_WINDY };
+                final String[] labels = { "As observed at the nearest station",
+                        "Dry day: 1 h 4%, 10 h 5%, 100 h 7%, wind as observed",
+                        "Dry and 20 mph wind" };
+                int current = 0;
+                for (int i = 0; i < keys.length; i++)
+                    if (keys[i].equals(model.conditions()))
+                        current = i;
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("Conditions")
+                        .setSingleChoiceItems(labels, current, new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                                model.setConditions(keys[which]);
+                                render();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+        view.findViewById(R.id.btn_clear).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                model.clear();
+                render();
+            }
+        });
+    }
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        render();
+        showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
+    }
+
+    @Override
+    public void onModelChanged() {
+        if (isVisible())
+            render();
+    }
+
+    /** Main thread. */
+    public void render() {
+        body.removeAllViews();
+        final FireModel.Run r = model.last();
+        final com.atakmap.coremap.maps.coords.GeoPoint start = model.startPoint();
+        ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && start != null);
+        ((Button) view.findViewById(R.id.btn_conditions)).setText("Conditions: " + FireModel.conditionsLabel(model.conditions()));
+        String stationLabel = "Station: automatic";
+        if (!model.station().isEmpty()) {
+            stationLabel = "Station: " + model.station();
+            if (r != null)
+                for (Weather.Reading s : r.stations)
+                    if (s.wxId.equals(model.station()))
+                        stationLabel = "Station: " + s.station;
+        }
+        ((Button) view.findViewById(R.id.btn_station)).setText(stationLabel);
+        if (model.isRunning()) {
+            section("Running", model.status());
+            return;
+        }
+        if (start == null) {
+            section("Fire model", "Tap Place start, then tap the map where the fire starts. Move the marker if it "
+                    + "needs to be exact (drag it, or Fine Adjust on its menu), pick the conditions, then Run model. "
+                    + "Where the fire is at 20, 40 and 60 minutes is drawn on the map, with everything the run assumed.");
+            return;
+        }
+        if (r == null) {
+            section("Start placed", "Drag the marker or use Fine Adjust on its menu if it needs to be exact, "
+                    + "then tap Run model.");
+            return;
+        }
+        if (r.problem != null) {
+            section("No run", r.problem);
+            inputs(r);
+            return;
+        }
+        final Behave.Result o = r.result;
+        final StringBuilder goes = new StringBuilder();
+        goes.append("Head runs toward ").append(Units.compass(o.headingDeg))
+                .append(String.format(Locale.US, " (%.0f°)", o.headingDeg))
+                .append(" at ").append(rate(o.rosFtPerMin)).append(".\n");
+        for (int min : FireModel.STEPS_MIN)
+            goes.append(min).append(" min: head ").append(Units.format(r.headM(min)))
+                    .append(" from the start, ").append(Units.format(o.aFtPerMin * min * 2 * 0.3048d)).append(" wide.\n");
+        goes.append("Backing ").append(rate(o.backingFtPerMin)).append(", flanks ").append(rate(o.flankingFtPerMin)).append('.');
+        section("Where it goes", goes.toString());
+
+        final String flame = String.format(Locale.US, "Flame length %s. Fireline intensity %.0f BTU/ft/s.",
+                Units.format(o.flameLengthFt * 0.3048d), o.firelineIntensity)
+                + (o.flameLengthFt > 11 ? " Past what a hand crew can hold at the head."
+                        : o.flameLengthFt > 8 ? " Too hot for a hand line at the head; equipment or retardant."
+                        : o.flameLengthFt > 4 ? " Hand line at the head is marginal." : " Hand line can hold the head.");
+        section("How hard it burns", flame);
+
+        inputs(r);
+
+        section("What this does not mean",
+                "One fuel, one slope and one wind for the whole run, read at the start point. Real fire crosses "
+                        + "fuel changes, terrain and a wind that shifts; this is the direction and the order of "
+                        + "distance, not a perimeter to plan on. No spotting, no crown fire, no barriers. "
+                        + "Run again as the wind changes.");
+    }
+
+    private void inputs(FireModel.Run r) {
+        final StringBuilder in = new StringBuilder();
+        if (r.site != null) {
+            in.append("Fuel: ").append(r.fuelName == null || r.fuelName.isEmpty() ? "code " + r.site.fuelModel : r.fuelName).append(" (LANDFIRE 2024).\n");
+            in.append(String.format(Locale.US, "Slope %.0f°, facing %s (%.0f°), canopy %.0f%%.\n",
+                    r.site.slopeDeg, Units.compass(r.site.aspectDeg), r.site.aspectDeg, r.site.coverPct));
+        }
+        if (r.result != null || r.windNote != null) {
+            in.append(String.format(Locale.US, "Wind %.0f mph from %s (%.0f°) at 20 ft",
+                    r.windMph, Units.compass(r.windFromDeg), r.windFromDeg));
+            if (r.windNote != null)
+                in.append(": ").append(r.windNote);
+            in.append(".\n");
+            if (r.weather != null) {
+                final String h = FireModel.heightNote(r, r.weather);
+                if (!h.isEmpty())
+                    in.append("That station is").append(h).append("; its wind and humidity may not be the fire's. "
+                            + "Pick another under Station if one sits nearer the fire's height.\n");
+                if (!Double.isNaN(r.weather.relativeHumidity))
+                    in.append(String.format(Locale.US, "RH %.0f%%", r.weather.relativeHumidity));
+                if (!Double.isNaN(r.weather.airTempF))
+                    in.append(String.format(Locale.US, ", %.0f°F", r.weather.airTempF));
+                if (r.weather.observedAt > 0)
+                    in.append(", read ").append(ago(r.weather.observedAt));
+                in.append(".\n");
+            }
+            in.append(String.format(Locale.US, "Fuel moisture 1 h %.0f%%, 10 h %.0f%%, 100 h %.0f%%, live herb %.0f%%, live woody %.0f%%.",
+                    r.m1, r.m10, r.m100, r.mHerb, r.mWoody));
+            if (r.weather != null && !Double.isNaN(r.weather.fuelMoisture) && r.weather.fuelMoisture > 0)
+                in.append(" The 10 h is the station's fuel stick.");
+            else
+                in.append(" Dry-season defaults; no station fuel stick.");
+        }
+        section("What went in", in.toString());
+        section("When", FireModel.stamp(r.ranAt) + " run");
+    }
+
+    private static String rate(double ftPerMin) {
+        return String.format(Locale.US, "%.1f ft/min (%.1f ch/h)", ftPerMin, ftPerMin * 60d / 66d);
+    }
+
+    private static String ago(long t) {
+        final long mins = (System.currentTimeMillis() - t) / 60000L;
+        if (mins < 1)
+            return "just now";
+        if (mins < 60)
+            return mins + " min ago";
+        return (mins / 60) + " h ago";
+    }
+
+    // ---- the same page furniture as the detail page ---------------------------------
+
+    private void section(String heading, String text) {
+        body.addView(headingView(heading));
+        body.addView(bodyView(text));
+    }
+
+    private TextView headingView(String text) {
+        final TextView t = new TextView(view.getContext());
+        t.setText(text);
+        t.setAllCaps(true);
+        t.setTextSize(14f);
+        t.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        t.setTextColor(0xFF00E5FF);
+        t.setGravity(Gravity.START);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(12);
+        lp.bottomMargin = dp(2);
+        t.setLayoutParams(lp);
+        return t;
+    }
+
+    private TextView bodyView(String text) {
+        final TextView t = new TextView(view.getContext());
+        t.setText(text);
+        t.setTextSize(16f);
+        t.setTextColor(Color.WHITE);
+        t.setLineSpacing(dp(4), 1f);
+        t.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        return t;
+    }
+
+    private int dp(int v) {
+        return Math.round(v * view.getResources().getDisplayMetrics().density);
+    }
+
+    @Override
+    public void onDropDownSelectionRemoved() {
+    }
+
+    @Override
+    public void onDropDownVisible(boolean v) {
+    }
+
+    @Override
+    public void onDropDownSizeChanged(double width, double height) {
+    }
+
+    @Override
+    public void onDropDownClose() {
+    }
+
+    @Override
+    protected void disposeImpl() {
+    }
+}

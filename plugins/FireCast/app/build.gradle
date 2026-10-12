@@ -131,6 +131,11 @@ android {
 
     // this is required and should not be removed otherwise the TAK 
     // inner signing check will fail and the plugin will not load
+    // The Fire Lab's behave library, built from src/main/cpp with the NDK the SDK's
+    // hellojni sample pins. tak.gov builds it the same way.
+    ndkVersion "27.3.13750724"
+    externalNativeBuild.ndkBuild.path = 'src/main/cpp/Android.mk'
+
     bundle {
         storeArchive {
             enable = false

@@ -259,6 +259,13 @@ public class DetectionPane implements DetectionFeed.Listener {
                         .sendBroadcast(new android.content.Intent(ActivityReceiver.ACTION));
             }
         });
+        header.findViewById(R.id.btn_model).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                com.atakmap.android.ipc.AtakBroadcast.getInstance()
+                        .sendBroadcast(new android.content.Intent(com.atakmap.android.firecast.model.ModelReceiver.ACTION));
+            }
+        });
         header.findViewById(R.id.btn_window).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

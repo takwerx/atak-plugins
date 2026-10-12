@@ -38,6 +38,8 @@ public class FireCast implements IPlugin {
     MapView mapView;
     DetectionFeed feed;
     DetectionPane paneView;
+    com.atakmap.android.firecast.model.FireModel model;
+    com.atakmap.android.firecast.model.ModelReceiver modelPage;
 
     public FireCast(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -47,6 +49,8 @@ public class FireCast implements IPlugin {
             pluginContext.setTheme(R.style.ATAKPluginTheme);
         }
         uiService = serviceController.getService(IHostUIService.class);
+        // The fire model's native library is found through the plugin's own package.
+        PluginNativeLoader.init(pluginContext);
         toolbarItem = new ToolbarItem.Builder(
                 pluginContext.getString(R.string.app_name),
                 MarshalManager.marshal(
@@ -78,6 +82,44 @@ public class FireCast implements IPlugin {
             });
             feed.start();
         }
+        if (mapView != null && model == null) {
+            model = new com.atakmap.android.firecast.model.FireModel(mapView, pluginContext);
+            model.start();
+            modelPage = new com.atakmap.android.firecast.model.ModelReceiver(mapView, pluginContext, model,
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            if (feed != null)
+                                feed.reopenPane();
+                        }
+                    });
+            model.setListener(modelPage);
+            // The start is placed from the map; the page comes back to say so.
+            model.setOnPlaced(new Runnable() {
+                @Override
+                public void run() {
+                    com.atakmap.android.ipc.AtakBroadcast.getInstance().sendBroadcast(
+                            new android.content.Intent(com.atakmap.android.firecast.model.ModelReceiver.ACTION));
+                }
+            });
+            model.setPickHooks(new Runnable() {
+                @Override
+                public void run() {
+                    if (feed != null)
+                        feed.setLayerVisible(false);
+                }
+            }, new Runnable() {
+                @Override
+                public void run() {
+                    if (feed != null)
+                        feed.setLayerVisible(true);
+                }
+            });
+            final com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter f =
+                    new com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter();
+            f.addAction(com.atakmap.android.firecast.model.ModelReceiver.ACTION, "open the fire model page");
+            com.atakmap.android.ipc.AtakBroadcast.getInstance().registerReceiver(modelPage, f);
+        }
     }
 
     @Override
@@ -93,6 +135,18 @@ public class FireCast implements IPlugin {
         }
         pane = null;
         paneView = null;
+        if (modelPage != null) {
+            try {
+                com.atakmap.android.ipc.AtakBroadcast.getInstance().unregisterReceiver(modelPage);
+            } catch (Exception ignored) {
+            }
+            modelPage.dispose();
+            modelPage = null;
+        }
+        if (model != null) {
+            model.stop();
+            model = null;
+        }
         if (feed != null) {
             feed.stop();
             feed = null;
