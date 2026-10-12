@@ -98,7 +98,7 @@ public final class FlightOutlines {
                     // box of ATAK's own, so drawing ours too put two boxes on
                     // the map (2026-10-11); ATAK's is left to it.
                     final boolean offline = installed.contains(f.id + "-pack");
-                    if (installed.contains(f.id) && !offline)
+                    if (installed.contains(f.id) && !offline && !f.boxed)
                         want.put(f.id, f);
                 }
             }

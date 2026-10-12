@@ -159,8 +159,15 @@ public class MapDepot implements IPlugin {
     /** NOAA post-disaster imagery, newest event first; see {@link Depot.Storm}. */
     private final List<Depot.Storm> allStorms = new ArrayList<>();
 
-    /** Index into {@link #allStorms} of the event whose flights are listed. */
-    private int stormIndex;
+    /**
+     * Index into {@link #allStorms} of the event whose flights are listed, or
+     * -1 for every event at once: the operator's "all list" so the flights
+     * on the phone from NOAA, CAP and Maxar can be hidden and shown together.
+     */
+    private int stormIndex = -1;
+
+    /** Every flight of every event, for the All Events view. */
+    private final List<Depot.Package> allFlights = new ArrayList<>();
 
     /** When the depot built the storms section, so the list can say how fresh "newest flight" is. */
     private String stormsBuiltAt = "";
@@ -450,6 +457,8 @@ public class MapDepot implements IPlugin {
                 if (client == null || !allStorms.isEmpty())
                     return;
                 allStorms.addAll(storms.events);
+                for (Depot.Storm s : allStorms)
+                    allFlights.addAll(s.flights);
                 stormsBuiltAt = storms.builtAt;
                 refreshInstalledPackages();
                 syncOutlines();
@@ -1078,9 +1087,10 @@ public class MapDepot implements IPlugin {
         if (packageMode == PackageMode.FORESTS)
             return allForests;
         if (packageMode == PackageMode.STORMS)
-            return stormIndex < allStorms.size()
-                    ? allStorms.get(stormIndex).flights
-                    : java.util.Collections.<Depot.Package>emptyList();
+            return stormIndex < 0 ? allFlights
+                    : stormIndex < allStorms.size()
+                            ? allStorms.get(stormIndex).flights
+                            : java.util.Collections.<Depot.Package>emptyList();
         switch (series) {
             case REGIONAL:
                 return allRegional;
@@ -1174,12 +1184,16 @@ public class MapDepot implements IPlugin {
 
     /** "Hurricane Erin 2025 (3)": the event, and what choosing it costs. */
     private String stormLabel(int i, boolean withCount) {
-        if (i < 0 || i >= allStorms.size())
+        if (i < 0)
+            return pluginContext.getString(R.string.all_events)
+                    + (withCount ? " (" + allFlights.size() + ")" : "");
+        if (i >= allStorms.size())
             return pluginContext.getString(R.string.choose_storm);
         final Depot.Storm s = allStorms.get(i);
         final String label = s.name
                 + (s.year > 0 && !s.name.contains(String.valueOf(s.year))
-                        ? " " + s.year : "");
+                        ? " " + s.year : "")
+                + ("NOAA".equalsIgnoreCase(s.agency) ? "" : " · " + s.agency);
         return withCount ? label + " (" + s.flightCount() + ")" : label;
     }
 
@@ -1188,17 +1202,17 @@ public class MapDepot implements IPlugin {
             toast(pluginContext.getString(R.string.no_storms));
             return;
         }
-        final String[] items = new String[allStorms.size()];
+        final String[] items = new String[allStorms.size() + 1];
         for (int i = 0; i < items.length; i++)
-            items[i] = stormLabel(i, true);
+            items[i] = stormLabel(i - 1, true);
         new AlertDialog.Builder(hostContext())
                 .setTitle(pluginContext.getString(R.string.choose_storm))
-                .setSingleChoiceItems(items, stormIndex,
+                .setSingleChoiceItems(items, stormIndex + 1,
                         new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface d, int which) {
                                 d.dismiss();
-                                stormIndex = which;
+                                stormIndex = which - 1;
                                 refreshSeriesControls();
                                 forestSearch.setText("");
                                 applyForestFilter();
@@ -1981,9 +1995,12 @@ public class MapDepot implements IPlugin {
                 forestsSavedAt = savedAt;
                 allStorms.clear();
                 allStorms.addAll(storms.events);
+                allFlights.clear();
+                for (Depot.Storm s : allStorms)
+                    allFlights.addAll(s.flights);
                 stormsBuiltAt = storms.builtAt;
                 if (stormIndex >= allStorms.size())
-                    stormIndex = 0;
+                    stormIndex = -1;
                 Log.i(TAG, "onForests forests=" + fetched.size()
                         + " recmaps=" + recMaps.size()
                         + " regional=" + sheets.regional.size()
@@ -2225,6 +2242,16 @@ public class MapDepot implements IPlugin {
                 ? " · catalog " + Depot.prettyDate(stormsBuiltAt.substring(0, 10)) : "";
         if (allStorms.isEmpty())
             return "No disaster aerials in the catalog yet." + built;
+        if (stormIndex < 0) {
+            int held = 0;
+            for (Depot.Package p : allFlights)
+                if (installedPackages.contains(p.id())
+                        || (p instanceof Depot.Flight && ((Depot.Flight) p).pack != null
+                                && installedPackages.contains(((Depot.Flight) p).pack.id())))
+                    held++;
+            return allStorms.size() + " events · " + held + " of " + allFlights.size()
+                    + " flights on the phone" + built;
+        }
         final Depot.Storm s = allStorms.get(stormIndex);
         int held = 0;
         total = 0;
@@ -2242,7 +2269,7 @@ public class MapDepot implements IPlugin {
                 return "All of " + s.name + " is installed." + built;
             return "Nothing matches \"" + query + "\" in " + s.name + "." + built;
         }
-        final String what = s.detail.isEmpty() ? s.name : s.detail;
+        final String what = (s.detail.isEmpty() ? s.name : s.detail) + " · " + s.agency;
         return what + " · " + s.span() + " · " + held + " of " + total + " installed"
                 + (hidden > 0 ? " · nearest " + shownPackages.size() + " shown" : "")
                 + built;

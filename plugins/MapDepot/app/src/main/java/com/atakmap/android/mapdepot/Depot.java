@@ -914,9 +914,12 @@ public final class Depot {
     /** An event slug on storms.ngs.noaa.gov, which becomes a depot path. */
     private static final Pattern EVENT_ID = Pattern.compile("[a-z0-9_]{1,40}");
 
-    /** NOAA's tile set name, {@code 20250823b-rgb}: date, flight letter, source. */
+    /**
+     * NOAA's tile set name, {@code 20250823b-rgb}; a CAP job, {@code cap-katy-tx-1};
+     * a Maxar event half, {@code maxar-<event>-post}. Lowercase, digits, dashes.
+     */
     private static final Pattern FLIGHT_ID =
-            Pattern.compile("\\d{8}[a-z]-[a-z0-9]{1,12}|[a-z0-9_]{1,40}-all");
+            Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
 
     /** The depot path of a generated XML, and nothing else. */
     private static final Pattern STORM_FILE =
@@ -937,6 +940,8 @@ public final class Depot {
         /** For a yearly set, the events it holds: "Texas Flooding, Maui Fire". */
         public final String detail;
         public final String first, last;
+        /** Who flew it: "NOAA", "Civil Air Patrol", "Maxar". */
+        public final String agency;
         /** south, west, north, east over every flight; null when the catalog has none. */
         public final double[] bounds;
         /** Each flight by date. A flight's offline copy is {@link Flight#pack}. */
@@ -952,6 +957,7 @@ public final class Depot {
             detail = o.optString("detail", "");
             first = o.optString("first", "");
             last = o.optString("last", "");
+            agency = o.optString("agency", "NOAA");
             bounds = box(o.optJSONArray("bounds"));
 
             final JSONArray arr = o.optJSONArray("flights");
@@ -1041,6 +1047,14 @@ public final class Depot {
         private final double[] box;
         /** The offline copy of this flight, when the depot has built one. */
         public final Pack pack;
+        /**
+         * True when ATAK draws a real outline for the streamed source itself
+         * (a WMS source carries its box; an XYZ source is the whole world),
+         * so the plugin does not draw a second one.
+         */
+        public final boolean boxed;
+        /** Cloud cover of the best pass, percent, or -1 when the source does not say. */
+        public final int clouds;
 
         Flight(JSONObject o, Storm storm, boolean all) {
             this.storm = storm;
@@ -1059,6 +1073,8 @@ public final class Depot {
                 throw new IllegalArgumentException("flight " + id + " has no date");
             letter = o.optString("letter", "");
             source = o.optString("source", "");
+            boxed = o.optBoolean("boxed", false);
+            clouds = o.has("clouds") && !o.isNull("clouds") ? o.optInt("clouds", -1) : -1;
 
             box = all ? storm.bounds : box(o.optJSONArray("bounds"));
             lat = box == null ? Double.NaN : (box[0] + box[2]) / 2.0;
@@ -1152,6 +1168,8 @@ public final class Depot {
                 sb.append(" · flight ").append(letter);
             if (!source.isEmpty() && !"RGB".equalsIgnoreCase(source))
                 sb.append(" · ").append(sourceName(source));
+            if (clouds >= 0)
+                sb.append(" · ").append(clouds).append("% cloud");
             if (pack != null)
                 sb.append(" · offline copy ").append(Depot.bytes(pack.bytes));
             return sb.toString();
@@ -1162,6 +1180,8 @@ public final class Depot {
                 return "Civil Air Patrol";
             if ("MAXAR".equalsIgnoreCase(s))
                 return "Maxar satellite";
+            if ("USGS".equalsIgnoreCase(s))
+                return "USGS";
             return s;
         }
     }

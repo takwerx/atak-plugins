@@ -73,9 +73,9 @@ The landing page offers six kinds of data, each on its own page.
   neighborhood, as GeoPDFs.
 - **Drone IR Maps (UASWFC)** — infrared flown by uncrewed aircraft, as
   georeferenced PDFs and KMZs.
-- **Disaster Aerials (NOAA)** — the high-resolution aerials NOAA flies after a
-  hurricane, flood, fire or tornado, one overlay per flight, drawn over
-  whatever map you have.
+- **Disaster Aerials** — the imagery flown or collected after a hurricane,
+  flood, fire or tornado by NOAA, the Civil Air Patrol and Maxar, one overlay
+  per flight, drawn over whatever map you have.
 
 ---
 
@@ -341,12 +341,24 @@ The maps' own site cannot be reached from a phone, so Map Depot reads them
 from its depot, where they are mirrored with the author's permission. Maps by
 FlameMapper.
 
-## 8. Disaster aerials (NOAA)
+## 8. Disaster aerials
 
 After a hurricane makes landfall, and after some floods, fires and tornadoes,
-NOAA flies the damaged area and publishes the aerials within a day or two of
-each flight. Map Depot lists NOAA's events from this year and last, newest
-first, and every flight in each.
+the damaged area gets flown, and the imagery is public within a day or two.
+Map Depot lists three sources in one list, events from this year and last,
+newest first, and every flight in each:
+
+- **NOAA**, the National Geodetic Survey's aerial flights, 15 to 30 cm a pixel.
+- **Civil Air Patrol**, flown for FEMA, down to 9 cm a pixel, served by FEMA.
+- **Maxar**, satellite, 30 cm, released under the Maxar Open Data program
+  for major US events, with a before and an after where both exist, and the
+  cloud cover of the best pass on the row. Non-commercial license.
+
+Map Depot lists what each agency publishes and does not grade it. A rushed
+mosaic can sit off its true position, and a satellite pass can be mostly
+cloud; the row's date and cloud figure are there to judge by, and Remove
+is one tap. The event button starts on **All Events**, every flight from
+every source in one list, and narrows to one event when you pick it.
 
 ![The flights of one event](screenshots/50_disaster_aerials.png)
 
