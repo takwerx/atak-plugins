@@ -111,7 +111,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 int current = 0;
                 for (int i = 0; i < list.size(); i++) {
                     final Weather.Reading s = list.get(i);
-                    labels[1 + i] = s.station + " (" + s.source + ")" + ("NWS forecast".equals(s.source) ? "" : " · " + Units.format(s.distanceM))
+                    labels[1 + i] = s.station + ("HRRR".equals(s.source) ? "" : " (" + s.source + ")")
+                            + ("NWS forecast".equals(s.source) || "HRRR".equals(s.source) ? "" : " · " + Units.format(s.distanceM))
                             + (s.elevationFt > 0 && r != null && !Double.isNaN(r.startElevFt)
                                     ? String.format(Locale.US, " · %+,.0f ft", s.elevationFt - r.startElevFt) : "")
                             + String.format(Locale.US, " · %.0f mph from %s", s.windMph, Units.compass(s.windFromDeg))
@@ -384,6 +385,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             if (r.moistureNote != null)
                 in.append(' ').append(r.moistureNote);
         }
+        if (r.windFieldNote != null)
+            in.append('\n').append(r.windFieldNote);
         section("What went in", in.toString());
         section("When", FireModel.stamp(r.ranAt) + " run");
         final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.model_action_row, null);

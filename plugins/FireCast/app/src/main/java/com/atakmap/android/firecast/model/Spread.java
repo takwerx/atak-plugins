@@ -136,10 +136,20 @@ public final class Spread {
         }
     }
 
-    /** What a cell's behavior is asked with: the run's weather and moistures. */
+    /** What a cell's behavior is asked with: the run's moistures, and this wind. */
     public interface Behavior {
-        /** @return [head rate ft/min, heading deg, A ft/min, B ft/min, C ft/min, flame ft, spot distance m], or null for no spread */
-        double[] run(int fuelModel, double slopeDeg, double aspectDeg);
+        /**
+         * @param windMph  the wind for this cell at this moment, or NaN for the run's own
+         * @param windFrom degrees the wind comes from, with it
+         * @return [head rate ft/min, heading deg, A ft/min, B ft/min, C ft/min, flame ft, spot distance m], or null for no spread
+         */
+        double[] run(int fuelModel, double slopeDeg, double aspectDeg, double windMph, double windFrom);
+    }
+
+    /** A wind that varies over the ground and the hour; null means one wind for the run. */
+    public interface Wind {
+        /** {mph, from-degrees} at a point and a moment, or null for no reading there. */
+        double[] at(double lat, double lon, long whenMillis);
     }
 
     private Spread() {
@@ -160,6 +170,15 @@ public final class Spread {
      */
     public static Result run(Landscape land, double lat, double lon, double halfKm, double maxMin, Behavior behavior,
             double[][] seedRing, double rateScale) {
+        return run(land, lat, lon, halfKm, maxMin, behavior, seedRing, rateScale, null, 0L);
+    }
+
+    /**
+     * @param wind     a wind field sampled per cell and time, or null for the run's one wind
+     * @param startMs  when the run begins, for sampling the field through the hour
+     */
+    public static Result run(Landscape land, double lat, double lon, double halfKm, double maxMin, Behavior behavior,
+            double[][] seedRing, double rateScale, Wind wind, long startMs) {
         // Half the grid's own 30 m: the fuel is sampled nearest, so the run follows the
         // same ground, but the front moves in finer steps and the rings come out smooth.
         final double cell = 15d;
@@ -169,9 +188,12 @@ public final class Spread {
         final double dLat = cell / mPerDegLat, dLon = cell / mPerDegLon;
         final double lat0 = lat - half * dLat - dLat / 2d, lon0 = lon - half * dLon - dLon / 2d;
 
-        // Each cell's behavior, computed once per fuel, slope step and aspect step.
+        // Each cell's behavior, computed once per fuel, slope step and aspect step, and,
+        // with a wind field, per wind step as well, looked up as the fire reaches it.
         final Cell[] cells = new Cell[nx * ny];
+        final int[] kindOf = new int[nx * ny];
         final Map<Integer, Cell> byKind = new HashMap<>();
+        final Map<Long, Cell> byKindAndWind = new HashMap<>();
         final java.util.Set<Integer> fuels = new java.util.HashSet<>();
         int burnable = 0;
         for (int y = 0; y < ny; y++) {
@@ -191,9 +213,10 @@ public final class Spread {
                 burnable++;
                 final int slopeStep = Math.min(80, (slope / 5) * 5), aspectStep = ((aspect + 11) / 22) * 22 % 360;
                 final int key = (fuel << 16) | (slopeStep << 8) | (aspectStep / 22);
+                kindOf[y * nx + x] = key;
                 Cell c = byKind.get(key);
                 if (c == null) {
-                    final double[] r = behavior.run(fuel, slopeStep, aspectStep);
+                    final double[] r = behavior.run(fuel, slopeStep, aspectStep, Double.NaN, Double.NaN);
                     if (r == null || r[0] <= 0.01)
                         c = BARRIER;
                     else {
@@ -284,7 +307,29 @@ public final class Spread {
             if (cells[i].spotM > maxSpot)
                 maxSpot = cells[i].spotM;
             final int x = i % nx, y = i / nx;
-            final Cell from = cells[i];
+            Cell from = cells[i];
+            if (wind != null && from != BARRIER) {
+                // This cell's behavior under the wind blowing here when the fire arrives.
+                final double[] w = wind.at(lat0 + (y + 0.5) * dLat, lon0 + (x + 0.5) * dLon, startMs + (long) (t * 60000d));
+                if (w != null) {
+                    final int ws = (int) Math.round(w[0] / 2d), wd = (int) Math.round(w[1] / 22.5d) % 16;
+                    final long wkey = ((long) kindOf[i] << 16) | (ws << 4) | wd;
+                    Cell cw = byKindAndWind.get(wkey);
+                    if (cw == null) {
+                        final double[] r = behavior.run(kindOf[i] >> 16, (kindOf[i] >> 8) & 0xFF, (kindOf[i] & 0xFF) * 22, ws * 2d, wd * 22.5d);
+                        if (r == null || r[0] <= 0.01)
+                            cw = BARRIER;
+                        else {
+                            final double b = r[3], cc = r[4];
+                            final double ecc = b > 0 ? Math.max(0, Math.min(0.98, cc / b)) : 0;
+                            cw = new Cell(r[0] * 0.3048d * rateScale, r[1], ecc, r[5], r.length > 6 ? r[6] : 0);
+                        }
+                        byKindAndWind.put(wkey, cw);
+                    }
+                    if (cw != BARRIER)
+                        from = cw;
+                }
+            }
             for (int m = 0; m < MOVES.length; m++) {
                 final int nx2 = x + MOVES[m][0], ny2 = y + MOVES[m][1];
                 if (nx2 < 0 || ny2 < 0 || nx2 >= nx || ny2 >= ny)

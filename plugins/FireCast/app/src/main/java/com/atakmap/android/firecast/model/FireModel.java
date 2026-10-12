@@ -107,6 +107,10 @@ public final class FireModel {
         /** The rate multiplier calibration settled on; 1 when there was none. */
         public double rateScale = 1;
         public String calibrationNote;
+        /** The HRRR field the run used, or null for one wind. */
+        public WindField windField;
+        public String windFieldNote;
+
         /** The grid's reach each way from the start, km. */
         public double halfKm = HALF_KM;
         /** Buildings reached by each step, homes among them, and people, from FEMA's inventory; null when not fetched. */
@@ -693,6 +697,20 @@ public final class FireModel {
                         Log.w(TAG, "NWS forecast grid failed", e);
                     }
                     try {
+                        // The 3 km wind field over the run's box, this hour and the next.
+                        final double dLat = r.halfKm * 1000d / 111320d;
+                        final double dLon = r.halfKm * 1000d / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(lat))));
+                        r.windField = WindField.fetch(lat - dLat, lon - dLon, lat + dLat, lon + dLon, r.ranAt);
+                        final double[] w = r.windField.at(lat, lon, r.ranAt);
+                        if (w != null)
+                            r.stations.add(0, new Weather.Reading("HRRR", "HRRR", "HRRR 3 km wind field, this hour",
+                                    lat, lon, 0, r.ranAt, w[0], Double.NaN, w[1], Double.NaN, Double.NaN));
+                    } catch (Exception e) {
+                        Log.w(TAG, "HRRR wind field failed: " + e);
+                        r.windFieldNote = "No HRRR wind field: " + e.getMessage();
+                    }
+
+                    try {
                         final String want = station();
                         for (Weather.Reading s : r.stations)
                             if (!want.isEmpty() && want.equals(s.wxId))
@@ -700,7 +718,7 @@ public final class FireModel {
                         if (r.weather == null) {
                             final java.util.List<Weather.Reading> observed = new java.util.ArrayList<>();
                             for (Weather.Reading s : r.stations)
-                                if (!"NWS forecast".equals(s.source))
+                                if (!"NWS forecast".equals(s.source) && !"HRRR".equals(s.source))
                                     observed.add(s);
                             r.weather = Weather.representative(observed, r.startElevFt);
                             if (r.weather == null && !r.stations.isEmpty())
@@ -744,7 +762,25 @@ public final class FireModel {
         r.fuelName = Behave.name(r.site.fuelModel);
         // Fuel moisture: the nearest station's 10-hour stick when it has one, dry fall
         // defaults when it does not. Live fuels at cured-season values.
-        final Weather.Reading w = r.weather;
+        Weather.Reading w = r.weather;
+        final boolean fieldWind = w != null && "HRRR".equals(w.source) && r.windField != null;
+        if (fieldWind) {
+            // The field gives wind only; humidity, temperature and the stick come from
+            // the forecast grid or the best station, whichever is there.
+            Weather.Reading other = null;
+            for (Weather.Reading s : r.stations)
+                if ("NWS forecast".equals(s.source))
+                    other = s;
+            if (other == null) {
+                final java.util.List<Weather.Reading> observed = new java.util.ArrayList<>();
+                for (Weather.Reading s : r.stations)
+                    if (!"NWS forecast".equals(s.source) && !"HRRR".equals(s.source))
+                        observed.add(s);
+                other = Weather.representative(observed, r.startElevFt);
+            }
+            if (other != null)
+                w = other;
+        }
         final boolean dry = COND_DRY.equals(r.conditions) || COND_DRY_WINDY.equals(r.conditions);
         if (dry) {
             r.m1 = 4;
@@ -769,7 +805,13 @@ public final class FireModel {
         }
         r.mHerb = 30;
         r.mWoody = 60;
-        if (COND_DRY_WINDY.equals(r.conditions)) {
+        if (fieldWind && !COND_DRY_WINDY.equals(r.conditions)) {
+            r.windMph = r.weather.windMph;
+            r.windFromDeg = r.weather.windFromDeg;
+            r.tenMeterWind = true;
+            r.windNote = "HRRR 3 km field, varying across the ground and the hour; at the start "
+                    + String.format(Locale.US, "%.0f mph from %s", r.windMph, Units.compass(r.windFromDeg));
+        } else if (COND_DRY_WINDY.equals(r.conditions)) {
             r.windMph = 20;
             r.windFromDeg = w != null && w.hasWind() ? w.windFromDeg : 0;
             r.windNote = "preset 20 mph" + (w != null && w.hasWind() ? ", from the direction " + w.station + " reads" : ", from the north");
@@ -841,19 +883,24 @@ public final class FireModel {
             return;
         }
         final long t0 = System.currentTimeMillis();
+        final boolean useField = r.windField != null && r.weather != null && "HRRR".equals(r.weather.source)
+                && !COND_DRY_WINDY.equals(r.conditions);
         final Spread.Behavior behavior = new Spread.Behavior() {
                     @Override
-                    public double[] run(int fuelModel, double slopeDeg, double aspectDeg) {
+                    public double[] run(int fuelModel, double slopeDeg, double aspectDeg, double windMph, double windFrom) {
                         final double cover = r.site.coverPct;
+                        final boolean own = Double.isNaN(windMph);
+                        final double mph = own ? r.windMph : windMph, from = own ? r.windFromDeg : windFrom;
+                        final boolean tenM = own ? r.tenMeterWind : true;
                         final Behave.Result b = Behave.surface(fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
-                                r.windMph, r.tenMeterWind, r.windFromDeg, slopeDeg, aspectDeg,
+                                mph, tenM, from, slopeDeg, aspectDeg,
                                 cover, r.canopyHeightFt, r.crownRatio);
                         if (b == null)
                             return null;
                         // Embers from this kind of cell: Albini's surface-fire reach at the
-                        // run's 20 ft wind (a 10 m wind scaled down to 20 ft), over open ground
+                        // 20 ft wind (a 10 m wind scaled down to 20 ft), over open ground
                         // or the canopy here.
-                        final double wind20 = r.tenMeterWind ? r.windMph * 0.87d : r.windMph;
+                        final double wind20 = tenM ? mph * 0.87d : mph;
                         final double spotM = Behave.spotDistanceM(b.flameLengthFt, wind20, r.canopyHeightFt);
                         return new double[] { b.rosFtPerMin, b.headingDeg, b.aFtPerMin, b.bFtPerMin, b.cFtPerMin, b.flameLengthFt, spotM };
                     }
@@ -869,7 +916,7 @@ public final class FireModel {
             final double elapsedMin = (r.ranAt - r.startedAt) / 60000d;
             final double observedAcres = Spread.ringAcres(r.perimeter);
             if (elapsedMin >= 5 && observedAcres > 0.1) {
-                final Spread.Result trial = Spread.run(land, r.lat, r.lon, r.halfKm, elapsedMin, behavior);
+                final Spread.Result trial = Spread.run(land, r.lat, r.lon, r.halfKm, elapsedMin, behavior, null, 1d, null, r.startedAt);
                 final double modeled = trial.acres(elapsedMin);
                 if (modeled > 0.05) {
                     final double raw = Math.sqrt(observedAcres / modeled);
@@ -882,8 +929,14 @@ public final class FireModel {
                 }
             }
         }
+        final Spread.Wind field = !useField ? null : new Spread.Wind() {
+            @Override
+            public double[] at(double lat, double lon, long whenMillis) {
+                return r.windField.at(lat, lon, whenMillis);
+            }
+        };
         final Spread.Result g = Spread.run(land, r.lat, r.lon, r.halfKm, STEPS_MIN[STEPS_MIN.length - 1],
-                behavior, r.perimeter, r.rateScale);
+                behavior, r.perimeter, r.rateScale, field, r.ranAt);
         Log.d(TAG, "ground run: " + g.cellsSeen + " cells reached of " + g.cellsBurnable + " burnable, "
                 + g.fuelsCrossed + " fuels, " + (System.currentTimeMillis() - t0) + " ms");
         if (g.cellsSeen < 2) {
@@ -1284,6 +1337,7 @@ public final class FireModel {
                     .put("startedAt", r.startedAt).put("rateScale", r.rateScale);
             if (r.calibrationNote != null)
                 o.put("calibrationNote", r.calibrationNote);
+
             if (r.perimeter != null) {
                 final org.json.JSONArray pa = new org.json.JSONArray();
                 for (double[] p : r.perimeter)
@@ -1383,6 +1437,7 @@ public final class FireModel {
             r.startedAt = o.optLong("startedAt", 0);
             r.rateScale = o.optDouble("rateScale", 1);
             r.calibrationNote = o.optString("calibrationNote", null);
+
             final org.json.JSONArray pa = o.optJSONArray("perimeter");
             if (pa != null && pa.length() >= 3) {
                 r.perimeter = new double[pa.length()][];
