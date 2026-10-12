@@ -135,17 +135,39 @@ public final class RainGaugesOverlay extends OutlookOverlay {
         }
     }
 
-    /** The state under the map center, or "" at sea or abroad. */
-    private String stateAtCenter() {
+    private static final int MAX_STATES = 4;
+
+    /**
+     * The states under the map: the center first, then the corners of the view, so a
+     * map on a state line draws both sides (operator, 2026-10-12: "we need gauges for
+     * all 50 states"). At most four; "" at sea or abroad. Comma-joined so one string
+     * compares.
+     */
+    private String statesUnderMap() {
         if (states == null)
             states = loadStates();
         if (states == null)
             return "";
+        final List<String> out = new ArrayList<>();
         final GeoPoint c = mapView.getCenterPoint().get();
-        if (c == null || !c.isValid())
-            return "";
-        final String s = states.at(c.getLatitude(), c.getLongitude());
-        return s == null ? "" : s;
+        if (c != null && c.isValid()) {
+            final String s = states.at(c.getLatitude(), c.getLongitude());
+            if (s != null && !s.isEmpty())
+                out.add(s);
+        }
+        final double[] x = extent();
+        if (x != null && x[2] - x[0] <= MAX_SPAN_LON) {
+            final double[][] corners = { { x[3], x[0] }, { x[3], x[2] }, { x[1], x[0] }, { x[1], x[2] } };
+            for (double[] k : corners) {
+                final String s = states.at(k[0], k[1]);
+                if (s != null && !s.isEmpty() && !out.contains(s) && out.size() < MAX_STATES)
+                    out.add(s);
+            }
+        }
+        final StringBuilder b = new StringBuilder();
+        for (String s : out)
+            b.append(b.length() > 0 ? "," : "").append(s);
+        return b.toString();
     }
 
     /** The gauges held, most rain first. Main thread. */
@@ -255,18 +277,20 @@ public final class RainGaugesOverlay extends OutlookOverlay {
         }
         // The volunteers' reports for the state under the map, today's and yesterday's:
         // a report is read around 7 am, so before mid-morning today's file is thin.
-        final String st = stateAtCenter();
+        final String st = statesUnderMap();
         state = st;
         if (!st.isEmpty()) {
             final long now = System.currentTimeMillis();
-            chain.add(CocoRahs.url(st, new Date(now)));
-            chain.add(CocoRahs.url(st, new Date(now - 24L * 60 * 60 * 1000)));
+            for (String one : st.split(",")) {
+                chain.add(CocoRahs.url(one, new Date(now)));
+                chain.add(CocoRahs.url(one, new Date(now - 24L * 60 * 60 * 1000)));
+            }
         }
     }
 
-    /** Whether the map center has moved into another state since the last ask. */
+    /** Whether the map has moved over another set of states since the last ask. */
     private boolean stateChanged() {
-        final String st = stateAtCenter();
+        final String st = statesUnderMap();
         return !st.isEmpty() && !st.equals(state);
     }
 
@@ -450,14 +474,15 @@ public final class RainGaugesOverlay extends OutlookOverlay {
         final int fromReport = reportGauges.size();
         final StringBuilder b = new StringBuilder();
         if (volunteers > 0) {
-            b.append(volunteers).append(" CoCoRaHS volunteer gauges in ").append(state)
-                    .append(", 24 h to about 7 am, cyan-ringed.");
+            b.append(volunteers).append(" CoCoRaHS volunteer gauges in ")
+                    .append(state.replace(",", " and ")).append(", 24 h to about 7 am, cyan-ringed.");
             if (wettest != null && wettest.inches > 0.004)
                 b.append(" Most: ").append(inches(wettest.inches)).append(" at ")
                         .append(wettest.name).append('.');
             b.append(' ');
         } else if (!state.isEmpty())
-            b.append("No CoCoRaHS volunteer reports in ").append(state).append(" today or yesterday. ");
+            b.append("No CoCoRaHS volunteer reports in ").append(state.replace(",", " or "))
+                    .append(" today or yesterday. ");
         if (zoomedOut)
             b.append("Zoom in for the USGS gauges.");
         else if (n == 0)
