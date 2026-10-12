@@ -1798,10 +1798,13 @@ public final class CamDepotPane implements CameraStore.Listener {
             }
         }
 
-        // Looking At: three groups, one rule. Everything the filters above kept is
-        // now judged against the point. A camera that sees it, a PTZ in range that
+        // Looking At: three groups in the LIST. Everything the filters above kept
+        // is judged against the point: a camera that sees it, a PTZ in range that
         // could be turned to it, a camera in range that reports no bearing; the
-        // rest are dropped, from the list and from the map alike.
+        // rest leave the list. The MAP keeps all of them: the operator wants the
+        // other cameras on the map and the list to say which might be in view
+        // (2026-10-11). `everyone` is what the map draws.
+        final List<Camera> everyone = new ArrayList<>(out);
         lastSees.clear();
         lastPtzCould = 0;
         lastNoBearing = 0;
@@ -1889,14 +1892,14 @@ public final class CamDepotPane implements CameraStore.Listener {
         // chosen when the map was somewhere else. Favorites go in too, or a Go to
         // from the pinned section arrives at empty ground.
         final List<Camera> drawn = new ArrayList<>(favs);
-        drawn.addAll(out);
+        drawn.addAll(everyone);
         layer.show(drawn);
 
         rememberUi();
         updateFoldHeads();
 
         lastFavorites = favs.size();
-        lastMatched = out.size();
+        lastMatched = everyone.size();
         lastTotal = all.size();
         updateStatus();
     }
