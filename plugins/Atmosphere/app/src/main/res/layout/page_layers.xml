@@ -21,13 +21,6 @@
         <!-- ====== LAYERS: overlays on the map, one toggle each, ON green / OFF red
              on a plain TakwerxButton the way Traffic does it. Time-enabled layers
              share the scrubber under the grid. ====== -->
-        <TextView
-            style="@style/TakwerxSectionHeading"
-            android:id="@+id/layers_heading"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/heading_layers" />
-
         <!-- Everything at once. "All off" is the one a crew actually reaches for:
              the map has filled up and they want it back. -->
         <LinearLayout
