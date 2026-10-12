@@ -5859,7 +5859,10 @@ public final class AtmospherePane {
                         final boolean open = p == null || p.getBoolean(groupPref(k), true);
                         if (p != null)
                             p.edit().putBoolean(groupPref(k), !open).apply();
+                        // Put back what the fold hid, then let the switch code decide
+                        // each settings block afresh.
                         applyGroupFolds();
+                        updateLayerControls();
                     }
                 });
             } else if (current != null)
@@ -5893,13 +5896,27 @@ public final class AtmospherePane {
      * group is known at a glance (operator, 2026-10-12: "you sort of know right off
      * the bat if something is on").
      */
+    /** What a fold hid and how it stood, so opening puts back exactly that and no more. */
+    private final java.util.Map<View, Integer> hiddenByFold = new java.util.HashMap<>();
+
     private void applyGroupFolds() {
         final SharedPreferences p = MapCompat.prefs();
         for (java.util.Map.Entry<Integer, TextView> e : groupHeads.entrySet()) {
             final boolean open = p == null || p.getBoolean(groupPref(e.getKey()), true);
             int on = 0;
+            // A layer's settings block is a sibling of its switch row, and the switch
+            // code decides whether it shows: a fold only hides, and an open only puts
+            // back what the fold hid (2026-10-12: every settings block showed with its
+            // layer off, because the open forced every member visible).
             for (View v : groupMembers.get(e.getKey())) {
-                v.setVisibility(open ? View.VISIBLE : View.GONE);
+                if (open) {
+                    final Integer was = hiddenByFold.remove(v);
+                    if (was != null)
+                        v.setVisibility(was);
+                } else if (!hiddenByFold.containsKey(v)) {
+                    hiddenByFold.put(v, v.getVisibility());
+                    v.setVisibility(View.GONE);
+                }
                 on += countOn(v);
             }
             final TextView h = e.getValue();

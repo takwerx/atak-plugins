@@ -22,7 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Earthquakes on the map, the way USGS draws them: a circle sized by magnitude and
- * colored by age, the magnitude in the pill from M2.5 up, and for the largest, the
+ * colored by age, the magnitude in the pill on every one, and for the largest, the
  * ShakeMap's intensity contours with their Roman numerals. The day row picks the
  * feed (past day, week or month); a second row picks the smallest magnitude shown.
  *
@@ -39,7 +39,7 @@ public final class QuakesOverlay extends OutlookOverlay {
     private static final String SHAKING = "Shaking (ShakeMap)";
     private static final int MAX_SHAKEMAPS = 5;
     private static final double SHAKEMAP_MIN_MAG = 4.5;
-    private static final double LABEL_MIN_MAG = 2.5;
+    private static final double LABEL_MIN_MAG = -10;
 
     /** The key. */
     public static final String[][] LEGEND = {
@@ -114,7 +114,7 @@ public final class QuakesOverlay extends OutlookOverlay {
 
     @Override
     public String choiceHeading() {
-        return "Smallest shown";
+        return "Magnitude";
     }
 
     @Override
@@ -253,12 +253,12 @@ public final class QuakesOverlay extends OutlookOverlay {
         }
         final StringBuilder b = new StringBuilder(dayLabel(window)).append(": ");
         if (n == 0)
-            b.append("no quakes").append(floor > 0 ? " at " + Quakes.FLOORS[choice()] : "")
+            b.append("no quakes").append(floor > 0 ? " of " + Quakes.FLOORS[choice()] : "")
                     .append('.');
         else {
             b.append(n).append(n == 1 ? " quake" : " quakes");
             if (floor > 0)
-                b.append(" at ").append(Quakes.FLOORS[choice()]);
+                b.append(" of ").append(Quakes.FLOORS[choice()]);
             if (big > 0 && floor < 4.5)
                 b.append(", ").append(big).append(" at M4.5+");
             b.append('.');
