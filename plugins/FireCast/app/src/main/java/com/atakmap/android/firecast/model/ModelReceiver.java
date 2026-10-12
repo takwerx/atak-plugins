@@ -339,6 +339,17 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         }
         section("What went in", in.toString());
         section("When", FireModel.stamp(r.ranAt) + " run");
+        final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.model_action_row, null);
+        final Button act = row.findViewById(R.id.action);
+        act.setEnabled(!model.isRunning());
+        act.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                model.rerun(r);
+                render();
+            }
+        });
+        body.addView(row);
     }
 
     private static String clock(long t) {

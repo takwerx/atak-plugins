@@ -496,6 +496,14 @@ public final class FireModel {
 
     // ---- the run ------------------------------------------------------------------
 
+    /** Puts the start on an earlier run's point and runs again under today's conditions. */
+    public void rerun(Run r) {
+        if (r == null || running)
+            return;
+        place(new GeoPoint(r.lat, r.lon));
+        run(r.lat, r.lon);
+    }
+
     /** Runs from wherever the start marker is now. */
     public boolean runFromStart() {
         final GeoPoint p = startPoint();
@@ -865,6 +873,12 @@ public final class FireModel {
         runs.remove(r);
         if (last == r)
             last = runs.isEmpty() ? null : runs.get(0);
+        // The start belongs to the next run; with no run left there is nothing to
+        // rerun, so it goes too (operator, 2026-10-12).
+        if (runs.isEmpty()) {
+            removeMarker();
+            prefs.edit().remove(PREF_LAT).remove(PREF_LON).apply();
+        }
         worker.execute(new Runnable() {
             @Override
             public void run() {
