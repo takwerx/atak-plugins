@@ -171,7 +171,9 @@ public final class RainReports {
         System.arraycopy(toks, first, values, 0, nValues);
         int elevation = Integer.MIN_VALUE;
         // With no column header, a trailing whole number after a decimal is the elevation.
-        if (columns == 0 && nValues >= 2 && values[nValues - 1].matches("\\d+")
+        // Six digits at most: an elevation in feet, never a timestamp that happens to
+        // trail a decimal (security review, 2026-10-11: an unguarded parse on main).
+        if (columns == 0 && nValues >= 2 && values[nValues - 1].matches("\\d{1,6}")
                 && values[nValues - 2].contains(".")) {
             elevation = Integer.parseInt(values[nValues - 1]);
             final String[] trimmed = new String[nValues - 1];

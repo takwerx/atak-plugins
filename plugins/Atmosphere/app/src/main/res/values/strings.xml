@@ -216,7 +216,7 @@
     <string name="raingauges_on">Rain Gauges ON</string>
     <string name="raingauges_off">Rain Gauges OFF</string>
     <string name="raingauges_allow_title">Show rain gauges?</string>
-    <string name="raingauges_allow_text">Atmosphere will ask the USGS for its rain gauges around the part of the map you are looking at and the last day of their readings, and draw each with its 24 hour total. The map view is sent, not your position.\n\nServer: waterservices.usgs.gov</string>
+    <string name="raingauges_allow_text">Atmosphere will ask the USGS for its rain gauges around the part of the map you are looking at and the last day of their readings, and draw each with its 24 hour total. The map view is sent, not your position. With NWS as the forecast service, the forecast office\'s own rainfall report is fetched too and its gauges drawn beside them.\n\nServers: waterservices.usgs.gov, api.weather.gov</string>
     <string name="credit_raingauges">Rain gauges from the USGS National Water Information System (%1$s)</string>
     <string name="raingauges_open_list">Open the Rain Gauges page</string>
     <string name="raingauges_gate_text">The USGS gauges are the map layer\'s. Allow it and they list here with their totals.</string>

@@ -40,6 +40,9 @@ public final class DiscussionBlock {
         GeoPoint point();
 
         String pointLabel();
+
+        /** Whether NWS is the picked forecast service: the discussion comes from its host. */
+        boolean nwsPicked();
     }
 
     private final Context pluginContext;
@@ -88,6 +91,13 @@ public final class DiscussionBlock {
     }
 
     public void refresh(boolean force) {
+        if (!host.nwsPicked()) {
+            status.setText("Pick NWS as the forecast service to see the office's discussion.");
+            status.setVisibility(View.VISIBLE);
+            synopsis.setText("");
+            sections.removeAllViews();
+            return;
+        }
         final GeoPoint p = host.point();
         if (p == null)
             return;
@@ -138,7 +148,12 @@ public final class DiscussionBlock {
                     public void onSuccess(String product) {
                         if (mine != generation)
                             return;
-                        discussion = Afd.parse(Cwf.parseText(product));
+                        try {
+                            discussion = Afd.parse(Cwf.parseText(product));
+                        } catch (RuntimeException e) {
+                            status.setText("The discussion could not be read.");
+                            return;
+                        }
                         fetchedAt = System.currentTimeMillis();
                         render();
                     }
