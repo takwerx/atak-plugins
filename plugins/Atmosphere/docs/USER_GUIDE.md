@@ -103,6 +103,13 @@ show** picks the readings. The point is sent rounded to about 100 m.
 
 <img src="screenshots/11_forecast_settings.png" width="420"> <img src="screenshots/14_favorites.png" width="420">
 
+**Synopsis.** Under the days, the forecaster's own words: the Area Forecast
+Discussion for the office covering the point, its Synopsis open, and the other
+sections the office writes (Short Term, Long Term, Discussion, Aviation, Marine,
+Fire Weather) each behind a button that opens it in place. It follows the point
+in the top row, so Map center in another office's area brings that office's
+discussion. The watches and warnings list stays with IPAWS.
+
 ## 4. The layers
 
 The second page lists every layer under a heading for what it is about: **Spot
@@ -144,7 +151,7 @@ opening the plugin.
 | Wind | Rain | The model's rain rate, light to violent, hour by hour for five days with the rate "Here"; a forecast, not radar |
 | Wind | Wind | The forecast wind as moving streaks colored by speed, with a time scrubber, heights to the jet stream, and the wind "Here" |
 | Storms | Storm Reports | Every report the NWS offices logged in the last 24, 48 or 72 hours: tornado, wind, hail, flood, rain, snow and ice, landslide; the type and size in the pill, the remarks behind a tap |
-| Storms | Tornado Paths | The tracks NWS survey teams walked in the last 30 days, 90 days or year, each line in its EF rating's color; length, width, peak wind, injuries, deaths and the survey behind a tap |
+| Storms | Tornado Paths | The tracks NWS survey teams walked in the last 2 days, 7 days, 30 days or year, each line in its EF rating's color with a pill at the touchdown; length, width, peak wind, injuries, deaths and the survey behind a tap |
 | Fire | Fire Weather Outlook | Elevated, critical and extreme areas and dry thunderstorms, Day 1, 2, 3 or all; from Day 3 as a chance of critical |
 | Fire | Fire Weather Zones | The NWS fire weather zones with their numbers, shaded under a Red Flag Warning or a Fire Weather Watch; the zone's planning forecast behind a tap |
 | Fire | SAWTI | The Forest Service's Santa Ana Wildfire Threat Index for four Southern California zones, colored by level for each of four days; the SAWTI page behind a tap |
@@ -156,6 +163,8 @@ opening the plugin.
 | Rain and rivers | Flash Flood Outlook | Excessive rainfall areas for three days, marginal to high |
 | Rain and rivers | River Gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
 | Rain and rivers | Flooded Ground | Where the river model puts water over the banks, now or at the worst of the next 5 days (experimental) |
+| Rain and rivers | Rain Totals | The rain that fell, as a picture: the NWS radar estimate for the last 1 h, 6 h, 24 h or 3 days, the gauge-corrected analysis for 7 days, in the NWS colors, with a transparency slider |
+| Rain and rivers | Rain Gauges | USGS rain gauges around the map with their 24 h totals, and the forecast office's own rainfall report gauges, inches in the pill; the day by the hour and the report's line behind a tap |
 | Rain and rivers | Streams Running High | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
 | Rain and rivers | Debris Flow | The USGS post-fire assessments: every fire of the last three years marked; zoomed in, the perimeter and each stream basin filled Low, Moderate or High for a 15-minute burst of rain, with likelihood and volume behind a tap |
 | Ocean | Buoys | Buoys and coastal stations, readings colored by sea state; tides, currents and the marine forecast behind a tap |
@@ -356,10 +365,20 @@ layer.
 
 <img src="screenshots/97_reports_layer_block.png" width="420">
 
+**The Storm Reports page** lists the same reports, and the tornado paths with
+them: **Nationwide**, **Near** the point in the pane's top row (your position,
+the map center or a picked point), on the **Map** as it sits, re-read whenever
+the map settles, or by **State**; **Newest** or **Closest** first; and a type
+picker of switches, any mix of the eight families and **Tornado**, which covers
+the dots and the paths. What you tick is what the map draws. A row flies the
+map to the report and opens its details in one tap. **Open the list** under the
+layer's switch jumps to the page.
+
 **Tornado Paths** draws the track a survey team walked after a tornado, as a
 line in the Damage Assessment Toolkit's color for its EF rating, from EF0 aqua
-to EF5 purple, EFU grey for a tornado with nothing to rate. The row picks the
-last 30 days, 90 days or year. Tap a line for the rating, the office, when it
+to EF5 purple, EFU grey for a tornado with nothing to rate, with a level pill
+at the touchdown naming the rating and the event. The row picks the last 2
+days, 7 days, 30 days or year. Tap a line for the rating, the office, when it
 was on the ground and for how long, the path's length and width, the peak wind
 the damage implies, injuries and deaths, and the survey team's words. A path
 appears a day or more after the storm, once the office has walked it, and is
@@ -397,7 +416,37 @@ minutes.
 
 <img src="screenshots/100_quakes_layer_block.png" width="420">
 
-## 10. Spot Weather Forecast
+## 10. Rain Totals and Rain Gauges
+
+**Rain Totals** draws the rain that fell as a picture over the map, in the
+NWS's own colors with the key under the switch. The row picks the last 1 h,
+6 h, 24 h or 3 days, which come from the NWS radar estimate at 1 km, updated
+every hour, so a storm that just ended is there at once; or 7 days, from the
+River Forecast Centers' analysis of radar corrected by the rain gauges, the
+better total once the center has produced it (grey is where it has not). The
+radar estimate is good at where it rained and the shape of the storm and fair
+on how much: in the mountains it reads low, in a downpour high. Use it for
+where it poured and a gauge for how much. The **Transparency** slider lets the
+map show through. Lower 48 only.
+
+**Rain Gauges** draws the USGS rain gauges around the map, a dot in the color of
+its last 24 hours with the inches in the pill, and, once the Rain Gauges page
+has fetched the forecast office's own rainfall report, that report's gauges
+too, dark-ringed. Tap one for the day by the hour, or the report's line. The
+map's extent is sent, not your position; the gauges are asked for again when
+the map settles outside what was asked.
+
+**The Rain Gauges page** shows the forecast office's rainfall report for the
+point in the pane's top row: the gauges the office lists, with their inches for
+the period the office names (during a storm a day or two; the line under the
+office says which), **Most rain first** or **Closest** to your point, with the
+miles on each row, the gauges the report gives no location for under their
+own heading, and the whole report as the office wrote it behind a button.
+Under it, the USGS gauges around the map with Go to. Thirty-three offices
+publish such a report, Los Angeles and San Diego among them; the page says so
+when the office here does not. It needs NWS as the forecast service.
+
+## 11. Spot Weather Forecast
 
 The layer draws every spot forecast request the National Weather Service has
 open, with the forecast the office wrote for each. The page lists them — All,
@@ -423,13 +472,13 @@ first; you see what came back before it is used.
 
 <img src="screenshots/61_spot_request.png" width="420"> <img src="screenshots/64_address_match.png" width="420">
 
-## 11. The user manual
+## 12. The user manual
 
 The manual is inside the plugin. Open ATAK's **Settings**, then **Tool
 Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
 **Atmosphere user manual**.
 
-## 12. What it does not do
+## 13. What it does not do
 
 - It draws no warnings, watches or advisories, except Red Flag Warnings and
   Fire Weather Watches on its fire weather zones. IPAWS Alerts does the rest.
@@ -447,5 +496,7 @@ Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
   when it is set to My position, rounded to about 100 m, and for the station,
   gauge and buoy lists when they are set to My position. The Fire Weather Zones
   page finds your zone by sending the half-degree square the point is in, about
-  30 miles across, never the point. Debris Flow sends the area the map shows,
-  padded, when it is zoomed in enough to draw basins.
+  30 miles across, never the point. Debris Flow, Rain Totals and Rain Gauges
+  send the area the map shows, padded. The office's rainfall report and the
+  synopsis find the office by the same half-degree square, and only while NWS
+  is the forecast service.

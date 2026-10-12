@@ -148,6 +148,19 @@ away again, and it stays the way you left it.
 ]
 
 #tak-slide[
+= The forecaster's synopsis
+
+Under the days, the forecaster's own words: the Area Forecast Discussion for
+the office covering the point, its *Synopsis* open and the other sections
+the office writes (Short Term, Long Term, Discussion, Aviation, Marine, Fire
+Weather) each behind a button that opens it in place.
+
+It follows the point in the top row: Map center in another office's area
+brings that office's discussion. The watches and warnings list stays with
+IPAWS. It needs NWS as the forecast service.
+]
+
+#tak-slide[
 = Forecast settings and favorites
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
@@ -318,6 +331,20 @@ it is a direction.
 ]
 
 #tak-slide[
+= The Storm Reports page
+
+The *Storm Reports* page lists the reports and the tornado paths together:
+*Nationwide*, *Near* the point in the pane's top row, on the *Map* as it sits
+(read again whenever the map settles), or by *State*; *Newest* or *Closest*
+first; and a picker of switches for any mix of the eight families and
+*Tornado*, which covers the dots and the paths. What you tick is what the map
+draws.
+
+A row flies the map to the report and opens its details in one tap. *Open
+the list* under the layer's switch jumps here.
+]
+
+#tak-slide[
 = Tornado Paths
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
@@ -325,8 +352,8 @@ it is a direction.
 ][
   *Tornado Paths* draws the track a survey team walked after a tornado, as a
   line in the Damage Assessment Toolkit's color for its EF rating, EF0 aqua to
-  EF5 purple, EFU grey for a tornado with nothing to rate. The row picks the
-  last 30 days, 90 days or year.
+  EF5 purple, EFU grey for a tornado with nothing to rate, with a level pill at
+  the touchdown. The row picks the last 2 days, 7 days, 30 days or year.
 
   Tap a line for the rating, the office, when it was on the ground and for
   how long, the path's length and width, the peak wind the damage implies,
@@ -590,6 +617,37 @@ numbers only.
   off faster than the ground and streams can take it, marginal, slight,
   moderate or high. One day at a time, or all three.
 ]
+]
+
+#tak-slide[
+= Rain Totals
+
+*Rain Totals* draws the rain that fell as a picture, in the NWS's own colors
+with the key under the switch. The row picks the last 1 h, 6 h, 24 h or 3
+days, from the NWS radar estimate at 1 km, updated every hour; or 7 days,
+from the River Forecast Centers' analysis of radar corrected by the gauges,
+the better total once the center has produced it (grey is where it has not).
+
+The radar estimate is good at where it rained and fair on how much: low in
+the mountains, high in a downpour. Use it for where it poured and a gauge
+for how much. The *Transparency* slider lets the map show through. Lower 48
+only.
+]
+
+#tak-slide[
+= Rain Gauges
+
+*Rain Gauges* draws the USGS rain gauges around the map, a dot in the color
+of its last 24 hours with the inches in the pill, and the forecast office's
+own report gauges beside them, dark-ringed. Tap one for the day by the hour,
+or the report's line. The map's extent is sent, never your position.
+
+The *Rain Gauges* page shows the office's rainfall report for the point in
+the top row: its gauges with their inches for the period the office names,
+*Most rain first* or *Closest* with the miles on each row, and the report
+as written behind a button; under it the USGS gauges with Go to.
+Thirty-three offices publish such a report; the page says so when the one
+here does not. It needs NWS as the forecast service.
 ]
 
 #tak-slide[
@@ -960,8 +1018,10 @@ Only what you ask for:
 - *SAWTI* and *PSPS* send nothing about where you are: each asks for its whole
   set, and the SAWTI page finds your zone on this device. So do *Storm
   Reports*, *Tornado Paths* and *Earthquakes*, which are whole national or
-  worldwide files; *Debris Flow* sends the area the map shows, padded, once it
-  is zoomed in enough to draw basins.
+  worldwide files; *Debris Flow*, *Rain Totals* and *Rain Gauges* send the
+  area the map shows, padded. The office's rainfall report and the synopsis
+  find the office by the half-degree square the point is in, and only while
+  NWS is the forecast service.
 - An *address* you type goes to the US Census Bureau, and to ATAK's own
   address finder if the Census has no answer.
 - Every request carries the plugin's name and version, which public services
