@@ -159,12 +159,6 @@
                     android:gravity="center_vertical|left"
                     android:textSize="13sp" />
 
-                <TextView
-                    style="@style/TakwerxSectionHeading"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/heading_legend" />
 
                 <!-- NWS's legend, built in code so the discs are the same art the
                      map is drawing. -->
@@ -421,12 +415,6 @@
                         android:orientation="vertical"
                         android:visibility="gone" />
 
-                    <TextView
-                        style="@style/TakwerxSectionHeading"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/heading_legend" />
 
                     <LinearLayout
                         android:id="@+id/stations_legend"
@@ -2083,12 +2071,6 @@
                         android:gravity="center_vertical|left"
                         android:textSize="13sp" />
 
-                    <TextView
-                        style="@style/TakwerxSectionHeading"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/heading_legend" />
 
                     <!-- water.noaa.gov's legend, built in code so the swatches are the
                          same colors the map is drawing. -->
@@ -2518,12 +2500,6 @@
                         android:gravity="center_vertical|left"
                         android:textSize="13sp" />
 
-                    <TextView
-                        style="@style/TakwerxSectionHeading"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/heading_legend" />
 
                     <!-- What the three colors mean, built in code. -->
                     <LinearLayout
