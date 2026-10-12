@@ -284,6 +284,7 @@ public final class CameraLayer {
         main.removeCallbacks(gateTick);
         main.removeCallbacks(addTick);
         main.removeCallbacks(removeTick);
+        listenForDrag(false);
         mapView.removeOnMapMovedListener(moved);
         mapView.getMapEventDispatcher().removeMapEventListener(
                 com.atakmap.android.maps.MapEvent.ITEM_CLICK, itemClick);
@@ -1602,6 +1603,59 @@ public final class CameraLayer {
     // ---- the Look At point ---------------------------------------------
 
     private Marker lookAtMarker;
+
+    /** Told where the Suggest marker was dropped after a drag. */
+    public interface OnLookAtMoved {
+        void onLookAtMoved(GeoPoint p);
+    }
+
+    private OnLookAtMoved onLookAtMoved;
+
+    public void setOnLookAtMoved(OnLookAtMoved l) {
+        this.onLookAtMoved = l;
+    }
+
+    /**
+     * Press the Suggest marker and drag it; the suggestion recomputes where it
+     * lands (operator, 2026-10-11). ATAK's touch controller turns a press and
+     * scroll on an item with {@code drag} set into ITEM_DRAG_* events; this
+     * moves the marker along and reports the drop. The listener is on the
+     * dispatcher only while the marker exists.
+     */
+    private final com.atakmap.android.maps.MapEventDispatcher.MapEventDispatchListener
+            lookAtDrag = new com.atakmap.android.maps.MapEventDispatcher
+                    .MapEventDispatchListener() {
+        @Override
+        public void onMapEvent(com.atakmap.android.maps.MapEvent event) {
+            final Marker m = lookAtMarker;
+            if (m == null || event.getItem() != m)
+                return;
+            final android.graphics.PointF pf = event.getPointF();
+            if (pf == null)
+                return;
+            final GeoPoint gp = mapView.inverseWithElevation(pf.x, pf.y).get();
+            if (gp == null)
+                return;
+            m.setPoint(gp);
+            if (com.atakmap.android.maps.MapEvent.ITEM_DRAG_DROPPED
+                    .equals(event.getType()) && onLookAtMoved != null)
+                onLookAtMoved.onLookAtMoved(gp);
+        }
+    };
+
+    private void listenForDrag(boolean on) {
+        final com.atakmap.android.maps.MapEventDispatcher d =
+                mapView.getMapEventDispatcher();
+        for (String t : new String[] {
+                com.atakmap.android.maps.MapEvent.ITEM_DRAG_STARTED,
+                com.atakmap.android.maps.MapEvent.ITEM_DRAG_CONTINUED,
+                com.atakmap.android.maps.MapEvent.ITEM_DRAG_DROPPED }) {
+            if (on)
+                d.addMapEventListener(t, lookAtDrag);
+            else
+                d.removeMapEventListener(t, lookAtDrag);
+        }
+    }
     private static final int HALO_COLOR = 0xFF00E5FF;
 
     /**
@@ -1624,6 +1678,7 @@ public final class CameraLayer {
                 m.setMetaBoolean("removable", false);
                 m.setMetaBoolean("movable", false);
                 m.setMetaBoolean("editable", false);
+                m.setMetaBoolean("drag", true);     // press and drag moves it
                 m.setMetaInteger("color", HALO_COLOR);
                 // Or ATAK's icon adapter swaps in its own glyph for the type and
                 // the composed one never shows: a tiny tinted crosshair was what
@@ -1648,6 +1703,7 @@ public final class CameraLayer {
                 m.setZOrder(-1000);
                 lookAtMarker = m;
                 group.addItem(m);
+                listenForDrag(true);
             } else {
                 lookAtMarker.setPoint(p);
                 if (lookAtMarker.getGroup() == null)
@@ -1663,6 +1719,7 @@ public final class CameraLayer {
         if (lookAtMarker == null)
             return;
         try {
+            listenForDrag(false);
             if (lookAtMarker.getGroup() != null)
                 group.removeItem(lookAtMarker);
         } catch (LinkageError | RuntimeException e) {

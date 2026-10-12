@@ -625,6 +625,20 @@ public final class CamDepotPane implements CameraStore.Listener {
             }
         });
 
+        // The Suggest marker dragged to a new spot: the suggestion follows it.
+        layer.setOnLookAtMoved(new CameraLayer.OnLookAtMoved() {
+            @Override
+            public void onLookAtMoved(final GeoPoint p) {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (lookAt != null)
+                            moveSuggestion(p);
+                    }
+                });
+            }
+        });
+
         // Tapping a stills camera on the map opens the same picture the panel shows.
         layer.setOnStillTapped(new CameraLayer.OnStillTapped() {
             @Override
@@ -1969,6 +1983,34 @@ public final class CamDepotPane implements CameraStore.Listener {
                 n, n == 1 ? "" : "s", on ? "ON" : "OFF"));
         lookAtBearingsButton.setTextColor(pluginContext.getResources().getColor(
                 on ? R.color.state_on : R.color.state_off));
+    }
+
+    /**
+     * The point moved: recompute, and if the bearing lines were on, move them
+     * too, off the cameras that no longer suggest and on to the ones that now
+     * do (operator, 2026-10-11). Lines the operator turned on by hand on other
+     * cameras are left alone.
+     */
+    private void moveSuggestion(GeoPoint p) {
+        final boolean wasOn = lookAtBearingsOn();
+        final List<Camera> before = new ArrayList<>(lastSees);
+        lookAt = p;
+        layer.showLookAtMarker(p);
+        apply();
+        if (!wasOn)
+            return;
+        final java.util.Set<String> now = new java.util.HashSet<>();
+        for (Camera c : lastSees)
+            now.add(c.id);
+        for (Camera c : before) {
+            if (!now.contains(c.id))
+                layer.hideFov(c.id);
+        }
+        for (Camera c : new ArrayList<>(lastSees))
+            layer.showFov(c);
+        updateBearingsOffButton();
+        updateLookAtControls();
+        rememberUi();
     }
 
     /** True when every camera that sees the point has its line on. */
