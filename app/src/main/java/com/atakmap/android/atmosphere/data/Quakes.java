@@ -26,15 +26,17 @@ public final class Quakes {
     public static String url(int window) {
         switch (window) {
             case 1:
+                return FEEDS + "all_hour.geojson";
+            case 2:
                 return FEEDS + "all_day.geojson";
-            case 3:
+            case 4:
                 return FEEDS + "2.5_month.geojson";
             default:
                 return FEEDS + "all_week.geojson";
         }
     }
 
-    public static final String[] WINDOWS = { "Past day", "Past week", "Past month" };
+    public static final String[] WINDOWS = { "Past hour", "Past day", "Past week", "Past month" };
     public static final String[] FLOORS = { "All", "M1+", "M2.5+", "M4.5+" };
     public static final double[] FLOOR_MAG = { -10d, 1d, 2.5d, 4.5d };
 

@@ -859,7 +859,7 @@ classes, lower 48 only.
   *Earthquakes* draws the USGS feed the way USGS's own map does: a circle
   sized by magnitude, colored by age (past hour red, past day orange, past
   week yellow, older white), the magnitude in the pill on every one. The first
-  row picks the past day, week or month (the month feed carries M2.5 and up
+  row picks the past hour, day, week or month (the month feed carries M2.5 and up
   only); *Magnitude* picks All, M1+, M2.5+ or M4.5+.
 
   For up to five of the largest quakes of M4.5 or more, the ShakeMap's

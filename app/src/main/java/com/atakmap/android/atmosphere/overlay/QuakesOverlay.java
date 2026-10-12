@@ -79,7 +79,7 @@ public final class QuakesOverlay extends OutlookOverlay {
 
     @Override
     protected boolean large(int index) {
-        return index == 0 && window != 1;
+        return index == 0 && window >= 3;
     }
 
     @Override
@@ -89,7 +89,12 @@ public final class QuakesOverlay extends OutlookOverlay {
 
     @Override
     protected int defaultDay() {
-        return 2;
+        return 3;
+    }
+
+    @Override
+    public int days() {
+        return 4;
     }
 
     @Override
@@ -99,7 +104,7 @@ public final class QuakesOverlay extends OutlookOverlay {
 
     @Override
     public String dayLabel(int day) {
-        return Quakes.WINDOWS[Math.max(1, Math.min(3, day)) - 1];
+        return Quakes.WINDOWS[Math.max(1, Math.min(4, day)) - 1];
     }
 
     @Override
@@ -269,7 +274,7 @@ public final class QuakesOverlay extends OutlookOverlay {
             if (maps > 0)
                 b.append(" Shaking drawn for the largest.");
         }
-        if (window == 3)
+        if (window == 4)
             b.append("\nThe month feed carries M2.5 and up only.");
         b.append("\nFrom USGS, worldwide; times are this phone's.");
         return b.toString();
