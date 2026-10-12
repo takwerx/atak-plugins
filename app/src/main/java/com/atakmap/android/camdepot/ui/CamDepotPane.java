@@ -141,7 +141,7 @@ public final class CamDepotPane implements CameraStore.Listener {
     private final View settings;
     /** The Settings page itself, shown in the list's place while it is open. */
     private final View settingsPage;
-    private Fold whereFold, showFold, distanceFold, reachFold, gateFold, catalogFold;
+    private Fold whereFold, showFold, distanceFold, reachFold, gateFold;
 
     /**
      * One Settings row: a head naming the setting and its value, an arrow, a body
@@ -481,10 +481,6 @@ public final class CamDepotPane implements CameraStore.Listener {
                 R.id.fold_reach_body, "camdepot.fold.reach");
         gateFold = new Fold(settings, R.id.fold_gate_head, R.id.fold_gate_chev,
                 R.id.fold_gate_body, "camdepot.fold.gate");
-        catalogFold = new Fold(settings, R.id.fold_catalog_head,
-                R.id.fold_catalog_chev, R.id.fold_catalog_body,
-                "camdepot.fold.catalog");
-        catalogFold.label("Catalog", null);
         find(R.id.btn_settings).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

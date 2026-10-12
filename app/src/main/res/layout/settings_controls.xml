@@ -321,53 +321,16 @@
         </LinearLayout>
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/fold_catalog_row"
+    <!-- One plain button, last. Re-reads the camera list from the server and
+         reloads the state; the shards are cached hard, so a list that changed
+         under a running plugin is only seen this way. Was a "Catalog" row with
+         Sync inside; the operator wanted one button (2026-10-11). -->
+    <Button
+        style="@style/TakwerxButton"
+        android:id="@+id/resync"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="6dp">
-
-        <Button
-            android:id="@+id/fold_catalog_head"
-            style="@style/TakwerxButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content" />
-
-        <ImageButton
-            android:id="@+id/fold_catalog_chev"
-            style="@style/TakwerxIconButton"
-            android:layout_width="44dp"
-            android:layout_weight="0"
-            android:layout_marginRight="0dp"
-            android:contentDescription="@string/show_settings"
-            android:src="@drawable/ic_expand" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/fold_catalog_body"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="4dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:text="Re-reads the catalog from the server and reloads the state. The shards are cached hard, so a catalog that changed under a running plugin is only seen this way." />
-
-        <!-- Was beside Favorites on the main screen; it is a once-in-a-while action. -->
-        <Button
-            style="@style/TakwerxButton"
-            android:id="@+id/resync"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Sync now" />
-    </LinearLayout>
+        android:layout_marginTop="12dp"
+        android:text="Sync Cameras" />
 
 </LinearLayout>
