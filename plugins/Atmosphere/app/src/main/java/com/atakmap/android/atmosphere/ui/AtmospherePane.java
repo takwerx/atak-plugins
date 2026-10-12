@@ -3845,7 +3845,7 @@ public final class AtmospherePane {
                 // The utility stations are counted apart, and said to be hidden when
                 // the zoom hides them: a count the map does not show reads as a fault.
                 if (stationsStatus != null)
-                    stationsStatus.setText(total == 0 ? ""
+                    stationsStatus.setText(total == 0 ? noStationsText()
                             : drawn + " stations, " + critical + " at criteria"
                                     + (utility == 0 ? "" : "\n" + utility
                                             + " utility stations, " + utilityCritical
@@ -3856,6 +3856,23 @@ public final class AtmospherePane {
                 if (stationPage != null)
                     stationPage.refresh();
                 updateLayerControls();
+            }
+
+            /**
+             * Nothing within the radius, said with the point it was measured from: a
+             * phone with no fix keeps a stale self position, and "0 stations" alone
+             * read as a broken layer (operator, 2026-10-12: "why aren't weather
+             * stations turning on").
+             */
+            private String noStationsText() {
+                final GeoPoint o = stationLayer.originPoint();
+                final String where = o == null ? "" : String.format(Locale.US, " (%.2f, %.2f)",
+                        o.getLatitude(), o.getLongitude());
+                if (stationLayer.fromMe())
+                    return "No stations within " + stationLayer.miles() + " mi of your position"
+                            + where + ". No GPS fix here? Pick Map center.";
+                return "No stations within " + stationLayer.miles() + " mi of the map center"
+                        + where + ".";
             }
 
             @Override

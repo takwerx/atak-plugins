@@ -852,6 +852,11 @@ public final class StationOverlay {
     }
 
     /** How far out stations are asked for, in miles. */
+    /** Whether the radius is measured from the operator rather than the map. */
+    public boolean fromMe() {
+        return fromMe;
+    }
+
     public int miles() {
         return miles;
     }
