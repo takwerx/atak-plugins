@@ -32,16 +32,19 @@ public final class Spread {
         /** The ellipse's eccentricity, 0 round to just under 1 a needle. */
         final double ecc;
         final double flameFt;
+        /** How far embers from this cell's fire can carry, meters (Albini); 0 for none. */
+        final double spotM;
 
-        Cell(double rate, double headingDeg, double ecc, double flameFt) {
+        Cell(double rate, double headingDeg, double ecc, double flameFt, double spotM) {
             this.rate = rate;
             this.headingDeg = headingDeg;
             this.ecc = ecc;
             this.flameFt = flameFt;
+            this.spotM = spotM;
         }
     }
 
-    private static final Cell BARRIER = new Cell(0, 0, 0, 0);
+    private static final Cell BARRIER = new Cell(0, 0, 0, 0, 0);
     private static final int[][] MOVES = {
             { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 },
             { 2, 1 }, { 2, -1 }, { -2, 1 }, { -2, -1 }, { 1, 2 }, { 1, -2 }, { -1, 2 }, { -1, -2 } };
@@ -58,6 +61,9 @@ public final class Spread {
         /** Peak flame length among cells reached, feet, by step. */
         public final double[] peakFlameFt;
         public final int cellsSeen, cellsBurnable;
+        /** The longest ember carry any reached cell had, meters, and how many times the fire crossed a wall that way. */
+        public double maxSpotM;
+        public int spotCrossings;
         /** How many different fuel models the fire crossed. */
         public final int fuelsCrossed;
         /** Where the run began when the start itself did not burn: meters and bearing from the start; 0 when it began there. */
@@ -132,7 +138,7 @@ public final class Spread {
 
     /** What a cell's behavior is asked with: the run's weather and moistures. */
     public interface Behavior {
-        /** @return [head rate ft/min, heading deg, A ft/min, B ft/min, C ft/min, flame ft], or null for no spread */
+        /** @return [head rate ft/min, heading deg, A ft/min, B ft/min, C ft/min, flame ft, spot distance m], or null for no spread */
         double[] run(int fuelModel, double slopeDeg, double aspectDeg);
     }
 
@@ -183,7 +189,7 @@ public final class Spread {
                     else {
                         final double b = r[3], cc = r[4];
                         final double ecc = b > 0 ? Math.max(0, Math.min(0.98, cc / b)) : 0;
-                        c = new Cell(r[0] * 0.3048d, r[1], ecc, r[5]);
+                        c = new Cell(r[0] * 0.3048d, r[1], ecc, r[5], r.length > 6 ? r[6] : 0);
                     }
                     byKind.put(key, c);
                 }
@@ -233,7 +239,8 @@ public final class Spread {
             if (arrival[i] == 0)
                 q.add(new long[] { Double.doubleToLongBits(0), i });
         final boolean[] done = new boolean[nx * ny];
-        int seen = 0;
+        int seen = 0, spotCrossings = 0;
+        double maxSpot = 0;
         final double[] moveLen = new double[MOVES.length], moveBearing = new double[MOVES.length];
         for (int m = 0; m < MOVES.length; m++) {
             moveLen[m] = Math.sqrt(MOVES[m][0] * MOVES[m][0] + MOVES[m][1] * MOVES[m][1]) * cell;
@@ -249,6 +256,8 @@ public final class Spread {
             seen++;
             if (t > maxMin)
                 break;
+            if (cells[i].spotM > maxSpot)
+                maxSpot = cells[i].spotM;
             final int x = i % nx, y = i / nx;
             final Cell from = cells[i];
             for (int m = 0; m < MOVES.length; m++) {
@@ -259,8 +268,43 @@ public final class Spread {
                 if (done[j])
                     continue;
                 final Cell to = cells[j];
-                if (to == BARRIER)
+                if (to == BARRIER) {
+                    // Spotting: within 45 degrees of the head, embers carry across a wall
+                    // (a freeway, a commercial block) narrower than the spot distance and
+                    // light the first fuel beyond it. One ember flight, at the head's pace.
+                    if (from.spotM <= 0 || m >= 8)
+                        continue;
+                    final double off = Math.abs(((moveBearing[m] - from.headingDeg) % 360 + 540) % 360 - 180);
+                    if (off > 45)
+                        continue;
+                    final int maxSteps = (int) Math.floor(from.spotM / moveLen[m]);
+                    int sx = nx2, sy = ny2, steps = 1;
+                    int landing = -1;
+                    while (steps < maxSteps) {
+                        sx += MOVES[m][0];
+                        sy += MOVES[m][1];
+                        steps++;
+                        if (sx < 0 || sy < 0 || sx >= nx || sy >= ny)
+                            break;
+                        final int k = sy * nx + sx;
+                        if (cells[k] != BARRIER) {
+                            landing = k;
+                            break;
+                        }
+                    }
+                    if (landing < 0 || done[landing])
+                        continue;
+                    final double rHead = rateToward(from, from.headingDeg);
+                    if (rHead <= 0)
+                        continue;
+                    final double nt = t + steps * moveLen[m] / rHead;
+                    if (nt < arrival[landing]) {
+                        arrival[landing] = (float) nt;
+                        q.add(new long[] { Double.doubleToLongBits(nt), landing });
+                        spotCrossings++;
+                    }
                     continue;
+                }
                 final double rFrom = rateToward(from, moveBearing[m]), rTo = rateToward(to, moveBearing[m]);
                 if (rFrom <= 0 && rTo <= 0)
                     continue;
@@ -275,6 +319,8 @@ public final class Spread {
         final Result res = new Result(nx, ny, cell, lat0, lon0, dLat, dLon, arrival, flameByStep(cells, arrival), seen, burnable, fuels.size());
         res.startOffsetM = offsetM;
         res.startOffsetDeg = offsetDeg;
+        res.maxSpotM = maxSpot;
+        res.spotCrossings = spotCrossings;
         return res;
     }
 

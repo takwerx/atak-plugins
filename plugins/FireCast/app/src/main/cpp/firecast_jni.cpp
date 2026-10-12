@@ -3,6 +3,7 @@
 #include <string>
 #include "fuelModels.h"
 #include "surface.h"
+#include "spot.h"
 
 namespace {
 // Fuel model 220, "BU1", burnable urban: Moran, Seielstad and Pietruszka 2025
@@ -83,6 +84,28 @@ Java_com_atakmap_android_firecast_model_Behave_surfaceRun(JNIEnv* env, jclass,
     }
     env->SetDoubleArrayRegion(out, 0, 11, v);
     return out;
+}
+
+// Albini's maximum spotting distance from a wind-driven surface fire, in meters,
+// on mountainous terrain (the larger figure): flame length ft, 20 ft wind mph,
+// downwind cover height ft (0 for open ground). Location: midslope, windward.
+JNIEXPORT jdouble JNICALL
+Java_com_atakmap_android_firecast_model_Behave_spotDistance(JNIEnv*, jclass,
+        jdouble flameLengthFt, jdouble windMph, jdouble coverHeightFt) {
+    try {
+        if (flameLengthFt <= 0 || windMph <= 0)
+            return 0;
+        Spot s;
+        s.updateSpotInputsForSurfaceFire(SpotFireLocation::MIDSLOPE_WINDWARD,
+                0.0, LengthUnits::Miles, 0.0, LengthUnits::Feet,
+                coverHeightFt, LengthUnits::Feet, SpotDownWindCanopyMode::OPEN,
+                windMph, SpeedUnits::MilesPerHour, flameLengthFt, LengthUnits::Feet);
+        s.calculateSpottingDistanceFromSurfaceFire();
+        const double m = s.getMaxMountainousTerrainSpottingDistanceFromSurfaceFire(LengthUnits::Meters);
+        return (m > 0 && m == m) ? m : 0;
+    } catch (...) {
+        return 0;
+    }
 }
 
 JNIEXPORT jstring JNICALL

@@ -100,6 +100,19 @@ public final class Behave {
         return fuelModel > 0 && fuelModel < 256;
     }
 
+    /** Albini's maximum spot distance from a surface fire, meters; 0 with no wind or no flame. */
+    public static double spotDistanceM(double flameLengthFt, double windMph20ft, double coverHeightFt) {
+        if (!load())
+            return 0;
+        try {
+            return spotDistance(flameLengthFt, windMph20ft, coverHeightFt);
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    private static native double spotDistance(double flameLengthFt, double windMph, double coverHeightFt);
+
     private static native double[] surfaceRun(int fuelModel, double m1, double m10, double m100,
             double mHerb, double mWoody, double windMph, int windHeight, double windFrom, double slopeDeg,
             double aspectDeg, double coverPct, double heightFt, double crownRatio);

@@ -255,6 +255,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 }
                 goes.append(".\n");
             }
+            if (r.ground.maxSpotM > 0)
+                goes.append("Embers carry up to ").append(Units.format(r.ground.maxSpotM))
+                        .append(" downwind (Albini); the fire crossed a road or a block that way ")
+                        .append(r.ground.spotCrossings).append(r.ground.spotCrossings == 1 ? " time.\n" : " times.\n");
             if (r.ground.startOffsetM > 0)
                 goes.append("The start itself is on ground LANDFIRE marks as not burnable (a road, a roof, bare ground), so the run began "
                         + "from the nearest fuel, ").append(Units.format(r.ground.startOffsetM)).append(" to the ")
@@ -293,7 +297,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
 
         section("What this does not mean", r.ground != null
                 ? "The fuel and slope are the real ground, cell by cell, but the wind is one reading for the whole "
-                        + "run and the whole hour. No spotting, no crown fire, no suppression. House-to-house spread is an "
+                        + "run and the whole hour. Spotting is the longest ember flight, straight downwind, across walls "
+                        + "narrower than it; no crown fire, no suppression. House-to-house spread is an "
                         + "average over past conflagrations, not this street. Run again as the wind changes."
                 : "One fuel, one slope and one wind for the whole run, read at the start point. Real fire crosses "
                         + "fuel changes, terrain and a wind that shifts; this is the direction and the order of "

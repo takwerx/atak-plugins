@@ -714,7 +714,12 @@ public final class FireModel {
                                 cover, r.canopyHeightFt, r.crownRatio);
                         if (b == null)
                             return null;
-                        return new double[] { b.rosFtPerMin, b.headingDeg, b.aFtPerMin, b.bFtPerMin, b.cFtPerMin, b.flameLengthFt };
+                        // Embers from this kind of cell: Albini's surface-fire reach at the
+                        // run's 20 ft wind (a 10 m wind scaled down to 20 ft), over open ground
+                        // or the canopy here.
+                        final double wind20 = r.tenMeterWind ? r.windMph * 0.87d : r.windMph;
+                        final double spotM = Behave.spotDistanceM(b.flameLengthFt, wind20, r.canopyHeightFt);
+                        return new double[] { b.rosFtPerMin, b.headingDeg, b.aFtPerMin, b.bFtPerMin, b.cFtPerMin, b.flameLengthFt, spotM };
                     }
                 });
         Log.d(TAG, "ground run: " + g.cellsSeen + " cells reached of " + g.cellsBurnable + " burnable, "
