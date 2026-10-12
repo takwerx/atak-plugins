@@ -7739,7 +7739,11 @@ public final class AtmospherePane {
         h.setMaxLines(2);
         h.setHeight(dp(HEADER_DP));
         h.setGravity((legend ? Gravity.START : Gravity.CENTER_HORIZONTAL) | Gravity.BOTTOM);
-        h.setAlpha(0.8f);
+        // The day and hour headers, and the row labels down the left, in the heading
+        // cyan, so the white readings stand off them (operator, 2026-10-11: "the hi lo
+        // min rh on the left etc it should offset the readings").
+        h.setTextColor(0xFF00E5FF);
+        h.setTypeface(Typeface.DEFAULT_BOLD);
         col.addView(h);
         for (String v : values) {
             final TextView t = new TextView(pluginContext);
@@ -7749,7 +7753,7 @@ public final class AtmospherePane {
             t.setHeight(dp(ROW_DP));
             t.setGravity((legend ? Gravity.START : Gravity.CENTER_HORIZONTAL) | Gravity.CENTER_VERTICAL);
             if (legend)
-                t.setAlpha(0.7f);
+                t.setTextColor(0xFF00E5FF);
             else
                 t.setTypeface(VALUE_FACE);
             col.addView(t);
