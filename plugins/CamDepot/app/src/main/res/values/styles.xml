@@ -143,4 +143,30 @@
         <item name="android:ellipsize">end</item>
     </style>
 
+    <!--
+        Section heading, per the plugin-ui rule of 2026-10-11: cyan, bold and full
+        strength, so a section change is seen rather than hunted for. The faint
+        10sp small caps it replaces were easy to scroll straight past.
+    -->
+    <style name="TakwerxPageHeading">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">#00E5FF</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">2dp</item>
+    </style>
+
+    <!-- The square arrow beside a Settings row that opens its controls. -->
+    <style name="TakwerxIconButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_marginLeft">2dp</item>
+        <item name="android:layout_marginRight">2dp</item>
+        <item name="android:background">@drawable/btn_gray</item>
+        <item name="android:scaleType">centerInside</item>
+        <item name="android:padding">9dp</item>
+    </style>
+
 </resources>
