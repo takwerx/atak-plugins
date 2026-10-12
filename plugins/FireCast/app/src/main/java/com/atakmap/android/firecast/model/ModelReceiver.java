@@ -232,14 +232,27 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         }
         final Behave.Result o = r.result;
         final StringBuilder goes = new StringBuilder();
-        goes.append("Head runs toward ").append(Units.compass(o.headingDeg))
-                .append(String.format(Locale.US, " (%.0f°)", o.headingDeg))
-                .append(" at ").append(rate(o.rosFtPerMin)).append(".\n");
-        for (int min : FireModel.STEPS_MIN)
-            goes.append(min).append(" min: ").append(acres(r.acres(min)))
-                    .append(", head ").append(Units.format(r.headM(min)))
-                    .append(" from the start, ").append(Units.format(o.aFtPerMin * min * 2 * 0.3048d)).append(" wide.\n");
-        goes.append("Backing ").append(rate(o.backingFtPerMin)).append(", flanks ").append(rate(o.flankingFtPerMin)).append('.');
+        if (r.ground != null) {
+            for (int min : FireModel.STEPS_MIN)
+                goes.append(min).append(" min: ").append(acres(r.acres(min)))
+                        .append(", farthest ").append(Units.format(r.headM(min)))
+                        .append(" to the ").append(Units.compass(r.headDeg(min))).append(".\n");
+            goes.append(String.format(Locale.US, "Across the ground: %d fuel%s crossed in %d cells of 30 m; roads, water and bare ground stop it. "
+                    + "At the start the head would run toward %s at %s.",
+                    r.ground.fuelsCrossed, r.ground.fuelsCrossed == 1 ? "" : "s", r.ground.cellsSeen,
+                    Units.compass(o.headingDeg), rate(o.rosFtPerMin)));
+        } else {
+            goes.append("Head runs toward ").append(Units.compass(o.headingDeg))
+                    .append(String.format(Locale.US, " (%.0f°)", o.headingDeg))
+                    .append(" at ").append(rate(o.rosFtPerMin)).append(".\n");
+            for (int min : FireModel.STEPS_MIN)
+                goes.append(min).append(" min: ").append(acres(r.acres(min)))
+                        .append(", head ").append(Units.format(r.headM(min)))
+                        .append(" from the start, ").append(Units.format(o.aFtPerMin * min * 2 * 0.3048d)).append(" wide.\n");
+            goes.append("Backing ").append(rate(o.backingFtPerMin)).append(", flanks ").append(rate(o.flankingFtPerMin)).append('.');
+            if (r.groundNote != null)
+                goes.append('\n').append(r.groundNote);
+        }
         section("Where it goes", goes.toString());
 
         final String flame = String.format(Locale.US, "Flame length %s. Fireline intensity %.0f BTU/ft/s.",
@@ -251,8 +264,11 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
 
         inputs(r);
 
-        section("What this does not mean",
-                "One fuel, one slope and one wind for the whole run, read at the start point. Real fire crosses "
+        section("What this does not mean", r.ground != null
+                ? "The fuel and slope are the real ground, cell by cell, but the wind is one reading for the whole "
+                        + "run and the whole hour. No spotting, no crown fire, no suppression. A road stops it here; "
+                        + "a real fire spots across one. Run again as the wind changes."
+                : "One fuel, one slope and one wind for the whole run, read at the start point. Real fire crosses "
                         + "fuel changes, terrain and a wind that shifts; this is the direction and the order of "
                         + "distance, not a perimeter to plan on. No spotting, no crown fire, no barriers. "
                         + "Run again as the wind changes.");

@@ -63,6 +63,8 @@ public final class FireModel {
 
     private static final String TAG = "FireCast";
     public static final int[] STEPS_MIN = { 20, 40, 60 };
+    /** The ground fetched around a start, each way. 4 km holds an hour of anything short of a wind-driven grass run. */
+    static final double HALF_KM = 4;
     private static final double FT_TO_M = 0.3048d;
 
     public interface Listener {
@@ -94,6 +96,12 @@ public final class FireModel {
         public String problem;
         /** The feature set that draws this run, 0 until drawn. */
         public long fsid;
+        /** The run across the ground, or null when it was the one-point ellipse. */
+        public Spread.Result ground;
+        /** Why it was the ellipse, when it was. */
+        public String groundNote;
+        /** The grid's reach each way from the start, km. */
+        public double halfKm = HALF_KM;
         /** On the map, or hidden by its switch. Hidden is not deleted. */
         public boolean visible = true;
 
@@ -110,13 +118,24 @@ public final class FireModel {
             return sb.toString();
         }
 
-        /** Head fire distance at a time, meters. */
+        /** Head fire distance at a time, meters: the farthest cell reached, or the ellipse's head. */
         public double headM(int minutes) {
+            if (ground != null)
+                return ground.reach(minutes)[0];
             return (result.bFtPerMin + result.cFtPerMin) * minutes * FT_TO_M;
         }
 
-        /** The ellipse's area at a time, acres: pi a b with both axes growing with time. */
+        /** Which way the farthest reach is, degrees; the ellipse's heading without a ground run. */
+        public double headDeg(int minutes) {
+            if (ground != null)
+                return ground.reach(minutes)[1];
+            return result.headingDeg;
+        }
+
+        /** Acres at a time: cells reached, or the ellipse's pi a b. */
         public double acres(int minutes) {
+            if (ground != null)
+                return ground.acres(minutes);
             final double a = result.aFtPerMin * minutes, b = result.bFtPerMin * minutes;
             return Math.PI * a * b / 43560d;
         }
@@ -540,6 +559,8 @@ public final class FireModel {
                         Log.w(TAG, "RAWS failed", e);
                     }
                     compute(r);
+                    if (r.problem == null)
+                        acrossTheGround(r);
                 }
                 last = r;
                 status = r.problem != null ? r.problem : "Model on the map";
@@ -629,6 +650,45 @@ public final class FireModel {
         if (Math.abs(d) < 300)
             return "";
         return String.format(Locale.US, ", %,.0f ft %s the start", Math.abs(d), d > 0 ? "above" : "below");
+    }
+
+    /**
+     * The run across the real ground: LANDFIRE's grids around the start, the engine
+     * asked once per kind of cell with the run's wind and moistures, the fire spread
+     * cell by cell. Falls back to the ellipse, and says so, when the ground cannot
+     * be had (no network and nothing on disk). Worker thread.
+     */
+    private void acrossTheGround(final Run r) {
+        final Landscape land;
+        try {
+            land = Landscape.around(r.lat, r.lon, r.halfKm);
+        } catch (Exception e) {
+            Log.w(TAG, "landscape unavailable, ellipse instead: " + e);
+            r.groundNote = "The ground around the start could not be fetched (no network, nothing saved here), "
+                    + "so this is the one-fuel ellipse.";
+            return;
+        }
+        final long t0 = System.currentTimeMillis();
+        final Spread.Result g = Spread.run(land, r.lat, r.lon, r.halfKm, STEPS_MIN[STEPS_MIN.length - 1],
+                new Spread.Behavior() {
+                    @Override
+                    public double[] run(int fuelModel, double slopeDeg, double aspectDeg) {
+                        final double cover = r.site.coverPct;
+                        final Behave.Result b = Behave.surface(fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
+                                r.windMph, r.tenMeterWind, r.windFromDeg, slopeDeg, aspectDeg,
+                                cover, r.canopyHeightFt, r.crownRatio);
+                        if (b == null)
+                            return null;
+                        return new double[] { b.rosFtPerMin, b.headingDeg, b.aFtPerMin, b.bFtPerMin, b.cFtPerMin, b.flameLengthFt };
+                    }
+                });
+        Log.d(TAG, "ground run: " + g.cellsSeen + " cells reached of " + g.cellsBurnable + " burnable, "
+                + g.fuelsCrossed + " fuels, " + (System.currentTimeMillis() - t0) + " ms");
+        if (g.cellsSeen < 2) {
+            r.groundNote = "The ground run did not take: the start sits on ground that does not burn. This is the one-fuel ellipse.";
+            return;
+        }
+        r.ground = g;
     }
 
     /** The one judgment on a run's numbers: no spread is a sentence, not a zero. */
@@ -777,14 +837,20 @@ public final class FireModel {
                 // Largest first so the 20 minute ring draws on top of the 60.
                 final int[] colors = { 0xFFD600, 0xFF8A00, 0xFF2A00 };
                 for (int i = STEPS_MIN.length - 1; i >= 0; i--) {
-                    final Polygon p = ellipse(r, STEPS_MIN[i]);
                     final Style style = new CompositeStyle(new Style[] {
                             new BasicFillStyle((0x30 << 24) | colors[i]),
                             new BasicStrokeStyle(0xFF000000 | colors[i], 3f) });
-                    final AttributeSet a = new AttributeSet();
-                    a.setAttribute("_title", STEPS_MIN[i] + " min");
-                    store.insertFeature(new Feature(fsid, STEPS_MIN[i] + " min", p, style, a,
-                            Feature.AltitudeMode.ClampToGround, 0d));
+                    final List<Polygon> shapes = new ArrayList<>();
+                    if (r.ground != null)
+                        shapes.addAll(r.ground.rings(STEPS_MIN[i]));
+                    else
+                        shapes.add(ellipse(r, STEPS_MIN[i]));
+                    for (Polygon p : shapes) {
+                        final AttributeSet a = new AttributeSet();
+                        a.setAttribute("_title", STEPS_MIN[i] + " min");
+                        store.insertFeature(new Feature(fsid, STEPS_MIN[i] + " min", p, style, a,
+                                Feature.AltitudeMode.ClampToGround, 0d));
+                    }
                 }
             }
         } catch (Exception e) {
@@ -929,7 +995,7 @@ public final class FireModel {
             o.put("windMph", r.windMph).put("windFromDeg", r.windFromDeg).put("windNote", r.windNote)
                     .put("tenMeterWind", r.tenMeterWind).put("moistureNote", r.moistureNote);
             o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions)
-                    .put("visible", r.visible);
+                    .put("visible", r.visible).put("ground", r.ground != null).put("halfKm", r.halfKm);
             if (r.weather != null) {
                 o.put("station", r.weather.station).put("observedAt", r.weather.observedAt)
                         .put("rh", r.weather.relativeHumidity).put("tempF", r.weather.airTempF)
@@ -983,7 +1049,7 @@ public final class FireModel {
     }
 
     /** One saved run back through the library; null when it does not come out. */
-    private static Run fromJson(JSONObject o) {
+    private Run fromJson(JSONObject o) {
         try {
             final Run r = new Run();
             r.lat = o.getDouble("lat");
@@ -1005,12 +1071,17 @@ public final class FireModel {
             r.crownRatio = o.optDouble("crownRatio", 0);
             r.conditions = o.optString("conditions", COND_OBSERVED);
             r.visible = o.optBoolean("visible", true);
+            r.halfKm = o.optDouble("halfKm", HALF_KM);
             r.fuelName = Behave.name(r.site.fuelModel);
             r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
                     r.windMph, r.tenMeterWind, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
                     r.site.coverPct, r.canopyHeightFt, r.crownRatio);
             finish(r);
-            return r.problem != null ? null : r;
+            if (r.problem != null)
+                return null;
+            if (o.optBoolean("ground", false))
+                acrossTheGround(r);   // the grids are on disk, so this needs no network
+            return r;
         } catch (Exception e) {
             Log.w(TAG, "could not read a saved model run", e);
             return null;
