@@ -516,6 +516,26 @@ public final class FireModel {
         worker.execute(new Runnable() {
             @Override
             public void run() {
+                Log.d(TAG, "model run started");
+                try {
+                    runNow(lat, lon);
+                } catch (Throwable t) {
+                    // The executor swallows an uncaught throwable and the flag would
+                    // stay up, so no later run could start (dev 1, 2026-10-11).
+                    Log.e(TAG, "model run died", t);
+                    status = "The run failed: " + t;
+                } finally {
+                    running = false;
+                    changed();
+                }
+            }
+        });
+    }
+
+    /** The run itself, on the worker. */
+    private void runNow(double lat, double lon) {
+        {
+            {
                 final Run r = new Run();
                 r.lat = lat;
                 r.lon = lon;
@@ -583,10 +603,8 @@ public final class FireModel {
                     }
                     save();
                 }
-                running = false;
-                changed();
             }
-        });
+        }
     }
 
     /** Model inputs from the site and the reading, with the assumptions written down. */
@@ -1068,6 +1086,11 @@ public final class FireModel {
         }
     }
 
+    private static void putNumber(JSONObject o, String key, double v) throws Exception {
+        if (!Double.isNaN(v) && !Double.isInfinite(v))
+            o.put(key, v);
+    }
+
     private static JSONObject toJson(Run r) throws Exception {
         {
             final JSONObject o = new JSONObject();
@@ -1091,9 +1114,12 @@ public final class FireModel {
             if (r.structureNote != null)
                 o.put("structureNote", r.structureNote);
             if (r.weather != null) {
-                o.put("station", r.weather.station).put("observedAt", r.weather.observedAt)
-                        .put("rh", r.weather.relativeHumidity).put("tempF", r.weather.airTempF)
-                        .put("gustMph", r.weather.gustMph).put("stationM", r.weather.distanceM);
+                // Android's org.json refuses NaN; a station without a reading has them.
+                o.put("station", r.weather.station).put("observedAt", r.weather.observedAt);
+                putNumber(o, "rh", r.weather.relativeHumidity);
+                putNumber(o, "tempF", r.weather.airTempF);
+                putNumber(o, "gustMph", r.weather.gustMph);
+                putNumber(o, "stationM", r.weather.distanceM);
             }
             return o;
         }
