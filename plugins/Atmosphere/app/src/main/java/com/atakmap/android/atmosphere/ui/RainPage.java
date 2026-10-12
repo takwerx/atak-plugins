@@ -505,8 +505,20 @@ public final class RainPage {
      * office's "top amounts" list) takes the id of the row with the same name below it.
      */
     private double[] place(RainReports.Row r) {
-        final String id = r.id.isEmpty() ? idByName(r.name) : r.id;
+        String id = r.id.isEmpty() ? idByName(r.name) : r.id;
+        if ((id == null || id.isEmpty()) && isRawsRow(r))
+            id = rawsKey(r);
         return id == null || id.isEmpty() ? null : located.get(id);
+    }
+
+    /** A row the office wrote as "... RAWS"; NIFC knows it by that name even with no id. */
+    private static boolean isRawsRow(RainReports.Row r) {
+        return r.name.toUpperCase(Locale.US).trim().endsWith(" RAWS");
+    }
+
+    /** The key a RAWS row with no id is placed under: its name, never sent to NWS. */
+    private static String rawsKey(RainReports.Row r) {
+        return "RAWS:" + r.name.toUpperCase(Locale.US).trim();
     }
 
     private RainReports.Report indexedReport;
@@ -609,10 +621,12 @@ public final class RainPage {
             return;
         final Map<String, String> pending = new LinkedHashMap<>();
         for (RainReports.Section sec : report.sections)
-            for (RainReports.Row r : sec.rows)
-                if (!r.id.isEmpty() && !located.containsKey(r.id) && !unknown.contains(r.id)
-                        && !toLocate.contains(r.id) && !pending.containsKey(r.id))
-                    pending.put(r.id, r.name.toUpperCase(Locale.US).trim());
+            for (RainReports.Row r : sec.rows) {
+                final String key = !r.id.isEmpty() ? r.id : isRawsRow(r) ? rawsKey(r) : "";
+                if (!key.isEmpty() && !located.containsKey(key) && !unknown.contains(key)
+                        && !toLocate.contains(key) && !pending.containsKey(key))
+                    pending.put(key, r.name.toUpperCase(Locale.US).trim());
+            }
         if (pending.isEmpty())
             return;
         batching = true;
@@ -723,6 +737,12 @@ public final class RainPage {
         if (locating || toLocate.isEmpty())
             return;
         final String id = toLocate.poll();
+        if (id.startsWith("RAWS:")) {
+            // A name NIFC did not have: nothing else can place it by name.
+            unknown.add(id);
+            locateNext();
+            return;
+        }
         locating = true;
         lookup(id, id.length() == 3 && !id.matches(".*\\d.*") ? "K" + id : id, true);
     }
