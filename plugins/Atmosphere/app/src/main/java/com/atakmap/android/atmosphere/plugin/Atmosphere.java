@@ -39,6 +39,8 @@ import com.atakmap.android.atmosphere.overlay.StormReportsOverlay;
 import com.atakmap.android.atmosphere.overlay.TornadoPathsOverlay;
 import com.atakmap.android.atmosphere.overlay.DebrisFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.QuakesOverlay;
+import com.atakmap.android.atmosphere.overlay.RainTotalsOverlay;
+import com.atakmap.android.atmosphere.overlay.RainGaugesOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
 import com.atakmap.android.atmosphere.overlay.SmokeOverlay;
@@ -157,6 +159,8 @@ public class Atmosphere implements IPlugin {
     private TornadoPathsOverlay tornado;
     private DebrisFlowOverlay debrisflow;
     private QuakesOverlay quakes;
+    private RainTotalsOverlay raintotals;
+    private RainGaugesOverlay raingauges;
     private FloodOutlookOverlay flood;
     private BeachOverlay beach;
     private HighFlowOverlay highflow;
@@ -345,6 +349,10 @@ public class Atmosphere implements IPlugin {
         debrisflow.start();
         quakes = new QuakesOverlay(mapView, pluginContext, egress);
         quakes.start();
+        raintotals = new RainTotalsOverlay(mapView, egress);
+        raintotals.start();
+        raingauges = new RainGaugesOverlay(mapView, pluginContext, egress);
+        raingauges.start();
         flood = new FloodOutlookOverlay(mapView, pluginContext, egress);
         flood.start();
         beach = new BeachOverlay(mapView, pluginContext, egress);
@@ -459,6 +467,10 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setDebrisFlow(debrisflow);
             if (quakes != null)
                 atmospherePane.setQuakes(quakes);
+            if (raintotals != null)
+                atmospherePane.setRainTotals(raintotals);
+            if (raingauges != null)
+                atmospherePane.setRainGauges(raingauges);
             if (flood != null)
                 atmospherePane.setFlood(flood);
             if (beach != null)
@@ -555,6 +567,14 @@ public class Atmosphere implements IPlugin {
         if (flood != null) {
             flood.stop();
             flood = null;
+        }
+        if (raingauges != null) {
+            raingauges.stop();
+            raingauges = null;
+        }
+        if (raintotals != null) {
+            raintotals.stop();
+            raintotals = null;
         }
         if (quakes != null) {
             quakes.stop();
@@ -688,6 +708,10 @@ public class Atmosphere implements IPlugin {
                 atmospherePane.setDebrisFlow(debrisflow);
             if (quakes != null)
                 atmospherePane.setQuakes(quakes);
+            if (raintotals != null)
+                atmospherePane.setRainTotals(raintotals);
+            if (raingauges != null)
+                atmospherePane.setRainGauges(raingauges);
             if (flood != null)
                 atmospherePane.setFlood(flood);
             if (beach != null)
