@@ -255,6 +255,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 }
                 goes.append(".\n");
             }
+            if (r.ground.startOffsetM > 0)
+                goes.append("The start itself is on ground LANDFIRE marks as not burnable (a road, a roof, bare ground), so the run began "
+                        + "from the nearest fuel, ").append(Units.format(r.ground.startOffsetM)).append(" to the ")
+                        .append(Units.compass(r.ground.startOffsetDeg)).append(".\n");
             if (r.structureNote != null)
                 goes.append(r.structureNote).append('\n');
             else if (r.structures != null)

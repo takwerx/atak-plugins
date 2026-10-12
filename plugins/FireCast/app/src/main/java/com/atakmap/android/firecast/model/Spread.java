@@ -60,6 +60,8 @@ public final class Spread {
         public final int cellsSeen, cellsBurnable;
         /** How many different fuel models the fire crossed. */
         public final int fuelsCrossed;
+        /** Where the run began when the start itself did not burn: meters and bearing from the start; 0 when it began there. */
+        public double startOffsetM, startOffsetDeg;
 
         Result(int nx, int ny, double cell, double lat0, double lon0, double dLat, double dLon, float[] arrival,
                 double[] peakFlameFt, int cellsSeen, int cellsBurnable, int fuelsCrossed) {
@@ -197,8 +199,10 @@ public final class Spread {
         final float[] arrival = new float[nx * ny];
         java.util.Arrays.fill(arrival, Float.POSITIVE_INFINITY);
         final int start = half * nx + half;
+        double offsetM = 0, offsetDeg = 0;
         if (cells[start] == BARRIER) {
-            // Light the nearest burnable cell instead of refusing: the tap was on a road.
+            // Light the nearest burnable cell instead of refusing: the tap was on a road
+            // or a roof. Up to 8 cells (120 m) away, and the result says how far.
             int best = -1;
             double bestD = Double.MAX_VALUE;
             for (int i = 0; i < cells.length; i++) {
@@ -210,9 +214,12 @@ public final class Spread {
                     best = i;
                 }
             }
-            if (best < 0 || bestD > 9)
+            if (best < 0 || bestD > 64)
                 return new Result(nx, ny, cell, lat0, lon0, dLat, dLon, arrival, new double[0], 0, burnable, 0);
             arrival[best] = 0;
+            final double dx = (best % nx - half) * cell, dy = (best / nx - half) * cell;
+            offsetM = Math.sqrt(dx * dx + dy * dy);
+            offsetDeg = (Math.toDegrees(Math.atan2(dx, dy)) + 360d) % 360d;
         } else {
             arrival[start] = 0;
         }
@@ -265,7 +272,10 @@ public final class Spread {
                 }
             }
         }
-        return new Result(nx, ny, cell, lat0, lon0, dLat, dLon, arrival, flameByStep(cells, arrival), seen, burnable, fuels.size());
+        final Result res = new Result(nx, ny, cell, lat0, lon0, dLat, dLon, arrival, flameByStep(cells, arrival), seen, burnable, fuels.size());
+        res.startOffsetM = offsetM;
+        res.startOffsetDeg = offsetDeg;
+        return res;
     }
 
     /** The ellipse's rate in a direction: the head rate at the heading, backing behind. */
