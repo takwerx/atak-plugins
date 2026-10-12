@@ -23,7 +23,7 @@ public class RainReportsTest {
     private static final String LOX = "RRMLOX\n\nPRECIPITATION SUMMARY\nNATIONAL WEATHER SERVICE LOS ANGELES/OXNARD CA\n"
             + "300 PM PDT SUN OCT 11 2026\n\n...PRELIMINARY PRECIPITATION TOTALS...\n\n"
             + "THE FOLLOWING ARE 24 HOUR RAINFALL TOTALS IN INCHES\nFOR THIS EVENT THROUGH 300 PM SUNDAY AFTERNOON.\n\n"
-            + ".LA CO COAST & METRO\nLA DOWNTOWN....................... 0.03\nHAWTHORNE (KHHR)..................    T\n";
+            + ".LA CO COAST & METRO\nLA DOWNTOWN....................... 0.03\nHAWTHORNE (KHHR)..................    T\nLA AIRPORT(KLAX).................. 0.21\n";
 
     private static final String SEW = "RRMSEW\n\nMiscellaneous Hydrologic Report\nNational Weather Service Seattle WA\n"
             + "858 PM PDT Sun Oct 11 2026\n\nPrecipitation amounts in Western Washington for the following time\n"
@@ -56,6 +56,12 @@ public class RainReportsTest {
     @Test
     public void losAngelesDotsAndTrace() {
         final RainReports.Report r = RainReports.parse(LOX);
+        RainReports.Row airport = null;
+        for (RainReports.Section sec : r.sections)
+            for (RainReports.Row row : sec.rows)
+                if (row.name.startsWith("La Airport"))
+                    airport = row;
+        assertEquals("KLAX", airport == null ? null : airport.id);
         assertEquals(1, r.sections.size());
         assertEquals("La Co Coast & Metro", r.sections.get(0).name);
         assertEquals("La Downtown", r.sections.get(0).rows.get(0).name);

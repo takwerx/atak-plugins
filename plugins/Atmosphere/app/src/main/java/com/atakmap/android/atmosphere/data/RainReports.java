@@ -157,7 +157,9 @@ public final class RainReports {
         final Matcher dotted = DOTTED.matcher(line);
         if (dotted.matches()) {
             final String v = dotted.group(2);
-            return new Row(clean(dotted.group(1)), "", new String[] { v }, Integer.MIN_VALUE, inches(v));
+            final Matcher a = AIRPORT.matcher(dotted.group(1));
+            return new Row(clean(dotted.group(1)), a.find() ? a.group(1) : "", new String[] { v },
+                    Integer.MIN_VALUE, inches(v));
         }
         final String[] toks = RANK.matcher(line).replaceFirst("").trim().split("\\s+");
         // Values hang off the end of the line.
@@ -198,6 +200,12 @@ public final class RainReports {
             name.append(i > nameFrom ? " " : "").append(toks[i]);
         if (name.length() == 0)
             return null;
+        // Los Angeles writes names only, with the airport code in brackets: "LA AIRPORT(KLAX)".
+        if (id.isEmpty()) {
+            final Matcher a = AIRPORT.matcher(name);
+            if (a.find())
+                id = a.group(1);
+        }
         // The 24 h column where the header names one, else the first value.
         String main = values[0];
         if (columns > 0 && values.length == columns)
@@ -214,6 +222,9 @@ public final class RainReports {
     }
 
     /** "SAN DIEGO COUNTY VALLEYS" from ".SAN DIEGO COUNTY VALLEYS...", in title case. */
+    /** An airport code in brackets inside a name, the one id some offices write. */
+    private static final Pattern AIRPORT = Pattern.compile("\\((K[A-Z0-9]{3})\\)");
+
     public static String clean(String heading) {
         String s = heading.trim();
         while (s.startsWith("."))
