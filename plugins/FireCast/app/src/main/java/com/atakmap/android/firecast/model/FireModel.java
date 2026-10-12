@@ -724,9 +724,9 @@ public final class FireModel {
             return;
         }
         if (g.cellsSeen <= 4) {
-            r.problem = "The fire cannot leave the start: LANDFIRE marks the ground around it as urban, paved or bare in "
-                    + "30 m cells, and this model does not spot across that. Move the start onto open fuel, "
-                    + "or a few hundred feet into the brush, and run again.";
+            r.problem = "The fire cannot leave the start: LANDFIRE marks the ground around it as commercial, water, bare or "
+                    + "farmed in 30 m cells, and this model does not spot across that. Move the start onto fuel or "
+                    + "into a neighborhood and run again.";
             return;
         }
         r.ground = g;

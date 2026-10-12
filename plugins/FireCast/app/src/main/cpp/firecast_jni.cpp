@@ -5,8 +5,27 @@
 #include "surface.h"
 
 namespace {
+// Fuel model 220, "BU1", burnable urban: Moran, Seielstad and Pietruszka 2025
+// (Int. J. Wildland Fire, WF24132), fitted to the mean 0.81 km/h spread of nine
+// North American conflagrations through neighborhoods. 1 h 5.0 Mg/ha, live herb
+// 0.5, live woody 27.0, surface-area-to-volume 13,120 /m for every class, 20 cm
+// deep, 12% moisture of extinction, 20,000 J/g. Its wind adjustment comes out at
+// 0.335 from the depth, which is the paper's figure. Static, so it does not drift.
+const int BU1 = 220;
+
 FuelModels& fuelModels() {
     static FuelModels fm;   // the standard 13 + 40 + the extras, built once
+    static bool custom = false;
+    if (!custom) {
+        custom = true;
+        fm.setCustomFuelModel(BU1, "BU1", "Burnable urban, house to house (Moran 2025)",
+                20.0, LengthUnits::Centimeters,
+                12.0, FractionUnits::Percent,
+                20000.0, 20000.0, HeatOfCombustionUnits::KilojoulesPerKilogram,
+                5.0, 0.0, 0.0, 0.5, 27.0, LoadingUnits::TonnesPerHectare,
+                13120.0, 13120.0, 13120.0, SurfaceAreaToVolumeUnits::SquareMetersOverCubicMeters,
+                false);
+    }
     return fm;
 }
 }

@@ -263,7 +263,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 goes.append(r.structureNote).append('\n');
             else if (r.structures != null)
                 goes.append("Structures and people from FEMA's national building inventory; a building counts when the fire reaches the ground beside it.\n");
-            goes.append(String.format(Locale.US, "Across the ground: %d fuel%s crossed in %d cells of 30 m; roads, water and bare ground stop it. "
+            goes.append(String.format(Locale.US, "Across the ground: %d fuel%s crossed in %d cells of 15 m. Neighborhoods burn house to house "
+                    + "at the rate measured in nine North American conflagrations; roads slow it; commercial blocks, water and bare ground stop it. "
                     + "At the start the head would run toward %s at %s.",
                     r.ground.fuelsCrossed, r.ground.fuelsCrossed == 1 ? "" : "s", r.ground.cellsSeen,
                     Units.compass(o.headingDeg), rate(o.rosFtPerMin)));
@@ -292,8 +293,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
 
         section("What this does not mean", r.ground != null
                 ? "The fuel and slope are the real ground, cell by cell, but the wind is one reading for the whole "
-                        + "run and the whole hour. No spotting, no crown fire, no suppression. A road stops it here; "
-                        + "a real fire spots across one. Run again as the wind changes."
+                        + "run and the whole hour. No spotting, no crown fire, no suppression. House-to-house spread is an "
+                        + "average over past conflagrations, not this street. Run again as the wind changes."
                 : "One fuel, one slope and one wind for the whole run, read at the start point. Real fire crosses "
                         + "fuel changes, terrain and a wind that shifts; this is the direction and the order of "
                         + "distance, not a perimeter to plan on. No spotting, no crown fire, no barriers. "

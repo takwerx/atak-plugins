@@ -161,13 +161,13 @@ public final class Spread {
         for (int y = 0; y < ny; y++) {
             for (int x = 0; x < nx; x++) {
                 final double cLat = lat0 + (y + 0.5) * dLat, cLon = lon0 + (x + 0.5) * dLon;
-                final int fuel = land.fuel.at(cLat, cLon);
+                final int fuel = effectiveFuel(land.fuel.at(cLat, cLon), land.evt.at(cLat, cLon), land.fuel.nodata, land.evt.nodata);
                 int slope = land.slope.at(cLat, cLon), aspect = land.aspect.at(cLat, cLon);
                 if (slope == land.slope.nodata || slope < 0)
                     slope = 0;
                 if (aspect == land.aspect.nodata || aspect < 0)
                     aspect = 0;
-                final boolean burns = fuel != land.fuel.nodata && (fuel >= 100 || (fuel >= 1 && fuel <= 13));
+                final boolean burns = fuel > 0 && (fuel >= 100 || fuel <= 13);
                 if (!burns) {
                     cells[y * nx + x] = BARRIER;
                     continue;
@@ -276,6 +276,33 @@ public final class Spread {
         res.startOffsetM = offsetM;
         res.startOffsetDeg = offsetDeg;
         return res;
+    }
+
+    /** The engine's number for the burnable urban fuel registered in the JNI. */
+    public static final int BU1 = 220;
+
+    /**
+     * What a cell burns as. LANDFIRE's fuel grid calls every street and every house
+     * NB1 (91), and a run that honors that stops at the first subdivision, which no
+     * conflagration ever did. Its vegetation grid tells them apart: houses burn house
+     * to house as BU1 (Moran 2025); a road is slow timber litter the fire crosses
+     * (the paper's closest fit); open space is sparse grass; commercial blocks,
+     * water, bare ground, farmed ground and snow stay walls.
+     */
+    static int effectiveFuel(int fuel, int evt, int fuelNodata, int evtNodata) {
+        if (fuel == fuelNodata)
+            return -1;
+        if (fuel != 91)
+            return fuel;
+        if (evt == evtNodata)
+            return -1;
+        if (evt == 7297 || evt == 7298 || (evt >= 7900 && evt <= 7919))
+            return BU1;
+        if (evt == 7299)
+            return 181;   // TL1, the slow one
+        if (evt == 7296)
+            return 101;   // GR1
+        return -1;        // 7300 and anything else developed: a wall
     }
 
     /** The ellipse's rate in a direction: the head rate at the heading, backing behind. */

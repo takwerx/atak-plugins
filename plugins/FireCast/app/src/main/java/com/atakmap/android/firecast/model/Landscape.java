@@ -31,6 +31,8 @@ public final class Landscape {
     private static final String TAG = "FireCast";
     private static final String HOST = "https://edcintl.cr.usgs.gov/geoserver/landfire/";
     public static final String FUEL = "LF2024_FBFM40_CONUS", SLOPE = "LF2020_SlpD_CONUS", ASPECT = "LF2020_Asp_CONUS";
+    /** Existing vegetation type: the one grid that tells houses (7297, 7298) from roads (7299) and parks (7296) inside the urban fuel class. */
+    public static final String EVT = "LF2024_EVT_CONUS";
 
     /** One grid: values by row and column, and where each cell is on the ground. */
     public static final class Raster {
@@ -61,14 +63,15 @@ public final class Landscape {
         }
     }
 
-    public final Raster fuel, slope, aspect;
+    public final Raster fuel, slope, aspect, evt;
     /** The square asked for, degrees: south, west, north, east. */
     public final double south, west, north, east;
 
-    private Landscape(Raster fuel, Raster slope, Raster aspect, double s, double w, double n, double e) {
+    private Landscape(Raster fuel, Raster slope, Raster aspect, Raster evt, double s, double w, double n, double e) {
         this.fuel = fuel;
         this.slope = slope;
         this.aspect = aspect;
+        this.evt = evt;
         south = s;
         west = w;
         north = n;
@@ -95,13 +98,15 @@ public final class Landscape {
         final Raster fuel = raster(dir, "fuel.tif", "conus_2024", FUEL, s, w, n, e);
         final Raster slope = raster(dir, "slope.tif", "conus_topo", SLOPE, s, w, n, e);
         final Raster aspect = raster(dir, "aspect.tif", "conus_topo", ASPECT, s, w, n, e);
-        return new Landscape(fuel, slope, aspect, s, w, n, e);
+        final Raster evt = raster(dir, "evt.tif", "conus_2024", EVT, s, w, n, e);
+        return new Landscape(fuel, slope, aspect, evt, s, w, n, e);
     }
 
     /** Whether the square is already on disk, so a run can be promised with no network. */
     public static boolean cached(double lat, double lon, double halfKm) {
         final File dir = new File(FileSystemUtils.getItem("tools/firecast/landscape"), key(lat, lon, halfKm));
-        return new File(dir, "fuel.tif").isFile() && new File(dir, "slope.tif").isFile() && new File(dir, "aspect.tif").isFile();
+        return new File(dir, "fuel.tif").isFile() && new File(dir, "slope.tif").isFile()
+                && new File(dir, "aspect.tif").isFile() && new File(dir, "evt.tif").isFile();
     }
 
     private static Raster raster(File dir, String name, String workspace, String coverage,
