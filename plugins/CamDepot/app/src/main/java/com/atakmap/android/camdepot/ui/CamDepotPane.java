@@ -275,7 +275,7 @@ public final class CamDepotPane implements CameraStore.Listener {
                     gp = mapView.inverseWithElevation(pf.x, pf.y).get();
             } else if (com.atakmap.android.maps.MapEvent.ITEM_CLICK
                     .equals(event.getType())) {
-                // A tap on the fire's own marker is the best answer there is.
+                // A tap on a marker takes the marker's own point.
                 final com.atakmap.android.maps.MapItem item = event.getItem();
                 if (item instanceof com.atakmap.android.maps.PointMapItem)
                     gp = ((com.atakmap.android.maps.PointMapItem) item).getPoint();
@@ -320,7 +320,7 @@ public final class CamDepotPane implements CameraStore.Listener {
             picking = false;
             return;
         }
-        Toast.makeText(mapView.getContext(), "Tap the fire on the map",
+        Toast.makeText(mapView.getContext(), "Tap a point on the map",
                 Toast.LENGTH_SHORT).show();
         updateLookAtControls();
     }
