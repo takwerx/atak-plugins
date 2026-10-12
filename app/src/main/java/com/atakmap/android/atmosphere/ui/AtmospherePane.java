@@ -65,6 +65,7 @@ import com.atakmap.android.atmosphere.overlay.StormReportsOverlay;
 import com.atakmap.android.atmosphere.overlay.TornadoPathsOverlay;
 import com.atakmap.android.atmosphere.overlay.DebrisFlowOverlay;
 import com.atakmap.android.atmosphere.overlay.QuakesOverlay;
+import com.atakmap.android.atmosphere.overlay.FuelMoistureOverlay;
 import com.atakmap.android.atmosphere.overlay.RainTotalsOverlay;
 import com.atakmap.android.atmosphere.overlay.RainGaugesOverlay;
 import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
@@ -318,6 +319,16 @@ public final class AtmospherePane {
     private final LinearLayout quakesChoiceRow;
     private QuakesOverlay quakes;
     private boolean quakesOpen = true;
+    private static final String PREF_FUEL_OPEN = "weather.fuel.open";
+    private final LinearLayout fuelSettings;
+    private final ImageButton fuelExpand;
+    private final Button fuelToggle;
+    private final TextView fuelStatus;
+    private final LinearLayout fuelLegend;
+    private final LinearLayout fuelDayRow;
+    private final LinearLayout fuelChoiceRow;
+    private FuelMoistureOverlay fuel;
+    private boolean fuelOpen = true;
     private static final String PREF_RAINTOTALS_OPEN = "weather.raintotals.open";
     private final LinearLayout raintotalsSettings;
     private final ImageButton raintotalsExpand;
@@ -443,6 +454,7 @@ public final class AtmospherePane {
     private RadarOverlay radar;
     private List<String> radarFrames = new ArrayList<>();
     private final Button windToggle;
+    private final Button windHeatToggle;
     private final View windScaleHost;
     private final WindScaleView windScale;
     private final LinearLayout windUnitRow;
@@ -787,6 +799,7 @@ public final class AtmospherePane {
         layersAttribution = find(R.id.layers_attribution);
         radarToggle = find(R.id.radar_toggle);
         windToggle = find(R.id.wind_toggle);
+        windHeatToggle = find(R.id.wind_heat_toggle);
         windScaleHost = find(R.id.wind_scale_host);
         windScale = new WindScaleView(pluginContext);
         ((LinearLayout) windScaleHost).addView(windScale);
@@ -864,6 +877,13 @@ public final class AtmospherePane {
         quakesLegend = find(R.id.quakes_legend);
         quakesDayRow = find(R.id.quakes_day_row);
         quakesChoiceRow = find(R.id.quakes_choice_row);
+        fuelSettings = find(R.id.fuel_settings);
+        fuelExpand = find(R.id.fuel_expand);
+        fuelToggle = find(R.id.fuel_toggle);
+        fuelStatus = find(R.id.fuel_status);
+        fuelLegend = find(R.id.fuel_legend);
+        fuelDayRow = find(R.id.fuel_day_row);
+        fuelChoiceRow = find(R.id.fuel_choice_row);
         raintotalsSettings = find(R.id.raintotals_settings);
         raintotalsExpand = find(R.id.raintotals_expand);
         raintotalsToggle = find(R.id.raintotals_toggle);
@@ -1229,6 +1249,15 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        fuelOpen = prefs == null || prefs.getBoolean(PREF_FUEL_OPEN, true);
+        fuelExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                fuelOpen = !fuelOpen;
+                rememberFold(PREF_FUEL_OPEN, fuelOpen);
+                updateLayerControls();
+            }
+        });
         raingaugesOpen = prefs == null || prefs.getBoolean(PREF_RAINGAUGES_OPEN, true);
         raingaugesExpand.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1531,6 +1560,8 @@ public final class AtmospherePane {
             debrisflow.refresh(false);
         if (quakes != null && quakes.isOn())
             quakes.refresh(false);
+        if (fuel != null && fuel.isOn())
+            fuel.refresh(false);
         if (raintotals != null && raintotals.isOn())
             raintotals.refresh(false);
         if (raingauges != null && raingauges.isOn())
@@ -2378,6 +2409,26 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** Fuel Moisture: the status line under the switch and the key. */
+    public void setFuel(FuelMoistureOverlay overlay) {
+        fuel = overlay;
+        if (fuel == null)
+            return;
+        fuel.setListener(new FuelMoistureOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                fuelStatus.setText(status);
+                fuelStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        fuelLegend.removeAllViews();
+        for (String[] row : FuelMoistureOverlay.LEGEND)
+            fuelLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(fuelDayRow, fuel);
+        buildChoiceRow(fuelChoiceRow, fuel);
+        updateLayerControls();
+    }
+
     /** USGS rain gauges: the status line, the key, and the page behind the list button. */
     public void setRainGauges(RainGaugesOverlay overlay) {
         raingauges = overlay;
@@ -2945,6 +2996,22 @@ public final class AtmospherePane {
                 }
             }
         });
+        fuelToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (fuel == null)
+                    return;
+                if (fuel.isOn()) {
+                    fuel.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FuelMoistureOverlay.LAYER_ID)) {
+                    fuel.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFuel();
+                }
+            }
+        });
         raingaugesToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -3038,6 +3105,15 @@ public final class AtmospherePane {
                 } else {
                     askToAllowWind();
                 }
+            }
+        });
+        windHeatToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (wind == null)
+                    return;
+                wind.setHeatOn(!wind.heatOn());
+                updateLayerControls();
             }
         });
         spotToggle.setOnClickListener(new View.OnClickListener() {
@@ -4322,6 +4398,10 @@ public final class AtmospherePane {
             quakes.setOn(on);
         else if (quakes != null && on)
             blocked++;
+        if (fuel != null && (!on || allowed(FuelMoistureOverlay.LAYER_ID)))
+            fuel.setOn(on);
+        else if (fuel != null && on)
+            blocked++;
         if (raintotals != null && (!on || allowed(RainTotalsOverlay.LAYER_ID)))
             raintotals.setOn(on);
         else if (raintotals != null && on)
@@ -5471,6 +5551,27 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowFuel() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.fuel_allow_title))
+                .setMessage(pluginContext.getString(R.string.fuel_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FuelMoistureOverlay.LAYER_ID, true);
+                                if (fuel != null)
+                                    fuel.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowRaingauges() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -5682,6 +5783,11 @@ public final class AtmospherePane {
         windToggle.setText(windOn ? R.string.wind_on : R.string.wind_off);
         windToggle.setTextColor(pluginContext.getResources().getColor(
                 windOn ? R.color.state_on : R.color.state_off));
+        final boolean heatOn = windOn && wind.heatOn();
+        windHeatToggle.setVisibility(windOn ? View.VISIBLE : View.GONE);
+        windHeatToggle.setText(heatOn ? R.string.wind_heat_on : R.string.wind_heat_off);
+        windHeatToggle.setTextColor(pluginContext.getResources().getColor(
+                heatOn ? R.color.state_on : R.color.state_off));
         final boolean smokeOn = smoke != null && smoke.isOn();
         smokeToggle.setText(smokeOn ? R.string.smoke_on : R.string.smoke_off);
         smokeToggle.setTextColor(pluginContext.getResources().getColor(
@@ -5939,6 +6045,13 @@ public final class AtmospherePane {
         quakesExpand.setVisibility(quakesOn ? View.VISIBLE : View.GONE);
         quakesExpand.setRotation(quakesOpen ? 180f : 0f);
         quakesSettings.setVisibility(quakesOn && quakesOpen ? View.VISIBLE : View.GONE);
+        final boolean fuelOn = fuel != null && fuel.isOn();
+        fuelToggle.setText(fuelOn ? R.string.fuel_on : R.string.fuel_off);
+        fuelToggle.setTextColor(pluginContext.getResources().getColor(
+                fuelOn ? R.color.state_on : R.color.state_off));
+        fuelExpand.setVisibility(fuelOn ? View.VISIBLE : View.GONE);
+        fuelExpand.setRotation(fuelOpen ? 180f : 0f);
+        fuelSettings.setVisibility(fuelOn && fuelOpen ? View.VISIBLE : View.GONE);
         final boolean raintotalsOn = raintotals != null && raintotals.isOn();
         raintotalsToggle.setText(raintotalsOn ? R.string.raintotals_on : R.string.raintotals_off);
         raintotalsToggle.setTextColor(pluginContext.getResources().getColor(
@@ -6110,6 +6223,11 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_quakes, QuakesOverlay.HOST));
+        }
+        if (fuel != null && fuel.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_fuel, FuelMoistureOverlay.HOST));
         }
         if (raintotals != null && raintotals.isOn()) {
             if (out.length() > 0)

@@ -95,6 +95,28 @@ public final class Raws {
         }
     }
 
+    /**
+     * The stations named exactly so, wherever they are: an office's rainfall report writes
+     * "VISTA GRANDE RAWS" with its own gauge id, and the name is what NIFC shares with it.
+     */
+    public static String byNameUrl(Collection<String> names) {
+        final StringBuilder in = new StringBuilder();
+        for (String n : names) {
+            if (n == null || n.isEmpty())
+                continue;
+            if (in.length() > 0)
+                in.append(',');
+            in.append('\'').append(n.replace("'", "''")).append('\'');
+        }
+        final String where = "StationName IN (" + in + ")";
+        try {
+            return LAYER + "/query?f=json&returnGeometry=false&outFields=" + FIELDS
+                    + "&where=" + URLEncoder.encode(where, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private static String trim(double d) {
         return String.format(Locale.US, "%.5f", d).replaceAll("0+$", "").replaceAll("\\.$", "");
     }

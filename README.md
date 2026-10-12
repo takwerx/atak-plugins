@@ -62,6 +62,12 @@ Capabilities:
     Forest Service's national service; tap an area's name for its ERC and
     Burning Index and its GACC's own ERC chart, full screen to pinch and zoom.
     Each fire weather zone gives the ERC of the area it is in.
+  - Fuel moisture samples: every sampling site of the National Fuel Moisture
+    Database in the state under the map, the newest live fuel's moisture in
+    the pill and colored by the chaparral thresholds, every fuel sampled there
+    behind a tap; live fuels, dead fuels or either, 30 days to a year back.
+  - The wind as a heat map: the speed the streaks are drawn from as a colored
+    field under them, in the same bands as the key, with one switch.
   - Storms after the fact: every storm report the NWS offices logged in the
     last three days (tornado, wind, hail, flood, rain, snow, landslide), and
     the tornado paths survey teams have walked in the last year, each line in
@@ -108,8 +114,11 @@ Earthquakes (the USGS feed, ShakeMap contours for the largest); a Storm
 Reports page listing reports and paths by where and type; Rain Totals (the NWS
 MRMS radar estimate and the RFC gauge-corrected analysis as a picture) and Rain
 Gauges (USGS gauges and the forecast office's rainfall report, on the map and
-as a list); the forecaster's synopsis on the Forecast page; and every section
-heading in the house cyan. 0.12 fixed a
+as a list); the forecaster's synopsis on the Forecast page; Fuel Moisture
+(the National Fuel Moisture Database's samples, by state); the wind as a heat
+map under the streaks; the rainfall report's RAWS placed through NIFC as well
+as NWS, with Go to on every placed row; and every section heading in the house
+cyan. 0.12 fixed a
 storm the National Hurricane Center still lists but no longer forecasts
 (takwerx/atmosphere#5). 0.11 brought Fire Danger, the Energy Release
 Component by Predictive Service Area with each GACC's chart; California's

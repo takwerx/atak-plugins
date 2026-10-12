@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fuel moisture: a leaf with its midrib and a drop beside it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineJoin="round" android:pathData="M4 20 C4 11 9 5 19 4 C19 13 14 19 4 20 Z"/>
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.6" android:strokeLineCap="round" android:pathData="M4 20 L15 8"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M19.5 14 C19.5 14 17.3 16.8 17.3 18.2 A2.2 2.2 0 0 0 21.7 18.2 C21.7 16.8 19.5 14 19.5 14 Z"/>
+</vector>

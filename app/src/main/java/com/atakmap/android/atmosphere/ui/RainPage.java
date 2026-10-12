@@ -13,6 +13,7 @@ import android.widget.TextView;
 
 import com.atakmap.android.atmosphere.data.Cwf;
 import com.atakmap.android.atmosphere.data.RainReports;
+import com.atakmap.android.atmosphere.data.Raws;
 import com.atakmap.android.atmosphere.data.UsgsRain;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.atmosphere.net.Http;
@@ -36,6 +37,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -455,9 +457,30 @@ public final class RainPage {
 
     // ---- placing the report's gauges ------------------------------------------------------
 
-    /** The gauge's place, or null when nothing has placed it yet. */
+    /**
+     * The gauge's place, or null when nothing has placed it yet. A row with no id (the
+     * office's "top amounts" list) takes the id of the row with the same name below it.
+     */
     private double[] place(RainReports.Row r) {
-        return r.id.isEmpty() ? null : located.get(r.id);
+        final String id = r.id.isEmpty() ? idByName(r.name) : r.id;
+        return id == null || id.isEmpty() ? null : located.get(id);
+    }
+
+    private RainReports.Report indexedReport;
+    private final Map<String, String> idByName = new HashMap<>();
+
+    private String idByName(String name) {
+        if (report == null)
+            return null;
+        if (indexedReport != report) {
+            idByName.clear();
+            for (RainReports.Section sec : report.sections)
+                for (RainReports.Row r : sec.rows)
+                    if (!r.id.isEmpty() && !idByName.containsKey(r.name.toUpperCase(Locale.US)))
+                        idByName.put(r.name.toUpperCase(Locale.US), r.id);
+            indexedReport = report;
+        }
+        return idByName.get(name.toUpperCase(Locale.US));
     }
 
     private double distance(RainReports.Row r, GeoPoint from) {
@@ -527,16 +550,129 @@ public final class RainPage {
         }
     }
 
-    /** Every id in the report that nothing has placed goes on the queue, once. */
+    private boolean batching;
+
+    /**
+     * Every id in the report that nothing has placed, in two passes: the rows written
+     * "... RAWS" against NIFC's RAWS by station name, in batches, then NWS's station
+     * service one id at a time for the rest. NWS places about half of San Diego's
+     * report, RAWS included once the lookups get to them (operator, 2026-10-11: "how do
+     * you not know where vista grande raws is"); the Cal OES station extract was tried
+     * for the rest on 2026-10-12 and every id it knew NWS knew too, so it is not asked.
+     * What stays unplaced is the counties' own flood-control gauges.
+     */
     private void queueLocations() {
-        if (report == null)
+        if (report == null || batching)
             return;
+        final Map<String, String> pending = new LinkedHashMap<>();
         for (RainReports.Section sec : report.sections)
             for (RainReports.Row r : sec.rows)
                 if (!r.id.isEmpty() && !located.containsKey(r.id) && !unknown.contains(r.id)
-                        && !toLocate.contains(r.id))
-                    toLocate.add(r.id);
-        locateNext();
+                        && !toLocate.contains(r.id) && !pending.containsKey(r.id))
+                    pending.put(r.id, r.name.toUpperCase(Locale.US).trim());
+        if (pending.isEmpty())
+            return;
+        batching = true;
+        placeRaws(pending, new Runnable() {
+            @Override
+            public void run() {
+                batching = false;
+                toLocate.addAll(pending.keySet());
+                placed();
+                locateNext();
+            }
+        });
+    }
+
+    /** A position a service answered that can be drawn and saved: finite and on the globe. */
+    private static boolean placeable(double lat, double lon) {
+        return !Double.isNaN(lat) && !Double.isNaN(lon) && !Double.isInfinite(lat)
+                && !Double.isInfinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+    }
+
+    /** After a batch placed some gauges: on disk, in the list, on the map. */
+    private void placed() {
+        saveLocations();
+        sinceSaved = 0;
+        renderReport();
+        pushReportGauges();
+    }
+
+    private double meters(GeoPoint from, double lat, double lon) {
+        return from == null ? 0 : Spot.distanceMeters(from.getLatitude(), from.getLongitude(), lat, lon);
+    }
+
+    private static final int RAWS_NAMES_PER_QUERY = 40;
+
+    /** The "... RAWS" rows by name; a name on more than one NIFC station takes the nearest. */
+    private void placeRaws(final Map<String, String> pending, final Runnable then) {
+        final Map<String, List<String>> byName = new HashMap<>();
+        for (Map.Entry<String, String> e : pending.entrySet()) {
+            final String n = e.getValue();
+            if (!n.endsWith(" RAWS"))
+                continue;
+            final String key = n.substring(0, n.length() - 5).trim();
+            if (key.isEmpty())
+                continue;
+            List<String> ids = byName.get(key);
+            if (ids == null)
+                byName.put(key, ids = new ArrayList<>());
+            ids.add(e.getKey());
+        }
+        Log.d(TAG, "placing " + pending.size() + " gauge ids, " + byName.size()
+                + " RAWS names to ask NIFC for first");
+        if (byName.isEmpty()) {
+            then.run();
+            return;
+        }
+        rawsBatch(new ArrayList<>(byName.keySet()), 0, byName, pending, then);
+    }
+
+    private void rawsBatch(final List<String> names, final int from,
+            final Map<String, List<String>> byName, final Map<String, String> pending,
+            final Runnable then) {
+        if (from >= names.size()) {
+            then.run();
+            return;
+        }
+        final int to = Math.min(names.size(), from + RAWS_NAMES_PER_QUERY);
+        final GeoPoint p = host.point();
+        Http.get(Raws.byNameUrl(names.subList(from, to)), egress.userAgent(),
+                new HashMap<String, String>(), new Http.Callback() {
+                    @Override
+                    public void onSuccess(String body) {
+                        final Map<String, Raws.Station> best = new HashMap<>();
+                        for (Raws.Station s : Raws.parse(body)) {
+                            if (!placeable(s.latitude, s.longitude))
+                                continue;
+                            final String key = s.name.toUpperCase(Locale.US).trim();
+                            final Raws.Station have = best.get(key);
+                            if (have == null || meters(p, s.latitude, s.longitude)
+                                    < meters(p, have.latitude, have.longitude))
+                                best.put(key, s);
+                        }
+                        for (Map.Entry<String, Raws.Station> e : best.entrySet()) {
+                            final List<String> ids = byName.get(e.getKey());
+                            if (ids == null)
+                                continue;
+                            for (String id : ids) {
+                                located.put(id, new double[] { e.getValue().latitude,
+                                        e.getValue().longitude });
+                                pending.remove(id);
+                            }
+                        }
+                        Log.d(TAG, "NIFC placed " + best.size() + " of " + (to - from)
+                                + " RAWS names; " + pending.size() + " ids left");
+                        if (!best.isEmpty())
+                            placed();
+                        rawsBatch(names, to, byName, pending, then);
+                    }
+
+                    @Override
+                    public void onFailure(String error) {
+                        rawsBatch(names, to, byName, pending, then);
+                    }
+                });
     }
 
     /** One lookup at a time, through the NWS station service; airports need a K in front. */
