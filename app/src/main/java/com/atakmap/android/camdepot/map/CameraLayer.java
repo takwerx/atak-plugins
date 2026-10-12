@@ -1616,8 +1616,8 @@ public final class CameraLayer {
             if (lookAtMarker == null) {
                 final Marker m = new Marker(p, UID_PREFIX + "lookat");
                 m.setType("b-m-p-s-p-i");
-                m.setTitle("Look At");
-                m.setMetaString("callsign", "Look At");
+                m.setTitle("Suggest");
+                m.setMetaString("callsign", "Suggest");
                 m.setMetaBoolean("nevercot", true);
                 m.setMetaBoolean("removable", false);
                 m.setMetaBoolean("movable", false);
