@@ -194,6 +194,15 @@
             </HorizontalScrollView>
         </LinearLayout>
 
+        <!-- The forecaster's discussion for the office covering the point: the Synopsis
+             open, the other sections behind buttons. Filled in code. -->
+        <LinearLayout
+            android:id="@+id/discussion_block"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical" />
+
         <TextView
             android:id="@+id/attribution_text"
             android:layout_width="match_parent"

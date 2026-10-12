@@ -197,6 +197,8 @@ public final class AtmospherePane {
     private final ReportsPage reportsPage;
     /** The office's rainfall report and the USGS gauges as a list. */
     private final RainPage rainPage;
+    /** The forecaster's discussion under the days on the Forecast page. */
+    private final DiscussionBlock discussion;
     private final Button refreshButton;
     private final Button settingsButton;
     private final TextView positionText;
@@ -760,6 +762,18 @@ public final class AtmospherePane {
         daysLegend = find(R.id.days_legend);
         daysContainer = find(R.id.days_container);
         attributionText = find(R.id.attribution_text);
+        discussion = new DiscussionBlock(pluginContext, egress, (LinearLayout) find(R.id.discussion_block),
+                new DiscussionBlock.Host() {
+                    @Override
+                    public GeoPoint point() {
+                        return AtmospherePane.this.point();
+                    }
+
+                    @Override
+                    public String pointLabel() {
+                        return modeLabel();
+                    }
+                });
         layersAttribution = find(R.id.layers_attribution);
         radarToggle = find(R.id.radar_toggle);
         windToggle = find(R.id.wind_toggle);
@@ -6790,6 +6804,7 @@ public final class AtmospherePane {
 
                 reportsPage.pointChanged();
             rainPage.pointChanged();
+            discussion.pointChanged();
         }
     };
 
@@ -6977,6 +6992,7 @@ public final class AtmospherePane {
 
             reportsPage.pointChanged();
             rainPage.pointChanged();
+            discussion.pointChanged();
         if (selected == null) {
             statusText.setText(R.string.no_sources);
             return;
@@ -7079,6 +7095,7 @@ public final class AtmospherePane {
         renderHours(wanted);
         renderDays(wanted);
         attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
+        discussion.refresh(false);
     }
 
     /** True when no hour of the whole forecast has a value for the element. */
