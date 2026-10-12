@@ -104,6 +104,8 @@ public final class FireModel {
         public double[][] perimeter;
         /** When the fire started, epoch ms, or 0 for unknown; with a perimeter it calibrates the run. */
         public long startedAt;
+        /** True when the pixel under the marker does not burn; the ground run starts from the nearest fuel. */
+        public boolean startNotBurnable;
         /** The rate multiplier calibration settled on; 1 when there was none. */
         public double rateScale = 1;
         public String calibrationNote;
@@ -753,13 +755,19 @@ public final class FireModel {
     /** Model inputs from the site and the reading, with the assumptions written down. */
     private void compute(Run r) {
         r.conditions = conditionsForRun;
-        if (!r.site.burnable()) {
+        // The one pixel under the marker may be a road or a roof while the ground
+        // around it burns; the ground run lights the nearest fuel and says how far.
+        // Only a run with no ground to search is refused here.
+        r.startNotBurnable = !r.site.burnable();
+        if (r.startNotBurnable) {
             r.fuelName = r.site.fuelModel < 0 ? "unknown" : Behave.name(r.site.fuelModel);
-            r.problem = "LANDFIRE says this ground does not burn (" + (r.fuelName.isEmpty()
-                    ? "code " + r.site.fuelModel : r.fuelName) + "). Tap on wildland fuel.";
-            return;
+            final int stand = 102;   // GR2 for the ellipse fallback; the ground run uses the real cells
+            r.site = new Landfire.Site(stand, r.site.slopeDeg, r.site.aspectDeg, r.site.coverPct);
+            r.fuelName = Behave.name(stand) + " (the pixel under the marker is " + (r.fuelName.isEmpty()
+                    ? "code " + r.site.fuelModel : r.fuelName) + ", not burnable; the run lights the nearest fuel)";
+        } else {
+            r.fuelName = Behave.name(r.site.fuelModel);
         }
-        r.fuelName = Behave.name(r.site.fuelModel);
         // Fuel moisture: the nearest station's 10-hour stick when it has one, dry fall
         // defaults when it does not. Live fuels at cured-season values.
         Weather.Reading w = r.weather;
@@ -878,6 +886,11 @@ public final class FireModel {
             land = Landscape.around(r.lat, r.lon, r.halfKm);
         } catch (Exception e) {
             Log.w(TAG, "landscape unavailable, ellipse instead: " + e);
+            if (r.startNotBurnable) {
+                r.problem = "LANDFIRE says the pixel under the marker does not burn, and the ground around it could not be "
+                        + "fetched (no network, nothing saved here) to find the nearest fuel. Move the start onto wildland fuel.";
+                return;
+            }
             r.groundNote = "The ground around the start could not be fetched (no network, nothing saved here), "
                     + "so this is the one-fuel ellipse.";
             return;
