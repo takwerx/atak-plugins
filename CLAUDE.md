@@ -265,8 +265,10 @@ every dialog and toast: **MapView context, never plugin context**.
 than the pane, put them in the list's `addHeaderView()` so the whole panel is one
 scroller — and offset click positions by `getHeaderViewsCount()`.
 
-**Label sections, and put counts on filters.** Small caps headings (10sp,
-`textAllCaps`, `alpha=0.6`) over each group. A filter states what it will cost
+**Label sections, and put counts on filters.** A cyan heading
+(`TakwerxSectionHeading`: 12sp, `textAllCaps`, bold, `#00E5FF`, full strength)
+over each group and each section of a page; the faint grey small caps it replaced
+disappeared between two buttons (operator, 2026-10-11). A filter states what it will cost
 before it is used — `Video (1,013)`, not `Video` — otherwise the only way to learn
 what a control does is to toggle it and watch a total move.
 
