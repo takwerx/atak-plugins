@@ -97,6 +97,27 @@ public final class Quakes {
         }
     }
 
+    private static final java.util.regex.Pattern KM_PLACE =
+            java.util.regex.Pattern.compile("^(\\d+(?:\\.\\d+)?)\\s*km\\s+(.*)$");
+
+    /**
+     * USGS writes "16 km WSW of Olancha, CA"; the crews read miles (operator,
+     * 2026-10-12). Whole miles, the rest of the phrase as USGS wrote it.
+     */
+    public static String placeInMiles(String place) {
+        if (place == null)
+            return "";
+        final java.util.regex.Matcher m = KM_PLACE.matcher(place.trim());
+        if (!m.matches())
+            return place;
+        try {
+            final double mi = Double.parseDouble(m.group(1)) * 0.621371;
+            return Math.round(mi) + " mi " + m.group(2);
+        } catch (NumberFormatException e) {
+            return place;
+        }
+    }
+
     public static final class Quake {
         public final String id, place, magType, status, alert, url, detail;
         public final double mag, depthKm, lat, lon, cdi, mmi;
@@ -108,7 +129,7 @@ public final class Quakes {
                 String detail, double mag, double depthKm, double lat, double lon, double cdi,
                 double mmi, long time, int felt, int tsunami, boolean shakeMap) {
             this.id = id;
-            this.place = place;
+            this.place = placeInMiles(place);
             this.magType = magType;
             this.status = status;
             this.alert = alert;
