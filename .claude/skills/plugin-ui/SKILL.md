@@ -57,7 +57,7 @@ IPAWS is the reference for the whole shape (`IpawsPane`, `controls_header.xml`,
   2. `Settings`
   3. the one other control used in the field: `Notify ON/OFF` if the plugin
      notifies, otherwise `Refresh` or nothing
-- **The list, straight underneath.** The row (and a small-caps heading naming the
+- **The list, straight underneath.** The row (and a cyan section heading naming the
   list) is the `ListView`'s header, `list.addHeaderView(header, null, false)`, so
   the whole screen is one scroller. Offset click positions by
   `getHeaderViewsCount()`.
@@ -96,7 +96,7 @@ IPAWS is the reference for the whole shape (`IpawsPane`, `controls_header.xml`,
 - **Arrow**: a 44dp `ImageButton`, style `TakwerxIconButton`, `@drawable/ic_expand`,
   rotated 180 degrees when open.
 - **Body**: a vertical `LinearLayout`, `gone` until opened. Its controls are
-  `TakwerxButton`s and small-caps headings.
+  `TakwerxButton`s and cyan section headings.
 - The head and the arrow both open and close it. Open/closed is remembered per
   row in prefs, `<plugin>.fold.<row>`, default closed.
 - **A row whose head is a switch** (Atmosphere's layers page: `Wind ON` with its
@@ -457,12 +457,12 @@ The base rules from CLAUDE.md's "Plugin UI standard", with the styles in full.
     <item name="android:padding">9dp</item>
 </style>
 <style name="TakwerxSectionHeading">
-    <item name="android:textSize">10sp</item>
+    <item name="android:textSize">12sp</item>
     <item name="android:textAllCaps">true</item>
-    <item name="android:textColor">@color/white</item>
-    <item name="android:alpha">0.6</item>
-    <item name="android:paddingTop">10dp</item>
-    <item name="android:paddingBottom">3dp</item>
+    <item name="android:textStyle">bold</item>
+    <item name="android:textColor">#00E5FF</item>
+    <item name="android:paddingTop">12dp</item>
+    <item name="android:paddingBottom">2dp</item>
 </style>
 ```
 
@@ -470,6 +470,21 @@ The base rules from CLAUDE.md's "Plugin UI standard", with the styles in full.
 <color name="state_on">#3ddc61</color>
 <color name="state_off">#ff5b52</color>
 ```
+
+**One heading style, everywhere, and it is cyan.** Every section heading, over
+a group of controls on the pane (FEEDS, FILTERS, IN VIEW) and between the
+sections of a page that is read (a detail page, a forecast, an alert, a
+station), is `TakwerxSectionHeading` above: 12sp, all caps, bold, `#00E5FF`,
+full strength. It used to be faint white small caps at 60 percent, and that
+disappeared between two buttons and between two paragraphs alike. The operator
+on Fire Cast (2026-10-11): *"what it covers, and when are very faint ... its
+hard to see a section change"*, then the same for the pane's own labels. Built
+in code, the same: `setAllCaps(true)`, `setTextSize(12f)`,
+`setTypeface(Typeface.DEFAULT_BOLD)`, `setTextColor(0xFF00E5FF)`, no alpha.
+Fire Cast's `pane_header.xml` and `DetectionDetailsReceiver.headingView` are the
+reference. Body text stays white 14sp. This is one of the few rules that applies
+to existing plugins too: each one takes it on its next release, in its own
+session.
 
 - `style="@style/TakwerxButton"` on every button, with no per-button `textSize`.
 - **Never a Spinner.** Every dialog and toast uses `mapView.getContext()`, never
