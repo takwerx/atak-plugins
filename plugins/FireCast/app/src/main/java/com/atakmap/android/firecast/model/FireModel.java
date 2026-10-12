@@ -94,6 +94,8 @@ public final class FireModel {
         public String problem;
         /** The feature set that draws this run, 0 until drawn. */
         public long fsid;
+        /** On the map, or hidden by its switch. Hidden is not deleted. */
+        public boolean visible = true;
 
         /** "20:43 run, SH2, 10 mph from SE": how a run is named in a list. */
         public String label() {
@@ -628,6 +630,34 @@ public final class FireModel {
                     r.fuelName == null || r.fuelName.isEmpty() ? "this fuel" : r.fuelName.split(" ")[0]);
     }
 
+    /** The run's map switch: hides or shows its set, never deletes it. */
+    public void setVisible(final Run r, final boolean on) {
+        r.visible = on;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock) {
+                    showLocked(r, on);
+                }
+                save();
+                changed();
+            }
+        });
+    }
+
+    /** Lock held. By ids, not setFeatureSetVisible, which rewrites every set in the store. */
+    private void showLocked(Run r, boolean on) {
+        if (store == null || r == null || r.fsid <= 0)
+            return;
+        try {
+            final FeatureDataStore2.FeatureSetQueryParameters p = new FeatureDataStore2.FeatureSetQueryParameters();
+            p.ids = java.util.Collections.singleton(r.fsid);
+            store.setFeatureSetsVisible(p, on);
+        } catch (Exception e) {
+            Log.w(TAG, "model set visibility", e);
+        }
+    }
+
     /** Takes one run off the map and forgets it: the operator's own Clear. */
     public void clear(final Run r) {
         runs.remove(r);
@@ -712,7 +742,7 @@ public final class FireModel {
             {
                 final long fsid = store.insertFeatureSet(new FeatureSet("Fire Cast", "Fire model",
                         r.label(), Double.MAX_VALUE, 0d));
-                store.setFeatureSetVisible(fsid, true);
+                store.setFeatureSetVisible(fsid, r.visible);
                 r.fsid = fsid;
                 // Largest first so the 20 minute ring draws on top of the 60.
                 final int[] colors = { 0xFFD600, 0xFF8A00, 0xFF2A00 };
@@ -854,7 +884,8 @@ public final class FireModel {
             o.put("m1", r.m1).put("m10", r.m10).put("m100", r.m100).put("mHerb", r.mHerb).put("mWoody", r.mWoody);
             o.put("windMph", r.windMph).put("windFromDeg", r.windFromDeg).put("windNote", r.windNote)
                     .put("tenMeterWind", r.tenMeterWind).put("moistureNote", r.moistureNote);
-            o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions);
+            o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions)
+                    .put("visible", r.visible);
             if (r.weather != null) {
                 o.put("station", r.weather.station).put("observedAt", r.weather.observedAt)
                         .put("rh", r.weather.relativeHumidity).put("tempF", r.weather.airTempF)
@@ -929,6 +960,7 @@ public final class FireModel {
             r.canopyHeightFt = o.optDouble("canopyHeightFt", 0);
             r.crownRatio = o.optDouble("crownRatio", 0);
             r.conditions = o.optString("conditions", COND_OBSERVED);
+            r.visible = o.optBoolean("visible", true);
             r.fuelName = Behave.name(r.site.fuelModel);
             r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
                     r.windMph, r.tenMeterWind, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,

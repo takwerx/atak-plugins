@@ -31,6 +31,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
     private final Runnable reopenPane;
     private final View view;
     private final LinearLayout body;
+    /** The run whose details the page shows; the newest unless one was tapped. */
+    private FireModel.Run shown;
 
     public ModelReceiver(MapView mapView, Context pluginContext, FireModel model, Runnable reopenPane) {
         super(mapView);
@@ -124,25 +126,13 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         view.findViewById(R.id.btn_clear).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final java.util.List<FireModel.Run> runs = model.runs();
-                if (runs.isEmpty()) {
-                    model.clearAll();
-                    render();
-                    return;
-                }
-                final String[] labels = new String[runs.size() + 1];
-                for (int i = 0; i < runs.size(); i++)
-                    labels[i] = runs.get(i).label();
-                labels[runs.size()] = "All runs and the start marker";
                 new android.app.AlertDialog.Builder(getMapView().getContext())
-                        .setTitle("Clear which run?")
-                        .setItems(labels, new android.content.DialogInterface.OnClickListener() {
+                        .setTitle("Clear everything?")
+                        .setMessage("Every run comes off the map and the start marker with it. One run at a time is Delete on its row.")
+                        .setPositiveButton("Clear all", new android.content.DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(android.content.DialogInterface dialog, int which) {
-                                if (which == runs.size())
-                                    model.clearAll();
-                                else
-                                    model.clear(runs.get(which));
+                                model.clearAll();
                                 render();
                             }
                         })
@@ -167,7 +157,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
     /** Main thread. */
     public void render() {
         body.removeAllViews();
-        final FireModel.Run r = model.last();
+        final java.util.List<FireModel.Run> runs = model.runs();
+        if (shown == null || !runs.contains(shown))
+            shown = model.last();
+        final FireModel.Run r = shown;
         final com.atakmap.coremap.maps.coords.GeoPoint start = model.startPoint();
         ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && start != null);
         ((Button) view.findViewById(R.id.btn_conditions)).setText("Conditions: " + FireModel.conditionsLabel(model.conditions()));
@@ -189,6 +182,39 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                     + "needs to be exact (drag it, or Fine Adjust on its menu), pick the conditions, then Run model. "
                     + "Where the fire is at 20, 40 and 60 minutes is drawn on the map, with everything the run assumed.");
             return;
+        }
+        if (!runs.isEmpty()) {
+            body.addView(headingView("Runs on the map"));
+            for (final FireModel.Run x : runs) {
+                final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.model_run_row, null);
+                final Button name = row.findViewById(R.id.run_name);
+                name.setText((x == r ? "\u25B8 " : "") + x.label());
+                name.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        shown = x;
+                        render();
+                    }
+                });
+                final Button toggle = row.findViewById(R.id.run_toggle);
+                toggle.setText(x.visible ? "ON" : "OFF");
+                toggle.setTextColor(x.visible ? 0xFF3DDC61 : 0xFFFF5B52);
+                toggle.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        model.setVisible(x, !x.visible);
+                        render();
+                    }
+                });
+                row.findViewById(R.id.run_delete).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        model.clear(x);
+                        render();
+                    }
+                });
+                body.addView(row);
+            }
         }
         if (r == null) {
             section("Start placed", "Drag the marker or use Fine Adjust on its menu if it needs to be exact, "
@@ -219,15 +245,6 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         section("How hard it burns", flame);
 
         inputs(r);
-
-        final java.util.List<FireModel.Run> runs = model.runs();
-        if (runs.size() > 1) {
-            final StringBuilder sb = new StringBuilder();
-            for (FireModel.Run x : runs)
-                sb.append(x == r ? "This one: " : "").append(x.label()).append('\n');
-            sb.append("Each run is its own layer under Fire Cast fire model in Overlay Manager; Clear takes one off.");
-            section("Runs on the map", sb.toString().trim());
-        }
 
         section("What this does not mean",
                 "One fuel, one slope and one wind for the whole run, read at the start point. Real fire crosses "
