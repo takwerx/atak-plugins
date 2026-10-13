@@ -38,10 +38,13 @@ public final class Units {
         return Span.ENGLISH;
     }
 
-    /** A distance in meters, written the way ATAK's own range tool writes it. */
+    /**
+     * A distance in meters, written the way ATAK's own range tool writes it, to the
+     * whole unit: "15 mi", not "14.77 mi". A planning reference is read at a glance.
+     */
     public static String distance(double meters) {
         try {
-            return SpanUtilities.formatType(type(), meters, Span.METER);
+            return SpanUtilities.formatType(type(), meters, Span.METER, 0);
         } catch (RuntimeException e) {
             return Math.round(meters) + " m";
         }
