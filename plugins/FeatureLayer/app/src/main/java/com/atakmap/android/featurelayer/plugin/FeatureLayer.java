@@ -1451,7 +1451,8 @@ public class FeatureLayer implements IPlugin {
 
     // ---- Boundaries: kind, states, which, add -------------------------------------------
 
-    private String bKind = com.atakmap.android.featurelayer.Boundaries.KIND_COUNTIES;
+    /** The kinds to add, in Boundaries.KINDS order; every kind until the operator unticks one. */
+    private final java.util.LinkedHashSet<String> bKinds = new java.util.LinkedHashSet<>(java.util.Arrays.asList(com.atakmap.android.featurelayer.Boundaries.KINDS));
     private final List<String> bStates = new java.util.ArrayList<>();          // FIPS codes, in the order picked
     private List<com.atakmap.android.featurelayer.Boundaries.Named> bPicks;     // null = every boundary in the states
     /** The state under the map center, asked of the Census once per page opening; null until it answers. */
@@ -1504,14 +1505,15 @@ public class FeatureLayer implements IPlugin {
         }
         if (bStates.isEmpty() && bCenterState != null)
             bStates.add(bCenterState.fips);
-        kind.setText("Kind: " + com.atakmap.android.featurelayer.Boundaries.kindTitle(bKind));
+        kind.setText(bKinds.isEmpty() ? "Kinds: pick one" : "Kinds: " + kindsTitle());
         state.setText(bStates.isEmpty() ? "State: pick one" : "State: " + joinStates(bStates, bStates.size() > 2));
         which.setText(bPicks == null ? "Which: All"
                 : "Which: " + bPicks.size() + (bPicks.size() == 1 ? " picked" : " picked"));
         final String[] names = pickNames();
-        add.setText(bStates.isEmpty() ? "Add"
-                : "Add " + com.atakmap.android.featurelayer.Boundaries.title(bKind, bStates.toArray(new String[0]), names));
-        add.setEnabled(!bStates.isEmpty() && (bPicks == null || !bPicks.isEmpty()));
+        add.setText(bStates.isEmpty() || bKinds.isEmpty() ? "Add"
+                : names != null ? "Add " + joinNames(names) + " (" + joinStates(bStates, true) + ")"
+                : "Add " + com.atakmap.android.featurelayer.Boundaries.groupTitle(bStates.toArray(new String[0])) + ": " + kindsTitle());
+        add.setEnabled(!bStates.isEmpty() && !bKinds.isEmpty() && (bPicks == null || !bPicks.isEmpty()));
         kind.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1538,6 +1540,25 @@ public class FeatureLayer implements IPlugin {
         });
     }
 
+    /** "Counties, Cities, Tribal Lands", in the standard order, for the row and the Add button. */
+    private String kindsTitle() {
+        final StringBuilder sb = new StringBuilder();
+        for (String k : com.atakmap.android.featurelayer.Boundaries.KINDS)
+            if (bKinds.contains(k))
+                sb.append(sb.length() > 0 ? ", " : "").append(com.atakmap.android.featurelayer.Boundaries.kindTitle(k));
+        return sb.toString();
+    }
+
+    private static String joinNames(String[] names) {
+        final StringBuilder sb = new StringBuilder();
+        final int shown = Math.min(3, names.length);
+        for (int i = 0; i < shown; i++)
+            sb.append(i > 0 ? ", " : "").append(names[i]);
+        if (names.length > shown)
+            sb.append(" +").append(names.length - shown);
+        return sb.toString();
+    }
+
     private String[] pickNames() {
         if (bPicks == null || bPicks.isEmpty())
             return null;
@@ -1550,7 +1571,7 @@ public class FeatureLayer implements IPlugin {
     private void pickBoundaryKind() {
         final String[] kinds = com.atakmap.android.featurelayer.Boundaries.KINDS;
         final CharSequence[] labels = new CharSequence[kinds.length];
-        int checked = 0;
+        final boolean[] on = new boolean[kinds.length];
         for (int i = 0; i < kinds.length; i++) {
             final String t = com.atakmap.android.featurelayer.Boundaries.kindTitle(kinds[i]);
             final String n = com.atakmap.android.featurelayer.Boundaries.kindNote(kinds[i]);
@@ -1558,20 +1579,30 @@ public class FeatureLayer implements IPlugin {
             two.setSpan(new android.text.style.RelativeSizeSpan(0.78f), t.length() + 1, two.length(), 0);
             two.setSpan(new android.text.style.ForegroundColorSpan(0xFFBBBBBB), t.length() + 1, two.length(), 0);
             labels[i] = two;
-            if (kinds[i].equals(bKind))
-                checked = i;
+            on[i] = bKinds.contains(kinds[i]);
         }
-        new AlertDialog.Builder(mapView.getContext()).setTitle("Kind")
-                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+        final java.util.LinkedHashSet<String> picked = new java.util.LinkedHashSet<>(bKinds);
+        new AlertDialog.Builder(mapView.getContext()).setTitle("Kinds")
+                .setMultiChoiceItems(labels, on, new DialogInterface.OnMultiChoiceClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which, boolean isChecked) {
+                        if (isChecked)
+                            picked.add(kinds[which]);
+                        else
+                            picked.remove(kinds[which]);
+                    }
+                })
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {
-                        d.dismiss();
-                        if (!kinds[which].equals(bKind))
-                            bPicks = null; // names belong to a kind
-                        bKind = kinds[which];
+                        if (!picked.equals(bKinds))
+                            bPicks = null; // names belong to the kinds they were picked in
+                        bKinds.clear();
+                        bKinds.addAll(picked);
                         bindBoundaries();
                     }
-                }).setNegativeButton("Cancel", null).show();
+                })
+                .setNegativeButton("Cancel", null).show();
     }
 
     /** Up to five states, the one under the map first; a sixth tap says so and stays off. */
@@ -1627,8 +1658,12 @@ public class FeatureLayer implements IPlugin {
             toast("Pick a state first");
             return;
         }
+        if (bKinds.isEmpty()) {
+            toast("Pick a kind first");
+            return;
+        }
         final String[] labels = { "All", "Pick names\u2026" };
-        new AlertDialog.Builder(mapView.getContext()).setTitle("Which " + com.atakmap.android.featurelayer.Boundaries.kindTitle(bKind).toLowerCase(java.util.Locale.US))
+        new AlertDialog.Builder(mapView.getContext()).setTitle("Which boundaries")
                 .setSingleChoiceItems(labels, bPicks == null ? 0 : 1, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int which) {
@@ -1647,7 +1682,11 @@ public class FeatureLayer implements IPlugin {
     private void fetchBoundaryNames() {
         if (manager == null)
             return;
-        final String kind = bKind;
+        final String[] kinds = new String[bKinds.size()];
+        int ki = 0;
+        for (String k : com.atakmap.android.featurelayer.Boundaries.KINDS)
+            if (bKinds.contains(k))
+                kinds[ki++] = k;
         final String[] states = bStates.toArray(new String[0]);
         final com.atakmap.coremap.maps.coords.GeoPoint c = mapCenter();
         final Button which = paneView.findViewById(R.id.btn_bnd_which);
@@ -1656,7 +1695,7 @@ public class FeatureLayer implements IPlugin {
         manager.search(new Callable<List<com.atakmap.android.featurelayer.Boundaries.Named>>() {
             @Override
             public List<com.atakmap.android.featurelayer.Boundaries.Named> call() throws Exception {
-                return com.atakmap.android.featurelayer.Boundaries.names(kind, states,
+                return com.atakmap.android.featurelayer.Boundaries.names(kinds, states,
                         c == null ? Double.NaN : c.getLatitude(), c == null ? Double.NaN : c.getLongitude());
             }
         }, new LayerManager.SearchCallback<List<com.atakmap.android.featurelayer.Boundaries.Named>>() {
@@ -1667,7 +1706,7 @@ public class FeatureLayer implements IPlugin {
                 if (error != null)
                     toast("Could not load the names: no network?");
                 else if (names == null || names.isEmpty())
-                    toast("No " + com.atakmap.android.featurelayer.Boundaries.kindTitle(kind).toLowerCase(java.util.Locale.US) + " listed there");
+                    toast("No boundaries listed there");
                 else
                     pickBoundaryNames(names);
             }
@@ -1750,8 +1789,8 @@ public class FeatureLayer implements IPlugin {
                     picked.remove(g);
             }
         });
-        final String what = com.atakmap.android.featurelayer.Boundaries.kindTitle(bKind);
-        new AlertDialog.Builder(ctx).setTitle("Pick " + what.toLowerCase(java.util.Locale.US) + " (" + names.size() + ")")
+        final String what = bKinds.size() == 1 ? kindsTitle().toLowerCase(java.util.Locale.US) : "boundaries";
+        new AlertDialog.Builder(ctx).setTitle("Pick " + what + " (" + names.size() + ")")
                 .setView(box)
                 .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     @Override
@@ -1767,19 +1806,34 @@ public class FeatureLayer implements IPlugin {
                 .setNegativeButton("Cancel", null).show();
     }
 
+    /** One layer per kind: every boundary of it in the states, or the names picked in it. */
     private void addBoundaries() {
-        if (manager == null || bStates.isEmpty())
+        if (manager == null || bStates.isEmpty() || bKinds.isEmpty())
             return;
-        String[] geoids = null;
-        if (bPicks != null && !bPicks.isEmpty()) {
-            geoids = new String[bPicks.size()];
-            for (int i = 0; i < geoids.length; i++)
-                geoids[i] = bPicks.get(i).geoid;
+        final String[] states = bStates.toArray(new String[0]);
+        LayerSpec last = null;
+        for (String kind : com.atakmap.android.featurelayer.Boundaries.KINDS) {
+            if (!bKinds.contains(kind))
+                continue;
+            String[] geoids = null, names = null;
+            if (bPicks != null && !bPicks.isEmpty()) {
+                final List<String> g = new java.util.ArrayList<>(), n = new java.util.ArrayList<>();
+                for (com.atakmap.android.featurelayer.Boundaries.Named p : bPicks)
+                    if (kind.equals(p.kind)) {
+                        g.add(p.geoid);
+                        n.add(p.shortName);
+                    }
+                if (g.isEmpty())
+                    continue; // nothing of this kind was picked
+                geoids = g.toArray(new String[0]);
+                names = n.toArray(new String[0]);
+            }
+            last = com.atakmap.android.featurelayer.Boundaries.layer(kind, states, geoids, names);
+            manager.add(last);
         }
-        final LayerSpec spec = com.atakmap.android.featurelayer.Boundaries.layer(bKind, bStates.toArray(new String[0]),
-                geoids, pickNames());
         bPicks = null;
-        addLayer(spec);
+        if (last != null)
+            backToMain();
     }
 
     private void renderRows() {
@@ -1810,111 +1864,205 @@ public class FeatureLayer implements IPlugin {
                         manager.setVisible(l, turnOn);
             }
         });
+        // Boundaries fold under their state: one row per state, the kinds inside it
+        // (operator, 2026-10-12: "keeping the side pane menus compact then expandable").
+        final java.util.Map<String, List<LoadedLayer>> groups = new java.util.LinkedHashMap<>();
+        final List<Object> order = new java.util.ArrayList<>(); // a LoadedLayer, or a group key
         for (final LoadedLayer l : layers) {
-            final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.layer_row, null);
-            final TextView status = row.findViewById(R.id.row_status);
-            status.setText(statusLine(l));
-            // "You are in Elko County, NV", from the layer itself, while it is on.
-            final TextView where = row.findViewById(R.id.row_where);
-            final String whereLine = l.whereLine;
-            if (whereLine != null && l.isVisible() && !l.refreshing && !l.busy) {
-                where.setText(whereLine);
-                where.setVisibility(View.VISIBLE);
+            if (com.atakmap.android.featurelayer.Boundaries.handles(l.spec)) {
+                final String key = com.atakmap.android.featurelayer.Boundaries.groupKey(l.spec);
+                List<LoadedLayer> g = groups.get(key);
+                if (g == null) {
+                    g = new java.util.ArrayList<>();
+                    groups.put(key, g);
+                    order.add(key);
+                }
+                g.add(l);
             } else {
-                where.setVisibility(View.GONE);
+                order.add(l);
             }
-            final Button toggle = row.findViewById(R.id.row_toggle);
-            if (l.refreshing || l.busy) {
-                toggle.setText(l.displayName() + " Loading\u2026");
-                toggle.setTextColor(Color.parseColor("#FFC107"));
-                toggle.setEnabled(false);
-            } else {
-                toggle.setText(l.myFiresShown() && l.isVisible()
-                        ? l.spec.title + ": My Fires (" + l.myFiresCount() + ")"
-                        : l.displayName() + (l.isVisible() ? " ON" : " OFF"));
-                toggle.setTextColor(l.isVisible() ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
-                toggle.setEnabled(true);
-            }
-            // One line per layer, its controls under the arrow (Atmosphere's layers page,
-            // operator 2026-10-05). Closed until opened, and remembered per layer: the
-            // list is rebuilt on every refresh, so the state cannot live in the views.
-            final ImageButton expand = row.findViewById(R.id.row_expand);
-            final View body = row.findViewById(R.id.row_body);
-            final String foldKey = foldPref(l);
-            final boolean open = uiPrefs().getBoolean(foldKey, false);
-            expand.setRotation(open ? 180f : 0f);
-            body.setVisibility(open ? View.VISIBLE : View.GONE);
-            status.setVisibility(open ? View.VISIBLE : View.GONE);
-            expand.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    final boolean nowOpen = body.getVisibility() != View.VISIBLE;
-                    uiPrefs().edit().putBoolean(foldKey, nowOpen).apply();
-                    expand.setRotation(nowOpen ? 180f : 0f);
-                    body.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
-                    status.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
-                }
-            });
-            toggle.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    manager.setVisible(l, !l.isVisible());
-                }
-            });
-            row.findViewById(R.id.row_sets).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    pickSets(l);
-                }
-            });
-            // Go to frames one incident; a feed spread over a state or the country has no
-            // one place to go, and Features takes the row.
-            row.findViewById(R.id.row_goto).setVisibility(l.isWideFeed() ? View.GONE : View.VISIBLE);
-            row.findViewById(R.id.row_goto).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    l.panTo();
-                }
-            });
-            final Button auto = row.findViewById(R.id.row_auto);
-            auto.setText(autoLabel(l.spec.refreshMinutes));
-            auto.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    final int[] steps = { 0, 1, 5, 15, 30 };
-                    int i = 0;
-                    for (int k = 0; k < steps.length; k++)
-                        if (steps[k] == l.spec.refreshMinutes)
-                            i = k;
-                    final int next = steps[(i + 1) % steps.length];
-                    auto.setText(autoLabel(next));
-                    manager.setRefreshMinutes(l, next);
-                }
-            });
-            row.findViewById(R.id.row_refresh).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    manager.refresh(l);
-                }
-            });
-            row.findViewById(R.id.row_remove).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    uiPrefs().edit().remove(foldKey).apply();
-                    manager.remove(l);
-                }
-            });
-            bindKey((LinearLayout) row.findViewById(R.id.row_key), l);
-            bindMyFires(row, l);
-            final View scopeBlock = row.findViewById(R.id.row_scope);
-            if (l.hasScopeControl()) {
-                scopeBlock.setVisibility(View.VISIBLE);
-                bindScope(row, l);
-            } else {
-                scopeBlock.setVisibility(View.GONE);
-            }
-            container.addView(row);
         }
+        for (Object o : order) {
+            if (o instanceof LoadedLayer)
+                container.addView(buildRow((LoadedLayer) o, ((LoadedLayer) o).displayName()));
+            else
+                container.addView(groupRow((String) o, groups.get((String) o)));
+        }
+    }
+
+    /** The prefix a where line starts with, so several can share one. */
+    private static String wherePrefix(String w) {
+        return w.startsWith("Map center is in ") ? "Map center is in " : w.startsWith("You are in ") ? "You are in " : "";
+    }
+
+    /** One state's row: the head switches every kind in it, the arrow opens the kind rows. */
+    private View groupRow(final String key, final List<LoadedLayer> kinds) {
+        final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.boundary_group_row, null);
+        final Button toggle = row.findViewById(R.id.group_toggle);
+        final ImageButton expand = row.findViewById(R.id.group_expand);
+        final LinearLayout body = row.findViewById(R.id.group_body);
+        final TextView where = row.findViewById(R.id.group_where);
+        final String title = com.atakmap.android.featurelayer.Boundaries.groupTitle(kinds.get(0).spec.states) + " Boundaries";
+        boolean anyOn = false, loading = false;
+        final StringBuilder wl = new StringBuilder();
+        for (LoadedLayer l : kinds) {
+            anyOn |= l.isVisible();
+            loading |= l.refreshing || l.busy;
+            final String w = l.whereLine;
+            if (w != null && l.isVisible() && !l.refreshing && !l.busy) {
+                if (wl.length() == 0)
+                    wl.append(w);
+                else
+                    wl.append(" \u00b7 ").append(w.substring(wherePrefix(w).length()));
+            }
+        }
+        if (loading) {
+            toggle.setText(title + " Loading\u2026");
+            toggle.setTextColor(Color.parseColor("#FFC107"));
+            toggle.setEnabled(false);
+        } else {
+            toggle.setText(title + (anyOn ? " ON" : " OFF"));
+            toggle.setTextColor(anyOn ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+            toggle.setEnabled(true);
+        }
+        final boolean turnOn = !anyOn;
+        toggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                for (LoadedLayer l : kinds)
+                    if (l.isVisible() != turnOn)
+                        manager.setVisible(l, turnOn);
+            }
+        });
+        if (wl.length() > 0) {
+            where.setText(wl);
+            where.setVisibility(View.VISIBLE);
+        } else {
+            where.setVisibility(View.GONE);
+        }
+        final String foldKey = "fold.group." + key;
+        final boolean open = uiPrefs().getBoolean(foldKey, false);
+        expand.setRotation(open ? 180f : 0f);
+        body.setVisibility(open ? View.VISIBLE : View.GONE);
+        expand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final boolean nowOpen = body.getVisibility() != View.VISIBLE;
+                uiPrefs().edit().putBoolean(foldKey, nowOpen).apply();
+                expand.setRotation(nowOpen ? 180f : 0f);
+                body.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
+            }
+        });
+        for (LoadedLayer l : kinds)
+            body.addView(buildRow(l, com.atakmap.android.featurelayer.Boundaries.shortTitle(l.spec)));
+        return row;
+    }
+
+    /** One layer's row: its switch, its status line and, under the arrow, its controls. */
+    private View buildRow(final LoadedLayer l, final String name) {
+        final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.layer_row, null);
+        final TextView status = row.findViewById(R.id.row_status);
+        status.setText(statusLine(l));
+        // "You are in Elko County, NV", from the layer itself, while it is on.
+        final TextView where = row.findViewById(R.id.row_where);
+        final String whereLine = l.whereLine;
+        if (whereLine != null && l.isVisible() && !l.refreshing && !l.busy) {
+            where.setText(whereLine);
+            where.setVisibility(View.VISIBLE);
+        } else {
+            where.setVisibility(View.GONE);
+        }
+        final Button toggle = row.findViewById(R.id.row_toggle);
+        if (l.refreshing || l.busy) {
+            toggle.setText(name + " Loading\u2026");
+            toggle.setTextColor(Color.parseColor("#FFC107"));
+            toggle.setEnabled(false);
+        } else {
+            toggle.setText(l.myFiresShown() && l.isVisible()
+                    ? l.spec.title + ": My Fires (" + l.myFiresCount() + ")"
+                    : name + (l.isVisible() ? " ON" : " OFF"));
+            toggle.setTextColor(l.isVisible() ? Color.parseColor("#4CAF50") : Color.parseColor("#F44336"));
+            toggle.setEnabled(true);
+        }
+        // One line per layer, its controls under the arrow (Atmosphere's layers page,
+        // operator 2026-10-05). Closed until opened, and remembered per layer: the
+        // list is rebuilt on every refresh, so the state cannot live in the views.
+        final ImageButton expand = row.findViewById(R.id.row_expand);
+        final View body = row.findViewById(R.id.row_body);
+        final String foldKey = foldPref(l);
+        final boolean open = uiPrefs().getBoolean(foldKey, false);
+        expand.setRotation(open ? 180f : 0f);
+        body.setVisibility(open ? View.VISIBLE : View.GONE);
+        status.setVisibility(open ? View.VISIBLE : View.GONE);
+        expand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final boolean nowOpen = body.getVisibility() != View.VISIBLE;
+                uiPrefs().edit().putBoolean(foldKey, nowOpen).apply();
+                expand.setRotation(nowOpen ? 180f : 0f);
+                body.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
+                status.setVisibility(nowOpen ? View.VISIBLE : View.GONE);
+            }
+        });
+        toggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.setVisible(l, !l.isVisible());
+            }
+        });
+        row.findViewById(R.id.row_sets).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickSets(l);
+            }
+        });
+        // Go to frames one incident; a feed spread over a state or the country has no
+        // one place to go, and Features takes the row.
+        row.findViewById(R.id.row_goto).setVisibility(l.isWideFeed() ? View.GONE : View.VISIBLE);
+        row.findViewById(R.id.row_goto).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                l.panTo();
+            }
+        });
+        final Button auto = row.findViewById(R.id.row_auto);
+        auto.setText(autoLabel(l.spec.refreshMinutes));
+        auto.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final int[] steps = { 0, 1, 5, 15, 30 };
+                int i = 0;
+                for (int k = 0; k < steps.length; k++)
+                    if (steps[k] == l.spec.refreshMinutes)
+                        i = k;
+                final int next = steps[(i + 1) % steps.length];
+                auto.setText(autoLabel(next));
+                manager.setRefreshMinutes(l, next);
+            }
+        });
+        row.findViewById(R.id.row_refresh).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                manager.refresh(l);
+            }
+        });
+        row.findViewById(R.id.row_remove).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                uiPrefs().edit().remove(foldKey).apply();
+                manager.remove(l);
+            }
+        });
+        bindKey((LinearLayout) row.findViewById(R.id.row_key), l);
+        bindMyFires(row, l);
+        final View scopeBlock = row.findViewById(R.id.row_scope);
+        if (l.hasScopeControl()) {
+            scopeBlock.setVisibility(View.VISIBLE);
+            bindScope(row, l);
+        } else {
+            scopeBlock.setVisibility(View.GONE);
+        }
+        return row;
     }
 
     /** After a panel swap; posted so it runs once the new panel has been laid out. */

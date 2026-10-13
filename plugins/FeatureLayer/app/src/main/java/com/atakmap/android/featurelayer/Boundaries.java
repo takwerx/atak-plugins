@@ -299,6 +299,33 @@ public final class Boundaries {
         return sb.append(' ').append(kindTitle(kind)).toString();
     }
 
+    /** "Nevada", "Nevada, Utah": the state row every kind of one set of states folds under. */
+    public static String groupTitle(String[] states) {
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; states != null && i < states.length; i++) {
+            final State st = state(states[i]);
+            sb.append(i > 0 ? ", " : "").append(st == null ? states[i] : st.name);
+        }
+        return sb.toString();
+    }
+
+    /** The key layers fold under in the list: their states, in order. */
+    public static String groupKey(LayerSpec s) {
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; s.states != null && i < s.states.length; i++)
+            sb.append(i > 0 ? "-" : "").append(s.states[i]);
+        return sb.toString();
+    }
+
+    /** What a layer is called inside its state's row: "Counties", "Elko, Humboldt Counties". */
+    public static String shortTitle(LayerSpec s) {
+        if (s.picks == null || s.picks.length == 0)
+            return kindTitle(s.kind);
+        final String t = s.title == null ? kindTitle(s.kind) : s.title;
+        final int paren = t.lastIndexOf(" (");
+        return paren > 0 ? t.substring(0, paren) : t;
+    }
+
     /** A stable id for what was picked; the file name is derived from it. */
     static String id(String kind, String[] states, String[] picks) {
         final StringBuilder sb = new StringBuilder(ID_PREFIX).append(kind).append(':');
@@ -507,6 +534,8 @@ public final class Boundaries {
     /** One boundary by name, for the Pick names list. */
     public static final class Named {
         public final String geoid, name, type, state;
+        /** The kind this name belongs to, so a pick across kinds makes one layer per kind. */
+        public String kind;
         /** The name without its legal suffix ("Elko" for Elko County), for a layer title. */
         public final String shortName;
         public final double lat, lon;
@@ -539,20 +568,27 @@ public final class Boundaries {
     }
 
     /**
-     * Every boundary of the kind in the states, names only, nearest the point first
+     * Every boundary of the kinds in the states, names only, nearest the point first
      * (17 rows for Nevada counties, 1,864 for Texas cities and communities). Worker
      * thread.
      */
-    public static List<Named> names(String kind, String[] states, final double lat, final double lon) throws Exception {
+    public static List<Named> names(String[] kinds, String[] states, final double lat, final double lon) throws Exception {
         final Map<String, Named> out = new LinkedHashMap<>();
-        final String fields = "NAME,BASENAME,GEOID,INTPTLAT,INTPTLON" + (KIND_TRIBAL.equals(kind) ? "" : ",STATE");
-        for (int layerId : layerIds(kind, states)) {
-            final String type = setName(kind, layerId);
-            if (KIND_TRIBAL.equals(kind)) {
-                for (String fips : states)
-                    namesPage(kind, layerId, type, fips, fields, "1=1", stateRings(fips), out);
-            } else {
-                namesPage(kind, layerId, type, null, fields, "STATE IN (" + list(states) + ")", null, out);
+        for (String kind : kinds) {
+            final String fields = "NAME,BASENAME,GEOID,INTPTLAT,INTPTLON" + (KIND_TRIBAL.equals(kind) ? "" : ",STATE");
+            final Map<String, Named> mine = new LinkedHashMap<>();
+            for (int layerId : layerIds(kind, states)) {
+                final String type = setName(kind, layerId);
+                if (KIND_TRIBAL.equals(kind)) {
+                    for (String fips : states)
+                        namesPage(kind, layerId, type, fips, fields, "1=1", stateRings(fips), mine);
+                } else {
+                    namesPage(kind, layerId, type, null, fields, "STATE IN (" + list(states) + ")", null, mine);
+                }
+            }
+            for (Named n : mine.values()) {
+                n.kind = kind;
+                out.put(kind + ":" + n.geoid, n);
             }
         }
         final List<Named> list = new ArrayList<>(out.values());
