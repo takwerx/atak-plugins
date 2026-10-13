@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.13** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -108,7 +108,7 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.13, for ATAK-CIV 5.6, 5.7 and 5.8. New: a Storms group with Storm Reports
+0.14, for ATAK-CIV 5.6, 5.7 and 5.8 (0.13 was a 5.8-only build for the pictures). New: a Storms group with Storm Reports
 (the NWS Local Storm Reports of the last three days) and Tornado Paths (the
 NWS Damage Assessment Toolkit's surveyed tracks of the last year, by EF
 rating); Debris Flow (the USGS post-fire debris-flow assessments, fires marked
