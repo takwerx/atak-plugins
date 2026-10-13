@@ -119,6 +119,15 @@
                 android:layout_marginLeft="4dp"
                 android:text="Go to" />
         </LinearLayout>
+        <!-- A Boundaries layer's outline color: "Color: Purple", opening the picker. Gone otherwise. -->
+        <Button
+            android:id="@+id/row_color"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Color: Purple"
+            android:visibility="gone" />
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

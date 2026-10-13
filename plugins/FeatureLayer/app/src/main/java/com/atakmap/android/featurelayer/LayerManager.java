@@ -379,6 +379,26 @@ public class LayerManager {
         });
     }
 
+    /** A Boundaries layer's color, in place from what the phone holds, no network; saved. */
+    public void setColor(final LoadedLayer l, final int rgb) {
+        l.spec.outlineRgb = rgb & 0x00FFFFFF;
+        save();
+        l.busy = true;
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    l.recolor(rgb);
+                } finally {
+                    l.busy = false;
+                    save();
+                    changed();
+                }
+            }
+        });
+    }
+
     /** Fill opacity for one feature type of one layer, in place, no network. */
     public void setSetFill(final LoadedLayer l, final String setName, final int alpha) {
         l.spec.setFill.put(setName, alpha);
@@ -869,6 +889,48 @@ public class LayerManager {
 
     // ---- state --------------------------------------------------------------------
 
+    /**
+     * Cities held the unincorporated communities too until 2026-10-13, when Communities
+     * became a kind of its own. A state whose Cities layer was added before that gets a
+     * Communities layer beside it, on or off as its Cities is, so nothing it showed goes
+     * missing (operator: "where is the community layer?"). Layers picked by name are left
+     * as they are: their picks were cities and communities mixed.
+     */
+    private static JSONArray withCommunities(JSONArray arr) {
+        try {
+            final java.util.Set<String> have = new java.util.HashSet<>();
+            for (int i = 0; i < arr.length(); i++) {
+                final JSONObject sp = arr.getJSONObject(i).optJSONObject("spec");
+                if (sp != null)
+                    have.add(sp.optString("id", ""));
+            }
+            final JSONArray out = new JSONArray();
+            for (int i = 0; i < arr.length(); i++) {
+                final JSONObject o = arr.getJSONObject(i);
+                out.put(o);
+                final JSONObject sp = o.optJSONObject("spec");
+                if (sp == null || !"boundaries".equals(sp.optString("iconSet")) || !Boundaries.KIND_CITIES.equals(sp.optString("kind"))
+                        || sp.optJSONArray("picks") != null)
+                    continue;
+                final String[] states = LayerSpec.fromJson(sp).states;
+                if (states == null || states.length == 0)
+                    continue;
+                final LayerSpec c = Boundaries.layer(Boundaries.KIND_COMMUNITIES, states, null, null);
+                if (have.contains(c.id))
+                    continue;
+                have.add(c.id);
+                final JSONObject n = new JSONObject();
+                n.put("spec", c.toJson());
+                n.put("visible", o.optBoolean("visible", true));
+                out.put(n);
+            }
+            return out;
+        } catch (Exception e) {
+            Log.w(TAG, "communities beside cities: skipped", e);
+            return arr;
+        }
+    }
+
     private void restore() {
         final File bak = new File(stateFile.getPath() + ".bak");
         if (!stateFile.isFile() && !bak.isFile())
@@ -892,6 +954,7 @@ public class LayerManager {
                     arr = prev;
                 }
             }
+            arr = withCommunities(arr);
             for (int i = 0; i < arr.length(); i++) {
                 final JSONObject o = arr.getJSONObject(i);
                 final LayerSpec spec = LayerSpec.fromJson(o.getJSONObject("spec"));

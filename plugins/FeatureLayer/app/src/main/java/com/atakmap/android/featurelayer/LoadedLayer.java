@@ -49,9 +49,9 @@ public class LoadedLayer {
      * Fire Starts as flame and RX markers. 55: fire labels carry % contained. 56: unnamed fires leave after four hours. 57: after an hour, so the
      * stored expiry times are written again. 58: CAL FIRE's record on its fires. 59: Fire History's
      * 2010s, 2000s and 1990s in color. 60: every decade in a color of its own.
-     * 61: 1979 and earlier grey again.
+     * 61: 1979 and earlier grey again. 62: tribal lands gated at 20 mi (Boundaries.TRIBAL_GATE_SINCE).
      */
-    private static final int STYLE_VERSION = 61;
+    private static final int STYLE_VERSION = 62;
 
     /** NWCG point categories that are repair bookkeeping; drawn only when zoomed well in. */
     private static final Set<String> REPAIR = new HashSet<>(Arrays.asList(
@@ -1991,7 +1991,7 @@ public class LoadedLayer {
                                 if (bn != null)
                                     name = bn;
                                 title = Boundaries.KIND_COUNTIES.equals(spec.kind) ? name : name + " (" + target + ")";
-                                style = Boundaries.style(spec.kind, spec.fillFor(target));
+                                style = Boundaries.style(spec, spec.fillFor(target));
                             }
                             if (NewStartsStyles.handles(spec) && isPointLayer) {
                                 // NIFC's colors and size rule on a composed circle, so the
@@ -2121,7 +2121,7 @@ public class LoadedLayer {
                         if (!isPointLayer && !isLineLayer) {
                             int hue = nwcg ? NwcgStyles.polygonFill(cat) : generic.rawFillFor(props);
                             if (bounds)
-                                hue = 0xFF000000 | Boundaries.hue(spec.kind);
+                                hue = 0xFF000000 | Boundaries.hue(spec);
                             if (!nwcg && "sarcop".equals(spec.iconSet)) {
                                 final int h = SarcopStyles.fillHue(layerName, props);
                                 if (h != 0)
@@ -2796,6 +2796,47 @@ public class LoadedLayer {
             } catch (Exception e) {
                 Log.w(TAG, "restyle failed", e);
             }
+        }
+    }
+
+    /**
+     * A Boundaries layer in another color, from what the phone holds: no fetch, so it
+     * works offline. The bare form in each feature's attributes and its fill hue take the
+     * color too, or the labels toggle and the fill control would bring the old one back.
+     * Worker thread.
+     */
+    public void recolor(int rgb) {
+        spec.outlineRgb = rgb & 0x00FFFFFF;
+        synchronized (lock) {
+            if (store == null || closed)
+                return;
+            loadCacheLocked();
+            final List<Pending> out = new ArrayList<>(cache.size());
+            for (Pending pf : cache) {
+                if (pf.attrs != null) {
+                    try {
+                        if (pf.attrs.containsAttribute(ATTR_BARE)) {
+                            final Style b = com.atakmap.map.layer.feature.ogr.style.FeatureStyleParser
+                                    .parse2(pf.attrs.getStringAttribute(ATTR_BARE));
+                            final String nb = packStyle(Boundaries.recolored(b, rgb));
+                            if (nb != null)
+                                pf.attrs.setAttribute(ATTR_BARE, nb);
+                        }
+                        if (pf.attrs.containsAttribute("_fill"))
+                            pf.attrs.setAttribute("_fill", String.valueOf(0xFF000000 | (rgb & 0x00FFFFFF)));
+                    } catch (Exception e) {
+                        Log.w(TAG, spec.id + ": recolor of a bare style failed", e);
+                    }
+                }
+                final Pending np = new Pending(pf.setName, pf.minGsd, pf.name, pf.geometry,
+                        Boundaries.recolored(pf.style, rgb), pf.attrs);
+                np.maxGsd = pf.maxGsd;
+                np.alt = pf.alt == null ? null : Boundaries.recolored(pf.alt, rgb);
+                out.add(np);
+            }
+            cache = out;
+            rewriteStore();
+            Log.d(TAG, spec.id + ": recolored " + out.size() + " to " + Boundaries.colorName(rgb));
         }
     }
 

@@ -44,8 +44,15 @@ public final class Boundaries {
     static final String AIANNHA = TIGER + "/AIANNHA/MapServer";
 
     public static final String ID_PREFIX = "boundaries:";
-    public static final String KIND_COUNTIES = "counties", KIND_CITIES = "cities", KIND_TRIBAL = "tribal";
-    public static final String[] KINDS = { KIND_COUNTIES, KIND_CITIES, KIND_TRIBAL };
+    public static final String KIND_COUNTIES = "counties", KIND_CITIES = "cities", KIND_COMMUNITIES = "communities",
+            KIND_TRIBAL = "tribal";
+    /**
+     * Cities are the incorporated places only; the unincorporated communities the Census
+     * draws are a kind of their own, in their own color (operator, 2026-10-13: "i want to
+     * just have incorporated cities, and then ... communities as a different layer ...
+     * all different colors").
+     */
+    public static final String[] KINDS = { KIND_COUNTIES, KIND_CITIES, KIND_COMMUNITIES, KIND_TRIBAL };
     /** The most states one layer holds: a nationwide county layer is 3,143 polygons and a store rewrite the phone does not need. */
     public static final int MAX_STATES = 5;
     /** About 50 m: the detail the lines are fetched at. Texas counties are 25 MB at full detail and 950 KB at this. */
@@ -54,13 +61,19 @@ public final class Boundaries {
     public static final String CREDIT = "Sources found with the help of Joseph Elfelt, mappingsupport.com";
 
     /** One outline color per kind, so two boundary layers on one ground can be told apart. */
-    public static final int COUNTY_RGB = 0xB040FF, CITY_RGB = 0x2962FF, TRIBAL_RGB = 0xFF4FA3;
+    public static final int COUNTY_RGB = 0xB040FF, CITY_RGB = 0x2962FF, COMMUNITY_RGB = 0xFFD600, TRIBAL_RGB = 0xFF4FA3;
 
     static final double MILE = 1609.344;
-    /** Counties and tribal lands label from the 20-mile scale, cities from the 5-mile scale. */
+    /** Counties and tribal lands label from the 20-mile scale, cities and communities from the 5-mile scale. */
     static final double LABEL_GSD_20MI = 20 * MILE / ScaleBar.FALLBACK_BAR_PIXELS;
-    /** Cities draw from the 20-mile scale in; counties and tribal lands at every zoom. */
+    /**
+     * Cities, communities and tribal lands draw from the 20-mile scale in; counties at
+     * every zoom. Tribal lands drew at every zoom until 2026-10-13 (operator: "tribes are
+     * staying on expanding out ... should be same zoom gate to start as cities").
+     */
     static final double GATE_GSD_20MI = LABEL_GSD_20MI;
+    /** The style version that brought the tribal gate; a layer saved before it takes the gate once. */
+    static final int TRIBAL_GATE_SINCE = 62;
 
     /** A state or territory: FIPS code, postal abbreviation, name, and the Census center for sorting by distance. */
     public static final class State {
@@ -180,11 +193,13 @@ public final class Boundaries {
         return spec != null && "boundaries".equals(spec.iconSet) && spec.kind != null;
     }
 
-    /** "Counties", "Cities", "Tribal Lands". */
+    /** "Counties", "Cities", "Communities", "Tribal Lands". */
     public static String kindTitle(String kind) {
         switch (kind == null ? "" : kind) {
             case KIND_CITIES:
                 return "Cities";
+            case KIND_COMMUNITIES:
+                return "Communities";
             case KIND_TRIBAL:
                 return "Tribal Lands";
             default:
@@ -196,7 +211,9 @@ public final class Boundaries {
     public static String kindNote(String kind) {
         switch (kind == null ? "" : kind) {
             case KIND_CITIES:
-                return "Incorporated cities and towns, and the unincorporated communities the Census draws";
+                return "Incorporated cities, towns and villages";
+            case KIND_COMMUNITIES:
+                return "Unincorporated communities the Census draws a line around";
             case KIND_TRIBAL:
                 return "Federal and state reservations and off-reservation trust lands";
             default:
@@ -204,10 +221,36 @@ public final class Boundaries {
         }
     }
 
+    /**
+     * The colors a Boundaries layer can be drawn in, name and RGB, in the picker's order
+     * (operator, 2026-10-13: "could we make it where the user could choose their color
+     * of preference?"). Each kind starts in its own; the pick is per layer and saved.
+     */
+    public static final Object[][] COLORS = {
+            { "Purple", 0xB040FF }, { "Royal Blue", 0x2962FF }, { "Yellow", 0xFFD600 }, { "Pink", 0xFF4FA3 },
+            { "Red", 0xFF1744 }, { "Green", 0x00C853 }, { "Teal", 0x00BFA5 }, { "Orange", 0xFF9100 },
+            { "White", 0xFFFFFF }, { "Black", 0x000000 },
+    };
+
+    /** The color a layer draws in: the operator's pick, else its kind's. */
+    public static int hue(LayerSpec s) {
+        return s != null && s.outlineRgb != 0 ? s.outlineRgb & 0x00FFFFFF : hue(s == null ? null : s.kind);
+    }
+
+    /** "Purple": the picker's name for a color, or its hex when it is not one of them. */
+    public static String colorName(int rgb) {
+        for (Object[] c : COLORS)
+            if (((Integer) c[1] & 0x00FFFFFF) == (rgb & 0x00FFFFFF))
+                return (String) c[0];
+        return String.format(Locale.US, "#%06X", rgb & 0x00FFFFFF);
+    }
+
     public static int hue(String kind) {
         switch (kind == null ? "" : kind) {
             case KIND_CITIES:
                 return CITY_RGB;
+            case KIND_COMMUNITIES:
+                return COMMUNITY_RGB;
             case KIND_TRIBAL:
                 return TRIBAL_RGB;
             default:
@@ -219,6 +262,7 @@ public final class Boundaries {
     static String base(String kind) {
         switch (kind == null ? "" : kind) {
             case KIND_CITIES:
+            case KIND_COMMUNITIES:
                 return PLACES;
             case KIND_TRIBAL:
                 return AIANNHA;
@@ -231,7 +275,9 @@ public final class Boundaries {
     static int[] layerIds(String kind, String[] states) {
         switch (kind == null ? "" : kind) {
             case KIND_CITIES:
-                return new int[] { 5, 4 }; // communities under the incorporated places
+                return new int[] { 4 }; // Incorporated Places
+            case KIND_COMMUNITIES:
+                return new int[] { 5 }; // Census Designated Places
             case KIND_TRIBAL:
                 return has(states, "15") ? new int[] { 2, 3, 4, 5 } : new int[] { 2, 3, 4 };
             default:
@@ -243,7 +289,9 @@ public final class Boundaries {
     public static String setName(String kind, int layerId) {
         switch (kind == null ? "" : kind) {
             case KIND_CITIES:
-                return layerId == 5 ? "Community" : "Incorporated";
+                return "City";
+            case KIND_COMMUNITIES:
+                return "Community";
             case KIND_TRIBAL:
                 return layerId == 3 ? "Trust land" : layerId == 4 ? "State reservation"
                         : layerId == 5 ? "Hawaiian home land" : "Federal reservation";
@@ -266,8 +314,8 @@ public final class Boundaries {
         s.setNotes.clear();
         for (int id : layerIds(s.kind, s.states)) {
             final String n = setName(s.kind, id);
-            s.setNotes.put(n, KIND_CITIES.equals(s.kind)
-                    ? (id == 5 ? "Unincorporated communities with a Census boundary" : "Cities, towns and villages")
+            s.setNotes.put(n, KIND_CITIES.equals(s.kind) ? "Cities, towns and villages"
+                    : KIND_COMMUNITIES.equals(s.kind) ? "Unincorporated communities with a Census boundary"
                     : KIND_TRIBAL.equals(s.kind)
                     ? (id == 3 ? "Land held in trust off a reservation" : id == 4 ? "Reservations a state recognizes"
                             : id == 5 ? "Hawaiian Homes Commission lands" : "Reservations the federal government recognizes")
@@ -365,8 +413,9 @@ public final class Boundaries {
         fixed(s);
         s.fillAlpha = 0; // outline only; the fill control adds a tint
         s.labels = true;
-        s.labelGsd = KIND_CITIES.equals(kind) ? LayerSpec.DEFAULT_LABEL_GSD_WIDE : LABEL_GSD_20MI;
-        s.gateGsd = KIND_CITIES.equals(kind) ? GATE_GSD_20MI : Double.MAX_VALUE;
+        final boolean places = KIND_CITIES.equals(kind) || KIND_COMMUNITIES.equals(kind);
+        s.labelGsd = places ? LayerSpec.DEFAULT_LABEL_GSD_WIDE : LABEL_GSD_20MI;
+        s.gateGsd = places || KIND_TRIBAL.equals(kind) ? GATE_GSD_20MI : Double.MAX_VALUE;
         return s;
     }
 
@@ -389,6 +438,10 @@ public final class Boundaries {
         s.generalize = false;
         s.where = where(s);
         notes(s);
+        // A tribal layer saved with the old "every zoom" takes the new gate, once: the
+        // style version moves on after its next fetch, so a gate set later stays.
+        if (KIND_TRIBAL.equals(s.kind) && s.styleVersion < TRIBAL_GATE_SINCE && s.gateGsd == Double.MAX_VALUE)
+            s.gateGsd = GATE_GSD_20MI;
     }
 
     /** The where clause: the states by FIPS, or the picked GEOIDs. Tribal lands have no state field; their state is a shape ({@link #passes}). */
@@ -413,7 +466,7 @@ public final class Boundaries {
     }
 
     /**
-     * The spatial filters a fetch runs, in turn: one pass for counties, cities and any
+     * The spatial filters a fetch runs, in turn: one pass for counties, cities, communities and any
      * picked names; one pass per state for every tribal land in a state, each the
      * state's own outline POSTed as the filter (the AIANNHA layers carry no state
      * field). Worker thread; a state outline that cannot be fetched throws.
@@ -520,13 +573,37 @@ public final class Boundaries {
         return num + (metric ? " sq km" : " sq mi");
     }
 
-    /** The outline in the kind's color, filled at {@code alpha} (0 = outline only). */
-    static Style style(String kind, int alpha) {
-        final Style edge = NwcgStyles.solid(0xFF000000 | hue(kind), 2f);
+    /** The outline in the layer's color, filled at {@code alpha} (0 = outline only). */
+    static Style style(LayerSpec s, int alpha) {
+        final int rgb = hue(s);
+        final Style edge = NwcgStyles.solid(0xFF000000 | rgb, 2f);
         if (alpha <= 0)
             return edge;
         return NwcgStyles.over(new com.atakmap.map.layer.feature.style.BasicFillStyle(
-                (Math.min(255, alpha) << 24) | hue(kind)), edge);
+                (Math.min(255, alpha) << 24) | rgb), edge);
+    }
+
+    /**
+     * The same style in another color: every stroke and fill in it takes {@code rgb},
+     * each keeping its own width or opacity; the name pill and labels are untouched.
+     */
+    static Style recolored(Style s, int rgb) {
+        if (s instanceof com.atakmap.map.layer.feature.style.BasicStrokeStyle) {
+            final com.atakmap.map.layer.feature.style.BasicStrokeStyle b = (com.atakmap.map.layer.feature.style.BasicStrokeStyle) s;
+            return new com.atakmap.map.layer.feature.style.BasicStrokeStyle(0xFF000000 | rgb, b.getStrokeWidth());
+        }
+        if (s instanceof com.atakmap.map.layer.feature.style.BasicFillStyle) {
+            final int a = ((com.atakmap.map.layer.feature.style.BasicFillStyle) s).getColor() & 0xFF000000;
+            return new com.atakmap.map.layer.feature.style.BasicFillStyle(a | (rgb & 0x00FFFFFF));
+        }
+        if (s instanceof com.atakmap.map.layer.feature.style.CompositeStyle) {
+            final com.atakmap.map.layer.feature.style.CompositeStyle c = (com.atakmap.map.layer.feature.style.CompositeStyle) s;
+            final Style[] parts = new Style[c.getNumStyles()];
+            for (int i = 0; i < parts.length; i++)
+                parts[i] = recolored(c.getStyle(i), rgb);
+            return new com.atakmap.map.layer.feature.style.CompositeStyle(parts);
+        }
+        return s;
     }
 
     // ---- the pick-names list -------------------------------------------------------

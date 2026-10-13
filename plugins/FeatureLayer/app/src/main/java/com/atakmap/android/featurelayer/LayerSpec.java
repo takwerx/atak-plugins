@@ -137,6 +137,8 @@ public class LayerSpec {
     public String kind;
     public String[] states;
     public String[] picks;
+    /** The outline color the operator picked for a Boundaries layer, RGB; 0 = the kind's own. */
+    public int outlineRgb;
     public int fillAlpha = 0x40; // polygon fill opacity 0..255; 0 = outline only
     /** Per feature type (set name): fill opacity override, and the geometry kind seen at load. */
     public final java.util.Map<String, Integer> setFill = new java.util.HashMap<>();
@@ -224,6 +226,8 @@ public class LayerSpec {
             o.put("states", new JSONArray(java.util.Arrays.asList(states)));
         if (picks != null)
             o.put("picks", new JSONArray(java.util.Arrays.asList(picks)));
+        if (outlineRgb != 0)
+            o.put("outlineRgb", outlineRgb);
         o.put("scopeKind", scopeKind).put("scopeRadiusM", scopeRadiusM).put("scopeRings", scopeRings);
         if (scopeBox != null)
             o.put("scopeBox", new JSONArray(
@@ -293,6 +297,7 @@ public class LayerSpec {
         s.kind = o.isNull("kind") ? null : o.optString("kind", null);
         s.states = strings(o.optJSONArray("states"));
         s.picks = strings(o.optJSONArray("picks"));
+        s.outlineRgb = o.optInt("outlineRgb", 0) & 0x00FFFFFF;
         final JSONArray mf = o.optJSONArray("myFires");
         if (mf != null)
             for (int i = 0; i < mf.length() && s.myFires.size() < MY_FIRES_MAX; i++) {

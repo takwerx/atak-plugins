@@ -1890,6 +1890,83 @@ public class FeatureLayer implements IPlugin {
         }
     }
 
+    /**
+     * "Color: Purple" on a Boundaries layer's row, with a swatch; a tap opens the colors
+     * as a grid of dark tiles. Gone on every other layer.
+     */
+    private void bindColor(View row, final LoadedLayer l) {
+        final Button b = row.findViewById(R.id.row_color);
+        if (b == null)
+            return;
+        if (!com.atakmap.android.featurelayer.Boundaries.handles(l.spec)) {
+            b.setVisibility(View.GONE);
+            return;
+        }
+        final int rgb = com.atakmap.android.featurelayer.Boundaries.hue(l.spec);
+        b.setVisibility(View.VISIBLE);
+        b.setText("Color: " + com.atakmap.android.featurelayer.Boundaries.colorName(rgb));
+        b.setCompoundDrawablesWithIntrinsicBounds(swatch(rgb), null, null, null);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickColor(l);
+            }
+        });
+    }
+
+    /** A rounded color square for a button, edged in grey so black and white show. */
+    private android.graphics.drawable.Drawable swatch(int rgb) {
+        final float dp = paneView.getResources().getDisplayMetrics().density;
+        final android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(0xFF000000 | rgb);
+        d.setStroke(Math.max(1, Math.round(dp)), 0xFF999999);
+        d.setCornerRadius(3 * dp);
+        final int side = Math.round(22 * dp);
+        d.setBounds(0, 0, side, side);
+        d.setSize(side, side);
+        return d;
+    }
+
+    /** The colors as two columns of dark tiles, each with its swatch; the layer's own marked. */
+    private void pickColor(final LoadedLayer l) {
+        final android.content.Context ctx = mapView.getContext();
+        final float dp = paneView.getResources().getDisplayMetrics().density;
+        final int now = com.atakmap.android.featurelayer.Boundaries.hue(l.spec);
+        final LinearLayout grid = new LinearLayout(ctx);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        final int pad = Math.round(8 * dp);
+        grid.setPadding(pad, pad, pad, pad);
+        final AlertDialog[] dialog = new AlertDialog[1];
+        final Object[][] colors = com.atakmap.android.featurelayer.Boundaries.COLORS;
+        LinearLayout line = null;
+        for (int i = 0; i < colors.length; i++) {
+            if (i % 2 == 0) {
+                line = new LinearLayout(ctx);
+                line.setOrientation(LinearLayout.HORIZONTAL);
+                grid.addView(line);
+            }
+            final String name = (String) colors[i][0];
+            final int rgb = (Integer) colors[i][1];
+            final Button t = (Button) PluginLayoutInflater.inflate(pluginContext, R.layout.color_tile, null);
+            t.setText(((rgb & 0x00FFFFFF) == (now & 0x00FFFFFF) ? "\u2713 " : "") + name);
+            t.setCompoundDrawablesWithIntrinsicBounds(swatch(rgb), null, null, null);
+            t.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (dialog[0] != null)
+                        dialog[0].dismiss();
+                    if ((rgb & 0x00FFFFFF) != (now & 0x00FFFFFF))
+                        manager.setColor(l, rgb);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.setMargins(Math.round(3 * dp), Math.round(3 * dp), Math.round(3 * dp), Math.round(3 * dp));
+            line.addView(t, lp);
+        }
+        dialog[0] = new AlertDialog.Builder(ctx).setTitle(l.displayName() + ": color").setView(grid)
+                .setNegativeButton("Cancel", null).show();
+    }
+
     /** The prefix a where line starts with, so several can share one. */
     private static String wherePrefix(String w) {
         return w.startsWith("Map center is in ") ? "Map center is in " : w.startsWith("You are in ") ? "You are in " : "";
@@ -2018,6 +2095,7 @@ public class FeatureLayer implements IPlugin {
         });
         // Go to frames one incident; a feed spread over a state or the country has no
         // one place to go, and Features takes the row.
+        bindColor(row, l);
         row.findViewById(R.id.row_goto).setVisibility(l.isWideFeed() ? View.GONE : View.VISIBLE);
         row.findViewById(R.id.row_goto).setOnClickListener(new View.OnClickListener() {
             @Override
