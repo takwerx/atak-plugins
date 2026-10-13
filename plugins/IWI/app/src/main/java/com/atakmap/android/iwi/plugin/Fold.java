@@ -23,9 +23,15 @@ final class Fold {
 
     Fold(View page, int headId, int chevronId, int bodyId, SharedPreferences prefs,
             String pref) {
-        this.head = page.findViewById(headId);
-        this.chevron = page.findViewById(chevronId);
-        this.body = page.findViewById(bodyId);
+        this((Button) page.findViewById(headId), (ImageButton) page.findViewById(chevronId),
+                page.findViewById(bodyId), prefs, pref);
+    }
+
+    /** For a row built in code. */
+    Fold(Button head, ImageButton chevron, View body, SharedPreferences prefs, String pref) {
+        this.head = head;
+        this.chevron = chevron;
+        this.body = body;
         this.prefs = prefs;
         this.pref = pref;
         this.open = prefs.getBoolean(pref, false);
@@ -44,6 +50,15 @@ final class Fold {
 
     void label(String name, String value) {
         head.setText(value == null ? name : name + ": " + value);
+    }
+
+    /** Green text once the row's section is filled in, white until then. */
+    void complete(boolean done, int green) {
+        head.setTextColor(done ? green : android.graphics.Color.WHITE);
+    }
+
+    boolean isOpen() {
+        return open;
     }
 
     private void show() {

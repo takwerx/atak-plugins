@@ -83,6 +83,14 @@
                     android:textColor="@color/white" />
 
                 <TextView
+                    android:id="@+id/live_patients"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="2dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/white" />
+
+                <TextView
                     android:id="@+id/live_where"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

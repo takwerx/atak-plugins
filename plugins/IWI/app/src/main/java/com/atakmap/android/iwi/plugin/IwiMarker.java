@@ -83,8 +83,8 @@ public final class IwiMarker {
             med.setAttribute("litter", Integer.toString(red + yellow));
             med.setAttribute("ambulatory", Integer.toString(green));
         }
-        if (s.patients() > 0)
-            med.setAttribute("us_civilian", Integer.toString(s.patients()));
+        if (s.patientCount() > 0)
+            med.setAttribute("us_civilian", Integer.toString(s.patientCount()));
         final String remarks = RadioScript.remarks(s, coords);
         if (!remarks.isEmpty())
             med.setAttribute("medline_remarks", remarks);

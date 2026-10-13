@@ -38,7 +38,8 @@ import java.util.List;
  * confirms it, and puts one CASEVAC marker on this map. Clear is two selections, the
  * button and a dialog naming what goes. Every dialog is built on the MapView's context.
  */
-public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource {
+public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
+        ReportForm.Host {
 
     private static final String TAG = "IWI-Pane";
     private static final long TICK_MS = 30_000L;
@@ -59,8 +60,11 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource {
     private final View liveBlock;
     private final TextView liveTime;
     private final TextView liveWhere;
+    private final TextView livePatients;
     private final Button moveButton;
     private final LinearLayout scriptContainer;
+    /** Where the script page's Back goes: the main page or the report. */
+    private View scriptReturn;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable tick = new Runnable() {
@@ -91,6 +95,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource {
         liveBlock = root.findViewById(R.id.live_block);
         liveTime = root.findViewById(R.id.live_time);
         liveWhere = root.findViewById(R.id.live_where);
+        livePatients = root.findViewById(R.id.live_patients);
         moveButton = root.findViewById(R.id.btn_move);
         scriptContainer = root.findViewById(R.id.script_container);
 
@@ -140,6 +145,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource {
             @Override
             public void onClick(View v) {
                 buildScript();
+                scriptReturn = mainPage;
                 show(scriptPage);
             }
         });
@@ -150,7 +156,15 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource {
             }
         };
         root.findViewById(R.id.btn_settings_back).setOnClickListener(back);
-        root.findViewById(R.id.btn_script_back).setOnClickListener(back);
+        root.findViewById(R.id.btn_script_back).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (scriptReturn == reportPage)
+                    show(reportPage);
+                else
+                    showMain();
+            }
+        });
         root.findViewById(R.id.btn_report_back).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -167,12 +181,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource {
                         if (state.isLive())
                             IwiMarker.write(state);
                         buildScript();
+                        scriptReturn = reportPage;
                         show(scriptPage);
                     }
                 });
 
-        form = new ReportForm(pluginContext, mapView,  state,
-                (LinearLayout) root.findViewById(R.id.report_container));
+        form = new ReportForm(pluginContext, mapView, state, manager.prefs(),
+                (LinearLayout) root.findViewById(R.id.report_container), this);
         trauma = new TraumaPane(mapView, root, manager, this, this);
         updateMain();
         handler.postDelayed(tick, TICK_MS);
@@ -266,6 +281,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource {
         liveWhere.setText(Coords.ddm(p.getLatitude(), p.getLongitude()) + "\n"
                 + (IwiState.SOURCE_MAP.equals(state.source())
                         ? "Set on the map" : "My Location when declared"));
+        final String who = RadioScript.summary(state);
+        livePatients.setText(who.isEmpty() ? "No patients counted yet" : who);
     }
 
     static String ago(long ms) {
@@ -438,15 +455,51 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource {
         updateMain();
     }
 
-    // ---- the radio script ----
+    // ---- the radio scripts ----
 
+    /** The Radio Script page: the initial report, then whatever the follow-ups say. */
     private void buildScript() {
         scriptContainer.removeAllViews();
         scriptContainer.addView(note(ctx.getString(R.string.script_how)));
         final GeoPoint p = state.isLive() ? state.point() : null;
         final String coords = p == null ? null
                 : Coords.ddm(p.getLatitude(), p.getLongitude());
-        final List<RadioScript.Section> sections = RadioScript.build(state, coords);
+        scriptContainer.addView(heading("Initial report"));
+        boolean anyMissing = render(RadioScript.initial(state, coords));
+        scriptContainer.addView(heading("Follow-up"));
+        final List<RadioScript.Section> more = RadioScript.followUp(state);
+        if (more.isEmpty()) {
+            scriptContainer.addView(note(ctx.getString(R.string.script_nothing_yet)));
+        } else {
+            scriptContainer.addView(line(RadioScript.updateLead(state), 20, Color.WHITE));
+            anyMissing |= render(more);
+        }
+        finishScript(anyMissing);
+    }
+
+    /** One patient's follow-up, from its card's Radio update. */
+    @Override
+    public void patientScript(int n) {
+        if (state.isLive())
+            IwiMarker.write(state);
+        final Patient patient = state.patient(n);
+        if (patient == null)
+            return;
+        scriptContainer.removeAllViews();
+        scriptContainer.addView(note(ctx.getString(R.string.script_how)));
+        scriptContainer.addView(heading("Update: patient " + n));
+        scriptContainer.addView(line(RadioScript.updateLead(state), 20, Color.WHITE));
+        final RadioScript.Section one = RadioScript.patient(state, patient);
+        one.after = null;
+        final List<RadioScript.Section> list = new java.util.ArrayList<>();
+        list.add(one);
+        finishScript(render(list));
+        scriptReturn = reportPage;
+        show(scriptPage);
+    }
+
+    /** @return whether anything in them is not filled in */
+    private boolean render(List<RadioScript.Section> sections) {
         boolean anyMissing = false;
         for (RadioScript.Section s : sections) {
             final SpannableStringBuilder b = new SpannableStringBuilder();
@@ -463,28 +516,43 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource {
                             b.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
             }
-            final TextView t = new TextView(ctx);
+            final TextView t = line("", 20, Color.WHITE);
             t.setText(b);
-            t.setTextSize(20);
-            t.setTextColor(Color.WHITE);
-            t.setLineSpacing(0, 1.15f);
-            t.setPadding(0, dp(12), 0, dp(4));
-            t.setTextIsSelectable(true);
             scriptContainer.addView(t);
             if (s.after != null) {
-                final TextView br = new TextView(ctx);
-                br.setText(s.after);
-                br.setTextSize(16);
+                final TextView br = line(s.after, 16, color(R.color.amber));
                 br.setTypeface(Typeface.DEFAULT_BOLD);
-                br.setTextColor(color(R.color.amber));
+                br.setPadding(0, 0, 0, 0);
                 scriptContainer.addView(br);
             }
         }
+        return anyMissing;
+    }
+
+    private void finishScript(boolean anyMissing) {
         if (anyMissing)
             scriptContainer.addView(note(ctx.getString(R.string.script_missing)));
         final TextView credit = note(ctx.getString(R.string.script_credit));
         credit.setPadding(0, dp(16), 0, dp(4));
         scriptContainer.addView(credit);
+    }
+
+    private TextView line(String text, int sp, int color) {
+        final TextView t = new TextView(ctx);
+        t.setText(text);
+        t.setTextSize(sp);
+        t.setTextColor(color);
+        t.setLineSpacing(0, 1.15f);
+        t.setPadding(0, dp(12), 0, dp(4));
+        t.setTextIsSelectable(true);
+        return t;
+    }
+
+    private TextView heading(String text) {
+        final TextView t = new TextView(ctx, null, 0, R.style.TakwerxSectionHeading);
+        t.setText(text);
+        t.setPadding(0, dp(18), 0, dp(2));
+        return t;
     }
 
     private TextView note(String text) {

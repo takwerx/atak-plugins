@@ -2,9 +2,17 @@ package com.atakmap.android.iwi.plugin;
 
 import android.content.SharedPreferences;
 
+import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -69,6 +77,8 @@ public final class IwiState implements RadioScript.Source {
     private static final String K_SOURCE = "iwi.source";
     private static final String K_DECLARED = "iwi.declaredMs";
     private static final String FIELD = "iwi.f.";
+    /** The patient cards, as one JSON array. Under FIELD, so a Clear takes them. */
+    private static final String K_PATIENTS = FIELD + "patients";
 
     private final SharedPreferences prefs;
 
@@ -172,20 +182,151 @@ public final class IwiState implements RadioScript.Source {
         prefs.edit().putString(FIELD + key, value == null ? "" : value).apply();
     }
 
+    /** How many patient cards are this color. The cards are the only count there is. */
     @Override
-    public int count(String key) {
+    public int count(String color) {
+        int n = 0;
+        for (Patient p : patients())
+            if (p.color.equals(color))
+                n++;
+        return n;
+    }
+
+    public int patientCount() {
+        return patients().size();
+    }
+
+    // ---- patients ----
+
+    /** Every card, in the order they were added. */
+    @Override
+    public List<Patient> patients() {
+        final List<Patient> out = new ArrayList<>();
+        final String json = prefs.getString(K_PATIENTS, "");
+        if (json == null || json.isEmpty())
+            return out;
         try {
-            return Math.max(0, prefs.getInt(FIELD + key, 0));
-        } catch (ClassCastException e) {
-            return 0;
+            final JSONArray a = new JSONArray(json);
+            for (int i = 0; i < a.length(); i++) {
+                final JSONObject o = a.optJSONObject(i);
+                if (o == null)
+                    continue;
+                final Patient p = new Patient();
+                p.n = o.optInt("n", i + 1);
+                p.color = o.optString("color", RED);
+                if (Patient.rank(p.color) == 3 && !BLACK.equals(p.color))
+                    p.color = RED;
+                p.assessment = o.optString("assessment", "");
+                p.treatment = o.optString("treatment", "");
+                p.weight = o.optString("weight", "");
+                p.updatedMs = o.optLong("updated", 0L);
+                out.add(p);
+            }
+        } catch (JSONException e) {
+            Log.w("IWI-State", "the patient cards are unreadable", e);
         }
+        return out;
     }
 
-    public void setCount(String key, int n) {
-        prefs.edit().putInt(FIELD + key, Math.max(0, Math.min(99, n))).apply();
+    /** Most severe first, then in the order they were added. */
+    public List<Patient> patientsBySeverity() {
+        final List<Patient> list = patients();
+        Collections.sort(list, new Comparator<Patient>() {
+            @Override
+            public int compare(Patient a, Patient b) {
+                final int r = Patient.rank(a.color) - Patient.rank(b.color);
+                return r != 0 ? r : a.n - b.n;
+            }
+        });
+        return list;
     }
 
-    public int patients() {
-        return count(RED) + count(YELLOW) + count(GREEN) + count(BLACK);
+    private void save(List<Patient> list) {
+        final JSONArray a = new JSONArray();
+        try {
+            for (Patient p : list) {
+                final JSONObject o = new JSONObject();
+                o.put("n", p.n);
+                o.put("color", p.color);
+                o.put("assessment", p.assessment);
+                o.put("treatment", p.treatment);
+                o.put("weight", p.weight);
+                o.put("updated", p.updatedMs);
+                a.put(o);
+            }
+        } catch (JSONException e) {
+            Log.w("IWI-State", "could not save the patient cards", e);
+            return;
+        }
+        prefs.edit().putString(K_PATIENTS, a.toString()).apply();
+    }
+
+    /** A new card of this color, numbered after the highest so far. */
+    public Patient addPatient(String color) {
+        final List<Patient> list = patients();
+        int max = 0;
+        for (Patient p : list)
+            max = Math.max(max, p.n);
+        final Patient p = new Patient();
+        p.n = max + 1;
+        p.color = color;
+        list.add(p);
+        save(list);
+        return p;
+    }
+
+    /**
+     * Take away the newest card of this color that nobody has written on.
+     *
+     * @return the number taken away, or -1 when every card of that color has notes
+     */
+    public int removeNewestBlank(String color) {
+        final List<Patient> list = patients();
+        for (int i = list.size() - 1; i >= 0; i--) {
+            final Patient p = list.get(i);
+            if (p.color.equals(color) && !p.hasNotes()) {
+                list.remove(i);
+                save(list);
+                return p.n;
+            }
+        }
+        return -1;
+    }
+
+    public void removePatient(int n) {
+        final List<Patient> list = patients();
+        for (int i = 0; i < list.size(); i++)
+            if (list.get(i).n == n) {
+                list.remove(i);
+                break;
+            }
+        save(list);
+    }
+
+    public Patient patient(int n) {
+        for (Patient p : patients())
+            if (p.n == n)
+                return p;
+        return null;
+    }
+
+    /** One field of one card: color, assessment, treatment or weight. */
+    public void updatePatient(int n, String field, String value) {
+        final List<Patient> list = patients();
+        for (Patient p : list) {
+            if (p.n != n)
+                continue;
+            final String v = value == null ? "" : value;
+            if ("color".equals(field))
+                p.color = v;
+            else if ("assessment".equals(field))
+                p.assessment = v;
+            else if ("treatment".equals(field))
+                p.treatment = v;
+            else if ("weight".equals(field))
+                p.weight = v;
+            p.updatedMs = System.currentTimeMillis();
+        }
+        save(list);
     }
 }
