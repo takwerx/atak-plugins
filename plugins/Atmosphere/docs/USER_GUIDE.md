@@ -181,7 +181,7 @@ opening the plugin.
 | Snow | Snow Stations | Mountain snow stations: depth, water equivalent, temperature |
 | Snow | Snow Depth | The daily snow analysis as a picture |
 
-<img src="screenshots/116_wind_heat.png" width="420"> <img src="screenshots/118_layers_folded.png" width="420">
+<img src="screenshots/116_wind_heat.jpg" width="420"> <img src="screenshots/118_layers_folded.png" width="420">
 
 ## 5. What the layers look like
 
@@ -351,7 +351,7 @@ date and the years it has been sampled. Moving the map into another state asks
 for that state. The database is the US Forest Service's; the samples reach the
 plugin through San Jose State University's fuel moisture portal.
 
-<img src="screenshots/115_fuel_block.png" width="420">
+<img src="screenshots/115_fuel_block.jpg" width="420">
 
 **Lightning** draws NOAA's lightning strike density: how many strikes the
 ground networks counted in each 5-mile square in 15 minutes, from yellow (under
@@ -392,10 +392,10 @@ where, when, the office and its remarks. They are preliminary, as spotters
 and the public told the offices; the surveyed tornado paths are the next
 layer.
 
-<img src="screenshots/97_reports_layer_block.png" width="420"> <img src="screenshots/101_reports_map.png" width="420">
+<img src="screenshots/97_reports_layer_block.png" width="420"> <img src="screenshots/101_reports_map.jpg" width="420">
 
 **The Storm Reports page** lists the same reports, and the tornado paths with
-them: **Nationwide**, **Near** the point in the pane's top row (your position,
+them: **US**, **Near** the point in the pane's top row (your position,
 the map center or a picked point), on the **Map** as it sits, re-read whenever
 the map settles, or by **State**; **Newest** or **Closest** first; and a type
 picker of switches, any mix of the eight families and **Tornado**, which covers
@@ -403,7 +403,7 @@ the dots and the paths. What you tick is what the map draws. A row flies the
 map to the report and opens its details in one tap. **Open the list** under the
 layer's switch jumps to the page.
 
-<img src="screenshots/107_reports_page.png" width="420"> <img src="screenshots/108_reports_types.png" width="420">
+<img src="screenshots/107_reports_page.jpg" width="420"> <img src="screenshots/108_reports_types.png" width="420">
 
 **Tornado Paths** draws the track a survey team walked after a tornado, as a
 line in the Damage Assessment Toolkit's color for its EF rating, from EF0 aqua
@@ -415,7 +415,7 @@ the damage implies, injuries and deaths, and the survey team's words. A path
 appears a day or more after the storm, once the office has walked it, and is
 preliminary until the office finalizes it.
 
-<img src="screenshots/98_tornado_layer_block.png" width="420"> <img src="screenshots/102_tornado_map.png" width="420">
+<img src="screenshots/98_tornado_layer_block.png" width="420"> <img src="screenshots/102_tornado_map.jpg" width="420">
 
 **Debris Flow** sits in the Rain and rivers group because a debris flow is a
 flood of rock and mud, and the trigger is a burst of rain over a burn. It
@@ -434,9 +434,9 @@ remembered. The status line names the fires shown and counts their basins by
 hazard. A burn stays hazardous for two to five years, until the slopes grow
 back.
 
-<img src="screenshots/99_debrisflow_layer_block.png" width="420"> <img src="screenshots/103_debrisflow_fires.png" width="420">
+<img src="screenshots/99_debrisflow_layer_block.png" width="420"> <img src="screenshots/103_debrisflow_fires.jpg" width="420">
 
-<img src="screenshots/103_fire_page.png" width="420"> <img src="screenshots/106_basin_details.png" width="420">
+<img src="screenshots/103_fire_page.jpg" width="420"> <img src="screenshots/106_basin_details.jpg" width="420">
 
 **Earthquakes** draws the USGS feed the way USGS's own map does: a circle sized
 by magnitude, colored by age (past hour red, past day orange, past week yellow,
@@ -451,7 +451,7 @@ it and how hard, the PAGER impact level, whether USGS flagged a tsunami, whether
 a seismologist has reviewed it, and the USGS event page. Worldwide, every five
 minutes.
 
-<img src="screenshots/100_quakes_layer_block.png" width="420"> <img src="screenshots/104_quakes_map.png" width="420">
+<img src="screenshots/100_quakes_layer_block.png" width="420"> <img src="screenshots/104_quakes_map.jpg" width="420">
 
 <img src="screenshots/105_quake_details.png" width="420">
 
@@ -468,7 +468,7 @@ on how much: in the mountains it reads low, in a downpour high. Use it for
 where it poured and a gauge for how much. The **Transparency** slider lets the
 map show through. Lower 48 only.
 
-<img src="screenshots/109_raintotals_block.png" width="420">
+<img src="screenshots/109_raintotals_block.jpg" width="420">
 
 **Rain Gauges** draws three kinds of gauge, each a dot in the color of its
 last 24 hours with the gauge's name and the inches in the pill, "Palomar CRS
@@ -485,7 +485,7 @@ CoCoRaHS is asked by state. Your position is not sent. Northern California
 has no office report and few USGS rain gauges, so the volunteers are most of
 what draws there.
 
-<img src="screenshots/110_raingauges_block.png" width="420">
+<img src="screenshots/110_raingauges_block.jpg" width="420">
 
 **The Rain Gauges page** shows the forecast office's rainfall report for the
 point in the pane's top row: the gauges the office lists, with their inches for
@@ -503,7 +503,7 @@ Under it, the USGS gauges around the map with Go to. Thirty-three offices
 publish such a report, Los Angeles and San Diego among them; the page says so
 when the office here does not. It needs NWS as the forecast service.
 
-<img src="screenshots/111_rain_page.png" width="420">
+<img src="screenshots/111_rain_page.jpg" width="420">
 
 ## 11. Spot Weather Forecast
 

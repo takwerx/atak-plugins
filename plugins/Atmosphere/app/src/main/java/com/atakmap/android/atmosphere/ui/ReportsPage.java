@@ -213,13 +213,8 @@ public final class ReportsPage {
         near = chip(pluginContext.getString(R.string.reports_near));
         onMap = chip(pluginContext.getString(R.string.reports_map));
         state = chip(pluginContext.getString(R.string.spot_state));
-        // Four chips with counts share one row; on a phone-width pane "Nationwide (143)"
-        // was cut to "Nationw..." (operator, 2026-10-12). Two lines at 13sp instead.
-        for (Button b : new Button[] { all, near, onMap, state }) {
-            b.setSingleLine(false);
-            b.setMaxLines(2);
-            b.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
-        }
+        // Four chips with counts share one row; "Nationwide (143)" was cut to "Nationw..."
+        // on a phone-width pane (operator, 2026-10-12), so the first reads "US".
         for (Button b : new Button[] { all, near, onMap, state })
             where.addView(b, weight(1f, b != state));
         browse.addView(where);

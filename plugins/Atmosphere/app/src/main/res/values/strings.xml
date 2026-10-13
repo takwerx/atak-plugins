@@ -402,7 +402,7 @@
     <string name="reports_switch_on">Switch Storm Reports on</string>
     <string name="reports_type_all">All Types</string>
     <string name="reports_map">Map</string>
-    <string name="reports_anywhere">Nationwide</string>
+    <string name="reports_anywhere">US</string>
     <string name="reports_near">Near</string>
     <string name="reports_paths">Tornado Paths</string>
     <string name="reports_nothing_picked">Nothing is ticked in the type picker, so there is nothing to list.</string>
