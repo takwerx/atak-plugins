@@ -1,12 +1,12 @@
 # Atmosphere for ATAK — User Guide
 
-**Version 0.13 · takwerx**
+**Version 0.14 · takwerx**
 
-**Download Atmosphere 0.13** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.13/ATAK-Plugin-Atmosphere-0.13--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -110,9 +110,13 @@ Fire Weather) each behind a button that opens it in place. It follows the point
 in the top row, so Map center in another office's area brings that office's
 discussion. The watches and warnings list stays with IPAWS.
 
+<img src="screenshots/112_synopsis.png" width="420">
+
 ## 4. The layers
 
-The second page lists every layer under a heading for what it is about: **Spot
+The second page lists every layer under a heading for what it is about; tap a
+heading to fold its group to one line (it turns green with a count when a layer
+under it is on): **Spot
 Weather Forecast** and **Weather Stations** at the top, then **Wind**, **Fire**, **Rain and
 rivers**, **Ocean** and **Snow**. Each row is a switch that shows its state —
 green ON, red OFF — with the layer's icon beside it. **All on** and **All off**
@@ -176,6 +180,8 @@ opening the plugin.
 | Snow | Avalanche | Forecast zones by danger rating, travel advice behind a tap |
 | Snow | Snow Stations | Mountain snow stations: depth, water equivalent, temperature |
 | Snow | Snow Depth | The daily snow analysis as a picture |
+
+<img src="screenshots/116_wind_heat.png" width="420"> <img src="screenshots/118_layers_folded.png" width="420">
 
 ## 5. What the layers look like
 
@@ -345,6 +351,8 @@ date and the years it has been sampled. Moving the map into another state asks
 for that state. The database is the US Forest Service's; the samples reach the
 plugin through San Jose State University's fuel moisture portal.
 
+<img src="screenshots/115_fuel_block.png" width="420">
+
 **Lightning** draws NOAA's lightning strike density: how many strikes the
 ground networks counted in each 5-mile square in 15 minutes, from yellow (under
 1) to deep purple (over 150). It counts ground strikes and some cloud flashes.
@@ -384,7 +392,7 @@ where, when, the office and its remarks. They are preliminary, as spotters
 and the public told the offices; the surveyed tornado paths are the next
 layer.
 
-<img src="screenshots/97_reports_layer_block.png" width="420">
+<img src="screenshots/97_reports_layer_block.png" width="420"> <img src="screenshots/101_reports_map.png" width="420">
 
 **The Storm Reports page** lists the same reports, and the tornado paths with
 them: **Nationwide**, **Near** the point in the pane's top row (your position,
@@ -394,6 +402,8 @@ picker of switches, any mix of the eight families and **Tornado**, which covers
 the dots and the paths. What you tick is what the map draws. A row flies the
 map to the report and opens its details in one tap. **Open the list** under the
 layer's switch jumps to the page.
+
+<img src="screenshots/107_reports_page.png" width="420"> <img src="screenshots/108_reports_types.png" width="420">
 
 **Tornado Paths** draws the track a survey team walked after a tornado, as a
 line in the Damage Assessment Toolkit's color for its EF rating, from EF0 aqua
@@ -405,7 +415,7 @@ the damage implies, injuries and deaths, and the survey team's words. A path
 appears a day or more after the storm, once the office has walked it, and is
 preliminary until the office finalizes it.
 
-<img src="screenshots/98_tornado_layer_block.png" width="420">
+<img src="screenshots/98_tornado_layer_block.png" width="420"> <img src="screenshots/102_tornado_map.png" width="420">
 
 **Debris Flow** sits in the Rain and rivers group because a debris flow is a
 flood of rock and mud, and the trigger is a burst of rain over a burn. It
@@ -424,7 +434,9 @@ remembered. The status line names the fires shown and counts their basins by
 hazard. A burn stays hazardous for two to five years, until the slopes grow
 back.
 
-<img src="screenshots/99_debrisflow_layer_block.png" width="420">
+<img src="screenshots/99_debrisflow_layer_block.png" width="420"> <img src="screenshots/103_debrisflow_fires.png" width="420">
+
+<img src="screenshots/103_fire_page.png" width="420"> <img src="screenshots/106_basin_details.png" width="420">
 
 **Earthquakes** draws the USGS feed the way USGS's own map does: a circle sized
 by magnitude, colored by age (past hour red, past day orange, past week yellow,
@@ -439,7 +451,9 @@ it and how hard, the PAGER impact level, whether USGS flagged a tsunami, whether
 a seismologist has reviewed it, and the USGS event page. Worldwide, every five
 minutes.
 
-<img src="screenshots/100_quakes_layer_block.png" width="420">
+<img src="screenshots/100_quakes_layer_block.png" width="420"> <img src="screenshots/104_quakes_map.png" width="420">
+
+<img src="screenshots/105_quake_details.png" width="420">
 
 ## 10. Rain Totals and Rain Gauges
 
@@ -453,6 +467,8 @@ radar estimate is good at where it rained and the shape of the storm and fair
 on how much: in the mountains it reads low, in a downpour high. Use it for
 where it poured and a gauge for how much. The **Transparency** slider lets the
 map show through. Lower 48 only.
+
+<img src="screenshots/109_raintotals_block.png" width="420">
 
 **Rain Gauges** draws three kinds of gauge, each a dot in the color of its
 last 24 hours with the gauge's name and the inches in the pill, "Palomar CRS
@@ -469,6 +485,8 @@ CoCoRaHS is asked by state. Your position is not sent. Northern California
 has no office report and few USGS rain gauges, so the volunteers are most of
 what draws there.
 
+<img src="screenshots/110_raingauges_block.png" width="420">
+
 **The Rain Gauges page** shows the forecast office's rainfall report for the
 point in the pane's top row: the gauges the office lists, with their inches for
 the period the office names (during a storm a day or two; the line under the
@@ -484,6 +502,8 @@ gauges.
 Under it, the USGS gauges around the map with Go to. Thirty-three offices
 publish such a report, Los Angeles and San Diego among them; the page says so
 when the office here does not. It needs NWS as the forecast service.
+
+<img src="screenshots/111_rain_page.png" width="420">
 
 ## 11. Spot Weather Forecast
 
