@@ -78,6 +78,18 @@ public final class Cwf {
         }
     }
 
+    /** The forecast office of a {@code /points} answer, "SGX", or "" when it names none. */
+    public static String office(String body) {
+        if (body == null || body.isEmpty())
+            return "";
+        try {
+            final JSONObject p = new JSONObject(body).optJSONObject("properties");
+            return p == null ? "" : p.optString("cwa", "").trim().toUpperCase(java.util.Locale.US);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     /** The marine zone of a {@code /points} answer, or null on land or at sea beyond a zone. */
     public static Zone parsePoint(String body) {
         if (body == null || body.isEmpty())

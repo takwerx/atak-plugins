@@ -42,8 +42,11 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
 
     private final View view;
 
+    private final Context pluginContext;
+
     public StormDetailsReceiver(MapView mapView, Context pluginContext) {
         super(mapView);
+        this.pluginContext = pluginContext;
         this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.storm_details, null);
         // Back closes the details and leaves the map where it is; ATAK's own close is
         // not where a thumb expects it.
@@ -73,6 +76,12 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
 
         /** A Predictive Service Area opens its fire danger and its GACC's chart ("SC08"). */
         void openErc(String code);
+
+        /** A debris-flow fire's Show the area / Hide the area: its basins drawn or taken off. */
+        void showFire(String ref, boolean show);
+
+        /** Whether that fire's area is drawn now, for the button's label. */
+        boolean isFireShown(String ref);
     }
 
     private static SpotOpener spotOpener;
@@ -130,6 +139,45 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         return false;
     }
 
+    private static final java.util.regex.Pattern URL =
+            java.util.regex.Pattern.compile("https?://[^\\s]+");
+
+    /**
+     * Every web address in the page opens in the browser. Through ATAK's own context
+     * with a new task, because a plugin context cannot start an activity (operator,
+     * 2026-10-12: "make the hyperlinks work for the events page").
+     */
+    private static CharSequence linked(String body) {
+        if (body == null || !body.contains("http"))
+            return body == null ? "" : body;
+        final android.text.SpannableString out = new android.text.SpannableString(body);
+        final java.util.regex.Matcher m = URL.matcher(body);
+        while (m.find()) {
+            String url = m.group();
+            int end = m.end();
+            while (end > m.start() && ".,;)".indexOf(url.charAt(url.length() - 1)) >= 0) {
+                url = url.substring(0, url.length() - 1);
+                end--;
+            }
+            final String target = url;
+            out.setSpan(new android.text.style.ClickableSpan() {
+                @Override
+                public void onClick(android.view.View widget) {
+                    final Context ctx = com.atakmap.android.atmosphere.compat.MapCompat.atakContext();
+                    if (ctx == null)
+                        return;
+                    try {
+                        ctx.startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(target))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    } catch (RuntimeException e) {
+                        Log.w(TAG, "no browser for " + target, e);
+                    }
+                }
+            }, m.start(), end, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return out;
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         final String uid = intent.getStringExtra("targetUID");
@@ -147,7 +195,32 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
                 .setText(title.isEmpty() ? "Storm" : title);
         ((TextView) view.findViewById(R.id.details_subtitle))
                 .setText(item.getMetaString("storm_set", ""));
-        ((TextView) view.findViewById(R.id.details_attributes)).setText(body);
+        final TextView attributes = view.findViewById(R.id.details_attributes);
+        attributes.setText(linked(body));
+        attributes.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+        // A fire's page carries the one action its marker is for: bring the map to the
+        // burn and let the layer draw its basins.
+        final android.widget.Button action = view.findViewById(R.id.details_action);
+        final String ref = item.getMetaString("atmosphereRef", "");
+        if (action != null) {
+            if (ref.startsWith("fire:") && spotOpener != null) {
+                final boolean[] shownNow = { spotOpener.isFireShown(ref) };
+                action.setText(pluginContext.getString(shownNow[0] ? R.string.hide_area : R.string.show_area));
+                action.setVisibility(android.view.View.VISIBLE);
+                // The page stays open and the button flips, so the next tap hides the
+                // area again (operator, 2026-10-12: "did not leave me on the pane").
+                action.setOnClickListener(new android.view.View.OnClickListener() {
+                    @Override
+                    public void onClick(android.view.View v) {
+                        shownNow[0] = !shownNow[0];
+                        spotOpener.showFire(ref, shownNow[0]);
+                        action.setText(pluginContext.getString(shownNow[0] ? R.string.hide_area
+                                : R.string.show_area));
+                    }
+                });
+            } else
+                action.setVisibility(android.view.View.GONE);
+        }
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
     }
 

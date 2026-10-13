@@ -16,13 +16,10 @@
         android:paddingBottom="8dp">
 
         <TextView
+            style="@style/TakwerxSectionHeading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/heading_zones"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:paddingTop="8dp"
-            android:alpha="0.6" />
+            android:text="@string/heading_zones" />
 
         <!-- Before the operator has allowed it: what it is and one button. -->
         <LinearLayout
@@ -57,14 +54,12 @@
 
             <!-- The zone the pane's point is in. -->
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:id="@+id/zones_here_heading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:text="@string/heading_zones_here"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="@string/heading_zones_here" />
 
             <TextView
                 android:id="@+id/zones_here_status"
@@ -84,13 +79,11 @@
                  country over: the operator's one exception to "alerts are IPAWS's"
                  (2026-09-28). A filter says its count before it is tapped. -->
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="@string/heading_zones_warned"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="@string/heading_zones_warned" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -132,13 +125,11 @@
             <!-- By number or name. flagNoExtractUi keeps a landscape Samsung keyboard
                  from replacing the pane with a full-screen editor (see page_spot). -->
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="@string/heading_zones_find"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="@string/heading_zones_find" />
 
             <LinearLayout
                 android:id="@+id/zones_search_row"
@@ -194,13 +185,11 @@
                 android:orientation="vertical" />
 
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="@string/heading_zones_starred"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="@string/heading_zones_starred" />
 
             <TextView
                 android:id="@+id/zones_starred_none"
@@ -281,13 +270,11 @@
             <!-- Fire danger: the ERC of the Predictive Service Area the zone sits in.
                  ERC is published per area, not per zone, so it names the area. -->
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="@string/heading_zones_erc"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="@string/heading_zones_erc" />
 
             <TextView
                 android:id="@+id/zones_erc_text"
@@ -308,13 +295,11 @@
                 android:visibility="gone" />
 
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="@string/heading_zones_forecast"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="@string/heading_zones_forecast" />
 
             <!-- As written: the eastern offices' tables are 74 columns wide, so it
                  scrolls sideways in a half-width pane rather than wrapping a row. -->

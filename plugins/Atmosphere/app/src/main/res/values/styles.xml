@@ -170,4 +170,15 @@
         <item name="android:scaleType">centerInside</item>
         <item name="android:padding">9dp</item>
     </style>
+    <!-- Every section heading, on the pane and on every page: 12sp, all caps, bold, cyan,
+         full strength. The house rule since 2026-10-11 (plugin-ui skill); the faint 60 percent
+         small caps vanished between two buttons. -->
+    <style name="TakwerxSectionHeading">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">#00E5FF</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">2dp</item>
+    </style>
 </resources>

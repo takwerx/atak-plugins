@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.12** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.12/ATAK-Plugin-Atmosphere-0.12--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -62,6 +62,35 @@ Capabilities:
     Forest Service's national service; tap an area's name for its ERC and
     Burning Index and its GACC's own ERC chart, full screen to pinch and zoom.
     Each fire weather zone gives the ERC of the area it is in.
+  - Fuel moisture samples: every sampling site of the National Fuel Moisture
+    Database in the state under the map, the newest sample's moisture in
+    the pill and colored critical to low on the live fuel or timelag class's
+    own breaks, every fuel sampled there
+    behind a tap; live fuels, dead fuels or both, 30 days to a year back.
+  - The wind as a heat map: the speed the streaks are drawn from as a colored
+    field under them, in the same bands as the key, with one switch.
+  - Storms after the fact: every storm report the NWS offices logged in the
+    last three days (tornado, wind, hail, flood, rain, snow, landslide), and
+    the tornado paths survey teams have walked in the last year, each line in
+    its EF rating's color with the survey behind a tap.
+  - Debris flow: the USGS post-fire assessments, every fire of the last three
+    years marked and, zoomed in, each stream basin filled Low, Moderate or
+    High for a 15-minute burst of rain, beside the river gauges and the rain.
+  - Earthquakes: the USGS feed worldwide, circles sized by magnitude and
+    colored by age the way USGS draws them, the shaking contours of the
+    largest, and the USGS record behind a tap.
+  - Storm Reports as a page: the reports and the tornado paths in one list,
+    nationwide, near the pane's point, on the map or by state, newest or
+    closest first, any mix of types; a row flies to it and opens it.
+  - Rain that fell: the NWS rainfall picture for the last hour to seven days
+    in the service's own colors with a transparency slider; the USGS rain
+    gauges with their 24 hour totals and the CoCoRaHS volunteer gauges of the
+    state under the map with their morning reading; and the forecast office's
+    own rainfall report as a list, most rain first or closest, its gauges on
+    the map too.
+  - The forecaster's synopsis on the Forecast page, from the Area Forecast
+    Discussion for the office covering the point, the other sections a tap
+    away.
   - Spot forecasts: every open request the National Weather Service has, with
     the office's forecast, newest or closest first and by type, and help
     preparing your own request.
@@ -79,20 +108,30 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.12, for ATAK-CIV 5.6, 5.7 and 5.8. Fix: a storm the National Hurricane
-Center still lists but no longer forecasts (post-tropical, or past its final
-advisory) now shows a marker where it is, and the Hurricanes block says NHC
-publishes no forecast map for it; before, such a storm was listed and nothing
-drew (takwerx/atmosphere#5). 0.11 brought Fire Danger, the Energy Release
+0.14, for ATAK-CIV 5.6, 5.7 and 5.8 (0.13 was a 5.8-only build for the pictures). New: a Storms group with Storm Reports
+(the NWS Local Storm Reports of the last three days) and Tornado Paths (the
+NWS Damage Assessment Toolkit's surveyed tracks of the last year, by EF
+rating); Debris Flow (the USGS post-fire debris-flow assessments, fires marked
+and basins by hazard) beside the river gauges; and a Ground group with
+Earthquakes (the USGS feed, ShakeMap contours for the largest); a Storm
+Reports page listing reports and paths by where and type; Rain Totals (the NWS
+MRMS radar estimate and the RFC gauge-corrected analysis as a picture) and Rain
+Gauges (USGS gauges and the forecast office's rainfall report, on the map and
+as a list); the forecaster's synopsis on the Forecast page; Fuel Moisture
+(the National Fuel Moisture Database's samples, by state); the wind as a heat
+map under the streaks; the rainfall report's RAWS placed through NIFC as well
+as NWS, with Go to on every placed row; and every section heading in the house
+cyan. 0.12 fixed a
+storm the National Hurricane Center still lists but no longer forecasts
+(takwerx/atmosphere#5). 0.11 brought Fire Danger, the Energy Release
 Component by Predictive Service Area with each GACC's chart; California's
 utility weather stations; a Layers button in the top row; labels that stay
 level when the map turns; the smoke forecast at every zoom; fire weather zones
 outlined in purple; and Atmosphere's drawn icons kept in ATAK's private
-storage rather than the shared card (takwerx/atmosphere#2). Developed on a
-Samsung Galaxy XCover Pro running ATAK-CIV 5.8.0.3; the 0.12 fix was checked
-as a release build on a development ATAK-CIV 5.8 phone; compiled clean against
-the 5.6.0.23 and 5.7.0.14 SDKs. The manual and the user guide carry
-screenshots from the signed build.
+storage rather than the shared card (takwerx/atmosphere#2). Developed on
+Samsung Galaxy S10 and XCover Pro phones running the development ATAK-CIV
+5.8.0.3; compiled clean against the 5.6.0.23 and 5.7.0.14 SDKs. The manual
+and the user guide carry screenshots from the signed build.
 
 Parsers for every service are covered by unit tests that run off-device
 (./gradlew testCivDebugUnitTest).

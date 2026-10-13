@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Rain Totals: a rain gauge, part full, with drops above it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineJoin="round"
+        android:pathData="M8 9 H16 V21 H8 Z"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M9 15 H15 V20 H9 Z"/>
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round"
+        android:pathData="M10 2.5 V5 M14 2.5 V5 M12 1.5 V3.5"/>
+</vector>
