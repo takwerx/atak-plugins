@@ -320,7 +320,12 @@ public class LoadedLayer {
         // and counts.
         if (dartLabels == null) {
             mapView.getMapOverlayManager().addFilesOverlay(overlay);
-            mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+            // Boundaries go under every live layer, so a perimeter is never hidden under
+            // a county fill: the bottom of the stack, whenever they are added or restored.
+            if (Boundaries.handles(spec))
+                mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, 0, layer);
+            else
+                mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
         }
         count = countFeatures();
         status = storedFeatures() > 0 ? "cached" : "empty";
@@ -953,6 +958,55 @@ public class LoadedLayer {
         return true;
     }
 
+    /**
+     * "Elko County, NV": the boundary under a point, from the memory copy, for the row's
+     * status line (operator: "an answer the crew asks for"). Null when none holds it or
+     * the layer is not a Boundaries layer. Worker thread: Texas cities is 1,864 shapes.
+     */
+    public String nameAt(double lat, double lon) {
+        if (!Boundaries.handles(spec))
+            return null;
+        synchronized (lock) {
+            loadCacheLocked();
+        }
+        final List<Pending> snapshot = cache;
+        for (Pending pf : snapshot) {
+            if (pf.geometry == null || pf.name == null || pf.name.isEmpty() || !spec.isOn(pf.setName))
+                continue;
+            final com.atakmap.map.layer.feature.geometry.Envelope e = pf.geometry.getEnvelope();
+            if (e == null || lon < e.minX || lon > e.maxX || lat < e.minY || lat > e.maxY)
+                continue;
+            if (!insideArea(pf.geometry, lon, lat))
+                continue;
+            final String fips = attr(pf.attrs, Boundaries.ATTR_STATE);
+            final Boundaries.State st = Boundaries.state(fips);
+            return pf.name + (st == null ? "" : ", " + st.abbr);
+        }
+        return null;
+    }
+
+    /** Inside a polygon's outer ring and in none of its holes; any polygon of a collection. */
+    private static boolean insideArea(Geometry g, double lon, double lat) {
+        if (g instanceof com.atakmap.map.layer.feature.geometry.Polygon) {
+            final com.atakmap.map.layer.feature.geometry.Polygon poly = (com.atakmap.map.layer.feature.geometry.Polygon) g;
+            final LineString outer = poly.getExteriorRing();
+            if (outer == null || outer.getNumPoints() < 3 || !inRing(flat(outer), lon, lat))
+                return false;
+            for (LineString hole : poly.getInteriorRings())
+                if (hole != null && hole.getNumPoints() > 2 && inRing(flat(hole), lon, lat))
+                    return false;
+            return true;
+        }
+        if (g instanceof GeometryCollection)
+            for (Geometry c : ((GeometryCollection) g).getGeometries())
+                if (insideArea(c, lon, lat))
+                    return true;
+        return false;
+    }
+
+    /** The row's "You are in Elko County, NV" line (or "Map center is in", with no fix), or null; set by the manager as the operator moves. */
+    public volatile String whereLine;
+
     /** A search hit: what it is, where it is. */
     public static class Hit {
         public final String title, layer, layerId, type;
@@ -1477,15 +1531,23 @@ public class LoadedLayer {
             perimeterRings.clear();
             perimeterHoles.clear();
             // Only My Fires: each fire fetched by its own extent and year, wherever it is.
-            final List<LayerSpec.MyFire> fires = new ArrayList<>();
-            if (myFiresShown())
-                fires.addAll(spec.myFires);
-            else
-                fires.add(null);
+            // Each pass is one spatial filter: a fire's extent for My Fires, a state's
+            // outline for tribal lands (Boundaries.passes), else one unfiltered pass.
+            final List<Object[]> passes = new ArrayList<>(); // { MyFire or null, Esri.Scope or null }
+            if (myFiresShown()) {
+                for (LayerSpec.MyFire f : spec.myFires)
+                    passes.add(new Object[] { f, boxScope(f.box) });
+            } else if (Boundaries.handles(spec)) {
+                for (Esri.Scope sc : Boundaries.passes(spec))
+                    passes.add(new Object[] { null, sc });
+            } else {
+                passes.add(new Object[] { null, null });
+            }
             int tries = 0;
             try {
-                for (LayerSpec.MyFire f : fires) {
-                    scopeOverride = f == null ? null : boxScope(f.box);
+                for (Object[] pass : passes) {
+                    final LayerSpec.MyFire f = (LayerSpec.MyFire) pass[0];
+                    scopeOverride = (Esri.Scope) pass[1];
                     yearOverride = f == null ? 0 : yearOf(f.key);
                     for (int li = 0; li < spec.layerIds.length; li++) {
                         final int layerId = spec.layerIds[li];
@@ -1717,19 +1779,22 @@ public class LoadedLayer {
         // decade, with its age color) wins; within a source the larger copy does.
         final boolean firstSource = base.equals(spec.baseFor(0));
         final boolean nwcg = spec.profile == LayerSpec.Profile.NWCG;
+        final boolean bounds = Boundaries.handles(spec);
         final boolean isPointLayer = info.geometryType.contains("Point");
         final boolean isLineLayer = info.geometryType.contains("Polyline");
+        // The type a source layer's features are listed under: its own name, or the word
+        // Boundaries uses for it ("Incorporated Places" is "Incorporated").
+        final String setName = bounds ? Boundaries.setName(spec.kind, layerId) : info.name;
         // Only when the source layer is itself the type. A layer that splits by a field
         // (CA Air Intel by source) names its types from the data, and the layer's own name
         // listed a seventh type nothing was ever in.
         if (spec.setField == null && !history)
-            spec.setKind.put(info.name, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
+            spec.setKind.put(setName, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
         else
             spec.setKind.remove(info.name);
-        final int fill = spec.fillFor(info.name);
+        final int fill = spec.fillFor(setName);
         final EsriRenderer generic = nwcg ? null : new EsriRenderer(info.drawingInfo, info.geometryType, iconDir, fill);
         final double gsd = isPointLayer ? pointGsd() : isLineLayer ? GSD_LINES : GSD_ALWAYS;
-        final String setName = info.name;
         final String repairName = (nwcg && isPointLayer) ? info.name + " (repair)" : null;
         final Set<String> dates = info.dateFields;
         lastDateFields = dates == null ? new java.util.HashSet<String>() : dates;
@@ -1919,6 +1984,15 @@ public class LoadedLayer {
                                 title = name + " (" + layerName + ")";
                             }
                             style = history ? FireHistoryStyles.style(target, spec.fillFor(target)) : generic.styleFor(props);
+                            if (bounds) {
+                                // "Elko County", "Reno": the Census name, in the kind's color,
+                                // outline only unless the fill control says otherwise.
+                                final String bn = Boundaries.label(spec.kind, props);
+                                if (bn != null)
+                                    name = bn;
+                                title = Boundaries.KIND_COUNTIES.equals(spec.kind) ? name : name + " (" + target + ")";
+                                style = Boundaries.style(spec.kind, spec.fillFor(target));
+                            }
                             if (NewStartsStyles.handles(spec) && isPointLayer) {
                                 // NIFC's colors and size rule on a composed circle, so the
                                 // name pill is drawn whole (a renderer dot has no icon to
@@ -1955,8 +2029,12 @@ public class LoadedLayer {
                         // Perimeter", so they get no name; lines never do (ATAK repeats a line's
                         // label along its length).
                         String bare = null, bareAlt = null;
+                        // A Census area's name sits on its own interior point, which the
+                        // Bureau places inside the shape; the centroid of a crescent-shaped
+                        // county lands outside it.
+                        final com.atakmap.map.layer.feature.geometry.Point census = bounds ? Boundaries.interiorPoint(props) : null;
                         final com.atakmap.map.layer.feature.geometry.Point at = !nwcg && !isPointLayer && !isLineLayer
-                                && name != null && !name.isEmpty() ? labelPoint(g) : null;
+                                && name != null && !name.isEmpty() ? (census != null ? census : labelPoint(g)) : null;
                         if (at != null) {
                             style = NwcgStyles.withNameLabel(style);
                             if (alt != null)
@@ -1999,7 +2077,9 @@ public class LoadedLayer {
                                 }
                             }
                         }
-                        final AttributeSet attrs = Esri.toAttributes(props, dates);
+                        // A boundary's details are five lines, not the Census row's thirty codes.
+                        final AttributeSet attrs = bounds ? Boundaries.attributes(spec.kind, target, props)
+                                : Esri.toAttributes(props, dates);
                         if (history && copy != null) {
                             // Which fire this is, so My Fires can pick it out later.
                             final double[] bx = (double[]) copy[1];
@@ -2026,7 +2106,7 @@ public class LoadedLayer {
                         // "Pickup", "IHC"), so the picker lists kinds and a row says what it
                         // is; the layer's name was standing in (operator, 2026-09-18: "when i
                         // click on vehicle how come i dont get a sub type?").
-                        final String dartType = history ? target : NewStartsStyles.handles(spec) ? NewStartsStyles.type(props)
+                        final String dartType = history || bounds ? target : NewStartsStyles.handles(spec) ? NewStartsStyles.type(props)
                                 : (DartStyles.handles(spec) || FireGuardStyles.handles(spec)) && spec.setField != null
                                 ? props.optString(spec.setField, "").trim() : "";
                         attrs.setAttribute("_type", !dartType.isEmpty() && !"null".equalsIgnoreCase(dartType) ? dartType
@@ -2040,6 +2120,8 @@ public class LoadedLayer {
                         // the button changed nothing (regressed unnoticed in the marks rewrite).
                         if (!isPointLayer && !isLineLayer) {
                             int hue = nwcg ? NwcgStyles.polygonFill(cat) : generic.rawFillFor(props);
+                            if (bounds)
+                                hue = 0xFF000000 | Boundaries.hue(spec.kind);
                             if (!nwcg && "sarcop".equals(spec.iconSet)) {
                                 final int h = SarcopStyles.fillHue(layerName, props);
                                 if (h != 0)

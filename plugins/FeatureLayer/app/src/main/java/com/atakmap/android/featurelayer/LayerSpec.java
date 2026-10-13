@@ -129,6 +129,14 @@ public class LayerSpec {
         return "Last " + (sinceHours / 24) + " days";
     }
     public String iconSet;     // "sarcop" swaps in NAPSG/NWCG icons; null keeps the service symbols
+    /**
+     * A Boundaries layer: which kind (counties, cities, tribal), which states by FIPS
+     * code, and the GEOIDs picked by name (null for every boundary in the states). Saved,
+     * so a restored layer is rebuilt from what was picked ({@link Boundaries#fixed}).
+     */
+    public String kind;
+    public String[] states;
+    public String[] picks;
     public int fillAlpha = 0x40; // polygon fill opacity 0..255; 0 = outline only
     /** Per feature type (set name): fill opacity override, and the geometry kind seen at load. */
     public final java.util.Map<String, Integer> setFill = new java.util.HashMap<>();
@@ -211,6 +219,11 @@ public class LayerSpec {
             ids.put(i);
         o.put("layerIds", ids);
         o.put("layerTitle", layerTitle).put("styleVersion", styleVersion);
+        o.put("kind", kind);
+        if (states != null)
+            o.put("states", new JSONArray(java.util.Arrays.asList(states)));
+        if (picks != null)
+            o.put("picks", new JSONArray(java.util.Arrays.asList(picks)));
         o.put("scopeKind", scopeKind).put("scopeRadiusM", scopeRadiusM).put("scopeRings", scopeRings);
         if (scopeBox != null)
             o.put("scopeBox", new JSONArray(
@@ -266,7 +279,7 @@ public class LayerSpec {
         // saved five-mile level equal to the old constant was never chosen, so it moves;
         // a preset the operator picked is computed from the live scale bar and does not
         // hit the constant exactly. DART and FireGuard keep five.
-        final boolean wide = "dart".equals(s.iconSet) || "fireguard".equals(s.iconSet);
+        final boolean wide = "dart".equals(s.iconSet) || "fireguard".equals(s.iconSet) || "boundaries".equals(s.iconSet);
         if (!wide && Math.abs(s.labelGsd - DEFAULT_LABEL_GSD_WIDE) < 1e-9)
             s.labelGsd = DEFAULT_LABEL_GSD;
         if (wide && lab < 0)
@@ -277,6 +290,9 @@ public class LayerSpec {
             s.layerIds[i] = ids.getInt(i);
         s.layerTitle = o.isNull("layerTitle") ? null : o.optString("layerTitle", null);
         s.styleVersion = o.optInt("styleVersion", 0);
+        s.kind = o.isNull("kind") ? null : o.optString("kind", null);
+        s.states = strings(o.optJSONArray("states"));
+        s.picks = strings(o.optJSONArray("picks"));
         final JSONArray mf = o.optJSONArray("myFires");
         if (mf != null)
             for (int i = 0; i < mf.length() && s.myFires.size() < MY_FIRES_MAX; i++) {
@@ -324,6 +340,19 @@ public class LayerSpec {
             }
         }
         return s;
+    }
+
+    /** A JSON array of strings, or null when absent or empty. */
+    private static String[] strings(JSONArray a) {
+        if (a == null || a.length() == 0)
+            return null;
+        final java.util.List<String> out = new java.util.ArrayList<>();
+        for (int i = 0; i < a.length(); i++) {
+            final String v = a.optString(i, null);
+            if (v != null && !v.isEmpty())
+                out.add(v);
+        }
+        return out.isEmpty() ? null : out.toArray(new String[0]);
     }
 
     /** A file-system-safe name for this layer's store. */

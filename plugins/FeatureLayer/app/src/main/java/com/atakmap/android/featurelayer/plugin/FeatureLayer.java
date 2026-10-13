@@ -112,6 +112,46 @@ public class FeatureLayer implements IPlugin {
             manager.start();
         }
         followMap(true);
+        registerShow();
+    }
+
+    /**
+     * Opens the pane: a system broadcast, so a test over adb can open it without driving
+     * the Tools list. Debug builds only: a system receiver is exported to every app on
+     * the phone, and a release build has no use for one.
+     */
+    public static final String SHOW_ACTION = "com.atakmap.android.featurelayer.SHOW";
+    private android.content.BroadcastReceiver showReceiver;
+
+    private void registerShow() {
+        if (showReceiver != null || !BuildConfig.DEBUG)
+            return;
+        showReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, android.content.Intent intent) {
+                if (SHOW_ACTION.equals(intent.getAction()))
+                    showPane();
+            }
+        };
+        try {
+            final com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter f =
+                    new com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter();
+            f.addAction(SHOW_ACTION);
+            com.atakmap.android.ipc.AtakBroadcast.getInstance().registerSystemReceiver(showReceiver, f);
+        } catch (Exception e) {
+            Log.w(TAG, "show receiver", e);
+            showReceiver = null;
+        }
+    }
+
+    private void unregisterShow() {
+        if (showReceiver == null)
+            return;
+        try {
+            com.atakmap.android.ipc.AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
+        } catch (Exception ignored) {
+        }
+        showReceiver = null;
     }
 
     @Override
@@ -135,6 +175,7 @@ public class FeatureLayer implements IPlugin {
         if (uiService != null)
             uiService.removeToolbarItem(toolbarItem);
         unregisterPreferences();
+        unregisterShow();
     }
 
     private void toast(String s) {
@@ -173,6 +214,8 @@ public class FeatureLayer implements IPlugin {
                     "Fires found more than a day ago and not yet contained, public"),
             new Org("fire-history", "Fire History", null, "Add fire history",
                     "Where fires have burned since 1900, by years since and by decade, public"),
+            new Org("boundaries", "Boundaries", null, "Add",
+                    "County, city and tribal land boundaries by state, public"),
             new Org("sarcop-live", "SARCOP Live", Sources.NAPSG_PORTAL, "Find incident", "Search"),
             new Org("sarcop-training", "SARCOP Training", null, "Find incident", "Search"),
             new Org("ca-air-intel", "CA Air Intel", null, "Add perimeters", "Statewide fire perimeters, public"),
@@ -1247,6 +1290,8 @@ public class FeatureLayer implements IPlugin {
         final View dartRow = paneView.findViewById(R.id.dart_row);
         final Button dart = paneView.findViewById(R.id.btn_dart);
         dartRow.setVisibility(View.GONE);
+        final View boundariesPanel = paneView.findViewById(R.id.boundaries_panel);
+        boundariesPanel.setVisibility(View.GONE);
         dart.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -1270,6 +1315,14 @@ public class FeatureLayer implements IPlugin {
         if ("nifc".equals(org.id) && manager != null && manager.auth(Sources.NIFC_PORTAL).isSignedIn())
             dartRow.setVisibility(View.VISIBLE);
         orgButton.setText(org.title);
+        if ("boundaries".equals(org.id)) {
+            // Its own page of rows under the source button; nothing to search or sign into.
+            searchRow.setVisibility(View.GONE);
+            signin.setVisibility(View.GONE);
+            boundariesPanel.setVisibility(View.VISIBLE);
+            bindBoundaries();
+            return;
+        }
         searchRow.setVisibility(View.VISIBLE);
         find.setText(org.findLabel);
         search.setHint(org.hint);
@@ -1396,6 +1449,339 @@ public class FeatureLayer implements IPlugin {
         }
     }
 
+    // ---- Boundaries: kind, states, which, add -------------------------------------------
+
+    private String bKind = com.atakmap.android.featurelayer.Boundaries.KIND_COUNTIES;
+    private final List<String> bStates = new java.util.ArrayList<>();          // FIPS codes, in the order picked
+    private List<com.atakmap.android.featurelayer.Boundaries.Named> bPicks;     // null = every boundary in the states
+    /** The state under the map center, asked of the Census once per page opening; null until it answers. */
+    private com.atakmap.android.featurelayer.Boundaries.State bCenterState;
+    private boolean bCenterAsked;
+
+    private static String joinStates(List<String> fips, boolean abbr) {
+        final StringBuilder sb = new StringBuilder();
+        for (String f : fips) {
+            final com.atakmap.android.featurelayer.Boundaries.State st = com.atakmap.android.featurelayer.Boundaries.state(f);
+            sb.append(sb.length() > 0 ? ", " : "").append(st == null ? f : abbr ? st.abbr : st.name);
+        }
+        return sb.toString();
+    }
+
+    /** The three rows and the Add button say what is picked; the state under the map is the default. */
+    private void bindBoundaries() {
+        if (paneView == null)
+            return;
+        final Button kind = paneView.findViewById(R.id.btn_bnd_kind);
+        final Button state = paneView.findViewById(R.id.btn_bnd_state);
+        final Button which = paneView.findViewById(R.id.btn_bnd_which);
+        final Button add = paneView.findViewById(R.id.btn_bnd_add);
+        if (!bCenterAsked && manager != null) {
+            // Which state the map is over, from the Census (the nearest state center is a
+            // guess that fails on a border); the list puts it first and the row starts on it.
+            bCenterAsked = true;
+            final com.atakmap.coremap.maps.coords.GeoPoint c = mapCenter();
+            if (c != null) {
+                manager.search(new Callable<com.atakmap.android.featurelayer.Boundaries.State>() {
+                    @Override
+                    public com.atakmap.android.featurelayer.Boundaries.State call() {
+                        return com.atakmap.android.featurelayer.Boundaries.stateAt(c.getLatitude(), c.getLongitude());
+                    }
+                }, new LayerManager.SearchCallback<com.atakmap.android.featurelayer.Boundaries.State>() {
+                    @Override
+                    public void onResult(com.atakmap.android.featurelayer.Boundaries.State st, String error) {
+                        if (st == null) {
+                            bCenterAsked = false; // offline, or at sea: asked again next time the page is shown
+                            return;
+                        }
+                        bCenterState = st;
+                        if (bStates.isEmpty()) {
+                            bStates.add(st.fips);
+                            bindBoundaries();
+                        }
+                    }
+                });
+            }
+        }
+        if (bStates.isEmpty() && bCenterState != null)
+            bStates.add(bCenterState.fips);
+        kind.setText("Kind: " + com.atakmap.android.featurelayer.Boundaries.kindTitle(bKind));
+        state.setText(bStates.isEmpty() ? "State: pick one" : "State: " + joinStates(bStates, bStates.size() > 2));
+        which.setText(bPicks == null ? "Which: All"
+                : "Which: " + bPicks.size() + (bPicks.size() == 1 ? " picked" : " picked"));
+        final String[] names = pickNames();
+        add.setText(bStates.isEmpty() ? "Add"
+                : "Add " + com.atakmap.android.featurelayer.Boundaries.title(bKind, bStates.toArray(new String[0]), names));
+        add.setEnabled(!bStates.isEmpty() && (bPicks == null || !bPicks.isEmpty()));
+        kind.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickBoundaryKind();
+            }
+        });
+        state.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickBoundaryStates();
+            }
+        });
+        which.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pickBoundaryWhich();
+            }
+        });
+        add.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                addBoundaries();
+            }
+        });
+    }
+
+    private String[] pickNames() {
+        if (bPicks == null || bPicks.isEmpty())
+            return null;
+        final String[] out = new String[bPicks.size()];
+        for (int i = 0; i < out.length; i++)
+            out[i] = bPicks.get(i).shortName; // "Elko, Humboldt Counties (NV)", not "Elko County, Humboldt County Counties"
+        return out;
+    }
+
+    private void pickBoundaryKind() {
+        final String[] kinds = com.atakmap.android.featurelayer.Boundaries.KINDS;
+        final CharSequence[] labels = new CharSequence[kinds.length];
+        int checked = 0;
+        for (int i = 0; i < kinds.length; i++) {
+            final String t = com.atakmap.android.featurelayer.Boundaries.kindTitle(kinds[i]);
+            final String n = com.atakmap.android.featurelayer.Boundaries.kindNote(kinds[i]);
+            final android.text.SpannableString two = new android.text.SpannableString(t + "\n" + n);
+            two.setSpan(new android.text.style.RelativeSizeSpan(0.78f), t.length() + 1, two.length(), 0);
+            two.setSpan(new android.text.style.ForegroundColorSpan(0xFFBBBBBB), t.length() + 1, two.length(), 0);
+            labels[i] = two;
+            if (kinds[i].equals(bKind))
+                checked = i;
+        }
+        new AlertDialog.Builder(mapView.getContext()).setTitle("Kind")
+                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        d.dismiss();
+                        if (!kinds[which].equals(bKind))
+                            bPicks = null; // names belong to a kind
+                        bKind = kinds[which];
+                        bindBoundaries();
+                    }
+                }).setNegativeButton("Cancel", null).show();
+    }
+
+    /** Up to five states, the one under the map first; a sixth tap says so and stays off. */
+    private void pickBoundaryStates() {
+        final com.atakmap.coremap.maps.coords.GeoPoint c = mapCenter();
+        final List<com.atakmap.android.featurelayer.Boundaries.State> all = com.atakmap.android.featurelayer.Boundaries
+                .statesNear(c == null ? Double.NaN : c.getLatitude(), c == null ? Double.NaN : c.getLongitude());
+        if (bCenterState != null) {
+            all.remove(bCenterState);
+            all.add(0, bCenterState);
+        }
+        final String[] labels = new String[all.size()];
+        final boolean[] on = new boolean[all.size()];
+        for (int i = 0; i < all.size(); i++) {
+            labels[i] = all.get(i).name;
+            on[i] = bStates.contains(all.get(i).fips);
+        }
+        final List<String> picked = new java.util.ArrayList<>(bStates);
+        new AlertDialog.Builder(mapView.getContext()).setTitle("States, up to " + com.atakmap.android.featurelayer.Boundaries.MAX_STATES)
+                .setMultiChoiceItems(labels, on, new DialogInterface.OnMultiChoiceClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which, boolean isChecked) {
+                        final String fips = all.get(which).fips;
+                        if (isChecked) {
+                            if (picked.size() >= com.atakmap.android.featurelayer.Boundaries.MAX_STATES) {
+                                ((AlertDialog) d).getListView().setItemChecked(which, false);
+                                toast("Up to " + com.atakmap.android.featurelayer.Boundaries.MAX_STATES
+                                        + " states in one layer; add another layer for more");
+                                return;
+                            }
+                            if (!picked.contains(fips))
+                                picked.add(fips);
+                        } else {
+                            picked.remove(fips);
+                        }
+                    }
+                })
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (!picked.equals(bStates))
+                            bPicks = null; // names belong to the states they were picked in
+                        bStates.clear();
+                        bStates.addAll(picked);
+                        bindBoundaries();
+                    }
+                })
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    private void pickBoundaryWhich() {
+        if (bStates.isEmpty()) {
+            toast("Pick a state first");
+            return;
+        }
+        final String[] labels = { "All", "Pick names\u2026" };
+        new AlertDialog.Builder(mapView.getContext()).setTitle("Which " + com.atakmap.android.featurelayer.Boundaries.kindTitle(bKind).toLowerCase(java.util.Locale.US))
+                .setSingleChoiceItems(labels, bPicks == null ? 0 : 1, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        d.dismiss();
+                        if (which == 0) {
+                            bPicks = null;
+                            bindBoundaries();
+                        } else {
+                            fetchBoundaryNames();
+                        }
+                    }
+                }).setNegativeButton("Cancel", null).show();
+    }
+
+    /** The names list, no shapes, nearest the map center first; then the checklist. */
+    private void fetchBoundaryNames() {
+        if (manager == null)
+            return;
+        final String kind = bKind;
+        final String[] states = bStates.toArray(new String[0]);
+        final com.atakmap.coremap.maps.coords.GeoPoint c = mapCenter();
+        final Button which = paneView.findViewById(R.id.btn_bnd_which);
+        which.setText("Which: loading names\u2026");
+        which.setEnabled(false);
+        manager.search(new Callable<List<com.atakmap.android.featurelayer.Boundaries.Named>>() {
+            @Override
+            public List<com.atakmap.android.featurelayer.Boundaries.Named> call() throws Exception {
+                return com.atakmap.android.featurelayer.Boundaries.names(kind, states,
+                        c == null ? Double.NaN : c.getLatitude(), c == null ? Double.NaN : c.getLongitude());
+            }
+        }, new LayerManager.SearchCallback<List<com.atakmap.android.featurelayer.Boundaries.Named>>() {
+            @Override
+            public void onResult(List<com.atakmap.android.featurelayer.Boundaries.Named> names, String error) {
+                which.setEnabled(true);
+                bindBoundaries();
+                if (error != null)
+                    toast("Could not load the names: no network?");
+                else if (names == null || names.isEmpty())
+                    toast("No " + com.atakmap.android.featurelayer.Boundaries.kindTitle(kind).toLowerCase(java.util.Locale.US) + " listed there");
+                else
+                    pickBoundaryNames(names);
+            }
+        });
+    }
+
+    /** A checklist with a filter box on top; a tick keeps a name, OK keeps the ticks. */
+    private void pickBoundaryNames(final List<com.atakmap.android.featurelayer.Boundaries.Named> names) {
+        final Context ctx = mapView.getContext();
+        final java.util.Set<String> picked = new java.util.LinkedHashSet<>();
+        if (bPicks != null)
+            for (com.atakmap.android.featurelayer.Boundaries.Named n : bPicks)
+                picked.add(n.geoid);
+        final boolean oneState = bStates.size() == 1;
+        boolean oneTypeTmp = true;
+        for (com.atakmap.android.featurelayer.Boundaries.Named n : names)
+            if (!n.type.equals(names.get(0).type))
+                oneTypeTmp = false;
+        final boolean oneType = oneTypeTmp;
+        final LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(LinearLayout.VERTICAL);
+        final int pad = (int) (8 * ctx.getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad, pad, 0);
+        final EditText filter = new EditText(ctx);
+        filter.setHint("Type to narrow the list");
+        filter.setSingleLine(true);
+        filter.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        filter.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
+                | android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN);
+        box.addView(filter, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        final android.widget.ListView list = new android.widget.ListView(ctx);
+        list.setChoiceMode(android.widget.ListView.CHOICE_MODE_MULTIPLE);
+        box.addView(list, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                (int) (mapView.getHeight() * 0.55)));
+        final List<com.atakmap.android.featurelayer.Boundaries.Named> shown = new java.util.ArrayList<>();
+        final Runnable fill = new Runnable() {
+            @Override
+            public void run() {
+                final String needle = filter.getText().toString().trim().toLowerCase(java.util.Locale.US);
+                shown.clear();
+                final List<String> labels = new java.util.ArrayList<>();
+                for (com.atakmap.android.featurelayer.Boundaries.Named n : names) {
+                    if (!needle.isEmpty() && !n.name.toLowerCase(java.util.Locale.US).contains(needle))
+                        continue;
+                    shown.add(n);
+                    labels.add(n.label(oneState, oneType)
+                            + (n.distanceM == Double.MAX_VALUE ? "" : "  \u00b7  " + Units.formatBig(n.distanceM)));
+                }
+                list.setAdapter(new android.widget.ArrayAdapter<String>(ctx,
+                        android.R.layout.simple_list_item_multiple_choice, labels));
+                for (int i = 0; i < shown.size(); i++)
+                    list.setItemChecked(i, picked.contains(shown.get(i).geoid));
+            }
+        };
+        fill.run();
+        filter.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable e) {
+                fill.run();
+            }
+        });
+        list.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(android.widget.AdapterView<?> parent, View v, int pos, long id) {
+                if (pos < 0 || pos >= shown.size())
+                    return;
+                final String g = shown.get(pos).geoid;
+                if (list.isItemChecked(pos))
+                    picked.add(g);
+                else
+                    picked.remove(g);
+            }
+        });
+        final String what = com.atakmap.android.featurelayer.Boundaries.kindTitle(bKind);
+        new AlertDialog.Builder(ctx).setTitle("Pick " + what.toLowerCase(java.util.Locale.US) + " (" + names.size() + ")")
+                .setView(box)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        final List<com.atakmap.android.featurelayer.Boundaries.Named> out = new java.util.ArrayList<>();
+                        for (com.atakmap.android.featurelayer.Boundaries.Named n : names)
+                            if (picked.contains(n.geoid))
+                                out.add(n);
+                        bPicks = out.isEmpty() ? null : out;
+                        bindBoundaries();
+                    }
+                })
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    private void addBoundaries() {
+        if (manager == null || bStates.isEmpty())
+            return;
+        String[] geoids = null;
+        if (bPicks != null && !bPicks.isEmpty()) {
+            geoids = new String[bPicks.size()];
+            for (int i = 0; i < geoids.length; i++)
+                geoids[i] = bPicks.get(i).geoid;
+        }
+        final LayerSpec spec = com.atakmap.android.featurelayer.Boundaries.layer(bKind, bStates.toArray(new String[0]),
+                geoids, pickNames());
+        bPicks = null;
+        addLayer(spec);
+    }
+
     private void renderRows() {
         if (paneView == null || manager == null)
             return;
@@ -1428,6 +1814,15 @@ public class FeatureLayer implements IPlugin {
             final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.layer_row, null);
             final TextView status = row.findViewById(R.id.row_status);
             status.setText(statusLine(l));
+            // "You are in Elko County, NV", from the layer itself, while it is on.
+            final TextView where = row.findViewById(R.id.row_where);
+            final String whereLine = l.whereLine;
+            if (whereLine != null && l.isVisible() && !l.refreshing && !l.busy) {
+                where.setText(whereLine);
+                where.setVisibility(View.VISIBLE);
+            } else {
+                where.setVisibility(View.GONE);
+            }
             final Button toggle = row.findViewById(R.id.row_toggle);
             if (l.refreshing || l.busy) {
                 toggle.setText(l.displayName() + " Loading\u2026");

@@ -330,6 +330,12 @@ public final class Sources {
     public static void migrate(LayerSpec s) {
         if (s == null || s.id == null)
             return;
+        // A Boundaries layer is rebuilt from what was picked; its endpoints, layers and
+        // types are the plugin's.
+        if (s.id.startsWith(Boundaries.ID_PREFIX) && s.kind != null && s.states != null) {
+            Boundaries.fixed(s);
+            return;
+        }
         final LayerSpec now = "dart-personnel".equals(s.id) ? dartPersonnel()
                 : "dart-vehicles".equals(s.id) ? dartVehicles()
                 : "nifc-fireguard".equals(s.id) ? fireGuard()

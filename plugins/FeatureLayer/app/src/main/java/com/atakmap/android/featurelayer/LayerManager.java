@@ -514,8 +514,75 @@ public class LayerManager {
             // redraws in place after every settled move, fetch or no fetch.
             if (followsView)
                 changed();
+            updateWhere(false);
         }
     };
+
+    /** Where "You are in" was last worked out, so a move of a few hundred meters is a no-op. */
+    private volatile double whereLat = Double.NaN, whereLon = Double.NaN;
+    private static final double WHERE_STEP_M = 300;
+
+    /**
+     * "You are in Elko County, NV" for every Boundaries layer that is on: a point-in-
+     * polygon over the memory copy, on the worker, after the self marker has moved
+     * {@link #WHERE_STEP_M} or a layer changed ({@code force}). Main thread.
+     */
+    private void updateWhere(boolean force) {
+        if (!started)
+            return;
+        boolean any = false;
+        for (LoadedLayer l : snapshot())
+            if (Boundaries.handles(l.spec))
+                any = true;
+        if (!any)
+            return;
+        final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
+        com.atakmap.coremap.maps.coords.GeoPoint p = self == null ? null : self.getPoint();
+        // No fix yet (the self marker reads 0,0 and calls itself valid): the map center
+        // stands in and the line says so, the way the scope control does.
+        final boolean fromCenter = p == null || !p.isValid()
+                || (Math.abs(p.getLatitude()) < 0.01 && Math.abs(p.getLongitude()) < 0.01);
+        if (fromCenter)
+            p = mapView.getPoint().get();
+        if (p == null || !p.isValid())
+            return;
+        final double lat = p.getLatitude(), lon = p.getLongitude();
+        if (!force && !Double.isNaN(whereLat)
+                && p.distanceTo(new com.atakmap.coremap.maps.coords.GeoPoint(whereLat, whereLon)) < WHERE_STEP_M)
+            return;
+        whereLat = lat;
+        whereLon = lon;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                boolean moved = false;
+                for (LoadedLayer l : snapshot()) {
+                    if (!Boundaries.handles(l.spec))
+                        continue;
+                    final String at = l.isVisible() ? l.nameAt(lat, lon) : null;
+                    final String now = at == null ? null : (fromCenter ? "Map center is in " : "You are in ") + at;
+                    final String was = l.whereLine;
+                    Log.d(TAG, "where: " + l.spec.id + " -> " + now);
+                    if (now == null ? was != null : !now.equals(was)) {
+                        l.whereLine = now;
+                        moved = true;
+                    }
+                }
+                if (moved)
+                    changed();
+            }
+        });
+    }
+
+    /** The same, from the worker: posted so the self marker is read on the main thread. */
+    private void updateWhereLater() {
+        main.post(new Runnable() {
+            @Override
+            public void run() {
+                updateWhere(true);
+            }
+        });
+    }
 
     private void attachFollow() {
         try {
@@ -614,6 +681,7 @@ public class LayerManager {
                 } finally {
                     l.busy = false;
                     changed();
+                    updateWhereLater();
                 }
             }
         });
@@ -633,6 +701,7 @@ public class LayerManager {
                 } finally {
                     l.busy = false;
                     changed();
+                    updateWhereLater();
                 }
             }
         });
@@ -735,6 +804,8 @@ public class LayerManager {
         startLog("refreshNow " + l.spec.id + " done: " + l.status);
         save();
         sweepLegacyIcons();
+        if (Boundaries.handles(l.spec))
+            updateWhereLater();
     }
 
     public void refreshAll() {
@@ -880,6 +951,7 @@ public class LayerManager {
                             } finally {
                                 l.busy = false;
                                 changed();
+                                updateWhereLater();
                             }
                         }
                     });
