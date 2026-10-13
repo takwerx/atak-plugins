@@ -2,6 +2,13 @@
 package com.atakmap.android.iwi.plugin;
 
 import android.content.Context;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
+
+import com.atakmap.android.cot.detail.CotDetailManager;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.log.Log;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
@@ -22,6 +29,7 @@ public class IWI implements IPlugin {
     IHostUIService uiService;
     ToolbarItem toolbarItem;
     Pane templatePane;
+    IwiDetailHandler iwiDetailHandler;
 
     public IWI(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -57,7 +65,13 @@ public class IWI implements IPlugin {
 
     @Override
     public void onStart() {
-        // the plugin is starting, add the button to the toolbar
+        // Anything that must outlive a tap lives here, not in a Tool. The
+        // detail handler is what makes _iwi_ typed rather than opaque on a
+        // phone that has the plugin.
+        if (iwiDetailHandler == null)
+            iwiDetailHandler = new IwiDetailHandler();
+        CotDetailManager.getInstance().registerHandler(iwiDetailHandler);
+
         if (uiService == null)
             return;
 
@@ -66,6 +80,9 @@ public class IWI implements IPlugin {
 
     @Override
     public void onStop() {
+        if (iwiDetailHandler != null)
+            CotDetailManager.getInstance().unregisterHandler(iwiDetailHandler);
+
         // the plugin is stopping, remove the button from the toolbar
         if (uiService == null)
             return;
@@ -80,8 +97,11 @@ public class IWI implements IPlugin {
             // In this case, using it is not necessary - but I am putting it here to remind
             // developers to look at this Inflator
 
-            templatePane = new PaneBuilder(PluginLayoutInflater.inflate(pluginContext,
-                    R.layout.main_layout, null))
+            final View v = PluginLayoutInflater.inflate(pluginContext,
+                    R.layout.main_layout, null);
+            wireSpike(v);
+
+            templatePane = new PaneBuilder(v)
                     // relative location is set to default; pane will switch location dependent on
                     // current orientation of device screen
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
@@ -96,5 +116,37 @@ public class IWI implements IPlugin {
         if(!uiService.isPaneVisible(templatePane)) {
             uiService.showPane(templatePane, null);
         }
+    }
+
+    /**
+     * Round-trip confirmation wiring (PLAN-IWI-v0.1). Temporary: this pane
+     * becomes the Report and Manage faces.
+     */
+    private void wireSpike(View v) {
+        final TextView result = v.findViewById(R.id.spike_result);
+
+        v.findViewById(R.id.btn_inject).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View button) {
+                        MapView mv = MapView.getMapView();
+                        String uid = RoundTrip.inject(mv);
+                        result.setText(uid != null
+                                ? "Injected. Open its radial, edit the med line, save, then Dump."
+                                : "Inject failed — see logcat tag " + RoundTrip.TAG);
+                    }
+                });
+
+        v.findViewById(R.id.btn_dump).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View button) {
+                        MapView mv = MapView.getMapView();
+                        boolean ok = RoundTrip.dump(mv);
+                        result.setText(ok
+                                ? "Dumped to logcat, tag " + RoundTrip.TAG
+                                : "No marker found — inject first.");
+                    }
+                });
     }
 }

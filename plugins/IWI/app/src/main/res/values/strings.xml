@@ -4,4 +4,11 @@
     <string name="app_name">IWI</string>
     <!-- description -->
     <string name="app_desc">IWI</string>
+
+    <!-- Round-trip spike. Temporary: replaced by the Report and Manage faces. -->
+    <string name="spike_heading">Round-trip confirmation</string>
+    <string name="spike_explain">Inject a CASEVAC carrying _medevac_ and _iwi_, edit its med line in ATAK, then dump. If _iwi_ comes back unchanged, the sidecar survives ATAK\'s own editor.</string>
+    <string name="spike_inject">1 — Inject IWI CASEVAC</string>
+    <string name="spike_dump">2 — Dump marker CoT</string>
+    <string name="spike_idle">Nothing run yet.</string>
 </resources>
