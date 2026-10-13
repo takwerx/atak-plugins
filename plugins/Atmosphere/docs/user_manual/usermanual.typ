@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.12",
+   plugin-version: "0.14",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -148,6 +148,23 @@ away again, and it stays the way you left it.
 ]
 
 #tak-slide[
+= The forecaster's synopsis
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("112.jpg", width: 100%)
+][
+  Under the days, the forecaster's own words: the Area Forecast Discussion for
+  the office covering the point, its *Synopsis* open and the other sections
+  the office writes (Short Term, Long Term, Discussion, Aviation, Marine, Fire
+  Weather) each behind a button that opens it in place.
+
+  It follows the point in the top row: Map center in another office's area
+  brings that office's discussion. The watches and warnings list stays with
+  IPAWS. It needs NWS as the forecast service.
+]
+]
+
+#tak-slide[
 = Forecast settings and favorites
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
@@ -174,7 +191,8 @@ forecast there.
   #image("15.png", width: 100%)
 ][
   The *Layers* page lists every map layer under a heading for what it is
-  about: *Wind*, *Fire*, *Rain and rivers*, *Ocean* and *Snow*, with *Spot
+  about: *Wind*, *Storms*, *Fire*, *Rain and rivers*, *Ocean*, *Snow* and
+  *Ground*, with *Spot
   Weather Forecast* and *Weather Stations* at the top. Each row is a switch that shows
   its state, green ON or red OFF, with the layer's icon beside it. *All on*
   and *All off* switch every allowed layer at once.
@@ -271,13 +289,26 @@ it is a direction.
   #image("23.png", width: 100%)
 ][
   *Wind* draws the forecast wind as moving streaks colored by speed, with the
-  key under the time strip in mph, kt or km/h.
+  key under the time strip in mph, kt or km/h. *Heat map* under the key draws
+  the same speed as a colored field beneath the streaks, in the key's colors.
 
   The line under it reads the wind *Here*, at the pane's point: speed and
   where it comes from. Outside the area being drawn it says so.
 
   The height buttons further down draw the wind from 10 m up to the jet
   stream.
+]
+]
+
+#tak-slide[
+= The wind as a heat map
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("116.jpg", width: 100%)
+][
+  *Heat map* under the Wind key paints the speed the streaks are drawn from as
+  a colored field beneath them, in the key's own colors, for the hour on the
+  time strip and the height picked. Off by default; the switch remembers.
 ]
 ]
 
@@ -295,6 +326,76 @@ it is a direction.
 
   It is a forecast, not radar. Radar is what is falling now where a radar
   can see it; Rain is what the model expects where nothing can.
+]
+]
+
+#tak-slide[
+= The Layers page folds
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("118.jpg", width: 100%)
+][
+  Each group on the Layers page folds to one line when its heading is tapped,
+  and stays folded until tapped again. A heading turns green with a count when
+  any layer under it is on, so a folded group still says what it is drawing.
+  *All on* and *All off* at the top switch every layer at once.
+]
+]
+
+#tak-slide[
+= Storm Reports
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("97.png", width: 100%)
+  #image("101.jpg", width: 100%)
+][
+  *Storm Reports* draws every report the NWS offices logged in the last three
+  days: a dot in its family's color (tornado red, wind orange, hail green,
+  flood blue, rain teal, snow and ice violet, landslide and debris flow brown,
+  other grey) with the NWS type and size in the pill: "Hail 1.75 in", "Gust
+  66 mph", "Tornado". The row under the switch picks 24, 48 or 72 hours.
+
+  Tap a dot for where, when, the office and its remarks. They are preliminary,
+  as spotters and the public told the offices; the surveyed tornado paths are
+  the next layer.
+]
+]
+
+#tak-slide[
+= The Storm Reports page
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("107.jpg", width: 100%)
+  #image("108.jpg", width: 100%)
+][
+  The *Storm Reports* page lists the reports and the tornado paths together:
+  *US*, *Near* the point in the pane's top row, on the *Map* as it sits
+  (read again whenever the map settles), or by *State*; *Newest* or *Closest*
+  first; and a picker of switches for any mix of the eight families and
+  *Tornado*, which covers the dots and the paths. What you tick is what the map
+  draws.
+
+  A row flies the map to the report and opens its details in one tap. *Open
+  the list* under the layer's switch jumps here.
+]
+]
+
+#tak-slide[
+= Tornado Paths
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("98.png", width: 100%)
+  #image("102.jpg", width: 100%)
+][
+  *Tornado Paths* draws the track a survey team walked after a tornado, as a
+  line in the Damage Assessment Toolkit's color for its EF rating, EF0 aqua to
+  EF5 purple, EFU grey for a tornado with nothing to rate, with a level pill at
+  the touchdown. The row picks the last 2 days, 7 days, 30 days or year.
+
+  Tap a line for the rating, the office, when it was on the ground and for
+  how long, the path's length and width, the peak wind the damage implies,
+  injuries and deaths, and the survey team's words. A path appears a day or
+  more after the storm, once the office has walked it.
 ]
 ]
 
@@ -470,6 +571,30 @@ numbers only.
 ]
 
 #tak-slide[
+= Fuel Moisture
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("115.jpg", width: 100%)
+][
+  *Fuel Moisture* draws the fuel samples crews cut and weigh every week or two:
+  every sampling site of the National Fuel Moisture Database in the state under
+  the map center, a dot colored by its newest live fuel's moisture, the fuel and
+  percent in the pill (*Chamise 58%*). Live fuel moisture is water as a percent
+  of the plant's dry weight, so it runs past 100; the colors are the chaparral
+  thresholds: 60% and under critical, 61 to 79 high, 80 to 99 moderate, 100 and
+  over low. Dead fuels are rated on their own breaks, the Texas A&M and Oklahoma
+  Mesonet figures (1 and 10 hour 6 / 9 / 15, 100 hour 10 / 13 / 18, 1000 hour
+  13 / 16 / 22); duff has no published scale and draws grey.
+
+  The first row picks how old a sample may be, *30 days*, *90 days* or *1 year*;
+  *Show* picks *Live fuels*, *Dead fuels* or *Both*. Tap a dot for every fuel
+  the site samples with its last value, date and years. Moving the map into
+  another state asks for that state. The database is the US Forest Service's,
+  through San Jose State University's fuel moisture portal.
+]
+]
+
+#tak-slide[
 = Lightning
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
@@ -556,6 +681,50 @@ numbers only.
 ]
 
 #tak-slide[
+= Rain Totals
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("109.jpg", width: 100%)
+][
+  *Rain Totals* draws the rain that fell as a picture, in the NWS's own colors
+  with the key under the switch. The row picks the last 1 h, 6 h, 24 h or 3
+  days, from the NWS radar estimate at 1 km, updated every hour; or 7 days,
+  from the River Forecast Centers' analysis of radar corrected by the gauges,
+  the better total once the center has produced it (grey is where it has not).
+
+  The radar estimate is good at where it rained and fair on how much: low in
+  the mountains, high in a downpour. Use it for where it poured and a gauge
+  for how much. The *Transparency* slider lets the map show through. Lower 48
+  only.
+]
+]
+
+#tak-slide[
+= Rain Gauges
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("110.jpg", width: 100%)
+  #image("111.jpg", width: 100%)
+][
+  *Rain Gauges* draws three kinds of gauge, each a dot in the color of its
+  last 24 hours with the name and the inches in the pill: the USGS gauges around the map
+  (white ring, the day by the hour on tap), the CoCoRaHS volunteer gauges of
+  the state under the map (cyan ring, read once a day around 7 am), and the
+  forecast office's own report gauges (dark ring). The map's extent and the
+  state's code are sent, never your position.
+
+  The *Rain Gauges* page shows the office's rainfall report for the point in
+  the top row: its gauges with their inches for the period the office names,
+  *Most rain first* or *Closest* with the miles on each row, a green *Go to*
+  under every gauge the page could place (the row flies in close and opens the
+  gauge's details, *Back* and *Go to* at the top), and the report as written
+  behind a button; under it the USGS gauges, the same on tap.
+  Thirty-three offices publish such a report; the page says so when the one
+  here does not. It needs NWS as the forecast service.
+]
+]
+
+#tak-slide[
 = River Gauges
 
 #toolbox.side-by-side(columns: (4fr, 8fr))[
@@ -606,6 +775,30 @@ its high-water mark, colored by how rare a flow that big is, a 1-in-2-year
 flow up to 1-in-50 or worse. Tap a line for the flow, the high-water mark and
 the 2 to 50-year flows. It follows the same *Now* / *Next 5 days* choice as
 the flooded ground.
+]
+
+#tak-slide[
+= Debris Flow
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("99.png", width: 100%)
+  #image("119.jpg", width: 100%)
+  #image("106.jpg", width: 100%)
+][
+  *Debris Flow* sits with the rivers because a debris flow is a flood of rock
+  and mud, and the trigger is a burst of rain over a burn. It marks every fire
+  the USGS has assessed in the last three years, and that is all it draws on
+  its own. Tap a marker for the fire's page: *Show the area* brings the map to
+  that burn and draws its perimeter and each stream basin, filled in USGS's
+  own colors, Low yellow, Moderate orange, High red, for one 15-minute burst of
+  rain at the rate the USGS set for that fire (24 mm/h, about an inch an
+  hour, for most).
+
+  Tap a basin for the likelihood of a debris flow, the volume it would carry,
+  the storm it is for and the fire; tap a fire for when it burned, when it was
+  assessed and the USGS record. A burn stays hazardous for two to five years.
+  This layer sends the area the map shows, never your position.
+]
 ]
 
 #tak-slide[
@@ -706,6 +899,29 @@ water equivalent and temperature, colored by depth.
 
 *Snow Depth* draws the daily snow analysis as a picture, in the same depth
 classes, lower 48 only.
+]
+
+#tak-slide[
+= Earthquakes
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("100.png", width: 100%)
+  #image("104.jpg", width: 100%)
+  #image("105.jpg", width: 100%)
+][
+  *Earthquakes* draws the USGS feed the way USGS's own map does: a circle
+  sized by magnitude, colored by age (past hour red, past day orange, past
+  week yellow, older white), the magnitude in the pill on every one. The first
+  row picks the past hour, day, week or month (the month feed carries M2.5 and up
+  only); *Magnitude* picks All, M1+, M2.5+ or M4.5+.
+
+  For up to five of the largest quakes of M4.5 or more, the ShakeMap's
+  intensity contours are drawn in USGS's intensity colors with their Roman
+  numeral. Tap a quake for the magnitude, the place, the time, the depth, how
+  many felt it and how hard, the PAGER impact level, a tsunami flag, whether a
+  seismologist has reviewed it, and the USGS event page. Worldwide, every five
+  minutes.
+]
 ]
 
 #tak-slide[
@@ -879,7 +1095,14 @@ Only what you ask for:
   square the point is in, about 30 miles across, never the point. The Red Flag
   Warning and Fire Weather Watch list is one request for the whole country.
 - *SAWTI* and *PSPS* send nothing about where you are: each asks for its whole
-  set, and the SAWTI page finds your zone on this device.
+  set, and the SAWTI page finds your zone on this device. So do *Storm
+  Reports*, *Tornado Paths* and *Earthquakes*, which are whole national or
+  worldwide files; *Debris Flow*, *Rain Totals* and *Rain Gauges* send the
+  area the map shows, padded; *Fuel Moisture* and the *Rain Gauges* volunteer
+  reports send the two-letter code of the state under the map center, found
+  on this device. The office's rainfall report and the synopsis
+  find the office by the half-degree square the point is in, and only while
+  NWS is the forecast service.
 - An *address* you type goes to the US Census Bureau, and to ATAK's own
   address finder if the Census has no answer.
 - Every request carries the plugin's name and version, which public services

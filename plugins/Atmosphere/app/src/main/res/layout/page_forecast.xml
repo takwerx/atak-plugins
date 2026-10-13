@@ -61,14 +61,11 @@
             android:text="@string/status_idle" />
 
         <TextView
+            style="@style/TakwerxSectionHeading"
             android:id="@+id/current_heading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/heading_now"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:paddingTop="8dp"
-            android:alpha="0.6" />
+            android:text="@string/heading_now" />
 
         <LinearLayout
             android:id="@+id/current_container"
@@ -77,14 +74,11 @@
             android:orientation="vertical" />
 
         <TextView
+            style="@style/TakwerxSectionHeading"
             android:id="@+id/series_heading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/heading_hours"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:paddingTop="8dp"
-            android:alpha="0.6" />
+            android:text="@string/heading_hours" />
 
         <!-- The trend strip: one value across the coming hours as numbers on a line,
              the value chosen by the chip row under it. Both scroll sideways. -->
@@ -158,14 +152,11 @@
         </LinearLayout>
 
         <TextView
+            style="@style/TakwerxSectionHeading"
             android:id="@+id/days_heading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/heading_days"
-            android:textSize="10sp"
-            android:textAllCaps="true"
-            android:paddingTop="8dp"
-            android:alpha="0.6" />
+            android:text="@string/heading_days" />
 
         <LinearLayout
             android:id="@+id/days_strip"
@@ -193,6 +184,15 @@
                     android:orientation="horizontal" />
             </HorizontalScrollView>
         </LinearLayout>
+
+        <!-- The forecaster's discussion for the office covering the point: the Synopsis
+             open, the other sections behind buttons. Filled in code. -->
+        <LinearLayout
+            android:id="@+id/discussion_block"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical" />
 
         <TextView
             android:id="@+id/attribution_text"

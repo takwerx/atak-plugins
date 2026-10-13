@@ -61,6 +61,13 @@ import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
 import com.atakmap.android.atmosphere.overlay.ErcOverlay;
 import com.atakmap.android.atmosphere.overlay.LightningOverlay;
 import com.atakmap.android.atmosphere.overlay.PspsOverlay;
+import com.atakmap.android.atmosphere.overlay.StormReportsOverlay;
+import com.atakmap.android.atmosphere.overlay.TornadoPathsOverlay;
+import com.atakmap.android.atmosphere.overlay.DebrisFlowOverlay;
+import com.atakmap.android.atmosphere.overlay.QuakesOverlay;
+import com.atakmap.android.atmosphere.overlay.FuelMoistureOverlay;
+import com.atakmap.android.atmosphere.overlay.RainTotalsOverlay;
+import com.atakmap.android.atmosphere.overlay.RainGaugesOverlay;
 import com.atakmap.android.atmosphere.overlay.FireZoneOverlay;
 import com.atakmap.android.atmosphere.overlay.FloodOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -175,7 +182,7 @@ public final class AtmospherePane {
     private static final int[] TAB_NAMES = { R.string.tab_forecast, R.string.tab_layers,
             R.string.tab_spots, R.string.tab_zones, R.string.tab_sawti, R.string.tab_erc,
             R.string.tab_stations,
-            R.string.tab_gauges, R.string.tab_buoys };
+            R.string.tab_gauges, R.string.tab_buoys, R.string.tab_reports, R.string.tab_rain };
     /** Where the Layers page sits in {@link #TAB_NAMES} and the pager. */
     private static final int LAYERS_PAGE = 1;
     private final View[] pages;
@@ -187,6 +194,12 @@ public final class AtmospherePane {
     private final SawtiPage sawtiPage;
     /** One area's fire danger with its GACC chart, opened wide from a tap on the map. */
     private final ErcPage ercPage;
+    /** The storm reports as a list, the map layer's own data narrowed by where and type. */
+    private final ReportsPage reportsPage;
+    /** The office's rainfall report and the USGS gauges as a list. */
+    private final RainPage rainPage;
+    /** The forecaster's discussion under the days on the Forecast page. */
+    private final DiscussionBlock discussion;
     private final Button refreshButton;
     private final Button settingsButton;
     private final TextView positionText;
@@ -270,6 +283,71 @@ public final class AtmospherePane {
     private final LinearLayout pspsLegend;
     private PspsOverlay psps;
     private boolean pspsOpen = true;
+    private static final String PREF_REPORTS_OPEN = "weather.reports.open";
+    private final LinearLayout reportsSettings;
+    private final ImageButton reportsExpand;
+    private final Button reportsToggle;
+    private final TextView reportsStatus;
+    private final LinearLayout reportsLegend;
+    private final LinearLayout reportsDayRow;
+    private StormReportsOverlay reports;
+    private boolean reportsOpen = true;
+    private static final String PREF_TORNADO_OPEN = "weather.tornado.open";
+    private final LinearLayout tornadoSettings;
+    private final ImageButton tornadoExpand;
+    private final Button tornadoToggle;
+    private final TextView tornadoStatus;
+    private final LinearLayout tornadoLegend;
+    private final LinearLayout tornadoDayRow;
+    private TornadoPathsOverlay tornado;
+    private boolean tornadoOpen = true;
+    private static final String PREF_DEBRISFLOW_OPEN = "weather.debrisflow.open";
+    private final LinearLayout debrisflowSettings;
+    private final ImageButton debrisflowExpand;
+    private final Button debrisflowToggle;
+    private final TextView debrisflowStatus;
+    private final LinearLayout debrisflowLegend;
+    private DebrisFlowOverlay debrisflow;
+    private boolean debrisflowOpen = true;
+    private static final String PREF_QUAKES_OPEN = "weather.quakes.open";
+    private final LinearLayout quakesSettings;
+    private final ImageButton quakesExpand;
+    private final Button quakesToggle;
+    private final TextView quakesStatus;
+    private final LinearLayout quakesLegend;
+    private final LinearLayout quakesDayRow;
+    private final LinearLayout quakesChoiceRow;
+    private QuakesOverlay quakes;
+    private boolean quakesOpen = true;
+    private static final String PREF_FUEL_OPEN = "weather.fuel.open";
+    private final LinearLayout fuelSettings;
+    private final ImageButton fuelExpand;
+    private final Button fuelToggle;
+    private final TextView fuelStatus;
+    private final LinearLayout fuelLegend;
+    private final LinearLayout fuelDayRow;
+    private final LinearLayout fuelChoiceRow;
+    private FuelMoistureOverlay fuel;
+    private boolean fuelOpen = true;
+    private static final String PREF_RAINTOTALS_OPEN = "weather.raintotals.open";
+    private final LinearLayout raintotalsSettings;
+    private final ImageButton raintotalsExpand;
+    private final Button raintotalsToggle;
+    private final TextView raintotalsStatus;
+    private final LinearLayout raintotalsLegend;
+    private final LinearLayout raintotalsWindowRow;
+    private final android.widget.SeekBar raintotalsTransparency;
+    private final TextView raintotalsTransparencyLabel;
+    private RainTotalsOverlay raintotals;
+    private boolean raintotalsOpen = true;
+    private static final String PREF_RAINGAUGES_OPEN = "weather.raingauges.open";
+    private final LinearLayout raingaugesSettings;
+    private final ImageButton raingaugesExpand;
+    private final Button raingaugesToggle;
+    private final TextView raingaugesStatus;
+    private final LinearLayout raingaugesLegend;
+    private RainGaugesOverlay raingauges;
+    private boolean raingaugesOpen = true;
     private static final String PREF_FIREZONES_OPEN = "weather.firezones.open";
     private final LinearLayout firezonesSettings;
     private final ImageButton firezonesExpand;
@@ -376,6 +454,7 @@ public final class AtmospherePane {
     private RadarOverlay radar;
     private List<String> radarFrames = new ArrayList<>();
     private final Button windToggle;
+    private final Button windHeatToggle;
     private final View windScaleHost;
     private final WindScaleView windScale;
     private final LinearLayout windUnitRow;
@@ -543,6 +622,73 @@ public final class AtmospherePane {
             }
         });
         ercPage = new ErcPage(pluginContext, egress);
+        reportsPage = new ReportsPage(pluginContext, MapView.getMapView(), egress,
+                new ReportsPage.Host() {
+                    @Override
+                    public UnitSystem units() {
+                        return units;
+                    }
+
+                    @Override
+                    public GeoPoint point() {
+                        return AtmospherePane.this.point();
+                    }
+
+                    @Override
+                    public String pointLabel() {
+                        return modeLabel();
+                    }
+
+                    @Override
+                    public void askToAllowReports() {
+                        AtmospherePane.this.askToAllowReports();
+                    }
+
+                    @Override
+                    public void setReportsOn(boolean on) {
+                        if (reports != null) {
+                            reports.setOn(on);
+                            updateLayerControls();
+                        }
+                    }
+
+                    @Override
+                    public void setTornadoOn(boolean on) {
+                        if (tornado != null) {
+                            tornado.setOn(on);
+                            updateLayerControls();
+                        }
+                    }
+                });
+        rainPage = new RainPage(pluginContext, MapView.getMapView(), egress, new RainPage.Host() {
+            @Override
+            public GeoPoint point() {
+                return AtmospherePane.this.point();
+            }
+
+            @Override
+            public String pointLabel() {
+                return modeLabel();
+            }
+
+            @Override
+            public boolean nwsPicked() {
+                return selected != null && "nws".equals(selected.id);
+            }
+
+            @Override
+            public void askToAllowGauges() {
+                askToAllowRaingauges();
+            }
+
+            @Override
+            public void setGaugesOn(boolean on) {
+                if (raingauges != null) {
+                    raingauges.setOn(on);
+                    updateLayerControls();
+                }
+            }
+        });
         sawtiPage = new SawtiPage(pluginContext, mapView(), egress, new SawtiPage.Host() {
             @Override
             public GeoPoint point() {
@@ -586,8 +732,11 @@ public final class AtmospherePane {
                 ercPage.view(),
                 stationPage.view(),
                 gaugePage.view(),
-                buoyPage.view()
+                buoyPage.view(),
+                reportsPage.view(),
+                rainPage.view()
         };
+        wireGroupFolds(pages[LAYERS_PAGE]);
         pager = root.findViewById(R.id.pager);
         pagePrev = root.findViewById(R.id.page_prev);
         pageNext = root.findViewById(R.id.page_next);
@@ -631,9 +780,27 @@ public final class AtmospherePane {
         daysLegend = find(R.id.days_legend);
         daysContainer = find(R.id.days_container);
         attributionText = find(R.id.attribution_text);
+        discussion = new DiscussionBlock(pluginContext, egress, (LinearLayout) find(R.id.discussion_block),
+                new DiscussionBlock.Host() {
+                    @Override
+                    public GeoPoint point() {
+                        return AtmospherePane.this.point();
+                    }
+
+                    @Override
+                    public String pointLabel() {
+                        return modeLabel();
+                    }
+
+                    @Override
+                    public boolean nwsPicked() {
+                        return selected != null && "nws".equals(selected.id);
+                    }
+                });
         layersAttribution = find(R.id.layers_attribution);
         radarToggle = find(R.id.radar_toggle);
         windToggle = find(R.id.wind_toggle);
+        windHeatToggle = find(R.id.wind_heat_toggle);
         windScaleHost = find(R.id.wind_scale_host);
         windScale = new WindScaleView(pluginContext);
         ((LinearLayout) windScaleHost).addView(windScale);
@@ -687,6 +854,50 @@ public final class AtmospherePane {
         pspsToggle = find(R.id.psps_toggle);
         pspsStatus = find(R.id.psps_status);
         pspsLegend = find(R.id.psps_legend);
+        reportsSettings = find(R.id.reports_settings);
+        reportsExpand = find(R.id.reports_expand);
+        reportsToggle = find(R.id.reports_toggle);
+        reportsStatus = find(R.id.reports_status);
+        reportsLegend = find(R.id.reports_legend);
+        reportsDayRow = find(R.id.reports_day_row);
+        tornadoSettings = find(R.id.tornado_settings);
+        tornadoExpand = find(R.id.tornado_expand);
+        tornadoToggle = find(R.id.tornado_toggle);
+        tornadoStatus = find(R.id.tornado_status);
+        tornadoLegend = find(R.id.tornado_legend);
+        tornadoDayRow = find(R.id.tornado_day_row);
+        debrisflowSettings = find(R.id.debrisflow_settings);
+        debrisflowExpand = find(R.id.debrisflow_expand);
+        debrisflowToggle = find(R.id.debrisflow_toggle);
+        debrisflowStatus = find(R.id.debrisflow_status);
+        debrisflowLegend = find(R.id.debrisflow_legend);
+        quakesSettings = find(R.id.quakes_settings);
+        quakesExpand = find(R.id.quakes_expand);
+        quakesToggle = find(R.id.quakes_toggle);
+        quakesStatus = find(R.id.quakes_status);
+        quakesLegend = find(R.id.quakes_legend);
+        quakesDayRow = find(R.id.quakes_day_row);
+        quakesChoiceRow = find(R.id.quakes_choice_row);
+        fuelSettings = find(R.id.fuel_settings);
+        fuelExpand = find(R.id.fuel_expand);
+        fuelToggle = find(R.id.fuel_toggle);
+        fuelStatus = find(R.id.fuel_status);
+        fuelLegend = find(R.id.fuel_legend);
+        fuelDayRow = find(R.id.fuel_day_row);
+        fuelChoiceRow = find(R.id.fuel_choice_row);
+        raintotalsSettings = find(R.id.raintotals_settings);
+        raintotalsExpand = find(R.id.raintotals_expand);
+        raintotalsToggle = find(R.id.raintotals_toggle);
+        raintotalsStatus = find(R.id.raintotals_status);
+        raintotalsLegend = find(R.id.raintotals_legend);
+        raintotalsWindowRow = find(R.id.raintotals_window_row);
+        raintotalsTransparency = find(R.id.raintotals_transparency);
+        raintotalsTransparencyLabel = find(R.id.raintotals_transparency_label);
+        raingaugesSettings = find(R.id.raingauges_settings);
+        raingaugesExpand = find(R.id.raingauges_expand);
+        raingaugesToggle = find(R.id.raingauges_toggle);
+        raingaugesStatus = find(R.id.raingauges_status);
+        raingaugesLegend = find(R.id.raingauges_legend);
         firezonesSettings = find(R.id.firezones_settings);
         firezonesExpand = find(R.id.firezones_expand);
         firezonesToggle = find(R.id.firezones_toggle);
@@ -1003,6 +1214,69 @@ public final class AtmospherePane {
                 updateLayerControls();
             }
         });
+        reportsOpen = prefs == null || prefs.getBoolean(PREF_REPORTS_OPEN, true);
+        reportsExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                reportsOpen = !reportsOpen;
+                rememberFold(PREF_REPORTS_OPEN, reportsOpen);
+                updateLayerControls();
+            }
+        });
+        tornadoOpen = prefs == null || prefs.getBoolean(PREF_TORNADO_OPEN, true);
+        tornadoExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                tornadoOpen = !tornadoOpen;
+                rememberFold(PREF_TORNADO_OPEN, tornadoOpen);
+                updateLayerControls();
+            }
+        });
+        debrisflowOpen = prefs == null || prefs.getBoolean(PREF_DEBRISFLOW_OPEN, true);
+        debrisflowExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                debrisflowOpen = !debrisflowOpen;
+                rememberFold(PREF_DEBRISFLOW_OPEN, debrisflowOpen);
+                updateLayerControls();
+            }
+        });
+        quakesOpen = prefs == null || prefs.getBoolean(PREF_QUAKES_OPEN, true);
+        quakesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                quakesOpen = !quakesOpen;
+                rememberFold(PREF_QUAKES_OPEN, quakesOpen);
+                updateLayerControls();
+            }
+        });
+        fuelOpen = prefs == null || prefs.getBoolean(PREF_FUEL_OPEN, true);
+        fuelExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                fuelOpen = !fuelOpen;
+                rememberFold(PREF_FUEL_OPEN, fuelOpen);
+                updateLayerControls();
+            }
+        });
+        raingaugesOpen = prefs == null || prefs.getBoolean(PREF_RAINGAUGES_OPEN, true);
+        raingaugesExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                raingaugesOpen = !raingaugesOpen;
+                rememberFold(PREF_RAINGAUGES_OPEN, raingaugesOpen);
+                updateLayerControls();
+            }
+        });
+        raintotalsOpen = prefs == null || prefs.getBoolean(PREF_RAINTOTALS_OPEN, true);
+        raintotalsExpand.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                raintotalsOpen = !raintotalsOpen;
+                rememberFold(PREF_RAINTOTALS_OPEN, raintotalsOpen);
+                updateLayerControls();
+            }
+        });
         firezonesOpen = prefs == null || prefs.getBoolean(PREF_FIREZONES_OPEN, true);
         firezonesExpand.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -1279,6 +1553,20 @@ public final class AtmospherePane {
             lightning.refresh(false);
         if (psps != null && psps.isOn())
             psps.refresh(false);
+        if (reports != null && reports.isOn())
+            reports.refresh(false);
+        if (tornado != null && tornado.isOn())
+            tornado.refresh(false);
+        if (debrisflow != null && debrisflow.isOn())
+            debrisflow.refresh(false);
+        if (quakes != null && quakes.isOn())
+            quakes.refresh(false);
+        if (fuel != null && fuel.isOn())
+            fuel.refresh(false);
+        if (raintotals != null && raintotals.isOn())
+            raintotals.refresh(false);
+        if (raingauges != null && raingauges.isOn())
+            raingauges.refresh(false);
         if (fireZones != null && fireZones.isOn())
             fireZones.refresh();
         if (flood != null && flood.isOn())
@@ -1299,6 +1587,10 @@ public final class AtmospherePane {
             sst.refresh(false);
         if (pages[pager.getCurrentItem()] == spotPage.view())
             spotPage.onShown();
+        if (pages[pager.getCurrentItem()] == reportsPage.view())
+            reportsPage.onShown();
+        if (pages[pager.getCurrentItem()] == rainPage.view())
+            rainPage.onShown();
         if (pages[pager.getCurrentItem()] == zonePage.view())
             zonePage.onShown();
         if (pages[pager.getCurrentItem()] == sawtiPage.view())
@@ -1354,6 +1646,10 @@ public final class AtmospherePane {
                 updatePageDots(position);
                 if (pages[position] == spotPage.view())
                     spotPage.onShown();
+                if (pages[position] == reportsPage.view())
+                    reportsPage.onShown();
+                if (pages[position] == rainPage.view())
+                    rainPage.onShown();
                 if (pages[position] == zonePage.view())
                     zonePage.onShown();
                 if (pages[position] == sawtiPage.view())
@@ -2014,6 +2310,256 @@ public final class AtmospherePane {
         updateLayerControls();
     }
 
+    /** Storm reports: the status line under the switch and the key. */
+    public void setReports(StormReportsOverlay overlay) {
+        reports = overlay;
+        if (reports == null)
+            return;
+        reports.setListener(new StormReportsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                reportsStatus.setText(status);
+                reportsStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        reportsLegend.removeAllViews();
+        for (String[] row : StormReportsOverlay.LEGEND)
+            reportsLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(reportsDayRow, reports);
+        reportsPage.setOverlay(reports);
+        reports.setDataListener(new Runnable() {
+            @Override
+            public void run() {
+                buildDayRow(reportsDayRow, reports);
+                reportsPage.onDataChanged();
+            }
+        });
+        final View openList = find(R.id.reports_open_list);
+        if (openList != null)
+            openList.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openPage(reportsPage.view());
+                }
+            });
+        updateLayerControls();
+    }
+
+    /** Tornado paths: the status line under the switch and the key. */
+    public void setTornado(TornadoPathsOverlay overlay) {
+        tornado = overlay;
+        if (tornado == null)
+            return;
+        tornado.setListener(new TornadoPathsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                tornadoStatus.setText(status);
+                tornadoStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        tornadoLegend.removeAllViews();
+        for (String[] row : TornadoPathsOverlay.LEGEND)
+            tornadoLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(tornadoDayRow, tornado);
+        reportsPage.setPathsOverlay(tornado);
+        tornado.setDataListener(new Runnable() {
+            @Override
+            public void run() {
+                buildDayRow(tornadoDayRow, tornado);
+                reportsPage.onDataChanged();
+            }
+        });
+        updateLayerControls();
+    }
+
+    /** Debris flow: the status line under the switch and the key. */
+    public void setDebrisFlow(DebrisFlowOverlay overlay) {
+        debrisflow = overlay;
+        if (debrisflow == null)
+            return;
+        debrisflow.setListener(new DebrisFlowOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                debrisflowStatus.setText(status);
+                debrisflowStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        debrisflowLegend.removeAllViews();
+        for (String[] row : DebrisFlowOverlay.LEGEND)
+            debrisflowLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        updateLayerControls();
+    }
+
+    /** Earthquakes: the status line under the switch and the key. */
+    public void setQuakes(QuakesOverlay overlay) {
+        quakes = overlay;
+        if (quakes == null)
+            return;
+        quakes.setListener(new QuakesOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                quakesStatus.setText(status);
+                quakesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        quakesLegend.removeAllViews();
+        for (String[] row : QuakesOverlay.LEGEND)
+            quakesLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(quakesDayRow, quakes);
+        buildChoiceRow(quakesChoiceRow, quakes);
+        updateLayerControls();
+    }
+
+    /** Fuel Moisture: the status line under the switch and the key. */
+    public void setFuel(FuelMoistureOverlay overlay) {
+        fuel = overlay;
+        if (fuel == null)
+            return;
+        fuel.setListener(new FuelMoistureOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                fuelStatus.setText(status);
+                fuelStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        fuelLegend.removeAllViews();
+        for (String[] row : FuelMoistureOverlay.LEGEND)
+            fuelLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
+        buildDayRow(fuelDayRow, fuel);
+        buildChoiceRow(fuelChoiceRow, fuel);
+        updateLayerControls();
+    }
+
+    /** USGS rain gauges: the status line, the key, and the page behind the list button. */
+    public void setRainGauges(RainGaugesOverlay overlay) {
+        raingauges = overlay;
+        if (raingauges == null)
+            return;
+        raingauges.setListener(new RainGaugesOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                raingaugesStatus.setText(status);
+                raingaugesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        raingaugesLegend.removeAllViews();
+        for (String[] row : RainGaugesOverlay.LEGEND)
+            raingaugesLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
+        rainPage.setGauges(raingauges);
+        raingauges.setDataListener(new Runnable() {
+            @Override
+            public void run() {
+                rainPage.onGaugesChanged();
+            }
+        });
+        final View openList = find(R.id.raingauges_open_list);
+        if (openList != null)
+            openList.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    openPage(rainPage.view());
+                }
+            });
+        updateLayerControls();
+    }
+
+    /** Rain that fell: the window chips, the status line and the key in the NWS colors. */
+    public void setRainTotals(RainTotalsOverlay overlay) {
+        raintotals = overlay;
+        if (raintotals == null)
+            return;
+        raintotals.setListener(new RainTotalsOverlay.Listener() {
+            @Override
+            public void onStatus(String status) {
+                raintotalsStatus.setText(status);
+                raintotalsStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+            }
+        });
+        buildRainTotalsRow();
+        updateLayerControls();
+    }
+
+    /** The chips and the key, which follows the window: MRMS's or the RFC analysis's. */
+    private void buildRainTotalsRow() {
+        if (raintotals == null)
+            return;
+        raintotalsLegend.removeAllViews();
+        for (String[] row : raintotals.legend())
+            raintotalsLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
+        chips(raintotalsWindowRow, RainTotalsOverlay.WINDOWS, raintotals.window(), new Picked() {
+            @Override
+            public void picked(int which) {
+                raintotals.setWindow(which);
+                buildRainTotalsRow();
+            }
+        });
+        raintotalsTransparency.setMax(RainTotalsOverlay.MAX_TRANSPARENCY);
+        raintotalsTransparency.setProgress(raintotals.transparency());
+        raintotalsTransparencyLabel.setText(pluginContext.getString(R.string.raintotals_opacity_heading)
+                + " " + raintotals.transparency() + "%");
+        // The bar owns the touch from down to up: the pager would otherwise take a
+        // sideways drag as a page turn. Applied on release, not on every tick, since
+        // each change asks the server for the picture again.
+        raintotalsTransparency.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                final int a = e.getActionMasked();
+                if (a == android.view.MotionEvent.ACTION_DOWN)
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                else if (a == android.view.MotionEvent.ACTION_UP
+                        || a == android.view.MotionEvent.ACTION_CANCEL)
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                return false;
+            }
+        });
+        raintotalsTransparency.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) {
+                raintotalsTransparencyLabel.setText(pluginContext.getString(
+                        R.string.raintotals_opacity_heading) + " " + progress + "%");
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar bar) {
+                if (raintotals != null)
+                    raintotals.setTransparency(bar.getProgress());
+            }
+        });
+    }
+
+    private interface Picked {
+        void picked(int which);
+    }
+
+    /** A row of equal chips, the current one green. */
+    private void chips(LinearLayout row, String[] labels, int current, final Picked picked) {
+        row.removeAllViews();
+        for (int i = 0; i < labels.length; i++) {
+            final int value = i;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(labels[i]);
+            b.setTextSize(12);
+            b.setTextColor(current == i
+                    ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    picked.picked(value);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
     /** Lightning strike density; the newest frame, its time and age on the status line. */
     public void setLightning(LightningOverlay overlay) {
         lightning = overlay;
@@ -2059,6 +2605,36 @@ public final class AtmospherePane {
                 public void onClick(View v) {
                     layer.setDay(value);
                     buildDayRow(row, layer);
+                }
+            });
+            final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = dp(4);
+            b.setLayoutParams(lp);
+            row.addView(b);
+        }
+    }
+
+
+    /** The second chip row of a layer that offers one: its {@code choices()}, the pick in green. */
+    private void buildChoiceRow(final LinearLayout row, final com.atakmap.android.atmosphere.overlay.OutlookOverlay layer) {
+        row.removeAllViews();
+        if (layer == null || layer.choices() == null)
+            return;
+        final String[] cs = layer.choices();
+        for (int i = 0; i < cs.length; i++) {
+            final int value = i;
+            final boolean chosen = layer.choice() == value;
+            final Button b = (Button) LayoutInflater.from(pluginContext)
+                    .inflate(R.layout.trend_chip, row, false);
+            b.setText(cs[i]);
+            b.setTextSize(12);
+            b.setTextColor(chosen ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    layer.setChoice(value);
+                    buildChoiceRow(row, layer);
                 }
             });
             final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
@@ -2357,6 +2933,118 @@ public final class AtmospherePane {
                 }
             }
         });
+        reportsToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (reports == null)
+                    return;
+                if (reports.isOn()) {
+                    reports.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(StormReportsOverlay.LAYER_ID)) {
+                    reports.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowReports();
+                }
+            }
+        });
+        tornadoToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (tornado == null)
+                    return;
+                if (tornado.isOn()) {
+                    tornado.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(TornadoPathsOverlay.LAYER_ID)) {
+                    tornado.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowTornado();
+                }
+            }
+        });
+        debrisflowToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (debrisflow == null)
+                    return;
+                if (debrisflow.isOn()) {
+                    debrisflow.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(DebrisFlowOverlay.LAYER_ID)) {
+                    debrisflow.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowDebrisflow();
+                }
+            }
+        });
+        quakesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (quakes == null)
+                    return;
+                if (quakes.isOn()) {
+                    quakes.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(QuakesOverlay.LAYER_ID)) {
+                    quakes.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowQuakes();
+                }
+            }
+        });
+        fuelToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (fuel == null)
+                    return;
+                if (fuel.isOn()) {
+                    fuel.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(FuelMoistureOverlay.LAYER_ID)) {
+                    fuel.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowFuel();
+                }
+            }
+        });
+        raingaugesToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (raingauges == null)
+                    return;
+                if (raingauges.isOn()) {
+                    raingauges.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(RainGaugesOverlay.LAYER_ID)) {
+                    raingauges.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowRaingauges();
+                }
+            }
+        });
+        raintotalsToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (raintotals == null)
+                    return;
+                if (raintotals.isOn()) {
+                    raintotals.setOn(false);
+                    updateLayerControls();
+                } else if (egress.isLayerEnabled(RainTotalsOverlay.LAYER_ID)) {
+                    raintotals.setOn(true);
+                    updateLayerControls();
+                } else {
+                    askToAllowRaintotals();
+                }
+            }
+        });
         lightningToggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -2418,6 +3106,15 @@ public final class AtmospherePane {
                 } else {
                     askToAllowWind();
                 }
+            }
+        });
+        windHeatToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (wind == null)
+                    return;
+                wind.setHeatOn(!wind.heatOn());
+                updateLayerControls();
             }
         });
         spotToggle.setOnClickListener(new View.OnClickListener() {
@@ -3149,7 +3846,7 @@ public final class AtmospherePane {
                 // The utility stations are counted apart, and said to be hidden when
                 // the zoom hides them: a count the map does not show reads as a fault.
                 if (stationsStatus != null)
-                    stationsStatus.setText(total == 0 ? ""
+                    stationsStatus.setText(total == 0 ? noStationsText()
                             : drawn + " stations, " + critical + " at criteria"
                                     + (utility == 0 ? "" : "\n" + utility
                                             + " utility stations, " + utilityCritical
@@ -3160,6 +3857,23 @@ public final class AtmospherePane {
                 if (stationPage != null)
                     stationPage.refresh();
                 updateLayerControls();
+            }
+
+            /**
+             * Nothing within the radius, said with the point it was measured from: a
+             * phone with no fix keeps a stale self position, and "0 stations" alone
+             * read as a broken layer (operator, 2026-10-12: "why aren't weather
+             * stations turning on").
+             */
+            private String noStationsText() {
+                final GeoPoint o = stationLayer.originPoint();
+                final String where = o == null ? "" : String.format(Locale.US, " (%.2f, %.2f)",
+                        o.getLatitude(), o.getLongitude());
+                if (stationLayer.fromMe())
+                    return "No stations within " + stationLayer.miles() + " mi of your position"
+                            + where + ". No GPS fix here? Pick Map center.";
+                return "No stations within " + stationLayer.miles() + " mi of the map center"
+                        + where + ".";
             }
 
             @Override
@@ -3686,6 +4400,34 @@ public final class AtmospherePane {
             psps.setOn(on);
         else if (psps != null && on)
             blocked++;
+        if (reports != null && (!on || allowed(StormReportsOverlay.LAYER_ID)))
+            reports.setOn(on);
+        else if (reports != null && on)
+            blocked++;
+        if (tornado != null && (!on || allowed(TornadoPathsOverlay.LAYER_ID)))
+            tornado.setOn(on);
+        else if (tornado != null && on)
+            blocked++;
+        if (debrisflow != null && (!on || allowed(DebrisFlowOverlay.LAYER_ID)))
+            debrisflow.setOn(on);
+        else if (debrisflow != null && on)
+            blocked++;
+        if (quakes != null && (!on || allowed(QuakesOverlay.LAYER_ID)))
+            quakes.setOn(on);
+        else if (quakes != null && on)
+            blocked++;
+        if (fuel != null && (!on || allowed(FuelMoistureOverlay.LAYER_ID)))
+            fuel.setOn(on);
+        else if (fuel != null && on)
+            blocked++;
+        if (raintotals != null && (!on || allowed(RainTotalsOverlay.LAYER_ID)))
+            raintotals.setOn(on);
+        else if (raintotals != null && on)
+            blocked++;
+        if (raingauges != null && (!on || allowed(RainGaugesOverlay.LAYER_ID)))
+            raingauges.setOn(on);
+        else if (raingauges != null && on)
+            blocked++;
         if (fireZones != null && (!on || allowed(FireZoneOverlay.LAYER_ID)))
             fireZones.setOn(on);
         else if (fireZones != null && on)
@@ -4115,10 +4857,10 @@ public final class AtmospherePane {
     /** A small caps heading inside the guide, the pane's own convention. */
     private View guideHeading(String text) {
         final TextView t = new TextView(pluginContext);
-        t.setTextColor(Color.WHITE);
-        t.setTextSize(10);
+        t.setTextColor(0xFF00E5FF);
+        t.setTextSize(12f);
         t.setAllCaps(true);
-        t.setAlpha(0.6f);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
         t.setPadding(0, dp(10), 0, dp(2));
         t.setText(text);
         return t;
@@ -4743,6 +5485,153 @@ public final class AtmospherePane {
                 .show();
     }
 
+    private void askToAllowReports() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.reports_allow_title))
+                .setMessage(pluginContext.getString(R.string.reports_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(StormReportsOverlay.LAYER_ID, true);
+                                if (reports != null)
+                                    reports.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowTornado() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.tornado_allow_title))
+                .setMessage(pluginContext.getString(R.string.tornado_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(TornadoPathsOverlay.LAYER_ID, true);
+                                if (tornado != null)
+                                    tornado.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowDebrisflow() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.debrisflow_allow_title))
+                .setMessage(pluginContext.getString(R.string.debrisflow_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(DebrisFlowOverlay.LAYER_ID, true);
+                                if (debrisflow != null)
+                                    debrisflow.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowQuakes() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.quakes_allow_title))
+                .setMessage(pluginContext.getString(R.string.quakes_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(QuakesOverlay.LAYER_ID, true);
+                                if (quakes != null)
+                                    quakes.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowFuel() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.fuel_allow_title))
+                .setMessage(pluginContext.getString(R.string.fuel_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(FuelMoistureOverlay.LAYER_ID, true);
+                                if (fuel != null)
+                                    fuel.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowRaingauges() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.raingauges_allow_title))
+                .setMessage(pluginContext.getString(R.string.raingauges_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(RainGaugesOverlay.LAYER_ID, true);
+                                if (raingauges != null)
+                                    raingauges.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    private void askToAllowRaintotals() {
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.raintotals_allow_title))
+                .setMessage(pluginContext.getString(R.string.raintotals_allow_text))
+                .setPositiveButton(pluginContext.getString(R.string.allow),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                egress.setLayerEnabled(RainTotalsOverlay.LAYER_ID, true);
+                                if (raintotals != null)
+                                    raintotals.setOn(true);
+                                updateLayerControls();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
     private void askToAllowLightning() {
         final Context ctx = MapCompat.atakContext();
         if (ctx == null)
@@ -4903,6 +5792,142 @@ public final class AtmospherePane {
                 .show();
     }
 
+    /**
+     * The Layers page's groups fold: a tap on a group heading hides or shows every
+     * block under it, remembered per group (operator, 2026-10-12: "it's getting to
+     * be a very long side pane window"). The page is flat, a heading then its
+     * blocks, so the members of a group are the siblings up to the next heading.
+     */
+    private static final int[] GROUP_NAMES = { R.string.group_points, R.string.group_wind, R.string.group_storms,
+            R.string.group_fire, R.string.group_rain, R.string.group_ocean, R.string.group_snow,
+            R.string.group_ground };
+    /** Each group's icon, the one its first layer wears, so the heading reads like its rows. */
+    private static final int[] GROUP_ICONS = { R.drawable.ic_layer_spot, R.drawable.ic_layer_wind,
+            R.drawable.ic_layer_reports, R.drawable.ic_layer_firewx, R.drawable.ic_layer_rain,
+            R.drawable.ic_layer_waves, R.drawable.ic_layer_snow, R.drawable.ic_layer_quakes };
+    private final java.util.Map<Integer, TextView> groupHeads = new java.util.LinkedHashMap<>();
+    private final java.util.Map<Integer, java.util.List<View>> groupMembers = new java.util.LinkedHashMap<>();
+
+    private static TextView findHeading(View v, String text) {
+        if (v instanceof TextView && text.contentEquals(((TextView) v).getText()))
+            return (TextView) v;
+        if (v instanceof android.view.ViewGroup) {
+            final android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                final TextView t = findHeading(g.getChildAt(i), text);
+                if (t != null)
+                    return t;
+            }
+        }
+        return null;
+    }
+
+    private void wireGroupFolds(View layersPage) {
+        final TextView first = findHeading(layersPage, pluginContext.getString(GROUP_NAMES[0]));
+        if (first == null || !(first.getParent() instanceof android.view.ViewGroup))
+            return;
+        final android.view.ViewGroup parent = (android.view.ViewGroup) first.getParent();
+        final java.util.Map<String, Integer> byText = new java.util.HashMap<>();
+        for (int id : GROUP_NAMES)
+            byText.put(pluginContext.getString(id), id);
+        Integer current = null;
+        for (int i = 0; i < parent.getChildCount(); i++) {
+            final View child = parent.getChildAt(i);
+            final Integer key = child instanceof TextView
+                    ? byText.get(((TextView) child).getText().toString()) : null;
+            if (key != null) {
+                current = key;
+                groupHeads.put(key, (TextView) child);
+                groupMembers.put(key, new java.util.ArrayList<View>());
+                for (int g = 0; g < GROUP_NAMES.length; g++)
+                    if (GROUP_NAMES[g] == key) {
+                        final android.graphics.drawable.Drawable icon =
+                                pluginContext.getResources().getDrawable(GROUP_ICONS[g]);
+                        if (icon != null) {
+                            icon.setBounds(0, 0, dp(26), dp(26));
+                            ((TextView) child).setCompoundDrawables(icon, null, null, null);
+                            ((TextView) child).setCompoundDrawablePadding(dp(10));
+                            ((TextView) child).setGravity(android.view.Gravity.CENTER_VERTICAL);
+                        }
+                    }
+                final int k = key;
+                child.setClickable(true);
+                child.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        final SharedPreferences p = MapCompat.prefs();
+                        final boolean open = p == null || p.getBoolean(groupPref(k), true);
+                        if (p != null)
+                            p.edit().putBoolean(groupPref(k), !open).apply();
+                        // Put back what the fold hid, then let the switch code decide
+                        // each settings block afresh.
+                        applyGroupFolds();
+                        updateLayerControls();
+                    }
+                });
+            } else if (current != null)
+                groupMembers.get(current).add(child);
+        }
+        applyGroupFolds();
+    }
+
+    private String groupPref(int nameId) {
+        return "weather.group." + pluginContext.getResources().getResourceEntryName(nameId) + ".open";
+    }
+
+    /** Layer switches under a view that read ON: every layer toggle says "<Name> ON" or "OFF". */
+    private static int countOn(View v) {
+        if (v instanceof Button) {
+            final CharSequence t = ((Button) v).getText();
+            return t != null && t.toString().endsWith(" ON") ? 1 : 0;
+        }
+        int n = 0;
+        if (v instanceof android.view.ViewGroup) {
+            final android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++)
+                n += countOn(g.getChildAt(i));
+        }
+        return n;
+    }
+
+    /**
+     * A heading reads bigger than a section heading, folds its group, and turns
+     * green with a count when any layer under it is on, so the state of a folded
+     * group is known at a glance (operator, 2026-10-12: "you sort of know right off
+     * the bat if something is on").
+     */
+    /** What a fold hid and how it stood, so opening puts back exactly that and no more. */
+    private final java.util.Map<View, Integer> hiddenByFold = new java.util.HashMap<>();
+
+    private void applyGroupFolds() {
+        final SharedPreferences p = MapCompat.prefs();
+        for (java.util.Map.Entry<Integer, TextView> e : groupHeads.entrySet()) {
+            final boolean open = p == null || p.getBoolean(groupPref(e.getKey()), true);
+            int on = 0;
+            // A layer's settings block is a sibling of its switch row, and the switch
+            // code decides whether it shows: a fold only hides, and an open only puts
+            // back what the fold hid (2026-10-12: every settings block showed with its
+            // layer off, because the open forced every member visible).
+            for (View v : groupMembers.get(e.getKey())) {
+                if (open) {
+                    final Integer was = hiddenByFold.remove(v);
+                    if (was != null)
+                        v.setVisibility(was);
+                } else if (!hiddenByFold.containsKey(v)) {
+                    hiddenByFold.put(v, v.getVisibility());
+                    v.setVisibility(View.GONE);
+                }
+                on += countOn(v);
+            }
+            final TextView h = e.getValue();
+            h.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);
+            h.setText(pluginContext.getString(e.getKey()) + (open ? "  \u25BE" : "  \u25B8")
+                    + (on > 0 ? "   " + on + " ON" : ""));
+            h.setTextColor(on > 0 ? pluginContext.getResources().getColor(R.color.state_on)
+                    : 0xFF00E5FF);
+        }
+    }
+
     private void updateLayerControls() {
         final boolean radarOn = radar != null && radar.isOn();
         final boolean windOn = wind != null && wind.isOn();
@@ -4912,6 +5937,11 @@ public final class AtmospherePane {
         windToggle.setText(windOn ? R.string.wind_on : R.string.wind_off);
         windToggle.setTextColor(pluginContext.getResources().getColor(
                 windOn ? R.color.state_on : R.color.state_off));
+        final boolean heatOn = windOn && wind.heatOn();
+        windHeatToggle.setVisibility(windOn ? View.VISIBLE : View.GONE);
+        windHeatToggle.setText(heatOn ? R.string.wind_heat_on : R.string.wind_heat_off);
+        windHeatToggle.setTextColor(pluginContext.getResources().getColor(
+                heatOn ? R.color.state_on : R.color.state_off));
         final boolean smokeOn = smoke != null && smoke.isOn();
         smokeToggle.setText(smokeOn ? R.string.smoke_on : R.string.smoke_off);
         smokeToggle.setTextColor(pluginContext.getResources().getColor(
@@ -5141,6 +6171,55 @@ public final class AtmospherePane {
         pspsExpand.setVisibility(pspsOn ? View.VISIBLE : View.GONE);
         pspsExpand.setRotation(pspsOpen ? 180f : 0f);
         pspsSettings.setVisibility(pspsOn && pspsOpen ? View.VISIBLE : View.GONE);
+        final boolean reportsOn = reports != null && reports.isOn();
+        reportsToggle.setText(reportsOn ? R.string.reports_on : R.string.reports_off);
+        reportsToggle.setTextColor(pluginContext.getResources().getColor(
+                reportsOn ? R.color.state_on : R.color.state_off));
+        reportsExpand.setVisibility(reportsOn ? View.VISIBLE : View.GONE);
+        reportsExpand.setRotation(reportsOpen ? 180f : 0f);
+        reportsSettings.setVisibility(reportsOn && reportsOpen ? View.VISIBLE : View.GONE);
+        final boolean tornadoOn = tornado != null && tornado.isOn();
+        tornadoToggle.setText(tornadoOn ? R.string.tornado_on : R.string.tornado_off);
+        tornadoToggle.setTextColor(pluginContext.getResources().getColor(
+                tornadoOn ? R.color.state_on : R.color.state_off));
+        tornadoExpand.setVisibility(tornadoOn ? View.VISIBLE : View.GONE);
+        tornadoExpand.setRotation(tornadoOpen ? 180f : 0f);
+        tornadoSettings.setVisibility(tornadoOn && tornadoOpen ? View.VISIBLE : View.GONE);
+        final boolean debrisflowOn = debrisflow != null && debrisflow.isOn();
+        debrisflowToggle.setText(debrisflowOn ? R.string.debrisflow_on : R.string.debrisflow_off);
+        debrisflowToggle.setTextColor(pluginContext.getResources().getColor(
+                debrisflowOn ? R.color.state_on : R.color.state_off));
+        debrisflowExpand.setVisibility(debrisflowOn ? View.VISIBLE : View.GONE);
+        debrisflowExpand.setRotation(debrisflowOpen ? 180f : 0f);
+        debrisflowSettings.setVisibility(debrisflowOn && debrisflowOpen ? View.VISIBLE : View.GONE);
+        final boolean quakesOn = quakes != null && quakes.isOn();
+        quakesToggle.setText(quakesOn ? R.string.quakes_on : R.string.quakes_off);
+        quakesToggle.setTextColor(pluginContext.getResources().getColor(
+                quakesOn ? R.color.state_on : R.color.state_off));
+        quakesExpand.setVisibility(quakesOn ? View.VISIBLE : View.GONE);
+        quakesExpand.setRotation(quakesOpen ? 180f : 0f);
+        quakesSettings.setVisibility(quakesOn && quakesOpen ? View.VISIBLE : View.GONE);
+        final boolean fuelOn = fuel != null && fuel.isOn();
+        fuelToggle.setText(fuelOn ? R.string.fuel_on : R.string.fuel_off);
+        fuelToggle.setTextColor(pluginContext.getResources().getColor(
+                fuelOn ? R.color.state_on : R.color.state_off));
+        fuelExpand.setVisibility(fuelOn ? View.VISIBLE : View.GONE);
+        fuelExpand.setRotation(fuelOpen ? 180f : 0f);
+        fuelSettings.setVisibility(fuelOn && fuelOpen ? View.VISIBLE : View.GONE);
+        final boolean raintotalsOn = raintotals != null && raintotals.isOn();
+        raintotalsToggle.setText(raintotalsOn ? R.string.raintotals_on : R.string.raintotals_off);
+        raintotalsToggle.setTextColor(pluginContext.getResources().getColor(
+                raintotalsOn ? R.color.state_on : R.color.state_off));
+        raintotalsExpand.setVisibility(raintotalsOn ? View.VISIBLE : View.GONE);
+        raintotalsExpand.setRotation(raintotalsOpen ? 180f : 0f);
+        raintotalsSettings.setVisibility(raintotalsOn && raintotalsOpen ? View.VISIBLE : View.GONE);
+        final boolean raingaugesOn = raingauges != null && raingauges.isOn();
+        raingaugesToggle.setText(raingaugesOn ? R.string.raingauges_on : R.string.raingauges_off);
+        raingaugesToggle.setTextColor(pluginContext.getResources().getColor(
+                raingaugesOn ? R.color.state_on : R.color.state_off));
+        raingaugesExpand.setVisibility(raingaugesOn ? View.VISIBLE : View.GONE);
+        raingaugesExpand.setRotation(raingaugesOpen ? 180f : 0f);
+        raingaugesSettings.setVisibility(raingaugesOn && raingaugesOpen ? View.VISIBLE : View.GONE);
         final boolean firezonesOn = fireZones != null && fireZones.isOn();
         firezonesToggle.setText(firezonesOn ? R.string.firezones_on : R.string.firezones_off);
         firezonesToggle.setTextColor(pluginContext.getResources().getColor(
@@ -5186,6 +6265,7 @@ public final class AtmospherePane {
             hostScrubberIn(radarSettings);
         scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn || rainOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
+        applyGroupFolds();
     }
 
     /**
@@ -5278,6 +6358,41 @@ public final class AtmospherePane {
             if (out.length() > 0)
                 out.append('\n');
             out.append(pluginContext.getString(R.string.credit_psps, PspsOverlay.HOST));
+        }
+        if (reports != null && reports.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_reports, StormReportsOverlay.HOST));
+        }
+        if (tornado != null && tornado.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_tornado, TornadoPathsOverlay.HOST));
+        }
+        if (debrisflow != null && debrisflow.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_debrisflow, DebrisFlowOverlay.HOST));
+        }
+        if (quakes != null && quakes.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_quakes, QuakesOverlay.HOST));
+        }
+        if (fuel != null && fuel.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_fuel, FuelMoistureOverlay.HOST));
+        }
+        if (raintotals != null && raintotals.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_raintotals, RainTotalsOverlay.HOST));
+        }
+        if (raingauges != null && raingauges.isOn()) {
+            if (out.length() > 0)
+                out.append('\n');
+            out.append(pluginContext.getString(R.string.credit_raingauges, RainGaugesOverlay.HOST));
         }
         // Synoptic asks for its credit, Cal OES that its extract is not called verified.
         if (stationLayer != null && stationLayer.isOn() && stationLayer.isUtilityOn()
@@ -5767,6 +6882,8 @@ public final class AtmospherePane {
     public void dispose() {
         onClosed();
         spotPage.dispose();
+        reportsPage.dispose();
+        rainPage.dispose();
         zonePage.dispose();
         sawtiPage.dispose();
     }
@@ -5967,6 +7084,10 @@ public final class AtmospherePane {
                 zonePage.pointChanged(pages[pager.getCurrentItem()] == zonePage.view());
             if (sawtiPage != null && pager != null)
                 sawtiPage.pointChanged(pages[pager.getCurrentItem()] == sawtiPage.view());
+
+                reportsPage.pointChanged();
+            rainPage.pointChanged();
+            discussion.pointChanged();
         }
     };
 
@@ -6151,6 +7272,10 @@ public final class AtmospherePane {
             zonePage.pointChanged(pages[pager.getCurrentItem()] == zonePage.view());
         if (sawtiPage != null && pager != null)
             sawtiPage.pointChanged(pages[pager.getCurrentItem()] == sawtiPage.view());
+
+            reportsPage.pointChanged();
+            rainPage.pointChanged();
+            discussion.pointChanged();
         if (selected == null) {
             statusText.setText(R.string.no_sources);
             return;
@@ -6253,6 +7378,7 @@ public final class AtmospherePane {
         renderHours(wanted);
         renderDays(wanted);
         attributionText.setText(snapshot.attribution == null ? "" : snapshot.attribution);
+        discussion.refresh(false);
     }
 
     /** True when no hour of the whole forecast has a value for the element. */
@@ -6896,7 +8022,11 @@ public final class AtmospherePane {
         h.setMaxLines(2);
         h.setHeight(dp(HEADER_DP));
         h.setGravity((legend ? Gravity.START : Gravity.CENTER_HORIZONTAL) | Gravity.BOTTOM);
-        h.setAlpha(0.8f);
+        // The day and hour headers, and the row labels down the left, in the heading
+        // cyan, so the white readings stand off them (operator, 2026-10-11: "the hi lo
+        // min rh on the left etc it should offset the readings").
+        h.setTextColor(0xFF00E5FF);
+        h.setTypeface(Typeface.DEFAULT_BOLD);
         col.addView(h);
         for (String v : values) {
             final TextView t = new TextView(pluginContext);
@@ -6906,7 +8036,7 @@ public final class AtmospherePane {
             t.setHeight(dp(ROW_DP));
             t.setGravity((legend ? Gravity.START : Gravity.CENTER_HORIZONTAL) | Gravity.CENTER_VERTICAL);
             if (legend)
-                t.setAlpha(0.7f);
+                t.setTextColor(0xFF00E5FF);
             else
                 t.setTypeface(VALUE_FACE);
             col.addView(t);

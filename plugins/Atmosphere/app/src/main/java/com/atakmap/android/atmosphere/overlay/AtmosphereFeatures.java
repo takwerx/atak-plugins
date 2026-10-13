@@ -1105,6 +1105,10 @@ final class AtmosphereFeatures {
             case "avalanche": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_avalanche;
             case "airquality": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_air;
             case "tropical": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_hurricane;
+            case "reports": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_reports;
+            case "tornado": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_tornado;
+            case "debrisflow": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_debrisflow;
+            case "quakes": return com.atakmap.android.atmosphere.plugin.R.drawable.ic_layer_quakes;
             default: return com.atakmap.android.atmosphere.plugin.R.drawable.ic_toolbar;
         }
     }
