@@ -210,9 +210,11 @@ SIZE_HUMAN=$(du -h "$OUT" | cut -f1 | tr -d ' ')
 # Without a manual a submission is a few hundred KB, and anything larger means the SDK
 # jar or build output crept in. A manual legitimately carries its own fonts, title art
 # and screenshots, so the ceiling moves -- but it is still a ceiling, and still well
-# under the ~30 MB that main.jar alone would add.
+# under the ~30 MB that main.jar alone would add. 16 MB since 2026-10-12: Atmosphere
+# 0.14's manual, 120 pictures and a 2 MB vector title page, zipped to 13.2 MB with
+# every picture already squeezed, and the gate is for the jar, not the pictures.
 if [ -d "$PROJECT/docs/user_manual" ]; then
-    SIZE_LIMIT=12000000
+    SIZE_LIMIT=16000000
     SIZE_NOTE="with the user manual"
 else
     SIZE_LIMIT=2000000
