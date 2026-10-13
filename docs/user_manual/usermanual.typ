@@ -151,7 +151,7 @@ away again, and it stays the way you left it.
 = The forecaster's synopsis
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  #image("112.png", width: 100%)
+  #image("112.jpg", width: 100%)
 ][
   Under the days, the forecaster's own words: the Area Forecast Discussion for
   the office covering the point, its *Synopsis* open and the other sections
@@ -301,6 +301,18 @@ it is a direction.
 ]
 
 #tak-slide[
+= The wind as a heat map
+
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("116.jpg", width: 100%)
+][
+  *Heat map* under the Wind key paints the speed the streaks are drawn from as
+  a colored field beneath them, in the key's own colors, for the hour on the
+  time strip and the height picked. Off by default; the switch remembers.
+]
+]
+
+#tak-slide[
 = Rain
 
 #toolbox.side-by-side(columns: (4fr, 4fr, 4fr))[
@@ -318,11 +330,24 @@ it is a direction.
 ]
 
 #tak-slide[
+= The Layers page folds
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("118.jpg", width: 100%)
+][
+  Each group on the Layers page folds to one line when its heading is tapped,
+  and stays folded until tapped again. A heading turns green with a count when
+  any layer under it is on, so a folded group still says what it is drawing.
+  *All on* and *All off* at the top switch every layer at once.
+]
+]
+
+#tak-slide[
 = Storm Reports
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("97.png", width: 100%)
-  #image("101.png", width: 100%)
+  #image("101.jpg", width: 100%)
 ][
   *Storm Reports* draws every report the NWS offices logged in the last three
   days: a dot in its family's color (tornado red, wind orange, hail green,
@@ -340,11 +365,11 @@ it is a direction.
 = The Storm Reports page
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  #image("107.png", width: 100%)
-  #image("108.png", width: 100%)
+  #image("107.jpg", width: 100%)
+  #image("108.jpg", width: 100%)
 ][
   The *Storm Reports* page lists the reports and the tornado paths together:
-  *Nationwide*, *Near* the point in the pane's top row, on the *Map* as it sits
+  *US*, *Near* the point in the pane's top row, on the *Map* as it sits
   (read again whenever the map settles), or by *State*; *Newest* or *Closest*
   first; and a picker of switches for any mix of the eight families and
   *Tornado*, which covers the dots and the paths. What you tick is what the map
@@ -360,7 +385,7 @@ it is a direction.
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("98.png", width: 100%)
-  #image("102.png", width: 100%)
+  #image("102.jpg", width: 100%)
 ][
   *Tornado Paths* draws the track a survey team walked after a tornado, as a
   line in the Damage Assessment Toolkit's color for its EF rating, EF0 aqua to
@@ -549,7 +574,7 @@ numbers only.
 = Fuel Moisture
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  #image("115.png", width: 100%)
+  #image("115.jpg", width: 100%)
 ][
   *Fuel Moisture* draws the fuel samples crews cut and weigh every week or two:
   every sampling site of the National Fuel Moisture Database in the state under
@@ -659,7 +684,7 @@ numbers only.
 = Rain Totals
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  #image("109.png", width: 100%)
+  #image("109.jpg", width: 100%)
 ][
   *Rain Totals* draws the rain that fell as a picture, in the NWS's own colors
   with the key under the switch. The row picks the last 1 h, 6 h, 24 h or 3
@@ -678,8 +703,8 @@ numbers only.
 = Rain Gauges
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
-  #image("110.png", width: 100%)
-  #image("111.png", width: 100%)
+  #image("110.jpg", width: 100%)
+  #image("111.jpg", width: 100%)
 ][
   *Rain Gauges* draws three kinds of gauge, each a dot in the color of its
   last 24 hours with the name and the inches in the pill: the USGS gauges around the map
@@ -757,7 +782,8 @@ the flooded ground.
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("99.png", width: 100%)
-  #image("119.png", width: 100%)
+  #image("119.jpg", width: 100%)
+  #image("106.jpg", width: 100%)
 ][
   *Debris Flow* sits with the rivers because a debris flow is a flood of rock
   and mud, and the trigger is a burst of rain over a burn. It marks every fire
@@ -880,7 +906,8 @@ classes, lower 48 only.
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("100.png", width: 100%)
-  #image("104.png", width: 100%)
+  #image("104.jpg", width: 100%)
+  #image("105.jpg", width: 100%)
 ][
   *Earthquakes* draws the USGS feed the way USGS's own map does: a circle
   sized by magnitude, colored by age (past hour red, past day orange, past
