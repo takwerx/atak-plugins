@@ -204,14 +204,18 @@ public class StormDetailsReceiver extends DropDownReceiver implements OnStateLis
         final String ref = item.getMetaString("atmosphereRef", "");
         if (action != null) {
             if (ref.startsWith("fire:") && spotOpener != null) {
-                final boolean shownNow = spotOpener.isFireShown(ref);
-                action.setText(pluginContext.getString(shownNow ? R.string.hide_area : R.string.show_area));
+                final boolean[] shownNow = { spotOpener.isFireShown(ref) };
+                action.setText(pluginContext.getString(shownNow[0] ? R.string.hide_area : R.string.show_area));
                 action.setVisibility(android.view.View.VISIBLE);
+                // The page stays open and the button flips, so the next tap hides the
+                // area again (operator, 2026-10-12: "did not leave me on the pane").
                 action.setOnClickListener(new android.view.View.OnClickListener() {
                     @Override
                     public void onClick(android.view.View v) {
-                        closeDropDown();
-                        spotOpener.showFire(ref, !shownNow);
+                        shownNow[0] = !shownNow[0];
+                        spotOpener.showFire(ref, shownNow[0]);
+                        action.setText(pluginContext.getString(shownNow[0] ? R.string.hide_area
+                                : R.string.show_area));
                     }
                 });
             } else
