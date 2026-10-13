@@ -1,53 +1,356 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- One pane, three pages by visibility swap (IPAWS's shape): the main page, Settings
+     with Back, a details page with Back. The main page is the placeholder the Report
+     and Manage faces grow into; the trauma center block is the piece both will carry. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fadeScrollbars="false"
-    android:padding="8dp">
+    android:orientation="vertical"
+    android:paddingLeft="6dp"
+    android:paddingRight="6dp">
 
-    <LinearLayout
+    <!-- Pinned in the pane root: a word about a download that just ran. -->
+    <TextView
+        android:id="@+id/status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp"
+        android:textSize="13sp"
+        android:textColor="@color/white"
+        android:visibility="gone" />
 
-        <TextView
+    <ScrollView
+        android:id="@+id/main_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fadeScrollbars="false"
+        android:focusableInTouchMode="true"
+        android:descendantFocusability="beforeDescendants">
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/spike_heading"
-            android:textAllCaps="true"
-            android:textSize="10sp"
-            android:alpha="0.6"
+            android:orientation="vertical"
+            android:paddingBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+
+                <Button
+                    android:id="@+id/btn_settings"
+                    style="@style/TakwerxButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings" />
+            </LinearLayout>
+
+            <!-- Nearest trauma center: a planning reference, two lines at most. -->
+            <TextView
+                android:id="@+id/trauma_heading"
+                style="@style/TakwerxSectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/trauma_heading" />
+
+            <TextView
+                android:id="@+id/trauma_line1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:gravity="center_vertical"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:textSize="15sp"
+                android:textColor="@color/white"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/trauma_line2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="44dp"
+                android:gravity="center_vertical"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:textSize="15sp"
+                android:textColor="@color/white"
+                android:clickable="true"
+                android:focusable="true"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/trauma_note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="2dp"
+                android:paddingBottom="8dp"
+                android:textSize="12sp"
+                android:textColor="#BBBBBB" />
+
+            <!-- Round-trip spike. Temporary: replaced by the Report and Manage faces. -->
+            <TextView
+                style="@style/TakwerxSectionHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/spike_heading" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/spike_explain"
+                android:textSize="13sp"
+                android:textColor="@color/white"
+                android:paddingBottom="10dp" />
+
+            <Button
+                android:id="@+id/btn_inject"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/spike_inject" />
+
+            <Button
+                android:id="@+id/btn_dump"
+                style="@style/TakwerxButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/spike_dump" />
+
+            <TextView
+                android:id="@+id/spike_result"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:textSize="13sp"
+                android:textColor="@color/white"
+                android:text="@string/spike_idle" />
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- The settings page, in place of the main page while it is open. -->
+    <LinearLayout
+        android:id="@+id/settings_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/btn_settings_back"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="90dp"
+                android:text="@string/back" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="12dp"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textColor="@color/white"
+                android:text="@string/settings" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false"
+            android:focusableInTouchMode="true"
+            android:descendantFocusability="beforeDescendants">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="12dp">
+
+                <!-- Helicopter cruise speed: the one number the flight estimate uses. -->
+                <LinearLayout
+                    android:id="@+id/fold_speed_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="6dp">
+
+                    <Button
+                        android:id="@+id/fold_speed_head"
+                        style="@style/TakwerxButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content" />
+
+                    <ImageButton
+                        android:id="@+id/fold_speed_chev"
+                        style="@style/TakwerxIconButton"
+                        android:layout_width="44dp"
+                        android:layout_weight="0"
+                        android:layout_marginRight="0dp"
+                        android:contentDescription="@string/show_settings"
+                        android:src="@drawable/ic_expand" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/fold_speed_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingTop="4dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="13sp"
+                        android:textColor="@color/white"
+                        android:paddingBottom="6dp"
+                        android:text="@string/cruise_explain" />
+
+                    <Button
+                        android:id="@+id/btn_cruise_speed"
+                        style="@style/TakwerxButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <!-- Trauma center data: what is on the phone, and a way to fetch it. -->
+                <LinearLayout
+                    android:id="@+id/fold_data_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="6dp">
+
+                    <Button
+                        android:id="@+id/fold_data_head"
+                        style="@style/TakwerxButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content" />
+
+                    <ImageButton
+                        android:id="@+id/fold_data_chev"
+                        style="@style/TakwerxIconButton"
+                        android:layout_width="44dp"
+                        android:layout_weight="0"
+                        android:layout_marginRight="0dp"
+                        android:contentDescription="@string/show_settings"
+                        android:src="@drawable/ic_expand" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/fold_data_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingTop="4dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/data_detail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="13sp"
+                        android:textColor="@color/white"
+                        android:paddingBottom="6dp" />
+
+                    <Button
+                        android:id="@+id/btn_download"
+                        style="@style/TakwerxButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/download_now" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- The details page for one trauma center. Back is pinned above the text. -->
+    <LinearLayout
+        android:id="@+id/details_page"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false"
+            android:layout_marginTop="6dp">
+
+            <Button
+                android:id="@+id/btn_details_back"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/back" />
+
+            <TextView
+                android:id="@+id/details_title"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="8dp"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/white" />
+
+            <Button
+                android:id="@+id/btn_go_to"
+                style="@style/TakwerxButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/go_to" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/details_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="#BBBBBB"
             android:paddingBottom="6dp" />
 
-        <TextView
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/spike_explain"
-            android:textSize="13sp"
-            android:paddingBottom="10dp" />
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false">
 
-        <Button
-            android:id="@+id/btn_inject"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/spike_inject" />
-
-        <Button
-            android:id="@+id/btn_dump"
-            style="@style/TakwerxButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/spike_dump" />
-
-        <TextView
-            android:id="@+id/spike_result"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="12dp"
-            android:textSize="13sp"
-            android:text="@string/spike_idle" />
-
+            <TextView
+                android:id="@+id/details_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:textColor="@color/white"
+                android:lineSpacingExtra="4dp"
+                android:textIsSelectable="true" />
+        </ScrollView>
     </LinearLayout>
-</ScrollView>
+
+</LinearLayout>

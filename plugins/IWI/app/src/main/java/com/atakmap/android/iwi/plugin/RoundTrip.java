@@ -25,7 +25,7 @@ public final class RoundTrip {
     public static final String TAG = "IWI-RoundTrip";
 
     /** UID is fixed so inject and dump find each other across an ATAK restart. */
-    private static final String UID = "IWI-ROUNDTRIP-SPIKE";
+    static final String UID = "IWI-ROUNDTRIP-SPIKE";
 
     private RoundTrip() {
     }
