@@ -6,7 +6,6 @@ import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ImageButton;
 import android.widget.TextView;
 
 import com.atakmap.android.maps.MapView;
@@ -20,40 +19,41 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * The "nearest trauma center" line, its Settings rows and its details page.
+ * The "nearest trauma center" drop-down, its two Settings rows and its details page.
  *
- * <p>One block the Report face and the Manage face both include. It is a planning
- * reference for a crew in the middle of nowhere, not a destination choice: whether and
- * where a patient flies is the air crew's lane, and every number here says "estimate".
- *
- * <p>The pages are the one pane by visibility swap, the way IPAWS does it: the main
- * page, a Settings page with Back, a details page with Back. Every dialog is built on
- * the MapView's context, never the plugin's.
+ * <p>A planning reference for a crew in the middle of nowhere, not a destination
+ * choice: whether and where a patient flies is the air crew's lane, and every number
+ * here says "estimate". The pane that holds it owns the pages; this fills them.
  */
 public final class TraumaPane implements TraumaManager.Listener {
 
     /** Where the line measures from, and what to call it. */
     public interface PointSource {
-        /** The incident marker's point, else the self marker's, else null. */
+        /** The IWI's point, else the self marker's, else null. */
         GeoPoint point();
 
-        /** "from the incident" or "from My Location". */
+        /** "from the patient" or "from My Location". */
         String label();
+    }
+
+    /** The pane's pages and status line. */
+    public interface Pages {
+        void showMain();
+
+        void showDetails();
+
+        void status(String message);
     }
 
     private final MapView mapView;
     private final TraumaManager manager;
     private final PointSource source;
-    private final SharedPreferences prefs;
+    private final Pages pages;
 
-    private final View mainPage;
-    private final View settingsPage;
-    private final View detailsPage;
-    private final TextView heading;
+    private final Fold fold;
     private final TextView line1;
     private final TextView line2;
     private final TextView note;
-    private final TextView status;
     private final Button speedButton;
     private final TextView dataDetail;
     private final Button downloadButton;
@@ -67,20 +67,19 @@ public final class TraumaPane implements TraumaManager.Listener {
     private TraumaFinder.Result better;
     private TraumaFinder.Result showing;
 
-    public TraumaPane(MapView mapView, View root, TraumaManager manager, PointSource source) {
+    public TraumaPane(MapView mapView, View root, TraumaManager manager, PointSource source,
+            Pages pages) {
         this.mapView = mapView;
         this.manager = manager;
         this.source = source;
-        this.prefs = manager.prefs();
+        this.pages = pages;
+        final SharedPreferences prefs = manager.prefs();
 
-        mainPage = root.findViewById(R.id.main_page);
-        settingsPage = root.findViewById(R.id.settings_page);
-        detailsPage = root.findViewById(R.id.details_page);
-        heading = root.findViewById(R.id.trauma_heading);
+        fold = new Fold(root, R.id.fold_trauma_head, R.id.fold_trauma_chev,
+                R.id.fold_trauma_body, prefs, "iwi.fold.trauma");
         line1 = root.findViewById(R.id.trauma_line1);
         line2 = root.findViewById(R.id.trauma_line2);
         note = root.findViewById(R.id.trauma_note);
-        status = root.findViewById(R.id.status);
         speedButton = root.findViewById(R.id.btn_cruise_speed);
         dataDetail = root.findViewById(R.id.data_detail);
         downloadButton = root.findViewById(R.id.btn_download);
@@ -88,24 +87,12 @@ public final class TraumaPane implements TraumaManager.Listener {
         detailsSubtitle = root.findViewById(R.id.details_subtitle);
         detailsBody = root.findViewById(R.id.details_body);
 
-        root.findViewById(R.id.btn_settings).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showSettings();
-            }
-        });
-        root.findViewById(R.id.btn_settings_back).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        showMain();
-                    }
-                });
         root.findViewById(R.id.btn_details_back).setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        showMain();
+                        showing = null;
+                        TraumaPane.this.pages.showMain();
                     }
                 });
         root.findViewById(R.id.btn_go_to).setOnClickListener(new View.OnClickListener() {
@@ -140,56 +127,24 @@ public final class TraumaPane implements TraumaManager.Listener {
             @Override
             public void onClick(View v) {
                 downloadButton.setEnabled(false);
-                status("Downloading trauma center data...");
+                TraumaPane.this.pages.status("Downloading trauma center data...");
                 TraumaPane.this.manager.download();
             }
         });
 
         speedFold = new Fold(root, R.id.fold_speed_head, R.id.fold_speed_chev,
-                R.id.fold_speed_body, "iwi.fold.speed");
+                R.id.fold_speed_body, prefs, "iwi.fold.speed");
         dataFold = new Fold(root, R.id.fold_data_head, R.id.fold_data_chev,
-                R.id.fold_data_body, "iwi.fold.data");
+                R.id.fold_data_body, prefs, "iwi.fold.data");
 
         manager.setListener(this);
         refresh();
-    }
-
-    /** The pane opens on the main page every time. */
-    public void onShown() {
-        showMain();
-        refresh();
-    }
-
-    // ---- pages ----
-
-    private void showMain() {
-        settingsPage.setVisibility(View.GONE);
-        detailsPage.setVisibility(View.GONE);
-        mainPage.setVisibility(View.VISIBLE);
-        showing = null;
-    }
-
-    private void showSettings() {
         refreshSettings();
-        mainPage.setVisibility(View.GONE);
-        detailsPage.setVisibility(View.GONE);
-        settingsPage.setVisibility(View.VISIBLE);
     }
 
-    private void showDetails(TraumaFinder.Result r) {
-        showing = r;
-        final TraumaCenter c = r.center;
-        detailsTitle.setText(c.name);
-        detailsSubtitle.setText(c.levelLabel() + " trauma center");
-        detailsBody.setText(detailsText(r));
-        mainPage.setVisibility(View.GONE);
-        settingsPage.setVisibility(View.GONE);
-        detailsPage.setVisibility(View.VISIBLE);
-    }
+    // ---- the drop-down ----
 
-    // ---- the line ----
-
-    /** Recompute both lines from the reference point. Main thread. */
+    /** Recompute the head and both lines from the reference point. Main thread. */
     public void refresh() {
         final List<TraumaCenter> centers = manager.centers();
         final GeoPoint from = source.point();
@@ -198,24 +153,28 @@ public final class TraumaPane implements TraumaManager.Listener {
         line2.setVisibility(View.GONE);
 
         if (centers == null || centers.isEmpty()) {
-            heading.setText("Nearest trauma center");
+            fold.label("Nearest trauma center", "no data on this phone");
             line1.setText("No trauma center data on this phone");
             note.setText(manager.busy() ? "Downloading..." : "Settings > Trauma center data");
             return;
         }
         if (from == null) {
-            heading.setText("Nearest trauma center");
+            fold.label("Nearest trauma center", "no position yet");
             line1.setText("No position yet");
-            note.setText("Needs the incident marker or a GPS fix.");
+            note.setText("Needs a declared IWI or a GPS fix.");
             return;
         }
-        heading.setText("Nearest trauma center " + source.label());
         first = TraumaFinder.nearest(centers, from);
         if (first == null) {
-            line1.setText("None within " + Units.distance(TraumaFinder.CAP_M));
+            fold.label("Nearest trauma center",
+                    "none within " + Units.distance(TraumaFinder.CAP_M));
+            line1.setText("None within " + Units.distance(TraumaFinder.CAP_M) + " "
+                    + source.label());
             note.setText(estimateNote());
             return;
         }
+        fold.label("Nearest trauma center", first.center.levelLabel() + ", "
+                + Units.distance(first.meters) + " " + cardinal(first.bearing));
         line1.setText(lineText(first));
         better = TraumaFinder.nearestBetter(centers, from, first.center.level);
         if (better != null) {
@@ -226,11 +185,12 @@ public final class TraumaPane implements TraumaManager.Listener {
     }
 
     private String estimateNote() {
-        return "Straight-line estimate at " + manager.cruiseKt()
-                + " kt. Tap a line for details. Where a patient flies is the air crew's call.";
+        return capitalize(source.label()) + ". Straight-line estimate at "
+                + manager.cruiseKt() + " kt. Tap a line for details. Where a patient "
+                + "flies is the air crew's call.";
     }
 
-    /** "Riverside Community Hospital (Level II), 23 mi NE, about 12 min by air (estimate)". */
+    /** "Riverside Community Hospital (Level II), 15 mi NE, about 6 min by air (estimate)". */
     String lineText(TraumaFinder.Result r) {
         final TraumaCenter c = r.center;
         return c.name + " (" + c.levelLabel() + "), " + Units.distance(r.meters) + " "
@@ -253,6 +213,17 @@ public final class TraumaPane implements TraumaManager.Listener {
             // Fall through to the number.
         }
         return Math.round(bearingTrue) + "°";
+    }
+
+    // ---- the details page ----
+
+    private void showDetails(TraumaFinder.Result r) {
+        showing = r;
+        final TraumaCenter c = r.center;
+        detailsTitle.setText(c.name);
+        detailsSubtitle.setText(c.levelLabel() + " trauma center");
+        detailsBody.setText(detailsText(r));
+        pages.showDetails();
     }
 
     private String detailsText(TraumaFinder.Result r) {
@@ -323,7 +294,7 @@ public final class TraumaPane implements TraumaManager.Listener {
 
     // ---- settings ----
 
-    private void refreshSettings() {
+    public void refreshSettings() {
         speedFold.label("Helicopter cruise speed", manager.cruiseKt() + " kt");
         speedButton.setText(manager.cruiseKt() + " kt");
         final TraumaPack.Index index = manager.index();
@@ -359,61 +330,18 @@ public final class TraumaPane implements TraumaManager.Listener {
                 .show();
     }
 
-    private void status(String message) {
-        status.setText(message);
-        status.setVisibility(message == null || message.isEmpty() ? View.GONE : View.VISIBLE);
-    }
-
     // ---- manager callbacks, main thread ----
 
     @Override
     public void onPackChanged() {
         refresh();
-        if (settingsPage.getVisibility() == View.VISIBLE)
-            refreshSettings();
+        refreshSettings();
     }
 
     @Override
     public void onStatus(String message) {
-        status(message);
+        pages.status(message);
         downloadButton.setEnabled(true);
-    }
-
-    /** One Settings row: a head naming the setting and its value, an arrow, a body. */
-    private final class Fold {
-        final Button head;
-        final ImageButton chevron;
-        final View body;
-        final String pref;
-        boolean open;
-
-        Fold(View page, int headId, int chevronId, int bodyId, String pref) {
-            head = page.findViewById(headId);
-            chevron = page.findViewById(chevronId);
-            body = page.findViewById(bodyId);
-            this.pref = pref;
-            open = prefs.getBoolean(pref, false);
-            final View.OnClickListener flip = new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    open = !open;
-                    prefs.edit().putBoolean(Fold.this.pref, open).apply();
-                    show();
-                }
-            };
-            head.setOnClickListener(flip);
-            chevron.setOnClickListener(flip);
-            show();
-        }
-
-        void label(String name, String value) {
-            head.setText(value == null ? name : name + ": " + value);
-        }
-
-        void show() {
-            chevron.setRotation(open ? 180f : 0f);
-            body.setVisibility(open ? View.VISIBLE : View.GONE);
-        }
     }
 
     /** The self marker's point when it is a real fix. */

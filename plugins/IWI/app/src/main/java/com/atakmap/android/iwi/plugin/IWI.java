@@ -3,13 +3,9 @@ package com.atakmap.android.iwi.plugin;
 
 import android.content.Context;
 import android.view.View;
-import android.widget.TextView;
 
 import com.atakmap.android.cot.detail.CotDetailManager;
-import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
-import com.atakmap.android.maps.PointMapItem;
-import com.atakmap.coremap.maps.coords.GeoPoint;
 
 import com.atak.plugins.impl.PluginContextProvider;
 import com.atak.plugins.impl.PluginLayoutInflater;
@@ -33,7 +29,7 @@ public class IWI implements IPlugin {
     IwiDetailHandler iwiDetailHandler;
     /** Anything that must outlive a tap lives here, not in a Tool. */
     TraumaManager traumaManager;
-    TraumaPane traumaPane;
+    IwiPane iwiPane;
 
     public IWI(IServiceController serviceController) {
         this.serviceController = serviceController;
@@ -97,7 +93,10 @@ public class IWI implements IPlugin {
             traumaManager.stop();
             traumaManager = null;
         }
-        traumaPane = null;
+        if (iwiPane != null) {
+            iwiPane.dispose();
+            iwiPane = null;
+        }
         templatePane = null;
 
         // the plugin is stopping, remove the button from the toolbar
@@ -116,10 +115,9 @@ public class IWI implements IPlugin {
 
             final View v = PluginLayoutInflater.inflate(pluginContext,
                     R.layout.main_layout, null);
-            wireSpike(v);
             final MapView mapView = MapView.getMapView();
             if (mapView != null && traumaManager != null)
-                traumaPane = new TraumaPane(mapView, v, traumaManager, referencePoint(mapView));
+                iwiPane = new IwiPane(pluginContext, mapView, v, traumaManager);
 
             templatePane = new PaneBuilder(v)
                     // relative location is set to default; pane will switch location dependent on
@@ -136,66 +134,7 @@ public class IWI implements IPlugin {
         if (!uiService.isPaneVisible(templatePane)) {
             uiService.showPane(templatePane, null);
         }
-        if (traumaPane != null)
-            traumaPane.onShown();
-    }
-
-    /**
-     * Where the trauma center line measures from: the live IWI marker when there is
-     * one (today the spike's), else the self marker. The heading says which.
-     */
-    private static TraumaPane.PointSource referencePoint(final MapView mapView) {
-        return new TraumaPane.PointSource() {
-            @Override
-            public GeoPoint point() {
-                final MapItem item = mapView.getRootGroup().deepFindUID(RoundTrip.UID);
-                if (item instanceof PointMapItem) {
-                    final GeoPoint p = ((PointMapItem) item).getPoint();
-                    if (p != null && p.isValid())
-                        return p;
-                }
-                return TraumaPane.selfPoint(mapView);
-            }
-
-            @Override
-            public String label() {
-                final MapItem item = mapView.getRootGroup().deepFindUID(RoundTrip.UID);
-                return item instanceof PointMapItem ? "from the incident" : "from My Location";
-            }
-        };
-    }
-
-    /**
-     * Round-trip confirmation wiring (PLAN-IWI-v0.1). Temporary: this pane
-     * becomes the Report and Manage faces.
-     */
-    private void wireSpike(View v) {
-        final TextView result = v.findViewById(R.id.spike_result);
-
-        v.findViewById(R.id.btn_inject).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View button) {
-                        MapView mv = MapView.getMapView();
-                        String uid = RoundTrip.inject(mv);
-                        result.setText(uid != null
-                                ? "Injected. Open its radial, edit the med line, save, then Dump."
-                                : "Inject failed — see logcat tag " + RoundTrip.TAG);
-                        if (traumaPane != null)
-                            traumaPane.refresh();
-                    }
-                });
-
-        v.findViewById(R.id.btn_dump).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View button) {
-                        MapView mv = MapView.getMapView();
-                        boolean ok = RoundTrip.dump(mv);
-                        result.setText(ok
-                                ? "Dumped to logcat, tag " + RoundTrip.TAG
-                                : "No marker found — inject first.");
-                    }
-                });
+        if (iwiPane != null)
+            iwiPane.onShown();
     }
 }

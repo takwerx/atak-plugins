@@ -1,24 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- App -->
     <string name="app_name">IWI</string>
-    <!-- description -->
     <string name="app_desc">IWI</string>
-
     <string name="settings">Settings</string>
     <string name="back">Back</string>
     <string name="go_to">Go to</string>
     <string name="show_settings">Show settings</string>
     <string name="download_now">Download now</string>
-
-    <!-- Nearest trauma center: a planning reference, never a destination choice. -->
-    <string name="trauma_heading">Nearest trauma center</string>
+    <string name="declare_iwi">Declare IWI</string>
+    <string name="change_location">Change location</string>
+    <string name="medical_incident_report">Medical Incident Report</string>
+    <string name="radio_script">Radio Script</string>
+    <string name="heading_iwi">IWI declared</string>
+    <string name="heading_report">Report</string>
+    <string name="heading_reference">Reference</string>
     <string name="cruise_explain">The flight time on the line is straight-line distance at this speed. One number, used for every estimate.</string>
-
-    <!-- Round-trip spike. Temporary: replaced by the Report and Manage faces. -->
-    <string name="spike_heading">Round-trip confirmation</string>
-    <string name="spike_explain">Inject a CASEVAC carrying _medevac_ and _iwi_, edit its med line in ATAK, then dump. If _iwi_ comes back unchanged, the sidecar survives ATAK\'s own editor.</string>
-    <string name="spike_inject">1 — Inject IWI CASEVAC</string>
-    <string name="spike_dump">2 — Dump marker CoT</string>
-    <string name="spike_idle">Nothing run yet.</string>
+    <string name="mir_header">FOR A NON-EMERGENCY INCIDENT, WORK THROUGH CHAIN OF COMMAND TO REPORT AND TRANSPORT INJURED PERSONNEL AS NECESSARY.\n\nFOR A MEDICAL EMERGENCY: IDENTIFY ON-SCENE INCIDENT COMMANDER BY NAME AND POSITION AND ANNOUNCE \"MEDICAL EMERGENCY\" TO INITIATE RESPONSE FROM IMT COMMUNICATIONS/DISPATCH.\n\nUse the following items to communicate situation to communications/dispatch.</string>
+    <string name="mir_1_title">1. Contact Communications / Dispatch</string>
+    <string name="mir_1_guide">(Verify correct frequency prior to starting report) Ex: \"Communications, Div. Alpha. Stand-by for Emergency Traffic.\"</string>
+    <string name="mir_2_title">2. Incident Status</string>
+    <string name="mir_2_guide">Provide incident summary (including number of patients) and command structure. Ex: \"Communications, I have a Red priority patient, unconscious, struck by a falling tree. Requesting air ambulance to Forest Road 1 at (Lat. / Long.). This will be the Trout Meadow Medical, IC is TFLD Jones. EMT Smith is providing medical care.\"</string>
+    <string name="mir_red">RED / PRIORITY 1 Life or limb threatening injury or illness. Evacuation need is IMMEDIATE. Ex: Unconscious, difficulty breathing, bleeding severely, 2° – 3° burns more than 4 palm sizes, heat stroke, disoriented.</string>
+    <string name="mir_yellow">YELLOW / PRIORITY 2 Serious injury or illness. Evacuation may be DELAYED if necessary. Ex: Significant trauma, unable to walk, 2° – 3° burns not more than 1-3 palm sizes.</string>
+    <string name="mir_green">GREEN / PRIORITY 3 Minor injury or illness. Non-Emergency transport. Ex: Sprains, strains, minor heat-related illness.</string>
+    <string name="mir_black">BLACK is a count for a multi-casualty incident only. The IRPG form has no Black row; IWI keeps it so the count can be said.</string>
+    <string name="mir_evac_pick">Tap to pick</string>
+    <string name="mir_shorthaul_guide">For Short-Haul or Hoist (IRPG p. 119): \"Include the patient weight and name of on-scene radio contact.\"</string>
+    <string name="mir_latlong_none">Lat. / Long. (WGS84): set when you declare the IWI.</string>
+    <string name="mir_care_guide">Use the terms Paramedic or EMT with the provider\'s last name in \"Patient Care.\" Do not use EMT to describe a Paramedic or the ambiguous term Medic. (NWCG 6MFS)</string>
+    <string name="mir_3_title">3. Initial Patient Assessment</string>
+    <string name="mir_3_guide">Complete this section for each patient as applicable (start with the most severe patient).</string>
+    <string name="mir_assessment_checklist">Patient Assessment, IRPG page 108:\n\nInitial Patient Assessment: General impression of patient. Major bleeding control. Airway. Breathing. Circulation. Wrist or neck pulse.\n\nPatient Information: Chief complaint. Age and weight.\n\nLevel of Consciousness: Alert and oriented. Verbal (responds to voice). Pain (responds to painful stimuli). Unresponsive.\n\nBreathing: Normal. Difficult/labored breathing. Not breathing? Start rescue breathing.\n\nPulse: Present. Absent: Start CPR (page 111).\n\nSkin Color: Normal. Pale. Bluish. Flushed/red.\n\nSkin Moisture: Normal. Dry. Moist/clammy. Profuse sweating.\n\nSkin Temperature: Normal/warm. Hot. Cool. Cold.\n\nPupils: Equal or unequal? Reactive to light. Fixed or slow response. Dilated or constricted.\n\nMake a transport decision.</string>
+    <string name="mir_4_title">4. Evacuation Plan</string>
+    <string name="mir_5_title">5. Additional Resources / Equipment Needs</string>
+    <string name="mir_5_hint">Example: Paramedic/EMT, crews, immobilization devices, AED, oxygen, trauma bag, IV/fluid(s), splints, rope rescue, wheeled litter, HAZMAT, extrication</string>
+    <string name="mir_6_title">6. Communications</string>
+    <string name="mir_6_guide">Identify State Air/Ground EMS Frequencies and Hospital Contacts as applicable.</string>
+    <string name="mir_7_title">7. Contingency</string>
+    <string name="mir_7_guide">Considerations: If primary options fail, what actions can be implemented in conjunction with primary evacuation method? Think ahead.</string>
+    <string name="mir_8_title">8. Additional Information</string>
+    <string name="mir_remember">Confirm ETAs of resources ordered.\nAct according to your level of training.\nBe Alert. Keep Calm. Think Clearly. Act Decisively.</string>
+    <string name="mir_credit">Medical Incident Report from the NWCG Incident Response Pocket Guide (IRPG), PMS 461, January 2025. IWI is a reporting aid, not a substitute for the IRPG or your training. Saved on this phone as you type; no patient names.</string>
+    <string name="script_how">Read it as written. Say the number and title of each section, then \"break\" and pause between sections (NWCG 6MFS). If the incident is life threatening, do not let documentation delay patient care.</string>
+    <string name="script_missing">Amber is what the report does not say yet. Fill it in on the Medical Incident Report, or say what you know.</string>
+    <string name="script_credit">From the NWCG Medical Incident Report, IRPG PMS 461, January 2025. A reporting aid, not a substitute for the IRPG or your training. Act according to your level of training.</string>
 </resources>
