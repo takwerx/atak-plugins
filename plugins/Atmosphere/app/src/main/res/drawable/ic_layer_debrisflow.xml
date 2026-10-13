@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debris Flow: a hillside with material running down its slope (operator, 2026-10-11:
+     "make it look more like a mtn or hill side"). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M1.5 20.5 L8 7 L11 12.5 L14.5 4.5 L22.5 20.5 Z"/>
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M15.5 10 A1.1 1.1 0 1 0 15.5 12.2 A1.1 1.1 0 1 0 15.5 10 Z M17.2 13.3 A1.1 1.1 0 1 0 17.2 15.5 A1.1 1.1 0 1 0 17.2 13.3 Z M18.9 16.6 A1.1 1.1 0 1 0 18.9 18.8 A1.1 1.1 0 1 0 18.9 16.6 Z M16.3 17.2 A0.9 0.9 0 1 0 16.3 19 A0.9 0.9 0 1 0 16.3 17.2 Z"/>
+</vector>
