@@ -91,7 +91,9 @@ public final class Units {
      */
     public static String formatBig(double meters) {
         final double n = SpanUtilities.convert(meters, Span.METER, bigSpan());
-        final String num = (n < 10 && n != Math.floor(n))
+        // A radius stored as meters comes back as 9.99999 miles, which is 10, not "10.0".
+        final boolean whole = Math.abs(n - Math.round(n)) < 0.01;
+        final String num = (n < 10 && !whole)
                 ? String.format(java.util.Locale.US, "%.1f", n)
                 : String.format(java.util.Locale.US, "%.0f", n);
         return num + " " + bigLabel();

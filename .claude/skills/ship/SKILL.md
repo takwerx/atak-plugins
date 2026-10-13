@@ -17,11 +17,17 @@ attached), README, guide and issues live. This monorepo carries no plugin
 release tags. The tak.gov TPC submission is the upstream release; the GitHub
 Release on the plugin repo is how users download.
 
-The other ship unit is **`tooling`**: shared files (`scripts/`, `.claude/`,
-`CLAUDE.md`, the root `README.md`, `.gitignore`, a rule applied to every
-plugin's `app/build.gradle`) going to `main` from `atak-plugins-tooling`, with
-nothing published anywhere. See "Ship unit `tooling`" at the end. A plugin
-branch never carries those (CLAUDE.md, "Working in parallel").
+There are two other ship units, both at the end of this file:
+
+- **`tooling`**: shared files (`scripts/`, `.claude/`, `CLAUDE.md`, the root
+  `README.md`, `.gitignore`, a rule applied to every plugin's
+  `app/build.gradle`) going to `main` from `atak-plugins-tooling`, with nothing
+  published anywhere. A plugin branch never carries those (CLAUDE.md, "Working
+  in parallel").
+- **`docs`**: a plugin's published files — README, guide, screenshots, LICENSE,
+  CONTRIBUTING — reaching its public repo with no tag, no GitHub Release and no
+  catalog. For a change that cannot alter the APK, so there is nothing to
+  version.
 
 Every ship merges in the **main checkout**, `~/GitHub/atak-plugins`, which is
 on `main` and nothing else; the branch being shipped lives in its own
@@ -95,6 +101,13 @@ main checkout; `git -C ~/GitHub/atak-plugins branch --show-current` must print
     fix is a version bump and a resubmission, never an edit to the check.
     `release-links-guard.sh` runs the same check (without `--live`) before
     the subtree push and the `gh release create`.
+12. **Manual pictures:** did this release change a screen the manual shows?
+    UI pictures (pane, dialog, menu, settings) should already be in this
+    build: they are shot on the dev phone and cropped before zipping, and
+    `submission-zip.sh` stops when screens changed with no picture. If a
+    changed screen is only visible with the map (features, overlays), the
+    signed build is where its picture comes from: say so, and the operator
+    decides whether that is a next round before shipping or after.
 
 ## Step 1 — The ship prompt (HARD STOP)
 
@@ -107,6 +120,7 @@ Present exactly this via AskUserQuestion and wait:
 > - open issues: `<count surfaced / none>` · commit scan: `<clean / acknowledged>`
 > - download links: `check-download-links PASS (<Plugin> <version>)`
 > - version code: `check-version-code PASS (<Plugin> <version> -> <code>)`, signed APKs for every target
+> - manual pictures: `<current / UI retaken on the dev build / map shots pending: which>`
 > - this will: merge the branch into `main` (merge commit), push main, subtree-push
 >   `plugins/<Name>` to `takwerx/<plugin-repo>` main, tag `v<version>` there,
 >   create its GitHub Release with the signed APKs, and refresh the depot
@@ -210,3 +224,73 @@ then steps 1, 2 and 7 of the execute list (merge in the main checkout, push
 main, fast-forward the branch), a line in the day's HANDOFF naming the merge
 commit, and the re-lock `rm`. Report the main SHA and which worktrees are now
 behind main (`./scripts/worktree.sh list`).
+
+## Ship unit `docs` — a plugin's published files, no release
+
+For a plugin branch whose changes **cannot alter the APK**: README, `docs/`
+(guide, screenshots, user manual source), `LICENSE`, `LICENSE-EXCEPTION.md`,
+`CONTRIBUTING.md`, `CLA.md`, and the `tools/` beside the plugin that never
+enters the build. It publishes the plugin tree to its public repo and stops:
+no tag, no GitHub Release, no depot catalog, no version bump, no tak.gov
+submission.
+
+Until 2026-09-14 publishing a file and releasing software were one act, because
+the only route to a plugin's public repo was the subtree push inside a plugin
+ship — and a plugin ship refuses a version that is already signed
+(`check-version-code.sh`). So a LICENSE file that two contributors were waiting
+on (takwerx/comms#1 and #2, both offering work against a repo with no license)
+could only be published by inventing a version: a new submission, three fresh
+signed APKs and a Market refresh, to ship a text file. A wrong download link and
+a typo in a guide hit the same wall.
+
+`scripts/check-docs-only.sh` is what keeps this honest. It refuses any change
+under `app/`, `gradle/`, `gradlew`, `build.gradle`, `settings.gradle`,
+`gradle.properties` or `template.local.properties`, and any change outside this
+plugin's directory. One byte inside the APK and it is a release — which is the
+correct answer, not an obstacle.
+
+Pre-flight:
+1. `git status -sb` clean; `./scripts/check-main-merged.sh` → PASS (`--merge`
+   brings main in if it is not).
+2. **`./scripts/check-docs-only.sh <Plugin>` → PASS.** This is the unit's whole
+   justification; a FAIL means ship the plugin properly with a version.
+3. **Publish scrub (MANDATORY):** `./scripts/publish-scrub.sh` → PASS. The tree
+   is about to become a public repo's `main`.
+4. `./scripts/check-download-links.sh <Plugin>` → PASS and
+   `./scripts/check-version-code.sh <Plugin> --signed` → PASS. Both already run
+   in `release-links-guard.sh` on the push; running them here means the ship
+   prompt is honest rather than discovering it mid-sequence. They pass at the
+   already-shipped version, because neither the version nor the APKs moved.
+5. **Commit scan** as in step 9 above: clean, or each hit acknowledged.
+6. Main checkout on `main`: `git -C ~/GitHub/atak-plugins branch --show-current`.
+
+Prompt, via AskUserQuestion:
+
+> Ready to publish **<Plugin> docs** (`<branch>`, N commits over main) to
+> `takwerx/<plugin-repo>`:
+> - what changes: `<one line: the files, e.g. "LICENSE, CONTRIBUTING, CLA and a
+>   README license section">`
+> - docs-only: `check-docs-only PASS (nothing inside the APK)`
+> - publish scrub: PASS · commit scan: `<clean / acknowledged>` · contains main: PASS
+> - this will: merge the branch into `main`, push main, and subtree-push
+>   `plugins/<Name>` to `takwerx/<plugin-repo>` main. **No tag, no release, no
+>   catalog, no version bump** — <Plugin> stays at <version> and the signed APKs
+>   already published are untouched.
+>
+> **Publish it?**
+
+Options: "Publish it" / "Abort". Anything other than an explicit yes → stop.
+
+After "Publish it": `echo "<Plugin> docs" > "$CLAUDE_PROJECT_DIR"/.claude/.ship-authorized`,
+then execute-list steps 1, 2, 3 and 7 only — merge in the main checkout, push
+main, subtree push, fast-forward the branch. **Skip steps 4, 5 and 6** (tag,
+release, catalog, release notes); there is no release to note. Then the re-lock
+`rm`.
+
+The sentinel's first word is the plugin, so `ship-close-guard.sh` checks the
+depot catalog on the way out as it does for a release. That is right: the
+catalog should already offer this version, and a FAIL here means it drifted and
+wants fixing regardless of what was just published.
+
+Report the main SHA, the public repo's new head, and one line stating that no
+release was created and the plugin remains at its current version.

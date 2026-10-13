@@ -1,0 +1,393 @@
+package com.atakmap.android.atmosphere.net;
+
+import android.os.Handler;
+import android.os.Looper;
+
+import com.atakmap.coremap.log.Log;
+
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+
+import javax.net.ssl.HttpsURLConnection;
+
+/**
+ * Small HTTPS GET client: bounded threads, bounded time, bounded response size.
+ *
+ * <p>Callbacks land on the main thread, so callers can touch views directly. Anonymous
+ * classes rather than lambdas throughout — the ATAK SDK documents lambdas breaking under
+ * release proguard, and this code ships in release builds.
+ */
+public final class Http {
+
+    private static final String TAG = "WxHttp";
+
+    private static final int CONNECT_TIMEOUT_MS = 10_000;
+    private static final int READ_TIMEOUT_MS = 15_000;
+    /** A forecast response is tens of KB, a wind box under a megabyte. Past this is not one. */
+    private static final int MAX_BYTES = 8 * 1024 * 1024;
+    /** Bounded pool: a burst of requests must not spawn a thread per request. */
+    private static final int MAX_CONCURRENT = 3;
+
+    public interface Callback {
+        void onSuccess(String body);
+
+        /** @param error already phrased for the operator, not a stack trace */
+        void onFailure(String error);
+    }
+
+    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(
+            MAX_CONCURRENT, new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable r) {
+                    final Thread t = new Thread(r, "wx-http");
+                    t.setDaemon(true);
+                    return t;
+                }
+            });
+
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+
+    /**
+     * A megabytes-once download -- a station list -- on a thread of its own, with a
+     * read timeout to match. The shared pool is three threads, and on 2026-09-26 all
+     * three sat asleep on stalled polls while a page waited on this queue behind
+     * them, silently, for minutes.
+     */
+    private static final ExecutorService LARGE = Executors.newSingleThreadExecutor(
+            new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable r) {
+                    final Thread t = new Thread(r, "wx-http-large");
+                    t.setDaemon(true);
+                    return t;
+                }
+            });
+    private static final int LARGE_READ_TIMEOUT_MS = 60_000;
+
+    /**
+     * Called when the plugin stops. These pools are static, so a plugin generation
+     * that is unloaded leaves them running, and their threads pin that generation's
+     * classloader and everything static in it -- icon caches, station lists, the
+     * lot. ATAK ran out of heap on 2026-09-26 after a day of reinstalls ("six
+     * wx-http threads" was two generations). A new generation has its own pools.
+     */
+    public static void shutdown() {
+        EXECUTOR.shutdownNow();
+        LARGE.shutdownNow();
+    }
+
+    public static void getLarge(final String url, final String userAgent,
+            final Map<String, String> headers, final Callback callback) {
+        LARGE.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    deliver(callback, new String(requestBytes(url, userAgent, headers,
+                            LARGE_READ_TIMEOUT_MS), "UTF-8"), null);
+                } catch (IOException e) {
+                    Log.w(TAG, "GET (large) failed: " + safeUrl(url), e);
+                    deliver(callback, null, describe(e));
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "GET (large) failed hard: " + safeUrl(url), e);
+                    deliver(callback, null, "request failed");
+                }
+            }
+        });
+    }
+
+    private Http() {
+    }
+
+    public interface BytesCallback {
+        void onSuccess(byte[] body);
+        void onFailure(String error);
+    }
+
+    /**
+     * A failure that carries the server's answer. A 404 from api.weather.gov for a
+     * zone is a durable "no such zone" worth remembering; a timeout is a zone we could
+     * not reach today and must not be remembered, and only the status tells them apart.
+     */
+    public static final class StatusException extends IOException {
+        public final int status;
+
+        StatusException(int status, String message) {
+            super(message);
+            this.status = status;
+        }
+    }
+
+    public interface StatusCallback {
+        void onSuccess(byte[] body);
+
+        /** @param status the HTTP status, or 0 when there was no answer at all */
+        void onFailure(int status, String error);
+    }
+
+    /** A binary GET that says which status failed it, delivered on main. */
+    public static void getBytes(final String url, final String userAgent,
+            final StatusCallback callback) {
+        EXECUTOR.execute(new Runnable() {
+            @Override
+            public void run() {
+                byte[] body = null;
+                String error = null;
+                int status = 0;
+                try {
+                    body = requestBytes(url, userAgent, null);
+                } catch (StatusException e) {
+                    status = e.status;
+                    error = e.getMessage();
+                } catch (IOException e) {
+                    error = describe(e);
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "GET failed hard: " + safeUrl(url), e);
+                    error = "request failed";
+                }
+                final byte[] b = body;
+                final String err = error;
+                final int st = status;
+                MAIN.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (callback == null)
+                            return;
+                        if (err == null)
+                            callback.onSuccess(b);
+                        else
+                            callback.onFailure(st, err);
+                    }
+                });
+            }
+        });
+    }
+
+    /** A binary GET, delivered on main. */
+    public static void getBytes(final String url, final String userAgent,
+            final BytesCallback callback) {
+        EXECUTOR.execute(new Runnable() {
+            @Override
+            public void run() {
+                byte[] body = null;
+                String error = null;
+                try {
+                    body = requestBytes(url, userAgent, null);
+                } catch (IOException e) {
+                    Log.w(TAG, "GET failed: " + safeUrl(url), e);
+                    error = describe(e);
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "GET failed hard: " + safeUrl(url), e);
+                    error = "request failed";
+                }
+                final byte[] b = body;
+                final String err = error;
+                MAIN.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (callback == null)
+                            return;
+                        if (err == null)
+                            callback.onSuccess(b);
+                        else
+                            callback.onFailure(err);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * A binary GET on the caller's own thread, for a worker that assembles several
+     * answers into one thing (the world radar's tiles) and would otherwise juggle a
+     * callback per piece on main. Never call it on the main thread.
+     */
+    public static byte[] fetchBytes(String url, String userAgent) throws IOException {
+        if (Looper.myLooper() == Looper.getMainLooper())
+            throw new IOException("fetchBytes on the main thread");
+        return requestBytes(url, userAgent, null);
+    }
+
+    public interface BitmapCallback {
+        void onSuccess(Bitmap bitmap);
+        void onFailure(String error);
+    }
+
+    /** An image GET, decoded on the worker so main only draws it. */
+    public static void getBitmap(final String url, final String userAgent,
+            final BitmapCallback callback) {
+        EXECUTOR.execute(new Runnable() {
+            @Override
+            public void run() {
+                Bitmap bitmap = null;
+                String error = null;
+                try {
+                    final byte[] bytes = requestBytes(url, userAgent, null);
+                    bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    if (bitmap == null)
+                        error = "the provider did not return an image";
+                } catch (IOException e) {
+                    Log.w(TAG, "GET failed: " + safeUrl(url), e);
+                    error = describe(e);
+                } catch (RuntimeException e) {
+                    Log.e(TAG, "GET failed hard: " + safeUrl(url), e);
+                    error = "request failed";
+                }
+                final Bitmap b = bitmap;
+                final String err = error;
+                MAIN.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (callback == null)
+                            return;
+                        if (err == null)
+                            callback.onSuccess(b);
+                        else
+                            callback.onFailure(err);
+                    }
+                });
+            }
+        });
+    }
+
+    public static void get(final String url, final String userAgent,
+            final Map<String, String> headers, final Callback callback) {
+
+        EXECUTOR.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    deliver(callback, request(url, userAgent, headers), null);
+                } catch (IOException e) {
+                    Log.w(TAG, "GET failed: " + safeUrl(url), e);
+                    deliver(callback, null, describe(e));
+                } catch (RuntimeException e) {
+                    // Never let a plugin thread take ATAK down.
+                    Log.e(TAG, "GET failed hard: " + safeUrl(url), e);
+                    deliver(callback, null, "request failed");
+                }
+            }
+        });
+    }
+
+    private static String request(String url, String userAgent,
+            Map<String, String> headers) throws IOException {
+        return new String(requestBytes(url, userAgent, headers), "UTF-8");
+    }
+
+    private static byte[] requestBytes(String url, String userAgent,
+            Map<String, String> headers) throws IOException {
+        return requestBytes(url, userAgent, headers, READ_TIMEOUT_MS);
+    }
+
+    private static byte[] requestBytes(String url, String userAgent,
+            Map<String, String> headers, int readTimeoutMs) throws IOException {
+
+        // Said at the start, so a request that never answers is still in the log.
+        Log.d(TAG, "GET " + safeUrl(url));
+        final URL parsed = new URL(url);
+        if (!"https".equalsIgnoreCase(parsed.getProtocol()))
+            throw new IOException("refusing a non-https request");
+
+        HttpsURLConnection conn = null;
+        InputStream in = null;
+        try {
+            conn = (HttpsURLConnection) parsed.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            conn.setReadTimeout(readTimeoutMs);
+            conn.setInstanceFollowRedirects(true);
+            conn.setRequestProperty("User-Agent", userAgent);
+            conn.setRequestProperty("Accept-Encoding", "identity");
+            if (headers != null) {
+                for (Map.Entry<String, String> e : headers.entrySet())
+                    conn.setRequestProperty(e.getKey(), e.getValue());
+            }
+
+            final int status = conn.getResponseCode();
+            if (status == HttpURLConnection.HTTP_NO_CONTENT)
+                return new byte[0];
+            if (status == HttpURLConnection.HTTP_NOT_FOUND)
+                throw new StatusException(status, "no data for this point (HTTP 404)");
+            if (status != HttpURLConnection.HTTP_OK)
+                throw new StatusException(status, "provider returned HTTP " + status);
+
+            in = conn.getInputStream();
+            // Identity is asked for above, so a server only compresses when a caller
+            // asked for gzip in its own headers (the spot list: 717 KB, 79 KB
+            // gzipped). The cap in read() counts what comes OUT of the inflater, so
+            // a small compressed body cannot unpack past it.
+            if ("gzip".equalsIgnoreCase(conn.getContentEncoding()))
+                in = new java.util.zip.GZIPInputStream(in);
+            return read(in);
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // Already have the body or the failure.
+                }
+            }
+            if (conn != null)
+                conn.disconnect();
+        }
+    }
+
+    private static byte[] read(InputStream in) throws IOException {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream(16 * 1024);
+        final byte[] buf = new byte[8192];
+        int n;
+        int total = 0;
+        while ((n = in.read(buf)) > 0) {
+            total += n;
+            if (total > MAX_BYTES)
+                throw new IOException("response larger than "
+                        + (MAX_BYTES / (1024 * 1024)) + " MB");
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
+    }
+
+    private static void deliver(final Callback callback, final String body,
+            final String error) {
+        if (callback == null)
+            return;
+        MAIN.post(new Runnable() {
+            @Override
+            public void run() {
+                if (error == null)
+                    callback.onSuccess(body);
+                else
+                    callback.onFailure(error);
+            }
+        });
+    }
+
+    private static String describe(IOException e) {
+        final String message = e.getMessage();
+        if (e instanceof java.net.SocketTimeoutException)
+            return "timed out";
+        if (e instanceof java.net.UnknownHostException)
+            return "no route to the provider";
+        if (e instanceof javax.net.ssl.SSLException)
+            return "TLS failed";
+        return message == null ? "network error" : message;
+    }
+
+    /** Query strings can carry coordinates; keep them out of the log. */
+    public static String safeUrl(String url) {
+        if (url == null)
+            return "";
+        final int q = url.indexOf('?');
+        return q < 0 ? url : url.substring(0, q) + "?…";
+    }
+}

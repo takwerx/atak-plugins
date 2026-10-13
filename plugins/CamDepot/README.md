@@ -1,10 +1,10 @@
 ATAK Plugin — Cam Depot
 
-**Download Cam Depot 1.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cam Depot 1.7** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.3/ATAK-Plugin-CamDepot-1.3--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.3/ATAK-Plugin-CamDepot-1.3--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.3/ATAK-Plugin-CamDepot-1.3--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cam-depot/releases/download/v1.7/ATAK-Plugin-CamDepot-1.7--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cam-depot/releases/download/v1.7/ATAK-Plugin-CamDepot-1.7--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cam-depot/releases/download/v1.7/ATAK-Plugin-CamDepot-1.7--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cam-depot/releases
 
@@ -14,8 +14,8 @@ All releases: https://github.com/takwerx/cam-depot/releases
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
 
-Public traffic and wildfire cameras on the ATAK map. About 38,000 of them across
-54 states and provinces, from state departments of transportation, the FAA, and
+Public traffic and wildfire cameras on the ATAK map. About 43,000 of them across
+55 states and provinces, from state departments of transportation, the FAA, and
 the wildfire lookout networks, browsed from a side panel and drawn on the map.
 
 Answers "what does it look like there right now" without leaving ATAK. An
@@ -25,7 +25,7 @@ ATAK's own player.
 
 Capabilities:
 
-  - About 38,000 cameras, refreshed from the publishing agencies, with roughly
+  - About 43,000 cameras, refreshed from the publishing agencies, with roughly
     9,000 carrying a playable video stream.
   - Filter by state, provider, county, distance from your position or from a
     point on the map, and by whether a camera streams, is a still, or belongs to
@@ -59,9 +59,23 @@ source submission zip).
 _________________________________________________________________
 STATUS
 
-Release candidate. Version 1.3.
+Version 1.7: Suggest Cameras, and a shorter pane.
 
-Exercised on hardware: Samsung Galaxy XCover Pro (ATAK-CIV 5.8.0.3). Panel,
+- Suggest Cameras: tap a point on the map and the list narrows to the cameras
+  whose reported aim covers it, nearest first, with the pan-tilt-zoom cameras
+  that could be turned to it and the nearby cameras that report no aim in
+  their own groups. One switch turns every suggested camera's bearing line on
+  or off, and the point, its marker and the lines come back after a restart.
+  Settings carries how far out a camera is trusted (10 miles by default).
+- The pane is the main screen and a Settings page: Cameras ON/OFF, Settings
+  and Favorites, Suggest Cameras, search and the list, with everything set
+  once and left on a Settings page of rows that read their value.
+- Turning many bearing lines on at once no longer stalls ATAK.
+
+Release candidate. Version 1.7.
+
+Exercised on hardware: Samsung Galaxy XCover Pro and Galaxy S10 (ATAK-CIV
+5.8.0.3). Panel,
 filters, favorites, camera imagery, live video, bearing lines and the zoom
 threshold have been run against the live catalog, as a release build with
 proguard enabled rather than a debug build only.
@@ -164,3 +178,33 @@ DEVELOPER NOTES
   video entries are registered in one batch when the queue drains: each
   registration broadcasts a hierarchy refresh, and doing that per batch rebuilds
   ATAK's Overlay Manager enough times to stop the application responding.
+
+LICENSE
+
+Copyright (C) 2026 Andreas Johansson (TAKWERX).
+
+Cam Depot is free software, licensed under the
+**[GNU Affero General Public License v3.0 or later](LICENSE)**
+(AGPL-3.0-or-later), with an
+**[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
+this plugin may be built against the TAK SDK, loaded into ATAK and distributed
+without the AGPL reaching into ATAK itself.
+
+You may run it, study it, modify it, and share it -- for any purpose, commercial
+or not, with no fee and no per-seat license. What the AGPL adds over a permissive
+license is a guarantee that it **stays** free: modify Cam Depot and pass it on,
+and the people you pass it to are owed the complete corresponding source of your
+version under the same license. Nobody can take this, close it, and sell it back
+to the emergency-services community.
+
+**If you only install and use Cam Depot, this obligation never touches you.**
+Running it, in any agency, on any number of devices, triggers nothing.
+
+**Scope.** The AGPL covers Cam Depot's own code. It does not change the license
+of the TAK Software, which stays under the TAK Software License Agreement, and it
+does not cover the parts of this repository scaffolded from the TAK-SDK plugin
+template -- those are listed under Provenance in
+[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md). No SDK binary is distributed here.
+
+Contributions are welcome -- see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+contribution terms and the [Contributor License Agreement](CLA.md).

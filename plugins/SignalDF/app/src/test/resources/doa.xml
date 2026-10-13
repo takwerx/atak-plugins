@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthesized from the element list and the scaling in
+     kraken_sdr_signal_processor.py wr_xml(), not captured from hardware. It
+     describes the same frame as DOA_value_single.html: theta_0 = 142 deg,
+     0.87 confidence, -37.6 dB, 155.16 MHz. -->
+<DATA>
+  <STATION_ID>KRAKEN-1</STATION_ID>
+  <TIME>1757894400000</TIME>
+  <GPS_TIME>1757894399</GPS_TIME>
+  <FREQUENCY>155.160000</FREQUENCY>
+  <LOCATION>
+    <LATITUDE>39.000000</LATITUDE>
+    <LONGITUDE>-120.000000</LONGITUDE>
+    <HEADING>0.0</HEADING>
+    <SPEED>0.0</SPEED>
+  </LOCATION>
+  <DOA>142.0</DOA>
+  <PWR>62.4</PWR>
+  <CONF>87.0</CONF>
+  <LATENCY>120</LATENCY>
+  <PROCESSING_TIME>18</PROCESSING_TIME>
+  <ADC_OVERDRIVE>0</ADC_OVERDRIVE>
+  <NUM_CORRELATED_SOURCES>1</NUM_CORRELATED_SOURCES>
+  <SNR_DB>21.3</SNR_DB>
+</DATA>

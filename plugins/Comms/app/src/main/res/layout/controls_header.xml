@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The filter controls, added to the site ListView with addHeaderView() so the whole
+     pane is one scroller: a ListView cannot live inside a ScrollView. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Re-reads the catalog from the depot now rather than once a day. -->
+    <Button
+        style="@style/TakwerxButton"
+        android:id="@+id/sync"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/resync" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Where"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:paddingTop="6dp"
+        android:alpha="0.6" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/state"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+
+        <!-- Says which point distances are measured from, and switches it. -->
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/from"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <Button
+        style="@style/TakwerxButton"
+        android:id="@+id/radius"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Draw on the map"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:paddingTop="6dp"
+        android:alpha="0.6" />
+
+    <TextView
+        android:id="@+id/zoom_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/zoom_set"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Use this zoom" />
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/zoom_preset"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Presets" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Reach from here"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:paddingTop="6dp"
+        android:alpha="0.6" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <!-- Four buttons on an even two by two grid. The two switches share the
+             top row and the two settings share the one under it, so the green and
+             red faces read as a pair rather than sitting diagonally from each other
+             (operator, 2026-09-11: "lets keep from me and only likely ON on the
+             same row"). Every one is 0dp with a weight of 1, the same as Use this
+             zoom and Presets above, because a wrap_content button makes each row a
+             different shape and the block reads as unfinished.
+
+             Which sites a handheld here is likely to open. ON in green, OFF
+             in red, the way Traffic's toggles read. There is no viewshed from a
+             site: drawn from a repeater it reads as a coverage map and is not one. -->
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/me_viewshed"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/only_likely"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <!-- Height is the one variable in the operator's hands, and the link that
+             decides the contact: the repeater is on a peak with power, the operator
+             is a handheld. -->
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/me_height"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+
+        <!-- How far out to look, and how high the operator's own antenna is:
+             handheld, vehicle, mast. The two settings, under the two switches. -->
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/viewshed_range"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/viewshed_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/viewshed_note"
+        android:textSize="11sp"
+        android:alpha="0.8" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Find a site, net, frequency or tone"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:paddingTop="2dp"
+        android:alpha="0.6" />
+
+    <!-- Clear sits beside the box and is disabled while it is empty, so a live Clear
+         button is the pane saying a search is filtering the list. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <EditText
+            android:id="@+id/search"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:hint="@string/search_hint"
+            android:inputType="text"
+            android:maxLines="1"
+            android:textSize="14sp" />
+
+        <Button
+            style="@style/TakwerxButton"
+            android:id="@+id/search_clear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:text="@string/clear" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Sites, nearest first"
+        android:textSize="10sp"
+        android:textAllCaps="true"
+        android:paddingTop="8dp"
+        android:alpha="0.6" />
+
+</LinearLayout>

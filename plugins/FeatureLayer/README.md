@@ -1,10 +1,10 @@
 ATAK Plugin — Feature Layer
 
-**Download Feature Layer 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Feature Layer 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.5/ATAK-Plugin-FeatureLayer-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/feature-layer/releases/download/v0.14/ATAK-Plugin-FeatureLayer-0.14--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/feature-layer/releases
 
@@ -33,6 +33,23 @@ Built-in sources:
     intel flights, USFS, NIFC and WFIGS, public. Each source toggles on its own,
     a time window picks how far back to look, and only the latest perimeter per
     fire per source is drawn.
+  - New Fire Starts: NIFC's public view of new wildfires and prescribed fires,
+    nationwide, for 24 hours after each is found or until it is contained.
+    Wildfires, wildfires with no size reported yet, and prescribed fires toggle
+    on their own; a time window of 1 to 24 hours, and the same distance-from-me
+    or map-center control DART has.
+  - Ongoing Fires: NIFC's public view of current wildfires and prescribed fires
+    not yet contained, from the day after each is found, so it and New Fire
+    Starts never show one fire twice. Labeled with acres and percent
+    contained; a fire with an InciWeb page opens it from its details.
+  - Fire History: where fires have burned since 1900, from NIFC's
+    interagency fire perimeter history, drawn as EGP draws it: the last ten
+    years colored by years since (under six months, to one, two, three and
+    ten years), then each decade in a color of its own back to the 1980s
+    and grey before, each band and decade switched on its
+    own, labeled "Carr Fire (2018)". Search it by name and year, and keep
+    the fires that matter to an incident as My Fires, shown alone until
+    cleared.
   - Add your own org: any ArcGIS Online organization. Sign in, search its
     content, add a layer; it draws with the service's own renderer.
 
@@ -45,16 +62,76 @@ its attributes, a bloodhound, a range and bearing line, or a marker.
 _________________________________________________________________
 STATUS
 
-0.5, correct multi-part areas: an Esri service sends every ring of a feature in
-one list and only the winding order separates them, so a fire perimeter of
-several separate burn islands drew as one island full of holes - no fill, and
-the shape fell apart on zoom-in. A CA Air Intel flight is also labeled by its
-mission now, and a feature type's fill setting survives a refresh (0.1 could not
-sign in, its OAuth client ID was empty; 0.2 lost cached features on the first
-toggle after a restart; 0.3 searched all of ArcGIS Online instead of your own
-organization for Find layer; 0.4 was the first release for feedback, with the
-illustrated guide). Tested on ATAK-CIV 5.8 with live NIFS incidents, the SARCOP
-training sandbox and CA Air Intel. SARCOP Live is not wired yet.
+0.14, the guide's pictures for 0.13, and two fixes. Every picture of a
+changed screen retaken on official ATAK. Find puts names that start with the
+typed word first ("Ranch 2007" no longer lists Rocky Branch above Ranch Fire).
+CAL FIRE's connection, which needs a certificate authority Android 12 and 13
+do not carry, now names its TLS version.
+
+0.13, fire history, and layers that stay on the phone. Fire History: where
+fires have burned since 1900, from NIFC's interagency perimeters, drawn as EGP
+draws them for the last ten years and with a color for each decade back to the
+1980s, newest burn on top; each band and decade switched on its own; Find
+searches it by name and year ("Ranch 2007"), one copy per fire. My Fires keeps
+the burns that matter to an incident: add them from the details, each edged in
+white, then show only those until the list is cleared. CAL FIRE's own record
+(acres, containment, a link to its incident page) on the fires it runs. A layer
+or a type switched off is now hidden, not deleted, so everything downloaded
+comes back after a restart with no network, and the row says so in words.
+
+0.12, fires and a simpler pane. Two new public sources from NIFC: New Fire
+Starts, every wildfire and prescribed fire found in the last 24 hours, and
+Ongoing Fires, every fire not yet contained from the day after it was found,
+so with both on each fire shows once. A red flame marks a wildfire, a green RX
+a prescribed fire; labels carry acres and percent contained; a fire with only
+a dispatch number for a name leaves the map an hour after it was found; a tap
+on a fire opens its details, and a fire with an InciWeb page links to it. The
+main screen is now Add Layer, Find and All ON/OFF over a list of one-line
+layers, each opening its controls under an arrow; Find searches every loaded
+layer, names before other fields. Every icon and label stays level when the
+map turns, generated icons live in ATAK's private storage instead of the
+shared card, and the pane comes back after a sign-in.
+
+0.11, saved layers restore without holding up ATAK: at start, the cached
+store of each saved layer is re-styled on the plugin's own thread instead of
+ATAK's main thread. A phone with a large saved layer (a long-lived NIFS live
+layer, a DART fleet) hung for twenty seconds at every ATAK start on 0.9 and
+0.10, with "ATAK isn't responding" dialogs before any pane opened. Nothing
+else changed.
+
+0.10, one versionCode per APK: the same plugin as 0.9, rebuilt so that each
+ATAK target's APK carries its own versionCode, the plugin version and the ATAK
+version folded into one integer. An MDM handed the 5.7 and 5.8 builds of 0.9
+saw two different files claiming one revision and reported an incompatible
+build (issue #1); with 0.10 it holds all three, and a phone moving up an ATAK
+version takes the matching build as a normal update. Nothing else changed.
+
+0.9, DART and FireGuard: NIFC's live positions are two layers, vehicles and
+personnel, drawn the way NIFC's own EGP viewer draws them, with whole callsigns
+and a ring that says how recently each reported (green under 10 minutes, yellow
+under 70, red older). Vehicles are colored by fleet, people by how they share
+(Field Maps pin, inReach handset, WFTAK badge), and an inReach S.O.S. is labeled
+as one. A layer fetches what is in view and follows the map, with a ceiling and a
+cap that say when to zoom in. Every layer has a label zoom: names from a chosen
+scale and closer, symbols alone further out. Find lists a DART layer's kinds with
+counts in view, a typed callsign asks the feed nationally, and a row opens its
+details with Go there. FireGuard adds NIFC's detections, filled by age the way
+EGP colors them. Point and area names are drawn whole, never trimmed. 0.7 and
+0.8 were the same work; each went to tak.gov once and was superseded on a scan
+finding before publication.
+
+0.6, distances that follow the map: a feature list was measured once, when it
+was drawn, so panning the map left every row reading its distance from wherever
+the map used to be - which is worse than no distance, because it still looks
+right. The list now follows the map center and the self marker as they move,
+re-sorting when the sort is Nearest and updating the numbers in place otherwise
+(0.1 could not sign in, its OAuth client ID was empty; 0.2 lost cached features
+on the first toggle after a restart; 0.3 searched all of ArcGIS Online instead
+of your own organization for Find layer; 0.4 was the first release for feedback,
+with the illustrated guide; 0.5 drew multi-part areas correctly, named a CA Air
+Intel flight by its mission, and kept a type's fill setting across a refresh).
+Tested on ATAK-CIV 5.8 with live NIFS incidents, the SARCOP training sandbox and
+CA Air Intel. SARCOP Live is not wired yet.
 
 _________________________________________________________________
 POINT OF CONTACTS
@@ -112,3 +189,33 @@ geometry inside the line's own feature. Symbol images and colors come from the
 NWCG PMS 936 symbology pages and NAPSG's published US&R symbol library. Area
 names sit at the centroid by pairing the polygon with its center point in one
 feature under an empty label style.
+
+LICENSE
+
+Copyright (C) 2026 Andreas Johansson (TAKWERX).
+
+Feature Layer is free software, licensed under the
+**[GNU Affero General Public License v3.0 or later](LICENSE)**
+(AGPL-3.0-or-later), with an
+**[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
+this plugin may be built against the TAK SDK, loaded into ATAK and distributed
+without the AGPL reaching into ATAK itself.
+
+You may run it, study it, modify it, and share it -- for any purpose, commercial
+or not, with no fee and no per-seat license. What the AGPL adds over a permissive
+license is a guarantee that it **stays** free: modify Feature Layer and pass it on,
+and the people you pass it to are owed the complete corresponding source of your
+version under the same license. Nobody can take this, close it, and sell it back
+to the emergency-services community.
+
+**If you only install and use Feature Layer, this obligation never touches you.**
+Running it, in any agency, on any number of devices, triggers nothing.
+
+**Scope.** The AGPL covers Feature Layer's own code. It does not change the license
+of the TAK Software, which stays under the TAK Software License Agreement, and it
+does not cover the parts of this repository scaffolded from the TAK-SDK plugin
+template -- those are listed under Provenance in
+[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md). No SDK binary is distributed here.
+
+Contributions are welcome -- see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+contribution terms and the [Contributor License Agreement](CLA.md).

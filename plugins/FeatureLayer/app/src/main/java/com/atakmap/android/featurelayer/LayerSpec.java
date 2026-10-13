@@ -34,14 +34,66 @@ public class LayerSpec {
      * further out than this (Cam Depot's "no further out than" limit). MAX = always.
      */
     public double gateGsd = Double.MAX_VALUE;
+    /**
+     * Labels from this resolution (m/px) and closer; {@code Double.MAX_VALUE} means at every
+     * zoom the layer draws. Symbols alone out wide, names once zoomed in past the level
+     * (operator, 2026-09-18: "a separate zoom level for the labels, not just on and off").
+     */
+    public double labelGsd = DEFAULT_LABEL_GSD;
+    /**
+     * Five miles on the scale bar, at the bar's nominal length: names appear from there
+     * in, symbols alone further out (operator, 2026-09-18: "labels need to come on at
+     * like 5 miles default", for every layer). Always is a choice, not the default.
+     */
+    public static final double DEFAULT_LABEL_GSD = 1 * 1609.344 / ScaleBar.FALLBACK_BAR_PIXELS;
+    /** Five miles: the wider default DART and FireGuard keep, where a callsign at a mile is too late. */
+    public static final double DEFAULT_LABEL_GSD_WIDE = 5 * 1609.344 / ScaleBar.FALLBACK_BAR_PIXELS;
     public int maxFeatures;    // per source layer, 0 = no cap
+    /**
+     * Spatial scope, for a feed that is too large to draw nationally. Null is the whole
+     * layer, as every source before DART. "me" is resolved against the self marker at
+     * every fetch rather than stored, so the scope follows the operator instead of
+     * freezing where they stood when they switched it on.
+     */
+    public String scopeKind;            // "me", "box", "shape"; null = no spatial filter
+    public double scopeRadiusM = 40000; // "me"
+    public double[] scopeBox;           // "box": south, west, north, east
+    public String scopeRings;           // "shape": the Esri JSON rings of a drawn shape
     /** A date field to window on, and how far back: "poly_DateCurrent", 72 h. 0 = everything. */
     public String timeField;
+    /**
+     * The date field the "anything new?" check reads, when it is not {@link #timeField}:
+     * a fire start is windowed by when it was found, but its size arrives later as an
+     * edit, so the check reads the edit time. Not saved; the source sets it on load.
+     */
+    public String stampField;
+    /**
+     * Only features at least this many hours old by {@link #timeField}; 0 = no lower
+     * bound. Ongoing Fires leaves the last day to New Fire Starts, so a fire is in one
+     * of the two, never both. Not saved; the source sets it.
+     */
+    public int minAgeHours;
+    /**
+     * Per entry of {@link #layerIds}, the service it is on when it is not {@link #base}:
+     * Fire History reads two services as one layer. Not saved; the source sets it.
+     */
+    public String[] sourceBases;
+    /** Simplify shapes to the map's resolution when fetching; fire perimeters are megabytes at full detail. Not saved. */
+    public boolean generalize;
+
+    /** The service the i-th entry of {@link #layerIds} is read from. */
+    public String baseFor(int i) {
+        return sourceBases != null && i < sourceBases.length && sourceBases[i] != null ? sourceBases[i] : base;
+    }
     public int sinceHours;
     /** Split the layer's features into types by this field's value (FIRIS: "source"), instead of one type per source layer. */
     public String setField;
     /** The field drawn as the map label, when the service's own display field is not the one people know. */
     public String labelField;
+    /** What to call the service's layer to a person, when its own name is a table name. */
+    public String layerTitle;
+    /** Which of this plugin's symbology versions the store was last written with. */
+    public int styleVersion;
     /**
      * Keep only the newest feature (by {@link #timeField}) per key: each entry is a field,
      * or fields separated by "|" tried in turn ("incident_name|mission"). Null = keep all.
@@ -51,18 +103,27 @@ public class LayerSpec {
     /** The where clause to query with right now: the fixed one, plus the time window from the present. */
     public String whereNow() {
         final String fixed = where == null || where.trim().isEmpty() ? "1=1" : where;
-        if (timeField == null || sinceHours <= 0)
+        if (timeField == null || (sinceHours <= 0 && minAgeHours <= 0))
             return fixed;
-        final long since = System.currentTimeMillis() - sinceHours * 3600000L;
+        final long now = System.currentTimeMillis();
         final java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US);
         f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
-        return "(" + fixed + ") AND " + timeField + " >= TIMESTAMP '" + f.format(new java.util.Date(since)) + "'";
+        final StringBuilder w = new StringBuilder("(").append(fixed).append(")");
+        if (sinceHours > 0)
+            w.append(" AND ").append(timeField).append(" >= TIMESTAMP '")
+                    .append(f.format(new java.util.Date(now - sinceHours * 3600000L))).append("'");
+        if (minAgeHours > 0)
+            w.append(" AND ").append(timeField).append(" < TIMESTAMP '")
+                    .append(f.format(new java.util.Date(now - minAgeHours * 3600000L))).append("'");
+        return w.toString();
     }
 
     /** "Last 3 days", "All time". */
     public String windowLabel() {
         if (timeField == null || sinceHours <= 0)
             return "All time";
+        if (sinceHours == 1)
+            return "Last hour";
         if (sinceHours < 48)
             return "Last " + sinceHours + " hours";
         return "Last " + (sinceHours / 24) + " days";
@@ -81,6 +142,43 @@ public class LayerSpec {
      */
     public final java.util.LinkedHashMap<String, String> setNotes = new java.util.LinkedHashMap<>();
 
+    /** One fire in My Fires: its identity as copies share it (normName|year), its extent and title. */
+    public static final class MyFire {
+        public final String key, title;
+        public final double[] box;
+
+        public MyFire(String key, double[] box, String title) {
+            this.key = key;
+            this.box = box;
+            this.title = title;
+        }
+    }
+
+    /**
+     * My Fires: the burns an operator picked out for the incident they are working, kept
+     * across restarts until cleared (operator, 2026-10-06: "a sort of favorites ... while
+     * im working this incident then get rid of them when im done").
+     */
+    public final java.util.List<MyFire> myFires = new java.util.concurrent.CopyOnWriteArrayList<>();
+    /**
+     * The most My Fires a layer holds. Each is a fetch of its own on every refresh, so a
+     * list without an end -- a layers.json written by something else -- would be
+     * thousands of requests a refresh. An incident wants a handful.
+     */
+    public static final int MY_FIRES_MAX = 50;
+    /** Whether only My Fires are drawn. */
+    public volatile boolean myFiresOnly;
+
+    /** Whether minX, minY, maxX, maxY is a real extent in degrees: finite, on the globe, min before max. */
+    static boolean lonLatBox(double[] b) {
+        if (b == null || b.length != 4)
+            return false;
+        for (double d : b)
+            if (Double.isNaN(d) || Double.isInfinite(d))
+                return false;
+        return b[0] >= -180 && b[2] <= 180 && b[1] >= -90 && b[3] <= 90 && b[0] <= b[2] && b[1] <= b[3];
+    }
+
     public boolean isOn(String setName) {
         final Boolean v = setOn.get(setName);
         return v == null || v;
@@ -92,21 +190,44 @@ public class LayerSpec {
         return v == null ? fillAlpha : v;
     }
 
+    /**
+     * A number JSON will accept, or null. {@code lat}/{@code lon} default to NaN and
+     * org.json refuses NaN outright ("Forbidden numeric value: NaN"), which threw from
+     * toJson and took the **whole layer list** down with it: DART has no centre point of
+     * its own, so nothing the operator added was ever saved (2026-09-17).
+     */
+    private static Object finite(double d) {
+        return Double.isNaN(d) || Double.isInfinite(d) ? JSONObject.NULL : (Object) d;
+    }
+
     public JSONObject toJson() throws Exception {
         final JSONObject o = new JSONObject();
         o.put("id", id).put("title", title).put("subtitle", subtitle).put("portal", portal)
                 .put("base", base).put("where", where).put("geojson", geojson)
-                .put("profile", profile.name()).put("lat", lat).put("lon", lon).put("live", live).put("maxFeatures", maxFeatures).put("iconSet", iconSet).put("fillAlpha", fillAlpha).put("refreshMinutes", refreshMinutes).put("repairStatus", repairStatus).put("labels", labels)
-                .put("timeField", timeField).put("sinceHours", sinceHours).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName);
+                .put("profile", profile.name()).put("lat", finite(lat)).put("lon", finite(lon)).put("live", live).put("maxFeatures", maxFeatures).put("iconSet", iconSet).put("fillAlpha", fillAlpha).put("refreshMinutes", refreshMinutes).put("repairStatus", repairStatus).put("labels", labels)
+                .put("timeField", timeField).put("sinceHours", sinceHours).put("setField", setField).put("labelField", labelField).put("gateGsd", gateGsd == Double.MAX_VALUE ? -1 : gateGsd).put("orgName", orgName).put("labelGsd", labelGsd == Double.MAX_VALUE ? 0 : labelGsd);
         final JSONArray ids = new JSONArray();
         for (int i : layerIds)
             ids.put(i);
         o.put("layerIds", ids);
+        o.put("layerTitle", layerTitle).put("styleVersion", styleVersion);
+        o.put("scopeKind", scopeKind).put("scopeRadiusM", scopeRadiusM).put("scopeRings", scopeRings);
+        if (scopeBox != null)
+            o.put("scopeBox", new JSONArray(
+                    java.util.Arrays.asList(scopeBox[0], scopeBox[1], scopeBox[2], scopeBox[3])));
         o.put("setFill", new JSONObject(setFill));
         o.put("setKind", new JSONObject(setKind));
         o.put("setOn", new JSONObject(setOn));
         if (bounds != null)
             o.put("bounds", new JSONArray(java.util.Arrays.asList(bounds[0], bounds[1], bounds[2], bounds[3])));
+        if (!myFires.isEmpty()) {
+            final JSONArray mf = new JSONArray();
+            for (MyFire f : myFires)
+                mf.put(new JSONObject().put("key", f.key).put("title", f.title)
+                        .put("box", new JSONArray().put(f.box[0]).put(f.box[1]).put(f.box[2]).put(f.box[3])));
+            o.put("myFires", mf);
+        }
+        o.put("myFiresOnly", myFiresOnly);
         return o;
     }
 
@@ -136,10 +257,45 @@ public class LayerSpec {
         s.orgName = o.isNull("orgName") ? null : o.optString("orgName", null);
         final double gate = o.optDouble("gateGsd", -1);
         s.gateGsd = gate <= 0 ? Double.MAX_VALUE : gate;
+        // Absent or negative: the default (one build on 2026-09-18 wrote -1 for every
+        // layer while Always was still the default). 0: Always, chosen. Else the level.
+        final double lab = o.optDouble("labelGsd", -1);
+        s.labelGsd = lab < 0 ? DEFAULT_LABEL_GSD : lab == 0 ? Double.MAX_VALUE : lab;
+        // The default for fires moved from five miles to one on 2026-09-18 (operator:
+        // "label on for fires like at 1 mile as the default, people can adjust"). A
+        // saved five-mile level equal to the old constant was never chosen, so it moves;
+        // a preset the operator picked is computed from the live scale bar and does not
+        // hit the constant exactly. DART and FireGuard keep five.
+        final boolean wide = "dart".equals(s.iconSet) || "fireguard".equals(s.iconSet);
+        if (!wide && Math.abs(s.labelGsd - DEFAULT_LABEL_GSD_WIDE) < 1e-9)
+            s.labelGsd = DEFAULT_LABEL_GSD;
+        if (wide && lab < 0)
+            s.labelGsd = DEFAULT_LABEL_GSD_WIDE;
         final JSONArray ids = o.getJSONArray("layerIds");
         s.layerIds = new int[ids.length()];
         for (int i = 0; i < ids.length(); i++)
             s.layerIds[i] = ids.getInt(i);
+        s.layerTitle = o.isNull("layerTitle") ? null : o.optString("layerTitle", null);
+        s.styleVersion = o.optInt("styleVersion", 0);
+        final JSONArray mf = o.optJSONArray("myFires");
+        if (mf != null)
+            for (int i = 0; i < mf.length() && s.myFires.size() < MY_FIRES_MAX; i++) {
+                final JSONObject f = mf.optJSONObject(i);
+                final JSONArray b = f == null ? null : f.optJSONArray("box");
+                if (f == null || b == null || b.length() != 4 || f.optString("key", "").isEmpty())
+                    continue;
+                final double[] box = { b.optDouble(0), b.optDouble(1), b.optDouble(2), b.optDouble(3) };
+                if (!lonLatBox(box))
+                    continue; // a damaged entry would put NaN into every fetch's query
+                s.myFires.add(new MyFire(f.optString("key"), box, f.optString("title", f.optString("key"))));
+            }
+        s.myFiresOnly = o.optBoolean("myFiresOnly", false) && !s.myFires.isEmpty();
+        s.scopeKind = o.isNull("scopeKind") ? null : o.optString("scopeKind", null);
+        s.scopeRadiusM = o.optDouble("scopeRadiusM", 40000);
+        s.scopeRings = o.isNull("scopeRings") ? null : o.optString("scopeRings", null);
+        final JSONArray sbx = o.optJSONArray("scopeBox");
+        if (sbx != null && sbx.length() == 4)
+            s.scopeBox = new double[] { sbx.getDouble(0), sbx.getDouble(1), sbx.getDouble(2), sbx.getDouble(3) };
         final JSONObject sf = o.optJSONObject("setFill");
         if (sf != null) {
             final java.util.Iterator<String> k = sf.keys();

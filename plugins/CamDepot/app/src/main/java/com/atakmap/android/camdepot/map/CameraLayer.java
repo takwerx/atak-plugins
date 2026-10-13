@@ -6,6 +6,7 @@ import com.atakmap.coremap.maps.assets.Icon;
 import com.atakmap.android.maps.MapGroup;
 import com.atakmap.android.maps.MapItem;
 import com.atakmap.android.maps.MapView;
+import com.atakmap.android.camdepot.plugin.R;
 import com.atakmap.android.maps.Marker;
 import com.atakmap.android.util.ATAKUtilities;
 import com.atakmap.coremap.log.Log;
@@ -159,9 +160,13 @@ public final class CameraLayer {
      * video list, and pointless work on the UI thread each time.
      */
     private final Map<String, String> videoUids = new HashMap<>();
-    /** Video entries built this pass, registered in one batch by {@link #addTick}. */
-    private final List<gov.tak.api.video.ConnectionEntry> pendingEntries =
-            new ArrayList<>();
+    /**
+     * Camera id -> video entry built this pass, registered in one batch by
+     * {@link #addTick}. Keyed by camera so a marker rebuilt before the flush
+     * replaces its own entry rather than queueing a second one.
+     */
+    private final Map<String, gov.tak.api.video.ConnectionEntry> pendingEntries =
+            new java.util.LinkedHashMap<>();
     private final Map<String, Camera> shown = new HashMap<>();
     /** Cameras waiting for a marker; drained by {@link #addTick}. */
     private final List<Camera> pending = new ArrayList<>();
@@ -279,6 +284,7 @@ public final class CameraLayer {
         main.removeCallbacks(gateTick);
         main.removeCallbacks(addTick);
         main.removeCallbacks(removeTick);
+        listenForDrag(false);
         mapView.removeOnMapMovedListener(moved);
         mapView.getMapEventDispatcher().removeMapEventListener(
                 com.atakmap.android.maps.MapEvent.ITEM_CLICK, itemClick);
@@ -386,13 +392,48 @@ public final class CameraLayer {
         final List<Camera> want = new ArrayList<>();
         // OFF wants nothing on screen; apply() then removes whatever is there.
         for (Camera c : mapOn ? selected : Collections.<Camera>emptyList()) {
-            if (view == null || view.intersects(c.lat, c.lon, c.lat, c.lon))
+            if (view == null || view.intersects(c.lat, c.lon, c.lat, c.lon)
+                    || lineInView(c, view))
                 want.add(c);
         }
         omitted = Math.max(0, want.size() - MAX_MARKERS);
         final List<Camera> draw = want.size() > MAX_MARKERS
                 ? new ArrayList<>(want.subList(0, MAX_MARKERS)) : want;
         apply(draw);
+    }
+
+    /**
+     * True when this camera's bearing is on and its line crosses {@code view}.
+     *
+     * <p>The line belongs to the marker -- ATAK drops the SensorFOV when the marker
+     * leaves the group -- so culling by the camera's own position took the line
+     * with it. A 60 km line runs far past the screen, and zooming in on what the
+     * camera is looking at pushes the camera itself out of view: the marker was
+     * removed and the line vanished exactly where the operator was looking.
+     *
+     * <p>The test is the line's bounding box (a stills camera's wedge: both
+     * edges), which can keep a camera whose line passes just outside a corner.
+     * That costs one marker; only cameras with a bearing switched on are ever
+     * tested, and there are a handful at most.
+     */
+    private boolean lineInView(Camera c, GeoBounds view) {
+        if (!requested.contains(c.id) || !c.hasFov())
+            return false;
+        final boolean still = !c.hasStream();
+        final double length = still ? STILL_FOV_RANGE_M
+                : Math.min(rangeMeters, SensorDetailHandler.MAX_SENSOR_RANGE);
+        final double half = still ? STILL_FOV_DEGREES / 2 : 0;
+        final GeoPoint origin = new GeoPoint(c.lat, c.lon);
+        double north = c.lat, south = c.lat, west = c.lon, east = c.lon;
+        for (double az : new double[] { c.pan - half, c.pan + half }) {
+            final GeoPoint end = com.atakmap.coremap.maps.coords.GeoCalculations
+                    .pointAtDistance(origin, az, length);
+            north = Math.max(north, end.getLatitude());
+            south = Math.min(south, end.getLatitude());
+            west = Math.min(west, end.getLongitude());
+            east = Math.max(east, end.getLongitude());
+        }
+        return view.intersects(north, west, south, east);
     }
 
     /** How many on-screen cameras the cap left out last pass. */
@@ -622,9 +663,16 @@ public final class CameraLayer {
             if (ce == null)
                 return;
             // Queued, not registered here. See flushVideoEntries().
-            pendingEntries.add(ce);
+            //
+            // videoUID is NOT set yet: flushVideoEntries sets it once the
+            // VideoManager holds the entry. It used to be set here, and the flush
+            // waits for the whole add queue -- about 13 s for Texas's 2,050
+            // streams -- so a radial video tap in that window named an entry
+            // ATAK did not hold and got "invalid video information". Without
+            // videoUID the radial grays its video button instead
+            // (menus/b-m-p-s-p-loc.xml: disabled='!{${videoUID}}').
+            pendingEntries.put(c.id, ce);
             videoUids.put(c.id, ce.getUID());
-            m.setMetaString("videoUID", ce.getUID());
             m.setMetaString("videoUrl", c.stream);
         } catch (LinkageError | RuntimeException e) {
             // Video is a bonus; a plugin must not fail to draw a camera over it.
@@ -798,13 +846,23 @@ public final class CameraLayer {
     private void flushVideoEntries() {
         if (pendingEntries.isEmpty())
             return;
+        final List<String> ids = new ArrayList<>(pendingEntries.keySet());
         final List<gov.tak.api.video.ConnectionEntry> batch =
-                new ArrayList<>(pendingEntries);
+                new ArrayList<>(pendingEntries.values());
         pendingEntries.clear();
         try {
             com.atakmap.android.video.manager.VideoManager.getInstance()
                     .addConnectionEntries(batch, false);
             Log.d(TAG, "registered " + batch.size() + " video entries (no persist)");
+            // Only now does each marker's video button point at something.
+            // videoUids, not the batch: the pane's Live video may have registered
+            // a newer entry for the same camera meanwhile.
+            for (String id : ids) {
+                final Marker m = markers.get(id);
+                final String uid = videoUids.get(id);
+                if (m != null && uid != null)
+                    m.setMetaString("videoUID", uid);
+            }
         } catch (LinkageError | RuntimeException e) {
             // Video is a bonus; a plugin must not fail to draw a camera over it.
             Log.w(TAG, "could not register video entries", e);
@@ -877,8 +935,33 @@ public final class CameraLayer {
         }
     }
 
+    /**
+     * The camera's point with the terrain's elevation under it, when the phone
+     * has terrain data; a plain lat/lon otherwise.
+     *
+     * <p>Not for the icon: ATAK clamps a marker to the ground either way. It is
+     * for the bearing label. GLSensorFOV draws the bearing text twice, on a
+     * left-edge and a right-edge line, and ends one at the marker's own
+     * altitude and the other at a computed one. With no altitude on the marker
+     * those two lines drape differently over terrain and the two copies of
+     * "359°T" land a few pixels apart along the line: the smeared label the
+     * operator saw on the XCover (which has DTED) and never on the S10 (which
+     * does not), 2026-10-11. With a real altitude the two lines agree.
+     */
+    private static GeoPoint grounded(double lat, double lon) {
+        try {
+            final double hae = com.atakmap.map.elevation.ElevationManager
+                    .getElevation(lat, lon, null);
+            if (!Double.isNaN(hae))
+                return new GeoPoint(lat, lon, hae);
+        } catch (LinkageError | RuntimeException e) {
+            // No terrain, or an engine that will not say: the flat point is fine.
+        }
+        return new GeoPoint(lat, lon);
+    }
+
     private Marker create(Camera c) {
-        final Marker m = new Marker(new GeoPoint(c.lat, c.lon), UID_PREFIX + c.id);
+        final Marker m = new Marker(grounded(c.lat, c.lon), UID_PREFIX + c.id);
         // A generic sensor point: ATAK has an icon for it, so the plugin does not
         // have to ship one to be usable on day one.
         // The radial menu is chosen by CoT type: ATAK's MenuMapAdapter looks up
@@ -989,8 +1072,17 @@ public final class CameraLayer {
         // The line itself.
         m.setMetaDouble(SensorDetailHandler.STROKE_WEIGHT, 5.0);
         m.setMetaInteger(SensorDetailHandler.STROKE_COLOR, LINE_COLOR);
-        // Range rings off; the line carries its bearing as a label instead.
-        m.setMetaInteger(SensorDetailHandler.RANGE_LINES_ATTRIBUTE, 0);
+        // ONE range line, at the far end. This is the spacing in meters, and 0 is
+        // not "none": GLSensorFOV clamps anything under 50 m up to 50 m and, with
+        // labels on, builds a GLBatchLineString every 50 m of the cone's length.
+        // A 60 km line is 1,200 of them, rebuilt on the GL thread at every
+        // metrics change; 33 bearings at once was 40,000 and an ANR on
+        // 2026-10-11 ("Input dispatching timed out", GLSensorFOV.computeRangeLines
+        // on the GL thread with the main thread waiting on its hit test). A
+        // spacing equal to the extent passes both clamps and yields one line.
+        m.setMetaInteger(SensorDetailHandler.RANGE_LINES_ATTRIBUTE,
+                (int) Math.round(Math.min(rangeMeters,
+                        SensorDetailHandler.MAX_SENSOR_RANGE)));
         m.setMetaBoolean(SensorDetailHandler.DISPLAY_LABELS, true);
         m.setMetaDouble(SensorDetailHandler.RANGE_LINES_STROKE_WEIGHT, 1.0);
         m.setMetaInteger(SensorDetailHandler.RANGE_LINES_STROKE_COLOR, 0xFF000000);
@@ -1032,14 +1124,17 @@ public final class CameraLayer {
         if (c == null || !c.hasFov())
             return;
         final boolean still = !c.hasStream();
+        final double extent = still ? STILL_FOV_RANGE_M
+                : Math.min(rangeMeters, SensorDetailHandler.MAX_SENSOR_RANGE);
+        // A line, never the camera's real lens as a filled wedge. That was tried
+        // for Look At on 2026-10-11 and eight filled cones over a fire were "a
+        // mess"; the operator wants the bearing lines.
         try {
             final com.atakmap.android.maps.SensorFOV f =
                     SensorDetailHandler.addFovToMap(m,
                             c.pan,
                             still ? STILL_FOV_DEGREES : 0,  // wedge, or a bearing line
-                            still ? STILL_FOV_RANGE_M
-                                  : Math.min(rangeMeters,
-                                          SensorDetailHandler.MAX_SENSOR_RANGE),
+                            extent,
                             // Line: alpha 0, no fill, per the operator's CoT.
                             // Wedge: translucent white, like Quick Pic's.
                             still ? new float[] { 1f, 1f, 1f, 0.25f }
@@ -1062,20 +1157,17 @@ public final class CameraLayer {
                             // pan put the line back -- bearings floating over a map
                             // with no markers on it.
                             visible && isWithinZoom(),
-                            // Labels on, range rings off.
-                            //
-                            // With bLabels true and rangeLines 0, ATAK writes the
-                            // bearing along the line itself -- so the operator reads
-                            // the azimuth off the map instead of opening the sensor
-                            // pane to find it. The six-argument form we used before
-                            // hard-codes these to false and 100, which is why the line
-                            // was unlabeled and carried range rings nobody asked for.
+                            // Labels on: ATAK writes the bearing along the line
+                            // itself, so the operator reads the azimuth off the map
+                            // instead of opening the sensor pane to find it.
                             //
                             // The azimuth is true north as it arrives: ALERT's pan was
                             // verified against view.line at a median of 0.00 degrees
                             // across 1,298 cameras, so nothing is corrected here.
                             true,
-                            0.0);
+                            // Range-line SPACING, not a count, and 0 means 50 m
+                            // (see the marker metadata above): one line, at the end.
+                            extent);
             if (f == null) {
                 Log.w(TAG, "ATAK declined to create a SensorFOV for " + c.id);
                 return;
@@ -1506,6 +1598,134 @@ public final class CameraLayer {
                 (int) Math.round(c.pan));
         styleFov(m, c, true);
         m.refresh(mapView.getMapEventDispatcher(), null, getClass());
+    }
+
+    // ---- the Look At point ---------------------------------------------
+
+    private Marker lookAtMarker;
+
+    /** Told where the Suggest marker was dropped after a drag. */
+    public interface OnLookAtMoved {
+        void onLookAtMoved(GeoPoint p);
+    }
+
+    private OnLookAtMoved onLookAtMoved;
+
+    public void setOnLookAtMoved(OnLookAtMoved l) {
+        this.onLookAtMoved = l;
+    }
+
+    /**
+     * Press the Suggest marker and drag it; the suggestion recomputes where it
+     * lands (operator, 2026-10-11). ATAK's touch controller turns a press and
+     * scroll on an item with {@code drag} set into ITEM_DRAG_* events; this
+     * moves the marker along and reports the drop. The listener is on the
+     * dispatcher only while the marker exists.
+     */
+    private final com.atakmap.android.maps.MapEventDispatcher.MapEventDispatchListener
+            lookAtDrag = new com.atakmap.android.maps.MapEventDispatcher
+                    .MapEventDispatchListener() {
+        @Override
+        public void onMapEvent(com.atakmap.android.maps.MapEvent event) {
+            final Marker m = lookAtMarker;
+            if (m == null || event.getItem() != m)
+                return;
+            final android.graphics.PointF pf = event.getPointF();
+            if (pf == null)
+                return;
+            final GeoPoint gp = mapView.inverseWithElevation(pf.x, pf.y).get();
+            if (gp == null)
+                return;
+            m.setPoint(gp);
+            if (com.atakmap.android.maps.MapEvent.ITEM_DRAG_DROPPED
+                    .equals(event.getType()) && onLookAtMoved != null)
+                onLookAtMoved.onLookAtMoved(gp);
+        }
+    };
+
+    private void listenForDrag(boolean on) {
+        final com.atakmap.android.maps.MapEventDispatcher d =
+                mapView.getMapEventDispatcher();
+        for (String t : new String[] {
+                com.atakmap.android.maps.MapEvent.ITEM_DRAG_STARTED,
+                com.atakmap.android.maps.MapEvent.ITEM_DRAG_CONTINUED,
+                com.atakmap.android.maps.MapEvent.ITEM_DRAG_DROPPED }) {
+            if (on)
+                d.addMapEventListener(t, lookAtDrag);
+            else
+                d.removeMapEventListener(t, lookAtDrag);
+        }
+    }
+    private static final int HALO_COLOR = 0xFF00E5FF;
+
+    /**
+     * Mark the point Look At is judging cameras against, so the operator can
+     * see exactly where the tap landed (2026-10-11: "add a marker that gets
+     * placed and then cleared so you know exactly where I pressed"). ATAK's
+     * own reference-point icon, in the plugin's own group, never shared as
+     * CoT: it is this phone's question, not a map object for the fleet.
+     */
+    public void showLookAtMarker(GeoPoint p) {
+        if (p == null)
+            return;
+        try {
+            if (lookAtMarker == null) {
+                final Marker m = new Marker(p, UID_PREFIX + "lookat");
+                m.setType("b-m-p-s-p-i");
+                m.setTitle("Suggest");
+                m.setMetaString("callsign", "Suggest");
+                m.setMetaBoolean("nevercot", true);
+                m.setMetaBoolean("removable", false);
+                m.setMetaBoolean("movable", false);
+                m.setMetaBoolean("editable", false);
+                m.setMetaBoolean("drag", true);     // press and drag moves it
+                m.setMetaInteger("color", HALO_COLOR);
+                // Or ATAK's icon adapter swaps in its own glyph for the type and
+                // the composed one never shows: a tiny tinted crosshair was what
+                // drew, three builds running (2026-10-11).
+                m.setMetaBoolean("adapt_marker_icon", false);
+                // The word and a cyan target as one bitmap, sized from ATAK's own
+                // label font, AirAware's launch marker's way: a plain drawable
+                // drew tiny and the label small (operator, 2026-10-11).
+                final SuggestIcon.Composed composed =
+                        SuggestIcon.compose(pluginContext, "SUGGEST");
+                if (composed != null) {
+                    m.setIcon(new Icon.Builder()
+                            .setImageUri(Icon.STATE_DEFAULT, composed.uri)
+                            .setSize(composed.widthDp, composed.heightDp)
+                            .setAnchor(composed.anchorXDp, composed.anchorYDp)
+                            .setColor(Icon.STATE_DEFAULT, 0xFFFFFFFF)
+                            .build());
+                    m.setTextRenderFlag(Marker.TEXT_STATE_NEVER_SHOW);
+                } else {
+                    m.setIcon(icon(R.drawable.ic_suggest));
+                }
+                m.setZOrder(-1000);
+                lookAtMarker = m;
+                group.addItem(m);
+                listenForDrag(true);
+            } else {
+                lookAtMarker.setPoint(p);
+                if (lookAtMarker.getGroup() == null)
+                    group.addItem(lookAtMarker);
+            }
+            lookAtMarker.setVisible(true);
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "could not place the Suggest marker", e);
+        }
+    }
+
+    public void hideLookAtMarker() {
+        if (lookAtMarker == null)
+            return;
+        try {
+            listenForDrag(false);
+            if (lookAtMarker.getGroup() != null)
+                group.removeItem(lookAtMarker);
+        } catch (LinkageError | RuntimeException e) {
+            Log.w(TAG, "could not remove the Suggest marker", e);
+        }
+        lookAtMarker = null;
     }
 
     // ---- navigation -------------------------------------------------------
