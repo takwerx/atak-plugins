@@ -42,7 +42,7 @@
     <string name="mir_remember">Confirm ETAs of resources ordered.\nAct according to your level of training.\nBe Alert. Keep Calm. Think Clearly. Act Decisively.</string>
     <string name="mir_credit">Medical Incident Report from the NWCG Incident Response Pocket Guide (IRPG), PMS 461, January 2025. IWI is a reporting aid, not a substitute for the IRPG or your training. Saved on this phone as you type; no patient names.</string>
     <string name="script_how">Read it as written. Say the number and title of each section, then \"break\" and pause between sections (NWCG 6MFS). If the incident is life threatening, do not let documentation delay patient care.</string>
-    <string name="script_missing">Amber is what the report does not say yet. Fill it in on the Medical Incident Report, or say what you know.</string>
+    <string name="script_missing">Red in brackets is what the report does not say yet. Fill it in on the Medical Incident Report, or say what you know.</string>
     <string name="script_credit">From the NWCG Medical Incident Report, IRPG PMS 461, January 2025. A reporting aid, not a substitute for the IRPG or your training. Act according to your level of training.</string>
     <string name="script_nothing_yet">Nothing to follow up yet. As you learn more, fill in the patients, the evacuation plan, communications and contingency on the Medical Incident Report, and they appear here.</string>
     <string name="mir_header_short">Medical emergency: name the on-scene IC and announce \"Medical Emergency\" first. Do not let the report delay patient care.</string>

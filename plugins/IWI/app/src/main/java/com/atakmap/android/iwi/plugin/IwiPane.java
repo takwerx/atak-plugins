@@ -571,7 +571,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         if (more.isEmpty()) {
             scriptContainer.addView(note(ctx.getString(R.string.script_nothing_yet)));
         } else {
-            scriptContainer.addView(line(RadioScript.updateLead(state), 20, Color.WHITE));
+            scriptContainer.addView(quoted(RadioScript.updateLead(state)));
             anyMissing |= render(more);
         }
         finishScript(anyMissing);
@@ -588,7 +588,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         scriptContainer.removeAllViews();
         scriptContainer.addView(note(ctx.getString(R.string.script_how)));
         scriptContainer.addView(heading("Update: patient " + n));
-        scriptContainer.addView(line(RadioScript.updateLead(state), 20, Color.WHITE));
+        scriptContainer.addView(quoted(RadioScript.updateLead(state)));
         final RadioScript.Section one = RadioScript.patient(state, patient);
         one.after = null;
         final List<RadioScript.Section> list = new java.util.ArrayList<>();
@@ -599,26 +599,41 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     }
 
     /** @return whether anything in them is not filled in */
+    /**
+     * The IRPG's own pattern (operator, 2026-10-14): the step in yellow on its own
+     * line, then what is said, in quotes, in white, then BREAK in yellow. What is not
+     * filled in shows in red brackets where it would be said, so it never reads as a
+     * step title.
+     *
+     * @return whether anything in them is not filled in
+     */
     private boolean render(List<RadioScript.Section> sections) {
         boolean anyMissing = false;
         for (RadioScript.Section s : sections) {
-            final SpannableStringBuilder b = new SpannableStringBuilder();
-            final String title = s.number + ". " + s.title + ". ";
-            b.append(title);
-            b.setSpan(new StyleSpan(Typeface.BOLD), 0, title.length(),
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            final TextView title = line(s.number + ". " + s.title, 17, color(R.color.amber));
+            title.setTypeface(Typeface.DEFAULT_BOLD);
+            title.setPadding(0, dp(14), 0, 0);
+            scriptContainer.addView(title);
+
+            final SpannableStringBuilder b = new SpannableStringBuilder("\"");
             for (RadioScript.Part part : s.parts) {
                 final int start = b.length();
                 b.append(part.text);
                 if (part.missing) {
                     anyMissing = true;
-                    b.setSpan(new ForegroundColorSpan(color(R.color.amber)), start,
+                    b.setSpan(new ForegroundColorSpan(color(R.color.state_off)), start,
                             b.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
             }
-            final TextView t = line("", 20, Color.WHITE);
-            t.setText(b);
-            scriptContainer.addView(t);
+            // A section's words never start with a space, but they can end with one.
+            while (b.length() > 1 && b.charAt(b.length() - 1) == ' ')
+                b.delete(b.length() - 1, b.length());
+            b.append("\"");
+            final TextView said = line("", 20, Color.WHITE);
+            said.setText(b);
+            said.setPadding(0, dp(4), 0, dp(4));
+            scriptContainer.addView(said);
+
             if (s.after != null) {
                 final TextView br = line(s.after, 16, color(R.color.amber));
                 br.setTypeface(Typeface.DEFAULT_BOLD);
@@ -627,6 +642,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             }
         }
         return anyMissing;
+    }
+
+    /** The opening of a follow-up call, said, in quotes. */
+    private TextView quoted(String words) {
+        final TextView t = line("\"" + words + "\"", 20, Color.WHITE);
+        t.setPadding(0, dp(8), 0, dp(4));
+        return t;
     }
 
     private void finishScript(boolean anyMissing) {
