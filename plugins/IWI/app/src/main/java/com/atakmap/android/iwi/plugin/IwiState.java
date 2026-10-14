@@ -238,32 +238,14 @@ public final class IwiState implements RadioScript.Source {
                     }
                 }
                 p.updatedMs = o.optLong("updated", 0L);
-                p.tag = o.optString("tag", "");
-                p.tagN = o.optInt("tagN", 0);
                 out.add(p);
             }
         } catch (JSONException e) {
             Log.w("IWI-State", "the patient cards are unreadable", e);
         }
-        // Cards from before patients had names get one: their color, numbered in the
-        // order they were added.
-        for (Patient p : out) {
-            if (p.tag.isEmpty() || p.tagN <= 0) {
-                p.tag = p.color;
-                p.tagN = nextNumber(out, p.color);
-            }
-        }
         return out;
     }
 
-    /** The next number in a color: one past the highest that color has used. */
-    private static int nextNumber(List<Patient> list, String color) {
-        int max = 0;
-        for (Patient p : list)
-            if (color.equals(p.tag) && p.tagN > 0)
-                max = Math.max(max, p.tagN);
-        return max + 1;
-    }
 
     /** Most severe first, then in the order they were added. */
     public List<Patient> patientsBySeverity() {
@@ -290,8 +272,6 @@ public final class IwiState implements RadioScript.Source {
                     picks.put(e.getKey(), e.getValue());
                 o.put("v", picks);
                 o.put("updated", p.updatedMs);
-                o.put("tag", p.tag);
-                o.put("tagN", p.tagN);
                 a.put(o);
             }
         } catch (JSONException e) {
@@ -310,8 +290,6 @@ public final class IwiState implements RadioScript.Source {
         final Patient p = new Patient();
         p.n = max + 1;
         p.color = color;
-        p.tag = color;
-        p.tagN = nextNumber(list, color);
         list.add(p);
         save(list);
         return p;

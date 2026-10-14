@@ -677,7 +677,7 @@ final class ReportForm {
             } else {
                 value = "no notes yet";
             }
-            fold.label(p.labelNow(), value);
+            fold.label(p.label(), value);
             fold.complete(missing == 0, green());
         }
     }
