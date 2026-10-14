@@ -592,7 +592,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         scriptContainer.addView(quoted(RadioScript.updateLead(state)));
         scriptContainer.addView(action(RadioScript.answer(state)));
         final RadioScript.Section one = RadioScript.patient(state, patient);
-        one.after = RadioScript.acknowledge(state);
+        one.endsWith(RadioScript.acknowledge(state));
         final List<RadioScript.Section> list = new java.util.ArrayList<>();
         list.add(one);
         finishScript(render(list));

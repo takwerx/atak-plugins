@@ -66,13 +66,20 @@ public final class RadioScript {
         public final List<Lead> leads = new ArrayList<>();
         public final List<Part> parts = new ArrayList<>();
         /**
-         * "Break" is a word that is said (operator, 2026-10-14): it ends the section's
-         * words, in the same quote. NWCG 6MFS: "say 'break' and pause between the
-         * sections".
+         * "Break" is a word that is said, and it means "I am going to keep talking"
+         * (operator, 2026-10-14). So it ends a section's words, in the same quote, only
+         * when more follows after a pause; a section that ends the transmission says no
+         * break and waits.
          */
         public boolean saysBreak = true;
         /** What to do after saying it: pause, or wait for an answer. Never said. */
         public String after = "Pause.";
+
+        /** The transmission stops here: no break, and wait for this. */
+        void endsWith(String wait) {
+            saysBreak = false;
+            after = wait;
+        }
         /** How many of its fields are filled in. */
         public int filled;
         /** How many are not. */
@@ -122,7 +129,7 @@ public final class RadioScript {
         out.add(contact(s));
         out.add(status(s, coords));
         final Section five = resources(s);
-        five.after = acknowledge(s);
+        five.endsWith(acknowledge(s));
         out.add(five);
         return out;
     }
@@ -142,7 +149,7 @@ public final class RadioScript {
             if (x.hasContent())
                 out.add(x);
         if (!out.isEmpty())
-            out.get(out.size() - 1).after = acknowledge(s);
+            out.get(out.size() - 1).endsWith(acknowledge(s));
         return out;
     }
 
@@ -164,14 +171,19 @@ public final class RadioScript {
 
     // ---- the sections ----
 
-    /** 1. The IRPG's example: "Communications, Div. Alpha. Stand-by for Emergency Traffic." */
+    /**
+     * 1. The IRPG's example: "Communications, Div. Alpha. Stand-by for Emergency Traffic."
+     * No break after it: the reporter waits for the air to be cleared.
+     */
     public static Section contact(Source s) {
         final String to = calling(s);
         final Section one = new Section(1, "Contact Communications / Dispatch")
                 .say(to + ", ")
                 .field(s.callsign(), "your callsign: set it in ATAK")
                 .say(". Stand-by for Emergency Traffic.");
-        one.after = "Wait for " + to + " to answer.";
+        // No break: the reporter stops, and Communications clears the air and comes
+        // back (operator, 2026-10-14).
+        one.endsWith("Wait for " + to + " to clear the air and come back to you.");
         return one;
     }
 
