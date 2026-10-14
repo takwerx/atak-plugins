@@ -47,4 +47,7 @@
     <string name="script_nothing_yet">Nothing to follow up yet. As you learn more, fill in the patients, the evacuation plan, communications and contingency on the Medical Incident Report, and they appear here.</string>
     <string name="mir_header_short">Medical emergency: name the on-scene IC and announce \"Medical Emergency\" first. Do not let the report delay patient care.</string>
     <string name="mir_nature_guide">Pick everything that applies. Medical is an illness; Trauma is how they were hurt. Topics follow the IRPG Emergency Medical Care pages.</string>
+    <string name="confirm_note">The marker is on the map now. Check it is where the patient is.</string>
+    <string name="pick_again">Pick again</string>
+    <string name="cancel">Cancel</string>
 </resources>

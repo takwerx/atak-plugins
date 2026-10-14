@@ -75,6 +75,15 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         }
     };
 
+    /** A location set and shown on the map, waiting for Declare, Pick again or Cancel. */
+    private GeoPoint pendingPoint;
+    private String pendingSource;
+    private boolean pendingMove;
+    private final View confirmBlock;
+    private final TextView confirmTitle;
+    private final TextView confirmWhere;
+    private final Button confirmButton;
+
     /** True while the next tap on the map is the patient's location. */
     private boolean picking;
     /** Whether that pick moves a declared IWI rather than declaring one. */
@@ -98,6 +107,35 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         livePatients = root.findViewById(R.id.live_patients);
         moveButton = root.findViewById(R.id.btn_move);
         scriptContainer = root.findViewById(R.id.script_container);
+        confirmBlock = root.findViewById(R.id.confirm_block);
+        confirmTitle = root.findViewById(R.id.confirm_title);
+        confirmWhere = root.findViewById(R.id.confirm_where);
+        confirmButton = root.findViewById(R.id.btn_confirm);
+        confirmButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                confirmPending();
+            }
+        });
+        root.findViewById(R.id.btn_pick_again).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // The marker stays where it was until the next tap moves it.
+                final boolean move = pendingMove;
+                pendingPoint = null;
+                hideConfirm();
+                beginPick(move, false);
+            }
+        });
+        root.findViewById(R.id.btn_confirm_cancel).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        cancelPending();
+                        status(null);
+                        updateMain();
+                    }
+                });
 
         declareButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -201,10 +239,12 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     /** The pane closed: a pick in progress lets go of the map. */
     public void onClosed() {
         cancelPick();
+        cancelPending();
     }
 
     public void dispose() {
         cancelPick();
+        cancelPending();
         handler.removeCallbacks(tick);
     }
 
@@ -270,6 +310,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             moveButton.setText("Change location");
             moveButton.setTextColor(Color.WHITE);
         }
+        // While a location waits, the confirm above is the only Declare on the page.
+        final boolean waiting = pendingPoint != null;
+        declareButton.setVisibility(waiting ? View.GONE : View.VISIBLE);
+        moveButton.setEnabled(!waiting);
         liveBlock.setVisibility(live ? View.VISIBLE : View.GONE);
         updateLive();
         trauma.refresh();
@@ -313,7 +357,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         if (which == 0 && self != null)
-                            confirmAt(self, IwiState.SOURCE_SELF, move);
+                            placePending(self, IwiState.SOURCE_SELF, move);
                         else
                             beginPick(move, which == 0);
                     }
@@ -322,36 +366,60 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                 .show();
     }
 
-    private void confirmAt(final GeoPoint p, final String source, final boolean move) {
-        final String where = Coords.ddm(p.getLatitude(), p.getLongitude()) + " (DDM)\n"
-                + (IwiState.SOURCE_MAP.equals(source) ? "Set on the map" : "My Location");
-        final String message = move
-                ? where + "\n\nThe IWI marker moves here."
-                : where + "\n\nThis puts a CASEVAC marker on your map. It is not sent to "
-                        + "anyone until you send it from the marker.";
-        new AlertDialog.Builder(mapView.getContext())
-                .setTitle(move ? "Move the IWI here?" : "Declare the IWI here?")
-                .setMessage(message)
-                .setPositiveButton(move ? "Move IWI" : "Declare IWI",
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                if (move)
-                                    state.move(p, source);
-                                else
-                                    state.declare(p, source);
-                                if (!IwiMarker.write(state))
-                                    status("Could not put the IWI marker on the map.");
-                                else
-                                    status(move ? "IWI moved."
-                                            : "IWI declared. Fill in the Medical Incident "
-                                                    + "Report, then use the Radio Script.");
-                                form.refresh();
-                                updateMain();
-                            }
-                        })
-                .setNegativeButton("Cancel", null)
-                .show();
+    /**
+     * The point is chosen: the marker goes on the map now, and the pane asks whether
+     * this is the place, so nothing covers the map while the operator checks it.
+     */
+    private void placePending(GeoPoint p, String source, boolean move) {
+        pendingPoint = p;
+        pendingSource = source;
+        pendingMove = move;
+        IwiMarker.preview(p, move);
+        // A map tap is already in view; My Location may not be.
+        if (IwiState.SOURCE_SELF.equals(source))
+            mapView.getMapController().panTo(p, true);
+        confirmTitle.setText(move ? "Move the IWI here?" : "Declare the IWI here?");
+        confirmWhere.setText(Coords.ddm(p.getLatitude(), p.getLongitude()) + " (DDM)\n"
+                + (IwiState.SOURCE_MAP.equals(source) ? "Set on the map" : "My Location"));
+        confirmButton.setText(move ? "Move IWI" : "Declare IWI");
+        confirmBlock.setVisibility(View.VISIBLE);
+        status(null);
+        show(mainPage);
+        mainPage.scrollTo(0, 0);
+        updateMain();
+    }
+
+    private void confirmPending() {
+        final GeoPoint p = pendingPoint;
+        final String source = pendingSource;
+        final boolean move = pendingMove;
+        cancelPending();
+        if (p == null)
+            return;
+        if (move)
+            state.move(p, source);
+        else
+            state.declare(p, source);
+        if (!IwiMarker.write(state))
+            status("Could not put the IWI marker on the map.");
+        else
+            status(move ? "IWI moved."
+                    : "IWI declared. Fill in the Medical Incident Report, then use the "
+                            + "Radio Script.");
+        form.refresh();
+        updateMain();
+    }
+
+    /** Drop a location that was never confirmed, and its marker. */
+    private void cancelPending() {
+        pendingPoint = null;
+        pendingSource = null;
+        IwiMarker.removePreview(mapView);
+        hideConfirm();
+    }
+
+    private void hideConfirm() {
+        confirmBlock.setVisibility(View.GONE);
     }
 
     // ---- clear: two selections ----
@@ -409,9 +477,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
                         @Override
                         public void run() {
                             endPick();
-                            status(null);
-                            updateMain();
-                            confirmAt(chosen, IwiState.SOURCE_MAP, move);
+                            placePending(chosen, IwiState.SOURCE_MAP, move);
                         }
                     });
                 }
@@ -456,6 +522,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         if (!picking)
             return;
         endPick();
+        cancelPending();
         status(null);
         updateMain();
     }

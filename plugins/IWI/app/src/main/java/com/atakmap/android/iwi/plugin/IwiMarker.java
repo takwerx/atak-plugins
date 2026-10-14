@@ -126,6 +126,53 @@ public final class IwiMarker {
             d.setAttribute(name, value);
     }
 
+    /** The marker shown while a location waits to be confirmed. One at a time. */
+    public static final String PREVIEW_UID = "IWI-PREVIEW";
+    private static final String PREVIEW_TYPE = "b-m-p-s-m";
+    private static final String RED_ARGB = "-65536";
+
+    /**
+     * Show where the IWI would go before it is declared (operator, 2026-10-14: "it
+     * should put the marker immediately"). A red spot marker labeled as not declared,
+     * on this map only, with no {@code archive}, so ATAK does not keep it.
+     *
+     * <p>Not the CASEVAC type: ATAK raises its own CASEVAC alert for any
+     * {@code b-r-f-h-c} it is handed, whatever its details say ("MED.14.141920",
+     * s10-dev-1, 2026-10-14), and a location not yet chosen must not alert anyone.
+     * The red cross arrives when the IWI is declared.
+     */
+    public static void preview(GeoPoint p, boolean move) {
+        final CotEvent e = new CotEvent();
+        e.setVersion("2.0");
+        e.setUID(PREVIEW_UID);
+        e.setType(PREVIEW_TYPE);
+        e.setHow("h-g-i-g-o");
+        final CoordinatedTime now = new CoordinatedTime();
+        e.setTime(now);
+        e.setStart(now);
+        e.setStale(new CoordinatedTime(now.getMilliseconds() + 30L * 60L * 1000L));
+        e.setPoint(new CotPoint(p.getLatitude(), p.getLongitude(), CotPoint.UNKNOWN,
+                CotPoint.UNKNOWN, CotPoint.UNKNOWN));
+        final CotDetail detail = new CotDetail("detail");
+        final CotDetail contact = new CotDetail("contact");
+        contact.setAttribute("callsign", move ? "IWI new location" : "IWI (not declared)");
+        detail.addChild(contact);
+        // ATAK's red spot map marker, as its own spot-marker tool writes one.
+        final CotDetail color = new CotDetail("color");
+        color.setAttribute("argb", RED_ARGB);
+        detail.addChild(color);
+        final CotDetail icon = new CotDetail("usericon");
+        icon.setAttribute("iconsetpath", "COT_MAPPING_SPOTMAP/" + PREVIEW_TYPE + "/" + RED_ARGB);
+        detail.addChild(icon);
+        e.setDetail(detail);
+        if (e.isValid())
+            CotMapComponent.getInternalDispatcher().dispatch(e);
+    }
+
+    public static void removePreview(MapView mapView) {
+        remove(mapView, PREVIEW_UID);
+    }
+
     /** Take the marker off this map. Anyone it was sent to keeps theirs. */
     public static void remove(MapView mapView, String uid) {
         if (mapView == null || uid == null || uid.isEmpty())
