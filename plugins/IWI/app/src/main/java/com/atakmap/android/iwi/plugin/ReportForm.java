@@ -677,7 +677,7 @@ final class ReportForm {
             } else {
                 value = "no notes yet";
             }
-            fold.label("Patient " + p.n, value);
+            fold.label(p.labelNow(), value);
             fold.complete(missing == 0, green());
         }
     }
@@ -685,7 +685,8 @@ final class ReportForm {
     private void rebuildPatients() {
         patientsBox.removeAllViews();
         cards.clear();
-        final List<Patient> list = state.patients();
+        // Most severe first, Reds on top, so a new Red never lands under the Greens.
+        final List<Patient> list = state.patientsBySeverity();
         if (list.isEmpty()) {
             patientsBox.addView(guide("No patients yet. Count them in 2. Incident Status; "
                     + "each one gets a card here for its follow-ups."));
@@ -695,19 +696,19 @@ final class ReportForm {
             cards.put(p.n, new Card(p));
     }
 
+    /** A re-triage moves the card to its new place in the order. */
     private void patientRecolored() {
-        for (Patient p : state.patients()) {
-            final Card c = cards.get(p.n);
-            if (c != null)
-                c.color(p.color);
-        }
-        refreshCounts();
-        refreshHeads();
+        patientsChanged();
+    }
+
+    private String label(int n) {
+        final Patient p = state.patient(n);
+        return p == null ? "this patient" : p.label();
     }
 
     private void confirmRemove(final int n) {
         new AlertDialog.Builder(mapView.getContext())
-                .setTitle("Remove patient " + n + "?")
+                .setTitle("Remove " + label(n) + "?")
                 .setMessage("The card and its notes are erased. Use this for someone "
                         + "counted by mistake.")
                 .setPositiveButton("Remove patient", new DialogInterface.OnClickListener() {

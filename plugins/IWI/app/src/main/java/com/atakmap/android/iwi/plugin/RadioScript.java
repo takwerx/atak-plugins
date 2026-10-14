@@ -127,7 +127,11 @@ public final class RadioScript {
     public static List<Section> initial(Source s, String coords) {
         final List<Section> out = new ArrayList<>();
         out.add(contact(s));
-        out.add(status(s, coords));
+        // No break after the incident status (operator, 2026-10-14): the reporter stops
+        // and Communications acknowledges before the resources are called.
+        final Section two = status(s, coords);
+        two.endsWith(acknowledge(s));
+        out.add(two);
         final Section five = resources(s);
         five.endsWith(acknowledge(s));
         out.add(five);
@@ -251,14 +255,15 @@ public final class RadioScript {
     }
 
     /**
-     * 3, for one patient, IRPG p. 108 in its order: "Patient 2, Red priority. Responds
+     * 3, for one patient, IRPG p. 108 in its order: "Red 2. Responds
      * to voice, labored breathing, pulse present, bleeding controlled. Skin pale, cool.
      * Treatment: tourniquet and treated for shock."
      */
     public static Section patient(Source s, Patient p) {
         final Section three = new Section(3, "Initial Patient Assessment")
-                .say("Patient " + p.n + ", " + Patient.name(p.color)
-                        + (IwiState.BLACK.equals(p.color) ? ". " : " priority. "))
+                .say(p.recolored()
+                        ? p.labelNow() + (IwiState.BLACK.equals(p.color) ? ". " : " priority. ")
+                        : p.label() + ". ")
                 .field(capital(Vocab.LOC.spoken(p.get(Patient.LOC))), "consciousness")
                 .say(", ")
                 .field(Vocab.BREATHING.spoken(p.get(Patient.BREATHING)), "breathing")
@@ -396,7 +401,7 @@ public final class RadioScript {
         for (Patient p : bySeverity(s.patients())) {
             if (!p.hasNotes())
                 continue;
-            line(b, "3. Patient " + p.n + " " + Patient.name(p.color), said(patient(s, p)));
+            line(b, "3. " + p.labelNow(), said(patient(s, p)));
         }
         line(b, "4. Evacuation location", s.text(IwiState.EVAC_LOCATION));
         line(b, "Patient ETA", s.text(IwiState.ETA));

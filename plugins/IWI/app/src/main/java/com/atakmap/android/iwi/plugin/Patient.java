@@ -30,9 +30,31 @@ public final class Patient {
             LOC, BREATHING, PULSE, BLEEDING, SKIN_COLOR, SKIN_MOIST, SKIN_TEMP, PUPILS, REACTION
     };
 
+    /** Unique on this IWI, never shown: what a card's open/closed state is keyed by. */
     public int n;
     /** Stored colors are the triage keys: red, yellow, green, black. */
     public String color = IwiState.RED;
+    /**
+     * The color the patient was counted under and its number in that color: "Red 2".
+     * Kept for the patient's life, so the name dispatch wrote down stays right after a
+     * re-triage ("Red 2, now Yellow"), never renumbered (operator, 2026-10-14).
+     */
+    public String tag = IwiState.RED;
+    public int tagN = 1;
+
+    /** "Red 2". */
+    public String label() {
+        return name(tag) + " " + tagN;
+    }
+
+    public boolean recolored() {
+        return !color.equals(tag);
+    }
+
+    /** "Red 2", or "Red 2, now Yellow" after a re-triage. */
+    public String labelNow() {
+        return recolored() ? label() + ", now " + name(color) : label();
+    }
     /** When anything on the card last changed, or 0 when nothing has. */
     public long updatedMs;
     /** Each field's code, or for treatment a comma-separated list, or "" when not picked. */

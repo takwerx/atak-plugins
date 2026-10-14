@@ -588,7 +588,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             return;
         scriptContainer.removeAllViews();
         scriptContainer.addView(note(ctx.getString(R.string.script_how)));
-        scriptContainer.addView(heading("Update: patient " + n));
+        scriptContainer.addView(heading("Update: " + patient.labelNow()));
         scriptContainer.addView(quoted(RadioScript.updateLead(state)));
         scriptContainer.addView(action(RadioScript.answer(state)));
         final RadioScript.Section one = RadioScript.patient(state, patient);
