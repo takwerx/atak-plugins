@@ -346,6 +346,7 @@ public final class AtmospherePane {
     private final Button raingaugesToggle;
     private final TextView raingaugesStatus;
     private final LinearLayout raingaugesLegend;
+    private final Button raingaugesWindow;
     private RainGaugesOverlay raingauges;
     private boolean raingaugesOpen = true;
     private static final String PREF_FIREZONES_OPEN = "weather.firezones.open";
@@ -898,6 +899,7 @@ public final class AtmospherePane {
         raingaugesToggle = find(R.id.raingauges_toggle);
         raingaugesStatus = find(R.id.raingauges_status);
         raingaugesLegend = find(R.id.raingauges_legend);
+        raingaugesWindow = find(R.id.raingauges_window);
         firezonesSettings = find(R.id.firezones_settings);
         firezonesExpand = find(R.id.firezones_expand);
         firezonesToggle = find(R.id.firezones_toggle);
@@ -2442,14 +2444,19 @@ public final class AtmospherePane {
                 raingaugesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
             }
         });
-        raingaugesLegend.removeAllViews();
-        for (String[] row : RainGaugesOverlay.LEGEND)
-            raingaugesLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
         rainPage.setGauges(raingauges);
+        buildRainGaugesKey();
         raingauges.setDataListener(new Runnable() {
             @Override
             public void run() {
                 rainPage.onGaugesChanged();
+                buildRainGaugesKey();
+            }
+        });
+        raingaugesWindow.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                rainPage.chooseWindow();
             }
         });
         final View openList = find(R.id.raingauges_open_list);
@@ -2461,6 +2468,34 @@ public final class AtmospherePane {
                 }
             });
         updateLayerControls();
+    }
+
+    /** The run of days the gauges add up, on its button, and the key for it. */
+    private void buildRainGaugesKey() {
+        if (raingauges == null)
+            return;
+        raingaugesWindow.setText(pluginContext.getString(R.string.rain_window_button, raingauges.windowLabel()));
+        raingaugesLegend.removeAllViews();
+        for (String[] row : raingauges.legend())
+            raingaugesLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
+    }
+
+    /** The radar estimate before a moment: the day, the time, then 1, 24, 48 or 72 hours before. */
+    private void pickRainTotalsMoment(android.content.Context ctx) {
+        MomentPicker.pick(ctx, raintotals.moment(), com.atakmap.android.atmosphere.data.IemRadar.HOURS,
+                raintotals.beforeHours(), pluginContext.getString(R.string.rain_window_title), new MomentPicker.Words() {
+                    @Override
+                    public String of(int hours, long millis) {
+                        return RainGaugesOverlay.hoursWords(hours) + " before " + RainGaugesOverlay.momentName(
+                                com.atakmap.android.atmosphere.data.IemRadar.hourOf(millis));
+                    }
+                }, new MomentPicker.Picked() {
+                    @Override
+                    public void picked(long millis, int hours) {
+                        raintotals.setMoment(millis, hours);
+                        buildRainTotalsRow();
+                    }
+                });
     }
 
     /** Rain that fell: the window chips, the status line and the key in the NWS colors. */
@@ -2486,13 +2521,42 @@ public final class AtmospherePane {
         raintotalsLegend.removeAllViews();
         for (String[] row : raintotals.legend())
             raintotalsLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
-        chips(raintotalsWindowRow, RainTotalsOverlay.WINDOWS, raintotals.window(), new Picked() {
+        // One "Totals:" button, as on Rain Gauges: eight windows do not fit a chip row.
+        raintotalsWindowRow.removeAllViews();
+        final Button pick = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, raintotalsWindowRow, false);
+        pick.setText(pluginContext.getString(R.string.rain_window_button, raintotals.windowLabel()));
+        pick.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        pick.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void picked(int which) {
-                raintotals.setWindow(which);
-                buildRainTotalsRow();
+            public void onClick(View v) {
+                final android.content.Context ctx = com.atakmap.android.atmosphere.compat.MapCompat.atakContext();
+                if (ctx == null)
+                    return;
+                final String[] names = RainTotalsOverlay.WINDOWS.clone();
+                names[RainTotalsOverlay.WINDOW_BEFORE] = raintotals.window() == RainTotalsOverlay.WINDOW_BEFORE
+                        ? raintotals.windowLabel() + "…" : "Before a date and time…";
+                new android.app.AlertDialog.Builder(ctx)
+                        .setTitle(pluginContext.getString(R.string.rain_window_title))
+                        .setSingleChoiceItems(names, raintotals.window(),
+                                new android.content.DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(android.content.DialogInterface d, int which) {
+                                        d.dismiss();
+                                        if (which == RainTotalsOverlay.WINDOW_BEFORE) {
+                                            pickRainTotalsMoment(ctx);
+                                            return;
+                                        }
+                                        raintotals.setWindow(which);
+                                        buildRainTotalsRow();
+                                    }
+                                })
+                        .setNegativeButton(pluginContext.getString(R.string.close), null)
+                        .show();
             }
         });
+        raintotalsWindowRow.addView(pick);
         raintotalsTransparency.setMax(RainTotalsOverlay.MAX_TRANSPARENCY);
         raintotalsTransparency.setProgress(raintotals.transparency());
         raintotalsTransparencyLabel.setText(pluginContext.getString(R.string.raintotals_opacity_heading)

@@ -53,14 +53,27 @@ public final class EgressPolicy {
     public boolean isLayerEnabled(String layerId) {
         final SharedPreferences prefs = MapCompat.prefs();
         return prefs != null && layerId != null
-                && prefs.getBoolean(PREF_LAYER_PREFIX + layerId, false);
+                && prefs.getBoolean(key(layerId), false);
+    }
+
+    /**
+     * The stored allow for a layer. A layer that now asks servers its old allow did
+     * not name is asked again, once, under a new key: Rain Gauges and Rain Totals took
+     * on the Iowa Environmental Mesonet and the Regional Climate Centers in 0.15, and a
+     * phone that allowed them in 0.14 had never seen those named (security review,
+     * 2026-10-14).
+     */
+    private static String key(String layerId) {
+        if (layerId.equals("raingauges") || layerId.equals("raintotals"))
+            return PREF_LAYER_PREFIX + layerId + ".v2";
+        return PREF_LAYER_PREFIX + layerId;
     }
 
     public void setLayerEnabled(String layerId, boolean enabled) {
         final SharedPreferences prefs = MapCompat.prefs();
         if (prefs == null || layerId == null)
             return;
-        prefs.edit().putBoolean(PREF_LAYER_PREFIX + layerId, enabled).apply();
+        prefs.edit().putBoolean(key(layerId), enabled).apply();
     }
 
     /**
