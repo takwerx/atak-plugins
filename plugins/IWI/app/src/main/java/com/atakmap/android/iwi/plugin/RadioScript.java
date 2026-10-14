@@ -101,9 +101,14 @@ public final class RadioScript {
     public static List<Section> initial(Source s, String coords) {
         final List<Section> out = new ArrayList<>();
         out.add(contact(s));
-        out.add(status(s, coords));
+        final Section two = status(s, coords);
+        // Tell dispatch a request is coming, unless none is (operator, 2026-10-14).
+        if (!Vocab.parse(s.text(IwiState.RESOURCES), Vocab.RESOURCES).contains("none"))
+            two.after = "BREAK. Stand by for additional resources.";
+        out.add(two);
         final Section five = resources(s);
-        five.after = null;
+        // Every section ends on a break and a pause (NWCG 6MFS), the last one too.
+        five.after = "BREAK. Wait for " + calling(s) + " to acknowledge.";
         out.add(five);
         return out;
     }
