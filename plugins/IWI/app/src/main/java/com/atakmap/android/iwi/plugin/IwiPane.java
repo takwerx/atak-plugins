@@ -83,6 +83,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final TextView confirmTitle;
     private final TextView confirmWhere;
     private final Button confirmButton;
+    /** The big draggable marker shown while a location waits. */
+    private final PreviewMarker preview;
+    /** The report page's scroller, so the next step opens at the top. */
+    private final View reportScroll;
 
     /** True while the next tap on the map is the patient's location. */
     private boolean picking;
@@ -111,20 +115,26 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         confirmTitle = root.findViewById(R.id.confirm_title);
         confirmWhere = root.findViewById(R.id.confirm_where);
         confirmButton = root.findViewById(R.id.btn_confirm);
+        reportScroll = (View) root.findViewById(R.id.report_container).getParent();
+        preview = new PreviewMarker(mapView, new PreviewMarker.OnMoved() {
+            @Override
+            public void onMoved(final GeoPoint p) {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (pendingPoint == null)
+                            return;
+                        pendingPoint = p;
+                        pendingSource = IwiState.SOURCE_MAP;
+                        showWhere();
+                    }
+                });
+            }
+        });
         confirmButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 confirmPending();
-            }
-        });
-        root.findViewById(R.id.btn_pick_again).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // The marker stays where it was until the next tap moves it.
-                final boolean move = pendingMove;
-                pendingPoint = null;
-                hideConfirm();
-                beginPick(move, false);
             }
         });
         root.findViewById(R.id.btn_confirm_cancel).setOnClickListener(
@@ -374,19 +384,27 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         pendingPoint = p;
         pendingSource = source;
         pendingMove = move;
-        IwiMarker.preview(p, move);
+        preview.show(p, move ? "IWI new location" : "IWI (not declared)");
         // A map tap is already in view; My Location may not be.
         if (IwiState.SOURCE_SELF.equals(source))
             mapView.getMapController().panTo(p, true);
         confirmTitle.setText(move ? "Move the IWI here?" : "Declare the IWI here?");
-        confirmWhere.setText(Coords.ddm(p.getLatitude(), p.getLongitude()) + " (DDM)\n"
-                + (IwiState.SOURCE_MAP.equals(source) ? "Set on the map" : "My Location"));
+        showWhere();
         confirmButton.setText(move ? "Move IWI" : "Declare IWI");
         confirmBlock.setVisibility(View.VISIBLE);
         status(null);
         show(mainPage);
         mainPage.scrollTo(0, 0);
         updateMain();
+    }
+
+    private void showWhere() {
+        final GeoPoint p = pendingPoint;
+        if (p == null)
+            return;
+        confirmWhere.setText(Coords.ddm(p.getLatitude(), p.getLongitude()) + " (DDM)\n"
+                + (IwiState.SOURCE_MAP.equals(pendingSource) ? "Set on the map"
+                        : "My Location"));
     }
 
     private void confirmPending() {
@@ -403,18 +421,28 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         if (!IwiMarker.write(state))
             status("Could not put the IWI marker on the map.");
         else
-            status(move ? "IWI moved."
-                    : "IWI declared. Fill in the Medical Incident Report, then use the "
-                            + "Radio Script.");
+            status(move ? "IWI moved." : null);
         form.refresh();
         updateMain();
+        if (!move) {
+            // Declared: straight on to the initial report.
+            form.openInitial();
+            show(reportPage);
+            // After layout, so item 2's position is known: it opens at the top.
+            reportScroll.post(new Runnable() {
+                @Override
+                public void run() {
+                    reportScroll.scrollTo(0, form.initialTop());
+                }
+            });
+        }
     }
 
     /** Drop a location that was never confirmed, and its marker. */
     private void cancelPending() {
         pendingPoint = null;
         pendingSource = null;
-        IwiMarker.removePreview(mapView);
+        preview.hide();
         hideConfirm();
     }
 

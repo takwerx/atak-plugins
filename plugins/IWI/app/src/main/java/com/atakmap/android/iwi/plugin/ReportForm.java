@@ -127,6 +127,17 @@ final class ReportForm {
         refresh();
     }
 
+    /** Declared: the next step is the initial report, item 2 open. */
+    void openInitial() {
+        status.setOpen(true);
+    }
+
+    /** Where item 2's row starts on the page, to scroll it to the top. */
+    int initialTop() {
+        final View row = (View) status.head.getParent();
+        return row == null ? 0 : row.getTop();
+    }
+
     /** Put what is saved back in every box and every card, after a Clear or a reopen. */
     void refresh() {
         binding = true;

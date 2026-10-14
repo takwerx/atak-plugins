@@ -86,15 +86,6 @@
                         android:textColor="@color/state_on" />
 
                     <Button
-                        android:id="@+id/btn_pick_again"
-                        style="@style/TakwerxButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="6dp"
-                        android:text="@string/pick_again" />
-
-                    <Button
                         android:id="@+id/btn_confirm_cancel"
                         style="@style/TakwerxButton"
                         android:layout_width="0dp"

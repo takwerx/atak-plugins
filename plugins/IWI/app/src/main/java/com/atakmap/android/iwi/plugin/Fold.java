@@ -61,6 +61,13 @@ final class Fold {
         return open;
     }
 
+    /** Open or close it from code, remembered like a tap. */
+    void setOpen(boolean on) {
+        open = on;
+        prefs.edit().putBoolean(pref, open).apply();
+        show();
+    }
+
     private void show() {
         chevron.setRotation(open ? 180f : 0f);
         body.setVisibility(open ? View.VISIBLE : View.GONE);
