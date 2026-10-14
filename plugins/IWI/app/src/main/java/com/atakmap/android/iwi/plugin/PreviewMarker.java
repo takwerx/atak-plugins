@@ -38,7 +38,7 @@ final class PreviewMarker {
 
     private static final String TAG = "IWI-Preview";
     private static final String GROUP = "IWI";
-    private static final String UID = "IWI-PREVIEW";
+    static final String UID = "IWI-PREVIEW";
     /** Bump when the drawing changes; a stale file would be served under the same name. */
     private static final int VERSION = 1;
     private static final int RED = 0xFFFF3B30;
