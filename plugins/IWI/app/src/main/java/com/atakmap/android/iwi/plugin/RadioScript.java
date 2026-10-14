@@ -166,7 +166,7 @@ public final class RadioScript {
     public static Section status(Source s, String coords) {
         final Section two = new Section(2, "Incident Status").say("I have ")
                 .field(triage(s), "how many patients, and how bad").say(", ")
-                .field(lowerFirst(s.text(IwiState.NATURE)), "what happened")
+                .field(Nature.said(s.text(IwiState.NATURE)), "what happened: pick from the list")
                 .say(". Requesting ")
                 .field(evac(s), "evacuation request").say(" to ")
                 .field(s.text(IwiState.LOCATION), "descriptive location").say(" at ")
@@ -249,7 +249,7 @@ public final class RadioScript {
     public static String remarks(Source s, String coords) {
         final StringBuilder b = new StringBuilder();
         line(b, "2. Patients", triage(s));
-        line(b, "Nature", s.text(IwiState.NATURE));
+        line(b, "Nature", Nature.said(s.text(IwiState.NATURE)));
         line(b, "Evacuation request", evac(s));
         line(b, "Location", join(s.text(IwiState.LOCATION), coords));
         line(b, "Incident", s.text(IwiState.INCIDENT));

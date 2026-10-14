@@ -60,6 +60,7 @@ final class ReportForm {
     private final Map<String, EditText> fields = new HashMap<>();
     private final Map<String, TextView> counts = new HashMap<>();
     private final Map<Integer, Card> cards = new LinkedHashMap<>();
+    private final Map<String, Button> natureTiles = new HashMap<>();
 
     private Fold contact;
     private Fold status;
@@ -147,9 +148,10 @@ final class ReportForm {
         mb.addView(guide(s(R.string.mir_yellow)));
         mb.addView(guide(s(R.string.mir_green)));
         mb.addView(guide(s(R.string.mir_black)));
-        field(body, IwiState.NATURE, "Nature of Injury or Illness and Mechanism of Injury",
-                "Brief Summary of Injury or Illness (Ex: Unconscious, Struck by Falling Tree)",
-                true);
+        body.addView(label("Nature of Injury or Illness and Mechanism of Injury"));
+        body.addView(guide(s(R.string.mir_nature_guide)));
+        natureGroup(body, "Medical", Nature.MEDICAL);
+        natureGroup(body, "Trauma", Nature.TRAUMA);
         body.addView(label("Evacuation Request"));
         evacButton = button("", new View.OnClickListener() {
             @Override
@@ -299,6 +301,9 @@ final class ReportForm {
         radioContactBlock.setVisibility(weight ? View.VISIBLE : View.GONE);
         for (Card c : cards.values())
             c.weightBlock.setVisibility(weight ? View.VISIBLE : View.GONE);
+        final java.util.Set<String> picked = Nature.parse(state.text(IwiState.NATURE));
+        for (Map.Entry<String, Button> t : natureTiles.entrySet())
+            t.getValue().setTextColor(picked.contains(t.getKey()) ? green() : Color.WHITE);
         final String role = state.text(IwiState.CARE_ROLE);
         roleParamedic.setTextColor(IwiState.ROLE_PARAMEDIC.equals(role) ? green() : Color.WHITE);
         roleEmt.setTextColor(IwiState.ROLE_EMT.equals(role) ? green() : Color.WHITE);
@@ -547,6 +552,34 @@ final class ReportForm {
         cell.addView(cap);
         cell.addView(edit(IwiState.commsKey(row, col), "", false));
         return cell;
+    }
+
+    /** A small heading and its tiles, two across, any number picked. */
+    private void natureGroup(LinearLayout into, String name, String[] codes) {
+        final TextView h = label(name);
+        h.setTextColor(color(R.color.guide_grey));
+        into.addView(h);
+        LinearLayout r = null;
+        for (int i = 0; i < codes.length; i++) {
+            if (i % 2 == 0) {
+                r = row();
+                final LinearLayout.LayoutParams lp = full();
+                lp.topMargin = dp(4);
+                into.addView(r, lp);
+            }
+            final String code = codes[i];
+            final Button t = button(Nature.label(code), new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    state.set(IwiState.NATURE,
+                            Nature.toggle(state.text(IwiState.NATURE), code));
+                    refreshChoices();
+                    refreshHeads();
+                }
+            });
+            natureTiles.put(code, t);
+            r.addView(t, weighted(i % 2 == 0 ? 0 : dp(6)));
+        }
     }
 
     private void pickEvac() {

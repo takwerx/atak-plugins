@@ -104,7 +104,7 @@ public final class IwiMarker {
         iwi.setAttribute("triage_yellow", Integer.toString(yellow));
         iwi.setAttribute("triage_green", Integer.toString(green));
         iwi.setAttribute("triage_black", Integer.toString(s.count(IwiState.BLACK)));
-        put(iwi, "nature", s.text(IwiState.NATURE));
+        put(iwi, "nature", Nature.said(s.text(IwiState.NATURE)));
         put(iwi, "evac_request", evac);
         put(iwi, "location_description", s.text(IwiState.LOCATION));
         put(iwi, "incident_name", s.text(IwiState.INCIDENT));

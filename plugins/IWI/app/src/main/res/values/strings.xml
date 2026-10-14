@@ -23,7 +23,7 @@
     <string name="mir_red">RED / PRIORITY 1 Life or limb threatening injury or illness. Evacuation need is IMMEDIATE. Ex: Unconscious, difficulty breathing, bleeding severely, 2° – 3° burns more than 4 palm sizes, heat stroke, disoriented.</string>
     <string name="mir_yellow">YELLOW / PRIORITY 2 Serious injury or illness. Evacuation may be DELAYED if necessary. Ex: Significant trauma, unable to walk, 2° – 3° burns not more than 1-3 palm sizes.</string>
     <string name="mir_green">GREEN / PRIORITY 3 Minor injury or illness. Non-Emergency transport. Ex: Sprains, strains, minor heat-related illness.</string>
-    <string name="mir_black">BLACK is a count for a multi-casualty incident only. The IRPG form has no Black row; IWI keeps it so the count can be said.</string>
+    <string name="mir_black">BLACK / Deceased or Dying: Dead or with injuries not compatible with life. No respirations after repositioning airway. (IRPG p. 116, Multi-Casualty Triage System)</string>
     <string name="mir_evac_pick">Tap to pick</string>
     <string name="mir_shorthaul_guide">For Short-Haul or Hoist (IRPG p. 119): \"Include the patient weight and name of on-scene radio contact.\"</string>
     <string name="mir_latlong_none">Lat. / Long. (WGS84): set when you declare the IWI.</string>
@@ -46,4 +46,5 @@
     <string name="script_credit">From the NWCG Medical Incident Report, IRPG PMS 461, January 2025. A reporting aid, not a substitute for the IRPG or your training. Act according to your level of training.</string>
     <string name="script_nothing_yet">Nothing to follow up yet. As you learn more, fill in the patients, the evacuation plan, communications and contingency on the Medical Incident Report, and they appear here.</string>
     <string name="mir_header_short">Medical emergency: name the on-scene IC and announce \"Medical Emergency\" first. Do not let the report delay patient care.</string>
+    <string name="mir_nature_guide">Pick everything that applies. Medical is an illness; Trauma is how they were hurt. Topics follow the IRPG Emergency Medical Care pages.</string>
 </resources>
