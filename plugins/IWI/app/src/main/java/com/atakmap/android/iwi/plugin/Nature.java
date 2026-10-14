@@ -20,7 +20,7 @@ import java.util.Set;
 public final class Nature {
 
     public static final String[] MEDICAL = {
-            "chest_pain", "allergic", "respiratory", "heat", "unconscious", "seizure",
+            "cardiac_arrest", "chest_pain", "allergic", "respiratory", "heat", "unconscious", "seizure",
             "diabetic", "other_medical"
     };
     public static final String[] TRAUMA = {
@@ -34,6 +34,7 @@ public final class Nature {
     /** The tile's label. */
     public static String label(String code) {
         switch (code) {
+            case "cardiac_arrest": return "Cardiac arrest";
             case "chest_pain": return "Chest pain";
             case "allergic": return "Allergic reaction";
             case "respiratory": return "Respiratory";
@@ -57,6 +58,7 @@ public final class Nature {
     /** What is said on the radio for it. */
     public static String spoken(String code) {
         switch (code) {
+            case "cardiac_arrest": return "cardiac arrest";
             case "chest_pain": return "chest pain";
             case "allergic": return "allergic reaction";
             case "respiratory": return "difficulty breathing";

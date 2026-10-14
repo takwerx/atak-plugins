@@ -61,6 +61,9 @@ final class ReportForm {
     private final Map<String, TextView> counts = new HashMap<>();
     private final Map<Integer, Card> cards = new LinkedHashMap<>();
     private final Map<String, Button> natureTiles = new HashMap<>();
+    /** Medical and Trauma: each a drop-down of its tiles, keyed by its name. */
+    private final Map<String, Fold> natureFolds = new LinkedHashMap<>();
+    private final Map<String, String[]> natureCodes = new HashMap<>();
 
     private Fold contact;
     private Fold status;
@@ -105,8 +108,8 @@ final class ReportForm {
         final GeoPoint p = state.isLive() ? state.point() : null;
         latLong.setText(p == null
                 ? s(R.string.mir_latlong_none)
-                : "Lat. / Long.: " + Coords.ddm(p.getLatitude(), p.getLongitude())
-                        + " (DDM, WGS84)");
+                : Coords.ddm(p.getLatitude(), p.getLongitude()) + " (DDM, WGS84)");
+        latLong.setTextColor(p == null ? color(R.color.amber) : green());
         rebuildPatients();
         refreshChoices();
         refreshCounts();
@@ -150,8 +153,8 @@ final class ReportForm {
         mb.addView(guide(s(R.string.mir_black)));
         body.addView(label("Nature of Injury or Illness and Mechanism of Injury"));
         body.addView(guide(s(R.string.mir_nature_guide)));
-        natureGroup(body, "Medical", Nature.MEDICAL);
-        natureGroup(body, "Trauma", Nature.TRAUMA);
+        natureGroup(body, "Medical", Nature.MEDICAL, "iwi.fold.medical");
+        natureGroup(body, "Trauma", Nature.TRAUMA, "iwi.fold.trauma_list");
         body.addView(label("Evacuation Request"));
         evacButton = button("", new View.OnClickListener() {
             @Override
@@ -169,9 +172,15 @@ final class ReportForm {
         field((LinearLayout) radioContactBlock, IwiState.RADIO_CONTACT,
                 "On-scene radio contact", "Ex: TFLD Jones", false);
         body.addView(radioContactBlock);
-        field(body, IwiState.LOCATION, "Patient Location", "Descriptive Location", false);
-        latLong = guide("");
+        // The patient is where the IWI marker is: shown, not asked for.
+        body.addView(label("Patient Location"));
+        latLong = new TextView(ctx);
+        latLong.setTextSize(16);
+        latLong.setTextColor(Color.WHITE);
+        latLong.setPadding(0, dp(2), 0, dp(2));
         body.addView(latLong);
+        body.addView(guide("Where the IWI marker is. Change location on the main page moves it."));
+        field(body, IwiState.LOCATION, "Landmark (optional)", "Ex: Forest Road 1", false);
         field(body, IwiState.INCIDENT, "Incident Name",
                 "Geographic Name + Medical (Ex: Trout Meadow Medical)", false);
         field(body, IwiState.IC, "On-Scene Incident Commander",
@@ -304,6 +313,16 @@ final class ReportForm {
         final java.util.Set<String> picked = Nature.parse(state.text(IwiState.NATURE));
         for (Map.Entry<String, Button> t : natureTiles.entrySet())
             t.getValue().setTextColor(picked.contains(t.getKey()) ? green() : Color.WHITE);
+        // A group's head is cyan, the color of a section change, until something in it
+        // is picked; then green with what was picked, so a closed row still says it.
+        for (Map.Entry<String, Fold> g : natureFolds.entrySet()) {
+            final StringBuilder which = new StringBuilder();
+            for (String code : natureCodes.get(g.getKey()))
+                if (picked.contains(code))
+                    which.append(which.length() > 0 ? ", " : "").append(Nature.label(code));
+            g.getValue().label(g.getKey(), which.length() == 0 ? null : which.toString());
+            g.getValue().head.setTextColor(which.length() == 0 ? cyan() : green());
+        }
         final String role = state.text(IwiState.CARE_ROLE);
         roleParamedic.setTextColor(IwiState.ROLE_PARAMEDIC.equals(role) ? green() : Color.WHITE);
         roleEmt.setTextColor(IwiState.ROLE_EMT.equals(role) ? green() : Color.WHITE);
@@ -554,11 +573,15 @@ final class ReportForm {
         return cell;
     }
 
-    /** A small heading and its tiles, two across, any number picked. */
-    private void natureGroup(LinearLayout into, String name, String[] codes) {
-        final TextView h = label(name);
-        h.setTextColor(color(R.color.guide_grey));
-        into.addView(h);
+    /**
+     * One group of tiles as a drop-down row, so a crew with a trauma patient never
+     * scrolls past the medical list. Two across, any number picked.
+     */
+    private void natureGroup(LinearLayout parent, String name, String[] codes, String pref) {
+        final Fold group = section(parent, pref);
+        natureFolds.put(name, group);
+        natureCodes.put(name, codes);
+        final LinearLayout into = body(group);
         LinearLayout r = null;
         for (int i = 0; i < codes.length; i++) {
             if (i % 2 == 0) {
@@ -779,6 +802,10 @@ final class ReportForm {
         if (IwiState.GREEN.equals(c))
             return color(R.color.triage_green);
         return Color.WHITE;
+    }
+
+    private int cyan() {
+        return 0xFF00E5FF;
     }
 
     private int green() {

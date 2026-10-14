@@ -26,7 +26,7 @@
     <string name="mir_black">BLACK / Deceased or Dying: Dead or with injuries not compatible with life. No respirations after repositioning airway. (IRPG p. 116, Multi-Casualty Triage System)</string>
     <string name="mir_evac_pick">Tap to pick</string>
     <string name="mir_shorthaul_guide">For Short-Haul or Hoist (IRPG p. 119): \"Include the patient weight and name of on-scene radio contact.\"</string>
-    <string name="mir_latlong_none">Lat. / Long. (WGS84): set when you declare the IWI.</string>
+    <string name="mir_latlong_none">Not set yet. Declare the IWI on the main page and its marker is the patient location.</string>
     <string name="mir_care_guide">Use the terms Paramedic or EMT with the provider\'s last name in \"Patient Care.\" Do not use EMT to describe a Paramedic or the ambiguous term Medic. (NWCG 6MFS)</string>
     <string name="mir_3_title">3. Initial Patient Assessment</string>
     <string name="mir_3_guide">Complete this section for each patient as applicable (start with the most severe patient).</string>

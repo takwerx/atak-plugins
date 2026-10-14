@@ -168,9 +168,13 @@ public final class RadioScript {
                 .field(triage(s), "how many patients, and how bad").say(", ")
                 .field(Nature.said(s.text(IwiState.NATURE)), "what happened: pick from the list")
                 .say(". Requesting ")
-                .field(evac(s), "evacuation request").say(" to ")
-                .field(s.text(IwiState.LOCATION), "descriptive location").say(" at ")
-                .field(coords, "Lat. / Long.: declare the IWI").say(". This will be the ")
+                .field(evac(s), "evacuation request").say(" to ");
+        // The patient is where the IWI marker is. A landmark helps dispatch when there
+        // is one, and is never asked for (operator, 2026-10-14).
+        final String landmark = s.text(IwiState.LOCATION);
+        if (!landmark.isEmpty())
+            two.say(landmark + " at ");
+        two.field(coords, "patient location: declare the IWI").say(". This will be the ")
                 .field(s.text(IwiState.INCIDENT), "incident name, Ex: Trout Meadow Medical")
                 .say(", IC is ")
                 .field(s.text(IwiState.IC), "on-scene IC").say(". ")
