@@ -505,7 +505,8 @@ final class ReportForm {
 
     private final class Card {
         final int n;
-        final TextView chip;
+        /** The patient's triage color as a filled square, no word (operator, 2026-10-14). */
+        final View chip;
         final Fold fold;
         final Map<String, Button> colorTiles = new HashMap<>();
         final List<TileGroup> groups = new ArrayList<>();
@@ -516,12 +517,10 @@ final class ReportForm {
             this.n = p.n;
             final LinearLayout headRow = row();
             headRow.setGravity(Gravity.CENTER_VERTICAL);
-            chip = new TextView(ctx);
-            chip.setTextSize(15);
-            chip.setTypeface(Typeface.DEFAULT_BOLD);
-            chip.setGravity(Gravity.CENTER);
-            headRow.addView(chip, new LinearLayout.LayoutParams(dp(76),
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            chip = new View(ctx);
+            final LinearLayout.LayoutParams sq = new LinearLayout.LayoutParams(dp(36), dp(36));
+            sq.rightMargin = dp(8);
+            headRow.addView(chip, sq);
             final Button head = stepHead();
             headRow.addView(head, weighted(0));
             final ImageButton chev = chevron();
@@ -660,24 +659,47 @@ final class ReportForm {
         }
 
         void color(String c) {
-            chip.setText(Patient.name(c).toUpperCase(java.util.Locale.US));
-            chip.setTextColor(triage(c));
+            final android.graphics.drawable.GradientDrawable box =
+                    new android.graphics.drawable.GradientDrawable();
+            box.setCornerRadius(dp(4));
+            if (IwiState.BLACK.equals(c)) {
+                // Black on a black pane: filled, with a white edge so it is seen.
+                box.setColor(Color.BLACK);
+                box.setStroke(dp(2), Color.WHITE);
+            } else {
+                box.setColor(triage(c));
+            }
+            chip.setBackground(box);
+            chip.setContentDescription(Patient.name(c));
             for (Map.Entry<String, Button> t : colorTiles.entrySet())
                 t.getValue().setTextColor(t.getKey().equals(c) ? triage(c) : Color.WHITE);
         }
 
-        /** "updated 1:45 PM", with what is still missing until there is nothing. */
+        /**
+         * Two lines, so nothing is cut off with dots (operator, 2026-10-14): the
+         * patient's number, then "updated 14:45" and, in amber, how many of its fields
+         * are still to fill in. Green when there are none.
+         */
         void head(Patient p, int missing) {
-            String value;
-            if (p.updatedMs > 0 && p.hasNotes()) {
-                value = "updated " + android.text.format.DateFormat.getTimeFormat(ctx)
-                        .format(new Date(p.updatedMs));
-                if (missing > 0)
-                    value += ", " + missing + " to fill in";
-            } else {
-                value = "no notes yet";
+            final android.text.SpannableStringBuilder b =
+                    new android.text.SpannableStringBuilder(p.label());
+            b.setSpan(new android.text.style.StyleSpan(Typeface.BOLD), 0, b.length(),
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            b.append('\n');
+            final int second = b.length();
+            b.append(p.updatedMs > 0 && p.hasNotes()
+                    ? "updated " + Clock.hhmm(p.updatedMs) : "no notes yet");
+            if (missing > 0) {
+                b.append(", ");
+                final int left = b.length();
+                b.append(missing + " to fill in");
+                b.setSpan(new android.text.style.ForegroundColorSpan(
+                        ReportForm.this.color(R.color.amber)), left, b.length(),
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
-            fold.label(p.label(), value);
+            b.setSpan(new android.text.style.RelativeSizeSpan(0.85f), second, b.length(),
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            fold.head.setText(b);
             fold.complete(missing == 0, green());
         }
     }
@@ -779,6 +801,9 @@ final class ReportForm {
     private Button stepHead() {
         final Button b = button("", null);
         b.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        // Two lines rather than a value cut off with dots (operator, 2026-10-14).
+        b.setSingleLine(false);
+        b.setMaxLines(2);
         return b;
     }
 

@@ -333,8 +333,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         if (!state.isLive())
             return;
         final long at = state.declaredMs();
-        final String clock = android.text.format.DateFormat.getTimeFormat(ctx)
-                .format(new Date(at));
+        final String clock = Clock.hhmm(at);
         liveTime.setText("Declared " + clock + ", " + ago(System.currentTimeMillis() - at));
         final GeoPoint p = state.point();
         liveWhere.setText(Coords.ddm(p.getLatitude(), p.getLongitude()) + "\n"
