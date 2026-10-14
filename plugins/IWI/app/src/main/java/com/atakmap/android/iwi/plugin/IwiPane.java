@@ -572,6 +572,7 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             scriptContainer.addView(note(ctx.getString(R.string.script_nothing_yet)));
         } else {
             scriptContainer.addView(quoted(RadioScript.updateLead(state)));
+            scriptContainer.addView(action(RadioScript.answer(state)));
             anyMissing |= render(more);
         }
         finishScript(anyMissing);
@@ -589,8 +590,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         scriptContainer.addView(note(ctx.getString(R.string.script_how)));
         scriptContainer.addView(heading("Update: patient " + n));
         scriptContainer.addView(quoted(RadioScript.updateLead(state)));
+        scriptContainer.addView(action(RadioScript.answer(state)));
         final RadioScript.Section one = RadioScript.patient(state, patient);
-        one.after = null;
+        one.after = RadioScript.acknowledge(state);
         final List<RadioScript.Section> list = new java.util.ArrayList<>();
         list.add(one);
         finishScript(render(list));
@@ -601,9 +603,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     /** @return whether anything in them is not filled in */
     /**
      * The IRPG's own pattern (operator, 2026-10-14): the step in yellow on its own
-     * line, then what is said, in quotes, in white, then BREAK in yellow. What is not
-     * filled in shows in red brackets where it would be said, so it never reads as a
-     * step title.
+     * line, then what is said, in quotes, in white, "Break" included because it is a
+     * word that is said, then what to do in yellow: pause, or wait for an answer.
+     * What is not filled in shows in red brackets where it would be said.
      *
      * @return whether anything in them is not filled in
      */
@@ -614,6 +616,11 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             title.setTypeface(Typeface.DEFAULT_BOLD);
             title.setPadding(0, dp(14), 0, 0);
             scriptContainer.addView(title);
+
+            for (RadioScript.Lead lead : s.leads) {
+                scriptContainer.addView(quoted(lead.said));
+                scriptContainer.addView(action(lead.then));
+            }
 
             final SpannableStringBuilder b = new SpannableStringBuilder("\"");
             for (RadioScript.Part part : s.parts) {
@@ -628,20 +635,26 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
             // A section's words never start with a space, but they can end with one.
             while (b.length() > 1 && b.charAt(b.length() - 1) == ' ')
                 b.delete(b.length() - 1, b.length());
+            if (s.saysBreak)
+                b.append(" Break.");
             b.append("\"");
             final TextView said = line("", 20, Color.WHITE);
             said.setText(b);
             said.setPadding(0, dp(4), 0, dp(4));
             scriptContainer.addView(said);
 
-            if (s.after != null) {
-                final TextView br = line(s.after, 16, color(R.color.amber));
-                br.setTypeface(Typeface.DEFAULT_BOLD);
-                br.setPadding(0, 0, 0, 0);
-                scriptContainer.addView(br);
-            }
+            if (s.after != null)
+                scriptContainer.addView(action(s.after));
         }
         return anyMissing;
+    }
+
+    /** What to do, not say: pause, or wait for an answer. Yellow. */
+    private TextView action(String what) {
+        final TextView t = line(what, 16, color(R.color.amber));
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setPadding(0, 0, 0, 0);
+        return t;
     }
 
     /** The opening of a follow-up call, said, in quotes. */

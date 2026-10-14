@@ -48,12 +48,31 @@ public final class RadioScript {
         }
     }
 
+    /** Something said before a section's main words, and what to do after saying it. */
+    public static final class Lead {
+        public final String said;
+        public final String then;
+
+        Lead(String said, String then) {
+            this.said = said;
+            this.then = then;
+        }
+    }
+
     public static final class Section {
         public final int number;
         public final String title;
+        /** Said first, each followed by a pause or a wait: item 5's call back. */
+        public final List<Lead> leads = new ArrayList<>();
         public final List<Part> parts = new ArrayList<>();
-        /** What to say or do after it: "BREAK", or null for the last. */
-        public String after = "BREAK";
+        /**
+         * "Break" is a word that is said (operator, 2026-10-14): it ends the section's
+         * words, in the same quote. NWCG 6MFS: "say 'break' and pause between the
+         * sections".
+         */
+        public boolean saysBreak = true;
+        /** What to do after saying it: pause, or wait for an answer. Never said. */
+        public String after = "Pause.";
         /** How many of its fields are filled in. */
         public int filled;
         /** How many are not. */
@@ -101,14 +120,9 @@ public final class RadioScript {
     public static List<Section> initial(Source s, String coords) {
         final List<Section> out = new ArrayList<>();
         out.add(contact(s));
-        final Section two = status(s, coords);
-        // Tell dispatch a request is coming, unless none is (operator, 2026-10-14).
-        if (!Vocab.parse(s.text(IwiState.RESOURCES), Vocab.RESOURCES).contains("none"))
-            two.after = "BREAK. Stand by for additional resources.";
-        out.add(two);
+        out.add(status(s, coords));
         final Section five = resources(s);
-        // Every section ends on a break and a pause (NWCG 6MFS), the last one too.
-        five.after = "BREAK. Wait for " + calling(s) + " to acknowledge.";
+        five.after = acknowledge(s);
         out.add(five);
         return out;
     }
@@ -128,7 +142,7 @@ public final class RadioScript {
             if (x.hasContent())
                 out.add(x);
         if (!out.isEmpty())
-            out.get(out.size() - 1).after = null;
+            out.get(out.size() - 1).after = acknowledge(s);
         return out;
     }
 
@@ -157,8 +171,18 @@ public final class RadioScript {
                 .say(to + ", ")
                 .field(s.callsign(), "your callsign: set it in ATAK")
                 .say(". Stand-by for Emergency Traffic.");
-        one.after = "BREAK. Wait for " + to + " to answer.";
+        one.after = "Wait for " + to + " to answer.";
         return one;
+    }
+
+    /** The end of a transmission: what the reporter waits for. */
+    public static String acknowledge(Source s) {
+        return "Wait for " + calling(s) + " to acknowledge.";
+    }
+
+    /** After a follow-up's opening call. */
+    public static String answer(Source s) {
+        return "Wait for " + calling(s) + " to answer.";
     }
 
     /** Communications unless Dispatch was picked. */
@@ -294,12 +318,24 @@ public final class RadioScript {
     }
 
     /** 5, picked: "Requesting a paramedic or EMT, a wheeled litter and oxygen." */
+    /**
+     * 5, picked. None needed is one line: "No additional resources needed. Break." A
+     * request is called in its own exchange (operator, 2026-10-14): "Stand by for
+     * additional resources. Break." then, after a pause, "Communications, BILLO, are you
+     * ready to copy resource request?" and, once they answer, the request.
+     */
     public static Section resources(Source s) {
         final Section five = new Section(5, "Additional Resources / Equipment Needs");
         final String stored = s.text(IwiState.RESOURCES);
         if (Vocab.parse(stored, Vocab.RESOURCES).contains("none"))
             return five.field("No additional resources needed.", "");
         final String said = Vocab.saidAnd(stored, Vocab.RESOURCES);
+        if (!said.isEmpty()) {
+            five.leads.add(new Lead("Stand by for additional resources. Break.", "Pause."));
+            final String me = s.callsign();
+            five.leads.add(new Lead(calling(s) + (me.isEmpty() ? "" : ", " + me)
+                    + ", are you ready to copy resource request?", answer(s)));
+        }
         return five.field(said.isEmpty() ? "" : "Requesting " + said + ".",
                 "resources needed, or None needed");
     }
