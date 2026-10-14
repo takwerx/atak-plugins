@@ -22,6 +22,7 @@ import android.widget.Toast;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.maps.coords.GeoPoint;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -30,17 +31,20 @@ import java.util.Map;
 
 /**
  * The NWCG Medical Incident Report, as an initial report and then follow-ups
- * (PLAN-IWI, "The workflow").
+ * (PLAN-IWI, "The workflow"), picked rather than typed.
  *
- * <p>Every item is a drop-down row, closed until opened. {@code INITIAL REPORT} holds
- * what is said first: 1 Contact, 2 Incident Status, 5 Resources. {@code AS YOU LEARN
- * MORE} holds 3 Patients, one card each, and 4, 6, 7 and 8. A row's head turns green
- * when its section is filled in, computed from the same {@link RadioScript} section the
- * script reads, so a green head is a section with nothing amber in the script.
+ * <p>The operator, 2026-10-14: "we get the iwi, we need to get the ball rolling, just
+ * the initial data" and "i need to check box, pick etc as much of this as possible".
+ * So {@code INITIAL REPORT} (1 Contact, 2 Incident Status, 5 Resources) is all tiles:
+ * the callsign comes from ATAK, the location from the IWI marker, the rest is a tap.
+ * The patient cards are the IRPG p. 108 assessment and the pp. 110-114 treatments as
+ * tiles. Typing is left only where it cannot be helped (frequencies) and in the
+ * optional and later items.
  *
- * <p>Patients are cards made from the counts in item 2; the cards are the only count
- * there is. Numbered, never named. Every field is saved as it is typed. Views are built
- * on the plugin context; dialogs and toasts on the MapView's, or ATAK dies.
+ * <p>Every item is a drop-down row, closed until opened; a row's head turns green
+ * when its {@link RadioScript} section has nothing missing. Patients are cards made
+ * from the counts in item 2; the cards are the only count. Views are built on the
+ * plugin context; dialogs and toasts on the MapView's, or ATAK dies.
  */
 final class ReportForm {
 
@@ -48,6 +52,37 @@ final class ReportForm {
     interface Host {
         /** Show the radio update for one patient. */
         void patientScript(int n);
+    }
+
+    /** Where a tile group reads and writes its value. */
+    private abstract static class Binding {
+        abstract String get();
+
+        abstract void set(String value);
+    }
+
+    /** A row of tiles over one list: one picked, or several. */
+    private final class TileGroup {
+        final Vocab.Choices choices;
+        final boolean many;
+        final Binding binding;
+        final Map<String, Button> tiles = new LinkedHashMap<>();
+
+        TileGroup(Vocab.Choices choices, boolean many, Binding binding) {
+            this.choices = choices;
+            this.many = many;
+            this.binding = binding;
+        }
+
+        void recolor() {
+            final String v = binding.get();
+            for (Map.Entry<String, Button> t : tiles.entrySet()) {
+                final boolean on = many
+                        ? Vocab.parse(v, choices).contains(t.getKey())
+                        : t.getKey().equals(v);
+                t.getValue().setTextColor(on ? green() : Color.WHITE);
+            }
+        }
     }
 
     private final Context ctx;
@@ -60,10 +95,10 @@ final class ReportForm {
     private final Map<String, EditText> fields = new HashMap<>();
     private final Map<String, TextView> counts = new HashMap<>();
     private final Map<Integer, Card> cards = new LinkedHashMap<>();
-    private final Map<String, Button> natureTiles = new HashMap<>();
-    /** Medical and Trauma: each a drop-down of its tiles, keyed by its name. */
-    private final Map<String, Fold> natureFolds = new LinkedHashMap<>();
-    private final Map<String, String[]> natureCodes = new HashMap<>();
+    private final List<TileGroup> groups = new ArrayList<>();
+    /** Medical and Trauma: each a drop-down of its tiles. */
+    private final Map<Fold, Vocab.Choices> natureFolds = new LinkedHashMap<>();
+    private final Map<Fold, String> natureNames = new HashMap<>();
 
     private Fold contact;
     private Fold status;
@@ -74,13 +109,9 @@ final class ReportForm {
     private Fold contingency;
     private Fold additional;
     private LinearLayout patientsBox;
-
-    private Button evacButton;
-    private View evacOtherBlock;
     private View radioContactBlock;
-    private Button roleParamedic;
-    private Button roleEmt;
     private TextView latLong;
+    private TextView callsignLine;
     /** True while boxes are being filled from the state, so no watcher writes back. */
     private boolean binding;
 
@@ -110,6 +141,10 @@ final class ReportForm {
                 ? s(R.string.mir_latlong_none)
                 : Coords.ddm(p.getLatitude(), p.getLongitude()) + " (DDM, WGS84)");
         latLong.setTextColor(p == null ? color(R.color.amber) : green());
+        final String me = state.callsign();
+        callsignLine.setText(me.isEmpty()
+                ? "Your callsign is not set in ATAK."
+                : "Your callsign: " + me + " (from ATAK)");
         rebuildPatients();
         refreshChoices();
         refreshCounts();
@@ -130,16 +165,27 @@ final class ReportForm {
         root.addView(heading("Initial report"));
         LinearLayout body;
 
-        contact = section("iwi.fold.r1");
+        contact = section(root, "iwi.fold.r1");
         body = body(contact);
-        body.addView(guide(s(R.string.mir_1_guide)));
-        field(body, IwiState.CONTACT_TO, "Who you are calling", "Ex: Communications", false);
-        field(body, IwiState.CONTACT_FROM, "Your callsign", "Ex: Div. Alpha", false);
+        body.addView(guide("(Verify correct frequency prior to starting report)"));
+        body.addView(label("Calling"));
+        tiles(body, Vocab.CONTACT, 2, false, new Binding() {
+            @Override
+            String get() {
+                return RadioScript.calling(state);
+            }
 
-        status = section("iwi.fold.r2");
+            @Override
+            void set(String v) {
+                state.set(IwiState.CONTACT_TO, v.isEmpty() ? "Communications" : v);
+            }
+        }, groups);
+        callsignLine = guide("");
+        body.addView(callsignLine);
+
+        status = section(root, "iwi.fold.r2");
         body = body(status);
-        body.addView(guide(s(R.string.mir_2_guide)));
-        body.addView(label("Patients: Severity of Emergency / Transport Priority"));
+        body.addView(label("Patients"));
         stepper(body, IwiState.RED, R.color.triage_red);
         stepper(body, IwiState.YELLOW, R.color.triage_yellow);
         stepper(body, IwiState.GREEN, R.color.triage_green);
@@ -151,86 +197,71 @@ final class ReportForm {
         mb.addView(guide(s(R.string.mir_yellow)));
         mb.addView(guide(s(R.string.mir_green)));
         mb.addView(guide(s(R.string.mir_black)));
-        body.addView(label("Nature of Injury or Illness and Mechanism of Injury"));
-        body.addView(guide(s(R.string.mir_nature_guide)));
-        natureGroup(body, "Medical", Nature.MEDICAL, "iwi.fold.medical");
-        natureGroup(body, "Trauma", Nature.TRAUMA, "iwi.fold.trauma_list");
-        body.addView(label("Evacuation Request"));
-        evacButton = button("", new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                pickEvac();
-            }
-        });
-        body.addView(evacButton, full());
-        evacOtherBlock = block();
-        field((LinearLayout) evacOtherBlock, IwiState.EVAC_OTHER, "Other: what",
-                "Ex: Engine to the trailhead", false);
-        body.addView(evacOtherBlock);
-        radioContactBlock = block();
-        ((LinearLayout) radioContactBlock).addView(guide(s(R.string.mir_shorthaul_guide)));
-        field((LinearLayout) radioContactBlock, IwiState.RADIO_CONTACT,
-                "On-scene radio contact", "Ex: TFLD Jones", false);
-        body.addView(radioContactBlock);
-        // The patient is where the IWI marker is: shown, not asked for.
-        body.addView(label("Patient Location"));
+
+        body.addView(label("What happened"));
+        natureGroup(body, "Medical", Vocab.MEDICAL, "iwi.fold.medical");
+        natureGroup(body, "Trauma", Vocab.TRAUMA, "iwi.fold.trauma_list");
+
+        body.addView(label("Evacuation request"));
+        tiles(body, Vocab.EVAC, 2, false, textBinding(IwiState.EVAC_REQUEST), groups);
+
+        body.addView(label("Patient location"));
         latLong = new TextView(ctx);
         latLong.setTextSize(16);
-        latLong.setTextColor(Color.WHITE);
         latLong.setPadding(0, dp(2), 0, dp(2));
         body.addView(latLong);
         body.addView(guide("Where the IWI marker is. Change location on the main page moves it."));
-        field(body, IwiState.LOCATION, "Landmark (optional)", "Ex: Forest Road 1", false);
-        field(body, IwiState.INCIDENT, "Incident Name",
-                "Geographic Name + Medical (Ex: Trout Meadow Medical)", false);
-        field(body, IwiState.IC, "On-Scene Incident Commander",
-                "Name of on-scene IC of Incident Within an Incident (Ex: TFLD Jones)", false);
-        body.addView(label("Patient Care"));
-        body.addView(guide(s(R.string.mir_care_guide)));
-        final LinearLayout roles = row();
-        roleParamedic = button(IwiState.ROLE_PARAMEDIC, role(IwiState.ROLE_PARAMEDIC));
-        roleEmt = button(IwiState.ROLE_EMT, role(IwiState.ROLE_EMT));
-        roles.addView(roleParamedic, weighted(0));
-        roles.addView(roleEmt, weighted(dp(6)));
-        body.addView(roles);
-        field(body, IwiState.CARE_NAME, "Last name", "Ex: Smith", false);
 
-        resources = section("iwi.fold.r5");
+        body.addView(label("Medical on scene"));
+        body.addView(guide("The highest level of medical training on scene."));
+        tiles(body, Vocab.CARE, 3, false, textBinding(IwiState.CARE_ROLE), groups);
+
+        final Fold more = section(body, "iwi.fold.more");
+        more.label("More, if you have it", null);
+        final LinearLayout mo = body(more);
+        mo.addView(guide("Never required. Said on the radio when it is here."));
+        field(mo, IwiState.INCIDENT, "Incident name", "Ex: Trout Meadow Medical", false);
+        field(mo, IwiState.IC, "On-scene IC", "Blank: you", false);
+        field(mo, IwiState.LOCATION, "Landmark", "Ex: Forest Road 1", false);
+        radioContactBlock = block();
+        ((LinearLayout) radioContactBlock).addView(guide(s(R.string.mir_shorthaul_guide)));
+        field((LinearLayout) radioContactBlock, IwiState.RADIO_CONTACT,
+                "On-scene radio contact", "Blank: you", false);
+        mo.addView(radioContactBlock);
+
+        resources = section(root, "iwi.fold.r5");
         body = body(resources);
-        field(body, IwiState.RESOURCES, "Additional Resources / Equipment Needs",
-                s(R.string.mir_5_hint), true);
+        body.addView(guide("The IRPG's example list. Pick everything you need."));
+        tiles(body, Vocab.RESOURCES, 2, true, textBinding(IwiState.RESOURCES), groups);
 
         root.addView(heading("As you learn more"));
 
-        patients = section("iwi.fold.r3");
+        patients = section(root, "iwi.fold.r3");
         body = body(patients);
         body.addView(guide(s(R.string.mir_3_guide)));
         patientsBox = block();
         body.addView(patientsBox, full());
-        final Fold checklist = section(body, "iwi.fold.checklist");
-        checklist.label("Assessment checklist, IRPG p. 108", null);
-        body(checklist).addView(guide(s(R.string.mir_assessment_checklist)));
 
-        evacPlan = section("iwi.fold.r4");
+        evacPlan = section(root, "iwi.fold.r4");
         body = body(evacPlan);
         field(body, IwiState.EVAC_LOCATION, "Evacuation Location (if different)",
                 "Descriptive Location (drop point, intersection, etc.) or Lat. / Long.", false);
         field(body, IwiState.ETA, "Patient's ETA to evacuation location", "Ex: 40 min", false);
         field(body, IwiState.HELISPOT, "Helispot / Extraction Site Size and Hazards", "", true);
 
-        comms = section("iwi.fold.r6");
+        comms = section(root, "iwi.fold.r6");
         body = body(comms);
         body.addView(guide(s(R.string.mir_6_guide)));
         final String[] names = {"COMMAND", "AIR-TO-GROUND", "TACTICAL"};
         for (int i = 0; i < IwiState.COMMS_ROWS.length; i++)
             commsRow(body, IwiState.COMMS_ROWS[i], names[i]);
 
-        contingency = section("iwi.fold.r7");
+        contingency = section(root, "iwi.fold.r7");
         body = body(contingency);
         body.addView(guide(s(R.string.mir_7_guide)));
         field(body, IwiState.CONTINGENCY, "Contingency", "", true);
 
-        additional = section("iwi.fold.r8");
+        additional = section(root, "iwi.fold.r8");
         body = body(additional);
         field(body, IwiState.ADDITIONAL, "Additional Information", "Updates/Changes, etc.", true);
 
@@ -246,13 +277,13 @@ final class ReportForm {
         final GeoPoint p = state.isLive() ? state.point() : null;
         final String coords = p == null ? null : Coords.ddm(p.getLatitude(), p.getLongitude());
 
-        head(contact, "1. Contact", RadioScript.contact(state), state.text(IwiState.CONTACT_TO));
+        head(contact, "1. Contact", RadioScript.contact(state), RadioScript.calling(state));
         final int n = state.patientCount();
         final String evac = state.text(IwiState.EVAC_REQUEST);
         head(status, "2. Incident Status", RadioScript.status(state, coords),
                 (n == 1 ? "1 patient" : n + " patients") + (evac.isEmpty() ? "" : ", " + evac));
         head(resources, "5. Resources", RadioScript.resources(state),
-                state.text(IwiState.RESOURCES));
+                Vocab.labels(state.text(IwiState.RESOURCES), Vocab.RESOURCES));
 
         final List<Patient> list = state.patients();
         int done = 0;
@@ -301,36 +332,104 @@ final class ReportForm {
         return b.toString();
     }
 
+    /** Every tile's color, the Medical and Trauma heads, and what shows for short-haul. */
     private void refreshChoices() {
-        final String evac = state.text(IwiState.EVAC_REQUEST);
-        evacButton.setText(evac.isEmpty() ? s(R.string.mir_evac_pick) : evac);
-        evacButton.setTextColor(evac.isEmpty() ? Color.WHITE : green());
-        evacOtherBlock.setVisibility("Other".equals(evac) ? View.VISIBLE : View.GONE);
-        final boolean weight = "Short-Haul".equals(evac) || "Hoist".equals(evac);
-        radioContactBlock.setVisibility(weight ? View.VISIBLE : View.GONE);
-        for (Card c : cards.values())
-            c.weightBlock.setVisibility(weight ? View.VISIBLE : View.GONE);
-        final java.util.Set<String> picked = Nature.parse(state.text(IwiState.NATURE));
-        for (Map.Entry<String, Button> t : natureTiles.entrySet())
-            t.getValue().setTextColor(picked.contains(t.getKey()) ? green() : Color.WHITE);
-        // A group's head is cyan, the color of a section change, until something in it
-        // is picked; then green with what was picked, so a closed row still says it.
-        for (Map.Entry<String, Fold> g : natureFolds.entrySet()) {
-            final StringBuilder which = new StringBuilder();
-            for (String code : natureCodes.get(g.getKey()))
-                if (picked.contains(code))
-                    which.append(which.length() > 0 ? ", " : "").append(Nature.label(code));
-            g.getValue().label(g.getKey(), which.length() == 0 ? null : which.toString());
-            g.getValue().head.setTextColor(which.length() == 0 ? cyan() : green());
+        for (TileGroup g : groups)
+            g.recolor();
+        final String nature = state.text(IwiState.NATURE);
+        // A group's head is cyan, the section color, until something in it is picked;
+        // then green naming the picks, so a closed row still says it.
+        for (Map.Entry<Fold, Vocab.Choices> g : natureFolds.entrySet()) {
+            final String which = Vocab.labels(nature, g.getValue());
+            g.getKey().label(natureNames.get(g.getKey()), which.isEmpty() ? null : which);
+            g.getKey().head.setTextColor(which.isEmpty() ? cyan() : green());
         }
-        final String role = state.text(IwiState.CARE_ROLE);
-        roleParamedic.setTextColor(IwiState.ROLE_PARAMEDIC.equals(role) ? green() : Color.WHITE);
-        roleEmt.setTextColor(IwiState.ROLE_EMT.equals(role) ? green() : Color.WHITE);
+        final boolean weight = RadioScript.needsWeight(state);
+        radioContactBlock.setVisibility(weight ? View.VISIBLE : View.GONE);
+        for (Card c : cards.values()) {
+            c.weightBlock.setVisibility(weight ? View.VISIBLE : View.GONE);
+            for (TileGroup g : c.groups)
+                g.recolor();
+        }
     }
 
     private void refreshCounts() {
         for (Map.Entry<String, TextView> c : counts.entrySet())
             c.getValue().setText(Integer.toString(state.count(c.getKey())));
+    }
+
+    /** After any tap: colors, then heads. */
+    private void picked() {
+        refreshChoices();
+        refreshHeads();
+    }
+
+    // ---- tiles ----
+
+    /**
+     * A grid of tiles over one list, {@code cols} across. One-of: a tap picks, a tap on
+     * the picked one clears. Pick-many: each tap switches one, and the list's
+     * exclusive tile ("None needed") clears the rest.
+     */
+    private TileGroup tiles(LinearLayout into, final Vocab.Choices c, int cols,
+            final boolean many, final Binding b, List<TileGroup> registry) {
+        final TileGroup g = new TileGroup(c, many, b);
+        LinearLayout r = null;
+        for (int i = 0; i < c.codes.length; i++) {
+            if (i % cols == 0) {
+                r = row();
+                final LinearLayout.LayoutParams lp = full();
+                lp.topMargin = dp(4);
+                into.addView(r, lp);
+            }
+            final String code = c.codes[i];
+            final Button t = button(c.labels[i], new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final String now = b.get();
+                    if (many)
+                        b.set(Vocab.toggle(now, code, c));
+                    else
+                        b.set(code.equals(now) ? "" : code);
+                    picked();
+                }
+            });
+            if (cols >= 3)
+                t.setTextSize(13);
+            g.tiles.put(code, t);
+            r.addView(t, weighted(i % cols == 0 ? 0 : dp(4)));
+        }
+        // Keep the last row's tiles the same width as the rest.
+        final int fill = (cols - c.codes.length % cols) % cols;
+        for (int i = 0; i < fill; i++)
+            r.addView(new View(ctx), weighted(dp(4)));
+        registry.add(g);
+        return g;
+    }
+
+    private Binding textBinding(final String key) {
+        return new Binding() {
+            @Override
+            String get() {
+                return state.text(key);
+            }
+
+            @Override
+            void set(String v) {
+                state.set(key, v);
+            }
+        };
+    }
+
+    /**
+     * One group of what-happened tiles as a drop-down row, so a crew with a trauma
+     * patient never scrolls past the medical list. Two across, any number picked.
+     */
+    private void natureGroup(LinearLayout parent, String name, Vocab.Choices c, String pref) {
+        final Fold group = section(parent, pref);
+        natureFolds.put(group, c);
+        natureNames.put(group, name);
+        tiles(body(group), c, 2, true, textBinding(IwiState.NATURE), groups);
     }
 
     // ---- item 2: the counts make the patients ----
@@ -391,14 +490,16 @@ final class ReportForm {
         refreshHeads();
     }
 
-    // ---- item 3: one card per patient ----
+    // ---- item 3: one card per patient, all picks ----
 
     private final class Card {
         final int n;
         final TextView chip;
         final Fold fold;
-        final Map<String, Button> tiles = new HashMap<>();
-        View weightBlock;
+        final Map<String, Button> colorTiles = new HashMap<>();
+        final List<TileGroup> groups = new ArrayList<>();
+        final TextView weightValue;
+        final View weightBlock;
 
         Card(final Patient p) {
             this.n = p.n;
@@ -434,17 +535,59 @@ final class ReportForm {
                         patientRecolored();
                     }
                 });
-                tiles.put(c, t);
+                colorTiles.put(c, t);
                 colors.addView(t, weighted(i == 0 ? 0 : dp(4)));
             }
             body.addView(colors);
-            patientField(body, p, "assessment", "Assessment",
-                    "General impression, bleeding, airway, breathing, circulation, LOC", true);
-            patientField(body, p, "treatment", "Treatment", "", true);
-            weightBlock = block();
-            patientField((LinearLayout) weightBlock, p, "weight", "Patient weight",
-                    "Ex: 210 lb", false);
-            body.addView(weightBlock);
+
+            // IRPG p. 108, Patient Assessment, in its order.
+            pick(body, "Consciousness", Patient.LOC, 2);
+            pick(body, "Breathing", Patient.BREATHING, 3);
+            pick(body, "Pulse", Patient.PULSE, 2);
+            pick(body, "Major bleeding", Patient.BLEEDING, 3);
+            final Fold more = section(body, "iwi.fold.skin." + p.n);
+            more.label("Skin and pupils", null);
+            final LinearLayout mb = body(more);
+            pick(mb, "Skin color", Patient.SKIN_COLOR, 4);
+            pick(mb, "Skin moisture", Patient.SKIN_MOIST, 4);
+            pick(mb, "Skin temperature", Patient.SKIN_TEMP, 4);
+            pick(mb, "Pupils", Patient.PUPILS, 2);
+            pick(mb, "Reaction to light", Patient.REACTION, 3);
+
+            // IRPG pp. 110-114, Specific Treatments.
+            body.addView(label("Treatment"));
+            tiles(body, Vocab.TREATMENT, 2, true, cardBinding(Patient.TREATMENT), groups);
+
+            // Short-haul and hoist need the weight (IRPG p. 119): a stepper, not a box.
+            final LinearLayout wb = block();
+            wb.addView(label("Patient weight"));
+            final LinearLayout wr = row();
+            wr.setGravity(Gravity.CENTER_VERTICAL);
+            weightValue = new TextView(ctx);
+            weightValue.setTextSize(20);
+            weightValue.setTypeface(Typeface.DEFAULT_BOLD);
+            weightValue.setTextColor(Color.WHITE);
+            wr.addView(weightValue, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            wr.addView(button("− 10", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    stepWeight(-10);
+                }
+            }), new LinearLayout.LayoutParams(dp(80), LinearLayout.LayoutParams.WRAP_CONTENT));
+            final LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(dp(80),
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            plp.leftMargin = dp(6);
+            wr.addView(button("+ 10", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    stepWeight(10);
+                }
+            }), plp);
+            wb.addView(wr);
+            weightBlock = wb;
+            body.addView(wb);
+            showWeight(p.get(Patient.WEIGHT));
 
             final LinearLayout actions = row();
             actions.addView(button("Radio update", new View.OnClickListener() {
@@ -465,10 +608,50 @@ final class ReportForm {
             color(p.color);
         }
 
+        private void pick(LinearLayout into, String title, String field, int cols) {
+            into.addView(label(title));
+            tiles(into, Patient.choices(field), cols, false, cardBinding(field), groups);
+        }
+
+        private Binding cardBinding(final String field) {
+            return new Binding() {
+                @Override
+                String get() {
+                    final Patient p = state.patient(n);
+                    return p == null ? "" : p.get(field);
+                }
+
+                @Override
+                void set(String v) {
+                    state.updatePatient(n, field, v);
+                }
+            };
+        }
+
+        /** Unset starts at 180 lb, a common estimate; then 10 lb a tap, 50 to 400. */
+        private void stepWeight(int by) {
+            final Patient p = state.patient(n);
+            int w;
+            try {
+                w = Integer.parseInt(p == null ? "" : p.get(Patient.WEIGHT));
+                w = Math.max(50, Math.min(400, w + by));
+            } catch (NumberFormatException e) {
+                w = 180;
+            }
+            state.updatePatient(n, Patient.WEIGHT, Integer.toString(w));
+            showWeight(Integer.toString(w));
+            refreshHeads();
+        }
+
+        private void showWeight(String w) {
+            weightValue.setText(w.isEmpty() ? "Not set" : "About " + w + " lb");
+            weightValue.setTextColor(w.isEmpty() ? ReportForm.this.color(R.color.amber) : Color.WHITE);
+        }
+
         void color(String c) {
             chip.setText(Patient.name(c).toUpperCase(java.util.Locale.US));
             chip.setTextColor(triage(c));
-            for (Map.Entry<String, Button> t : tiles.entrySet())
+            for (Map.Entry<String, Button> t : colorTiles.entrySet())
                 t.getValue().setTextColor(t.getKey().equals(c) ? triage(c) : Color.WHITE);
         }
 
@@ -527,25 +710,7 @@ final class ReportForm {
                 .show();
     }
 
-    private void patientField(LinearLayout into, Patient p, final String field, String label,
-            String hint, boolean multiline) {
-        into.addView(label(label));
-        final EditText e = editBox(hint, multiline);
-        final String now = "assessment".equals(field) ? p.assessment
-                : "treatment".equals(field) ? p.treatment : p.weight;
-        e.setText(now);
-        final int n = p.n;
-        e.addTextChangedListener(new Watcher() {
-            @Override
-            public void afterTextChanged(Editable s) {
-                state.updatePatient(n, field, s.toString());
-                refreshHeads();
-            }
-        });
-        into.addView(e, full());
-    }
-
-    // ---- the rest ----
+    // ---- the typed follow-ups ----
 
     private void commsRow(LinearLayout into, String row, String name) {
         into.addView(label(name));
@@ -573,80 +738,9 @@ final class ReportForm {
         return cell;
     }
 
-    /**
-     * One group of tiles as a drop-down row, so a crew with a trauma patient never
-     * scrolls past the medical list. Two across, any number picked.
-     */
-    private void natureGroup(LinearLayout parent, String name, String[] codes, String pref) {
-        final Fold group = section(parent, pref);
-        natureFolds.put(name, group);
-        natureCodes.put(name, codes);
-        final LinearLayout into = body(group);
-        LinearLayout r = null;
-        for (int i = 0; i < codes.length; i++) {
-            if (i % 2 == 0) {
-                r = row();
-                final LinearLayout.LayoutParams lp = full();
-                lp.topMargin = dp(4);
-                into.addView(r, lp);
-            }
-            final String code = codes[i];
-            final Button t = button(Nature.label(code), new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    state.set(IwiState.NATURE,
-                            Nature.toggle(state.text(IwiState.NATURE), code));
-                    refreshChoices();
-                    refreshHeads();
-                }
-            });
-            natureTiles.put(code, t);
-            r.addView(t, weighted(i % 2 == 0 ? 0 : dp(6)));
-        }
-    }
-
-    private void pickEvac() {
-        final String now = state.text(IwiState.EVAC_REQUEST);
-        int checked = -1;
-        for (int i = 0; i < IwiState.EVAC.length; i++)
-            if (IwiState.EVAC[i].equals(now))
-                checked = i;
-        new AlertDialog.Builder(mapView.getContext())
-                .setTitle("Evacuation Request")
-                .setSingleChoiceItems(IwiState.EVAC, checked,
-                        new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                state.set(IwiState.EVAC_REQUEST, IwiState.EVAC[which]);
-                                dialog.dismiss();
-                                refreshChoices();
-                                refreshHeads();
-                            }
-                        })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private View.OnClickListener role(final String role) {
-        return new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // A second tap on the chosen one clears it.
-                state.set(IwiState.CARE_ROLE,
-                        role.equals(state.text(IwiState.CARE_ROLE)) ? "" : role);
-                refreshChoices();
-                refreshHeads();
-            }
-        };
-    }
-
     // ---- pieces ----
 
     /** A drop-down row on the page: head, arrow, body. Closed until opened, remembered. */
-    private Fold section(String pref) {
-        return section(root, pref);
-    }
-
     private Fold section(LinearLayout into, String pref) {
         final LinearLayout headRow = row();
         headRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -690,21 +784,6 @@ final class ReportForm {
     }
 
     private EditText edit(final String key, String hint, boolean multiline) {
-        final EditText e = editBox(hint, multiline);
-        e.addTextChangedListener(new Watcher() {
-            @Override
-            public void afterTextChanged(Editable s) {
-                if (binding)
-                    return;
-                state.set(key, s.toString());
-                refreshHeads();
-            }
-        });
-        fields.put(key, e);
-        return e;
-    }
-
-    private EditText editBox(String hint, boolean multiline) {
         final EditText e = new EditText(ctx);
         e.setTextColor(Color.WHITE);
         e.setHintTextColor(color(R.color.hint_grey));
@@ -722,18 +801,25 @@ final class ReportForm {
             e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
             e.setSingleLine(true);
         }
+        e.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (binding)
+                    return;
+                state.set(key, s.toString());
+                refreshHeads();
+            }
+        });
+        fields.put(key, e);
         return e;
-    }
-
-    /** A TextWatcher that only cares about the end result. */
-    private abstract static class Watcher implements TextWatcher {
-        @Override
-        public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-        }
-
-        @Override
-        public void onTextChanged(CharSequence s, int start, int before, int count) {
-        }
     }
 
     private TextView heading(String text) {
@@ -749,7 +835,7 @@ final class ReportForm {
         t.setTextSize(14);
         t.setTypeface(Typeface.DEFAULT_BOLD);
         t.setTextColor(Color.WHITE);
-        t.setPadding(0, dp(8), 0, 0);
+        t.setPadding(0, dp(10), 0, 0);
         return t;
     }
 

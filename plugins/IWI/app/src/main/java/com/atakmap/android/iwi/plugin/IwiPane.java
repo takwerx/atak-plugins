@@ -198,6 +198,11 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         showMain();
     }
 
+    /** The pane closed: a pick in progress lets go of the map. */
+    public void onClosed() {
+        cancelPick();
+    }
+
     public void dispose() {
         cancelPick();
         handler.removeCallbacks(tick);

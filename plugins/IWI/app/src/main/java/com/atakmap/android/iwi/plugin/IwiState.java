@@ -164,6 +164,19 @@ public final class IwiState implements RadioScript.Source {
         return false;
     }
 
+    /** This phone's callsign, from ATAK: the reporter, and the IC unless one is named. */
+    @Override
+    public String callsign() {
+        try {
+            final com.atakmap.android.maps.MapView mv =
+                    com.atakmap.android.maps.MapView.getMapView();
+            final String c = mv == null ? null : mv.getDeviceCallsign();
+            return c == null ? "" : c.trim();
+        } catch (RuntimeException e) {
+            return "";
+        }
+    }
+
     // ---- the report ----
 
     @Override
@@ -216,9 +229,14 @@ public final class IwiState implements RadioScript.Source {
                 p.color = o.optString("color", RED);
                 if (Patient.rank(p.color) == 3 && !BLACK.equals(p.color))
                     p.color = RED;
-                p.assessment = o.optString("assessment", "");
-                p.treatment = o.optString("treatment", "");
-                p.weight = o.optString("weight", "");
+                final JSONObject picks = o.optJSONObject("v");
+                if (picks != null) {
+                    final java.util.Iterator<String> keys = picks.keys();
+                    while (keys.hasNext()) {
+                        final String k = keys.next();
+                        p.v.put(k, picks.optString(k, ""));
+                    }
+                }
                 p.updatedMs = o.optLong("updated", 0L);
                 out.add(p);
             }
@@ -248,9 +266,10 @@ public final class IwiState implements RadioScript.Source {
                 final JSONObject o = new JSONObject();
                 o.put("n", p.n);
                 o.put("color", p.color);
-                o.put("assessment", p.assessment);
-                o.put("treatment", p.treatment);
-                o.put("weight", p.weight);
+                final JSONObject picks = new JSONObject();
+                for (java.util.Map.Entry<String, String> e : p.v.entrySet())
+                    picks.put(e.getKey(), e.getValue());
+                o.put("v", picks);
                 o.put("updated", p.updatedMs);
                 a.put(o);
             }
@@ -319,12 +338,8 @@ public final class IwiState implements RadioScript.Source {
             final String v = value == null ? "" : value;
             if ("color".equals(field))
                 p.color = v;
-            else if ("assessment".equals(field))
-                p.assessment = v;
-            else if ("treatment".equals(field))
-                p.treatment = v;
-            else if ("weight".equals(field))
-                p.weight = v;
+            else
+                p.v.put(field, v);
             p.updatedMs = System.currentTimeMillis();
         }
         save(list);

@@ -2,7 +2,6 @@ package com.atakmap.android.iwi.plugin;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * The Medical Incident Report as it is said on the radio, one numbered section at a
@@ -10,13 +9,14 @@ import java.util.Locale;
  *
  * <p>NWCG 6MFS: "When transmitting the report, state the number and title of each
  * section, and say 'break' and pause between the sections." The workflow (PLAN-IWI,
- * "The workflow") is an initial report with the basics, items 1, 2 and 5, then
- * follow-ups as more is known: item 3 for each patient, most severe first, and 4, 6,
- * 7 and 8 once they say something.
+ * "The workflow") is an initial report with the basics, items 1, 2 and 5, all picked
+ * rather than typed, then follow-ups as more is known: item 3 for each patient, most
+ * severe first, and 4, 6, 7 and 8 once they say something.
  *
- * <p>What the reporter has not filled in is a part marked missing, shown where it
- * would be said. The report page colors a section's row green exactly when its
- * section here has nothing missing, so the two cannot disagree.
+ * <p>What has not been picked yet is a part marked missing, shown where it would be
+ * said. The report page colors a section's row green exactly when its section here
+ * has nothing missing, so the two cannot disagree. Optional things (an incident name,
+ * a landmark, a named IC) are said when they are there and never marked missing.
  *
  * <p>No Android or ATAK types, so it runs against a plain map on a desktop JVM.
  */
@@ -32,6 +32,9 @@ public final class RadioScript {
 
         /** The patient cards, in the order they were added. */
         List<Patient> patients();
+
+        /** This phone's callsign: the reporter, and the IC unless one is named. */
+        String callsign();
     }
 
     /** A run of words, or a gap the reporter has not filled in. */
@@ -125,18 +128,16 @@ public final class RadioScript {
     }
 
     /**
-     * How a follow-up call opens: "Communications, Div. Alpha, update on the Trout
-     * Meadow Medical." Whatever is not filled in is left out rather than shown.
+     * How a follow-up call opens: "Communications, BILLO, update on the Trout Meadow
+     * Medical." Whatever is not known is left out rather than shown.
      */
     public static String updateLead(Source s) {
-        final String to = s.text(IwiState.CONTACT_TO);
-        final String from = s.text(IwiState.CONTACT_FROM);
-        final String incident = s.text(IwiState.INCIDENT);
-        final StringBuilder b = new StringBuilder();
-        b.append(to.isEmpty() ? "Communications" : to);
+        final StringBuilder b = new StringBuilder(calling(s));
+        final String from = s.callsign();
         if (!from.isEmpty())
             b.append(", ").append(from);
         b.append(", update");
+        final String incident = s.text(IwiState.INCIDENT);
         if (!incident.isEmpty())
             b.append(" on the ").append(incident);
         return b.append('.').toString();
@@ -146,14 +147,19 @@ public final class RadioScript {
 
     /** 1. The IRPG's example: "Communications, Div. Alpha. Stand-by for Emergency Traffic." */
     public static Section contact(Source s) {
-        final String to = s.text(IwiState.CONTACT_TO);
+        final String to = calling(s);
         final Section one = new Section(1, "Contact Communications / Dispatch")
-                .field(to, "who you are calling, Ex: Communications").say(", ")
-                .field(s.text(IwiState.CONTACT_FROM), "your callsign, Ex: Div. Alpha")
+                .say(to + ", ")
+                .field(s.callsign(), "your callsign: set it in ATAK")
                 .say(". Stand-by for Emergency Traffic.");
-        one.after = "BREAK. Wait for " + (to.isEmpty() ? "Communications" : to)
-                + " to answer.";
+        one.after = "BREAK. Wait for " + to + " to answer.";
         return one;
+    }
+
+    /** Communications unless Dispatch was picked. */
+    static String calling(Source s) {
+        final String to = s.text(IwiState.CONTACT_TO);
+        return Vocab.CONTACT.index(to) >= 0 ? to : "Communications";
     }
 
     /**
@@ -161,44 +167,115 @@ public final class RadioScript {
      * tree. Requesting air ambulance to Forest Road 1 at (Lat. / Long.). This will be the
      * Trout Meadow Medical, IC is TFLD Jones. EMT Smith is providing medical care."
      *
+     * <p>What gets the ball rolling is required: how many and how bad, what happened,
+     * the evacuation request, where, and the medical training on scene. The incident
+     * name, a landmark and a named IC are said when given; the IC defaults to the
+     * reporter.
+     *
      * @param coords the patient's location in DDM, or null when no IWI is declared
      */
     public static Section status(Source s, String coords) {
         final Section two = new Section(2, "Incident Status").say("I have ")
                 .field(triage(s), "how many patients, and how bad").say(", ")
-                .field(Nature.said(s.text(IwiState.NATURE)), "what happened: pick from the list")
+                .field(Vocab.said(s.text(IwiState.NATURE), Vocab.MEDICAL, Vocab.TRAUMA),
+                        "what happened: pick from the list")
                 .say(". Requesting ")
                 .field(evac(s), "evacuation request").say(" to ");
-        // The patient is where the IWI marker is. A landmark helps dispatch when there
-        // is one, and is never asked for (operator, 2026-10-14).
         final String landmark = s.text(IwiState.LOCATION);
         if (!landmark.isEmpty())
             two.say(landmark + " at ");
-        two.field(coords, "patient location: declare the IWI").say(". This will be the ")
-                .field(s.text(IwiState.INCIDENT), "incident name, Ex: Trout Meadow Medical")
-                .say(", IC is ")
-                .field(s.text(IwiState.IC), "on-scene IC").say(". ")
-                .field(care(s), "patient care, Ex: EMT Smith")
-                .say(" is providing medical care.");
+        two.field(coords, "patient location: declare the IWI").say(". ");
+        final String incident = s.text(IwiState.INCIDENT);
+        if (!incident.isEmpty())
+            two.say("This will be the " + incident + ", IC");
+        else
+            two.say("IC");
+        two.say(" is " + ic(s) + ". ")
+                .field(care(s), "medical on scene: None, EMT or Paramedic").say(".");
         if (needsWeight(s)) {
-            two.say(" On-scene radio contact ")
-                    .field(s.text(IwiState.RADIO_CONTACT), "on-scene radio contact")
-                    .say(".");
+            final String contact = s.text(IwiState.RADIO_CONTACT);
+            two.say(" On-scene radio contact " + (contact.isEmpty() ? s.callsign() : contact)
+                    + ".");
         }
         return two;
     }
 
-    /** 3, for one patient: "Patient 2, Yellow priority. ... Treatment: ..." */
+    /** The named IC, or the reporter when none is named. */
+    static String ic(Source s) {
+        final String named = s.text(IwiState.IC);
+        if (!named.isEmpty())
+            return named;
+        final String me = s.callsign();
+        return me.isEmpty() ? "on scene" : me;
+    }
+
+    /**
+     * 3, for one patient, IRPG p. 108 in its order: "Patient 2, Red priority. Responds
+     * to voice, labored breathing, pulse present, bleeding controlled. Skin pale, cool.
+     * Treatment: tourniquet and treated for shock."
+     */
     public static Section patient(Source s, Patient p) {
         final Section three = new Section(3, "Initial Patient Assessment")
                 .say("Patient " + p.n + ", " + Patient.name(p.color)
                         + (IwiState.BLACK.equals(p.color) ? ". " : " priority. "))
-                .field(sentence(p.assessment.trim()), "assessment")
-                .say(" Treatment: ")
-                .field(sentence(p.treatment.trim()), "treatment");
-        if (needsWeight(s))
-            three.say(" Patient weight ").field(p.weight.trim(), "patient weight").say(".");
+                .field(capital(Vocab.LOC.spoken(p.get(Patient.LOC))), "consciousness")
+                .say(", ")
+                .field(Vocab.BREATHING.spoken(p.get(Patient.BREATHING)), "breathing")
+                .say(", ")
+                .field(Vocab.PULSE.spoken(p.get(Patient.PULSE)), "pulse").say(", ")
+                .field(Vocab.BLEEDING.spoken(p.get(Patient.BLEEDING)), "bleeding").say(".");
+        final String skin = skin(p);
+        if (!skin.isEmpty())
+            three.say(" " + skin);
+        final String pupils = pupils(p);
+        if (!pupils.isEmpty())
+            three.say(" " + pupils);
+        three.say(" Treatment: ")
+                .field(Vocab.saidAnd(p.get(Patient.TREATMENT), Vocab.TREATMENT),
+                        "treatment, or none yet")
+                .say(".");
+        if (needsWeight(s)) {
+            final String w = p.get(Patient.WEIGHT);
+            three.say(" Patient weight ")
+                    .field(w.isEmpty() ? "" : "about " + w + " pounds", "patient weight")
+                    .say(".");
+        }
         return three;
+    }
+
+    /** "Skin pale, moist and clammy, cool." or "Skin normal." or "" when not looked at. */
+    static String skin(Patient p) {
+        final String[] fields = {Patient.SKIN_COLOR, Patient.SKIN_MOIST, Patient.SKIN_TEMP};
+        final List<String> words = new ArrayList<>();
+        boolean any = false;
+        for (String f : fields) {
+            final String code = p.get(f);
+            if (code.isEmpty())
+                continue;
+            any = true;
+            final String w = Patient.choices(f).spoken(code);
+            if (!w.isEmpty())
+                words.add(w);
+        }
+        if (!any)
+            return "";
+        if (words.isEmpty())
+            return "Skin normal.";
+        final StringBuilder b = new StringBuilder("Skin ");
+        for (int i = 0; i < words.size(); i++)
+            b.append(i > 0 ? ", " : "").append(words.get(i));
+        return b.append('.').toString();
+    }
+
+    /** "Pupils unequal, slow to react." or "" when not looked at. */
+    static String pupils(Patient p) {
+        final String eq = Vocab.PUPILS.spoken(p.get(Patient.PUPILS));
+        final String react = Vocab.REACTION.spoken(p.get(Patient.REACTION));
+        if (eq.isEmpty() && react.isEmpty())
+            return "";
+        if (eq.isEmpty() || react.isEmpty())
+            return "Pupils " + eq + react + ".";
+        return "Pupils " + eq + ", " + react + ".";
     }
 
     public static Section evacPlan(Source s) {
@@ -211,10 +288,15 @@ public final class RadioScript {
                 .say(".");
     }
 
+    /** 5, picked: "Requesting a paramedic or EMT, a wheeled litter and oxygen." */
     public static Section resources(Source s) {
-        return new Section(5, "Additional Resources / Equipment Needs")
-                .field(sentence(s.text(IwiState.RESOURCES)),
-                        "resources and equipment needed, or say none");
+        final Section five = new Section(5, "Additional Resources / Equipment Needs");
+        final String stored = s.text(IwiState.RESOURCES);
+        if (Vocab.parse(stored, Vocab.RESOURCES).contains("none"))
+            return five.field("No additional resources needed.", "");
+        final String said = Vocab.saidAnd(stored, Vocab.RESOURCES);
+        return five.field(said.isEmpty() ? "" : "Requesting " + said + ".",
+                "resources needed, or None needed");
     }
 
     public static Section comms(Source s) {
@@ -247,43 +329,42 @@ public final class RadioScript {
 
     /**
      * The report as plain text for ATAK's med line remarks: the items in MIR order with
-     * their numbers, the order the radio script says them, and nothing the reporter
-     * has not filled in.
+     * their numbers, the order the radio script says them, and nothing not filled in.
      */
     public static String remarks(Source s, String coords) {
         final StringBuilder b = new StringBuilder();
         line(b, "2. Patients", triage(s));
-        line(b, "Nature", Nature.said(s.text(IwiState.NATURE)));
+        line(b, "Nature", Vocab.said(s.text(IwiState.NATURE), Vocab.MEDICAL, Vocab.TRAUMA));
         line(b, "Evacuation request", evac(s));
         line(b, "Location", join(s.text(IwiState.LOCATION), coords));
         line(b, "Incident", s.text(IwiState.INCIDENT));
-        line(b, "On-scene IC", s.text(IwiState.IC));
-        line(b, "Patient care", care(s));
-        if (needsWeight(s))
-            line(b, "On-scene radio contact", s.text(IwiState.RADIO_CONTACT));
+        line(b, "On-scene IC", ic(s));
+        line(b, "Medical on scene", Vocab.CARE.label(s.text(IwiState.CARE_ROLE)));
         for (Patient p : bySeverity(s.patients())) {
             if (!p.hasNotes())
                 continue;
-            final StringBuilder one = new StringBuilder();
-            if (!p.assessment.trim().isEmpty())
-                one.append(p.assessment.trim());
-            if (!p.treatment.trim().isEmpty())
-                one.append(one.length() > 0 ? "; " : "").append("treatment ")
-                        .append(p.treatment.trim());
-            if (!p.weight.trim().isEmpty())
-                one.append(one.length() > 0 ? "; " : "").append("weight ")
-                        .append(p.weight.trim());
-            line(b, "3. Patient " + p.n + " " + Patient.name(p.color), one.toString());
+            line(b, "3. Patient " + p.n + " " + Patient.name(p.color), said(patient(s, p)));
         }
         line(b, "4. Evacuation location", s.text(IwiState.EVAC_LOCATION));
         line(b, "Patient ETA", s.text(IwiState.ETA));
         line(b, "Helispot", s.text(IwiState.HELISPOT));
-        line(b, "5. Resources", s.text(IwiState.RESOURCES));
+        final Section five = resources(s);
+        if (five.complete())
+            line(b, "5. Resources", said(five));
         for (int i = 0; i < IwiState.COMMS_ROWS.length; i++)
             line(b, (i == 0 ? "6. " : "") + IwiState.COMMS_ROW_NAMES[i],
                     commsRow(s, IwiState.COMMS_ROWS[i]));
         line(b, "7. Contingency", s.text(IwiState.CONTINGENCY));
         line(b, "8. Additional", s.text(IwiState.ADDITIONAL));
+        return b.toString().trim();
+    }
+
+    /** A section's words without its gaps. */
+    static String said(Section x) {
+        final StringBuilder b = new StringBuilder();
+        for (Part p : x.parts)
+            if (!p.missing)
+                b.append(p.text);
         return b.toString().trim();
     }
 
@@ -363,12 +444,7 @@ public final class RadioScript {
     }
 
     private static String evac(Source s) {
-        final String v = s.text(IwiState.EVAC_REQUEST);
-        if (v.isEmpty())
-            return "";
-        if ("Other".equals(v))
-            return lowerFirst(s.text(IwiState.EVAC_OTHER));
-        return v.toLowerCase(Locale.US);
+        return Vocab.EVAC.spoken(s.text(IwiState.EVAC_REQUEST));
     }
 
     static boolean needsWeight(Source s) {
@@ -377,11 +453,7 @@ public final class RadioScript {
     }
 
     private static String care(Source s) {
-        final String role = s.text(IwiState.CARE_ROLE);
-        final String name = s.text(IwiState.CARE_NAME);
-        if (name.isEmpty())
-            return "";
-        return role.isEmpty() ? name : role + " " + name;
+        return Vocab.CARE.spoken(s.text(IwiState.CARE_ROLE));
     }
 
     private static String commsRow(Source s, String row) {
@@ -416,12 +488,8 @@ public final class RadioScript {
         return last == '.' || last == '!' || last == '?' ? v : v + ".";
     }
 
-    /** "Unconscious" reads "unconscious" mid-sentence; "AED" stays "AED". */
-    static String lowerFirst(String v) {
-        if (v.length() < 2 || !Character.isUpperCase(v.charAt(0))
-                || Character.isUpperCase(v.charAt(1)))
-            return v;
-        return Character.toLowerCase(v.charAt(0)) + v.substring(1);
+    private static String capital(String v) {
+        return v.isEmpty() ? v : Character.toUpperCase(v.charAt(0)) + v.substring(1);
     }
 
     private static final String[] WORDS = {

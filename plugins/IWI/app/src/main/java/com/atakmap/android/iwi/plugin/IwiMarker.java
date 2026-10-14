@@ -93,8 +93,7 @@ public final class IwiMarker {
         final String evac = s.text(IwiState.EVAC_REQUEST);
         if (!evac.isEmpty()) {
             med.setAttribute("equipment_other", "true");
-            med.setAttribute("equipment_detail", "Other".equals(evac)
-                    ? s.text(IwiState.EVAC_OTHER) : evac);
+            med.setAttribute("equipment_detail", evac);
         }
         detail.addChild(med);
 
@@ -104,14 +103,12 @@ public final class IwiMarker {
         iwi.setAttribute("triage_yellow", Integer.toString(yellow));
         iwi.setAttribute("triage_green", Integer.toString(green));
         iwi.setAttribute("triage_black", Integer.toString(s.count(IwiState.BLACK)));
-        put(iwi, "nature", Nature.said(s.text(IwiState.NATURE)));
+        put(iwi, "nature", Vocab.said(s.text(IwiState.NATURE), Vocab.MEDICAL, Vocab.TRAUMA));
         put(iwi, "evac_request", evac);
         put(iwi, "location_description", s.text(IwiState.LOCATION));
         put(iwi, "incident_name", s.text(IwiState.INCIDENT));
         put(iwi, "onscene_ic", s.text(IwiState.IC));
-        final String care = (s.text(IwiState.CARE_ROLE) + " " + s.text(IwiState.CARE_NAME))
-                .trim();
-        put(iwi, "patient_care", care);
+        put(iwi, "patient_care", Vocab.CARE.label(s.text(IwiState.CARE_ROLE)));
         iwi.setAttribute("declared", new CoordinatedTime(s.declaredMs()).toString());
         detail.addChild(iwi);
 

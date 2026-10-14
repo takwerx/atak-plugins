@@ -13,8 +13,6 @@ import com.atak.plugins.impl.PluginLayoutInflater;
 import gov.tak.api.plugin.IPlugin;
 import gov.tak.api.plugin.IServiceController;
 import gov.tak.api.ui.IHostUIService;
-import gov.tak.api.ui.Pane;
-import gov.tak.api.ui.PaneBuilder;
 import gov.tak.api.ui.ToolbarItem;
 import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
@@ -25,7 +23,8 @@ public class IWI implements IPlugin {
     Context pluginContext;
     IHostUIService uiService;
     ToolbarItem toolbarItem;
-    Pane templatePane;
+    /** The pane, hosted in a drop-down so it can be dragged out wide. */
+    IwiDropDown dropDown;
     IwiDetailHandler iwiDetailHandler;
     /** Anything that must outlive a tap lives here, not in a Tool. */
     TraumaManager traumaManager;
@@ -93,11 +92,13 @@ public class IWI implements IPlugin {
             traumaManager.stop();
             traumaManager = null;
         }
-        if (iwiPane != null) {
-            iwiPane.dispose();
-            iwiPane = null;
+        if (dropDown != null) {
+            // disposeImpl disposes the pane, which lets go of any map pick.
+            dropDown.closeDropDown();
+            dropDown.dispose();
+            dropDown = null;
         }
-        templatePane = null;
+        iwiPane = null;
 
         // the plugin is stopping, remove the button from the toolbar
         if (uiService == null)
@@ -107,34 +108,15 @@ public class IWI implements IPlugin {
     }
 
     private void showPane() {
-        // instantiate the plugin view if necessary
-        if (templatePane == null) {
-            // Remember to use the PluginLayoutInflator if you are actually inflating a custom view
-            // In this case, using it is not necessary - but I am putting it here to remind
-            // developers to look at this Inflator
-
+        final MapView mapView = MapView.getMapView();
+        if (mapView == null || traumaManager == null)
+            return;
+        if (dropDown == null) {
             final View v = PluginLayoutInflater.inflate(pluginContext,
                     R.layout.main_layout, null);
-            final MapView mapView = MapView.getMapView();
-            if (mapView != null && traumaManager != null)
-                iwiPane = new IwiPane(pluginContext, mapView, v, traumaManager);
-
-            templatePane = new PaneBuilder(v)
-                    // relative location is set to default; pane will switch location dependent on
-                    // current orientation of device screen
-                    .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
-                    // pane will take up 50% of screen width in landscape mode
-                    .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
-                    // pane will take up 50% of screen height in portrait mode
-                    .setMetaValue(Pane.PREFERRED_HEIGHT_RATIO, 0.5D)
-                    .build();
+            iwiPane = new IwiPane(pluginContext, mapView, v, traumaManager);
+            dropDown = new IwiDropDown(mapView, v, iwiPane);
         }
-
-        // if the plugin pane is not visible, show it!
-        if (!uiService.isPaneVisible(templatePane)) {
-            uiService.showPane(templatePane, null);
-        }
-        if (iwiPane != null)
-            iwiPane.onShown();
+        dropDown.show();
     }
 }
