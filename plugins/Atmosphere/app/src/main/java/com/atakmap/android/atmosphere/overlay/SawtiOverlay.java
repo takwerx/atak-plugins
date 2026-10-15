@@ -120,9 +120,9 @@ public final class SawtiOverlay extends OutlookOverlay {
     private volatile int pickedZone;
 
     /**
-     * The zone the SAWTI page is reading: outlined in white and its label turned
-     * white, since the zone itself is already filled in its level's color (operator,
-     * 2026-10-14: "maybe an outline would work or outline the pill box").
+     * The zone the SAWTI page is reading: outlined in white, since the zone itself is
+     * already filled in its level's color (operator, 2026-10-14: "maybe an outline
+     * would work"); its label keeps its level's tile.
      */
     public void setPickedZone(int zone) {
         if (zone == pickedZone)
@@ -147,8 +147,12 @@ public final class SawtiOverlay extends OutlookOverlay {
         if (!picked(a))
             return super.drawn(a, g, s);
         final int fill = (fillAlpha(a) << 24) | (a.color & 0x00FFFFFF);
-        return new AtmosphereFeatures.Drawn(setName(a), a.title, g, AtmosphereFeatures.area(0xFFFFFFFF, 6f, fill,
-                a.title, 0xFF000000, 0xFFFFFFFF, labelMaxResolution()), s);
+        // The label keeps its level's tile; only the edge says which zone is picked
+        // (operator, 2026-10-14: "i want that to stay just outline the zone").
+        final int[] lc = labelColors(a);
+        return new AtmosphereFeatures.Drawn(setName(a), a.title, g, lc == null
+                ? AtmosphereFeatures.area(0xFFFFFFFF, 6f, fill, a.title)
+                : AtmosphereFeatures.area(0xFFFFFFFF, 6f, fill, a.title, lc[0], lc[1], labelMaxResolution()), s);
     }
 
     /** Each zone's label is its level's tile, in the site's colors. */
