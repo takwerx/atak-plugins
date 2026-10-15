@@ -66,6 +66,8 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     /** Red, Yellow, Green, Black: the count boxes pinned over every page. */
     private final TextView[] tally = new TextView[4];
     private final TextView tallyTotal;
+    /** Set by the plugin once the drop-down exists: opens the pane wide or narrow. */
+    private Runnable wideToggle;
     /** Where the script page's Back goes: the main page or the report. */
     private View scriptReturn;
 
@@ -119,6 +121,13 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         tally[2] = root.findViewById(R.id.tally_green);
         tally[3] = root.findViewById(R.id.tally_black);
         tallyTotal = root.findViewById(R.id.tally_total);
+        root.findViewById(R.id.btn_wide).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (wideToggle != null)
+                    wideToggle.run();
+            }
+        });
         styleTally();
         confirmBlock = root.findViewById(R.id.confirm_block);
         confirmTitle = root.findViewById(R.id.confirm_title);
@@ -253,6 +262,10 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     /** The pane opens on the main page every time. */
     public void onShown() {
         showMain();
+    }
+
+    public void setWideToggle(Runnable r) {
+        wideToggle = r;
     }
 
     /** The pane closed: a pick in progress lets go of the map. */

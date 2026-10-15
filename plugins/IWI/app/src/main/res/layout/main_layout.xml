@@ -79,6 +79,18 @@
             android:textSize="22sp"
             android:textStyle="bold"
             android:textColor="@color/white" />
+
+        <!-- Atmosphere's: drag the handle, or tap this, to open the pane wide. -->
+        <ImageButton
+            android:id="@+id/btn_wide"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="0dp"
+            android:contentDescription="@string/wide"
+            android:src="@drawable/ic_wide" />
     </LinearLayout>
 
     <!-- Main page -->

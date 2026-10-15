@@ -198,6 +198,13 @@ public class IWI implements IPlugin {
                     R.layout.main_layout, null);
             iwiPane = new IwiPane(pluginContext, mapView, v, traumaManager);
             dropDown = new IwiDropDown(mapView, v, iwiPane);
+            iwiPane.setWideToggle(new Runnable() {
+                @Override
+                public void run() {
+                    if (dropDown != null)
+                        dropDown.toggleWide();
+                }
+            });
         }
         dropDown.show();
     }

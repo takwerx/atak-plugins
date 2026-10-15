@@ -49,4 +49,5 @@
     <string name="mir_nature_guide">Pick everything that applies. Medical is an illness; Trauma is how they were hurt. Topics follow the IRPG Emergency Medical Care pages.</string>
     <string name="confirm_note">Press and drag the marker to put it exactly where the patient is.</string>
     <string name="cancel">Cancel</string>
+    <string name="wide">Wide or narrow</string>
 </resources>

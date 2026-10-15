@@ -57,6 +57,14 @@ public class IwiDropDown extends DropDownReceiver implements OnStateListener {
             goNarrow();
     }
 
+    /** The pane's own button: wide if narrow, narrow if wide. */
+    public void toggleWide() {
+        if (isWide())
+            goNarrow();
+        else
+            goWide();
+    }
+
     private void goWide() {
         if (!isPortrait())
             resize(FULL_WIDTH - HANDLE_THICKNESS_LANDSCAPE, FULL_HEIGHT);
@@ -71,10 +79,15 @@ public class IwiDropDown extends DropDownReceiver implements OnStateListener {
             resize(FULL_WIDTH, HALF_HEIGHT);
     }
 
+    /**
+     * Past three quarters, not past half: ATAK reports a half pane as a little over
+     * half, and the first tap on the wide button read that as already wide and did
+     * nothing (s10-dev-1, 2026-10-14).
+     */
     public boolean isWide() {
         return !isPortrait()
-                ? currentWidth > HALF_WIDTH + 0.01
-                : currentHeight > HALF_HEIGHT + 0.01;
+                ? currentWidth > (HALF_WIDTH + FULL_WIDTH) / 2
+                : currentHeight > (HALF_HEIGHT + FULL_HEIGHT) / 2;
     }
 
     @Override
@@ -90,6 +103,7 @@ public class IwiDropDown extends DropDownReceiver implements OnStateListener {
     public void onDropDownSizeChanged(double width, double height) {
         currentWidth = width;
         currentHeight = height;
+        com.atakmap.coremap.log.Log.d("IWI-DropDown", "size " + width + " x " + height);
     }
 
     @Override
