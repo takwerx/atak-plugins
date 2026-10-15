@@ -1,14 +1,26 @@
 # Comms: the operator's own sites and nets, one row per site and net.
 #
-# Lines starting with # are ignored. lat/lon may be blank when `site` matches a
-# name in the GIS layers (FIRENET, CESRS, USFS); the builder fills them in and
-# refuses a row it cannot place. `net` is a MACS 441-1 designator when one exists
-# ("CDF C1"); a net that is not in the plan carries its own rx/tx on the row.
+# Lines starting with # are ignored. CONTRIBUTING.md has the full column table.
+# `state` is two letters and required: the builder refuses a row without it.
+# lat/lon may be blank when `site` matches a name in the GIS layers (in California:
+# FIRENET, CESRS, USFS) or, with `area` set, the USGS names database; the builder
+# reports a row it cannot place. Outside California, supply lat/lon.
+# `area` is a boundary to look a name up inside: USFS:<forest name>,
+# NPS:<unit code> or CO:<county>.
+# `net` is a MACS 441-1 designator when one exists ("CDF C1"), otherwise whatever
+# the local plan calls the channel; `net_name` is the readable name, and outside
+# California it is what makes `net` legible.
 # Frequencies are the mobile's view: rx is what you listen on, tx is what you
-# transmit on. Tones are Hz ("103.5") or blank; the builder adds the tone number.
+# transmit on.
+# Tones are Hz ("103.5") or blank. rx_tone/tx_tone are THIS SITE's tones;
+# net_rx_tone/net_tx_tone are the net-wide pair, the same at every site on the net.
+# They are not the same thing, and mixing them up is the easiest mistake here.
+# A tone number ("Tone 8", "8") is read as California's standard 32 on a CA row
+# and refused anywhere else: another plan's Tone 9 is another frequency. California
+# rows get the California tone number in the catalog; other rows get none.
 # elev_m is ground elevation, ant_m the antenna height above ground (10 m is
 # assumed when blank); both drive the viewshed.
 #
 # Example (not a real row):
-# Santiago Peak,CA,Orange,,,,30,CDF C1,,,,103.5,KMF695,CAL FIRE,"south zone",operator,2026-09-09
-site,state,county,lat,lon,elev_m,ant_m,net,rx,tx,rx_tone,tx_tone,callsign,agency,notes,source,as_of
+# Santiago Peak,CA,Orange,,,,30,CDF C1,CDF Command 1,,,,103.5,,,KMF695,CAL FIRE,CO:Orange,"south zone",operator,2026-09-09
+site,state,county,lat,lon,elev_m,ant_m,net,net_name,rx,tx,rx_tone,tx_tone,net_rx_tone,net_tx_tone,callsign,agency,area,notes,source,as_of
