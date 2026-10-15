@@ -507,6 +507,8 @@ final class ReportForm {
         final int n;
         /** The patient's triage color as a filled square, no word (operator, 2026-10-14). */
         final View chip;
+        /** The card's head row, scrolled to when the card is closed from its bottom. */
+        LinearLayout headRow;
         final Fold fold;
         final Map<String, Button> colorTiles = new HashMap<>();
         final List<TileGroup> groups = new ArrayList<>();
@@ -515,7 +517,7 @@ final class ReportForm {
 
         Card(final Patient p) {
             this.n = p.n;
-            final LinearLayout headRow = row();
+            headRow = row();
             headRow.setGravity(Gravity.CENTER_VERTICAL);
             chip = new View(ctx);
             final LinearLayout.LayoutParams sq = new LinearLayout.LayoutParams(dp(36), dp(36));
@@ -615,6 +617,20 @@ final class ReportForm {
             final LinearLayout.LayoutParams alp = full();
             alp.topMargin = dp(8);
             body.addView(actions, alp);
+
+            // Done with this one: fold it from the bottom, where the hand already is, and
+            // bring its head to the top so the next patient is right under it (operator,
+            // 2026-10-14).
+            final Button close = button("Close " + p.label(), new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    fold.setOpen(false);
+                    scrollToTop(headRow);
+                }
+            });
+            final LinearLayout.LayoutParams clp = full();
+            clp.topMargin = dp(6);
+            body.addView(close, clp);
             color(p.color);
         }
 
@@ -702,6 +718,22 @@ final class ReportForm {
             fold.head.setText(b);
             fold.complete(missing == 0, green());
         }
+    }
+
+    /** Scroll the report so this view sits at the top of the page, after layout. */
+    private void scrollToTop(final View v) {
+        if (!(root.getParent() instanceof android.widget.ScrollView))
+            return;
+        final android.widget.ScrollView scroll = (android.widget.ScrollView) root.getParent();
+        scroll.post(new Runnable() {
+            @Override
+            public void run() {
+                final android.graphics.Rect r = new android.graphics.Rect();
+                v.getDrawingRect(r);
+                root.offsetDescendantRectToMyCoords(v, r);
+                scroll.smoothScrollTo(0, Math.max(0, r.top - dp(6)));
+            }
+        });
     }
 
     private void rebuildPatients() {
