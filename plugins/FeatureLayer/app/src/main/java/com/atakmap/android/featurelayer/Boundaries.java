@@ -782,6 +782,28 @@ public final class Boundaries {
         return android.graphics.Color.HSVToColor(hsv) & 0x00FFFFFF;
     }
 
+    /**
+     * The class name for a value the publisher's renderer has no class for: PAD-US codes
+     * access "UK" where it is unknown and the renderer stops at open, restricted and
+     * closed, so the row read "UK" (operator, 2026-10-14: "what is UK?"). Said in words,
+     * never a code.
+     */
+    static String fallbackClass(String kind, String raw) {
+        final String v = raw == null ? "" : raw.trim();
+        switch (kind == null ? "" : kind) {
+            case KIND_ACCESS:
+                return "UK".equalsIgnoreCase(v) || v.isEmpty() ? "Unknown Access" : "Other Access (" + v + ")";
+            case KIND_PUBLIC_LAND:
+                return v.isEmpty() ? "Other Federal" : "Other Federal (" + v + ")";
+            case KIND_DPA:
+                return v.isEmpty() ? "Other Agency" : "Other Agency (" + v + ")";
+            case KIND_RESPONSIBILITY:
+                return v.isEmpty() ? "Unknown Responsibility" : "Other Responsibility (" + v + ")";
+            default:
+                return v.isEmpty() ? "Other" : v;
+        }
+    }
+
     private static void put(AttributeSet a, String key, JSONObject p, String field) {
         final String v = p.isNull(field) ? null : Esri.firstNonEmpty(p.optString(field, null));
         if (v != null)

@@ -1888,8 +1888,8 @@ public class LoadedLayer {
                             // ("State Responsibility Area (SRA)"), not the code behind it.
                             if (bounds && generic != null) {
                                 final String lbl = generic.labelFor(props);
-                                if (lbl != null && !lbl.isEmpty())
-                                    target = lbl;
+                                target = lbl != null && !lbl.isEmpty() ? lbl
+                                        : Boundaries.mosaic(spec.kind) ? Boundaries.fallbackClass(spec.kind, v) : target;
                             }
                             spec.setKind.put(target, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
                         }
