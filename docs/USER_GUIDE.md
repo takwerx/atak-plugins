@@ -1,12 +1,12 @@
 # Atmosphere for ATAK — User Guide
 
-**Version 0.14 · takwerx**
+**Version 0.16 · takwerx**
 
-**Download Atmosphere 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.16** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -483,7 +483,9 @@ NWS's own colors, with the key under the switch; the key changes with the time
 picked. Up to 3 days it is the NWS radar estimate at 1 km, updated every hour,
 so a storm that just ended is there at once. For 7 and 30 days and the seasons
 it is the River Forecast Centers' analysis of radar corrected by the rain
-gauges, grey where the center has not produced it yet. Before a date and time
+gauges. Where a center has not produced it yet (all of California on October 15,
+2026) its picture is grey; for 7 days the radar estimate for the same 7 days
+fills the grey in, and for longer the status line says so. Before a date and time
 is the radar estimate as it stood at that hour, kept hour by hour by the Iowa
 Environmental Mesonet: the picture is of the hour at or before the time you
 pick, 1, 24, 48 or 72 hours of it. The radar is good at where it rained and the
