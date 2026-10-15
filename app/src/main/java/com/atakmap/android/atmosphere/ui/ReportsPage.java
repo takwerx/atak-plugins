@@ -143,6 +143,8 @@ public final class ReportsPage {
                 return;
             if (filter == Filter.MAP || filter == Filter.NEAR || closest)
                 render();
+            else
+                paintFilters(); // "Map (N)" counts the map as it now sits
         }
     };
     private final AtakMapView.OnMapMovedListener moved = new AtakMapView.OnMapMovedListener() {

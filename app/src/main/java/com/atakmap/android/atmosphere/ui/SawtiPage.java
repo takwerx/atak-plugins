@@ -88,6 +88,7 @@ public final class SawtiPage {
     private final Button zoneButton;
     private final LinearLayout dayRow, gaugeRow, links, table;
     private final TextView tile, meaning, event, actions, status;
+    private final View eventHead, actionsHead;
     private final SawtiGaugeView threatGauge, windGauge, fuelGauge;
     private final double[][][] zones;
     private final float density;
@@ -122,6 +123,8 @@ public final class SawtiPage {
         meaning = root.findViewById(R.id.sawti_meaning);
         event = root.findViewById(R.id.sawti_event);
         actions = root.findViewById(R.id.sawti_actions);
+        eventHead = root.findViewById(R.id.sawti_event_head);
+        actionsHead = root.findViewById(R.id.sawti_actions_head);
         status = root.findViewById(R.id.sawti_status);
         ((TextView) root.findViewById(R.id.sawti_credit))
                 .setText(pluginContext.getString(R.string.credit_sawti, Sawti.HOST));
@@ -385,8 +388,8 @@ public final class SawtiPage {
             threatGauge.setValue(Double.NaN);
             windGauge.setValue(Double.NaN);
             fuelGauge.setValue(Double.NaN);
-            event.setText("");
-            actions.setText("");
+            words(eventHead, event, "");
+            words(actionsHead, actions, "");
         } else {
             tile.setVisibility(View.VISIBLE);
             tile.setText(Sawti.longDate(date) + ": " + Sawti.level(d.value));
@@ -396,12 +399,20 @@ public final class SawtiPage {
             threatGauge.setValue(d.value);
             windGauge.setValue(model == null ? Double.NaN : model.wind(zone, date));
             fuelGauge.setValue(model == null ? Double.NaN : model.fuel(zone, date));
-            event.setText(d.description);
-            actions.setText(d.actions);
+            words(eventHead, event, d.description);
+            words(actionsHead, actions, d.actions);
         }
         buildLinks();
         buildTable(f, dates, n);
         status.setText(statusLine(f));
+    }
+
+    /** The forecaster's words under their heading; with none, neither shows. */
+    private static void words(View head, TextView text, String s) {
+        text.setText(s);
+        final int v = s == null || s.isEmpty() ? View.GONE : View.VISIBLE;
+        head.setVisibility(v);
+        text.setVisibility(v);
     }
 
     private String statusLine(Sawti.Forecast f) {
