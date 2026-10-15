@@ -82,12 +82,14 @@ Capabilities:
   - Storm Reports as a page: the reports and the tornado paths in one list,
     nationwide, near the pane's point, on the map or by state, newest or
     closest first, any mix of types; a row flies to it and opens it.
-  - Rain that fell: the NWS rainfall picture for the last hour to seven days
-    in the service's own colors with a transparency slider; the USGS rain
-    gauges with their 24 hour totals and the CoCoRaHS volunteer gauges of the
-    state under the map with their morning reading; and the forecast office's
-    own rainfall report as a list, most rain first or closest, its gauges on
-    the map too.
+  - Rain that fell, for the time picked: the last hour to 30 days, since
+    October 1 or January 1, one day, or the hours before a date and time (the
+    rain before a fire started). The NWS rainfall picture in the service's own
+    colors with a transparency slider; the measured gauges around the map
+    (USGS, airports, NWS observers, county flood control, RAWS) with their
+    totals in the same colors, a gauge that missed part of the time or reads
+    far off its neighbors left off; and the forecast office's own rainfall
+    report as a table, most rain first or closest.
   - The forecaster's synopsis on the Forecast page, from the Area Forecast
     Discussion for the office covering the point, the other sections a tap
     away.
@@ -177,7 +179,20 @@ PORTS REQUIRED
     api.avalanche.org               avalanche forecast zones
     wcc.sc.egov.usda.gov            snow stations (NRCS)
     services.arcgis.com             EPA AirNow air quality areas
-    services3.arcgis.com            the interagency weather station feed
+    services3.arcgis.com            the interagency weather station feed, the
+                                    Energy Release Component, the RAWS a
+                                    rainfall report names
+    fsapps.nwcg.gov                 SAWTI (Forest Service)
+    gacc.nifc.gov                   Fire Danger charts (the GACCs)
+    www.nfmdb.org                   fuel moisture samples (NFMD)
+    services.dat.noaa.gov           tornado paths (NWS Damage Assessment Toolkit)
+    earthquake.usgs.gov             earthquakes, debris flow basins (USGS)
+    waterservices.usgs.gov          USGS rain gauges
+    data.rcc-acis.org               airports and NWS observers' rain over a run
+                                    of days (NOAA Regional Climate Centers)
+    mesonet.agron.iastate.edu       county flood control, RAWS and agency
+                                    gauges, airports' hourly rain, past radar
+                                    rain pictures (Iowa Environmental Mesonet)
     geocoding.geo.census.gov        address search for a spot request, only
                                     when the operator types an address
 
