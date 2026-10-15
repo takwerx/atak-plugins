@@ -292,8 +292,17 @@ public final class RainPage {
                 reportBox.setVisibility(reportOpen ? View.VISIBLE : View.GONE);
                 showReport.setText(pluginContext.getString(reportOpen ? R.string.rain_report_hide
                         : R.string.rain_report_show));
-                if (reportOpen)
+                if (reportOpen) {
                     fetchReport(false);
+                    // The report opens under the gauge list, below the pane's edge;
+                    // bring its button to the top so the table is what shows.
+                    root.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            root.smoothScrollTo(0, topIn(root, showReport));
+                        }
+                    });
+                }
             }
         });
         windowButton.setOnClickListener(new View.OnClickListener() {
@@ -924,6 +933,17 @@ public final class RainPage {
         b.append("\nFrom the ").append(office.isEmpty() ? "forecast office's" : office + " office's")
                 .append(" rainfall report, as written.");
         return b.toString();
+    }
+
+    /** How far down the scroller's content a view starts, through its nested rows. */
+    private static int topIn(ScrollView scroller, View v) {
+        int y = 0;
+        View at = v;
+        while (at != null && at.getParent() != scroller) {
+            y += at.getTop();
+            at = at.getParent() instanceof View ? (View) at.getParent() : null;
+        }
+        return at == null ? 0 : y + at.getTop();
     }
 
     private void openDetail(String title, String facts, Runnable goTo) {

@@ -252,6 +252,119 @@ public final class RainTotalsOverlay extends ImageOverlay {
         return out;
     }
 
+    /** The window filled from the radar where the RFCs left grey. */
+    static final int WINDOW_7_DAYS = 4;
+    /** The RFC analysis's grey, "not produced", exactly as the service draws it. */
+    static final int RFC_GREY = 0xFF7D7D7D;
+    /** The last RFC picture had grey in it, and what became of it. */
+    private boolean greyed;
+    private boolean filled, fillFailedNow;
+
+    /**
+     * Where a River Forecast Center has not produced its analysis the national picture
+     * is grey, and on 2026-10-15 every RFC window was grey across California while the
+     * gauges there held up to 3 in (operator: "if the data is there we need to show
+     * it"). Seven days is three of the mesonet's radar pictures end to end, 72 + 72 + 24
+     * hours, ending at the newest hour it has finished (it lags by up to an hour).
+     */
+    @Override
+    protected String[] fillUrls(android.graphics.Bitmap picture, double west, double south, double east,
+            double north, int px, int py) {
+        greyed = false;
+        filled = false;
+        fillFailedNow = false;
+        if (window < MRMS_FUNCTIONS.length || window == WINDOW_BEFORE)
+            return null;
+        final int w = picture.getWidth(), h = picture.getHeight();
+        final int[] pixels = new int[w * h];
+        picture.getPixels(pixels, 0, w, 0, 0, w, h);
+        greyed = greyCount(pixels) > pixels.length / 500;
+        if (!greyed || window != WINDOW_7_DAYS)
+            return null;
+        final long end = com.atakmap.android.atmosphere.data.IemRadar.hourOf(
+                System.currentTimeMillis() - 75 * 60_000L);
+        final long day = 24 * 3_600_000L;
+        return new String[] {
+                com.atakmap.android.atmosphere.data.IemRadar.url(72, end, west, south, east, north, w, h),
+                com.atakmap.android.atmosphere.data.IemRadar.url(72, end - 3 * day, west, south, east, north, w, h),
+                com.atakmap.android.atmosphere.data.IemRadar.url(24, end - 6 * day, west, south, east, north, w, h) };
+    }
+
+    @Override
+    protected android.graphics.Bitmap fill(android.graphics.Bitmap picture, android.graphics.Bitmap[] fills) {
+        final int w = picture.getWidth(), h = picture.getHeight();
+        final int[][] radar = new int[fills.length][];
+        for (int k = 0; k < fills.length; k++) {
+            final android.graphics.Bitmap f = fills[k];
+            if (f == null || f.getWidth() != w || f.getHeight() != h) {
+                fillFailedNow = true;
+                return picture;
+            }
+            radar[k] = new int[w * h];
+            f.getPixels(radar[k], 0, w, 0, 0, w, h);
+        }
+        final int[] pixels = new int[w * h];
+        picture.getPixels(pixels, 0, w, 0, 0, w, h);
+        fillGrey(pixels, radar);
+        final android.graphics.Bitmap out = android.graphics.Bitmap.createBitmap(w, h,
+                android.graphics.Bitmap.Config.ARGB_8888);
+        out.setPixels(pixels, 0, w, 0, 0, w, h);
+        filled = true;
+        return out;
+    }
+
+    @Override
+    protected void fillFailed() {
+        fillFailedNow = true;
+    }
+
+    @Override
+    protected String fillingWords() {
+        return "The NWS has not produced this area's 7 days yet; adding up the radar for it…";
+    }
+
+    static int greyCount(int[] pixels) {
+        int n = 0;
+        for (int c : pixels)
+            if (c == RFC_GREY)
+                n++;
+        return n;
+    }
+
+    /**
+     * Each grey pixel becomes the radar's total for it, summed over the pictures and
+     * painted in the RFC 7-day key; under 0.01 in it is left clear, as the RFC leaves
+     * dry ground. A pixel the radar has no reading for either stays grey.
+     */
+    static void fillGrey(int[] pixels, int[][] radar) {
+        final java.util.Map<Integer, Double> memo = new java.util.HashMap<>();
+        for (int i = 0; i < pixels.length; i++) {
+            if (pixels[i] != RFC_GREY)
+                continue;
+            double inches = 0;
+            boolean known = true;
+            for (int[] r : radar) {
+                final int c = r[i];
+                if ((c >>> 24) == 0)
+                    continue;
+                Double v = memo.get(c);
+                if (v == null) {
+                    v = com.atakmap.android.atmosphere.data.IemRadar.inches(c);
+                    memo.put(c, v);
+                }
+                if (Double.isNaN(v)) {
+                    known = false;
+                    break;
+                }
+                inches += v;
+            }
+            if (!known)
+                continue;
+            final Integer key = colorIn(LEGEND_RFC, FROM_RFC, inches);
+            pixels[i] = key == null ? 0 : key;
+        }
+    }
+
     /** Another window: the picture up is the wrong one, so it is asked for again. */
     public void setWindow(int index) {
         int v = Math.max(0, Math.min(WINDOWS.length - 1, index));
@@ -329,7 +442,16 @@ public final class RainTotalsOverlay extends ImageOverlay {
         if (window < MRMS_FUNCTIONS.length)
             return "Rain that fell " + when + ": the NWS radar estimate, 1 km, updated every hour, in"
                     + " inches, lower 48 only. Dry ground is left clear.";
-        return "Rain that fell " + when + ": the NWS analysis from radar corrected by the rain gauges,"
-                + " in inches, lower 48 only. Grey is where the River Forecast Center has not produced it yet.";
+        final String rfc = "Rain that fell " + when + ": the NWS analysis from radar corrected by the rain gauges,"
+                + " in inches, lower 48 only.";
+        if (!greyed)
+            return rfc;
+        if (filled)
+            return rfc + " Where the NWS has not produced it yet, the radar estimate for the same 7 days fills in.";
+        if (window == WINDOW_7_DAYS)
+            return rfc + " Grey: the NWS has not produced it here yet, and the radar estimate could not be had"
+                    + (fillFailedNow ? " just now" : "") + ". Rain Gauges has the gauges' totals.";
+        return rfc + " Grey: the NWS has not produced it here yet; the radar fills that in for Last 7 days only."
+                + " Rain Gauges has the gauges' totals.";
     }
 }

@@ -79,6 +79,17 @@ public class SawtiTest {
     }
 
     @Test
+    public void wordsDropTheSitesStandIns() {
+        assertEquals("", Sawti.words("Event description for index 1"));
+        assertEquals("", Sawti.words("<p>Recommended action for index 3</p>"));
+        assertEquals("", Sawti.words("Recommended actions for index 0."));
+        assertEquals("Upon ignition, fires may grow rapidly.",
+                Sawti.words("Upon ignition, fires may grow rapidly."));
+        assertEquals("The event description for index 1 is late.",
+                Sawti.words("The event description for index 1 is late."));
+    }
+
+    @Test
     public void levelsColorsAndOddValues() {
         assertEquals("No Rating", Sawti.level(0));
         assertEquals("Extreme", Sawti.level(4));
