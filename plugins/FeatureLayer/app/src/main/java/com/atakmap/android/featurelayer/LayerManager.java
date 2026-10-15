@@ -828,6 +828,22 @@ public class LayerManager {
             updateWhereLater();
     }
 
+    /**
+     * Refresh from the row's button: a land layer takes a new square around where the
+     * map is now, so Refresh is also "load it here" after a drive; every other layer
+     * refreshes as it is.
+     */
+    public void refreshHere(final LoadedLayer l) {
+        if (Boundaries.handles(l.spec) && Boundaries.mosaic(l.spec.kind)) {
+            final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+            if (c != null) {
+                l.spec.scopeBox = Boundaries.boxAround(c.getLatitude(), c.getLongitude());
+                save();
+            }
+        }
+        refresh(l);
+    }
+
     public void refreshAll() {
         for (LoadedLayer l : snapshot())
             refresh(l);

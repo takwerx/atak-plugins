@@ -576,13 +576,15 @@ public final class Boundaries {
         s.timeField = null;
         s.setField = setField(s.kind);
         if (mosaic(s.kind)) {
-            // What is in view, simplified to the zoom, the Fire History pattern: a
-            // state's responsibility areas are 20,000 polygons and never wanted whole.
-            s.scopeKind = "view";
-            s.generalize = true;
-            // Ownership around Santa Barbara is 2,200 polygons in a 100-mile box and the
-            // map's own bounds run wider than the pane shows; a 3,000 cap cut the Los
-            // Padres block out of the first fetch (2026-10-14).
+            // One load for the area the operator is in: a fixed square around the map
+            // center when the layer is added, kept until Refresh (operator, 2026-10-14:
+            // "wreaking havoc trying to load as i move the map ... loaded up the data
+            // once"). A whole state is 3 to 10 MB and tens of thousands of polygons;
+            // what is in view fetched on every move.
+            s.scopeKind = "box";
+            s.generalize = false;
+            // Ownership around Santa Barbara is 2,200 polygons in a 100-mile box; a
+            // 3,000 cap cut the Los Padres block out of the first fetch (2026-10-14).
             s.maxFeatures = 8000;
         } else {
             s.scopeKind = null;
@@ -625,6 +627,18 @@ public final class Boundaries {
         return sb.toString();
     }
 
+    /** Half the side of the square a land layer loads: 50 miles each way from the map center. */
+    static final double AREA_HALF_M = 50 * MILE;
+    /** About 100 m: the detail a land mosaic is fetched at, once, for its square. */
+    static final double AREA_OFFSET_DEG = 0.001;
+
+    /** South, west, north, east of the square a land layer loads around a point. */
+    public static double[] boxAround(double lat, double lon) {
+        final double dLat = AREA_HALF_M / 111_320d;
+        final double dLon = AREA_HALF_M / (111_320d * Math.max(0.2, Math.cos(Math.toRadians(lat))));
+        return new double[] { Math.max(-90, lat - dLat), Math.max(-180, lon - dLon), Math.min(90, lat + dLat), Math.min(180, lon + dLon) };
+    }
+
     /** The whole globe, simplified: a scope that costs nothing but carries the detail setting (and goes by POST). */
     private static Esri.Scope world() {
         return Esri.Scope.box(-90, -180, 90, 180).simplified(OFFSET_DEG);
@@ -639,7 +653,7 @@ public final class Boundaries {
     static List<Esri.Scope> passes(LayerSpec s) throws Exception {
         final List<Esri.Scope> out = new ArrayList<>();
         if (mosaic(s.kind)) {
-            out.add(null); // the layer's own view scope, simplified to the zoom
+            out.add(null); // the layer's own square, at a fixed detail; LoadedLayer.scope() supplies it
             return out;
         }
         if (!KIND_TRIBAL.equals(s.kind) || (s.picks != null && s.picks.length > 0)) {

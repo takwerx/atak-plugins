@@ -1334,6 +1334,8 @@ public class LoadedLayer {
     public String scopeLabel() {
         if (spec.scopeKind == null)
             return "Everything";
+        if ("box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind))
+            return "100 miles around where it was loaded";
         if ("all".equals(spec.scopeKind))
             return "Everywhere";
         if ("view".equals(spec.scopeKind))
@@ -1508,9 +1510,19 @@ public class LoadedLayer {
             return Esri.Scope.circle(c.getLatitude(), c.getLongitude(), spec.scopeRadiusM);
         }
         if ("box".equals(spec.scopeKind)) {
+            final boolean land = Boundaries.handles(spec) && Boundaries.mosaic(spec.kind);
+            if (spec.scopeBox == null && land) {
+                // A land layer saved before it had a square: the square goes around
+                // where the map is now.
+                final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+                if (c == null)
+                    throw new IllegalStateException("the map has no center yet");
+                spec.scopeBox = Boundaries.boxAround(c.getLatitude(), c.getLongitude());
+            }
             if (spec.scopeBox == null)
                 throw new IllegalStateException("no area set for " + spec.title);
-            return Esri.Scope.box(spec.scopeBox[0], spec.scopeBox[1], spec.scopeBox[2], spec.scopeBox[3]);
+            final Esri.Scope b = Esri.Scope.box(spec.scopeBox[0], spec.scopeBox[1], spec.scopeBox[2], spec.scopeBox[3]);
+            return land ? b.simplified(Boundaries.AREA_OFFSET_DEG) : b;
         }
         if ("shape".equals(spec.scopeKind)) {
             if (spec.scopeRings == null || spec.scopeRings.isEmpty())

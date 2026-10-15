@@ -1838,6 +1838,12 @@ public class FeatureLayer implements IPlugin {
                 names = n.toArray(new String[0]);
             }
             last = com.atakmap.android.featurelayer.Boundaries.layer(kind, states, geoids, names);
+            if (com.atakmap.android.featurelayer.Boundaries.mosaic(kind)) {
+                // The square it loads once: around where the map is now.
+                final com.atakmap.coremap.maps.coords.GeoPoint c = mapCenter();
+                if (c != null)
+                    last.scopeBox = com.atakmap.android.featurelayer.Boundaries.boxAround(c.getLatitude(), c.getLongitude());
+            }
             manager.add(last);
         }
         bPicks = null;
@@ -2152,7 +2158,7 @@ public class FeatureLayer implements IPlugin {
         row.findViewById(R.id.row_refresh).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                manager.refresh(l);
+                manager.refreshHere(l);
             }
         });
         row.findViewById(R.id.row_remove).setOnClickListener(new View.OnClickListener() {
