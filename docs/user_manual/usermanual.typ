@@ -498,10 +498,10 @@ of the four days the Forest Service shows. Tap a zone to open its page.
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   #image("76.png", width: 100%)
-  #cap[The zone, the four days and the day's level.]
+  #cap[The layer switch, the zone, the four days and the day's level.]
 ][
   #image("77.png", width: 100%)
-  #cap[The gauges, the forecaster's words and what to do.]
+  #cap[The day's level and the site's three gauges.]
 ]
 
 #v(4pt)
@@ -511,6 +511,17 @@ day button shows that day's level. Then the site's three gauges, the
 forecaster's *Event Description* and *Recommended Actions*, and the county
 links. The page and the map show the same day, picking a day turns the layer
 on, and while the page is open its zone has a white outline on the map.
+]
+
+#tak-slide[
+= SAWTI: the page's zone on the map
+
+#align(center, image("123.jpg", width: 78%))
+
+#v(4pt)
+While the *SAWTI* page is open, the zone it shows is outlined in white on the
+map and keeps its level's color, so it stands out among the others. Leave the
+page and the outline goes.
 ]
 
 #tak-slide[
@@ -716,6 +727,23 @@ numbers only.
   forecast office's own rainfall report opens as a table, for the period the
   forecaster names; it needs NWS as the forecast service.
 ]
+]
+
+#tak-slide[
+= Gauges over the totals
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("113.jpg", width: 100%)
+  #cap[Both on Last 7 days: each dot on shading of its own color.]
+][
+  #image("122.jpg", width: 100%)
+  #cap[The office's rainfall report, opened on the Rain Gauges page.]
+]
+
+#v(4pt)
+With *Rain Totals* and *Rain Gauges* on the same time, a gauge that caught more
+or less than the radar shows stands out against the shading under it. The
+office's report is a table in the same colors, *Most rain first* or *Closest*.
 ]
 
 #tak-slide[
