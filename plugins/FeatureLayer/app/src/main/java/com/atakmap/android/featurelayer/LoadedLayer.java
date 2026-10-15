@@ -2190,8 +2190,10 @@ public class LoadedLayer {
                             if (bounds && !Boundaries.mosaic(spec.kind))
                                 hue = 0xFF000000 | Boundaries.hue(spec);
                             final boolean strongMosaic = bounds && Boundaries.mosaic(spec.kind) && hue != 0;
-                            if (strongMosaic)
-                                hue = 0xFF000000 | Boundaries.strongFill(hue & 0x00FFFFFF);
+                            if (strongMosaic) {
+                                final int chosen = Boundaries.classHue(spec.kind, target);
+                                hue = 0xFF000000 | (chosen != 0 ? chosen : Boundaries.strongFill(hue & 0x00FFFFFF));
+                            }
                             if (!nwcg && "sarcop".equals(spec.iconSet)) {
                                 final int h = SarcopStyles.fillHue(layerName, props);
                                 if (h != 0)

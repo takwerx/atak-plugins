@@ -780,6 +780,16 @@ public final class Boundaries {
      * (2026-10-14). The hue is kept, so a legend still matches; the color is pushed to
      * at least mid saturation and off pure white. A grey or white class stays a grey.
      */
+    /**
+     * A class drawn in a color of the operator's choosing rather than the publisher's:
+     * SRA red (operator, 2026-10-14: "sra should be red"). 0 keeps the publisher's.
+     */
+    static int classHue(String kind, String label) {
+        if (KIND_RESPONSIBILITY.equals(kind) && label != null && label.startsWith("State Responsibility"))
+            return 0xFF1744;
+        return 0;
+    }
+
     static int strongFill(int rgb) {
         final float[] hsv = new float[3];
         android.graphics.Color.colorToHSV(0xFF000000 | rgb, hsv);
