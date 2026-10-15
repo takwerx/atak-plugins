@@ -63,6 +63,9 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
     private final TextView livePatients;
     private final Button moveButton;
     private final LinearLayout scriptContainer;
+    /** Red, Yellow, Green, Black: the count boxes pinned over every page. */
+    private final TextView[] tally = new TextView[4];
+    private final TextView tallyTotal;
     /** Where the script page's Back goes: the main page or the report. */
     private View scriptReturn;
 
@@ -111,6 +114,12 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         livePatients = root.findViewById(R.id.live_patients);
         moveButton = root.findViewById(R.id.btn_move);
         scriptContainer = root.findViewById(R.id.script_container);
+        tally[0] = root.findViewById(R.id.tally_red);
+        tally[1] = root.findViewById(R.id.tally_yellow);
+        tally[2] = root.findViewById(R.id.tally_green);
+        tally[3] = root.findViewById(R.id.tally_black);
+        tallyTotal = root.findViewById(R.id.tally_total);
+        styleTally();
         confirmBlock = root.findViewById(R.id.confirm_block);
         confirmTitle = root.findViewById(R.id.confirm_title);
         confirmWhere = root.findViewById(R.id.confirm_where);
@@ -303,9 +312,54 @@ public final class IwiPane implements TraumaPane.Pages, TraumaPane.PointSource,
         return state.isLive() ? "from the patient" : "from My Location";
     }
 
+    // ---- the tally ----
+
+    /** Each box filled in its triage color; text in the color that reads on it. */
+    private void styleTally() {
+        final int[] fill = {
+                color(R.color.triage_red), color(R.color.triage_yellow),
+                color(R.color.triage_green), Color.BLACK
+        };
+        final int[] text = {Color.WHITE, Color.BLACK, Color.BLACK, Color.WHITE};
+        for (int i = 0; i < tally.length; i++) {
+            final android.graphics.drawable.GradientDrawable box =
+                    new android.graphics.drawable.GradientDrawable();
+            box.setCornerRadius(dp(4));
+            box.setColor(fill[i]);
+            if (i == 3)
+                box.setStroke(dp(2), Color.WHITE);
+            tally[i].setBackground(box);
+            tally[i].setTextColor(text[i]);
+            tally[i].setContentDescription(Patient.name(Patient.COLORS[i]));
+        }
+        // The total is not a triage color: ATAK's own dark button face and edge.
+        final android.graphics.drawable.GradientDrawable box =
+                new android.graphics.drawable.GradientDrawable();
+        box.setCornerRadius(dp(4));
+        box.setColor(0xFF383838);
+        box.setStroke(dp(2), 0xFF585858);
+        tallyTotal.setBackground(box);
+    }
+
+    @Override
+    public void countsChanged() {
+        refreshTally();
+    }
+
+    private void refreshTally() {
+        for (int i = 0; i < tally.length; i++)
+            tally[i].setText(Integer.toString(state.count(Patient.COLORS[i])));
+        final SpannableStringBuilder b = new SpannableStringBuilder("Total ");
+        b.setSpan(new android.text.style.RelativeSizeSpan(0.7f), 0, b.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        b.append(Integer.toString(state.patientCount()));
+        tallyTotal.setText(b);
+    }
+
     // ---- the main page ----
 
     private void updateMain() {
+        refreshTally();
         final boolean live = state.isLive();
         if (picking) {
             // The button that started the pick is the one that stops it.

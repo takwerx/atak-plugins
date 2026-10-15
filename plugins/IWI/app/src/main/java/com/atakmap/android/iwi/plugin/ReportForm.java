@@ -52,6 +52,9 @@ final class ReportForm {
     interface Host {
         /** Show the radio update for one patient. */
         void patientScript(int n);
+
+        /** A patient was added, removed or re-triaged: the tally changes. */
+        void countsChanged();
     }
 
     /** Where a tile group reads and writes its value. */
@@ -495,6 +498,7 @@ final class ReportForm {
     }
 
     private void patientsChanged() {
+        host.countsChanged();
         rebuildPatients();
         refreshChoices();
         refreshCounts();
