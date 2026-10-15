@@ -721,8 +721,7 @@ public final class AtmospherePane {
             @Override
             public void zoneShown(int zone) {
                 sawtiZone = zone;
-                if (sawti != null)
-                    sawti.setPickedZone(zone);
+                updateSawtiOutline();
             }
         });
         stationPage = new StationPage(pluginContext, mapView(), new StationPage.Host() {
@@ -1635,6 +1634,8 @@ public final class AtmospherePane {
             zonePage.onShown();
         if (pages[pager.getCurrentItem()] == sawtiPage.view())
             sawtiPage.onShown();
+        paneShowing = true;
+        updateSawtiOutline();
         updateLayerControls();
     }
 
@@ -1694,6 +1695,7 @@ public final class AtmospherePane {
                     zonePage.onShown();
                 if (pages[position] == sawtiPage.view())
                     sawtiPage.onShown();
+                updateSawtiOutline();
                 // A list page re-reads its layer when it comes into view: the tile
                 // counts are otherwise as old as the last redraw, and the operator
                 // saw "Red Flag (1)" over a list of two (2026-09-26).
@@ -2326,7 +2328,7 @@ public final class AtmospherePane {
                 buildDayRow(sawtiDayRow, sawti);
             }
         });
-        sawti.setPickedZone(sawtiZone);
+        updateSawtiOutline();
         sawtiLegend.removeAllViews();
         for (String[] row : SawtiOverlay.LEGEND)
             sawtiLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
@@ -6034,6 +6036,26 @@ public final class AtmospherePane {
 
     /** The zone the SAWTI page reads, held for a layer that arrives after the page. */
     private int sawtiZone;
+    /** The pane is on screen. */
+    private boolean paneShowing;
+
+    /**
+     * The SAWTI page's zone is outlined on the map only while that page is on
+     * screen: leaving it is how the outline goes, with nothing to switch off
+     * (operator, 2026-10-14: "there is now no way to turn off that white outline").
+     */
+    private void updateSawtiOutline() {
+        if (sawti == null)
+            return;
+        final boolean onPage = paneShowing && pager != null && pages[pager.getCurrentItem()] == sawtiPage.view();
+        sawti.setPickedZone(onPage ? sawtiZone : 0);
+    }
+
+    /** The pane is covered or slid away without closing. */
+    public void onHidden() {
+        paneShowing = false;
+        updateSawtiOutline();
+    }
 
     /** A day picked on the SAWTI page before the layer's own forecast was in. */
     private String sawtiPendingDate;
@@ -7035,6 +7057,8 @@ public final class AtmospherePane {
 
     /** The pane left the screen: an armed pick must not keep the map's tap listeners. */
     public void onClosed() {
+        paneShowing = false;
+        updateSawtiOutline();
         disarmPick();
         updateModeIcons();
         final MapView mv = MapView.getMapView();
