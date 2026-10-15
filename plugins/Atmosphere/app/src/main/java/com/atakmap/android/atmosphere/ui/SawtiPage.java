@@ -69,6 +69,12 @@ public final class SawtiPage {
     public interface Host {
         /** The point the pane is reading, or null. */
         GeoPoint point();
+
+        /** The date the SAWTI map layer is drawing, yyyy-MM-dd, or null. */
+        String mapDate();
+
+        /** Draw this date on the SAWTI map layer, as its day button on the Layers page does. */
+        void showOnMap(String date);
     }
 
     private final Context pluginContext;
@@ -150,8 +156,24 @@ public final class SawtiPage {
             return;
         if (pointDirty)
             followPoint();
+        // The page shows the day the map shows: one day for both, picked in either
+        // (operator, 2026-10-13: "if i click thursday on the sawti layer page it
+        // changes map ... if i change date [on the page] it does not change the map").
+        final String onMap = host.mapDate();
+        if (onMap != null && pendingDate == null)
+            pendingDate = onMap;
+        resolvePendingDate();
         fetch(false);
         render();
+    }
+
+    /** A day picked on the page: the map is told, so both show it. */
+    private void pickDay(int value) {
+        day = value;
+        final Sawti.Forecast f = forecast;
+        final List<String> dates = f == null ? null : f.dates();
+        if (dates != null && value >= 1 && value <= dates.size())
+            host.showOnMap(dates.get(value - 1));
     }
 
     /** The pane is reading another point: the page follows it the next time it is looked at. */
@@ -424,7 +446,7 @@ public final class SawtiPage {
             b.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    day = value;
+                    pickDay(value);
                     render();
                 }
             });
@@ -484,7 +506,7 @@ public final class SawtiPage {
                     @Override
                     public void onClick(View view) {
                         setZone(pickZone);
-                        day = pickDay;
+                        pickDay(pickDay);
                         render();
                     }
                 });
