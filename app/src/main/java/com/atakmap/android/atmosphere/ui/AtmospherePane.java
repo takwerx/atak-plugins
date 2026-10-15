@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.HorizontalScrollView;
+import android.widget.ScrollView;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -695,6 +696,27 @@ public final class AtmospherePane {
             public GeoPoint point() {
                 return AtmospherePane.this.point();
             }
+
+            @Override
+            public String mapDate() {
+                final com.atakmap.android.atmosphere.data.Sawti.Forecast f = sawti == null ? null : sawti.forecast();
+                final List<String> dates = f == null ? null : f.dates();
+                final int d = sawti == null ? 0 : sawti.day();
+                return dates == null || d < 1 || d > dates.size() ? null : dates.get(d - 1);
+            }
+
+            @Override
+            public void showOnMap(String date) {
+                if (sawti == null || date == null)
+                    return;
+                // Picking a day is asking to see it: the layer comes on, by its own
+                // switch, so a first time asks for the allow (operator, 2026-10-14). A
+                // layer that was off has no forecast yet: the day waits for it.
+                sawtiPendingDate = date;
+                applySawtiPendingDate();
+                if (!sawti.isOn())
+                    sawtiToggle.performClick();
+            }
         });
         stationPage = new StationPage(pluginContext, mapView(), new StationPage.Host() {
             @Override
@@ -738,6 +760,15 @@ public final class AtmospherePane {
                 rainPage.view()
         };
         wireGroupFolds(pages[LAYERS_PAGE]);
+        addPageSwitch(spotPage.view(), R.id.spot_toggle);
+        addPageSwitch(zonePage.view(), R.id.firezones_toggle);
+        addPageSwitch(sawtiPage.view(), R.id.sawti_toggle);
+        addPageSwitch(ercPage.view(), R.id.erc_toggle);
+        addPageSwitch(stationPage.view(), R.id.stations_toggle);
+        addPageSwitch(gaugePage.view(), R.id.gauges_toggle);
+        addPageSwitch(buoyPage.view(), R.id.buoys_toggle);
+        addPageSwitch(reportsPage.view(), R.id.reports_toggle);
+        addPageSwitch(rainPage.view(), R.id.raingauges_toggle);
         pager = root.findViewById(R.id.pager);
         pagePrev = root.findViewById(R.id.page_prev);
         pageNext = root.findViewById(R.id.page_next);
@@ -2284,6 +2315,7 @@ public final class AtmospherePane {
             public void onStatus(String status) {
                 sawtiStatus.setText(status);
                 sawtiStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+                applySawtiPendingDate();
                 buildDayRow(sawtiDayRow, sawti);
             }
         });
@@ -5992,6 +6024,66 @@ public final class AtmospherePane {
         }
     }
 
+    /** A day picked on the SAWTI page before the layer's own forecast was in. */
+    private String sawtiPendingDate;
+
+    private void applySawtiPendingDate() {
+        final com.atakmap.android.atmosphere.data.Sawti.Forecast f = sawti == null ? null : sawti.forecast();
+        if (f == null || sawtiPendingDate == null)
+            return;
+        final int n = f.dayNumber(sawtiPendingDate);
+        sawtiPendingDate = null;
+        if (n < 1 || n > sawti.days())
+            return;
+        sawti.setDay(n);
+        buildDayRow(sawtiDayRow, sawti);
+    }
+
+    /** Each page's own layer switch, beside the Layers page switch it mirrors. */
+    private final List<Button[]> pageSwitches = new ArrayList<>();
+
+    /**
+     * Puts a page's map layer switch at its top: a mirror of that layer's switch on the
+     * Layers page, which it clicks, so allowing, turning on and off go one way wherever
+     * they start (operator, 2026-10-14: "some way from a page to turn that layer on for
+     * all the pages we host").
+     */
+    private void addPageSwitch(View page, int toggleId) {
+        final View t = pages[LAYERS_PAGE].findViewById(toggleId);
+        if (!(t instanceof Button))
+            return;
+        final Button toggle = (Button) t;
+        ViewGroup column = null;
+        if (page instanceof ScrollView && ((ScrollView) page).getChildCount() > 0
+                && ((ScrollView) page).getChildAt(0) instanceof ViewGroup)
+            column = (ViewGroup) ((ScrollView) page).getChildAt(0);
+        else if (page instanceof LinearLayout)
+            column = (ViewGroup) page;
+        if (column == null)
+            return;
+        final Button sw = (Button) LayoutInflater.from(pluginContext).inflate(R.layout.page_layer_switch, column,
+                false);
+        sw.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggle.performClick();
+                syncPageSwitches();
+            }
+        });
+        column.addView(sw, 0);
+        pageSwitches.add(new Button[] { sw, toggle });
+        sw.setText(toggle.getText());
+        sw.setTextColor(toggle.getCurrentTextColor());
+    }
+
+    /** The page switches say what their Layers page switches say. */
+    private void syncPageSwitches() {
+        for (Button[] pair : pageSwitches) {
+            pair[0].setText(pair[1].getText());
+            pair[0].setTextColor(pair[1].getCurrentTextColor());
+        }
+    }
+
     private void updateLayerControls() {
         final boolean radarOn = radar != null && radar.isOn();
         final boolean windOn = wind != null && wind.isOn();
@@ -6330,6 +6422,7 @@ public final class AtmospherePane {
         scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn || rainOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
         applyGroupFolds();
+        syncPageSwitches();
     }
 
     /**
