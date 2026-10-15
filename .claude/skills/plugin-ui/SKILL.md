@@ -187,6 +187,18 @@ Anonymous classes, not lambdas: lambdas break under release proguard (CLAUDE.md)
   feature sets invisible off the main thread, then show the layer again, or its
   labels stay on an empty map (IPAWS `AlertOverlay.setVisible`). Never make a
   switch empty the store and wait for a rebuild.
+- **Every page whose data is a map layer carries that layer's switch at its top.**
+  A plugin with several pages (Atmosphere: Stations, Gauges, SAWTI, Rain Gauges,
+  ...) puts the same `<Layer> ON/OFF` switch first on each page, a mirror of the
+  one on the layers or main screen that **clicks that switch** rather than copying
+  its logic, so allowing, on and off go one way wherever they start and both
+  always read the same. A pick on the page that is a request to see something on
+  the map (a day, a zone) turns the layer on through that switch, and a first
+  time asks for the allow. Something the page marks on the map for reading (the
+  zone it shows, outlined) is drawn only while that page is on screen, so there
+  is nothing extra to switch off (operator, 2026-10-14: "some way from a page to
+  turn that layer on for all the pages we host" ... "i like layer switch as
+  standard"; Atmosphere `addPageSwitch`, `updateSawtiOutline`).
 
 ```java
 static void setState(Resources res, Button b, String thing, boolean on) {
