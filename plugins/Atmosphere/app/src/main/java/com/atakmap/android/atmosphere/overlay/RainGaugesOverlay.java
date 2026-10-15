@@ -39,16 +39,18 @@ import java.util.Locale;
  * Rain gauges on the map: a dot per gauge in the color of its total, the same bins and
  * colors the Rain Totals picture uses, with the total in the pill.
  *
- * <p>The last 24 hours, the default, is the USGS gauges around the map with their
- * 15-minute readings, the CoCoRaHS volunteers' morning reports for the states under the
- * map, and the forecast office's own report. Any other run of days, from the last three
- * to since January 1 or one day picked, is the airports and NWS observers of the
- * climate record for those states, added up by the Regional Climate Centers, and the
- * USGS gauges: every one of them, from its readings, for a few days or one day, and
- * the ones that keep daily totals for a month or more (operator, 2026-10-13: "storm
- * ended two days ago i cant get a look ... even to pick a day and say how much fell
- * that day"). No volunteer gauges over a run ("i cant be having vounteers"), and no
- * gauge that missed a day of it: its total reads as dry ground when it is a gap.
+ * <p>Hours ending at a moment (the last 24 h, or before a date and time) are exact:
+ * every USGS gauge's readings, the airports' hourly reports and the county, RAWS and
+ * agency gauges of the NWS feed, from the Iowa Environmental Mesonet. A run of days,
+ * from the last three to since January 1 or one day picked, is the airports and NWS
+ * observers of the climate record for the states under the map, added up by the
+ * Regional Climate Centers, the mesonet's daily totals for the agency gauges, and the
+ * USGS gauges: every one from its readings for a few days or one day, the ones that
+ * keep daily totals for a month or more (operator, 2026-10-13: "storm ended two days
+ * ago i cant get a look ... even to pick a day and say how much fell that day"). No
+ * volunteer gauges ("i cant be having vounteers"), and no gauge that missed part of
+ * the time or disagrees with every gauge around it: its total reads as dry ground or a
+ * downpour where it is a gap or a fault.
  *
  * <p>The USGS gauges are asked for the map's extent, padded, and asked again when the map
  * settles outside it; over about eight degrees wide the status says to zoom in. The
@@ -136,7 +138,7 @@ public final class RainGaugesOverlay extends OutlookOverlay {
 
     private final DotIcons icons;
     private volatile String url = "";
-    /** The requests of one refresh: the USGS box, then CoCoRaHS today and yesterday. */
+    /** The requests of one refresh, in the order their answers are read; some add more. */
     private final List<String> chain = new CopyOnWriteArrayList<>();
     private final Context pluginContext;
     private States states;
