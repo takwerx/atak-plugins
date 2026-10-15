@@ -313,6 +313,8 @@ the SAWTI layer on. While the page is open, the zone it shows has a white
 outline on the map, so you can find it among the others; leave the page and the
 outline goes.
 
+<img src="screenshots/123_sawti_outline.jpg" width="560">
+
 <img src="screenshots/76_sawti_page_top.png" width="420"> <img src="screenshots/77_sawti_page_middle.png" width="420">
 
 <img src="screenshots/78_sawti_page_table.png" width="420"> <img src="screenshots/79_sawti_zone_picker.png" width="420">
@@ -511,6 +513,11 @@ the states under it are sent with the dates, not your position.
 
 <img src="screenshots/110_raingauges_block.jpg" width="420">
 
+With both layers on the same time, each dot sits on shading of its own color, so
+a gauge that caught more or less than the radar shows stands out:
+
+<img src="screenshots/113_rain_7d_gauges_on_totals.jpg" width="560">
+
 **The Rain Gauges page** has the Totals button at the top, then the gauges in
 the map's view, **Most rain first** or **Closest** to your point, with the
 miles on each row and a green **Go to** that flies the map in close and opens
@@ -523,7 +530,9 @@ offices publish such a report, Los Angeles and San Diego among them; it needs
 NWS as the forecast service. Its gauges are among the ones on the map, so the
 report is not drawn there.
 
-<img src="screenshots/111_rain_page.jpg" width="420">
+<img src="screenshots/111_rain_page.jpg" width="420"> <img src="screenshots/114_rain_gauges_7d.jpg" width="420">
+
+<img src="screenshots/122_rain_report_table.jpg" width="560">
 
 ## 11. Spot Weather Forecast
 
