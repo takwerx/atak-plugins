@@ -77,6 +77,9 @@ public class LoadedLayer {
     private final ChooserGlyphs glyphs;
     private final PointIcons pointIcons;
 
+    /** This plugin's live (non-boundary) layers on the map, so a boundaries layer can slot in under them. */
+    private static final Set<com.atakmap.map.layer.Layer> LIVE = java.util.Collections.synchronizedSet(new HashSet<com.atakmap.map.layer.Layer>());
+
     private FeatureSetDatabase2 store;
     private FeatureLayer3 layer;
     private FeatureDataStoreMapOverlay overlay;
@@ -322,10 +325,27 @@ public class LoadedLayer {
             mapView.getMapOverlayManager().addFilesOverlay(overlay);
             // Boundaries go under every live layer, so a perimeter is never hidden under
             // a county fill: the bottom of the stack, whenever they are added or restored.
-            if (Boundaries.handles(spec))
-                mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, 0, layer);
-            else
+            // Boundaries go under every live layer of this plugin, so a perimeter is
+            // never hidden under a county fill: just below the lowest live layer in the
+            // stack, or on top when there is none. Not at index 0: the bottom of ATAK's
+            // overlay stack sits under one of its own layers, and the fifth boundaries
+            // layer pushed down there never drew (2026-10-14).
+            if (Boundaries.handles(spec)) {
+                int at = -1;
+                final java.util.List<com.atakmap.map.layer.Layer> stack = mapView.getLayers(MapView.RenderStack.VECTOR_OVERLAYS);
+                for (int i = 0; stack != null && i < stack.size(); i++)
+                    if (LIVE.contains(stack.get(i))) {
+                        at = i;
+                        break;
+                    }
+                if (at >= 0)
+                    mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, at, layer);
+                else
+                    mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+            } else {
                 mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+                LIVE.add(layer);
+            }
         }
         count = countFeatures();
         status = storedFeatures() > 0 ? "cached" : "empty";
@@ -376,6 +396,8 @@ public class LoadedLayer {
                 dartLabels.dispose();
             if (layer != null && !drawnByMarkers)
                 mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
+            if (layer != null)
+                LIVE.remove(layer);
             if (overlay != null && !drawnByMarkers)
                 mapView.getMapOverlayManager().removeOverlay(overlay);
             if (store != null)
