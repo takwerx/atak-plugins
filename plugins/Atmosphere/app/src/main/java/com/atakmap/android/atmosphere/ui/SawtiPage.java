@@ -75,6 +75,9 @@ public final class SawtiPage {
 
         /** Draw this date on the SAWTI map layer, as its day button on the Layers page does. */
         void showOnMap(String date);
+
+        /** The zone the page is reading, so the map can mark it. */
+        void zoneShown(int zone);
     }
 
     private final Context pluginContext;
@@ -128,6 +131,7 @@ public final class SawtiPage {
         zones = Sawti.parseZones(readAsset(Sawti.ZONES_ASSET));
         final SharedPreferences p = MapCompat.prefs();
         zone = p == null ? 3 : Math.max(1, Math.min(4, p.getInt(PREF_ZONE, 3)));
+        host.zoneShown(zone);
 
         root.findViewById(R.id.sawti_load).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -223,6 +227,7 @@ public final class SawtiPage {
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
             p.edit().putInt(PREF_ZONE, z).apply();
+        host.zoneShown(z);
     }
 
     private void resolvePendingDate() {

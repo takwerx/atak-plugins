@@ -717,6 +717,13 @@ public final class AtmospherePane {
                 if (!sawti.isOn())
                     sawtiToggle.performClick();
             }
+
+            @Override
+            public void zoneShown(int zone) {
+                sawtiZone = zone;
+                if (sawti != null)
+                    sawti.setPickedZone(zone);
+            }
         });
         stationPage = new StationPage(pluginContext, mapView(), new StationPage.Host() {
             @Override
@@ -2319,6 +2326,7 @@ public final class AtmospherePane {
                 buildDayRow(sawtiDayRow, sawti);
             }
         });
+        sawti.setPickedZone(sawtiZone);
         sawtiLegend.removeAllViews();
         for (String[] row : SawtiOverlay.LEGEND)
             sawtiLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
@@ -6023,6 +6031,9 @@ public final class AtmospherePane {
                     : 0xFF00E5FF);
         }
     }
+
+    /** The zone the SAWTI page reads, held for a layer that arrives after the page. */
+    private int sawtiZone;
 
     /** A day picked on the SAWTI page before the layer's own forecast was in. */
     private String sawtiPendingDate;

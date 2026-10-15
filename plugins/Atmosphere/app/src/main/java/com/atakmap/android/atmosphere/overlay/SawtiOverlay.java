@@ -16,6 +16,8 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import com.atakmap.map.layer.feature.AttributeSet;
+import com.atakmap.map.layer.feature.geometry.Geometry;
 import java.util.List;
 import java.util.Locale;
 
@@ -112,6 +114,41 @@ public final class SawtiOverlay extends OutlookOverlay {
     @Override
     protected int fillAlpha(Area a) {
         return Sawti.LEVELS[0].equals(a.label) ? 0x01 : 0x80;
+    }
+
+    /** The zone the SAWTI page is reading, 1 to 4, or 0: drawn so it can be found. */
+    private volatile int pickedZone;
+
+    /**
+     * The zone the SAWTI page is reading: outlined in white and its label turned
+     * white, since the zone itself is already filled in its level's color (operator,
+     * 2026-10-14: "maybe an outline would work or outline the pill box").
+     */
+    public void setPickedZone(int zone) {
+        if (zone == pickedZone)
+            return;
+        pickedZone = zone;
+        redraw();
+    }
+
+    private boolean picked(Area a) {
+        final int bar = a.ref.indexOf('|');
+        if (pickedZone <= 0 || bar <= 0)
+            return false;
+        try {
+            return Integer.parseInt(a.ref.substring(0, bar)) == pickedZone;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    @Override
+    protected AtmosphereFeatures.Drawn drawn(Area a, Geometry g, AttributeSet s) {
+        if (!picked(a))
+            return super.drawn(a, g, s);
+        final int fill = (fillAlpha(a) << 24) | (a.color & 0x00FFFFFF);
+        return new AtmosphereFeatures.Drawn(setName(a), a.title, g, AtmosphereFeatures.area(0xFFFFFFFF, 6f, fill,
+                a.title, 0xFF000000, 0xFFFFFFFF, labelMaxResolution()), s);
     }
 
     /** Each zone's label is its level's tile, in the site's colors. */
