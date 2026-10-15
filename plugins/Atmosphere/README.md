@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.16** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -110,7 +110,16 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.14, for ATAK-CIV 5.6, 5.7 and 5.8 (0.13 was a 5.8-only build for the pictures). New: a Storms group with Storm Reports
+0.16, for ATAK-CIV 5.6, 5.7 and 5.8 (0.15 was a 5.8-only build for the pictures). New: rain totals for
+any time on both rain layers: the last 24 hours, 3, 7 or 30 days, since October 1
+or January 1, one day, or the hours before a date and time, such as when a fire
+started; Rain Gauges from the USGS, county flood control, RAWS and airport
+gauges, no volunteer gauges, in Rain Totals' colors, with a gauge that missed
+part of the time or disagrees with its neighbors left off; where the NWS has not
+produced its 7-day analysis, the radar estimate fills it in; the SAWTI page and
+map on one day, the page's zone outlined on the map while it is open; every page
+with a map layer starts with that layer's switch; and filter counts that follow
+the map. 0.14 brought a Storms group with Storm Reports
 (the NWS Local Storm Reports of the last three days) and Tornado Paths (the
 NWS Damage Assessment Toolkit's surveyed tracks of the last year, by EF
 rating); Debris Flow (the USGS post-fire debris-flow assessments, fires marked

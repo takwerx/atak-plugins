@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.15",
+   plugin-version: "0.16",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -700,7 +700,8 @@ numbers only.
   with the key under the switch. *Totals* picks the time: the last hour to 3
   days from the NWS radar estimate at 1 km, updated every hour; 7 or 30 days,
   since Oct 1 or Jan 1 from the River Forecast Centers' analysis of radar
-  corrected by the gauges (grey where it is not produced yet); or the hours
+  corrected by the gauges (where it is not produced yet, the radar fills in
+  7 days and the rest is grey); or the hours
   before a date and time, the radar estimate as it stood at that hour.
 
   The radar is good at where it rained and fair on how much: a sprinkle shows
