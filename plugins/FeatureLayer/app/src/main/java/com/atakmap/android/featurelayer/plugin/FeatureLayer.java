@@ -1541,9 +1541,14 @@ public class FeatureLayer implements IPlugin {
     }
 
     /** "Counties, Cities, Tribal Lands", in the standard order, for the row and the Add button. */
+    /** The kinds on offer for the picked states, in the standard order. */
+    private String[] kindsOffered() {
+        return com.atakmap.android.featurelayer.Boundaries.kindsFor(bStates.toArray(new String[0]));
+    }
+
     private String kindsTitle() {
         final StringBuilder sb = new StringBuilder();
-        for (String k : com.atakmap.android.featurelayer.Boundaries.KINDS)
+        for (String k : kindsOffered())
             if (bKinds.contains(k))
                 sb.append(sb.length() > 0 ? ", " : "").append(com.atakmap.android.featurelayer.Boundaries.kindTitle(k));
         return sb.toString();
@@ -1569,7 +1574,7 @@ public class FeatureLayer implements IPlugin {
     }
 
     private void pickBoundaryKind() {
-        final String[] kinds = com.atakmap.android.featurelayer.Boundaries.KINDS;
+        final String[] kinds = kindsOffered();
         final CharSequence[] labels = new CharSequence[kinds.length];
         final boolean[] on = new boolean[kinds.length];
         for (int i = 0; i < kinds.length; i++) {
@@ -1682,11 +1687,15 @@ public class FeatureLayer implements IPlugin {
     private void fetchBoundaryNames() {
         if (manager == null)
             return;
-        final String[] kinds = new String[bKinds.size()];
-        int ki = 0;
-        for (String k : com.atakmap.android.featurelayer.Boundaries.KINDS)
-            if (bKinds.contains(k))
-                kinds[ki++] = k;
+        final List<String> kl = new java.util.ArrayList<>();
+        for (String k : kindsOffered())
+            if (bKinds.contains(k) && !com.atakmap.android.featurelayer.Boundaries.mosaic(k))
+                kl.add(k);
+        if (kl.isEmpty()) {
+            toast("Names are picked for counties, cities, communities and tribal lands; the land layers show what is in view");
+            return;
+        }
+        final String[] kinds = kl.toArray(new String[0]);
         final String[] states = bStates.toArray(new String[0]);
         final com.atakmap.coremap.maps.coords.GeoPoint c = mapCenter();
         final Button which = paneView.findViewById(R.id.btn_bnd_which);
@@ -1812,11 +1821,11 @@ public class FeatureLayer implements IPlugin {
             return;
         final String[] states = bStates.toArray(new String[0]);
         LayerSpec last = null;
-        for (String kind : com.atakmap.android.featurelayer.Boundaries.KINDS) {
+        for (String kind : kindsOffered()) {
             if (!bKinds.contains(kind))
                 continue;
             String[] geoids = null, names = null;
-            if (bPicks != null && !bPicks.isEmpty()) {
+            if (bPicks != null && !bPicks.isEmpty() && !com.atakmap.android.featurelayer.Boundaries.mosaic(kind)) {
                 final List<String> g = new java.util.ArrayList<>(), n = new java.util.ArrayList<>();
                 for (com.atakmap.android.featurelayer.Boundaries.Named p : bPicks)
                     if (kind.equals(p.kind)) {
@@ -1898,7 +1907,9 @@ public class FeatureLayer implements IPlugin {
         final Button b = row.findViewById(R.id.row_color);
         if (b == null)
             return;
-        if (!com.atakmap.android.featurelayer.Boundaries.handles(l.spec)) {
+        // A land mosaic draws in its publisher's colors, one per class: no color to pick.
+        if (!com.atakmap.android.featurelayer.Boundaries.handles(l.spec)
+                || com.atakmap.android.featurelayer.Boundaries.mosaic(l.spec.kind)) {
             b.setVisibility(View.GONE);
             return;
         }
@@ -2003,12 +2014,32 @@ public class FeatureLayer implements IPlugin {
             toggle.setEnabled(true);
         }
         final boolean turnOn = !anyOn;
+        // Off remembers which kinds were on, and on brings back those, not every kind
+        // (operator, 2026-10-13: "if i have ... county and community on, then i hit calif
+        // boundary off and back on it should be last state not everything back on").
+        final String onKey = "group.on." + key;
         toggle.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (!turnOn) {
+                    final StringBuilder was = new StringBuilder();
+                    for (LoadedLayer l : kinds)
+                        if (l.isVisible())
+                            was.append(was.length() > 0 ? "\n" : "").append(l.spec.id);
+                    uiPrefs().edit().putString(onKey, was.toString()).apply();
+                    for (LoadedLayer l : kinds)
+                        if (l.isVisible())
+                            manager.setVisible(l, false);
+                    return;
+                }
+                final java.util.Set<String> was = new java.util.HashSet<>(
+                        java.util.Arrays.asList(uiPrefs().getString(onKey, "").split("\n")));
+                boolean any = false;
                 for (LoadedLayer l : kinds)
-                    if (l.isVisible() != turnOn)
-                        manager.setVisible(l, turnOn);
+                    any |= was.contains(l.spec.id);
+                for (LoadedLayer l : kinds)
+                    if (!any || was.contains(l.spec.id))
+                        manager.setVisible(l, true);
             }
         });
         if (wl.length() > 0) {

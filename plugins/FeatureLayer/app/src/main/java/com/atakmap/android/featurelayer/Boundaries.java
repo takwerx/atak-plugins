@@ -52,7 +52,71 @@ public final class Boundaries {
      * just have incorporated cities, and then ... communities as a different layer ...
      * all different colors").
      */
-    public static final String[] KINDS = { KIND_COUNTIES, KIND_CITIES, KIND_COMMUNITIES, KIND_TRIBAL };
+    /**
+     * The land layers (operator, 2026-10-14: "blm, usfs, then for like california SRA vs
+     * FRA ... DPA direct protection area ... how ONX hunt has a lot of data on like
+     * private vs public lands"): who answers the fire, who owns the ground, whether the
+     * public may enter. Mosaics of a whole state, so they are fetched for what is in
+     * view and drawn in the publisher's own colors with the fill on.
+     */
+    public static final String KIND_RESPONSIBILITY = "responsibility", KIND_DPA = "dpa", KIND_OWNERSHIP = "ownership",
+            KIND_PUBLIC_LAND = "publicland", KIND_ACCESS = "access";
+    public static final String[] KINDS = { KIND_COUNTIES, KIND_CITIES, KIND_COMMUNITIES, KIND_TRIBAL,
+            KIND_RESPONSIBILITY, KIND_DPA, KIND_OWNERSHIP, KIND_PUBLIC_LAND, KIND_ACCESS };
+
+    /** CAL FIRE FRAP's Responsibility Areas: SRA, LRA, FRA, the whole state. */
+    static final String CA_RESPONSIBILITY = "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/State_Responsibility_Area/FeatureServer";
+    /** California Wildland Fire Direct Protection Areas, NIFC's authoritative copy. */
+    static final String CA_DPA = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/CA_WF_Direct_Protection_Areas_Public/FeatureServer";
+    /** CAL FIRE FRAP's Public Land Ownership, the public view on the CAL FIRE org. */
+    static final String CA_OWNERSHIP = "https://jUJYIo9tSA7EHvfZ.svcs1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/Public_Land_Ownership_view/FeatureServer";
+    /** USGS PAD-US federal fee managers, nationwide, by managing agency. */
+    static final String PADUS_MANAGERS = "https://services.arcgis.com/v01gqwM5QqNysAAi/arcgis/rest/services/Federal_Fee_Managers_Authoritative_PADUS/FeatureServer";
+    /** USGS PAD-US public access: open, restricted, closed. */
+    static final String PADUS_ACCESS = "https://services.arcgis.com/v01gqwM5QqNysAAi/ArcGIS/rest/services/PADUS_Public_Access/FeatureServer";
+
+    /** Whether a kind is a whole-state mosaic fetched for what is in view, not named shapes. */
+    public static boolean mosaic(String kind) {
+        return KIND_RESPONSIBILITY.equals(kind) || KIND_DPA.equals(kind) || KIND_OWNERSHIP.equals(kind)
+                || KIND_PUBLIC_LAND.equals(kind) || KIND_ACCESS.equals(kind);
+    }
+
+    /** Whether a kind's features carry a name pill on the map (counties, cities, communities, tribal lands). */
+    public static boolean labelled(String kind) {
+        return !mosaic(kind);
+    }
+
+    /** Whether a kind exists only for California (CAL FIRE's layers). */
+    static boolean californiaOnly(String kind) {
+        return KIND_RESPONSIBILITY.equals(kind) || KIND_DPA.equals(kind) || KIND_OWNERSHIP.equals(kind);
+    }
+
+    /** The kinds the picked states can have: CAL FIRE's three only when California is among them. */
+    public static String[] kindsFor(String[] states) {
+        final List<String> out = new ArrayList<>();
+        for (String k : KINDS)
+            if (!californiaOnly(k) || has(states, "06"))
+                out.add(k);
+        return out.toArray(new String[0]);
+    }
+
+    /** The field a mosaic's features are typed and colored by, the publisher's own renderer field. */
+    static String setField(String kind) {
+        switch (kind == null ? "" : kind) {
+            case KIND_RESPONSIBILITY:
+                return "SRA";
+            case KIND_DPA:
+                return "DPA_AGENCY";
+            case KIND_OWNERSHIP:
+                return "Own_Group";
+            case KIND_PUBLIC_LAND:
+                return "WebServiceMangName";
+            case KIND_ACCESS:
+                return "Pub_Access";
+            default:
+                return null;
+        }
+    }
     /** The most states one layer holds: a nationwide county layer is 3,143 polygons and a store rewrite the phone does not need. */
     public static final int MAX_STATES = 5;
     /** About 50 m: the detail the lines are fetched at. Texas counties are 25 MB at full detail and 950 KB at this. */
@@ -202,6 +266,16 @@ public final class Boundaries {
                 return "Communities";
             case KIND_TRIBAL:
                 return "Tribal Lands";
+            case KIND_RESPONSIBILITY:
+                return "Responsibility Areas";
+            case KIND_DPA:
+                return "Protection Areas";
+            case KIND_OWNERSHIP:
+                return "Land Ownership";
+            case KIND_PUBLIC_LAND:
+                return "Public Land";
+            case KIND_ACCESS:
+                return "Public Access";
             default:
                 return "Counties";
         }
@@ -216,6 +290,16 @@ public final class Boundaries {
                 return "Unincorporated communities the Census draws a line around";
             case KIND_TRIBAL:
                 return "Federal and state reservations and off-reservation trust lands";
+            case KIND_RESPONSIBILITY:
+                return "Who has fire protection responsibility: state (SRA), local (LRA) or federal (FRA), from CAL FIRE";
+            case KIND_DPA:
+                return "Direct Protection Areas: which agency answers a wildland fire, CAL FIRE, USFS, BLM and the rest";
+            case KIND_OWNERSHIP:
+                return "Public land by owner, federal, state and local, from CAL FIRE; private land is what stays uncolored";
+            case KIND_PUBLIC_LAND:
+                return "Federal land by managing agency, from the USGS Protected Areas Database";
+            case KIND_ACCESS:
+                return "Where the public may enter: open, restricted or closed, from the USGS Protected Areas Database";
             default:
                 return "County and county-equivalent boundaries";
         }
@@ -266,6 +350,16 @@ public final class Boundaries {
                 return PLACES;
             case KIND_TRIBAL:
                 return AIANNHA;
+            case KIND_RESPONSIBILITY:
+                return CA_RESPONSIBILITY;
+            case KIND_DPA:
+                return CA_DPA;
+            case KIND_OWNERSHIP:
+                return CA_OWNERSHIP;
+            case KIND_PUBLIC_LAND:
+                return PADUS_MANAGERS;
+            case KIND_ACCESS:
+                return PADUS_ACCESS;
             default:
                 return STATE_COUNTY;
         }
@@ -273,6 +367,8 @@ public final class Boundaries {
 
     /** The source layers a kind reads, in draw order. */
     static int[] layerIds(String kind, String[] states) {
+        if (mosaic(kind))
+            return new int[] { 0 };
         switch (kind == null ? "" : kind) {
             case KIND_CITIES:
                 return new int[] { 4 }; // Incorporated Places
@@ -310,8 +406,26 @@ public final class Boundaries {
     }
 
     /** The types a kind always offers, each with a line saying what it is. */
+    /** The classes a mosaic always offers, as the publisher labels them, with a line each where one helps. */
+    private static final String[][] MOSAIC_TYPES = {
+            { KIND_RESPONSIBILITY, "State Responsibility Area (SRA)", "CAL FIRE has fire protection responsibility" },
+            { KIND_RESPONSIBILITY, "Local Responsibility Area (LRA)", "A city, county or district has it" },
+            { KIND_RESPONSIBILITY, "Federal Responsibility Area (FRA)", "A federal agency has it" },
+            { KIND_ACCESS, "Open Access", "The public may enter" },
+            { KIND_ACCESS, "Restricted Access", "Entry with a permit or at set times" },
+            { KIND_ACCESS, "Closed Access", "No public entry" },
+    };
+
     static void notes(LayerSpec s) {
         s.setNotes.clear();
+        if (mosaic(s.kind)) {
+            for (String[] t : MOSAIC_TYPES)
+                if (t[0].equals(s.kind)) {
+                    s.setNotes.put(t[1], t[2]);
+                    s.setKind.put(t[1], "polygon");
+                }
+            return;
+        }
         for (int id : layerIds(s.kind, s.states)) {
             final String n = setName(s.kind, id);
             s.setNotes.put(n, KIND_CITIES.equals(s.kind) ? "Cities, towns and villages"
@@ -409,14 +523,41 @@ public final class Boundaries {
         s.picks = picks == null || picks.length == 0 ? null : picks.clone();
         s.id = id(kind, states, picks);
         s.title = title(kind, states, pickNames);
-        s.subtitle = "Census";
+        s.subtitle = subtitle(kind);
         fixed(s);
+        if (mosaic(kind)) {
+            // An area classification: the fill is the information, half see-through so
+            // the ground reads through it; no name pills, the class is on the Features
+            // list and on tap.
+            s.fillAlpha = 0x80;
+            s.labels = false;
+            s.labelGsd = LABEL_GSD_20MI;
+            s.gateGsd = Double.MAX_VALUE;
+            s.scopeRadiusM = 40000;
+            return s;
+        }
         s.fillAlpha = 0; // outline only; the fill control adds a tint
         s.labels = true;
         final boolean places = KIND_CITIES.equals(kind) || KIND_COMMUNITIES.equals(kind);
         s.labelGsd = places ? LayerSpec.DEFAULT_LABEL_GSD_WIDE : LABEL_GSD_20MI;
         s.gateGsd = places || KIND_TRIBAL.equals(kind) ? GATE_GSD_20MI : Double.MAX_VALUE;
         return s;
+    }
+
+    /** Who published it, for the row: the Census, CAL FIRE, NIFC, USGS. */
+    static String subtitle(String kind) {
+        switch (kind == null ? "" : kind) {
+            case KIND_RESPONSIBILITY:
+            case KIND_OWNERSHIP:
+                return "CAL FIRE";
+            case KIND_DPA:
+                return "NIFC";
+            case KIND_PUBLIC_LAND:
+            case KIND_ACCESS:
+                return "USGS PAD-US";
+            default:
+                return "Census";
+        }
     }
 
     /** The parts the plugin owns, applied on creation and again on every restore ({@link Sources#migrate}). */
@@ -433,9 +574,20 @@ public final class Boundaries {
         s.refreshMinutes = 0;
         s.maxFeatures = 0;
         s.timeField = null;
-        s.setField = null;
-        s.scopeKind = null;
-        s.generalize = false;
+        s.setField = setField(s.kind);
+        if (mosaic(s.kind)) {
+            // What is in view, simplified to the zoom, the Fire History pattern: a
+            // state's responsibility areas are 20,000 polygons and never wanted whole.
+            s.scopeKind = "view";
+            s.generalize = true;
+            // Ownership around Santa Barbara is 2,200 polygons in a 100-mile box and the
+            // map's own bounds run wider than the pane shows; a 3,000 cap cut the Los
+            // Padres block out of the first fetch (2026-10-14).
+            s.maxFeatures = 8000;
+        } else {
+            s.scopeKind = null;
+            s.generalize = false;
+        }
         s.where = where(s);
         notes(s);
         // A tribal layer saved with the old "every zoom" takes the new gate, once: the
@@ -446,6 +598,19 @@ public final class Boundaries {
 
     /** The where clause: the states by FIPS, or the picked GEOIDs. Tribal lands have no state field; their state is a shape ({@link #passes}). */
     static String where(LayerSpec s) {
+        if (mosaic(s.kind)) {
+            // PAD-US managers carry the state by postal code; CAL FIRE's layers are one
+            // state, and PAD-US access has no state field. The view does the scoping.
+            if (!KIND_PUBLIC_LAND.equals(s.kind))
+                return "1=1";
+            final List<String> ab = new ArrayList<>();
+            for (String f : s.states) {
+                final State st = state(f);
+                if (st != null)
+                    ab.add(st.abbr);
+            }
+            return ab.isEmpty() ? "1=1" : "State_Nm IN (" + list(ab.toArray(new String[0])) + ")";
+        }
         if (s.picks != null && s.picks.length > 0)
             return "GEOID IN (" + list(s.picks) + ")";
         if (KIND_TRIBAL.equals(s.kind))
@@ -473,6 +638,10 @@ public final class Boundaries {
      */
     static List<Esri.Scope> passes(LayerSpec s) throws Exception {
         final List<Esri.Scope> out = new ArrayList<>();
+        if (mosaic(s.kind)) {
+            out.add(null); // the layer's own view scope, simplified to the zoom
+            return out;
+        }
         if (!KIND_TRIBAL.equals(s.kind) || (s.picks != null && s.picks.length > 0)) {
             out.add(world());
             return out;
@@ -546,6 +715,37 @@ public final class Boundaries {
     /** The lines the details page shows, in place of the Census row's thirty codes. */
     static AttributeSet attributes(String kind, String setName, JSONObject p) {
         final AttributeSet a = new AttributeSet();
+        if (mosaic(kind)) {
+            // The publisher's own words for what this ground is, and nothing else.
+            switch (kind) {
+                case KIND_RESPONSIBILITY:
+                    a.setAttribute("Responsibility", setName);
+                    break;
+                case KIND_DPA:
+                    a.setAttribute("Protection", setName);
+                    put(a, "Group", p, "DPA_GROUP");
+                    put(a, "Unit", p, "NWCG_UNITID");
+                    put(a, "Agreements", p, "AGREEMENTS");
+                    break;
+                case KIND_OWNERSHIP:
+                    a.setAttribute("Owner group", setName);
+                    put(a, "Owner", p, "Own_Agency");
+                    put(a, "Level", p, "Own_Level");
+                    break;
+                case KIND_PUBLIC_LAND:
+                    a.setAttribute("Manager", setName);
+                    put(a, "Unit", p, "Unit_Nm");
+                    put(a, "Owner", p, "Own_Name");
+                    put(a, "Access", p, "Pub_Access");
+                    break;
+                default:
+                    a.setAttribute("Access", setName);
+                    put(a, "Unit", p, "Unit_Nm");
+                    put(a, "Manager", p, "MngNm_Desc");
+                    break;
+            }
+            return a;
+        }
         final String fips = stateOf(p);
         if (fips != null)
             a.setAttribute(ATTR_STATE, fips);
@@ -563,6 +763,29 @@ public final class Boundaries {
         if (geoid != null)
             a.setAttribute("GEOID", geoid);
         return a;
+    }
+
+    /**
+     * A publisher's fill color made to read over satellite imagery: CAL FIRE and NIFC
+     * draw their responsibility and protection areas in pastels for a white basemap
+     * (SRA is 255,255,190), and at half opacity over tan terrain those vanished
+     * (2026-10-14). The hue is kept, so a legend still matches; the color is pushed to
+     * at least mid saturation and off pure white. A grey or white class stays a grey.
+     */
+    static int strongFill(int rgb) {
+        final float[] hsv = new float[3];
+        android.graphics.Color.colorToHSV(0xFF000000 | rgb, hsv);
+        if (hsv[1] < 0.12f)
+            return 0x9E9E9E;
+        hsv[1] = Math.max(hsv[1], 0.75f);
+        hsv[2] = Math.min(Math.max(hsv[2], 0.55f), 0.92f);
+        return android.graphics.Color.HSVToColor(hsv) & 0x00FFFFFF;
+    }
+
+    private static void put(AttributeSet a, String key, JSONObject p, String field) {
+        final String v = p.isNull(field) ? null : Esri.firstNonEmpty(p.optString(field, null));
+        if (v != null)
+            a.setAttribute(key, v);
     }
 
     /** Square meters in the operator's units: square miles or square kilometers. */
@@ -652,6 +875,8 @@ public final class Boundaries {
     public static List<Named> names(String[] kinds, String[] states, final double lat, final double lon) throws Exception {
         final Map<String, Named> out = new LinkedHashMap<>();
         for (String kind : kinds) {
+            if (mosaic(kind))
+                continue; // a classification has no names to pick
             final String fields = "NAME,BASENAME,GEOID,INTPTLAT,INTPTLON" + (KIND_TRIBAL.equals(kind) ? "" : ",STATE");
             final Map<String, Named> mine = new LinkedHashMap<>();
             for (int layerId : layerIds(kind, states)) {

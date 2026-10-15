@@ -412,7 +412,8 @@ public class LoadedLayer {
      */
     public boolean isWideFeed() {
         return DartStyles.handles(spec) || FireGuardStyles.handles(spec) || NewStartsStyles.handles(spec)
-                || FireHistoryStyles.handles(spec) || "ca-air-intel".equals(spec.id);
+                || FireHistoryStyles.handles(spec) || "ca-air-intel".equals(spec.id)
+                || (Boundaries.handles(spec) && Boundaries.mosaic(spec.kind));
     }
 
     /** Removes unnamed fires whose hour is up from the memory copy and the store. Worker thread. */
@@ -1380,6 +1381,9 @@ public class LoadedLayer {
         if (NewStartsStyles.handles(spec))
             return Double.MAX_VALUE;
         // Fire History: a century of perimeters; 250 km keeps a view to a few thousand.
+        // A land mosaic (responsibility areas, ownership) is the same shape of data.
+        if (Boundaries.handles(spec) && Boundaries.mosaic(spec.kind))
+            return 160_000; // about 100 miles: ownership is 2,200 polygons in such a box
         return FireHistoryStyles.handles(spec) ? 250_000 : MAX_VIEW_M;
     }
 
@@ -1858,6 +1862,13 @@ public class LoadedLayer {
                             // no size reported is a type of its own (NewStartsStyles).
                             if (NewStartsStyles.handles(spec))
                                 target = NewStartsStyles.type(props);
+                            // A land mosaic is typed by the publisher's own class label
+                            // ("State Responsibility Area (SRA)"), not the code behind it.
+                            if (bounds && generic != null) {
+                                final String lbl = generic.labelFor(props);
+                                if (lbl != null && !lbl.isEmpty())
+                                    target = lbl;
+                            }
                             spec.setKind.put(target, isPointLayer ? "point" : isLineLayer ? "line" : "polygon");
                         }
                         int dupAt = -1;
@@ -1984,7 +1995,12 @@ public class LoadedLayer {
                                 title = name + " (" + layerName + ")";
                             }
                             style = history ? FireHistoryStyles.style(target, spec.fillFor(target)) : generic.styleFor(props);
-                            if (bounds) {
+                            if (bounds && Boundaries.mosaic(spec.kind)) {
+                                // The publisher's class, in the publisher's color (the service's
+                                // own renderer): what the ground is, named once.
+                                name = target;
+                                title = target;
+                            } else if (bounds) {
                                 // "Elko County", "Reno": the Census name, in the kind's color,
                                 // outline only unless the fill control says otherwise.
                                 final String bn = Boundaries.label(spec.kind, props);
@@ -2032,8 +2048,9 @@ public class LoadedLayer {
                         // A Census area's name sits on its own interior point, which the
                         // Bureau places inside the shape; the centroid of a crescent-shaped
                         // county lands outside it.
-                        final com.atakmap.map.layer.feature.geometry.Point census = bounds ? Boundaries.interiorPoint(props) : null;
-                        final com.atakmap.map.layer.feature.geometry.Point at = !nwcg && !isPointLayer && !isLineLayer
+                        final boolean mosaic = bounds && !Boundaries.labelled(spec.kind);
+                        final com.atakmap.map.layer.feature.geometry.Point census = bounds && !mosaic ? Boundaries.interiorPoint(props) : null;
+                        final com.atakmap.map.layer.feature.geometry.Point at = !nwcg && !isPointLayer && !isLineLayer && !mosaic
                                 && name != null && !name.isEmpty() ? (census != null ? census : labelPoint(g)) : null;
                         if (at != null) {
                             style = NwcgStyles.withNameLabel(style);
@@ -2120,8 +2137,11 @@ public class LoadedLayer {
                         // the button changed nothing (regressed unnoticed in the marks rewrite).
                         if (!isPointLayer && !isLineLayer) {
                             int hue = nwcg ? NwcgStyles.polygonFill(cat) : generic.rawFillFor(props);
-                            if (bounds)
+                            if (bounds && !Boundaries.mosaic(spec.kind))
                                 hue = 0xFF000000 | Boundaries.hue(spec);
+                            final boolean strongMosaic = bounds && Boundaries.mosaic(spec.kind) && hue != 0;
+                            if (strongMosaic)
+                                hue = 0xFF000000 | Boundaries.strongFill(hue & 0x00FFFFFF);
                             if (!nwcg && "sarcop".equals(spec.iconSet)) {
                                 final int h = SarcopStyles.fillHue(layerName, props);
                                 if (h != 0)
@@ -2145,7 +2165,8 @@ public class LoadedLayer {
                                 style = refilled(style, hue & 0x00FFFFFF, want);
                                 if (alt != null)
                                     alt = refilled(alt, hue & 0x00FFFFFF, want);
-                            } else if (want != fill && hue != 0) {
+                            } else if ((want != fill || strongMosaic) && hue != 0) {
+                                // A land mosaic is refilled in its strengthened color.
                                 style = refilled(style, hue & 0x00FFFFFF, want);
                                 if (alt != null)
                                     alt = refilled(alt, hue & 0x00FFFFFF, want);
