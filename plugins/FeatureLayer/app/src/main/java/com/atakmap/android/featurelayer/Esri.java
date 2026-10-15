@@ -384,10 +384,25 @@ public final class Esri {
         final java.util.List<Polygon> parts = new java.util.ArrayList<>();
         for (int i = 0; i < rings.length(); i++) {
             final JSONArray r = rings.getJSONArray(i);
-            if (parts.isEmpty() || ringArea(r) < 0)
+            final double a = ringArea(r);
+            // A ring the server's simplification collapsed to a line or a point: CAL
+            // FIRE's State Responsibility Area is one polygon of 927 rings, and at a
+            // 50 m offset hundreds of its inholdings come back as three or four points
+            // of no area. The tessellator refused the whole polygon and nothing of the
+            // state's responsibility drew (2026-10-14). Dropped; a polygon whose outer
+            // ring is one of them is dropped with it.
+            if (r.length() < 4 || Math.abs(a) < 1e-12) {
+                if (a < 0 || parts.isEmpty())
+                    parts.add(null); // an outer ring with nothing in it: its holes go nowhere
+                continue;
+            }
+            if (parts.isEmpty() || a < 0)
                 parts.add(new Polygon(2));
-            parts.get(parts.size() - 1).addRing(line(r));
+            final Polygon p = parts.get(parts.size() - 1);
+            if (p != null)
+                p.addRing(line(r));
         }
+        parts.removeAll(java.util.Collections.singleton(null));
         if (parts.isEmpty())
             return null;
         if (parts.size() == 1)
