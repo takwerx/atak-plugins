@@ -1900,6 +1900,13 @@ public class LoadedLayer {
                 Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
+                        if (bounds && Boundaries.mosaic(spec.kind)) {
+                            // Parts and holes too small to see at the square's scale go, or
+                            // the renderer tessellates thousands of parcel-sized dots.
+                            g = Boundaries.prune(g, Boundaries.MIN_RING_AREA_DEG2);
+                            if (g == null)
+                                return;
+                        }
                         // A fire with no name, past its hour: a dispatch call nobody came
                         // back to. Left out, and counted on the row's status line.
                         long dropAt = 0;

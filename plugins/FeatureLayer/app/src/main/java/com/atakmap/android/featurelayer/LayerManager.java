@@ -835,13 +835,38 @@ public class LayerManager {
      */
     public void refreshHere(final LoadedLayer l) {
         if (Boundaries.handles(l.spec) && Boundaries.mosaic(l.spec.kind)) {
+            // Every land layer of the same states moves with it: one Refresh loads the
+            // new area for all of them, not the one whose button was under the thumb
+            // (the operator refreshed Public Access near San Diego and read SRA, still
+            // holding Santa Barbara, as broken, 2026-10-14).
             final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
-            if (c != null) {
-                l.spec.scopeBox = Boundaries.boxAround(c.getLatitude(), c.getLongitude());
-                save();
+            if (c == null) {
+                refresh(l);
+                return;
             }
+            final double[] box = Boundaries.boxAround(c.getLatitude(), c.getLongitude());
+            final String key = Boundaries.groupKey(l.spec);
+            for (LoadedLayer o : snapshot()) {
+                if (!Boundaries.handles(o.spec) || !Boundaries.mosaic(o.spec.kind) || !key.equals(Boundaries.groupKey(o.spec)))
+                    continue;
+                o.spec.scopeBox = box.clone();
+                refresh(o);
+            }
+            save();
+            return;
         }
         refresh(l);
+    }
+
+    /** Whether the map center lies inside the square a land layer loaded; true for every other layer. */
+    public boolean loadedHere(LoadedLayer l) {
+        if (!Boundaries.handles(l.spec) || !Boundaries.mosaic(l.spec.kind) || l.spec.scopeBox == null)
+            return true;
+        final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+        if (c == null)
+            return true;
+        final double[] b = l.spec.scopeBox;
+        return c.getLatitude() >= b[0] && c.getLatitude() <= b[2] && c.getLongitude() >= b[1] && c.getLongitude() <= b[3];
     }
 
     public void refreshAll() {

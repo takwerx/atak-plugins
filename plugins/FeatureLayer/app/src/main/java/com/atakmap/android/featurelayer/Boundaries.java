@@ -627,10 +627,77 @@ public final class Boundaries {
         return sb.toString();
     }
 
-    /** Half the side of the square a land layer loads: 50 miles each way from the map center. */
-    static final double AREA_HALF_M = 50 * MILE;
-    /** About 100 m: the detail a land mosaic is fetched at, once, for its square. */
-    static final double AREA_OFFSET_DEG = 0.001;
+    /**
+     * Half the side of the square a land layer loads: 25 miles each way from the map
+     * center. At 50 miles each way and 100 m detail the five layers carried about
+     * 150,000 vertices apiece and the map fell to half a frame a second (2026-10-14).
+     */
+    static final double AREA_HALF_M = 25 * MILE;
+    /** About 400 m: the detail a land mosaic is fetched at, once, for its square. */
+    static final double AREA_OFFSET_DEG = 0.004;
+    /**
+     * Rings smaller than this many square degrees are dropped after the fetch: a part
+     * or a hole under about 800 m across is a dot at the scale the square is read at,
+     * and CAL FIRE's Local protection area alone had 3,000 such parcels.
+     */
+    static final double MIN_RING_AREA_DEG2 = (2 * AREA_OFFSET_DEG) * (2 * AREA_OFFSET_DEG);
+
+    /**
+     * The geometry without its tiny rings: each polygon keeps its outer ring only if it
+     * is big enough, and only the holes that are; a collection keeps the polygons that
+     * survive. Null when nothing does.
+     */
+    static com.atakmap.map.layer.feature.geometry.Geometry prune(com.atakmap.map.layer.feature.geometry.Geometry g, double minArea) {
+        if (g instanceof com.atakmap.map.layer.feature.geometry.Polygon)
+            return prunePolygon((com.atakmap.map.layer.feature.geometry.Polygon) g, minArea);
+        if (g instanceof com.atakmap.map.layer.feature.geometry.GeometryCollection) {
+            final List<com.atakmap.map.layer.feature.geometry.Geometry> keep = new ArrayList<>();
+            for (com.atakmap.map.layer.feature.geometry.Geometry c : ((com.atakmap.map.layer.feature.geometry.GeometryCollection) g).getGeometries()) {
+                final com.atakmap.map.layer.feature.geometry.Geometry k = prune(c, minArea);
+                if (k != null)
+                    keep.add(k);
+            }
+            if (keep.isEmpty())
+                return null;
+            if (keep.size() == 1)
+                return keep.get(0);
+            final com.atakmap.map.layer.feature.geometry.GeometryCollection out = new com.atakmap.map.layer.feature.geometry.GeometryCollection(2);
+            for (com.atakmap.map.layer.feature.geometry.Geometry k : keep)
+                out.addGeometry(k);
+            return out;
+        }
+        return g;
+    }
+
+    private static com.atakmap.map.layer.feature.geometry.Polygon prunePolygon(com.atakmap.map.layer.feature.geometry.Polygon p, double minArea) {
+        final com.atakmap.map.layer.feature.geometry.LineString outer = p.getExteriorRing();
+        if (outer == null || Math.abs(ringArea(outer)) < minArea)
+            return null;
+        // A ring belongs to the polygon it was parsed into; adding it to another throws.
+        final com.atakmap.map.layer.feature.geometry.Polygon out = new com.atakmap.map.layer.feature.geometry.Polygon(2);
+        out.addRing(copy(outer));
+        for (com.atakmap.map.layer.feature.geometry.LineString hole : p.getInteriorRings())
+            if (hole != null && Math.abs(ringArea(hole)) >= minArea)
+                out.addRing(copy(hole));
+        return out;
+    }
+
+    private static com.atakmap.map.layer.feature.geometry.LineString copy(com.atakmap.map.layer.feature.geometry.LineString r) {
+        final com.atakmap.map.layer.feature.geometry.LineString out = new com.atakmap.map.layer.feature.geometry.LineString(2);
+        for (int i = 0; i < r.getNumPoints(); i++)
+            out.addPoint(r.getX(i), r.getY(i));
+        return out;
+    }
+
+    private static double ringArea(com.atakmap.map.layer.feature.geometry.LineString r) {
+        final int n = r.getNumPoints();
+        double a = 0;
+        for (int i = 0; i < n; i++) {
+            final int j = (i + 1) % n;
+            a += r.getX(i) * r.getY(j) - r.getX(j) * r.getY(i);
+        }
+        return a / 2;
+    }
 
     /** South, west, north, east of the square a land layer loads around a point. */
     public static double[] boxAround(double lat, double lon) {
