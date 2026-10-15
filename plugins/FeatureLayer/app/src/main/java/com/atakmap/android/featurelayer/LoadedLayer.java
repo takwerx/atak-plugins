@@ -1027,6 +1027,34 @@ public class LoadedLayer {
         return false;
     }
 
+    /**
+     * Each class of a land mosaic with the color it is drawn in, from the memory copy
+     * (the hue rides in every feature's {@code _fill}), in the Features list's order:
+     * the map key. Empty until the first fetch.
+     */
+    public java.util.LinkedHashMap<String, Integer> classHues() {
+        final java.util.LinkedHashMap<String, Integer> out = new java.util.LinkedHashMap<>();
+        synchronized (lock) {
+            loadCacheLocked();
+        }
+        final Map<String, Integer> seen = new HashMap<>();
+        for (Pending pf : cache) {
+            if (seen.containsKey(pf.setName))
+                continue;
+            final String raw = attr(pf.attrs, "_fill");
+            if (raw == null)
+                continue;
+            try {
+                seen.put(pf.setName, (int) Long.parseLong(raw) & 0x00FFFFFF);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        for (SetInfo si : types())
+            if (seen.containsKey(si.name))
+                out.put(si.name, seen.get(si.name));
+        return out;
+    }
+
     /** The row's "You are in Elko County, NV" line (or "Map center is in", with no fix), or null; set by the manager as the operator moves. */
     public volatile String whereLine;
 

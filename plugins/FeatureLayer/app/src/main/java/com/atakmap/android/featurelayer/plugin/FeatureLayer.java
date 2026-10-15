@@ -2783,6 +2783,11 @@ public class FeatureLayer implements IPlugin {
             bindHistoryKey(key, l);
             return;
         }
+        if (com.atakmap.android.featurelayer.Boundaries.handles(l.spec)
+                && com.atakmap.android.featurelayer.Boundaries.mosaic(l.spec.kind)) {
+            bindMosaicKey(key, l);
+            return;
+        }
         if (!com.atakmap.android.featurelayer.NewStartsStyles.handles(l.spec)) {
             key.setVisibility(View.GONE);
             return;
@@ -2806,6 +2811,44 @@ public class FeatureLayer implements IPlugin {
             final TextView name = new TextView(key.getContext());
             name.setText(k[1]);
             name.setTextColor(Color.WHITE);
+            name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+            name.setPadding(Math.round(10 * dp), 0, 0, 0);
+            line.addView(name);
+            key.addView(line);
+        }
+        key.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * A land layer's key: each class the view holds as a swatch in the color it is drawn
+     * in, read from the features themselves, so the key and the map cannot disagree
+     * (operator, 2026-10-14: the Features list named the classes without colors).
+     */
+    private void bindMosaicKey(LinearLayout key, LoadedLayer l) {
+        while (key.getChildCount() > 1)
+            key.removeViewAt(1);
+        final java.util.LinkedHashMap<String, Integer> hues = l.classHues();
+        if (hues.isEmpty()) {
+            key.setVisibility(View.GONE);
+            return;
+        }
+        final float dp = paneView.getResources().getDisplayMetrics().density;
+        for (java.util.Map.Entry<String, Integer> k : hues.entrySet()) {
+            final LinearLayout line = new LinearLayout(key.getContext());
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            line.setPadding(0, Math.round(2 * dp), 0, Math.round(2 * dp));
+            final View swatch = new View(key.getContext());
+            final android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+            d.setColor(0xFF000000 | k.getValue());
+            d.setStroke(Math.max(1, Math.round(dp)), 0xFF999999);
+            d.setCornerRadius(3 * dp);
+            swatch.setBackground(d);
+            final int side = Math.round(22 * dp);
+            line.addView(swatch, new LinearLayout.LayoutParams(side, side));
+            final TextView name = new TextView(key.getContext());
+            name.setText(k.getKey() + (l.spec.isOn(k.getKey()) ? "" : "  (off)"));
+            name.setTextColor(l.spec.isOn(k.getKey()) ? Color.WHITE : 0xFF999999);
             name.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
             name.setPadding(Math.round(10 * dp), 0, 0, 0);
             line.addView(name);

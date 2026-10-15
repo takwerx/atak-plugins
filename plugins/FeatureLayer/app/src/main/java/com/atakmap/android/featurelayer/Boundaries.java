@@ -721,12 +721,20 @@ public final class Boundaries {
                 case KIND_RESPONSIBILITY:
                     a.setAttribute("Responsibility", setName);
                     break;
-                case KIND_DPA:
+                case KIND_DPA: {
                     a.setAttribute("Protection", setName);
-                    put(a, "Group", p, "DPA_GROUP");
+                    // NIFC's codes in words where the code is known: the group is the
+                    // level of government, CNTRCT a county CAL FIRE protects by contract.
+                    final String g = p.isNull("DPA_GROUP") ? "" : p.optString("DPA_GROUP", "").trim();
+                    if (!g.isEmpty())
+                        a.setAttribute("Level", "FEDERAL".equals(g) ? "Federal" : "STATE".equals(g) ? "State"
+                                : "LOCAL".equals(g) ? "Local" : g);
                     put(a, "Unit", p, "NWCG_UNITID");
-                    put(a, "Agreements", p, "AGREEMENTS");
+                    final String ag = p.isNull("AGREEMENTS") ? "" : p.optString("AGREEMENTS", "").trim();
+                    if (!ag.isEmpty() && !"None".equalsIgnoreCase(ag))
+                        a.setAttribute("Agreement", "CNTRCT".equals(ag) ? "Contract county (CNTRCT)" : ag);
                     break;
+                }
                 case KIND_OWNERSHIP:
                     a.setAttribute("Owner group", setName);
                     put(a, "Owner", p, "Own_Agency");
