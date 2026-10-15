@@ -674,18 +674,72 @@ public final class Boundaries {
         if (outer == null || Math.abs(ringArea(outer)) < minArea)
             return null;
         // A ring belongs to the polygon it was parsed into; adding it to another throws.
+        final com.atakmap.map.layer.feature.geometry.LineString o = copy(outer);
+        if (o == null)
+            return null;
         final com.atakmap.map.layer.feature.geometry.Polygon out = new com.atakmap.map.layer.feature.geometry.Polygon(2);
-        out.addRing(copy(outer));
-        for (com.atakmap.map.layer.feature.geometry.LineString hole : p.getInteriorRings())
-            if (hole != null && Math.abs(ringArea(hole)) >= minArea)
-                out.addRing(copy(hole));
+        out.addRing(o);
+        for (com.atakmap.map.layer.feature.geometry.LineString hole : p.getInteriorRings()) {
+            if (hole == null || Math.abs(ringArea(hole)) < minArea)
+                continue;
+            final com.atakmap.map.layer.feature.geometry.LineString h = copy(hole);
+            if (h != null)
+                out.addRing(h);
+        }
         return out;
     }
 
+    /**
+     * A copy of the ring with repeated and collinear points removed. ATAK tessellates
+     * fills with earcut, and earcut's cure for local self-intersections loops forever
+     * on a ring with a repeated vertex or a zero-width spike, which a server's
+     * simplification leaves behind: one such ring pinned a core for twenty minutes,
+     * stalled the GL thread and ANR'd ATAK (dev 2, 2026-10-14). Null when fewer than
+     * three distinct points remain.
+     */
     private static com.atakmap.map.layer.feature.geometry.LineString copy(com.atakmap.map.layer.feature.geometry.LineString r) {
+        final int n = r.getNumPoints();
+        final List<double[]> pts = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            final double x = r.getX(i), y = r.getY(i);
+            if (Double.isNaN(x) || Double.isNaN(y))
+                continue;
+            if (!pts.isEmpty()) {
+                final double[] p = pts.get(pts.size() - 1);
+                if (Math.abs(p[0] - x) < 1e-9 && Math.abs(p[1] - y) < 1e-9)
+                    continue; // the same point again
+            }
+            pts.add(new double[] { x, y });
+        }
+        // Closed: the last point is the first; it is put back at the end.
+        while (pts.size() > 1) {
+            final double[] a = pts.get(0), z = pts.get(pts.size() - 1);
+            if (Math.abs(a[0] - z[0]) < 1e-9 && Math.abs(a[1] - z[1]) < 1e-9)
+                pts.remove(pts.size() - 1);
+            else
+                break;
+        }
+        // A point on the straight line between its neighbors, or a spike that doubles
+        // back, adds nothing to the shape and everything to the tessellator's trouble.
+        boolean changed = true;
+        while (changed && pts.size() > 3) {
+            changed = false;
+            for (int i = 0; i < pts.size() && pts.size() > 3; i++) {
+                final double[] a = pts.get((i + pts.size() - 1) % pts.size()), b = pts.get(i), c = pts.get((i + 1) % pts.size());
+                final double cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+                if (Math.abs(cross) < 1e-14) {
+                    pts.remove(i);
+                    i--;
+                    changed = true;
+                }
+            }
+        }
+        if (pts.size() < 3)
+            return null;
         final com.atakmap.map.layer.feature.geometry.LineString out = new com.atakmap.map.layer.feature.geometry.LineString(2);
-        for (int i = 0; i < r.getNumPoints(); i++)
-            out.addPoint(r.getX(i), r.getY(i));
+        for (double[] p : pts)
+            out.addPoint(p[0], p[1]);
+        out.addPoint(pts.get(0)[0], pts.get(0)[1]);
         return out;
     }
 
