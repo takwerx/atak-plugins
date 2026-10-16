@@ -57,6 +57,8 @@ because another plan's Tone 9 is another frequency (Boise's is 179.9, California
 is 100.0), and searching "tone 9" no longer finds it. The catalog builder refuses
 a tone written as a number outside California and a row with no state, and finds
 the names a radio plan prints in capitals and abbreviations (takwerx/comms#2).
+A tap on a site opens its details in the side pane with no radial menu first,
+and the section headings are cyan, as in the other takwerx plugins.
 
 Version 0.8: one versionCode per APK. The same plugin as 0.7, rebuilt so that
 each ATAK target's APK carries its own versionCode, the plugin version and the
