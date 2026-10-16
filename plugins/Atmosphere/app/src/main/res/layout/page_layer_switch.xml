@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A page's own map layer switch, at its top: the same switch as on the Layers page,
+     mirrored, so a page whose data is on the map can put it there (operator,
+     2026-10-14: "some way from a page to turn that layer on for all the pages"). -->
+<Button xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/TakwerxButton"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="6dp"
+    android:gravity="left|center_vertical"
+    android:text="" />

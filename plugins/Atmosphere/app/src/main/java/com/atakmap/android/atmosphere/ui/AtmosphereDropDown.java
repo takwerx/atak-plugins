@@ -136,6 +136,8 @@ public class AtmosphereDropDown extends DropDownReceiver implements OnStateListe
     public void onDropDownVisible(boolean visible) {
         if (visible)
             pane.onShown();
+        else
+            pane.onHidden();
     }
 
     @Override
