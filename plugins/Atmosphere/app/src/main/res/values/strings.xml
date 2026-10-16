@@ -137,6 +137,8 @@
     <string name="lightning_allow_text">Atmosphere will ask NOAA where lightning has struck in the last 15 minutes around the map view, and draw it by how many strikes. It arrives 10 to 25 minutes after the strikes: it shows which storms are making lightning and whether they are building, not where the next strike will be, and is not a reason to call it safe to be outside. The map view is sent, not your position.\n\nServer: nowcoast.noaa.gov</string>
     <string name="lightning_legend_heading">Strikes in a 5-mile square in 15 minutes</string>
     <string name="credit_lightning">Lightning strike density from NOAA nowCOAST and the NWS Ocean Prediction Center, from the NLDN and GLD360 detection networks (%1$s)</string>
+    <string name="page_map_on">Map ON</string>
+    <string name="page_map_off">Map OFF</string>
     <string name="psps_on">PSPS ON</string>
     <string name="psps_off">PSPS OFF</string>
     <string name="psps_allow_title">Show PSPS?</string>

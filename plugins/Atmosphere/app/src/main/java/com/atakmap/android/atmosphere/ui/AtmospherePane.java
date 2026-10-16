@@ -6079,7 +6079,10 @@ public final class AtmospherePane {
      * Puts a page's map layer switch at its top: a mirror of that layer's switch on the
      * Layers page, which it clicks, so allowing, turning on and off go one way wherever
      * they start (operator, 2026-10-14: "some way from a page to turn that layer on for
-     * all the pages we host").
+     * all the pages we host"). It sits small at the end of the page's heading line, as
+     * "Map ON", the heading naming the layer; a row of its own took the space of a list
+     * item on every page (operator, 2026-10-16: "it needs to be small and in line with
+     * something else that is already on the page to allow space for list items").
      */
     private void addPageSwitch(View page, int toggleId) {
         final View t = pages[LAYERS_PAGE].findViewById(toggleId);
@@ -6103,16 +6106,66 @@ public final class AtmospherePane {
                 syncPageSwitches();
             }
         });
-        column.addView(sw, 0);
+        final TextView heading = firstHeading(column);
+        if (heading != null && heading.getParent() instanceof LinearLayout) {
+            // The heading and the switch on one line: the heading takes what is left,
+            // the switch its own width, and the line keeps the heading's place and its
+            // space above.
+            final LinearLayout parent = (LinearLayout) heading.getParent();
+            final int at = parent.indexOfChild(heading);
+            final LinearLayout line = new LinearLayout(pluginContext);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.setPadding(0, heading.getPaddingTop(), 0, 0);
+            final ViewGroup.LayoutParams lp = heading.getLayoutParams();
+            parent.removeViewAt(at);
+            heading.setPadding(heading.getPaddingLeft(), 0, heading.getPaddingRight(),
+                    heading.getPaddingBottom());
+            line.addView(heading, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            final LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            swLp.leftMargin = (int) (8 * pluginContext.getResources().getDisplayMetrics().density);
+            sw.setGravity(Gravity.CENTER);
+            sw.setTag(COMPACT);
+            // As wide as "Map OFF" both ways, so the switch does not jump as it flips.
+            sw.setMinWidth(sw.getPaddingLeft() + sw.getPaddingRight() + (int) Math.ceil(
+                    sw.getPaint().measureText(pluginContext.getString(R.string.page_map_off))));
+            line.addView(sw, swLp);
+            parent.addView(line, at, lp != null ? lp : new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        } else
+            column.addView(sw, 0);
         pageSwitches.add(new Button[] { sw, toggle });
-        sw.setText(toggle.getText());
-        sw.setTextColor(toggle.getCurrentTextColor());
+        syncPageSwitches();
+    }
+
+    /** Marks a page switch that sits on its heading's line and says only "Map ON". */
+    private static final String COMPACT = "compact";
+
+    /**
+     * A page's heading: its first text, down through first children. Null when a page
+     * starts with something else, and the switch then takes a row of its own.
+     */
+    private static TextView firstHeading(ViewGroup column) {
+        View v = column.getChildCount() > 0 ? column.getChildAt(0) : null;
+        while (v instanceof LinearLayout && ((LinearLayout) v).getChildCount() > 0)
+            v = ((LinearLayout) v).getChildAt(0);
+        return v instanceof TextView && !(v instanceof Button) ? (TextView) v : null;
     }
 
     /** The page switches say what their Layers page switches say. */
     private void syncPageSwitches() {
         for (Button[] pair : pageSwitches) {
-            pair[0].setText(pair[1].getText());
+            final String full = pair[1].getText().toString();
+            String shown = full;
+            if (COMPACT.equals(pair[0].getTag())) {
+                if (full.endsWith(" ON"))
+                    shown = pluginContext.getString(R.string.page_map_on);
+                else if (full.endsWith(" OFF"))
+                    shown = pluginContext.getString(R.string.page_map_off);
+            }
+            pair[0].setText(shown);
             pair[0].setTextColor(pair[1].getCurrentTextColor());
         }
     }
