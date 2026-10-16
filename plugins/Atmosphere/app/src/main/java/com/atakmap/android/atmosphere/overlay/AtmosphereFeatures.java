@@ -865,6 +865,11 @@ final class AtmosphereFeatures {
             final FeatureDataStore2.FeatureQueryParameters visibleOnly =
                     new FeatureDataStore2.FeatureQueryParameters();
             visibleOnly.visibleOnly = true;
+            // Drawn in the order written, the last on top. Without it the store draws
+            // its sets in hash order, and PSPS drew SCE's watched circuits over the
+            // ones it had shut off (XCover, 2026-10-16).
+            visibleOnly.order = java.util.Collections.<FeatureDataStore2.FeatureQueryParameters.Order>singletonList(
+                    new FeatureDataStore2.FeatureQueryParameters.Order.ID());
             layer = new FeatureLayer3(layerName, store, visibleOnly);
 
             // A field, not a local: it is built here with the store and used when the
