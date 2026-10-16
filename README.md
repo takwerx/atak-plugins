@@ -1,10 +1,10 @@
 ATAK Plugin — Comms
 
-**Download Comms 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Comms 0.9** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.9/ATAK-Plugin-Comms-0.9--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.9/ATAK-Plugin-Comms-0.9--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.9/ATAK-Plugin-Comms-0.9--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/comms/releases
 
@@ -25,9 +25,10 @@ Capabilities:
   - Radio sites from the Cal OES FIRENET and CESRS relay layers, the USFS
     communications-site layer, and the operator's own rows, with county and
     ground elevation.
-  - The nets on each site, with the tone that opens that repeater, as Hz and as
-    the California tone number ("Tone 8 (103.5)"). One tone per site: the one a
-    radio transmits to key that mountain.
+  - The nets on each site, with the tone that opens that repeater, as Hz and, on
+    a California site, as the California tone number ("Tone 8 (103.5)"). Outside
+    California a site shows the Hz alone, because each plan numbers its tones
+    differently. One tone per site: the one a radio transmits to key that mountain.
   - Search by site name, net name or designator, tone or callsign, and loosely:
     "cdf command 5", "CDF C5" and "cdf 5" all find the same net. When the search
     names a net, each row shows that net's line at that site, so the nearest one
@@ -49,6 +50,13 @@ Capabilities:
 
 _________________________________________________________________
 STATUS
+
+Version 0.9: a tone number belongs to the plan, not the frequency. A California
+site still reads "Tone 8 (103.5)"; a site anywhere else reads the Hz alone,
+because another plan's Tone 9 is another frequency (Boise's is 179.9, California's
+is 100.0), and searching "tone 9" no longer finds it. The catalog builder refuses
+a tone written as a number outside California and a row with no state, and finds
+the names a radio plan prints in capitals and abbreviations (takwerx/comms#2).
 
 Version 0.8: one versionCode per APK. The same plugin as 0.7, rebuilt so that
 each ATAK target's APK carries its own versionCode, the plugin version and the
