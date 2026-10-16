@@ -1,10 +1,10 @@
 ATAK Plugin — Comms
 
-**Download Comms 0.9** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Comms 0.10** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.9/ATAK-Plugin-Comms-0.9--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.9/ATAK-Plugin-Comms-0.9--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.9/ATAK-Plugin-Comms-0.9--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.10/ATAK-Plugin-Comms-0.10--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.10/ATAK-Plugin-Comms-0.10--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.10/ATAK-Plugin-Comms-0.10--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/comms/releases
 
@@ -51,14 +51,15 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-Version 0.9: a tone number belongs to the plan, not the frequency. A California
-site still reads "Tone 8 (103.5)"; a site anywhere else reads the Hz alone,
-because another plan's Tone 9 is another frequency (Boise's is 179.9, California's
-is 100.0), and searching "tone 9" no longer finds it. The catalog builder refuses
-a tone written as a number outside California and a row with no state, and finds
-the names a radio plan prints in capitals and abbreviations (takwerx/comms#2).
-A tap on a site opens its details in the side pane with no radial menu first,
-and the section headings are cyan, as in the other takwerx plugins.
+Version 0.10 (0.9 was built but not released): a tone number belongs to the
+plan, not the frequency. A California site still reads "Tone 8 (103.5)"; a site
+anywhere else reads the Hz alone, because another plan's Tone 9 is another
+frequency (Boise's is 179.9, California's is 100.0), and searching "tone 9" no
+longer finds it. The catalog builder refuses a tone written as a number outside
+California and a row with no state, and finds the names a radio plan prints in
+capitals and abbreviations (takwerx/comms#2). A tap on a site opens its details
+in the side pane with no radial menu first, and the section headings are cyan,
+as in the other takwerx plugins.
 
 Version 0.8: one versionCode per APK. The same plugin as 0.7, rebuilt so that
 each ATAK target's APK carries its own versionCode, the plugin version and the
