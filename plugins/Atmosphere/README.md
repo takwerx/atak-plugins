@@ -56,7 +56,8 @@ Capabilities:
     level for four days and as a page with the site's gauges, the forecaster's
     words and the recommended actions; NOAA's 15-minute lightning strike
     density; California's Public Safety Power Shutoffs from Cal OES (counties
-    warned, power off, power back on), saying what it does not cover.
+    warned, where the power is off, customers out and when it is expected
+    back), saying what it does not cover.
   - Fire danger: every Predictive Service Area in the lower 48 shaded by its
     Energy Release Component percentile, observed or forecast, from the
     Forest Service's national service; tap an area's name for its ERC and
@@ -204,6 +205,9 @@ PORTS REQUIRED
                                     rain pictures (Iowa Environmental Mesonet)
     geocoding.geo.census.gov        address search for a spot request, only
                                     when the operator types an address
+    mapdepot.takwerx.org            Public Safety Power Shutoffs: Cal OES's
+                                    warned counties and power-off areas,
+                                    relayed by takwerx as one file
 
   An operator-supplied weather service definition can name a different host;
   the dialog that enables it lists the hosts it will contact.

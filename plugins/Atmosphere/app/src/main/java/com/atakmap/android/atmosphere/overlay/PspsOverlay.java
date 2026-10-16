@@ -9,28 +9,29 @@ import com.atakmap.android.maps.MapView;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
- * Public Safety Power Shutoffs on the map, California, from Cal OES: the counties a
- * utility has warned may have a shutoff (amber), and the areas where the power is
- * off (red), off because a circuit upstream was cut (orange), or back on (green).
- * In the Fire group because a shutoff is called for fire weather (operator,
- * 2026-09-30); Atmosphere's and not Critical Infrastructure's (2026-10-01).
+ * Public Safety Power Shutoffs on the map, California, from Cal OES by way of
+ * takwerx's relay: the counties a utility has warned may have a shutoff (amber), and
+ * the areas where the power is off for public safety (red). In the Fire group because
+ * a shutoff is called for fire weather (operator, 2026-09-30); Atmosphere's and not
+ * Critical Infrastructure's (2026-10-01).
  *
- * <p>Three requests every 15 minutes while on: the county rows' newest stamp (about
- * 700 bytes), the flagged counties, the shutoff areas. The status line always says
- * what it covers, and when Cal OES has gone quiet it says the status is unknown
- * rather than "none".
+ * <p>One request every 15 minutes while on, the relay's file (250 KB gzipped for 528
+ * areas). The status line always says what it covers, and a part Cal OES or the relay
+ * has stopped rewriting is unknown, never "none".
  */
 public final class PspsOverlay extends OutlookOverlay {
 
     public static final String LAYER_ID = "psps";
     public static final String HOST = Psps.HOST;
-    private static final String[] URLS = { Psps.FRESHNESS_URL, Psps.COUNTIES_URL, Psps.AREAS_URL };
+    private static final String[] URLS = { Psps.URL };
     private static final String COVERS = "Covers PG&E, SCE and SDG&E customers in California only;"
             + " not PacifiCorp, Liberty, Bear Valley or other states.";
 
@@ -38,13 +39,11 @@ public final class PspsOverlay extends OutlookOverlay {
     public static final String[][] LEGEND = {
             { Psps.POSSIBLE + ": a utility has warned Cal OES it may cut power in the county",
                     String.valueOf(Psps.COLORS[0]) },
-            { Psps.OFF + ": the utility has cut power here", String.valueOf(Psps.COLORS[1]) },
-            { Psps.DOWNSTREAM + ": off because a line feeding it was cut",
-                    String.valueOf(Psps.COLORS[2]) },
-            { Psps.RESTORED + ": power is back on", String.valueOf(Psps.COLORS[3]) } };
+            { Psps.OFF + ": the utility has shut the power off here",
+                    String.valueOf(Psps.COLORS[1]) } };
 
-    private volatile long updated;
-    private volatile long rows;
+    private volatile long countiesUpdated, areasUpdated;
+    private volatile int countyRows;
 
     public PspsOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
         super(mapView, pluginContext, egress, "AtmospherePsps", LAYER_ID, "PSPS");
@@ -55,6 +54,14 @@ public final class PspsOverlay extends OutlookOverlay {
         return URLS;
     }
 
+    /** The file is 1 MB as JSON in a big shutoff and a quarter of that gzipped. */
+    @Override
+    protected Map<String, String> headers(int index) {
+        final Map<String, String> h = new HashMap<>();
+        h.put("Accept-Encoding", "gzip");
+        return h;
+    }
+
     /**
      * PSPS has no days; the details pane printed "Day 1" under a county's title on
      * the signed 0.8 (S22 Ultra, 2026-10-01).
@@ -62,12 +69,6 @@ public final class PspsOverlay extends OutlookOverlay {
     @Override
     protected String setName(Area a) {
         return "Public Safety Power Shutoffs, California";
-    }
-
-    /** Without the stamp the areas still draw, and the status says it cannot vouch for them. */
-    @Override
-    protected boolean optional(int index) {
-        return index == 0;
     }
 
     @Override
@@ -103,35 +104,37 @@ public final class PspsOverlay extends OutlookOverlay {
 
     @Override
     protected List<Area> parse(int index, String body) {
+        final Psps.Feed feed = Psps.parse(body);
+        if (feed == null)
+            throw new Refused("the shutoff list could not be read");
+        countiesUpdated = feed.countiesUpdated;
+        countyRows = feed.countyRows;
+        areasUpdated = feed.areasUpdated;
         final List<Area> out = new ArrayList<>();
-        if (index == 0) {
-            // A failed check leaves the last stamp read: still the real time Cal OES last
-            // published, and past 45 minutes it says "unknown" by itself.
-            final long[] f = Psps.freshness(body);
-            updated = f[0];
-            rows = f[1];
-            return out;
-        }
-        final String when = updated > 0 ? time(updated) : "";
-        final List<Psps.Area> got = index == 1 ? Psps.parseCounties(body) : Psps.parseAreas(body);
-        for (Psps.Area p : got) {
+        for (Psps.Area p : feed.areas) {
             final StringBuilder d = new StringBuilder();
             final String title;
+            final long when;
             if (Psps.POSSIBLE.equals(p.kind)) {
                 title = p.county + ": " + Psps.POSSIBLE;
+                when = feed.countiesUpdated;
                 d.append(p.county).append(" County\n").append(Psps.POSSIBLE)
                         .append(": a utility has told Cal OES it may cut power somewhere in the"
                                 + " county to keep its lines from starting a fire. Which"
                                 + " neighborhoods is the utility's to say.");
             } else {
-                title = (p.utility.isEmpty() ? "" : p.utility + ": ") + p.kind;
-                d.append(title).append("\nCounty: ").append(p.county)
-                        .append("\nStatus: ").append(p.status);
-                if (!p.event.isEmpty())
-                    d.append("\nEvent: ").append(p.event);
+                title = (p.utility.isEmpty() ? "" : p.utility + " - ") + p.kind;
+                when = feed.areasUpdated;
+                d.append(title).append("\nCounty: ").append(p.county);
+                if (p.customers > 0)
+                    d.append("\nCustomers out: ").append(p.customers);
+                if (p.since > 0)
+                    d.append("\nOff since: ").append(day(p.since));
+                d.append("\nExpected back on: ")
+                        .append(p.restore > 0 ? day(p.restore) : "the utility has not said");
             }
-            if (!when.isEmpty())
-                d.append("\nCal OES updated: ").append(when);
+            if (when > 0)
+                d.append("\nCal OES updated: ").append(day(when));
             d.append("\nFrom: California Governor's Office of Emergency Services, as reported by")
                     .append(" PG&E, SCE and SDG&E");
             out.add(new Area(1, title, p.kind, Psps.color(p.kind), p.geometry, d.toString()));
@@ -141,45 +144,51 @@ public final class PspsOverlay extends OutlookOverlay {
 
     @Override
     protected String summary(List<Area> areas) {
-        final StringBuilder b = new StringBuilder();
-        final long age = updated > 0 ? System.currentTimeMillis() - updated : Long.MAX_VALUE;
-        final boolean stale = age > Psps.STALE_MS || rows == 0;
-        if (stale)
-            b.append(updated > 0
-                    ? "Cal OES has not updated since " + time(updated) + ": shutoff status unknown."
-                    : "Cal OES did not say when it last updated: shutoff status unknown.");
+        final long now = System.currentTimeMillis();
+        final boolean countiesFresh = fresh(countiesUpdated, now) && countyRows > 0;
+        final boolean areasFresh = fresh(areasUpdated, now);
         final Set<String> counties = new LinkedHashSet<>();
-        int off = 0, downstream = 0, restored = 0;
+        int off = 0;
         for (Area a : areas) {
             if (Psps.POSSIBLE.equals(a.label))
                 counties.add(a.title.substring(0, a.title.indexOf(':')));
             else if (Psps.OFF.equals(a.label))
                 off++;
-            else if (Psps.DOWNSTREAM.equals(a.label))
-                downstream++;
-            else if (Psps.RESTORED.equals(a.label))
-                restored++;
         }
-        if (!stale) {
-            if (counties.isEmpty() && off + downstream + restored == 0)
-                b.append("No shutoffs warned or in effect.");
-            else {
+        final StringBuilder b = new StringBuilder();
+        if (countiesFresh && areasFresh && counties.isEmpty() && off == 0)
+            b.append("No shutoffs warned or in effect.");
+        else {
+            if (!countiesFresh)
+                b.append("Warned counties unknown: ").append(quiet(countiesUpdated)).append('.');
+            else
                 b.append(counties.isEmpty() ? "No counties warned."
                         : Psps.POSSIBLE + ": " + join(counties) + ".");
-                b.append(off == 0 ? " Power off: none." : " Power off: " + areasText(off) + ".");
-                if (downstream > 0)
-                    b.append(" Off upstream: ").append(areasText(downstream)).append('.');
-                if (restored > 0)
-                    b.append(" Restored: ").append(areasText(restored)).append('.');
-            }
-            b.append(" Cal OES updated ").append(time(updated)).append('.');
+            b.append(' ');
+            if (!areasFresh)
+                b.append("PSPS areas unknown: ").append(quiet(areasUpdated)).append('.');
+            else
+                b.append(off == 0 ? "PSPS: no areas shut off."
+                        : "PSPS: " + areasText(off) + " shut off.");
         }
+        if (countiesFresh && areasFresh)
+            b.append(" Cal OES updated ").append(time(Math.min(countiesUpdated, areasUpdated)))
+                    .append('.');
         return b.append('\n').append(COVERS).toString();
     }
 
     @Override
     protected String noun() {
         return "PSPS status";
+    }
+
+    private static boolean fresh(long updated, long now) {
+        return updated > 0 && now - updated <= Psps.STALE_MS;
+    }
+
+    private static String quiet(long updated) {
+        return updated > 0 ? "Cal OES has not updated it since " + time(updated)
+                : "Cal OES could not be read";
     }
 
     private static String areasText(int n) {
@@ -195,5 +204,10 @@ public final class PspsOverlay extends OutlookOverlay {
 
     private static String time(long millis) {
         return new SimpleDateFormat("h:mm a", Locale.US).format(new Date(millis));
+    }
+
+    /** A shutoff runs past midnight, so its times carry the day. */
+    private static String day(long millis) {
+        return new SimpleDateFormat("EEE MMM d, h:mm a", Locale.US).format(new Date(millis));
     }
 }
