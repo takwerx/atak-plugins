@@ -42,8 +42,8 @@ center, and a radius.
 
 = Site details
 #toolbox.side-by-side(columns: (5fr, 4fr))[
-Tap a row, or Details on a site's radial menu, for county, elevation, distance and
-bearing, and every net on the mountain with the tone that opens that repeater.
+Tap a row, or a site on the map, for county, elevation, distance and bearing, and
+every net on the mountain with the tone that opens that repeater.
 
 One tone per net, and it is the one you transmit to key that repeater. A call plan
 prints two, but the other belongs to the net and is identical at every site on it,
@@ -68,8 +68,7 @@ Sites draw as the NWCG repeater symbol, named, once you are zoomed in far enough
 to make sense of them. *Draw on the map* sets that zoom and quotes it as what the
 scale bar reads, so you can match it to how you work rather than to a number.
 
-Tapping a site opens ATAK's radial menu on it, with Details, a pairing line and
-polar.
+Tapping a site opens its details in the side pane, with no radial menu first.
 ][
 #image("4.jpg", width: 100%)
 ]

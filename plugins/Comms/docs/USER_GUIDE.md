@@ -71,8 +71,9 @@ county, and the nets on it.
 
 ## Site details
 
-Tap a row — or **Details** on a site's radial menu — for the county, elevation,
-distance and bearing, and every net on the mountain with the tone that opens it.
+Tap a row, or a site on the map, for the county, elevation, distance and bearing,
+and every net on the mountain with the tone that opens it. A tap on the map opens
+the details in the side pane straight away, with no radial menu first.
 
 ![Site details](screenshots/09_site_details.png)
 
@@ -105,10 +106,7 @@ match it to how you actually work rather than to a number.
 
 ![Setting the draw zoom](screenshots/11_draw_on_the_map.png)
 
-Tapping a site opens ATAK's radial menu on it, with Details, a pairing line and
-polar.
-
-![The radial menu on a site](screenshots/13_radial_menu.png)
+Tapping a site opens its details in the side pane.
 
 ## Which repeaters can I reach from here
 
