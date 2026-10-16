@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.HorizontalScrollView;
+import android.widget.ScrollView;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -346,6 +347,7 @@ public final class AtmospherePane {
     private final Button raingaugesToggle;
     private final TextView raingaugesStatus;
     private final LinearLayout raingaugesLegend;
+    private final Button raingaugesWindow;
     private RainGaugesOverlay raingauges;
     private boolean raingaugesOpen = true;
     private static final String PREF_FIREZONES_OPEN = "weather.firezones.open";
@@ -694,6 +696,33 @@ public final class AtmospherePane {
             public GeoPoint point() {
                 return AtmospherePane.this.point();
             }
+
+            @Override
+            public String mapDate() {
+                final com.atakmap.android.atmosphere.data.Sawti.Forecast f = sawti == null ? null : sawti.forecast();
+                final List<String> dates = f == null ? null : f.dates();
+                final int d = sawti == null ? 0 : sawti.day();
+                return dates == null || d < 1 || d > dates.size() ? null : dates.get(d - 1);
+            }
+
+            @Override
+            public void showOnMap(String date) {
+                if (sawti == null || date == null)
+                    return;
+                // Picking a day is asking to see it: the layer comes on, by its own
+                // switch, so a first time asks for the allow (operator, 2026-10-14). A
+                // layer that was off has no forecast yet: the day waits for it.
+                sawtiPendingDate = date;
+                applySawtiPendingDate();
+                if (!sawti.isOn())
+                    sawtiToggle.performClick();
+            }
+
+            @Override
+            public void zoneShown(int zone) {
+                sawtiZone = zone;
+                updateSawtiOutline();
+            }
         });
         stationPage = new StationPage(pluginContext, mapView(), new StationPage.Host() {
             @Override
@@ -737,6 +766,15 @@ public final class AtmospherePane {
                 rainPage.view()
         };
         wireGroupFolds(pages[LAYERS_PAGE]);
+        addPageSwitch(spotPage.view(), R.id.spot_toggle);
+        addPageSwitch(zonePage.view(), R.id.firezones_toggle);
+        addPageSwitch(sawtiPage.view(), R.id.sawti_toggle);
+        addPageSwitch(ercPage.view(), R.id.erc_toggle);
+        addPageSwitch(stationPage.view(), R.id.stations_toggle);
+        addPageSwitch(gaugePage.view(), R.id.gauges_toggle);
+        addPageSwitch(buoyPage.view(), R.id.buoys_toggle);
+        addPageSwitch(reportsPage.view(), R.id.reports_toggle);
+        addPageSwitch(rainPage.view(), R.id.raingauges_toggle);
         pager = root.findViewById(R.id.pager);
         pagePrev = root.findViewById(R.id.page_prev);
         pageNext = root.findViewById(R.id.page_next);
@@ -898,6 +936,7 @@ public final class AtmospherePane {
         raingaugesToggle = find(R.id.raingauges_toggle);
         raingaugesStatus = find(R.id.raingauges_status);
         raingaugesLegend = find(R.id.raingauges_legend);
+        raingaugesWindow = find(R.id.raingauges_window);
         firezonesSettings = find(R.id.firezones_settings);
         firezonesExpand = find(R.id.firezones_expand);
         firezonesToggle = find(R.id.firezones_toggle);
@@ -1595,6 +1634,8 @@ public final class AtmospherePane {
             zonePage.onShown();
         if (pages[pager.getCurrentItem()] == sawtiPage.view())
             sawtiPage.onShown();
+        paneShowing = true;
+        updateSawtiOutline();
         updateLayerControls();
     }
 
@@ -1654,6 +1695,7 @@ public final class AtmospherePane {
                     zonePage.onShown();
                 if (pages[position] == sawtiPage.view())
                     sawtiPage.onShown();
+                updateSawtiOutline();
                 // A list page re-reads its layer when it comes into view: the tile
                 // counts are otherwise as old as the last redraw, and the operator
                 // saw "Red Flag (1)" over a list of two (2026-09-26).
@@ -2282,9 +2324,11 @@ public final class AtmospherePane {
             public void onStatus(String status) {
                 sawtiStatus.setText(status);
                 sawtiStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
+                applySawtiPendingDate();
                 buildDayRow(sawtiDayRow, sawti);
             }
         });
+        updateSawtiOutline();
         sawtiLegend.removeAllViews();
         for (String[] row : SawtiOverlay.LEGEND)
             sawtiLegend.addView(legendLine(row[0], Integer.parseInt(row[1])));
@@ -2442,14 +2486,19 @@ public final class AtmospherePane {
                 raingaugesStatus.setVisibility(status.isEmpty() ? View.GONE : View.VISIBLE);
             }
         });
-        raingaugesLegend.removeAllViews();
-        for (String[] row : RainGaugesOverlay.LEGEND)
-            raingaugesLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
         rainPage.setGauges(raingauges);
+        buildRainGaugesKey();
         raingauges.setDataListener(new Runnable() {
             @Override
             public void run() {
                 rainPage.onGaugesChanged();
+                buildRainGaugesKey();
+            }
+        });
+        raingaugesWindow.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                rainPage.chooseWindow();
             }
         });
         final View openList = find(R.id.raingauges_open_list);
@@ -2461,6 +2510,34 @@ public final class AtmospherePane {
                 }
             });
         updateLayerControls();
+    }
+
+    /** The run of days the gauges add up, on its button, and the key for it. */
+    private void buildRainGaugesKey() {
+        if (raingauges == null)
+            return;
+        raingaugesWindow.setText(pluginContext.getString(R.string.rain_window_button, raingauges.windowLabel()));
+        raingaugesLegend.removeAllViews();
+        for (String[] row : raingauges.legend())
+            raingaugesLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
+    }
+
+    /** The radar estimate before a moment: the day, the time, then 1, 24, 48 or 72 hours before. */
+    private void pickRainTotalsMoment(android.content.Context ctx) {
+        MomentPicker.pick(ctx, raintotals.moment(), com.atakmap.android.atmosphere.data.IemRadar.HOURS,
+                raintotals.beforeHours(), pluginContext.getString(R.string.rain_window_title), new MomentPicker.Words() {
+                    @Override
+                    public String of(int hours, long millis) {
+                        return RainGaugesOverlay.hoursWords(hours) + " before " + RainGaugesOverlay.momentName(
+                                com.atakmap.android.atmosphere.data.IemRadar.hourOf(millis));
+                    }
+                }, new MomentPicker.Picked() {
+                    @Override
+                    public void picked(long millis, int hours) {
+                        raintotals.setMoment(millis, hours);
+                        buildRainTotalsRow();
+                    }
+                });
     }
 
     /** Rain that fell: the window chips, the status line and the key in the NWS colors. */
@@ -2486,13 +2563,42 @@ public final class AtmospherePane {
         raintotalsLegend.removeAllViews();
         for (String[] row : raintotals.legend())
             raintotalsLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
-        chips(raintotalsWindowRow, RainTotalsOverlay.WINDOWS, raintotals.window(), new Picked() {
+        // One "Totals:" button, as on Rain Gauges: eight windows do not fit a chip row.
+        raintotalsWindowRow.removeAllViews();
+        final Button pick = (Button) LayoutInflater.from(pluginContext)
+                .inflate(R.layout.trend_chip, raintotalsWindowRow, false);
+        pick.setText(pluginContext.getString(R.string.rain_window_button, raintotals.windowLabel()));
+        pick.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        pick.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void picked(int which) {
-                raintotals.setWindow(which);
-                buildRainTotalsRow();
+            public void onClick(View v) {
+                final android.content.Context ctx = com.atakmap.android.atmosphere.compat.MapCompat.atakContext();
+                if (ctx == null)
+                    return;
+                final String[] names = RainTotalsOverlay.WINDOWS.clone();
+                names[RainTotalsOverlay.WINDOW_BEFORE] = raintotals.window() == RainTotalsOverlay.WINDOW_BEFORE
+                        ? raintotals.windowLabel() + "…" : "Before a date and time…";
+                new android.app.AlertDialog.Builder(ctx)
+                        .setTitle(pluginContext.getString(R.string.rain_window_title))
+                        .setSingleChoiceItems(names, raintotals.window(),
+                                new android.content.DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(android.content.DialogInterface d, int which) {
+                                        d.dismiss();
+                                        if (which == RainTotalsOverlay.WINDOW_BEFORE) {
+                                            pickRainTotalsMoment(ctx);
+                                            return;
+                                        }
+                                        raintotals.setWindow(which);
+                                        buildRainTotalsRow();
+                                    }
+                                })
+                        .setNegativeButton(pluginContext.getString(R.string.close), null)
+                        .show();
             }
         });
+        raintotalsWindowRow.addView(pick);
         raintotalsTransparency.setMax(RainTotalsOverlay.MAX_TRANSPARENCY);
         raintotalsTransparency.setProgress(raintotals.transparency());
         raintotalsTransparencyLabel.setText(pluginContext.getString(R.string.raintotals_opacity_heading)
@@ -5928,6 +6034,89 @@ public final class AtmospherePane {
         }
     }
 
+    /** The zone the SAWTI page reads, held for a layer that arrives after the page. */
+    private int sawtiZone;
+    /** The pane is on screen. */
+    private boolean paneShowing;
+
+    /**
+     * The SAWTI page's zone is outlined on the map only while that page is on
+     * screen: leaving it is how the outline goes, with nothing to switch off
+     * (operator, 2026-10-14: "there is now no way to turn off that white outline").
+     */
+    private void updateSawtiOutline() {
+        if (sawti == null)
+            return;
+        final boolean onPage = paneShowing && pager != null && pages[pager.getCurrentItem()] == sawtiPage.view();
+        sawti.setPickedZone(onPage ? sawtiZone : 0);
+    }
+
+    /** The pane is covered or slid away without closing. */
+    public void onHidden() {
+        paneShowing = false;
+        updateSawtiOutline();
+    }
+
+    /** A day picked on the SAWTI page before the layer's own forecast was in. */
+    private String sawtiPendingDate;
+
+    private void applySawtiPendingDate() {
+        final com.atakmap.android.atmosphere.data.Sawti.Forecast f = sawti == null ? null : sawti.forecast();
+        if (f == null || sawtiPendingDate == null)
+            return;
+        final int n = f.dayNumber(sawtiPendingDate);
+        sawtiPendingDate = null;
+        if (n < 1 || n > sawti.days())
+            return;
+        sawti.setDay(n);
+        buildDayRow(sawtiDayRow, sawti);
+    }
+
+    /** Each page's own layer switch, beside the Layers page switch it mirrors. */
+    private final List<Button[]> pageSwitches = new ArrayList<>();
+
+    /**
+     * Puts a page's map layer switch at its top: a mirror of that layer's switch on the
+     * Layers page, which it clicks, so allowing, turning on and off go one way wherever
+     * they start (operator, 2026-10-14: "some way from a page to turn that layer on for
+     * all the pages we host").
+     */
+    private void addPageSwitch(View page, int toggleId) {
+        final View t = pages[LAYERS_PAGE].findViewById(toggleId);
+        if (!(t instanceof Button))
+            return;
+        final Button toggle = (Button) t;
+        ViewGroup column = null;
+        if (page instanceof ScrollView && ((ScrollView) page).getChildCount() > 0
+                && ((ScrollView) page).getChildAt(0) instanceof ViewGroup)
+            column = (ViewGroup) ((ScrollView) page).getChildAt(0);
+        else if (page instanceof LinearLayout)
+            column = (ViewGroup) page;
+        if (column == null)
+            return;
+        final Button sw = (Button) LayoutInflater.from(pluginContext).inflate(R.layout.page_layer_switch, column,
+                false);
+        sw.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggle.performClick();
+                syncPageSwitches();
+            }
+        });
+        column.addView(sw, 0);
+        pageSwitches.add(new Button[] { sw, toggle });
+        sw.setText(toggle.getText());
+        sw.setTextColor(toggle.getCurrentTextColor());
+    }
+
+    /** The page switches say what their Layers page switches say. */
+    private void syncPageSwitches() {
+        for (Button[] pair : pageSwitches) {
+            pair[0].setText(pair[1].getText());
+            pair[0].setTextColor(pair[1].getCurrentTextColor());
+        }
+    }
+
     private void updateLayerControls() {
         final boolean radarOn = radar != null && radar.isOn();
         final boolean windOn = wind != null && wind.isOn();
@@ -6266,6 +6455,7 @@ public final class AtmospherePane {
         scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn || rainOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
         applyGroupFolds();
+        syncPageSwitches();
     }
 
     /**
@@ -6867,6 +7057,8 @@ public final class AtmospherePane {
 
     /** The pane left the screen: an armed pick must not keep the map's tap listeners. */
     public void onClosed() {
+        paneShowing = false;
+        updateSawtiOutline();
         disarmPick();
         updateModeIcons();
         final MapView mv = MapView.getMapView();

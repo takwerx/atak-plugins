@@ -1,11 +1,15 @@
 package com.atakmap.android.atmosphere.ui;
 
+import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -21,7 +25,9 @@ import com.atakmap.android.atmosphere.overlay.RainGaugesOverlay;
 import com.atakmap.android.atmosphere.plugin.R;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
+import com.atakmap.coremap.maps.coords.GeoBounds;
 import com.atakmap.coremap.maps.coords.GeoPoint;
+import com.atakmap.android.atmosphere.compat.MapCompat;
 
 import com.atakmap.android.atmosphere.compat.GeneratedFiles;
 import com.atakmap.android.atmosphere.data.Spot;
@@ -31,7 +37,9 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayDeque;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -81,12 +89,24 @@ public final class RainPage {
     private final TextView detailTitle, detailFacts;
     private Runnable detailGoTo;
     private final TextView officeLine, periodLine, status, reportText;
-    private final Button sortWritten, sortMost, showReport;
-    private final LinearLayout rows, gaugeRows;
+    private final Button showReport, sortWritten, sortMost, showRaw;
+    private final LinearLayout rows;
+    /** The office's report, folded until asked for. */
+    private final LinearLayout reportBox;
+    private final LinearLayout gaugeRows;
     private final TextView gaugeStatus;
     private final Button gaugeButton;
+    /** The run of days the gauges add up, and what that means, over the whole page. */
+    private final Button windowButton;
+    private final TextView windowLine;
+    /** Moves while the gauges are being fetched or drawn. */
+    private final android.widget.ProgressBar windowBusy;
     private final HorizontalScrollView reportScroll;
     private RainGaugesOverlay gauges;
+    /** The map's gauges by distance from the pane's point rather than by rain. */
+    private boolean gaugesClosest;
+    private final Button gaugeMost, gaugeClosest;
+    private boolean reportOpen, rawOpen;
     private boolean mostFirst = true;
     /**
      * Where each gauge id is, looked up once through the NWS station service and
@@ -99,7 +119,6 @@ public final class RainPage {
     private final ArrayDeque<String> toLocate = new ArrayDeque<>();
     private boolean locating;
     private int sinceSaved;
-    private boolean reportOpen;
     private RainReports.Report report;
     /** The office whose report is showing, and the half-degree cell it was found for. */
     private String office = "";
@@ -155,38 +174,29 @@ public final class RainPage {
             }
         });
 
-        body.addView(heading(pluginContext.getString(R.string.rain_office_heading)));
-        officeLine = text(15, true);
-        officeLine.setPadding(0, dp(4), 0, 0);
-        body.addView(officeLine);
-        periodLine = text(13, false);
-        periodLine.setTextColor(0xFFD0D0D0);
-        body.addView(periodLine);
-        final LinearLayout sort = row();
-        sortMost = chip("Most rain first");
-        sortWritten = chip("Closest");
-        sort.addView(sortMost, weight(1f, true));
-        sort.addView(sortWritten, weight(1f, false));
-        body.addView(sort);
-        status = text(13, false);
-        status.setPadding(0, dp(6), 0, 0);
-        body.addView(status);
-        rows = new LinearLayout(pluginContext);
-        rows.setOrientation(LinearLayout.VERTICAL);
-        body.addView(rows);
-        showReport = chip("Show the report as written");
-        body.addView(showReport, matchWidth(8));
-        reportScroll = new HorizontalScrollView(pluginContext);
-        reportText = new TextView(pluginContext);
-        reportText.setTypeface(Typeface.MONOSPACE);
-        reportText.setTextSize(12);
-        reportText.setTextColor(Color.WHITE);
-        reportText.setTextIsSelectable(true);
-        reportScroll.addView(reportText);
-        reportScroll.setVisibility(View.GONE);
-        body.addView(reportScroll, matchWidth(4));
-
-        body.addView(heading(pluginContext.getString(R.string.rain_gauges_heading)));
+        // The run of days first: it decides every number on the map and in the gauge list
+        // (operator, 2026-10-13: "could we have like last 72 or week to show totals ...
+        // or even year to date").
+        body.addView(heading(pluginContext.getString(R.string.rain_window_heading)));
+        windowButton = chip("");
+        body.addView(windowButton, matchWidth(4));
+        windowBusy = new android.widget.ProgressBar(pluginContext, null, android.R.attr.progressBarStyleHorizontal);
+        windowBusy.setIndeterminate(true);
+        windowBusy.setVisibility(View.GONE);
+        body.addView(windowBusy, matchWidth(4));
+        windowLine = text(13, false);
+        windowLine.setTextColor(0xFFD0D0D0);
+        windowLine.setPadding(0, dp(4), 0, 0);
+        body.addView(windowLine);
+        // The gauges the map draws, right under the choice that decides them, sorted
+        // their own way (operator, 2026-10-14: "i did closest but that is not whats
+        // listed": the Closest below sorted the office's report, not these).
+        final LinearLayout gaugeSort = row();
+        gaugeMost = chip("Most rain first");
+        gaugeClosest = chip("Closest");
+        gaugeSort.addView(gaugeMost, weight(1f, true));
+        gaugeSort.addView(gaugeClosest, weight(1f, false));
+        body.addView(gaugeSort);
         gaugeStatus = text(13, false);
         gaugeStatus.setPadding(0, dp(4), 0, 0);
         body.addView(gaugeStatus);
@@ -196,7 +206,62 @@ public final class RainPage {
         gaugeRows = new LinearLayout(pluginContext);
         gaugeRows.setOrientation(LinearLayout.VERTICAL);
         body.addView(gaugeRows);
+        gaugeMost.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                gaugesClosest = false;
+                renderGauges();
+            }
+        });
+        gaugeClosest.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                gaugesClosest = true;
+                renderGauges();
+            }
+        });
 
+        // The office's own bulletin, as written, behind one button at the bottom: its
+        // period is the forecaster's, and its gauges are among the ones listed above
+        // (operator, 2026-10-14: "why have them separate im confused").
+        showReport = chip(pluginContext.getString(R.string.rain_report_show));
+        body.addView(showReport, matchWidth(12));
+        reportBox = new LinearLayout(pluginContext);
+        reportBox.setOrientation(LinearLayout.VERTICAL);
+        reportBox.setVisibility(View.GONE);
+        body.addView(reportBox);
+        officeLine = text(15, true);
+        officeLine.setPadding(0, dp(6), 0, 0);
+        reportBox.addView(officeLine);
+        periodLine = text(13, false);
+        periodLine.setTextColor(0xFFD0D0D0);
+        reportBox.addView(periodLine);
+        // The office's table, read into rows in the level colors (operator,
+        // 2026-10-14: "i liked the format it had colors ... it doesnt fit on the page
+        // in the text look"); the text as written stays one tap further.
+        final LinearLayout sort = row();
+        sortMost = chip("Most rain first");
+        sortWritten = chip("Closest");
+        sort.addView(sortMost, weight(1f, true));
+        sort.addView(sortWritten, weight(1f, false));
+        reportBox.addView(sort);
+        status = text(13, false);
+        status.setPadding(0, dp(6), 0, 0);
+        reportBox.addView(status);
+        rows = new LinearLayout(pluginContext);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        reportBox.addView(rows);
+        showRaw = chip("Show the report as written");
+        reportBox.addView(showRaw, matchWidth(8));
+        reportScroll = new HorizontalScrollView(pluginContext);
+        reportText = new TextView(pluginContext);
+        reportText.setTypeface(Typeface.MONOSPACE);
+        reportText.setTextSize(12);
+        reportText.setTextColor(Color.WHITE);
+        reportText.setTextIsSelectable(true);
+        reportScroll.addView(reportText);
+        reportScroll.setVisibility(View.GONE);
+        reportBox.addView(reportScroll, matchWidth(4));
         sortMost.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -211,12 +276,39 @@ public final class RainPage {
                 renderReport();
             }
         });
+        showRaw.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                rawOpen = !rawOpen;
+                reportScroll.setVisibility(rawOpen ? View.VISIBLE : View.GONE);
+                showRaw.setText(rawOpen ? "Hide the report as written" : "Show the report as written");
+            }
+        });
+
         showReport.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 reportOpen = !reportOpen;
-                reportScroll.setVisibility(reportOpen ? View.VISIBLE : View.GONE);
-                showReport.setText(reportOpen ? "Hide the report" : "Show the report as written");
+                reportBox.setVisibility(reportOpen ? View.VISIBLE : View.GONE);
+                showReport.setText(pluginContext.getString(reportOpen ? R.string.rain_report_hide
+                        : R.string.rain_report_show));
+                if (reportOpen) {
+                    fetchReport(false);
+                    // The report opens under the gauge list, below the pane's edge;
+                    // bring its button to the top so the table is what shows.
+                    root.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            root.smoothScrollTo(0, topIn(root, showReport));
+                        }
+                    });
+                }
+            }
+        });
+        windowButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                chooseWindow();
             }
         });
         gaugeButton.setOnClickListener(new View.OnClickListener() {
@@ -246,51 +338,21 @@ public final class RainPage {
     /** The gauge layer fetched or moved; with it on, the office's report is wanted too. */
     public void onGaugesChanged() {
         renderGauges();
-        if (gauges != null && gauges.isOn())
-            fetchReport(false);
-    }
-
-    /** Hand every placed gauge of the report to the map layer. */
-    private void pushReportGauges() {
-        if (gauges == null)
-            return;
-        final List<RainGaugesOverlay.ReportGauge> out = new ArrayList<>();
-        if (report != null) {
-            final StringBuilder period = new StringBuilder();
-            for (String l : report.period)
-                period.append(period.length() > 0 ? " " : "").append(l);
-            final Set<String> seen = new HashSet<>();
-            for (RainReports.Section sec : report.sections)
-                for (RainReports.Row r : sec.rows) {
-                    final double[] at = place(r);
-                    if (at == null || !seen.add(r.id))
-                        continue;
-                    final StringBuilder d = new StringBuilder();
-                    d.append(r.values.length == 1 ? r.values[0] + (Double.isNaN(r.inches) ? " (trace)" : " in")
-                            : join(" ", r.values))
-                            .append(period.length() > 0 ? "\n" + period : "")
-                            .append('\n').append(r.name);
-                    if (!r.id.isEmpty())
-                        d.append("\nGauge id: ").append(r.id);
-                    if (r.elevationFt != Integer.MIN_VALUE)
-                        d.append("\nElevation: ").append(String.format(Locale.US, "%,d ft", r.elevationFt));
-                    d.append("\nFrom: ").append(RainReports.clean(report.office)).append(" rainfall report, ")
-                            .append(report.issued).append(", preliminary");
-                    out.add(new RainGaugesOverlay.ReportGauge(r.name, at[0], at[1], r.inches, d.toString()));
-                }
-        }
-        gauges.setReportGauges(office, out);
     }
 
     /** The pane's point moved: another office, maybe. */
     public void pointChanged() {
-        fetchReport(false);
-        if (!mostFirst)
-            renderReport();
+        if (reportOpen) {
+            fetchReport(false);
+            if (!mostFirst)
+                renderReport();
+        }
+        renderGauges();
     }
 
     public void onShown() {
-        fetchReport(false);
+        if (reportOpen)
+            fetchReport(false);
         renderGauges();
         if (gauges != null && gauges.isOn())
             gauges.refresh(false);
@@ -387,7 +449,6 @@ public final class RainPage {
                         fetchedAt = System.currentTimeMillis();
                         queueLocations();
                         renderReport();
-                        pushReportGauges();
                     }
 
                     @Override
@@ -411,11 +472,9 @@ public final class RainPage {
         green(sortWritten, !mostFirst);
         rows.removeAllViews();
         if (report == null) {
-            showReport.setVisibility(View.GONE);
-            reportScroll.setVisibility(View.GONE);
+            reportText.setText("");
             return;
         }
-        showReport.setVisibility(View.VISIBLE);
         reportText.setText(report.text);
         officeLine.setText(RainReports.clean(report.office.isEmpty() ? "Office " + office : report.office)
                 + (report.issued.isEmpty() ? "" : ", " + report.issued));
@@ -652,7 +711,6 @@ public final class RainPage {
         saveLocations();
         sinceSaved = 0;
         renderReport();
-        pushReportGauges();
     }
 
     private double meters(GeoPoint from, double lat, double lon) {
@@ -788,12 +846,10 @@ public final class RainPage {
                             saveLocations();
                             sinceSaved = 0;
                             renderReport();
-                            pushReportGauges();
-                        } else {
+                                            } else {
                             if (toLocate.size() % 10 == 0) {
                                 renderReport();
-                                pushReportGauges();
-                            }
+                                                    }
                             locateNext();
                         }
                     }
@@ -879,6 +935,17 @@ public final class RainPage {
         return b.toString();
     }
 
+    /** How far down the scroller's content a view starts, through its nested rows. */
+    private static int topIn(ScrollView scroller, View v) {
+        int y = 0;
+        View at = v;
+        while (at != null && at.getParent() != scroller) {
+            y += at.getTop();
+            at = at.getParent() instanceof View ? (View) at.getParent() : null;
+        }
+        return at == null ? 0 : y + at.getTop();
+    }
+
     private void openDetail(String title, String facts, Runnable goTo) {
         detailTitle.setText(title);
         detailFacts.setText(facts);
@@ -907,7 +974,10 @@ public final class RainPage {
 
     // ---- the USGS gauges ------------------------------------------------------------------
 
+    private static final int MAX_ROWS = 50;
+
     private void renderGauges() {
+        renderWindow();
         gaugeRows.removeAllViews();
         final boolean allowed = egress.isLayerEnabled(RainGaugesOverlay.LAYER_ID);
         final boolean on = gauges != null && gauges.isOn();
@@ -920,18 +990,42 @@ public final class RainPage {
             return;
         }
         gaugeButton.setVisibility(View.GONE);
-        if (gauges.zoomedOut()) {
-            gaugeStatus.setText("Zoom the map in to see the USGS gauges around it.");
+        // The gauges the map shows, in its view, most rain first: the list follows the map.
+        final GeoBounds view = mapView.getBounds();
+        final List<RainGaugesOverlay.Reading> list = new ArrayList<>();
+        for (RainGaugesOverlay.Reading r : gauges.readings())
+            if (view == null || view.contains(new GeoPoint(r.lat, r.lon)))
+                list.add(r);
+        green(gaugeMost, !gaugesClosest);
+        green(gaugeClosest, gaugesClosest);
+        final GeoPoint from = host.point();
+        if (gaugesClosest && from != null)
+            Collections.sort(list, new Comparator<RainGaugesOverlay.Reading>() {
+                @Override
+                public int compare(RainGaugesOverlay.Reading a, RainGaugesOverlay.Reading b) {
+                    return Double.compare(meters(from, a.lat, a.lon), meters(from, b.lat, b.lon));
+                }
+            });
+        if (list.isEmpty() && gauges.busy()) {
+            gaugeStatus.setText("Getting the gauges…");
             return;
         }
-        final List<UsgsRain.Gauge> list = gauges.gauges();
         if (list.isEmpty()) {
-            gaugeStatus.setText("No USGS rain gauges around the map.");
+            gaugeStatus.setText(gauges.zoomedOut() && gauges.window() == RainGaugesOverlay.WINDOW_24H
+                    ? "Zoom the map in to see the gauges around it."
+                    : "No gauges in the map's view. Move or zoom out the map.");
             return;
         }
-        gaugeStatus.setText(list.size() + (list.size() == 1 ? " USGS gauge" : " USGS gauges")
-                + " around the map, last 24 h, most rain first. Tap one to go to it.");
-        for (final UsgsRain.Gauge g : list) {
+        final int shown = Math.min(MAX_ROWS, list.size());
+        gaugeStatus.setText((gauges.busy() ? "Updating. " : "") + (shown < list.size()
+                ? "The " + shown + (gaugesClosest && from != null ? " closest" : " wettest") + " of " + list.size()
+                        + " gauges in the map's view"
+                : list.size() + (list.size() == 1 ? " gauge" : " gauges") + " in the map's view")
+                + ", rain " + gauges.runWords() + (gaugesClosest && from != null ? ", closest first." : ", most first.")
+                + " Tap one to go to it."
+                + (shown < list.size() ? " Zoom in for the rest." : ""));
+        for (int i = 0; i < shown; i++) {
+            final RainGaugesOverlay.Reading g = list.get(i);
             final LinearLayout row = new LinearLayout(pluginContext);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setBackgroundResource(R.drawable.btn_gray);
@@ -939,7 +1033,7 @@ public final class RainPage {
             row.setClickable(true);
             row.setLayoutParams(matchWidth(4));
             final View dot = new View(pluginContext);
-            dot.setBackgroundColor(RainGaugesOverlay.color(g.total));
+            dot.setBackgroundColor(g.color);
             final LinearLayout.LayoutParams dp = new LinearLayout.LayoutParams(dp(14), dp(14));
             dp.rightMargin = dp(10);
             dp.topMargin = dp(5);
@@ -948,11 +1042,12 @@ public final class RainPage {
             col.setOrientation(LinearLayout.VERTICAL);
             row.addView(col, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             final TextView t = text(15, true);
-            t.setText(RainGaugesOverlay.inches(g.total));
+            t.setText(g.amount);
             col.addView(t);
             final TextView n = text(13, false);
             n.setTextColor(0xFFD0D0D0);
-            n.setText(g.name);
+            final String away = from == null ? "" : distanceLabel(meters(from, g.lat, g.lon));
+            n.setText((away.isEmpty() ? g.name : g.name + " · " + away) + (g.note.isEmpty() ? "" : "\n" + g.note));
             col.addView(n);
             final TextView go = text(13, true);
             go.setText(pluginContext.getString(R.string.go_to));
@@ -963,7 +1058,7 @@ public final class RainPage {
                 @Override
                 public void onClick(View v) {
                     flyTo(g.lat, g.lon);
-                    openDetail(g.name, RainGaugesOverlay.details(g), new Runnable() {
+                    openDetail(g.name, g.details, new Runnable() {
                         @Override
                         public void run() {
                             flyTo(g.lat, g.lon);
@@ -973,6 +1068,98 @@ public final class RainPage {
             });
             gaugeRows.addView(row);
         }
+    }
+
+    // ---- the run of days ---------------------------------------------------------------------
+
+    private void renderWindow() {
+        if (gauges == null) {
+            windowButton.setText(pluginContext.getString(R.string.rain_window_button, RainGaugesOverlay.WINDOWS[0]));
+            windowLine.setText("");
+            return;
+        }
+        windowButton.setText(pluginContext.getString(R.string.rain_window_button, gauges.windowLabel()));
+        final boolean busy = gauges.isOn() && gauges.busy();
+        windowBusy.setVisibility(busy ? View.VISIBLE : View.GONE);
+        windowLine.setTextColor(busy ? pluginContext.getResources().getColor(R.color.state_on) : 0xFFD0D0D0);
+        if (busy) {
+            windowLine.setText((gauges.window() == RainGaugesOverlay.WINDOW_24H ? "Getting the rain of the last 24 h"
+                    : "Getting the rain for " + gauges.windowLabel()) + "… The gauges come in when all have answered.");
+            return;
+        }
+        windowLine.setText(gauges.window() == RainGaugesOverlay.WINDOW_24H
+                ? "Every gauge on the map and in the list below shows its last 24 hours."
+                : "Every gauge on the map and in the list below shows its rain " + gauges.runWords() + ".");
+    }
+
+    /** The runs of days, the one in use checked; One day opens a date. The Layers page asks too. */
+    public void chooseWindow() {
+        if (gauges == null)
+            return;
+        final Context ctx = MapCompat.atakContext();
+        if (ctx == null)
+            return;
+        final String[] names = RainGaugesOverlay.WINDOWS.clone();
+        names[RainGaugesOverlay.WINDOW_ONE_DAY] = gauges.window() == RainGaugesOverlay.WINDOW_ONE_DAY
+                ? "One day: " + gauges.windowLabel() : "One day…";
+        names[RainGaugesOverlay.WINDOW_BEFORE] = gauges.window() == RainGaugesOverlay.WINDOW_BEFORE
+                ? gauges.windowLabel() + "…" : "Before a date and time…";
+        new AlertDialog.Builder(ctx)
+                .setTitle(pluginContext.getString(R.string.rain_window_title))
+                .setSingleChoiceItems(names, gauges.window(), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        if (which == RainGaugesOverlay.WINDOW_ONE_DAY)
+                            chooseDay(ctx);
+                        else if (which == RainGaugesOverlay.WINDOW_BEFORE)
+                            chooseMoment(ctx);
+                        else
+                            gauges.setWindow(which, "");
+                        renderGauges();
+                    }
+                })
+                .setNegativeButton(pluginContext.getString(R.string.close), null)
+                .show();
+    }
+
+    /** The rain before a moment, the start of a fire: day, time, then how long before it. */
+    private void chooseMoment(final Context ctx) {
+        MomentPicker.pick(ctx, gauges.moment(), RainGaugesOverlay.BEFORE_HOURS, gauges.beforeHours(),
+                pluginContext.getString(R.string.rain_window_title), new MomentPicker.Words() {
+                    @Override
+                    public String of(int hours, long millis) {
+                        return RainGaugesOverlay.hoursWords(hours) + " before " + RainGaugesOverlay.momentName(millis);
+                    }
+                }, new MomentPicker.Picked() {
+                    @Override
+                    public void picked(long millis, int hours) {
+                        gauges.setMoment(millis, hours);
+                        renderGauges();
+                    }
+                });
+    }
+
+    /** A calendar, today the latest day it offers. */
+    private void chooseDay(Context ctx) {
+        final Calendar c = Calendar.getInstance();
+        final String had = gauges.pickedDate();
+        if (!had.isEmpty())
+            try {
+                c.setTime(new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(had));
+            } catch (java.text.ParseException e) {
+                // Today.
+            }
+        final DatePickerDialog d = new DatePickerDialog(ctx, new DatePickerDialog.OnDateSetListener() {
+            @Override
+            public void onDateSet(DatePicker view, int year, int month, int day) {
+                gauges.setWindow(RainGaugesOverlay.WINDOW_ONE_DAY,
+                        String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, day));
+                renderGauges();
+            }
+        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH));
+        d.getDatePicker().setMaxDate(System.currentTimeMillis());
+        d.show();
     }
 
     // ---- widgets ---------------------------------------------------------------------------

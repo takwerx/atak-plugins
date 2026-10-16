@@ -183,8 +183,8 @@ public final class Sawti {
                         continue;
                     out.add(new Day(zone, date.substring(0, 10),
                             clamp(r.optInt("forecastValue", 0)),
-                            text(r.optString("eventDescription", "")),
-                            text(r.optString("recommendedActions", ""))));
+                            words(r.optString("eventDescription", "")),
+                            words(r.optString("recommendedActions", ""))));
                 }
             }
         } catch (Exception e) {
@@ -333,6 +333,16 @@ public final class Sawti {
                 .replaceAll(" *\n *", "\n")
                 .replaceAll("\n{2,}", "\n");
         return s.trim();
+    }
+
+    /**
+     * The forecaster's words, or nothing when the feed carries the site's stand-in
+     * instead: on 2026-10-15 every day read "Event description for index 1" and
+     * "Recommended action for index 1", on the Forest Service's own page too.
+     */
+    public static String words(String html) {
+        final String s = text(html);
+        return s.matches("(?i)(event description|recommended actions?) for index \\d+\\.?") ? "" : s;
     }
 
     /** "Wed 9/30" from {@code 2026-09-30}; the date itself when it is not one. */

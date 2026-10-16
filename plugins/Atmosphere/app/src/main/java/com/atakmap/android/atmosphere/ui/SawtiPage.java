@@ -69,6 +69,15 @@ public final class SawtiPage {
     public interface Host {
         /** The point the pane is reading, or null. */
         GeoPoint point();
+
+        /** The date the SAWTI map layer is drawing, yyyy-MM-dd, or null. */
+        String mapDate();
+
+        /** Draw this date on the SAWTI map layer, as its day button on the Layers page does. */
+        void showOnMap(String date);
+
+        /** The zone the page is reading, so the map can mark it. */
+        void zoneShown(int zone);
     }
 
     private final Context pluginContext;
@@ -79,6 +88,7 @@ public final class SawtiPage {
     private final Button zoneButton;
     private final LinearLayout dayRow, gaugeRow, links, table;
     private final TextView tile, meaning, event, actions, status;
+    private final View eventHead, actionsHead;
     private final SawtiGaugeView threatGauge, windGauge, fuelGauge;
     private final double[][][] zones;
     private final float density;
@@ -113,6 +123,8 @@ public final class SawtiPage {
         meaning = root.findViewById(R.id.sawti_meaning);
         event = root.findViewById(R.id.sawti_event);
         actions = root.findViewById(R.id.sawti_actions);
+        eventHead = root.findViewById(R.id.sawti_event_head);
+        actionsHead = root.findViewById(R.id.sawti_actions_head);
         status = root.findViewById(R.id.sawti_status);
         ((TextView) root.findViewById(R.id.sawti_credit))
                 .setText(pluginContext.getString(R.string.credit_sawti, Sawti.HOST));
@@ -122,6 +134,7 @@ public final class SawtiPage {
         zones = Sawti.parseZones(readAsset(Sawti.ZONES_ASSET));
         final SharedPreferences p = MapCompat.prefs();
         zone = p == null ? 3 : Math.max(1, Math.min(4, p.getInt(PREF_ZONE, 3)));
+        host.zoneShown(zone);
 
         root.findViewById(R.id.sawti_load).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -150,8 +163,24 @@ public final class SawtiPage {
             return;
         if (pointDirty)
             followPoint();
+        // The page shows the day the map shows: one day for both, picked in either
+        // (operator, 2026-10-13: "if i click thursday on the sawti layer page it
+        // changes map ... if i change date [on the page] it does not change the map").
+        final String onMap = host.mapDate();
+        if (onMap != null && pendingDate == null)
+            pendingDate = onMap;
+        resolvePendingDate();
         fetch(false);
         render();
+    }
+
+    /** A day picked on the page: the map is told, so both show it. */
+    private void pickDay(int value) {
+        day = value;
+        final Sawti.Forecast f = forecast;
+        final List<String> dates = f == null ? null : f.dates();
+        if (dates != null && value >= 1 && value <= dates.size())
+            host.showOnMap(dates.get(value - 1));
     }
 
     /** The pane is reading another point: the page follows it the next time it is looked at. */
@@ -201,6 +230,7 @@ public final class SawtiPage {
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
             p.edit().putInt(PREF_ZONE, z).apply();
+        host.zoneShown(z);
     }
 
     private void resolvePendingDate() {
@@ -358,8 +388,8 @@ public final class SawtiPage {
             threatGauge.setValue(Double.NaN);
             windGauge.setValue(Double.NaN);
             fuelGauge.setValue(Double.NaN);
-            event.setText("");
-            actions.setText("");
+            words(eventHead, event, "");
+            words(actionsHead, actions, "");
         } else {
             tile.setVisibility(View.VISIBLE);
             tile.setText(Sawti.longDate(date) + ": " + Sawti.level(d.value));
@@ -369,12 +399,20 @@ public final class SawtiPage {
             threatGauge.setValue(d.value);
             windGauge.setValue(model == null ? Double.NaN : model.wind(zone, date));
             fuelGauge.setValue(model == null ? Double.NaN : model.fuel(zone, date));
-            event.setText(d.description);
-            actions.setText(d.actions);
+            words(eventHead, event, d.description);
+            words(actionsHead, actions, d.actions);
         }
         buildLinks();
         buildTable(f, dates, n);
         status.setText(statusLine(f));
+    }
+
+    /** The forecaster's words under their heading; with none, neither shows. */
+    private static void words(View head, TextView text, String s) {
+        text.setText(s);
+        final int v = s == null || s.isEmpty() ? View.GONE : View.VISIBLE;
+        head.setVisibility(v);
+        text.setVisibility(v);
     }
 
     private String statusLine(Sawti.Forecast f) {
@@ -424,7 +462,7 @@ public final class SawtiPage {
             b.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    day = value;
+                    pickDay(value);
                     render();
                 }
             });
@@ -484,7 +522,7 @@ public final class SawtiPage {
                     @Override
                     public void onClick(View view) {
                         setZone(pickZone);
-                        day = pickDay;
+                        pickDay(pickDay);
                         render();
                     }
                 });

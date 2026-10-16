@@ -1805,6 +1805,15 @@
                     android:layout_marginTop="4dp"
                     android:text="@string/raingauges_open_list" />
 
+                <Button
+                    android:id="@+id/raingauges_window"
+                    style="@style/TakwerxButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="left|center_vertical"
+                    android:text="" />
+
                 <TextView
                     android:id="@+id/raingauges_status"
                     android:layout_width="match_parent"
