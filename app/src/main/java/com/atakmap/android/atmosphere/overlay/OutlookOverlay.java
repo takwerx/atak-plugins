@@ -273,6 +273,29 @@ public abstract class OutlookOverlay {
     protected abstract List<Area> parse(int index, String body);
 
     /**
+     * Thrown by {@link #parse(int, String)} for an answer that is not the data: the
+     * request is then a failed one, and what is drawn stays with the status saying so.
+     * An empty list would read as "none", and on 2026-10-16 PSPS said "Power off:
+     * none" over a "Token Required" while 528 areas were off.
+     */
+    protected static final class Refused extends RuntimeException {
+        public Refused(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * An ArcGIS refusal: it comes as HTTP 200 with a small {@code {"error": ...}} body
+     * ("Token Required" when a layer goes private), which a parser would read as no
+     * features.
+     */
+    static boolean arcgisRefusal(String body) {
+        if (body == null || body.length() > 4096)
+            return false;
+        return body.replaceAll("\\s", "").startsWith("{\"error\":{");
+    }
+
+    /**
      * The answer to {@code url}, the request as it went out: a layer whose chain
      * changes under a refresh reads which request this was from here, never from the
      * chain as it stands now (security review, 2026-10-14). By default, {@link #parse(int, String)}.
@@ -605,16 +628,30 @@ public abstract class OutlookOverlay {
                             // A parser slip on a server's answer is a line in the log
                             // and nothing drawn from that answer, never ATAK going down.
                             List<Area> parsed;
+                            String refused = null;
                             try {
+                                if (arcgisRefusal(body))
+                                    throw new Refused("the server turned the request away");
                                 parsed = parse(index, url, body);
+                            } catch (Refused e) {
+                                Log.w(tag, "request " + index + " refused: " + e.getMessage()
+                                        + " " + (body == null ? "" : body.substring(0,
+                                                Math.min(200, body.length()))));
+                                parsed = Collections.emptyList();
+                                refused = e.getMessage();
                             } catch (RuntimeException e) {
                                 Log.w(tag, "unreadable answer to request " + index, e);
                                 parsed = Collections.emptyList();
                             }
                             final List<Area> answer = parsed;
+                            final String failed = refused;
                             mapView.post(new Runnable() {
                                 @Override
                                 public void run() {
+                                    if (failed != null) {
+                                        onFailure(failed);
+                                        return;
+                                    }
                                     got.addAll(answer);
                                     fetch(index + 1, got, mine);
                                 }

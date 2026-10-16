@@ -12,7 +12,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 public class PspsTest {
 
@@ -28,55 +27,50 @@ public class PspsTest {
     }
 
     @Test
-    public void theFlaggedCountiesOfTheNightOfTheFirst() throws IOException {
-        // 2026-10-01 04:29Z: SCE considering Riverside circuits, SDG&E forecasting San Diego.
-        final List<Psps.Area> c = Psps.parseCounties(resource("psps_counties_2026-10-01.json"));
-        assertEquals(2, c.size());
-        assertEquals("Riverside", c.get(0).county);
-        assertEquals(Psps.POSSIBLE, c.get(0).kind);
-        assertEquals("MultiPolygon", c.get(1).geometry.optString("type"));
-        assertEquals(0, Psps.parseAreas(resource("psps_areas_empty.json")).size());
+    public void theRelayFileOfThePgeShutoff() throws IOException {
+        // 2026-10-16 16:25Z, cut to one warned county and three of the 529 areas off.
+        final Psps.Feed f = Psps.parse(resource("psps_relay_2026-10-16.json"));
+        assertEquals(1792167573719L, f.countiesUpdated);
+        assertEquals(58, f.countyRows);
+        assertEquals(1792167096446L, f.areasUpdated);
+        assertEquals(4, f.areas.size());
+        assertEquals(Psps.POSSIBLE, f.areas.get(0).kind);
+        assertEquals("Alameda", f.areas.get(0).county);
+        final Psps.Area off = f.areas.get(1);
+        assertEquals(Psps.OFF, off.kind);
+        assertEquals("Contra Costa", off.county);
+        assertEquals("PG&E", off.utility);
+        assertEquals(1, off.customers);
+        assertEquals(1792077480000L, off.since);
+        assertEquals(1792191600000L, off.restore);
+        // The one area with no restore estimate.
+        assertEquals(0, f.areas.get(3).restore);
+        assertTrue(off.geometry.optString("type").endsWith("Polygon"));
     }
 
     @Test
-    public void areasKeepTheirStatusAndDropMonitoring() {
-        final String ring = "{\"type\":\"Polygon\",\"coordinates\":[[[-117,33.5],[-116.9,33.5],[-116.9,33.6],[-117,33.5]]]}";
-        final String body = "{\"type\":\"FeatureCollection\",\"features\":["
-                + area("De-Energized", "SCE", ring) + "," + area("Downstream", "SCE", ring) + ","
-                + area("Re-Energized", "SDG&E", ring) + "," + area("Monitoring", "PG&E", ring) + ","
-                + "{\"type\":\"Feature\",\"properties\":{\"Status\":\"De-Energized\"},\"geometry\":null}]}";
-        final List<Psps.Area> a = Psps.parseAreas(body);
-        assertEquals(3, a.size());
-        assertEquals(Psps.OFF, a.get(0).kind);
-        assertEquals(Psps.DOWNSTREAM, a.get(1).kind);
-        assertEquals(Psps.RESTORED, a.get(2).kind);
-        assertEquals("SDG&E", a.get(2).utility);
-        assertEquals("PSPS Incident 10-01-2026", a.get(0).event);
-        assertNull(Psps.kind("Monitoring"));
-        assertEquals(0, Psps.parseAreas("<html>").size());
-    }
-
-    private static String area(String status, String utility, String geometry) {
-        return "{\"type\":\"Feature\",\"properties\":{\"County\":\"Riverside\",\"Status\":\"" + status
-                + "\",\"UtilityCompany\":\"" + utility + "\",\"EventName\":\"PSPS Incident 10-01-2026\"},"
-                + "\"geometry\":" + geometry + "}";
+    public void anythingButTheFileIsNoAnswer() {
+        // What 0.16 read as "Power off: none" while 528 areas were off.
+        assertNull(Psps.parse("{\"error\":{\"code\":499,\"message\":\"Token Required\","
+                + "\"messageCode\":\"GWM_0003\",\"details\":[\"Token Required\"]}}"));
+        assertNull(Psps.parse("<html><body>502 Bad Gateway</body></html>"));
+        assertNull(Psps.parse("{\"type\":\"FeatureCollection\",\"features\":[]}"));
+        assertNull(Psps.parse(""));
+        assertNull(Psps.parse(null));
     }
 
     @Test
-    public void freshnessReadsTheNewestStampAndTheRowCount() {
-        final String body = "{\"features\":[{\"attributes\":{\"latest\":1790828195610,\"counties\":58}}]}";
-        final long[] f = Psps.freshness(body);
-        assertEquals(1790828195610L, f[0]);
-        assertEquals(58, f[1]);
-        assertEquals(0, Psps.freshness("{}")[0]);
-        assertEquals(0, Psps.freshness("nope")[1]);
+    public void anEmptyFileIsAnAnswer() {
+        final Psps.Feed f = Psps.parse("{\"type\":\"FeatureCollection\",\"psps\":{\"v\":1,"
+                + "\"counties\":{\"updated\":5,\"rows\":58},\"areas\":{\"updated\":7}},\"features\":[]}");
+        assertEquals(0, f.areas.size());
+        assertEquals(5, f.countiesUpdated);
+        assertEquals(7, f.areasUpdated);
     }
 
     @Test
-    public void urlsAndColors() {
-        assertTrue(Psps.FRESHNESS_URL.startsWith("https://services.arcgis.com/BLN4oKB0N1YSgvY8/"));
-        assertTrue(Psps.FRESHNESS_URL.contains("outStatistics=%5B%7B"));
-        assertTrue(Psps.COUNTIES_URL.contains("where=Impacted%3D%27Yes%27"));
+    public void urlAndColors() {
+        assertEquals("https://mapdepot.takwerx.org/atmosphere/psps/psps.json", Psps.URL);
         assertEquals(0xFFD50000, Psps.color(Psps.OFF));
         assertEquals(0xFF000000, Psps.textColor(Psps.POSSIBLE));
         assertEquals(0xFFFFFFFF, Psps.textColor(Psps.OFF));

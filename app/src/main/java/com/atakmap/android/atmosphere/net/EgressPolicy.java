@@ -61,10 +61,11 @@ public final class EgressPolicy {
      * not name is asked again, once, under a new key: Rain Gauges and Rain Totals took
      * on the Iowa Environmental Mesonet and the Regional Climate Centers in 0.15, and a
      * phone that allowed them in 0.14 had never seen those named (security review,
-     * 2026-10-14).
+     * 2026-10-14). PSPS moved from Cal OES's own server to takwerx's relay in 0.17.
      */
     private static String key(String layerId) {
-        if (layerId.equals("raingauges") || layerId.equals("raintotals"))
+        if (layerId.equals("raingauges") || layerId.equals("raintotals")
+                || layerId.equals("psps"))
             return PREF_LAYER_PREFIX + layerId + ".v2";
         return PREF_LAYER_PREFIX + layerId;
     }
