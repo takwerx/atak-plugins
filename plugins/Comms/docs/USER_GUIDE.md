@@ -1,10 +1,10 @@
 # Comms — user guide
 
-**Download Comms 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Comms 0.9** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.9/ATAK-Plugin-Comms-0.9--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.9/ATAK-Plugin-Comms-0.9--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.9/ATAK-Plugin-Comms-0.9--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/comms/releases
 
@@ -81,6 +81,11 @@ print two, but the other belongs to the net and is the same at every site on it,
 so it can never tell you which mountain to use. Where the catalog does not hold a
 tone, the row says which kind of nothing it is — a digital trunked channel has no
 CTCSS tone at all, and a plan can withhold one — rather than leaving you to guess.
+
+A California site shows the tone's number as well as its frequency, "Tone 8
+(103.5)", because every California plan numbers the same 32 tones the same way. A
+site anywhere else shows the frequency alone: other plans number their tones
+differently, and Boise's Tone 9 is 179.9 Hz where California's is 100.0.
 
 A mountain often carries several agencies, each on its own tone. Sierra Peak has
 the Cleveland National Forest, CAL FIRE and Orange County on it, on three

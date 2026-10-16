@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Comms",
-   plugin-version: "0.8",
+   plugin-version: "0.9",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -50,6 +50,10 @@ prints two, but the other belongs to the net and is identical at every site on i
 so it can never tell you which mountain to use. Where this catalog does not hold a
 tone the row says which kind of nothing it is -- a digital trunked channel has no
 CTCSS tone at all, and a plan can withhold one -- rather than leaving you to guess.
+
+A California site shows the tone's number as well as its frequency, "Tone 8
+(103.5)". A site anywhere else shows the frequency alone: other plans number their
+tones differently, and Boise's Tone 9 is 179.9 Hz where California's is 100.0.
 
 A mountain often carries several agencies, each on its own tone.
 ][
