@@ -1999,12 +1999,9 @@ public class FeatureLayer implements IPlugin {
         final String title = com.atakmap.android.featurelayer.Boundaries.groupTitle(kinds.get(0).spec.states) + " Boundaries";
         boolean anyOn = false, loading = false;
         final StringBuilder wl = new StringBuilder();
-        boolean elsewhere = false;
         for (LoadedLayer l : kinds) {
             anyOn |= l.isVisible();
             loading |= l.refreshing || l.busy;
-            if (l.isVisible() && !manager.loadedHere(l))
-                elsewhere = true;
             final String w = l.whereLine;
             if (w != null && l.isVisible() && !l.refreshing && !l.busy) {
                 if (wl.length() == 0)
@@ -2051,10 +2048,6 @@ public class FeatureLayer implements IPlugin {
                         manager.setVisible(l, true);
             }
         });
-        // A land layer holds the square it was loaded for; when the map has left it,
-        // the row says so instead of looking broken.
-        if (elsewhere)
-            wl.append(wl.length() > 0 ? " \u00b7 " : "").append("Land layers loaded elsewhere: Refresh loads them here");
         if (wl.length() > 0) {
             where.setText(wl);
             where.setVisibility(View.VISIBLE);

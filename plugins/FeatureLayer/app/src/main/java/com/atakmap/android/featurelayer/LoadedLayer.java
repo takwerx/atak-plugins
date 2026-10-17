@@ -1335,7 +1335,7 @@ public class LoadedLayer {
         if (spec.scopeKind == null)
             return "Everything";
         if ("box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind))
-            return "100 miles around where it was loaded";
+            return "50 miles around the map, following it";
         if ("all".equals(spec.scopeKind))
             return "Everywhere";
         if ("view".equals(spec.scopeKind))
@@ -1375,7 +1375,20 @@ public class LoadedLayer {
      * {@link LayerManager} after a debounced map move.
      */
     boolean movedOutOfScope() {
-        if (!hasScopeControl() || refreshing || busy || "all".equals(spec.scopeKind))
+        if (refreshing || busy)
+            return false;
+        // A land layer's square follows the map center: a new one once the center has
+        // left the middle of the loaded one.
+        if ("box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind)) {
+            try {
+                final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
+                return c != null && spec.scopeBox != null
+                        && !Boundaries.wellInside(spec.scopeBox, c.getLatitude(), c.getLongitude());
+            } catch (RuntimeException e) {
+                return false;
+            }
+        }
+        if (!hasScopeControl() || "all".equals(spec.scopeKind))
             return false;
         if (myFiresShown())
             return false; // My Fires are fetched by their own extents: the map moving changes nothing
@@ -1511,13 +1524,15 @@ public class LoadedLayer {
         }
         if ("box".equals(spec.scopeKind)) {
             final boolean land = Boundaries.handles(spec) && Boundaries.mosaic(spec.kind);
-            if (spec.scopeBox == null && land) {
-                // A land layer saved before it had a square: the square goes around
-                // where the map is now.
+            if (land) {
+                // The square follows the map: loaded again around the center once the
+                // center has left the middle of it (movedOutOfScope), or when a saved
+                // layer has none yet.
                 final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
                 if (c == null)
                     throw new IllegalStateException("the map has no center yet");
-                spec.scopeBox = Boundaries.boxAround(c.getLatitude(), c.getLongitude());
+                if (spec.scopeBox == null || !Boundaries.wellInside(spec.scopeBox, c.getLatitude(), c.getLongitude()))
+                    spec.scopeBox = Boundaries.boxAround(c.getLatitude(), c.getLongitude());
             }
             if (spec.scopeBox == null)
                 throw new IllegalStateException("no area set for " + spec.title);

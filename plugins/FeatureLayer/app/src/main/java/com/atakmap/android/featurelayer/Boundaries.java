@@ -753,6 +753,19 @@ public final class Boundaries {
         return a / 2;
     }
 
+    /**
+     * Whether a point is still well inside a loaded square: inside the middle 60% of
+     * it. Past that the square is loaded again around the map, so a layer follows the
+     * map by itself (operator, 2026-10-16: "its got to be automatic, not manual"),
+     * roughly every ten miles of travel and never on a zoom.
+     */
+    public static boolean wellInside(double[] box, double lat, double lon) {
+        if (box == null)
+            return false;
+        final double mLat = (box[2] - box[0]) * 0.2, mLon = (box[3] - box[1]) * 0.2;
+        return lat >= box[0] + mLat && lat <= box[2] - mLat && lon >= box[1] + mLon && lon <= box[3] - mLon;
+    }
+
     /** South, west, north, east of the square a land layer loads around a point. */
     public static double[] boxAround(double lat, double lon) {
         final double dLat = AREA_HALF_M / 111_320d;
