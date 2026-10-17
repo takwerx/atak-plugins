@@ -117,6 +117,45 @@ public final class RunFile {
         return out;
     }
 
+    /**
+     * The id in a saved data package's manifest, or null when the file is not there or
+     * not readable as one: {@code <Parameter name="uid" value="..."/>} in
+     * {@code MANIFEST/manifest.xml}. Read only to tell our own last send from another
+     * package under the same name.
+     */
+    static String packageUid(File zip) {
+        if (zip == null || !zip.isFile() || zip.length() > (64L << 20))
+            return null;
+        java.util.zip.ZipFile z = null;
+        try {
+            z = new java.util.zip.ZipFile(zip);
+            final ZipEntry e = z.getEntry("MANIFEST/manifest.xml");
+            if (e == null || e.getSize() > (1 << 20))
+                return null;
+            final java.io.InputStream in = z.getInputStream(e);
+            final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            try {
+                final byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0 && out.size() < (1 << 20))
+                    out.write(buf, 0, n);
+            } finally {
+                in.close();
+            }
+            final java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("name=\"uid\"\\s+value=\"([^\"]{1,64})\"").matcher(out.toString("UTF-8"));
+            return m.find() ? m.group(1) : null;
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            if (z != null)
+                try {
+                    z.close();
+                } catch (Exception ignored) {
+                }
+        }
+    }
+
     /** A title as a file name: letters, digits, spaces and a little punctuation, 80 characters at most. */
     static String safeName(String title) {
         final String s = title.replace(':', '-').replaceAll("[^A-Za-z0-9 .,_-]", "").replaceAll("\\s+", " ").trim();

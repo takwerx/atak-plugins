@@ -76,6 +76,17 @@ final class RunImportResolver extends ImportResolver {
         }
     }
 
+    /**
+     * In place: the run is read where ATAK put the file, and ATAK checks that the file
+     * it records for the package exists. Left to the default, the record named a file in
+     * {@code tools/firecast/runs} that was never written, the package reported "Failed
+     * to extract", and its delete looked for the run under that path (dev-2, 2026-10-17).
+     */
+    @Override
+    public File getDestinationPath(File f) {
+        return f;
+    }
+
     @Override
     public Pair<String, String> getContentMIME() {
         return new Pair<>("Fire Cast run", "application/vnd.google-earth.kmz");

@@ -203,6 +203,15 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        // From a "Fire Cast run from ..." notice: open that run and fly to it.
+        final String runId = intent == null ? null : intent.getStringExtra(FireModel.EXTRA_RUN);
+        final FireModel.Run asked = runId != null && runId.matches("[0-9a-f-]{36}") ? model.find(runId) : null;
+        if (asked != null) {
+            shown = asked;
+            if (!asked.visible)
+                model.setVisible(asked, true);
+            model.goTo(asked);
+        }
         render();
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
     }

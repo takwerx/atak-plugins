@@ -115,6 +115,8 @@ public final class FireModel {
         /** The device the file says it came from; a resend replaces only a run with the same one. */
         public String byUid;
         public long receivedAt;
+        /** The file ATAK handed over (inside its data package): deleting the package deletes the run. */
+        public String sourcePath;
         public double lat, lon;
         public long ranAt;
         public Landfire.Site site;
@@ -602,12 +604,16 @@ public final class FireModel {
             }
             importer = new RunImportResolver(this, icon);
             com.atakmap.android.importexport.ImportExportMapComponent.getInstance().addImporterClass(importer);
+            content = new RunContent(this);
+            com.atakmap.android.data.URIContentManager.getInstance().registerResolver(content);
         } catch (Throwable t) {
             Log.w(TAG, "run importer not registered", t);
         }
     }
 
     private RunImportResolver importer;
+    private RunContent content;
+    static final String EXTRA_RUN = "runId";
 
     public void stop() {
         started = false;
@@ -617,6 +623,13 @@ public final class FireModel {
             } catch (Throwable ignored) {
             }
             importer = null;
+        }
+        if (content != null) {
+            try {
+                com.atakmap.android.data.URIContentManager.getInstance().unregisterResolver(content);
+            } catch (Throwable ignored) {
+            }
+            content = null;
         }
         cancelPick();
         if (perimeterPicker != null) {
@@ -1180,6 +1193,7 @@ public final class FireModel {
                     r.by = callsign(saved.optString("by", ""));
                     r.byUid = deviceUid(saved.optString("byUid", ""));
                     r.receivedAt = System.currentTimeMillis();
+                    r.sourcePath = source.getAbsolutePath();
                     // A resend replaces the run it resends: a received run from the same
                     // device. Never a run made here, and never someone else's: a file
                     // can carry any id and any name, so a clash is listed beside it.
@@ -1236,11 +1250,112 @@ public final class FireModel {
                     save();
                     Log.d(TAG, "received run " + r.runId + " from " + r.by);
                     changed();
+                    notifyArrived(r);
                 } catch (Throwable t) {
                     Log.w(TAG, "received run failed", t);
                 }
             }
         });
+    }
+
+    /** The run with this id, or null. Any thread. */
+    public Run find(String runId) {
+        if (runId == null)
+            return null;
+        try {
+            for (Run r : new ArrayList<>(runs))
+                if (runId.equals(r.runId))
+                    return r;
+        } catch (java.util.ConcurrentModificationException e) {
+            // The worker changed the list mid-copy; the caller asks again.
+        }
+        return null;
+    }
+
+    /** The received run a data package's file brought, or null. */
+    Run receivedFrom(File f) {
+        final String path = f.getAbsolutePath();
+        try {
+            for (Run r : new ArrayList<>(runs))
+                if (r.by != null && path.equals(r.sourcePath))
+                    return r;
+        } catch (java.util.ConcurrentModificationException e) {
+            // As in find().
+        }
+        return null;
+    }
+
+    /** Its data package was deleted: the run goes too. Any thread. */
+    void deleteReceived(final String runId) {
+        main.post(new Runnable() {
+            @Override
+            public void run() {
+                if (!started)
+                    return;
+                final Run r = find(runId);
+                if (r != null && r.by != null) {
+                    Log.d(TAG, "package deleted, run " + runId + " goes with it");
+                    clear(r);
+                    clearNotice(runId);
+                }
+            }
+        });
+    }
+
+    /** The package's eye: shows or hides a run by id. */
+    boolean setVisible(String runId, boolean on) {
+        final Run r = find(runId);
+        if (r == null)
+            return false;
+        if (r.visible != on)
+            setVisible(r, on);
+        return true;
+    }
+
+    android.graphics.drawable.Drawable icon() {
+        try {
+            return pluginContext.getDrawable(com.atakmap.android.firecast.plugin.R.drawable.ic_toolbar);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private final java.util.Map<String, Integer> notices = new java.util.HashMap<>();
+
+    /**
+     * "Fire Cast run from TAPER" in ATAK's notifications; a tap opens the run and flies
+     * to it. A resend of the same run replaces its notice. Any thread.
+     */
+    private void notifyArrived(final Run r) {
+        main.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final com.atakmap.android.util.NotificationUtil n = com.atakmap.android.util.NotificationUtil.getInstance();
+                    Integer id = notices.get(r.runId);
+                    if (id == null) {
+                        id = n.reserveNotifyId();
+                        notices.put(r.runId, id);
+                    }
+                    final android.content.Intent open = new android.content.Intent(ModelReceiver.ACTION)
+                            .putExtra(EXTRA_RUN, r.runId);
+                    n.postNotification(id, com.atakmap.android.util.NotificationUtil.GeneralIcon.DOWNLOAD_COMPLETE.getID(),
+                            "Fire Cast run from " + r.by, "Fire Cast run from " + r.by,
+                            r.label() + ". Tap to see it.", open, true);
+                } catch (Throwable t) {
+                    Log.w(TAG, "could not post the arrival notice", t);
+                }
+            }
+        });
+    }
+
+    private void clearNotice(String runId) {
+        final Integer id = notices.remove(runId);
+        if (id != null)
+            try {
+                com.atakmap.android.util.NotificationUtil.getInstance().clearNotification(id);
+            } catch (Throwable ignored) {
+            }
     }
 
     /** Whether a device uid from a run file is this phone's. */
@@ -1618,14 +1733,24 @@ public final class FireModel {
             public void run() {
                 final File f, named;
                 // The package's title is also its file name on every phone, and Android
-                // storage refuses a colon in a file name ("10:12" failed with EPERM).
-                final String title = RunFile.safeName("Fire Cast - " + r.label());
+                // storage refuses a colon in a file name ("10:12" failed with EPERM). A
+                // different package already saved under the same title (another run with
+                // the same label) is never touched: this one is told apart by its id.
+                String t = RunFile.safeName("Fire Cast - " + r.label());
+                final File dpDir = FileSystemUtils.getItem("tools/datapackage");
+                final String existing = RunFile.packageUid(new File(dpDir, t + ".zip"));
+                if (existing != null && !existing.equals(r.runId))
+                    t = RunFile.safeName(t + " " + r.runId.substring(0, 4));
+                final String title = t;
                 try {
                     final JSONObject saved = toJson(r);
                     // A run passed on keeps the name of whoever ran it.
                     saved.put("by", r.by != null ? r.by : mapView.getDeviceCallsign())
                             .put("engine", "behave d4acc8a").put("pluginVersion", pluginVersion());
                     saved.put("byUid", r.by != null ? (r.byUid == null ? "" : r.byUid) : MapView.getDeviceUid());
+                    // Where this phone keeps it and when it got it are nobody else's business.
+                    saved.remove("sourcePath");
+                    saved.remove("receivedAt");
                     f = RunFile.write(r, saved, card(r), startIcon(), saved.optString("by", ""));
                     named = RunFile.readableCopy(f, title);
                     Log.d(TAG, "run file written: " + f.getName() + ", " + f.length() + " bytes");
@@ -1653,7 +1778,7 @@ public final class FireModel {
                             // Only"), and the receiver skips one it holds by checksum: the last
                             // send's copy goes, so this one is built from the run as it is now.
                             final File old = new File(m.getPath());
-                            if (old.isFile() && !old.delete())
+                            if (old.isFile() && r.runId.equals(RunFile.packageUid(old)) && !old.delete())
                                 Log.w(TAG, "could not replace the last sent package");
                             Log.d(TAG, "package at " + m.getPath() + (old.isFile() ? " (still there)" : ""));
                             new com.atakmap.android.importexport.send.SendDialog.Builder(mapView)
@@ -2084,6 +2209,8 @@ public final class FireModel {
                 o.put("by", r.by).put("receivedAt", r.receivedAt);
                 if (r.byUid != null)
                     o.put("byUid", r.byUid);
+                if (r.sourcePath != null)
+                    o.put("sourcePath", r.sourcePath);
             }
             o.put("lat", r.lat).put("lon", r.lon).put("ranAt", r.ranAt);
             o.put("fuelModel", r.site.fuelModel).put("slopeDeg", r.site.slopeDeg)
@@ -2194,6 +2321,13 @@ public final class FireModel {
             for (Run r : read) {
                 if (r == null)
                     continue;
+                if (r.by != null && r.sourcePath != null && !new File(r.sourcePath).exists()) {
+                    // Its package is gone. "Remove Contents" took the run with it when it
+                    // happened; this is "Leave Contents" (ATAK deletes the package's files
+                    // either way), so the run stays, no longer tied to a package.
+                    Log.d(TAG, "package gone, received run " + r.runId + " kept on its own");
+                    r.sourcePath = null;
+                }
                 if (r.by != null && ownRun(r.byUid)) {
                     // This phone's own run, taken back in from its own sent package before
                     // that was caught (2026-10-17): the original is in the list already.
@@ -2227,6 +2361,7 @@ public final class FireModel {
                 r.by = callsign(o.optString("by", ""));
                 r.byUid = deviceUid(o.optString("byUid", ""));
                 r.receivedAt = o.optLong("receivedAt", 0);
+                r.sourcePath = text(o.optString("sourcePath", null));
             }
             // Every number is held to what a run of ours can produce: this reads our own
             // file and a file someone sent, and a size or an index from either reaches
