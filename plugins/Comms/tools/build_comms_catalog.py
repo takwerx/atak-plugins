@@ -71,6 +71,19 @@ TONES = {
 }
 TONE_NUMBER = {v: k for k, v in TONES.items()}
 
+
+def tone_number(hz, st):
+    """
+    The plan's number for a tone, or None.
+
+    The number belongs to the plan, not to the frequency, so only California's rows
+    get California's numbers. Boise's interagency plan numbers its tones too, agrees
+    with this table for 1 to 8 and then does not: 100.0 Hz is Tone 9 here and Tone
+    11 there, where Tone 9 is 179.9 (takwerx/comms#2). A row from anywhere else is
+    printed with its frequency and no number.
+    """
+    return TONE_NUMBER.get(hz) if st == "CA" and isinstance(hz, float) else None
+
 # Which agency a net designator belongs to, from its prefix. The site filter in the
 # plugin counts a site under every agency whose net it carries, so this is what
 # "CAL FIRE (61)" means.
@@ -176,20 +189,31 @@ def arcgis_all(layer, where="1=1", fields="*", refresh=False):
 
 # ---- sites ------------------------------------------------------------------------------
 
-def tone_value(s):
+class ToneNumber(ValueError):
+    """A tone written as a number, where no table says what the number means."""
+
+
+def tone_value(s, numbered=True):
     """
     '103.5' -> 103.5; '0.0' -> None (carrier squelch); 'OST' and NACs stay strings.
 
-    A call plan names a tone by its California standard number as often as by its
+    A California call plan names a tone by its standard number as often as by its
     frequency, so 'T8', 'tone 8' and a bare '8' resolve through the table. There is
     no ambiguity: every CTCSS tone is 67.0 Hz or higher and carries a decimal, and
     every tone number is 1 to 32.
+
+    Only in California, though. Another plan's 'Tone 9' is another frequency, and
+    reading it through this table records a plausible wrong tone with no warning:
+    six of Boise's sixteen came out wrong that way. With {@code numbered} false a
+    tone number raises ToneNumber instead of being guessed at.
     """
     s = (s or "").strip()
     if s in ("", "0.0", "0", "CSQ", "None", "none", "N/A"):
         return None
     m = re.fullmatch(r"(?:[Tt](?:one)?[ -]?)?(\d{1,2})", s)
     if m and 1 <= int(m.group(1)) <= 32:
+        if not numbered:
+            raise ToneNumber(s)
         return TONES[int(m.group(1))]
     try:
         v = float(s)
@@ -225,11 +249,13 @@ def slug(s):
 
 
 def norm_name(s):
-    """'MT. LOWE' and 'Mount Lowe' meet here."""
+    """'MT. LOWE' and 'Mount Lowe' meet here, and so do 'MEADOW CR' and 'Meadow Creek'."""
     k = re.sub(r"\(.*?\)", "", s.upper())
     k = re.sub(r"[^A-Z0-9 ]", " ", k)
     k = re.sub(r"\bMT\b|\bMTN\b|\bMOUNTAIN\b", "MOUNT", k)
     k = re.sub(r"\bPK\b", "PEAK", k)
+    k = re.sub(r"\bCRK?\b", "CREEK", k)
+    k = re.sub(r"\bPT\b", "POINT", k)
     k = re.sub(r"\bSAINT\b", "ST", k)
     return re.sub(r"\s+", " ", k).strip()
 
@@ -296,6 +322,17 @@ def alias(name):
     """The name this catalog files a site under, normalized."""
     k = norm_name(name)
     return norm_name(SAME_SITE[k]) if k in SAME_SITE else k
+
+
+def spell_out(n):
+    """Pk and Mtn are the same words as Peak and Mountain, written shorter."""
+    n = re.sub(r"\bMtn\.?\b", "Mountain", n)
+    n = re.sub(r"\bPk\.?\b", "Peak", n)
+    n = re.sub(r"\bMt\.?\b", "Mount", n)
+    n = re.sub(r"\bLkt\.?\b|\bLO\b", "Lookout", n)
+    n = re.sub(r"\bCrk?\.?\b", "Creek", n)
+    n = re.sub(r"\bPt\.?\b", "Point", n)
+    return re.sub(r"\s+", " ", n).strip()
 
 
 def title_case(s):
@@ -560,17 +597,25 @@ def gnis(name, state, anchor, refresh=False, bounds=None, max_km=None):
     sites are all absent from the GIS layers -- one unambiguous summit anchors the
     rest.
 
+    <p>A radio plan prints its names in capitals and abbreviates the generic --
+    SNOWBANK, EAST MTN, MEADOW CR -- and the names database writes Snowbank
+    Mountain, East Mountain and Meadow Creek. Its LIKE is case-sensitive, so the
+    query is on the upper-cased name, and the abbreviations are spelled out first:
+    left as CR, the tail of Meadow Creek past MEADOW CR is "eek", which is no
+    generic, and the match was thrown away. Both failed without a word, and an
+    Idaho row file written as its plan prints anchored nothing (takwerx/comms#2).
+
     @return (lat, lon, official name, county, km from the anchor) or None
     """
-    base = re.sub(r"\s+", " ", name).strip()
-    base = re.sub(r"\b(Lookout|Benchmark|LKO|BM)\b\.?$", "", base).strip()
+    base = spell_out(title_case(re.sub(r"\s+", " ", name).strip()))
+    base = re.sub(r"\b(Lookout|Benchmark|LKO|BM)\b\.?$", "", base, flags=re.I).strip()
     if not base:
         return None
-    like = base.replace("'", "''") + "%"
+    like = base.upper().replace("'", "''") + "%"
     best = None
     for layer in GNIS_LAYERS:
         q = urllib.parse.urlencode(dict(
-            where="state_alpha='%s' AND gaz_name LIKE '%s'" % (state, like),
+            where="state_alpha='%s' AND UPPER(gaz_name) LIKE '%s'" % (state, like),
             outFields="gaz_name,gaz_featureclass,county_name", f="json",
             returnGeometry="true", outSR="4326", resultRecordCount=200))
         try:
@@ -802,8 +847,35 @@ def build(args):
                 r = {k.strip(): (v or "").strip() for k, v in r.items() if k}
                 if r.get("site"):
                     r["_label"] = label
-                    r["_st"] = (r.get("state") or "CA").upper()
+                    r["_st"] = (r.get("state") or "").upper()
                     parsed.append(r)
+
+    # A blank state used to be read as CA, which filed an Idaho row in California
+    # and then read its tones through California's table. The state decides both,
+    # so a row has to say it (takwerx/comms#2).
+    stateless = ["  %s: %s (%s)" % (r["_label"], r["site"], r.get("net", ""))
+                 for r in parsed if not re.fullmatch(r"[A-Z]{2}", r["_st"])]
+    if stateless:
+        raise SystemExit("%d rows with no two-letter state:\n%s"
+                         % (len(stateless), "\n".join(stateless)))
+
+    # A tone number is read through California's table on a California row and
+    # refused everywhere else, loudly and before any row is placed: the docs have
+    # always said tones are Hz, and a contributor transcribing a plan that prints
+    # numbers -- most of them -- got a plausible wrong frequency and no error.
+    bad_tones = []
+    for r in parsed:
+        for col in ("rx_tone", "tx_tone", "net_rx_tone", "net_tx_tone"):
+            try:
+                tone_value(r.get(col), numbered=r["_st"] == "CA")
+            except ToneNumber as e:
+                bad_tones.append("  %s: %s (%s) %s=%r" % (r["_label"], r["site"], r.get("net", ""), col, str(e)))
+    if bad_tones:
+        raise SystemExit(
+            "%d tones written as numbers outside California:\n%s\n"
+            "A tone number means a different frequency in each plan (Boise's Tone 9 is "
+            "179.9, California's is 100.0), so outside California write the tone in Hz."
+            % (len(bad_tones), "\n".join(bad_tones)))
 
     # What each source calls its sites, so a loose name match cannot merge two
     # places that source lists apart.
@@ -851,13 +923,24 @@ def build(args):
             remember(r, site)
 
     # 3a: a forest with nothing placed has no anchor. Bootstrap it on any of its own
-    # sites whose name is unambiguous in the state.
+    # sites whose name is unambiguous inside the boundary its row names.
+    #
+    # Inside a boundary, never the whole state. "The one place in the state by that
+    # name" is the guess pass 4 below took out of the homeless rows after five wrong
+    # in twenty, and here it was still being made for any row with no boundary. It
+    # placed nothing in the California build of 2026-10-15, and out of state it
+    # anchored WILDERNESS-RANCH, a subdivision in Boise County,
+    # on Wilderness Peak at the other end of Idaho (takwerx/comms#2). A row with no
+    # boundary waits for pass 4, which will place it by a site already on the map
+    # or report it.
     for key in {anchor_key(r) for r in parsed} - set(anchor_pts):
         for r in parsed:
             if id(r) in placed or anchor_key(r) != key:
                 continue
-            hit = gnis(r["site"], r["_st"], None, args.refresh,
-                       bounds=area_of(r))
+            bounds = area_of(r)
+            if bounds is None:
+                continue
+            hit = gnis(r["site"], r["_st"], None, args.refresh, bounds=bounds)
             if hit is None:
                 continue
             lat, lon, official, county, _ = hit
@@ -992,9 +1075,9 @@ def build(args):
             continue
         ch = S(site=site, net=net, callsign=r.get("callsign", ""),
                tx_tone=txt_ if isinstance(txt_, float) else None,
-               tx_tone_num=TONE_NUMBER.get(txt_) if isinstance(txt_, float) else None,
+               tx_tone_num=tone_number(txt_, r["_st"]),
                rx_tone=rxt if isinstance(rxt, float) else None,
-               rx_tone_num=TONE_NUMBER.get(rxt) if isinstance(rxt, float) else None,
+               rx_tone_num=tone_number(rxt, r["_st"]),
                notes=r.get("notes", ""), source=r.get("source") or r["_label"],
                as_of=r.get("as_of") or today)
         seen_channels[key] = ch
@@ -1099,14 +1182,6 @@ def build(args):
     # the bare name is the label, and where two sites share one, the county tells
     # them apart, because that is a fact about the mountain: Strawberry Peak
     # (San Bernardino) and Strawberry Peak (Tuolumne).
-    def spell_out(n):
-        """Pk and Mtn are the same words as Peak and Mountain, written shorter."""
-        n = re.sub(r"\bMtn\.?\b", "Mountain", n)
-        n = re.sub(r"\bPk\.?\b", "Peak", n)
-        n = re.sub(r"\bMt\.?\b", "Mount", n)
-        n = re.sub(r"\bLkt\.?\b|\bLO\b", "Lookout", n)
-        return re.sub(r"\s+", " ", n).strip()
-
     bare = {}
     for s in out_sites:
         s["label"] = spell_out(re.sub(r"\s*\([^)]*\)$", "", s["name"]).strip() or s["name"])
