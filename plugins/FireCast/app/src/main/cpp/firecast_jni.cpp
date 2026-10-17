@@ -1,9 +1,13 @@
-// JNI over the Fire Lab's behave surface fire module. One call in, one array out.
+// JNI over the Fire Lab's behave surface and crown fire modules. One call in, one array out.
 #include <jni.h>
 #include <string>
+#include <algorithm>
+#include <cmath>
 #include "fuelModels.h"
 #include "surface.h"
+#include "crown.h"
 #include "spot.h"
+#include "CrownFirebrandProcessor.h"
 
 namespace {
 // Fuel model 220, "BU1", burnable urban: Moran, Seielstad and Pietruszka 2025
@@ -28,6 +32,116 @@ FuelModels& fuelModels() {
                 false);
     }
     return fm;
+}
+
+// The surface fire with the canopy over it, through behave's crown module: Scott and
+// Reinhardt (2001), the linked models FlamMap and Behave7 use. Surface for the heading
+// and the ellipse; the crown run decides surface, torching or crowning and gives the
+// final spread rate and flame. A crowning fire takes the crown fire's own length to
+// width (Rothermel 1991, from the 20 ft wind); a torching one keeps the surface shape
+// at the faster rate. Embers: Albini's active crown firebrands when it crowns, his
+// surface fire model with the final flame otherwise.
+//   out: 0 spread rate ft/min, 1 heading deg, 2 A, 3 B, 4 C (ft per minute), 5 flame ft,
+//        6 fire type (0 surface, 1 torching, 2 conditional crown, 3 crowning),
+//        7 crown fraction burned, 8 fireline intensity BTU/ft/s, 9 spot distance m
+// Returns false when behave threw.
+bool crownRun(double out[10], int fuelModel, double m1, double m10, double m100, double mHerb, double mWoody,
+        double mFoliar, double windMph, int windHeight, double windFrom, double slopeDeg, double aspectDeg,
+        double coverPct, double heightFt, double baseFt, double density) {
+    try {
+        const double crownRatio = heightFt > 0 ? std::max(0.0, std::min(1.0, (heightFt - baseFt) / heightFt)) : 0.0;
+        const WindHeightInputMode::WindHeightInputModeEnum wh =
+                windHeight == 1 ? WindHeightInputMode::TenMeter : WindHeightInputMode::TwentyFoot;
+        Surface s(fuelModels());
+        s.updateSurfaceInputs(fuelModel, m1, m10, m100, mHerb, mWoody, FractionUnits::Percent,
+                windMph, SpeedUnits::MilesPerHour, wh,
+                windFrom, WindAndSpreadOrientationMode::RelativeToNorth,
+                slopeDeg, SlopeUnits::Degrees, aspectDeg,
+                coverPct, FractionUnits::Percent, heightFt, LengthUnits::Feet,
+                crownRatio, FractionUnits::Fraction);
+        s.doSurfaceRunInDirectionOfMaxSpread();
+        const double surfaceRos = s.getSpreadRate(SpeedUnits::FeetPerMinute);
+        double a = s.getEllipticalA(LengthUnits::Feet, 1, TimeUnits::Minutes);
+        double b = s.getEllipticalB(LengthUnits::Feet, 1, TimeUnits::Minutes);
+        double c = s.getEllipticalC(LengthUnits::Feet, 1, TimeUnits::Minutes);
+
+        Crown cr(fuelModels());
+        cr.updateCrownInputs(fuelModel, m1, m10, m100, mHerb, mWoody, mFoliar, FractionUnits::Percent,
+                windMph, SpeedUnits::MilesPerHour, wh,
+                windFrom, WindAndSpreadOrientationMode::RelativeToNorth,
+                slopeDeg, SlopeUnits::Degrees, aspectDeg,
+                coverPct, FractionUnits::Percent, heightFt, baseFt, LengthUnits::Feet,
+                crownRatio, FractionUnits::Fraction,
+                density, DensityUnits::KilogramsPerCubicMeter);
+        cr.doCrownRunScottAndReinhardt();
+        const int type = (int) cr.getFireType();
+        double ros = cr.getFinalSpreadRate(SpeedUnits::FeetPerMinute);
+        if (!(ros >= 0) || std::isinf(ros))
+            ros = surfaceRos;
+        if (type == (int) FireType::Crowning) {
+            const double lw = std::max(1.0, cr.getCrownFireLengthToWidthRatio());
+            const double e = std::sqrt(std::max(0.0, 1.0 - 1.0 / (lw * lw)));
+            b = ros / (1.0 + e);
+            c = e * b;
+            a = b / lw;
+        } else if (surfaceRos > 0) {
+            const double k = ros / surfaceRos;
+            a *= k;
+            b *= k;
+            c *= k;
+        }
+        const double flame = cr.getFinalFlameLength(LengthUnits::Feet);
+        const double wind20 = windHeight == 1 ? windMph * 0.87 : windMph;
+        double spotM = 0;
+        if (flame > 0 && wind20 > 0) {
+            Spot sp;
+            const SpotDownWindCanopyMode::SpotDownWindCanopyModeEnum canopy =
+                    coverPct >= 50 ? SpotDownWindCanopyMode::CLOSED : SpotDownWindCanopyMode::OPEN;
+            bool crownEmbers = false;
+            if (type == (int) FireType::Crowning) {
+                // Albini's crown firebrands exactly as Spot computes them for an active
+                // crown fire with no ridge given (flat ground), but on the stack: Spot
+                // allocates the processor and never frees it. The processor's flame height
+                // solve never ends once exp() of its constant overflows, which takes a
+                // canopy or a wind past anything real (security review, 2026-10-17); that
+                // case keeps the surface ember model below.
+                const double treeM = heightFt * 0.3048 * (canopy == SpotDownWindCanopyMode::OPEN ? 0.5 : 1.0);
+                const double intensity = std::pow(flame * 0.3048 / 0.0775, 1.0 / 0.46);   // Byram, from flame
+                const double windKmh = wind20 * 1.609344;
+                const double canopyWind = treeM > 0.1
+                        ? windKmh / (3.6 * (1.0 + std::log(1.0 + 2.94 * 6.096 / treeM))) : 0.0;
+                const double con = treeM > 0.1 && canopyWind > 0 ? 7.791e-03 * intensity / (treeM * canopyWind) : 0.0;
+                if (con > 0 && con < 700) {
+                    CrownFirebrandProcessor p(treeM, intensity, windKmh, 6.096, 0.5);
+                    spotM = p.getFirebrandDistance();
+                    crownEmbers = true;
+                }
+            }
+            if (!crownEmbers) {
+                sp.updateSpotInputsForSurfaceFire(SpotFireLocation::MIDSLOPE_WINDWARD,
+                        0.0, LengthUnits::Miles, 0.0, LengthUnits::Feet,
+                        heightFt, LengthUnits::Feet, canopy,
+                        wind20, SpeedUnits::MilesPerHour, flame, LengthUnits::Feet);
+                sp.calculateSpottingDistanceFromSurfaceFire();
+                spotM = sp.getMaxMountainousTerrainSpottingDistanceFromSurfaceFire(LengthUnits::Meters);
+            }
+            if (!(spotM > 0) || std::isinf(spotM))
+                spotM = 0;
+        }
+        out[0] = ros;
+        out[1] = s.getDirectionOfMaxSpread();
+        out[2] = a;
+        out[3] = b;
+        out[4] = c;
+        out[5] = flame;
+        out[6] = type;
+        out[7] = cr.getCrownFractionBurned();
+        out[8] = cr.getFinalFirelineIntesity(FirelineIntensityUnits::BtusPerFootPerSecond);
+        out[9] = spotM;
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 }
 
@@ -106,6 +220,28 @@ Java_com_atakmap_android_firecast_model_Behave_spotDistance(JNIEnv*, jclass,
     } catch (...) {
         return 0;
     }
+}
+
+// The crown run above, for the Java side: surfaceRun's inputs, then foliar moisture
+// percent, canopy cover percent, canopy height ft, canopy base height ft, canopy bulk
+// density kg/m3. Ten numbers out, or null.
+JNIEXPORT jdoubleArray JNICALL
+Java_com_atakmap_android_firecast_model_Behave_crownRun(JNIEnv* env, jclass,
+        jint fuelModel, jdouble m1, jdouble m10, jdouble m100, jdouble mHerb, jdouble mWoody, jdouble mFoliar,
+        jdouble windMph, jint windHeight, jdouble windFrom, jdouble slopeDeg, jdouble aspectDeg,
+        jdouble coverPct, jdouble heightFt, jdouble baseFt, jdouble density) {
+    // The fuel model table has 256 slots and the library indexes it unchecked.
+    if (fuelModel <= 0 || fuelModel >= 256)
+        return nullptr;
+    double v[10] = { 0 };
+    if (!crownRun(v, fuelModel, m1, m10, m100, mHerb, mWoody, mFoliar, windMph, windHeight, windFrom,
+            slopeDeg, aspectDeg, coverPct, heightFt, baseFt, density))
+        return nullptr;
+    jdoubleArray out = env->NewDoubleArray(10);
+    if (out == nullptr)
+        return nullptr;
+    env->SetDoubleArrayRegion(out, 0, 10, v);
+    return out;
 }
 
 JNIEXPORT jstring JNICALL

@@ -118,6 +118,11 @@ public final class FireModel {
         public double startElevFt = Double.NaN;
         /** The moistures used, percent: 1 h, 10 h, 100 h, live herb, live woody. */
         public double m1, m10, m100, mHerb, mWoody;
+        /** Conifer needles, percent, for the crown fire question: measured nearby, or 100. */
+        public double mFoliar = 100;
+        public String foliarNote;
+        /** The canopy over the start from the grids: cover %, height ft, base ft, density kg/m3; null without them. */
+        public double[] startCanopy;
         /** The fire danger station's hours around the run, or null; not saved, the moistures above are. */
         public FuelMoisture.Dead dead;
         /** The nearest measured brush, grass and needles; not saved. */
@@ -1016,6 +1021,14 @@ public final class FireModel {
             note.append(" Live grass 30% (cured): dry-season default.");
         }
         r.moistureNote = note.toString();
+        // Conifer needles decide when a surface fire climbs into the trees.
+        if (live != null && live.needles != null) {
+            r.mFoliar = Math.max(60, Math.min(300, live.needles.value));
+            r.foliarNote = String.format(Locale.US, "Conifer needles %.0f%%: ", r.mFoliar) + measured(live.needles);
+        } else {
+            r.mFoliar = 100;
+            r.foliarNote = "Conifer needles 100%, the usual figure; none measured within " + reach + " in the last 45 days.";
+        }
     }
 
     /**
@@ -1150,12 +1163,19 @@ public final class FireModel {
                     + "so this is the one-fuel ellipse.";
             return;
         }
+        if (land.cc != null && land.ch != null && land.cbh != null && land.cbd != null) {
+            final int cc = land.cc.at(r.lat, r.lon), ch = land.ch.at(r.lat, r.lon), cbh = land.cbh.at(r.lat, r.lon),
+                    cbd = land.cbd.at(r.lat, r.lon);
+            final boolean trees = cc > 0 && cc <= 100 && ch > 0 && ch != land.ch.nodata && cbd > 0 && cbd != land.cbd.nodata
+                    && cbh >= 0 && cbh != land.cbh.nodata;
+            r.startCanopy = trees ? new double[] { cc, ch / 10d * 3.28084d, cbh / 10d * 3.28084d, cbd / 100d }
+                    : new double[] { 0, 0, 0, 0 };
+        }
         final long t0 = System.currentTimeMillis();
         final boolean useField = r.windField != null && r.fieldWind && !COND_DRY_WINDY.equals(r.conditions);
         final Spread.Behavior behavior = new Spread.Behavior() {
                     @Override
-                    public double[] run(int fuelModel, double slopeDeg, double aspectDeg, double windMph, double windFrom, int hour) {
-                        final double cover = r.site.coverPct;
+                    public double[] run(Spread.Ground g, double windMph, double windFrom, int hour) {
                         final Hour hr = r.hourly == null || r.hourly.length == 0 ? null
                                 : r.hourly[Math.max(0, Math.min(r.hourly.length - 1, hour))];
                         final boolean own = Double.isNaN(windMph);
@@ -1164,17 +1184,30 @@ public final class FireModel {
                         final boolean tenM = own ? r.tenMeterWind : true;
                         final double m1 = hr == null ? r.m1 : hr.m1, m10 = hr == null ? r.m10 : hr.m10,
                                 m100 = hr == null ? r.m100 : hr.m100;
-                        final Behave.Result b = Behave.surface(fuelModel, m1, m10, m100, r.mHerb, r.mWoody,
-                                mph, tenM, from, slopeDeg, aspectDeg,
-                                cover, r.canopyHeightFt, r.crownRatio);
+                        if (g.canopy()) {
+                            // Trees over it: whether the fire stays down, torches or crowns.
+                            final Behave.Crown c = Behave.crown(g.fuel, m1, m10, m100, r.mHerb, r.mWoody, r.mFoliar,
+                                    mph, tenM, from, g.slopeDeg, g.aspectDeg, g.coverPct, g.heightFt, g.baseFt, g.density);
+                            if (c == null)
+                                return null;
+                            return new double[] { c.rosFtPerMin, c.headingDeg, c.aFtPerMin, c.bFtPerMin, c.cFtPerMin,
+                                    c.flameLengthFt, c.spotM, c.fireType };
+                        }
+                        // Open ground, or no canopy grids: the start's canopy as before.
+                        final boolean known = !Double.isNaN(g.coverPct);
+                        final double cover = known ? 0 : r.site.coverPct, heightFt = known ? 0 : r.canopyHeightFt,
+                                ratio = known ? 0 : r.crownRatio;
+                        final Behave.Result b = Behave.surface(g.fuel, m1, m10, m100, r.mHerb, r.mWoody,
+                                mph, tenM, from, g.slopeDeg, g.aspectDeg, cover, heightFt, ratio);
                         if (b == null)
                             return null;
                         // Embers from this kind of cell: Albini's surface-fire reach at the
                         // 20 ft wind (a 10 m wind scaled down to 20 ft), over open ground
                         // or the canopy here.
                         final double wind20 = tenM ? mph * 0.87d : mph;
-                        final double spotM = Behave.spotDistanceM(b.flameLengthFt, wind20, r.canopyHeightFt);
-                        return new double[] { b.rosFtPerMin, b.headingDeg, b.aFtPerMin, b.bFtPerMin, b.cFtPerMin, b.flameLengthFt, spotM };
+                        final double spotM = Behave.spotDistanceM(b.flameLengthFt, wind20, heightFt);
+                        return new double[] { b.rosFtPerMin, b.headingDeg, b.aFtPerMin, b.bFtPerMin, b.cFtPerMin,
+                                b.flameLengthFt, spotM, Behave.SURFACE };
                     }
                 };
         // Calibration: with a perimeter and a start time, the model is run from the
@@ -1748,6 +1781,10 @@ public final class FireModel {
                 o.put("bArrival", ba).put("bHome", bh).put("bPeople", bp);
             }
             o.put("atMinutes", r.atMinutes);
+            o.put("mFoliar", r.mFoliar);
+            if (r.foliarNote != null)
+                o.put("foliarNote", r.foliarNote);
+
             if (r.hourly != null) {
                 final org.json.JSONArray hs = new org.json.JSONArray();
                 for (Hour h : r.hourly)
@@ -1857,6 +1894,10 @@ public final class FireModel {
             r.rateScale = o.optDouble("rateScale", 1);
             r.calibrationNote = o.optString("calibrationNote", null);
             r.atMinutes = Math.max(0, Math.min(r.steps[r.steps.length - 1], o.optInt("atMinutes", 0)));
+            r.mFoliar = Math.max(60, Math.min(300, o.optDouble("mFoliar", 100)));
+            if (Double.isNaN(r.mFoliar))
+                r.mFoliar = 100;
+            r.foliarNote = o.optString("foliarNote", null);
             final org.json.JSONArray hs = o.optJSONArray("hourly");
             if (hs != null && hs.length() > 0 && hs.length() <= 6) {
                 final Hour[] hours = new Hour[hs.length()];

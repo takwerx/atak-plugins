@@ -16,9 +16,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * The ground around a point as three grids: LANDFIRE's fuel model, slope and aspect,
- * 30 m cells, from its public coverage service, kept on disk so a run can be redone
- * with no network.
+ * The ground around a point as LANDFIRE's grids: fuel model, slope, aspect, vegetation
+ * type and the four canopy grids, 30 m cells, from its public coverage service, kept on
+ * disk so a run can be redone with no network.
  *
  * <p>The service hands back a plain GeoTIFF: 16-bit, uncompressed, tiled, in plain
  * latitude and longitude with the georeferencing in one affine tag (measured
@@ -33,6 +33,13 @@ public final class Landscape {
     public static final String FUEL = "LF2024_FBFM40_CONUS", SLOPE = "LF2020_SlpD_CONUS", ASPECT = "LF2020_Asp_CONUS";
     /** Existing vegetation type: the one grid that tells houses (7297, 7298) from roads (7299) and parks (7296) inside the urban fuel class. */
     public static final String EVT = "LF2024_EVT_CONUS";
+    /**
+     * The canopy, for crown fire: cover in percent, height and base height in meters
+     * times ten, bulk density in kg/m3 times a hundred (read off forest pixels in Oregon,
+     * Colorado and the Sierra, 2026-10-17). Zero where there are no trees.
+     */
+    public static final String CC = "LF2024_CC_CONUS", CH = "LF2024_CH_CONUS", CBH = "LF2024_CBH_CONUS",
+            CBD = "LF2024_CBD_CONUS";
 
     /** One grid: values by row and column, and where each cell is on the ground. */
     public static final class Raster {
@@ -64,14 +71,21 @@ public final class Landscape {
     }
 
     public final Raster fuel, slope, aspect, evt;
+    /** The canopy grids, all four or none: null when they could not be had, and the run is surface fire only. */
+    public final Raster cc, ch, cbh, cbd;
     /** The square asked for, degrees: south, west, north, east. */
     public final double south, west, north, east;
 
-    private Landscape(Raster fuel, Raster slope, Raster aspect, Raster evt, double s, double w, double n, double e) {
+    private Landscape(Raster fuel, Raster slope, Raster aspect, Raster evt, Raster[] canopy,
+            double s, double w, double n, double e) {
         this.fuel = fuel;
         this.slope = slope;
         this.aspect = aspect;
         this.evt = evt;
+        cc = canopy == null ? null : canopy[0];
+        ch = canopy == null ? null : canopy[1];
+        cbh = canopy == null ? null : canopy[2];
+        cbd = canopy == null ? null : canopy[3];
         south = s;
         west = w;
         north = n;
@@ -99,7 +113,17 @@ public final class Landscape {
         final Raster slope = raster(dir, "slope.tif", "conus_topo", SLOPE, s, w, n, e);
         final Raster aspect = raster(dir, "aspect.tif", "conus_topo", ASPECT, s, w, n, e);
         final Raster evt = raster(dir, "evt.tif", "conus_2024", EVT, s, w, n, e);
-        return new Landscape(fuel, slope, aspect, evt, s, w, n, e);
+        // The canopy is wanted, not needed: without it the run is surface fire and says so.
+        Raster[] canopy = null;
+        try {
+            canopy = new Raster[] { raster(dir, "cc.tif", "conus_2024", CC, s, w, n, e),
+                    raster(dir, "ch.tif", "conus_2024", CH, s, w, n, e),
+                    raster(dir, "cbh.tif", "conus_2024", CBH, s, w, n, e),
+                    raster(dir, "cbd.tif", "conus_2024", CBD, s, w, n, e) };
+        } catch (Exception ex) {
+            Log.w(TAG, "canopy grids unavailable, surface fire only: " + ex);
+        }
+        return new Landscape(fuel, slope, aspect, evt, canopy, s, w, n, e);
     }
 
     /** Whether the square is already on disk, so a run can be promised with no network. */

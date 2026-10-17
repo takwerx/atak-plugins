@@ -4,7 +4,7 @@ import com.atakmap.android.firecast.plugin.PluginNativeLoader;
 import com.atakmap.coremap.log.Log;
 
 /**
- * The Fire Lab's behave library, surface fire module, over JNI.
+ * The Fire Lab's behave library, surface and crown fire modules, over JNI.
  *
  * <p>This is the engine inside FlamMap and Behave7: Rothermel's surface spread with
  * Albini's wind adjustment and the fire ellipse, public domain, vendored verbatim under
@@ -79,6 +79,52 @@ public final class Behave {
         return v == null || v.length < 11 ? null : new Result(v);
     }
 
+    /** What kind of fire a crown run found. */
+    public static final int SURFACE = 0, TORCHING = 1, CONDITIONAL = 2, CROWNING = 3;
+
+    /** One crown run's outputs: the final fire, whatever kind it is, in the library's units. */
+    public static final class Crown {
+        public final double rosFtPerMin, headingDeg, aFtPerMin, bFtPerMin, cFtPerMin, flameLengthFt;
+        /** {@link #SURFACE}, {@link #TORCHING}, {@link #CONDITIONAL} or {@link #CROWNING}. */
+        public final int fireType;
+        public final double crownFraction, firelineIntensity;
+        /** Albini's ember reach, meters: crown firebrands when it crowns, the surface model otherwise. */
+        public final double spotM;
+
+        Crown(double[] v) {
+            rosFtPerMin = v[0];
+            headingDeg = v[1];
+            aFtPerMin = v[2];
+            bFtPerMin = v[3];
+            cFtPerMin = v[4];
+            flameLengthFt = v[5];
+            fireType = (int) Math.round(v[6]);
+            crownFraction = v[7];
+            firelineIntensity = v[8];
+            spotM = v[9];
+        }
+    }
+
+    /**
+     * The surface fire with the canopy over it (Scott and Reinhardt 2001, as FlamMap and
+     * Behave7 run it): whether it stays on the ground, torches or crowns, and the fire
+     * that results. Only for ground with a canopy; open ground is {@link #surface}.
+     *
+     * @param mFoliar   foliar moisture, percent (100 is the usual figure)
+     * @param heightFt  canopy height; {@code baseFt} canopy base height
+     * @param density   canopy bulk density, kg/m3
+     * @return the run, or null when the library is missing or refused the inputs
+     */
+    public static Crown crown(int fuelModel, double m1, double m10, double m100, double mHerb, double mWoody,
+            double mFoliar, double windMph, boolean tenMeter, double windFromDeg, double slopeDeg, double aspectDeg,
+            double coverPct, double heightFt, double baseFt, double density) {
+        if (!load() || !validFuelModel(fuelModel))
+            return null;
+        final double[] v = crownRun(fuelModel, m1, m10, m100, mHerb, mWoody, mFoliar, windMph, tenMeter ? 1 : 0,
+                windFromDeg, slopeDeg, aspectDeg, coverPct, heightFt, baseFt, density);
+        return v == null || v.length < 10 ? null : new Crown(v);
+    }
+
     /** "SH2 Moderate load, dry climate shrub (S)", or "" for a code the library has no model for. */
     public static String name(int fuelModel) {
         if (!load() || !validFuelModel(fuelModel))
@@ -118,4 +164,8 @@ public final class Behave {
             double aspectDeg, double coverPct, double heightFt, double crownRatio);
 
     private static native String fuelName(int fuelModel);
+
+    private static native double[] crownRun(int fuelModel, double m1, double m10, double m100, double mHerb,
+            double mWoody, double mFoliar, double windMph, int windHeight, double windFrom, double slopeDeg,
+            double aspectDeg, double coverPct, double heightFt, double baseFt, double density);
 }

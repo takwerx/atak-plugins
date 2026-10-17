@@ -323,9 +323,19 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 goes.append(".\n");
             }
             if (r.ground.maxSpotM > 0)
-                goes.append("Embers carry up to ").append(Units.format(r.ground.maxSpotM))
-                        .append(" downwind (Albini); the fire crossed a road or a block that way ")
-                        .append(r.ground.spotCrossings).append(r.ground.spotCrossings == 1 ? " time.\n" : " times.\n");
+                goes.append("Embers carry up to ").append(Units.format(r.ground.maxSpotM)).append(" downwind (Albini)")
+                        .append(r.ground.spotCrossings == 0 ? ".\n" : "; the fire crossed a road or a block that way "
+                                + r.ground.spotCrossings + (r.ground.spotCrossings == 1 ? " time.\n" : " times.\n"));
+            if (r.startCanopy != null) {
+                final int last = r.steps[r.steps.length - 1];
+                final double[] crown = r.ground.crownAcres(last);
+                if (crown[0] >= 0.05 || crown[1] >= 0.05)
+                    goes.append("Crown fire by ").append(clock(r.ranAt + last * 60000L)).append(": ")
+                            .append(acres(crown[0])).append(" crowning through the trees, ")
+                            .append(acres(crown[1])).append(" torching. Flames that size are past any line at the head.\n");
+                else
+                    goes.append("No crown fire: where there are trees, the fire stays on the ground under these conditions.\n");
+            }
             if (r.calibrationNote != null)
                 goes.append(r.calibrationNote).append('\n');
             if (r.perimeter != null)
@@ -374,7 +384,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                                 : "one reading for the whole run and the whole hour")
                         + (byHour ? ", and the fuel moisture steps by the hour, not within it" : "")
                         + ". Spotting is the longest ember flight, straight downwind, across walls "
-                        + "narrower than it; no crown fire, no suppression. House-to-house spread is an "
+                        + "narrower than it; "
+                        + (r.startCanopy != null ? "crown fire is the trees in LANDFIRE's canopy grid, cell by cell, not "
+                                + "the fire's own wind; " : "no crown fire (the canopy grids were not reached); ")
+                        + "no suppression. House-to-house spread is an "
                         + "average over past conflagrations, not this street. Run again as the wind changes."
                 : "One fuel, one slope and one wind for the whole run, read at the start point. Real fire crosses "
                         + "fuel changes, terrain and a wind that shifts; this is the direction and the order of "
@@ -412,6 +425,16 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                     r.m1, r.m10, r.m100, r.mHerb, r.mWoody));
             if (r.moistureNote != null)
                 in.append(' ').append(r.moistureNote);
+            if (r.foliarNote != null)
+                in.append(' ').append(r.foliarNote);
+            if (r.startCanopy == null)
+                in.append("\nCanopy grids not reached; this run is surface fire only.");
+            else if (r.startCanopy[0] <= 0)
+                in.append("\nNo trees over the start (LANDFIRE 2024).");
+            else
+                in.append(String.format(Locale.US, "\nTrees over the start: %.0f%% cover, %.0f ft tall, crowns from %.0f ft, "
+                        + "%.2f kg/m\u00B3 of crown fuel (LANDFIRE 2024).", r.startCanopy[0], r.startCanopy[1],
+                        r.startCanopy[2], r.startCanopy[3]));
             if (r.hourly != null && r.hourly.length > 1) {
                 in.append("\nHour by hour:");
                 for (FireModel.Hour h : r.hourly)
@@ -521,6 +544,11 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                         : minutes % 60 == 0 ? (minutes / 60) + " h" : (minutes / 60) + " h " + (minutes % 60) + " min")
                 .append(": ").append(acres(r.acres(minutes))).append(", farthest ").append(Units.format(r.headM(minutes)))
                 .append(" to the ").append(Units.compass(r.headDeg(minutes)));
+        if (r.ground != null && r.startCanopy != null) {
+            final double[] crown = r.ground.crownAcres(minutes);
+            if (crown[0] >= 0.05)
+                sb.append("; ").append(acres(crown[0])).append(" crowning");
+        }
         final double[] b = r.reachedBy(minutes);
         if (b != null) {
             final int n = (int) b[0], h = (int) b[1];

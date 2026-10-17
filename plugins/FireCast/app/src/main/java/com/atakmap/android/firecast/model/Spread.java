@@ -13,8 +13,9 @@ import java.util.PriorityQueue;
  * Fire across the ground: when the fire reaches every cell around the start.
  *
  * <p>Minimum travel time, the way FlamMap does it. Each 30 m cell gets its own head
- * rate, heading and ellipse shape from the engine, for its fuel, slope and aspect
- * under the run's one wind. From the start cell, the earliest arrival at every cell
+ * rate, heading and ellipse shape from the engine, for its fuel, slope, aspect and the
+ * canopy over it (surface fire, torching or crown fire), under the wind and the fuel
+ * moisture of the hour the fire reaches it. From the start cell, the earliest arrival at every cell
  * is found by Dijkstra over sixteen neighbors, each move costing its length over the
  * rate in that direction, which is the ellipse's: head rate at the heading, less and
  * less off it, backing rate behind. Ground that does not burn (urban, water, bare,
@@ -34,17 +35,48 @@ public final class Spread {
         final double flameFt;
         /** How far embers from this cell's fire can carry, meters (Albini); 0 for none. */
         final double spotM;
+        /** Surface, torching or crowning: {@link Behave#SURFACE} and the rest. */
+        final byte type;
 
-        Cell(double rate, double headingDeg, double ecc, double flameFt, double spotM) {
+        Cell(double rate, double headingDeg, double ecc, double flameFt, double spotM, int type) {
             this.rate = rate;
             this.headingDeg = headingDeg;
             this.ecc = ecc;
             this.flameFt = flameFt;
             this.spotM = spotM;
+            this.type = (byte) type;
         }
     }
 
-    private static final Cell BARRIER = new Cell(0, 0, 0, 0, 0);
+    /**
+     * What a cell is, for the engine: its fuel, slope and aspect, and the canopy over it,
+     * binned so that like cells share one answer from the library.
+     */
+    public static final class Ground {
+        public final int fuel;
+        public final double slopeDeg, aspectDeg;
+        /** Canopy cover percent; 0 for open ground, NaN when the canopy grids could not be had. */
+        public final double coverPct;
+        /** Canopy height and base height, feet; bulk density, kg/m3. */
+        public final double heightFt, baseFt, density;
+
+        Ground(int fuel, double slopeDeg, double aspectDeg, double coverPct, double heightFt, double baseFt, double density) {
+            this.fuel = fuel;
+            this.slopeDeg = slopeDeg;
+            this.aspectDeg = aspectDeg;
+            this.coverPct = coverPct;
+            this.heightFt = heightFt;
+            this.baseFt = baseFt;
+            this.density = density;
+        }
+
+        /** Whether there are trees enough over it for the crown fire question to be asked. */
+        public boolean canopy() {
+            return coverPct > 0 && heightFt > 0 && density > 0;
+        }
+    }
+
+    private static final Cell BARRIER = new Cell(0, 0, 0, 0, 0, 0);
     private static final int[][] MOVES = {
             { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 },
             { 2, 1 }, { 2, -1 }, { -2, 1 }, { -2, -1 }, { 1, 2 }, { 1, -2 }, { -1, 2 }, { -1, -2 } };
@@ -68,6 +100,24 @@ public final class Spread {
         public final int fuelsCrossed;
         /** Where the run began when the start itself did not burn: meters and bearing from the start; 0 when it began there. */
         public double startOffsetM, startOffsetDeg;
+        /** How each cell burned, {@link Behave#SURFACE} to {@link Behave#CROWNING}; null for an engine without canopy. */
+        public byte[] fireType;
+
+        /** {crowning, torching} acres by a time: crown fire through the canopy, and trees torching under a surface fire. */
+        public double[] crownAcres(double minutes) {
+            if (fireType == null)
+                return new double[] { 0, 0 };
+            int c = 0, t = 0;
+            for (int i = 0; i < arrival.length; i++) {
+                if (arrival[i] > minutes)
+                    continue;
+                if (fireType[i] == Behave.CROWNING)
+                    c++;
+                else if (fireType[i] == Behave.TORCHING)
+                    t++;
+            }
+            return new double[] { c * cell * cell / 4046.856d, t * cell * cell / 4046.856d };
+        }
 
         Result(int nx, int ny, double cell, double lat0, double lon0, double dLat, double dLon, float[] arrival,
                 double[] peakFlameFt, int cellsSeen, int cellsBurnable, int fuelsCrossed) {
@@ -142,9 +192,10 @@ public final class Spread {
          * @param windMph  the wind for this cell at this moment, or NaN for the hour's own
          * @param windFrom degrees the wind comes from, with it
          * @param hour     which hour of the run, 0 the first: its moistures and, with NaN wind, its wind
-         * @return [head rate ft/min, heading deg, A ft/min, B ft/min, C ft/min, flame ft, spot distance m], or null for no spread
+         * @return [head rate ft/min, heading deg, A ft/min, B ft/min, C ft/min, flame ft, spot distance m, fire type],
+         *         or null for no spread; the fire type may be left off for a surface fire
          */
-        double[] run(int fuelModel, double slopeDeg, double aspectDeg, double windMph, double windFrom, int hour);
+        double[] run(Ground g, double windMph, double windFrom, int hour);
     }
 
     /** A wind that varies over the ground and the hour; null means one wind for the run. */
@@ -212,17 +263,22 @@ public final class Spread {
         // hour later can burn it, and embers do not fly over it as if it were a road.
         final Cell[] cells = new Cell[nx * ny];
         final int[] kindOf = new int[nx * ny];
-        final Map<Integer, Cell> byKind = new HashMap<>();
+        final List<Ground> kinds = new ArrayList<>();
+        final Map<Long, Integer> kindIndex = new HashMap<>();
+        final List<Cell> kindCell = new ArrayList<>();
         final Map<Long, Cell> byKindAndWind = new HashMap<>();
         final java.util.Set<Integer> fuels = new java.util.HashSet<>();
         final Cell[][] byHour = new Cell[Math.max(1, hours)][];
         final Map<Long, Cell> byKindHour = new HashMap<>();
         final float[] flame = new float[nx * ny];
+        final byte[] fireType = new byte[nx * ny];
+        final boolean canopyKnown = land.cc != null && land.ch != null && land.cbh != null && land.cbd != null;
         int burnable = 0;
         for (int y = 0; y < ny; y++) {
             for (int x = 0; x < nx; x++) {
                 final double cLat = lat0 + (y + 0.5) * dLat, cLon = lon0 + (x + 0.5) * dLon;
-                final int fuel = effectiveFuel(land.fuel.at(cLat, cLon), land.evt.at(cLat, cLon), land.fuel.nodata, land.evt.nodata);
+                final int ownFuel = land.fuel.at(cLat, cLon);
+                final int fuel = effectiveFuel(ownFuel, land.evt.at(cLat, cLon), land.fuel.nodata, land.evt.nodata);
                 int slope = land.slope.at(cLat, cLon), aspect = land.aspect.at(cLat, cLon);
                 if (slope == land.slope.nodata || slope < 0)
                     slope = 0;
@@ -235,16 +291,39 @@ public final class Spread {
                 }
                 burnable++;
                 final int slopeStep = Math.min(80, (slope / 5) * 5), aspectStep = ((aspect + 11) / 22) * 22 % 360;
-                final int key = (fuel << 16) | (slopeStep << 8) | (aspectStep / 22);
-                kindOf[y * nx + x] = key;
-                Cell c = byKind.get(key);
-                if (c == null) {
-                    c = cellOf(behavior.run(fuel, slopeStep, aspectStep, Double.NaN, Double.NaN, 0), rateScale);
-                    byKind.put(key, c);
+                // The canopy in bins: cover 10%, height 3 m, base 0.5 m, density 0.02 kg/m3
+                // (LANDFIRE carries height and base in decimeters, density in hundredths).
+                // A house, a road or a park inside the urban class is open ground here.
+                int ccB = 0, chB = 0, cbhB = 0, cbdB = 0;
+                if (canopyKnown && fuel == ownFuel) {
+                    final int cc = land.cc.at(cLat, cLon), ch = land.ch.at(cLat, cLon),
+                            cbh = land.cbh.at(cLat, cLon), cbd = land.cbd.at(cLat, cLon);
+                    if (cc > 0 && cc <= 100 && ch > 0 && ch != land.ch.nodata && cbd > 0 && cbd != land.cbd.nodata
+                            && cbh >= 0 && cbh != land.cbh.nodata) {
+                        // Held to LANDFIRE's own range: trees to 60 m, crowns from 30 m, 0.5 kg/m3.
+                        ccB = Math.min(10, Math.round(cc / 10f));
+                        chB = Math.min(20, Math.round(ch / 30f));
+                        cbhB = Math.min(60, Math.round(cbh / 5f));
+                        cbdB = Math.min(25, Math.round(cbd / 2f));
+                        if (ccB == 0 || chB == 0 || cbdB == 0)
+                            ccB = chB = cbhB = cbdB = 0;
+                    }
                 }
-                if (c.rate > 0)
-                    fuels.add(fuel);
-                cells[y * nx + x] = c;
+                final long key = ((long) fuel << 40) | ((long) slopeStep << 32) | ((long) (aspectStep / 22) << 26)
+                        | ((long) ccB << 22) | ((long) chB << 16) | ((long) cbhB << 8) | cbdB;
+                Integer k = kindIndex.get(key);
+                if (k == null) {
+                    k = kinds.size();
+                    kindIndex.put(key, k);
+                    final double mToFt = 3.28084d;
+                    kinds.add(new Ground(fuel, slopeStep, aspectStep, canopyKnown ? ccB * 10d : Double.NaN,
+                            chB * 3d * mToFt, cbhB * 0.5d * mToFt, cbdB * 0.02d));
+                    kindCell.add(null);
+                }
+                // Worked out when the fire first comes near it: a forested box holds tens of
+                // thousands of kinds, most of them where the fire never goes.
+                kindOf[y * nx + x] = k;
+                cells[y * nx + x] = null;
             }
         }
 
@@ -323,17 +402,18 @@ public final class Spread {
             final int x = i % nx, y = i / nx;
             // The hour the fire is in when it leaves this cell; the last one holds past the end.
             final int hour = Math.min(hours - 1, (int) (t / 60d));
-            Cell from = at(i, hour, cells, kindOf, byHour, byKindHour, behavior, rateScale, hours);
+            Cell from = at(i, hour, cells, kindOf, kinds, kindCell, byHour, byKindHour, behavior, rateScale, hours);
             if (wind != null && from != BARRIER) {
                 // This cell's behavior under the wind blowing here when the fire arrives.
                 final double[] w = wind.at(lat0 + (y + 0.5) * dLat, lon0 + (x + 0.5) * dLon, startMs + (long) (t * 60000d));
                 if (w != null) {
-                    final int ws = Math.min(2047, (int) Math.round(w[0] / 2d)), wd = (int) Math.round(w[1] / 22.5d) % 16;
+                    // 150 mph at most, as the hourly winds are: the crown ember model never
+                    // finishes past winds like that.
+                    final int ws = Math.max(0, Math.min(75, (int) Math.round(w[0] / 2d))), wd = (int) Math.round(w[1] / 22.5d) % 16;
                     final long wkey = ((long) kindOf[i] << 20) | ((long) hour << 16) | (ws << 4) | wd;
                     Cell cw = byKindAndWind.get(wkey);
                     if (cw == null) {
-                        cw = cellOf(behavior.run(kindOf[i] >> 16, (kindOf[i] >> 8) & 0xFF, (kindOf[i] & 0xFF) * 22,
-                                ws * 2d, wd * 22.5d, hour), rateScale);
+                        cw = cellOf(behavior.run(kinds.get(kindOf[i]), ws * 2d, wd * 22.5d, hour), rateScale);
                         byKindAndWind.put(wkey, cw);
                     }
                     if (cw.rate > 0)
@@ -341,6 +421,9 @@ public final class Spread {
                 }
             }
             flame[i] = (float) from.flameFt;
+            fireType[i] = from.type;
+            if (from.rate > 0)
+                fuels.add(kinds.get(kindOf[i]).fuel);
             if (from.spotM > maxSpot)
                 maxSpot = from.spotM;
             for (int m = 0; m < MOVES.length; m++) {
@@ -350,7 +433,7 @@ public final class Spread {
                 final int j = ny2 * nx + nx2;
                 if (done[j])
                     continue;
-                final Cell to = at(j, hour, cells, kindOf, byHour, byKindHour, behavior, rateScale, hours);
+                final Cell to = at(j, hour, cells, kindOf, kinds, kindCell, byHour, byKindHour, behavior, rateScale, hours);
                 if (to == BARRIER) {
                     // Spotting: within 45 degrees of the head, embers carry across a wall
                     // (a freeway, a commercial block) narrower than the spot distance and
@@ -372,7 +455,7 @@ public final class Spread {
                             break;
                         final int k = sy * nx + sx;
                         if (cells[k] != BARRIER) {
-                            if (at(k, hour, cells, kindOf, byHour, byKindHour, behavior, rateScale, hours).rate > 0)
+                            if (at(k, hour, cells, kindOf, kinds, kindCell, byHour, byKindHour, behavior, rateScale, hours).rate > 0)
                                 landing = k;
                             break;
                         }
@@ -407,6 +490,7 @@ public final class Spread {
         res.startOffsetDeg = offsetDeg;
         res.maxSpotM = maxSpot;
         res.spotCrossings = spotCrossings;
+        res.fireType = fireType;
         return res;
     }
 
@@ -483,7 +567,7 @@ public final class Spread {
     }
 
     /** Fuel that will not carry fire under these conditions: entered by nothing, a wall to nothing. */
-    private static final Cell STILL = new Cell(0, 0, 0, 0, 0);
+    private static final Cell STILL = new Cell(0, 0, 0, 0, 0, 0);
 
     /** A cell from the engine's answer: the rate in meters a minute scaled, the ellipse, the flame, the embers. */
     private static Cell cellOf(double[] r, double rateScale) {
@@ -491,13 +575,22 @@ public final class Spread {
             return STILL;
         final double b = r[3], cc = r[4];
         final double ecc = b > 0 ? Math.max(0, Math.min(0.98, cc / b)) : 0;
-        return new Cell(r[0] * 0.3048d * rateScale, r[1], ecc, r[5], r.length > 6 ? r[6] : 0);
+        return new Cell(r[0] * 0.3048d * rateScale, r[1], ecc, r[5], r.length > 6 ? r[6] : 0,
+                r.length > 7 ? (int) Math.round(r[7]) : 0);
     }
 
     /** Cell {@code i} in hour {@code h}: the first hour's from the grid, a later one asked once per kind and hour. */
-    private static Cell at(int i, int h, Cell[] cells, int[] kindOf, Cell[][] byHour, Map<Long, Cell> byKindHour,
-            Behavior behavior, double rateScale, int hours) {
-        final Cell c0 = cells[i];
+    private static Cell at(int i, int h, Cell[] cells, int[] kindOf, List<Ground> kinds, List<Cell> kindCell,
+            Cell[][] byHour, Map<Long, Cell> byKindHour, Behavior behavior, double rateScale, int hours) {
+        Cell c0 = cells[i];
+        if (c0 == null) {
+            c0 = kindCell.get(kindOf[i]);
+            if (c0 == null) {
+                c0 = cellOf(behavior.run(kinds.get(kindOf[i]), Double.NaN, Double.NaN, 0), rateScale);
+                kindCell.set(kindOf[i], c0);
+            }
+            cells[i] = c0;
+        }
         if (h <= 0 || c0 == BARRIER || hours <= 1)
             return c0;
         Cell[] a = byHour[h];
@@ -508,8 +601,7 @@ public final class Spread {
             final long key = ((long) kindOf[i] << 4) | h;
             c = byKindHour.get(key);
             if (c == null) {
-                c = cellOf(behavior.run(kindOf[i] >> 16, (kindOf[i] >> 8) & 0xFF, (kindOf[i] & 0xFF) * 22,
-                        Double.NaN, Double.NaN, h), rateScale);
+                c = cellOf(behavior.run(kinds.get(kindOf[i]), Double.NaN, Double.NaN, h), rateScale);
                 byKindHour.put(key, c);
             }
             a[i] = c;
