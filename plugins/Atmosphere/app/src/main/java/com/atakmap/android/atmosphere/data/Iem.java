@@ -15,8 +15,8 @@ import java.util.TimeZone;
 import java.util.TreeMap;
 
 /**
- * The Iowa Environmental Mesonet (Iowa State University, {@code mesonet.agron.iastate.edu},
- * keyless, public domain): the archive of the NWS gauge feed (HADS) that the forecast
+ * The Iowa Environmental Mesonet (Iowa State University, keyless, public domain), read
+ * through takwerx's relay ({@link IemRelay}) since 0.18, never asked by the phone: the archive of the NWS gauge feed (HADS) that the forecast
  * offices' rainfall reports are written from. County flood-control gauges, RAWS, the
  * Forest Service's and the state's: about 960 gauges in a box around Southern
  * California against the ten the USGS keeps there (2026-10-13). And the airports' hourly
@@ -31,7 +31,6 @@ import java.util.TreeMap;
  */
 public final class Iem {
 
-    public static final String HOST = "mesonet.agron.iastate.edu";
     static final String ID = "[A-Z0-9]{3,10}";
     private static final long HOUR = 3_600_000L;
     /** A gauge whose readings stop for longer than this inside a run has a gap. */
@@ -76,11 +75,6 @@ public final class Iem {
     }
 
     // ---- network lists ---------------------------------------------------------------------
-
-    /** A state's gauges: "DCP" for the HADS gauges, "ASOS" for the airports. */
-    public static String networkUrl(String state, String kind) {
-        return "https://" + HOST + "/api/1/network/" + state + "_" + kind + ".geojson";
-    }
 
     /** Every gauge on line with a place; the archive lists retired ones too. */
     public static List<Station> parseNetwork(String geojson) {
@@ -142,12 +136,6 @@ public final class Iem {
 
     // ---- daily totals ----------------------------------------------------------------------
 
-    /** The HADS gauges' daily totals, the gauge's local calendar day, {@code start} to {@code end}. */
-    public static String dailyUrl(String state, List<String> ids, String start, String end) {
-        return "https://" + HOST + "/cgi-bin/request/daily.py?network=" + state + "_DCP&stations=" + join(ids)
-                + "&sts=" + start + "&ets=" + end + "&var=precip_in&format=csv&na=M";
-    }
-
     /** Gauge to day to inches; a day with no total ("M") is absent. */
     public static Map<String, TreeMap<String, Double>> parseDaily(String csv) {
         final Map<String, TreeMap<String, Double>> out = new LinkedHashMap<>();
@@ -176,12 +164,6 @@ public final class Iem {
     }
 
     // ---- a stretch of hours: the HADS readings ---------------------------------------------
-
-    /** The HADS gauges' readings from {@code startZ} to {@code endZ}, "2026-10-10T21:00Z". */
-    public static String hadsUrl(String state, List<String> ids, String startZ, String endZ) {
-        return "https://" + HOST + "/cgi-bin/request/hads.py?network=" + state + "_DCP&stations=" + join(ids)
-                + "&sts=" + startZ + "&ets=" + endZ;
-    }
 
     /**
      * Each gauge's rain from {@code startMs} to {@code endMs} (UTC): from its
@@ -300,13 +282,6 @@ public final class Iem {
     }
 
     // ---- a stretch of hours: the airports --------------------------------------------------
-
-    /** Every airport's routine hourly reports in a state, with their places. */
-    public static String asosUrl(String state, String startZ, String endZ) {
-        return "https://" + HOST + "/cgi-bin/request/asos.py?network=" + state
-                + "_ASOS&stations=_ALL&data=p01i&tz=Etc/UTC&format=onlycomma&latlon=yes&report_type=3&missing=M"
-                + "&trace=T&sts=" + startZ + "&ets=" + endZ;
-    }
 
     /**
      * Each airport's rain from {@code startMs} to {@code endMs}: one report an hour,
@@ -487,14 +462,6 @@ public final class Iem {
     static boolean placeable(double lat, double lon) {
         return !Double.isNaN(lat) && !Double.isNaN(lon) && !Double.isInfinite(lat) && !Double.isInfinite(lon)
                 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat == 0 && lon == 0);
-    }
-
-    private static String join(List<String> ids) {
-        final StringBuilder b = new StringBuilder();
-        for (String id : ids)
-            if (id.matches(ID))
-                b.append(b.length() > 0 ? "," : "").append(id);
-        return b.toString();
     }
 
     /** The lines after the header, without building one array of the whole body. */
