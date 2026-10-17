@@ -423,7 +423,8 @@ public class DetectionPane implements DetectionFeed.Listener {
         } else if (feed.lastRefresh <= 0) {
             status.setText("Nothing fetched yet");
         } else {
-            status.setText(count(feed.shownNow()) + " detections on the map");
+            final int shown = feed.shownNow();
+            status.setText(count(shown) + (shown == 1 ? " detection on the map" : " detections on the map"));
         }
         status.setTextColor(Color.WHITE);
 

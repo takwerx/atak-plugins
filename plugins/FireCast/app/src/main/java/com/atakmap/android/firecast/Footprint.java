@@ -73,6 +73,11 @@ public class Footprint {
      * portal). The axes are read off the polygon so the size still reads in words.
      */
     public static Footprint pixel(Geometry polygon, double lat, double lon, Double zenithDeg) {
+        return pixel(polygon, lat, lon, zenithDeg, 1);
+    }
+
+    /** {@code count} pixels of one fire, each at its own corners. */
+    public static Footprint pixel(Geometry polygon, double lat, double lon, Double zenithDeg, int count) {
         double alongScan = 0, alongTrack = 0;
         try {
             final com.atakmap.map.layer.feature.geometry.Envelope e = polygon.getEnvelope();
@@ -82,7 +87,8 @@ public class Footprint {
         } catch (Exception ignored) {
         }
         return new Footprint(Kind.PIXEL, alongScan, alongTrack, 90d, polygon,
-                "the pixel's own four corners as NOAA computed them"
+                (count > 1 ? count + " pixels, each at its own four corners as NOAA computed them"
+                        : "the pixel's own four corners as NOAA computed them")
                         + (zenithDeg == null ? "" : String.format(Locale.US, ", seen at a %.0f degree view angle", zenithDeg)));
     }
 

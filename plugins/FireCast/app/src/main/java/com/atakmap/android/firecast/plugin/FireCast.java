@@ -120,7 +120,31 @@ public class FireCast implements IPlugin {
             f.addAction(com.atakmap.android.firecast.model.ModelReceiver.ACTION, "open the fire model page");
             com.atakmap.android.ipc.AtakBroadcast.getInstance().registerReceiver(modelPage, f);
         }
+        // `adb shell am broadcast -a com.atakmap.android.firecast.SHOW` opens the pane,
+        // so a test session never drives the Tools list. A system receiver, because
+        // AtakBroadcast's own is process-local and am broadcast cannot reach it.
+        if (showReceiver == null) {
+            showReceiver = new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(android.content.Context c, android.content.Intent i) {
+                    if (mapView != null)
+                        mapView.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                showPane();
+                            }
+                        });
+                }
+            };
+            final com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter sf =
+                    new com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter();
+            sf.addAction(SHOW, "open the Fire Cast pane");
+            com.atakmap.android.ipc.AtakBroadcast.getInstance().registerSystemReceiver(showReceiver, sf);
+        }
     }
+
+    public static final String SHOW = "com.atakmap.android.firecast.SHOW";
+    private android.content.BroadcastReceiver showReceiver;
 
     @Override
     public void onStop() {
@@ -135,6 +159,13 @@ public class FireCast implements IPlugin {
         }
         pane = null;
         paneView = null;
+        if (showReceiver != null) {
+            try {
+                com.atakmap.android.ipc.AtakBroadcast.getInstance().unregisterSystemReceiver(showReceiver);
+            } catch (Exception ignored) {
+            }
+            showReceiver = null;
+        }
         if (modelPage != null) {
             try {
                 com.atakmap.android.ipc.AtakBroadcast.getInstance().unregisterReceiver(modelPage);

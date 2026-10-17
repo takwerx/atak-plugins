@@ -120,7 +120,10 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
             sb.append("A mapped area, drawn exactly as the service served it.\n");
         } else {
             sb.append(d.footprint.sizeText()).append(" on the ground");
-            if (d.pixelCount != null && d.pixelCount > 1)
+            if (d.footprint.kind == Footprint.Kind.PIXEL) {
+                if (d.pixelCount != null && d.pixelCount > 1)
+                    sb.append(", across the ").append(d.pixelCount).append(" pixels hot in the latest scan");
+            } else if (d.pixelCount != null && d.pixelCount > 1)
                 sb.append(", per sensor pixel, and the record merges ").append(d.pixelCount).append(" of them");
             sb.append(".\n");
         }
@@ -129,8 +132,10 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
             case MEASURED:
             case DERIVED:
             case NOMINAL:
-            case PIXEL:
                 sb.append("Something inside this box was hot when the satellite looked. The center of the box is the center of the sensor pixel, not the fire.");
+                break;
+            case PIXEL:
+                sb.append("Something inside each square was hot when the satellite looked. The squares are the satellite's pixels, not the fire's edge.");
                 break;
             default:
                 sb.append("The outline is the burned or radiating ground itself, at the time of the pass.");

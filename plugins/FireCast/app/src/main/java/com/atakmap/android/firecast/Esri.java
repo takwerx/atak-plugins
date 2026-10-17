@@ -255,6 +255,8 @@ public final class Esri {
      * default and will follow an https request onto http without saying so. Checking the
      * URL we asked for only proves where the request started.
      */
+    private static final int MAX_CHARS = 32 << 20;
+
     public static String get(String url) throws Exception {
         if (!url.startsWith("https://"))
             throw new IllegalStateException("not https: " + hostOf(url));
@@ -275,8 +277,13 @@ public final class Esri {
             try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
                 final char[] buf = new char[16384];
                 int n;
-                while ((n = r.read(buf)) > 0)
+                while ((n = r.read(buf)) > 0) {
                     sb.append(buf, 0, n);
+                    // A service that ignores its page limit would otherwise be held
+                    // whole, and running out of memory is an Error no catch here sees.
+                    if (sb.length() > MAX_CHARS)
+                        throw new java.io.IOException("answer over " + (MAX_CHARS >> 20) + " MB from " + hostOf(url));
+                }
             }
             return sb.toString();
         } finally {

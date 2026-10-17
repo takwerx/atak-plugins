@@ -50,7 +50,7 @@ public class GoesSource implements DetectionSource {
         return true;
     }
 
-    private static String where(long sinceMillis) {
+    static String where(long sinceMillis) {
         return "acq_date_time >= timestamp '" + Sources.utc(sinceMillis) + "'";
     }
 
@@ -78,16 +78,21 @@ public class GoesSource implements DetectionSource {
         if (!(g instanceof Point))
             return null;
         final Point p = (Point) g;
-        final HeatDetection d = read(a, p.getY(), p.getX());
+        final HeatDetection d = build(a, p.getY(), p.getX(), null);
         if (d != null)
             d.record = PolarSource.record(a, raw);
         return d;
     }
 
-    private HeatDetection read(JSONObject a, double lat, double lon) {
+    /**
+     * One fire from NIFC's record. {@code pixels} is NOAA's own pixel footprint for the
+     * fire's latest scan when {@link NgfsSource} found it; null derives a box from the
+     * view angle.
+     */
+    HeatDetection build(JSONObject a, double lat, double lon, Footprint pixels) {
         final String satellite = Fields.text(a, "satellite");
         final Double zenith = Fields.number(a, "satellite_zenith_angle");
-        final Footprint fp = zenith != null
+        final Footprint fp = pixels != null ? pixels : zenith != null
                 ? Footprint.geostationary(NOMINAL_M, zenith, satellite, lat, lon)
                 : Footprint.nominal(NOMINAL_M,
                         "the record carried no view angle, so this is the 2 km pixel at nadir - off nadir it is larger");
@@ -97,7 +102,7 @@ public class GoesSource implements DetectionSource {
         // total_frp is the whole detected feature; maximum_frp is its hottest pixel. The
         // one an operator is sizing a fire by is the total.
         d.frpMw = Fields.number(a, "total_frp");
-        d.pixelCount = Fields.integer(a, "pixel_count");
+        d.pixelCount = pixels != null ? Fields.integer(a, "ngfs_pixels") : Fields.integer(a, "pixel_count");
         final String dn = Fields.text(a, "daynight");
         if (dn != null)
             d.day = dn.trim().toUpperCase(Locale.US).startsWith("D");
@@ -121,12 +126,20 @@ public class GoesSource implements DetectionSource {
             d.classedNonFire = c.contains("solar") || c.contains("reflective");
         }
         final List<String> caveats = new ArrayList<>();
-        caveats.add("The box is where the heat was at this scan, not where the fire or its edge is now. GOES says a fire started and roughly where; a fire running since can be outside the box.");
-        caveats.add("This box is " + fp.sizeText() + ". A crew sent to the middle of it can be a kilometer or more from the fire.");
+        if (pixels != null) {
+            caveats.add("The squares are the pixels NOAA saw hot in this fire's latest scan, at their own corners. Something inside each was hot; the fire is not the whole square, and a fire running since can be outside them.");
+            caveats.add("Together they span " + fp.sizeText() + ". A crew sent to the middle of a square can be a kilometer or more from the fire.");
+        } else {
+            caveats.add("The box is where the heat was at this scan, not where the fire or its edge is now. GOES says a fire started and roughly where; a fire running since can be outside the box.");
+            caveats.add("This box is " + fp.sizeText() + ". A crew sent to the middle of it can be a kilometer or more from the fire.");
+        }
         if (d.persistenceHours != null && d.persistenceHours < 0.5)
             caveats.add("Detected for under half an hour. A single hot scan can be a flare, a glint or a short-lived heat source as easily as a new fire.");
         if (d.classedNonFire)
             caveats.add("NOAA classed this as \"" + d.classification + "\" - its own reading is that this is probably not a wildfire.");
+        final String fuel = Fields.text(a, "fuel");
+        if (fuel != null && !fuel.isEmpty())
+            caveats.add("Fuel under the hottest pixel, from LANDFIRE: " + NgfsSource.fuelWords(fuel) + ".");
         caveats.add("Cloud between the satellite and the ground suppresses or weakens a detection; the power reading is a floor, not a measurement of the fire.");
         d.caveats = caveats.toArray(new String[0]);
         d.raw = Esri.toAttributes(a);
