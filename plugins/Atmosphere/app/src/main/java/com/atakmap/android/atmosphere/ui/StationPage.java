@@ -62,7 +62,7 @@ public final class StationPage {
     private final MapView mapView;
     private final Host host;
     private final View root;
-    private final LinearLayout filterRow, scopeRow;
+    private final LinearLayout filterRow;
     private final TextView status;
     private final ListView list;
     private final View detail;
@@ -81,7 +81,6 @@ public final class StationPage {
         this.host = host;
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.page_stations, null);
         filterRow = root.findViewById(R.id.stations_filter_row);
-        scopeRow = root.findViewById(R.id.stations_scope_row);
         status = root.findViewById(R.id.stations_page_status);
         list = root.findViewById(R.id.stations_list);
         list.setAdapter(adapter);
@@ -133,7 +132,6 @@ public final class StationPage {
         shown = keep;
 
         buildFilterRow(counts, starred);
-        buildScopeRow();
         status.setText(summary(counts, from));
         adapter.notifyDataSetChanged();
         // A station being looked at stays looked at while the map moves around it.
@@ -145,14 +143,15 @@ public final class StationPage {
         if (layer == null || !layer.isOn())
             return "Turn the weather stations layer on to see them here.";
         if (from == null)
-            return layer.isFromMe() ? "No position yet — switch to the map center."
-                    : "The map has no center yet.";
+            return layer.originSource().self()
+                    ? "No position yet \u2014 pick Map center at the top."
+                    : "No point to measure from yet \u2014 pick one at the top.";
         final int total = counts[0] + counts[1] + counts[2];
         if (total == 0)
             return "No stations reporting within " + layer.miles() + " mi.";
         final int far = layer.favoritesBeyond();
         return shown.size() + " of " + total + " stations, nearest first, within "
-                + layer.miles() + " mi of " + (layer.isFromMe() ? "you" : "the map")
+                + layer.miles() + " mi of " + layer.originSource().words()
                 + (far == 0 ? "" : ", and " + far + " favorites beyond that");
     }
 
@@ -190,33 +189,12 @@ public final class StationPage {
         refresh();
     }
 
-    /** Where "nearest" is measured from. The layer owns it; this only switches it. */
-    private void buildScopeRow() {
-        scopeRow.removeAllViews();
-        final boolean me = layer.isFromMe();
-        scopeRow.addView(scopeTile("My position", me, true));
-        scopeRow.addView(scopeTile("Map center", !me, false));
-    }
-
     private View tile(String label, boolean chosen, final int color, final int value) {
         final Button b = chip(label, chosen, color);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 filter = value;
-                refresh();
-            }
-        });
-        return b;
-    }
-
-    private View scopeTile(String label, boolean chosen, final boolean fromMe) {
-        final Button b = chip(label, chosen, 0);
-        b.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (layer != null)
-                    layer.setFromMe(fromMe);
                 refresh();
             }
         });
@@ -405,7 +383,6 @@ public final class StationPage {
         list.setVisibility(View.GONE);
         heading.setVisibility(View.GONE);
         filterRow.setVisibility(View.GONE);
-        scopeRow.setVisibility(View.GONE);
         status.setVisibility(View.GONE);
     }
 
@@ -415,7 +392,6 @@ public final class StationPage {
         list.setVisibility(View.VISIBLE);
         heading.setVisibility(View.VISIBLE);
         filterRow.setVisibility(View.VISIBLE);
-        scopeRow.setVisibility(View.VISIBLE);
         status.setVisibility(View.VISIBLE);
     }
 

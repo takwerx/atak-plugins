@@ -54,7 +54,9 @@ The pane opens at half width. The top row is the same on every page:
 
 - **My position**, **Map center** and **Pick a point** choose the point every
   reading is for; the one in use is green. Map center follows the map: the
-  forecast and the fire weather zone are read again when the map stops.
+  forecast and the fire weather zone are read again when the map stops. The
+  Weather Stations, River Gauges and Buoys lists are measured from this point
+  too, nearest first, and say which point in their status line.
 - The star is **Favorites**: places kept by name.
 - **Units** switches every number between US, metric and aviation units.
 - **Full size** makes the pane full width and back; at full size every button
@@ -584,7 +586,8 @@ Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
 - It records nothing about you: no callsign, device identifier or TAK server
   detail is ever sent. Your position leaves the device only for the forecast
   when it is set to My position, rounded to about 100 m, and for the station,
-  gauge and buoy lists when they are set to My position. The Fire Weather Zones
+  gauge and buoy lists, which are measured from the same point, rounded the
+  same way. The Fire Weather Zones
   page finds your zone by sending the half-degree square the point is in, about
   30 miles across, never the point. Debris Flow, Rain Totals and Rain Gauges
   send the area the map shows, padded. Fuel Moisture sends the two-letter code
