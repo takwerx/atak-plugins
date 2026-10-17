@@ -431,6 +431,10 @@ public final class AtmospherePane {
     /** Which storms are showing their own list of maps. By storm id, not by slot. */
     private final Set<String> stormOpen = new HashSet<>();
     private final LinearLayout radarSettings;
+    private final android.widget.SeekBar radarTransparency;
+    private final TextView radarTransparencyLabel;
+    /** The strip's Play/Stop button, keyed apart from Live, the days and the hours. */
+    private static final String PLAY_TAG = "play";
     private final LinearLayout windSettings;
     private final ImageButton radarExpand;
     private final ImageButton windExpand;
@@ -997,6 +1001,8 @@ public final class AtmospherePane {
         snotelLegend = find(R.id.snotel_legend);
         buildStormScale();
         radarSettings = find(R.id.radar_settings);
+        radarTransparency = find(R.id.radar_transparency);
+        radarTransparencyLabel = find(R.id.radar_transparency_label);
         windSettings = find(R.id.wind_settings);
         radarExpand = find(R.id.radar_expand);
         windExpand = find(R.id.wind_expand);
@@ -1909,6 +1915,51 @@ public final class AtmospherePane {
                     scrubberLabel.setText(frameLabel(i,
                             i < 0 || i >= radarFrames.size() ? null : radarFrames.get(i)));
                 }
+            }
+
+            @Override
+            public void onPlaying(boolean playing) {
+                if (stripLayer() != TimeLayer.RADAR || radar == null)
+                    return;
+                // Playing hides the hours, as Live does; stopped, the frame it
+                // stopped on is green among them, or Live when it is the newest.
+                liveMode = playing || radar.frameIndex() == whenLive;
+                buildWhenPicker();
+            }
+        });
+        radarTransparency.setMax(RadarOverlay.MAX_TRANSPARENCY);
+        radarTransparency.setProgress(radar.transparency());
+        radarTransparencyLabel.setText(pluginContext.getString(R.string.raintotals_opacity_heading)
+                + " " + radar.transparency() + "%");
+        // The bar owns the touch from down to up, or the pager takes a sideways drag
+        // as a page turn. Applied on every tick: the renderer fades what it holds.
+        radarTransparency.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                final int a = e.getActionMasked();
+                if (a == android.view.MotionEvent.ACTION_DOWN)
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                else if (a == android.view.MotionEvent.ACTION_UP
+                        || a == android.view.MotionEvent.ACTION_CANCEL)
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                return false;
+            }
+        });
+        radarTransparency.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) {
+                radarTransparencyLabel.setText(pluginContext.getString(
+                        R.string.raintotals_opacity_heading) + " " + progress + "%");
+                if (fromUser && radar != null)
+                    radar.setTransparency(progress);
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar bar) {
             }
         });
         updateLayerControls();
@@ -3535,13 +3586,24 @@ public final class AtmospherePane {
         // Live, then one button per day the times cover. A single day is not worth
         // a button of its own: the hours below it are already that day.
         final List<Button> dayButtons = new ArrayList<>();
+        final boolean playing = radarPlaying();
         dayButtons.add(whenButton("Live", null, new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 liveMode = true;
                 pickWhen(whenLive);
             }
-        }, liveMode));
+        }, liveMode && !playing));
+        // The radar plays its last two hours as a loop, to show which way the cells
+        // move (takwerx/atmosphere#7). Any other pick on the strip stops it.
+        if (stripLayer() == TimeLayer.RADAR && radar != null && whenTimes.size() > 1)
+            dayButtons.add(whenButton(playing ? "Stop" : "Play", PLAY_TAG, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (radar != null)
+                        radar.setPlaying(!radar.isPlaying());
+                }
+            }, playing));
         final List<Long> days = new ArrayList<>();
         for (Long t : whenTimes) {
             final long d = startOfDay(t);
@@ -3665,8 +3727,10 @@ public final class AtmospherePane {
                 on = !liveMode && (Integer) tag == whenIndex;
             else if (tag instanceof Long)
                 on = !liveMode && ((Long) tag).longValue() == day;
+            else if (PLAY_TAG.equals(tag))
+                on = radarPlaying();
             else
-                on = liveMode;
+                on = liveMode && !radarPlaying();
             ((Button) v).setTextColor(on
                     ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
         }
@@ -3690,6 +3754,11 @@ public final class AtmospherePane {
         lp.topMargin = dp(4);
         b.setLayoutParams(lp);
         return b;
+    }
+
+    /** The radar's loop is playing on the strip it owns. */
+    private boolean radarPlaying() {
+        return radar != null && radar.isPlaying() && stripLayer() == TimeLayer.RADAR;
     }
 
     /** The layers that share the one time strip. */
@@ -6578,6 +6647,9 @@ public final class AtmospherePane {
         }
         followStripOwner();
         final TimeLayer owner = stripLayer();
+        // The loop's Stop is on the strip: a radar that loses the strip stops playing.
+        if (radar != null && radar.isPlaying() && owner != TimeLayer.RADAR)
+            radar.setPlaying(false);
         if (owner == TimeLayer.WIND)
             hostScrubberIn(windSettings);
         else if (owner == TimeLayer.SMOKE)

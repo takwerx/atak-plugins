@@ -241,7 +241,9 @@ it is a direction.
   Canada's over Canada. It picks the right one by itself as the map moves.
 
   The time strip under it scrubs back through the last two to three hours of
-  frames. *Live* follows the newest.
+  frames. *Live* follows the newest. *Play* runs those hours as a loop, to show
+  which way the storm cells move; *Stop* or any time picked ends it. The
+  *Transparency* slider lets the map show through.
 ]
 ]
 

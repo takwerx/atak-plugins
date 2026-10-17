@@ -117,7 +117,8 @@ changes are here). New: Rain Gauges' county, RAWS and airport gauges and Rain
 Totals' past radar come from takwerx's relay of the Iowa Environmental
 Mesonet, which turns away a phone that asks it fast; the relay keeps their
 hours 45 days, and further back the county and RAWS gauges show whole days.
-Public Safety Power Shutoffs from
+Radar plays its last two hours as a loop and has a transparency slider
+(takwerx/atmosphere#7). Public Safety Power Shutoffs from
 takwerx's relay of Cal OES, SCE and SDG&E, after Cal OES put its shutoff areas
 behind a login: areas shut off by utility, the circuits a utility is watching,
 customers out and when power is expected back, with labels that group as the

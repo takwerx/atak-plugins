@@ -41,6 +41,8 @@ public final class RasterLayer extends AbstractLayer {
     private final ConcurrentLinkedQueue<OnLayerChangedListener> listeners = new ConcurrentLinkedQueue<>();
     private final Object lock = new Object();
     private Frame frame;
+    /** How opaque the picture is drawn, 0 to 1; changed without a new picture. */
+    private volatile float alpha = 1f;
 
     public RasterLayer(String name) {
         super(name);
@@ -52,6 +54,22 @@ public final class RasterLayer extends AbstractLayer {
             frame = bitmap == null || bounds == null ? null : new Frame(bitmap, bounds);
         }
         dispatch();
+    }
+
+    /**
+     * How opaque the picture is drawn, 0 to 1. The renderer fades the texture it
+     * already holds, so a slider moves the picture at once with no new download.
+     */
+    public void setAlpha(float a) {
+        final float v = Math.max(0f, Math.min(1f, a));
+        if (v == alpha)
+            return;
+        alpha = v;
+        dispatch();
+    }
+
+    public float getAlpha() {
+        return alpha;
     }
 
     /** Takes the image off the map without removing the layer itself. */

@@ -156,7 +156,7 @@ opening the plugin.
 |---|---|---|
 | | Spot Weather Forecast | Every open spot forecast request, with the office's forecast behind a tap |
 | | Weather Stations | The stations around you, wind barb and readings, colored against the Red Flag criteria for their zone; in California, the utilities' stations too |
-| Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber |
+| Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber, Play to loop the last two hours and see which way the cells move, and a transparency slider |
 | Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches the open ocean where no radar does |
 | Wind | Rain | The model's rain rate, light to violent, hour by hour for five days with the rate "Here"; a forecast, not radar |
 | Wind | Wind | The forecast wind as moving streaks colored by speed, or as a heat map under them in the same colors, with a time scrubber, heights to the jet stream, and the wind "Here". Runs together with Radar; the heat map and Radar take turns |
