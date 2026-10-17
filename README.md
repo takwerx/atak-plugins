@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.17** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.18** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.18/ATAK-Plugin-Atmosphere-0.18--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.18/ATAK-Plugin-Atmosphere-0.18--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.18/ATAK-Plugin-Atmosphere-0.18--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -112,7 +112,12 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.17, for ATAK-CIV 5.6, 5.7 and 5.8. New: Public Safety Power Shutoffs from
+0.18, for ATAK-CIV 5.6, 5.7 and 5.8 (0.17 was built but never released; its
+changes are here). New: Rain Gauges' county, RAWS and airport gauges and Rain
+Totals' past radar come from takwerx's relay of the Iowa Environmental
+Mesonet, which turns away a phone that asks it fast; the relay keeps their
+hours 45 days, and further back the county and RAWS gauges show whole days.
+Public Safety Power Shutoffs from
 takwerx's relay of Cal OES, SCE and SDG&E, after Cal OES put its shutoff areas
 behind a login: areas shut off by utility, the circuits a utility is watching,
 customers out and when power is expected back, with labels that group as the
@@ -210,15 +215,16 @@ PORTS REQUIRED
     waterservices.usgs.gov          USGS rain gauges
     data.rcc-acis.org               airports and NWS observers' rain over a run
                                     of days (NOAA Regional Climate Centers)
-    mesonet.agron.iastate.edu       county flood control, RAWS and agency
-                                    gauges, airports' hourly rain, past radar
-                                    rain pictures (Iowa Environmental Mesonet)
     geocoding.geo.census.gov        address search for a spot request, only
                                     when the operator types an address
-    mapdepot.takwerx.org            Public Safety Power Shutoffs: Cal OES's
-                                    warned counties and PG&E's areas, SCE's
-                                    and SDG&E's circuits, relayed by takwerx
-                                    as one file
+    mapdepot.takwerx.org            takwerx's relays: Public Safety Power
+                                    Shutoffs (Cal OES's warned counties and
+                                    PG&E's areas, SCE's and SDG&E's circuits,
+                                    as one file); county flood control, RAWS
+                                    and agency gauges, airports' hourly rain
+                                    and past radar rain pictures, by state,
+                                    day and 2-degree square (the Iowa
+                                    Environmental Mesonet's, kept 45 days)
 
   An operator-supplied weather service definition can name a different host;
   the dialog that enables it lists the hosts it will contact.

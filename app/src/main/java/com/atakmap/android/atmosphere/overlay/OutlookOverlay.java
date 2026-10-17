@@ -404,6 +404,11 @@ public abstract class OutlookOverlay {
         return skipped(index);
     }
 
+    /** {@link #skipped(int, String)} with the failure in words: "no data for this point (HTTP 404)". */
+    protected List<Area> skipped(int index, String url, String error) {
+        return skipped(index, url);
+    }
+
     /** The fill's alpha for an area; 0 draws the outline alone. */
     protected int fillAlpha(Area a) {
         return FILL_ALPHA;
@@ -713,7 +718,7 @@ public abstract class OutlookOverlay {
                 if (mine != generation)
                     return;
                 if (optional(index)) {
-                    got.addAll(skipped(index, url));
+                    got.addAll(skipped(index, url, error));
                     fetch(index + 1, got, mine);
                     return;
                 }

@@ -2543,9 +2543,13 @@ public final class AtmospherePane {
             raingaugesLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
     }
 
-    /** The radar estimate before a moment: the day, the time, then 1, 24, 48 or 72 hours before. */
+    /**
+     * The radar estimate before a moment: the day, the time, then 1, 24, 48 or 72 hours
+     * before. The relay keeps 45 days, so the calendar starts there.
+     */
     private void pickRainTotalsMoment(android.content.Context ctx) {
-        MomentPicker.pick(ctx, raintotals.moment(), com.atakmap.android.atmosphere.data.IemRadar.HOURS,
+        MomentPicker.pick(ctx, raintotals.moment(), RainTotalsOverlay.earliestMoment(),
+                com.atakmap.android.atmosphere.data.IemRadar.HOURS,
                 raintotals.beforeHours(), pluginContext.getString(R.string.rain_window_title), new MomentPicker.Words() {
                     @Override
                     public String of(int hours, long millis) {
