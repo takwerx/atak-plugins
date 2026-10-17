@@ -100,6 +100,24 @@ public final class Boundaries {
         return out.toArray(new String[0]);
     }
 
+    /** The fields a mosaic fetches: the ones its type, color and details use, not PAD-US's thirty-six. */
+    static String outFields(String kind) {
+        switch (kind == null ? "" : kind) {
+            case KIND_RESPONSIBILITY:
+                return "SRA";
+            case KIND_DPA:
+                return "DPA_AGENCY,DPA_GROUP,NWCG_UNITID,AGREEMENTS";
+            case KIND_OWNERSHIP:
+                return "Own_Group,Own_Agency,Own_Level";
+            case KIND_PUBLIC_LAND:
+                return "WebServiceMangName,Unit_Nm,Own_Name,Pub_Access,State_Nm";
+            case KIND_ACCESS:
+                return "Pub_Access,Unit_Nm,MngNm_Desc";
+            default:
+                return null;
+        }
+    }
+
     /** The field a mosaic's features are typed and colored by, the publisher's own renderer field. */
     static String setField(String kind) {
         switch (kind == null ? "" : kind) {
@@ -575,6 +593,7 @@ public final class Boundaries {
         s.maxFeatures = 0;
         s.timeField = null;
         s.setField = setField(s.kind);
+        s.outFields = outFields(s.kind);
         if (mosaic(s.kind)) {
             // One load for the area the operator is in: a fixed square around the map
             // center when the layer is added, kept until Refresh (operator, 2026-10-14:
@@ -753,17 +772,34 @@ public final class Boundaries {
         return a / 2;
     }
 
+    /** The widest square a land layer loads: 75 miles each way; further out the edges stay empty and the row says zoom in. */
+    static final double AREA_MAX_HALF_M = 75 * MILE;
+
     /**
-     * Whether a point is still well inside a loaded square: inside the middle 60% of
-     * it. Past that the square is loaded again around the map, so a layer follows the
-     * map by itself (operator, 2026-10-16: "its got to be automatic, not manual"),
-     * roughly every ten miles of travel and never on a zoom.
+     * Whether a loaded square still covers the whole view. Once the view reaches the
+     * square's edge the square is loaded again (operator, 2026-10-16: "on borders it
+     * wont fill in till i move it"); the margin the new square carries is what keeps
+     * a slow pan from fetching at every settle.
      */
-    public static boolean wellInside(double[] box, double lat, double lon) {
-        if (box == null)
-            return false;
-        final double mLat = (box[2] - box[0]) * 0.2, mLon = (box[3] - box[1]) * 0.2;
-        return lat >= box[0] + mLat && lat <= box[2] - mLat && lon >= box[1] + mLon && lon <= box[3] - mLon;
+    public static boolean covers(double[] box, com.atakmap.coremap.maps.coords.GeoBounds b) {
+        return box != null && b != null
+                && b.getSouth() >= box[0] && b.getWest() >= box[1] && b.getNorth() <= box[2] && b.getEast() <= box[3];
+    }
+
+    /**
+     * South, west, north, east of the square to load for a view: the view plus half
+     * its size each way, never less than 25 miles each way from the center (a zoomed-in
+     * phone still gets the county around it), never more than 75 (a state-wide view
+     * gets its middle and the rest when it zooms in).
+     */
+    public static double[] boxFor(com.atakmap.coremap.maps.coords.GeoBounds b) {
+        final double lat = (b.getNorth() + b.getSouth()) / 2, lon = (b.getEast() + b.getWest()) / 2;
+        final double minLat = AREA_HALF_M / 111_320d, maxLat = AREA_MAX_HALF_M / 111_320d;
+        final double cos = Math.max(0.2, Math.cos(Math.toRadians(lat)));
+        final double minLon = minLat / cos, maxLon = maxLat / cos;
+        final double hLat = Math.min(maxLat, Math.max(minLat, (b.getNorth() - b.getSouth())));
+        final double hLon = Math.min(maxLon, Math.max(minLon, (b.getEast() - b.getWest())));
+        return new double[] { Math.max(-90, lat - hLat), Math.max(-180, lon - hLon), Math.min(90, lat + hLat), Math.min(180, lon + hLon) };
     }
 
     /** South, west, north, east of the square a land layer loads around a point. */

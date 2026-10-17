@@ -1839,10 +1839,10 @@ public class FeatureLayer implements IPlugin {
             }
             last = com.atakmap.android.featurelayer.Boundaries.layer(kind, states, geoids, names);
             if (com.atakmap.android.featurelayer.Boundaries.mosaic(kind)) {
-                // The square it loads once: around where the map is now.
-                final com.atakmap.coremap.maps.coords.GeoPoint c = mapCenter();
-                if (c != null)
-                    last.scopeBox = com.atakmap.android.featurelayer.Boundaries.boxAround(c.getLatitude(), c.getLongitude());
+                // The square it loads first: what is on screen and around it.
+                final com.atakmap.coremap.maps.coords.GeoBounds vb = mapView.getBounds();
+                if (vb != null)
+                    last.scopeBox = com.atakmap.android.featurelayer.Boundaries.boxFor(vb);
             }
             manager.add(last);
         }

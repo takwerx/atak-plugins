@@ -1335,7 +1335,7 @@ public class LoadedLayer {
         if (spec.scopeKind == null)
             return "Everything";
         if ("box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind))
-            return "50 miles around the map, following it";
+            return "what is on screen and around it, following the map";
         if ("all".equals(spec.scopeKind))
             return "Everywhere";
         if ("view".equals(spec.scopeKind))
@@ -1381,9 +1381,8 @@ public class LoadedLayer {
         // left the middle of the loaded one.
         if ("box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind)) {
             try {
-                final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
-                return c != null && spec.scopeBox != null
-                        && !Boundaries.wellInside(spec.scopeBox, c.getLatitude(), c.getLongitude());
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                return b != null && spec.scopeBox != null && !Boundaries.covers(spec.scopeBox, b);
             } catch (RuntimeException e) {
                 return false;
             }
@@ -1525,14 +1524,14 @@ public class LoadedLayer {
         if ("box".equals(spec.scopeKind)) {
             final boolean land = Boundaries.handles(spec) && Boundaries.mosaic(spec.kind);
             if (land) {
-                // The square follows the map: loaded again around the center once the
-                // center has left the middle of it (movedOutOfScope), or when a saved
-                // layer has none yet.
-                final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
-                if (c == null)
-                    throw new IllegalStateException("the map has no center yet");
-                if (spec.scopeBox == null || !Boundaries.wellInside(spec.scopeBox, c.getLatitude(), c.getLongitude()))
-                    spec.scopeBox = Boundaries.boxAround(c.getLatitude(), c.getLongitude());
+                // The square follows the view: loaded again, sized to what is on screen
+                // plus a margin, once the view reaches the edge of the loaded one
+                // (movedOutOfScope), or when a saved layer has none yet.
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                if (b == null)
+                    throw new IllegalStateException("the map has no extent yet");
+                if (spec.scopeBox == null || !Boundaries.covers(spec.scopeBox, b))
+                    spec.scopeBox = Boundaries.boxFor(b);
             }
             if (spec.scopeBox == null)
                 throw new IllegalStateException("no area set for " + spec.title);
@@ -1912,7 +1911,7 @@ public class LoadedLayer {
                 ? "(" + spec.whereNow() + ") AND " + FireHistoryStyles.yearWhere(base.equals(spec.baseFor(0)), year)
                 : spec.whereNow();
         Esri.query(base, layerId, where, sc, token, spec.geojson,
-                Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, new Esri.FeatureSink() {
+                Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, spec.outFields, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
                         if (bounds && Boundaries.mosaic(spec.kind)) {

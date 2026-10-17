@@ -525,7 +525,10 @@ public class LayerManager {
                 if (!l.movedOutOfScope())
                     continue;
                 final Long last = lastMoveFetch.get(l.spec.id);
-                if (last != null && now - last < MOVE_MIN_GAP_MS)
+                // A land layer's square is sized to the view and fetches in a few
+                // seconds; it may follow the map more closely than a live feed.
+                final long gap = Boundaries.handles(l.spec) && Boundaries.mosaic(l.spec.kind) ? 6_000 : MOVE_MIN_GAP_MS;
+                if (last != null && now - last < gap)
                     continue;
                 lastMoveFetch.put(l.spec.id, now);
                 refresh(l);
@@ -839,12 +842,12 @@ public class LayerManager {
             // new area for all of them, not the one whose button was under the thumb
             // (the operator refreshed Public Access near San Diego and read SRA, still
             // holding Santa Barbara, as broken, 2026-10-14).
-            final com.atakmap.coremap.maps.coords.GeoPoint c = mapView.getPoint().get();
-            if (c == null) {
+            final com.atakmap.coremap.maps.coords.GeoBounds vb = mapView.getBounds();
+            if (vb == null) {
                 refresh(l);
                 return;
             }
-            final double[] box = Boundaries.boxAround(c.getLatitude(), c.getLongitude());
+            final double[] box = Boundaries.boxFor(vb);
             final String key = Boundaries.groupKey(l.spec);
             for (LoadedLayer o : snapshot()) {
                 if (!Boundaries.handles(o.spec) || !Boundaries.mosaic(o.spec.kind) || !key.equals(Boundaries.groupKey(o.spec)))

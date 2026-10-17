@@ -247,6 +247,12 @@ public final class Esri {
      */
     public static int query(String base, int layerId, String where, Scope scope, String token, boolean geojson,
             int pageSize, int maxFeatures, FeatureSink sink) throws Exception {
+        return query(base, layerId, where, scope, token, geojson, pageSize, maxFeatures, null, sink);
+    }
+
+    /** The same, asking for only {@code outFields} (comma separated); null is every field. */
+    public static int query(String base, int layerId, String where, Scope scope, String token, boolean geojson,
+            int pageSize, int maxFeatures, String outFields, FeatureSink sink) throws Exception {
         int count = 0, offset = 0;
         // The cap is a cap: a 1,000-row page for a 300-feature layer delivered 1,000
         // (a national view of DART on 2026-09-18). Ask for no more than the cap, and
@@ -257,7 +263,8 @@ public final class Esri {
             if (maxFeatures > 0 && count >= maxFeatures)
                 break;
             final String params = "where=" + enc(where)
-                    + "&outFields=*&outSR=4326&f=" + (geojson ? "geojson" : "json")
+                    + "&outFields=" + (outFields == null || outFields.isEmpty() ? "*" : enc(outFields))
+                    + "&outSR=4326&f=" + (geojson ? "geojson" : "json")
                     + "&resultRecordCount=" + pageSize + "&resultOffset=" + offset
                     + (scope == null ? "" : scope.params());
             final String url = base + "/" + layerId + "/query";

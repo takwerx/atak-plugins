@@ -78,6 +78,8 @@ public class LayerSpec {
      * Fire History reads two services as one layer. Not saved; the source sets it.
      */
     public String[] sourceBases;
+    /** The fields to fetch, comma separated, when the layer needs only a few of a wide table; null is all. Not saved. */
+    public String outFields;
     /** Simplify shapes to the map's resolution when fetching; fire perimeters are megabytes at full detail. Not saved. */
     public boolean generalize;
 
