@@ -219,8 +219,23 @@ public class LayerManager {
         startLog("start: restoring");
         restore();
         startLog("start: restored " + snapshot().size() + " layers, queuing refreshes");
-        for (LoadedLayer l : snapshot())
-            refresh(l);
+        for (LoadedLayer l : snapshot()) {
+            if (!Boundaries.handles(l.spec) || l.isVisible()) {
+                refresh(l);
+                continue;
+            }
+            // A hidden boundary or land layer is reference data the phone already holds:
+            // no download at every start for something nobody is looking at. It fetches
+            // when switched on if it has nothing, an old style, or a square elsewhere.
+            final ExecutorService on = Boundaries.mosaic(l.spec.kind) ? landPool : worker;
+            on.execute(new Runnable() {
+                @Override
+                public void run() {
+                    if (!l.restsHidden())
+                        refreshNow(l);
+                }
+            });
+        }
         // After the refreshes, on the same thread: with no layers, or all of them already
         // redrawn by this build, the old folder goes now.
         worker.execute(new Runnable() {
@@ -515,6 +530,8 @@ public class LayerManager {
     private com.atakmap.android.maps.Marker selfWatched;
     /** About a second after the last movement, so a pan asks once, not per frame. */
     private static final long MOVE_SETTLE_MS = 1000;
+    /** How soon a land layer that skipped a move is asked again. */
+    private static final long LAND_RETRY_MS = 1500;
     /** No layer is re-fetched for movement more often than this. */
     private static final long MOVE_MIN_GAP_MS = 20_000;
     private final java.util.Map<String, Long> lastMoveFetch = new java.util.HashMap<>();
@@ -526,19 +543,32 @@ public class LayerManager {
             final long now = System.currentTimeMillis();
             final double res = mapView.getMapResolution();
             boolean followsView = false;
+            boolean landWaits = false;
             for (LoadedLayer l : snapshot()) {
                 l.onMapResolution(res);
                 followsView |= "view".equals(l.spec.scopeKind);
-                if (!l.movedOutOfScope())
+                if (!l.movedOutOfScope()) {
+                    // Still fetching the square it took mid-drag: look again once that is in.
+                    landWaits |= l.landSquareStale();
                     continue;
+                }
                 final Long last = lastMoveFetch.get(l.spec.id);
                 // A land layer's square is sized to the view and fetches in a few
                 // seconds; it may follow the map more closely than a live feed.
                 final long gap = Boundaries.handles(l.spec) && Boundaries.mosaic(l.spec.kind) ? 3_000 : MOVE_MIN_GAP_MS;
-                if (last != null && now - last < gap)
+                if (last != null && now - last < gap) {
+                    landWaits |= l.landSquareStale();
                     continue;
+                }
                 lastMoveFetch.put(l.spec.id, now);
                 refresh(l);
+            }
+            // A land layer that skipped this move, for the gap or a fetch still running,
+            // is asked again: the map may never move again, and a drag that settled
+            // inside the gap left SRA empty over Los Angeles (dev 2, 2026-10-16).
+            if (landWaits) {
+                main.removeCallbacks(moveTick);
+                main.postDelayed(moveTick, LAND_RETRY_MS);
             }
             // A list scoped to the view is drawn from what is in view now, so the pane
             // redraws in place after every settled move, fetch or no fetch.
@@ -861,7 +891,9 @@ public class LayerManager {
                 if (!Boundaries.handles(o.spec) || !Boundaries.mosaic(o.spec.kind) || !key.equals(Boundaries.groupKey(o.spec)))
                     continue;
                 o.spec.scopeBox = box.clone();
-                refresh(o);
+                // A hidden one takes the new square and fetches when it is switched on.
+                if (o == l || o.isVisible())
+                    refresh(o);
             }
             save();
             return;

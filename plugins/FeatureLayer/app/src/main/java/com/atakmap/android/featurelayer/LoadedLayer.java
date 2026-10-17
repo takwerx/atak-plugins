@@ -473,6 +473,18 @@ public class LoadedLayer {
         return NewStartsStyles.handles(spec) ? NewStartsStyles.marker(kind, iconDir) : null;
     }
 
+    /**
+     * A switched-off boundary or land layer that needs nothing at start: it holds
+     * features written with this build's styles. Worker thread (reads the store).
+     */
+    boolean restsHidden() {
+        if (layerOn || !Boundaries.handles(spec) || !drawnByThisBuild())
+            return false;
+        synchronized (lock) {
+            return store != null && !closed && storedFeatures() > 0;
+        }
+    }
+
     /** Whether the store was last written with this build's styles, so nothing in it points at older files. */
     boolean drawnByThisBuild() {
         return spec.styleVersion == STYLE_VERSION;
@@ -496,6 +508,19 @@ public class LoadedLayer {
                 rewriteStore();
             else
                 applyVisibility();
+        }
+        // A boundary layer skipped at start (restsHidden) catches up a style change now.
+        if (v && Boundaries.handles(spec) && !drawnByThisBuild())
+            return true;
+        // A land layer switched on where its square no longer reaches: it shows what it
+        // holds at once and fetches the square here (scope() re-boxes it).
+        if (v && "box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind)) {
+            try {
+                final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+                return b != null && (spec.scopeBox == null || !Boundaries.coversWithRoom(spec.scopeBox, b));
+            } catch (RuntimeException e) {
+                return false;
+            }
         }
         return false;
     }
@@ -1374,12 +1399,31 @@ public class LoadedLayer {
      * what is drawn no longer answers the scope. Judged on the main thread by
      * {@link LayerManager} after a debounced map move.
      */
+    /**
+     * A land layer that is shown and whose square no longer reaches the view, whether or
+     * not a fetch is running: what the move tick waits on before it lets go.
+     */
+    boolean landSquareStale() {
+        if (!layerOn || !"box".equals(spec.scopeKind) || !Boundaries.handles(spec) || !Boundaries.mosaic(spec.kind))
+            return false;
+        try {
+            final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
+            return b != null && spec.scopeBox != null && !Boundaries.coversWithRoom(spec.scopeBox, b);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     boolean movedOutOfScope() {
         if (refreshing || busy)
             return false;
         // A land layer's square follows the map center: a new one once the center has
         // left the middle of the loaded one.
         if ("box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind)) {
+            // A land layer that is switched off follows nothing: four hidden layers were
+            // fetched again on every pan (2026-10-16). It catches up when switched on.
+            if (!layerOn)
+                return false;
             try {
                 final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
                 return b != null && spec.scopeBox != null && !Boundaries.coversWithRoom(spec.scopeBox, b);
@@ -1918,8 +1962,10 @@ public class LoadedLayer {
         // A land layer takes the service's biggest page: round trips were the time.
         final int page = bounds && Boundaries.mosaic(spec.kind) ? Math.min(2000, info.maxRecordCount)
                 : Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount);
+        // And it comes as protobuf: the wire was most of a redraw (2026-10-16).
+        final boolean pbf = bounds && Boundaries.mosaic(spec.kind);
         Esri.query(base, layerId, where, sc, token, spec.geojson,
-                page, spec.maxFeatures, spec.outFields, new Esri.FeatureSink() {
+                page, spec.maxFeatures, spec.outFields, pbf, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
                         if (bounds && Boundaries.mosaic(spec.kind)) {
