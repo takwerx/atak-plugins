@@ -551,6 +551,37 @@ switches and gates above to behave. Full machinery:
   layer), so it comes back after a restart with no network, the list and details
   with it. CLAUDE.md, "Downloaded data survives a restart with no network".
 
+### A busy map: offer labels that group as it zooms out (ask, never default)
+
+When a layer can put hundreds of labels on the screen at once, **ask the
+operator whether they want grouped labels**: one pill standing for the nearby
+features of one kind, "SCE - PSPS (23)", that splits into each feature's own
+label as the map zooms in. The operator liked it where the map gets very busy
+and wants it offered, not built in (2026-10-17: "leave it just as a
+recommendation like hey do you want this"). A layer with a few dozen labels does
+not need it.
+
+If they want it, Atmosphere's PSPS layer is the reference (`PspsOverlay`,
+`AtmosphereFeatures.applySetFilter`, 2026-10-16), and these are what it took:
+
+- **Ranges read off ATAK's scale bar**, like the zoom gate: each feature its own
+  label from 10 mi in, pills worked out for 20, 40, 60, 100 and 150 mi, nothing
+  past 150 ("at this level no labels"). Narrow ranges: grouping for a range's far
+  edge merged features 70 miles apart at its near edge.
+- **Every range's labels are written with the features, one set per range, and the
+  plugin shows one** with `setFeatureSetVisible` when the map settles, by
+  `ScaleBar.meters`. A set's own zoom band cannot do it: the renderer tests a
+  window two tile steps wide, and three ranges' pills drew at once.
+- **Group one kind from one source only**, never across: grouping every utility
+  together put PG&E's count on an SCE circuit 100 miles away.
+- **A pill sits on the label point inside its group's feature nearest the
+  middle**, never on the mean or a box center: the mean of features along a coast
+  is at sea, and a box center can be empty ground between a feature's pieces.
+- **Overlap: move the lesser pill down one pill, once.** Moving pills again and
+  again, a pill's height is 150 miles of ground at the far range, put them out
+  at sea.
+- Pills are label-only points a tap passes through to the features under them.
+
 ### A tap: straight to the pane, or a radial
 
 **Ask the operator, per kind of thing on the map, in the PLAN.** Propose this
