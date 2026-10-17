@@ -618,19 +618,30 @@ public final class Boundaries {
     }
 
     /** The where clause: the states by FIPS, or the picked GEOIDs. Tribal lands have no state field; their state is a shape ({@link #passes}). */
+    /**
+     * The smallest feature a land layer asks for, in the service's own square meters
+     * (Web Mercator, about 1.4 times true area at California's latitude): a parcel under
+     * about 600 m across is a dot at the square's scale and was dropped after the fetch
+     * anyway. Ownership around Los Angeles was nine pages of 1,000 rows for 700 kept,
+     * one page at a time (2026-10-16).
+     */
+    static final long MIN_SHAPE_AREA_M2 = 400_000;
+
     static String where(LayerSpec s) {
         if (mosaic(s.kind)) {
             // PAD-US managers carry the state by postal code; CAL FIRE's layers are one
-            // state, and PAD-US access has no state field. The view does the scoping.
+            // state, and PAD-US access has no state field. The square does the scoping;
+            // the area floor keeps the parcel dust on the server.
+            final String floor = "Shape__Area >= " + MIN_SHAPE_AREA_M2;
             if (!KIND_PUBLIC_LAND.equals(s.kind))
-                return "1=1";
+                return floor;
             final List<String> ab = new ArrayList<>();
             for (String f : s.states) {
                 final State st = state(f);
                 if (st != null)
                     ab.add(st.abbr);
             }
-            return ab.isEmpty() ? "1=1" : "State_Nm IN (" + list(ab.toArray(new String[0])) + ")";
+            return ab.isEmpty() ? floor : floor + " AND State_Nm IN (" + list(ab.toArray(new String[0])) + ")";
         }
         if (s.picks != null && s.picks.length > 0)
             return "GEOID IN (" + list(s.picks) + ")";
@@ -718,47 +729,38 @@ public final class Boundaries {
      */
     private static com.atakmap.map.layer.feature.geometry.LineString copy(com.atakmap.map.layer.feature.geometry.LineString r) {
         final int n = r.getNumPoints();
-        final List<double[]> pts = new ArrayList<>(n);
+        // One pass, linear: a point is kept unless it repeats the last kept point or
+        // lies on the straight line from the last kept point to the next one. The
+        // first version re-scanned the ring after every removal, quadratic on CAL
+        // FIRE's 13,000-point outer rings, and the phone spent seven seconds a fetch
+        // in it (2026-10-16).
+        final double[] xs = new double[n], ys = new double[n];
+        int k = 0;
         for (int i = 0; i < n; i++) {
             final double x = r.getX(i), y = r.getY(i);
             if (Double.isNaN(x) || Double.isNaN(y))
                 continue;
-            if (!pts.isEmpty()) {
-                final double[] p = pts.get(pts.size() - 1);
-                if (Math.abs(p[0] - x) < 1e-9 && Math.abs(p[1] - y) < 1e-9)
-                    continue; // the same point again
+            if (k > 0 && Math.abs(xs[k - 1] - x) < 1e-9 && Math.abs(ys[k - 1] - y) < 1e-9)
+                continue; // the same point again
+            if (k > 0 && i + 1 < n) {
+                final double nx = r.getX(i + 1), ny = r.getY(i + 1);
+                final double cross = (x - xs[k - 1]) * (ny - ys[k - 1]) - (y - ys[k - 1]) * (nx - xs[k - 1]);
+                if (Math.abs(cross) < 1e-14)
+                    continue; // on the line between its neighbors, or a spike back along it
             }
-            pts.add(new double[] { x, y });
+            xs[k] = x;
+            ys[k] = y;
+            k++;
         }
-        // Closed: the last point is the first; it is put back at the end.
-        while (pts.size() > 1) {
-            final double[] a = pts.get(0), z = pts.get(pts.size() - 1);
-            if (Math.abs(a[0] - z[0]) < 1e-9 && Math.abs(a[1] - z[1]) < 1e-9)
-                pts.remove(pts.size() - 1);
-            else
-                break;
-        }
-        // A point on the straight line between its neighbors, or a spike that doubles
-        // back, adds nothing to the shape and everything to the tessellator's trouble.
-        boolean changed = true;
-        while (changed && pts.size() > 3) {
-            changed = false;
-            for (int i = 0; i < pts.size() && pts.size() > 3; i++) {
-                final double[] a = pts.get((i + pts.size() - 1) % pts.size()), b = pts.get(i), c = pts.get((i + 1) % pts.size());
-                final double cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-                if (Math.abs(cross) < 1e-14) {
-                    pts.remove(i);
-                    i--;
-                    changed = true;
-                }
-            }
-        }
-        if (pts.size() < 3)
+        // Closed: drop a closing repeat of the first point, then close it again.
+        while (k > 1 && Math.abs(xs[k - 1] - xs[0]) < 1e-9 && Math.abs(ys[k - 1] - ys[0]) < 1e-9)
+            k--;
+        if (k < 3)
             return null;
         final com.atakmap.map.layer.feature.geometry.LineString out = new com.atakmap.map.layer.feature.geometry.LineString(2);
-        for (double[] p : pts)
-            out.addPoint(p[0], p[1]);
-        out.addPoint(pts.get(0)[0], pts.get(0)[1]);
+        for (int i = 0; i < k; i++)
+            out.addPoint(xs[i], ys[i]);
+        out.addPoint(xs[0], ys[0]);
         return out;
     }
 

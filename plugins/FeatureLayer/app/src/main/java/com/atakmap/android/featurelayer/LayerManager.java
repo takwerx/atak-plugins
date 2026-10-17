@@ -51,7 +51,7 @@ public class LayerManager {
      * worker was ten seconds after a pan (operator, 2026-10-16). Each layer holds its
      * own store and lock, so their refreshes do not touch each other.
      */
-    private final ExecutorService landPool = Executors.newFixedThreadPool(3);
+    private final ExecutorService landPool = Executors.newFixedThreadPool(5);
     private final File root, iconDir, legacyIconDir, layersDir, stateFile;
     private final Map<String, String> nwcgIcons = new HashMap<>();
     private final Map<String, String> sarcopIcons = new HashMap<>();

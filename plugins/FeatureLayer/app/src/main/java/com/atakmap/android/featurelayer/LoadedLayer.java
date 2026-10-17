@@ -1566,6 +1566,7 @@ public class LoadedLayer {
     public void refresh(String token, Runnable progress) {
         if (store == null || closed || refreshing)
             return;
+        final long startedAt = System.currentTimeMillis();
         refreshing = true;
         this.progress = 0;
         status = "refreshing";
@@ -1656,6 +1657,7 @@ public class LoadedLayer {
             }
             if (tries > 0 && problems.size() == tries)
                 throw new IllegalStateException(problems.get(0));
+            final long fetchedAt = System.currentTimeMillis();
             synchronized (lock) {
                 if (store == null || closed)
                     throw new IllegalStateException("layer closed");
@@ -1663,7 +1665,10 @@ public class LoadedLayer {
                 spec.bounds = extentOf(pending);
                 rewriteStore(true);
                 spec.styleVersion = STYLE_VERSION;
-                Log.d(TAG, spec.id + ": refresh done, " + pending.size() + " fetched, store holds " + count);
+                // Where the time goes, so a slow layer can be blamed on the network or
+                // the store rather than guessed at (2026-10-16, ten-second redraws).
+                Log.d(TAG, spec.id + ": refresh done, " + pending.size() + " fetched, store holds " + count
+                        + " (fetch " + (fetchedAt - startedAt) + " ms, store " + (System.currentTimeMillis() - fetchedAt) + " ms)");
             }
             lastRefresh = System.currentTimeMillis();
             stale = false;
@@ -1910,8 +1915,11 @@ public class LoadedLayer {
         final String where = year > 0
                 ? "(" + spec.whereNow() + ") AND " + FireHistoryStyles.yearWhere(base.equals(spec.baseFor(0)), year)
                 : spec.whereNow();
+        // A land layer takes the service's biggest page: round trips were the time.
+        final int page = bounds && Boundaries.mosaic(spec.kind) ? Math.min(2000, info.maxRecordCount)
+                : Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount);
         Esri.query(base, layerId, where, sc, token, spec.geojson,
-                Math.min(spec.geojson ? 2000 : 1000, info.maxRecordCount), spec.maxFeatures, spec.outFields, new Esri.FeatureSink() {
+                page, spec.maxFeatures, spec.outFields, new Esri.FeatureSink() {
                     @Override
                     public void feature(JSONObject props, Geometry g) throws Exception {
                         if (bounds && Boundaries.mosaic(spec.kind)) {

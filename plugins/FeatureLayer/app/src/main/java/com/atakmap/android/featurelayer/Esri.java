@@ -76,7 +76,11 @@ public final class Esri {
          * full detail and 1.3 MB at 0.001 degrees (about 100 m), 2026-10-06.
          */
         public Scope simplified(double degrees) {
-            return new Scope(geometry, type, extra + String.format(java.util.Locale.US, "&maxAllowableOffset=%.6f", degrees));
+            // geometryPrecision: five decimals, about a meter, instead of the
+            // fifteen the server writes by default; the coordinates are most of
+            // the bytes and a land layer's fetch was 6 to 8 s on the phone (2026-10-16).
+            return new Scope(geometry, type, extra + String.format(java.util.Locale.US,
+                    "&maxAllowableOffset=%.6f&geometryPrecision=5", degrees));
         }
 
         String params() throws Exception {
@@ -268,8 +272,11 @@ public final class Esri {
                     + "&resultRecordCount=" + pageSize + "&resultOffset=" + offset
                     + (scope == null ? "" : scope.params());
             final String url = base + "/" + layerId + "/query";
-            final JSONObject page = new JSONObject(
-                    scope == null ? get(url + "?" + params, token) : post(url, params, token));
+            final long t0 = System.currentTimeMillis();
+            final String body = scope == null ? get(url + "?" + params, token) : post(url, params, token);
+            final long t1 = System.currentTimeMillis();
+            final JSONObject page = new JSONObject(body);
+            final long t2 = System.currentTimeMillis();
             if (page.has("error")) {
                 final JSONObject err = page.getJSONObject("error");
                 throw new IllegalStateException(err.optString("message") + " " + err.optJSONArray("details"));
@@ -277,6 +284,11 @@ public final class Esri {
             final JSONArray feats = page.optJSONArray("features");
             if (feats == null || feats.length() == 0)
                 break;
+            // Where a slow fetch spends its time (2026-10-16): the wire, the parse, or the sink.
+            final long[] sinkMs = { 0 };
+            final long t3 = System.currentTimeMillis();
+            com.atakmap.coremap.log.Log.d("FeatureLayer", "page " + layerId + " offset " + offset + ": " + body.length()
+                    + " chars, wire " + (t1 - t0) + " ms, parse " + (t2 - t1) + " ms, " + feats.length() + " rows");
             for (int i = 0; i < feats.length(); i++) {
                 final JSONObject f = feats.getJSONObject(i);
                 final JSONObject props = f.optJSONObject(geojson ? "properties" : "attributes");
@@ -291,6 +303,8 @@ public final class Esri {
                 if (maxFeatures > 0 && count >= maxFeatures)
                     break;
             }
+            com.atakmap.coremap.log.Log.d("FeatureLayer", "page " + layerId + " offset " + offset + ": sink "
+                    + (System.currentTimeMillis() - t3) + " ms");
             final boolean more = page.optBoolean("exceededTransferLimit", false)
                     || (page.optJSONObject("properties") != null
                             && page.getJSONObject("properties").optBoolean("exceededTransferLimit", false));
