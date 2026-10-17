@@ -108,6 +108,13 @@ public final class FireModel {
 
     /** Everything about one run: where, what went in, what came out. */
     public static final class Run {
+        /** Made at run time; names the run's file and makes a resend replace, not duplicate. */
+        public String runId = java.util.UUID.randomUUID().toString();
+        /** Who the file says ran it, for a run that came from another phone; null for one run here. */
+        public String by;
+        /** The device the file says it came from; a resend replaces only a run with the same one. */
+        public String byUid;
+        public long receivedAt;
         public double lat, lon;
         public long ranAt;
         public Landfire.Site site;
@@ -204,9 +211,12 @@ public final class FireModel {
             return new double[] { n, h, p };
         }
 
-        /** "20:43 run, SH2, 10 mph from SE": how a run is named in a list. */
+        /** "20:43 run, SH2, 10 mph from SE": how a run is named in a list; "Jones · 20:43 run, ..." for one sent here. */
         public String label() {
-            final StringBuilder sb = new StringBuilder(stamp(ranAt)).append(" run");
+            final StringBuilder sb = new StringBuilder();
+            if (by != null)
+                sb.append(by).append(" \u00B7 ");
+            sb.append(stamp(ranAt)).append(" run");
             if (fuelName != null && !fuelName.isEmpty())
                 sb.append(", ").append(fuelName.split(" ")[0]);
             if (result != null)
@@ -580,10 +590,34 @@ public final class FireModel {
                 restore();
             }
         });
+        // Run files from other phones, by whatever road they reach ATAK.
+        try {
+            gov.tak.api.commons.graphics.Drawable icon = null;
+            try {
+                icon = gov.tak.platform.marshal.MarshalManager.marshal(
+                        pluginContext.getDrawable(com.atakmap.android.firecast.plugin.R.drawable.ic_launcher),
+                        android.graphics.drawable.Drawable.class, gov.tak.api.commons.graphics.Drawable.class);
+            } catch (Throwable t) {
+                Log.d(TAG, "no icon for the run importer: " + t);
+            }
+            importer = new RunImportResolver(this, icon);
+            com.atakmap.android.importexport.ImportExportMapComponent.getInstance().addImporterClass(importer);
+        } catch (Throwable t) {
+            Log.w(TAG, "run importer not registered", t);
+        }
     }
+
+    private RunImportResolver importer;
 
     public void stop() {
         started = false;
+        if (importer != null) {
+            try {
+                com.atakmap.android.importexport.ImportExportMapComponent.getInstance().removeImporterClass(importer);
+            } catch (Throwable ignored) {
+            }
+            importer = null;
+        }
         cancelPick();
         if (perimeterPicker != null) {
             perimeterPicker.dispose();
@@ -848,11 +882,17 @@ public final class FireModel {
                         drawLocked(r);
                     }
                     runs.add(0, r);
-                    while (runs.size() > MAX_RUNS) {
-                        final Run old = runs.remove(runs.size() - 1);
+                    // Ten of each kind: what this phone ran, and what it was sent.
+                    int local = 0;
+                    for (int i = 0; i < runs.size(); i++) {
+                        final Run old = runs.get(i);
+                        if (old.by != null || ++local <= MAX_RUNS)
+                            continue;
+                        runs.remove(i--);
                         synchronized (lock) {
                             dropLocked(old);
                         }
+                        RunFile.delete(old.runId);
                     }
                     save();
                 }
@@ -1098,6 +1138,148 @@ public final class FireModel {
         r.hourlyNote = "Later hours: the wind " + (windy ? "held at the preset" : windFrom == null
                 ? "held as read (no forecast reached)" : "follows " + windFrom) + "; the dead fuel "
                 + (dry ? "held at the preset" : wetFrom == null ? "held as read" : "follows " + wetFrom) + ".";
+    }
+
+    /** A sender's callsign as a list can show it: printable, short, never empty. */
+    static String callsign(String s) {
+        final StringBuilder b = new StringBuilder();
+        for (int i = 0; s != null && i < s.length() && b.length() < 40; i++) {
+            final char c = s.charAt(i);
+            final int type = Character.getType(c);
+            // No control, bidi or invisible formatting characters, no line or paragraph separators.
+            if (c >= 0x20 && c != 0x7F && type != Character.FORMAT && type != Character.LINE_SEPARATOR
+                    && type != Character.PARAGRAPH_SEPARATOR && type != Character.CONTROL)
+                b.append(c);
+        }
+        final String t = b.toString().trim();
+        return t.isEmpty() ? "Someone" : t;
+    }
+
+    /**
+     * A run someone sent: its inputs rerun here with this phone's own engine and
+     * ground, its buildings counted again here, drawn and listed with the sender's
+     * name. A resend of the same run replaces it. Nothing the sender computed is shown
+     * as ours: the rings, acres and counts are this phone's. Any thread.
+     */
+    void importRun(final JSONObject saved, final File source) {
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final Run r = fromJson(saved);
+                    if (r == null) {
+                        Log.w(TAG, "received run did not come out: " + source.getName());
+                        return;
+                    }
+                    r.by = callsign(saved.optString("by", ""));
+                    r.byUid = deviceUid(saved.optString("byUid", ""));
+                    r.receivedAt = System.currentTimeMillis();
+                    // A resend replaces the run it resends: a received run from the same
+                    // device. Never a run made here, and never someone else's: a file
+                    // can carry any id and any name, so a clash is listed beside it.
+                    Run replaced = null;
+                    boolean clash = false;
+                    for (Run x : runs)
+                        if (x.runId.equals(r.runId)) {
+                            if (x.by != null && r.byUid != null && r.byUid.equals(x.byUid))
+                                replaced = x;
+                            else
+                                clash = true;
+                        }
+                    if (clash && replaced == null)
+                        r.runId = java.util.UUID.randomUUID().toString();
+                    // The file first, while it is still there: ATAK may delete a
+                    // package's files once the import returns.
+                    keepFile(source, r.runId);
+                    r.visible = true;
+                    // Recounted here from FEMA's inventory, never the sender's numbers.
+                    r.structures = null;
+                    r.homes = null;
+                    r.people = null;
+                    r.bArrival = null;
+                    r.bHome = null;
+                    r.bPeople = null;
+                    r.critical = new ArrayList<>();
+                    r.structureNote = null;
+                    if (r.ground != null)
+                        countStructures(r);
+                    if (replaced != null) {
+                        runs.remove(replaced);
+                        synchronized (lock) {
+                            dropLocked(replaced);
+                        }
+                    }
+                    synchronized (lock) {
+                        drawLocked(r);
+                    }
+                    runs.add(0, r);
+                    // Ten of each kind: what this phone ran, and what it was sent.
+                    int received = 0;
+                    for (int i = 0; i < runs.size(); i++) {
+                        final Run x = runs.get(i);
+                        if (x.by == null || ++received <= MAX_RUNS)
+                            continue;
+                        runs.remove(i--);
+                        synchronized (lock) {
+                            dropLocked(x);
+                        }
+                        RunFile.delete(x.runId);
+                    }
+                    last = r;
+                    status = "Run from " + r.by + " on the map";
+                    save();
+                    Log.d(TAG, "received run " + r.runId + " from " + r.by);
+                    changed();
+                } catch (Throwable t) {
+                    Log.w(TAG, "received run failed", t);
+                }
+            }
+        });
+    }
+
+    /** A received run keeps its file under its own id, so it can be sent on; the sender's file name is never used. */
+    private static void keepFile(File source, String runId) {
+        try {
+            final File to = RunFile.fileFor(runId);
+            if (source.getCanonicalPath().equals(to.getCanonicalPath()))
+                return;
+            final File tmp = new File(to.getPath() + ".tmp");
+            final java.io.InputStream in = new java.io.FileInputStream(source);
+            final java.io.OutputStream out = new java.io.FileOutputStream(tmp);
+            try {
+                final byte[] buf = new byte[16384];
+                long total = 0;
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    total += n;
+                    if (total > RunFile.MAX_FILE)
+                        throw new IllegalStateException("run file too large");
+                    out.write(buf, 0, n);
+                }
+            } finally {
+                in.close();
+                out.close();
+            }
+            if (!tmp.renameTo(to) && !(to.delete() && tmp.renameTo(to)))
+                Log.w(TAG, "could not keep the received run's file");
+        } catch (Exception e) {
+            Log.w(TAG, "could not keep the received run's file: " + e);
+        }
+    }
+
+    /** A device uid as a key: printable ASCII, 64 at most; null for none. */
+    static String deviceUid(String s) {
+        return s != null && s.matches("[\\x21-\\x7E]{1,64}") ? s : null;
+    }
+
+    /** A number into a range; NaN or a non-number to the default. */
+    private static double clamp(double v, double lo, double hi, double dflt) {
+        return Double.isNaN(v) ? dflt : Math.max(lo, Math.min(hi, v));
+    }
+
+    /** Text from a saved or received run, cut to a length a page can carry. */
+    private static String text(String s) {
+        return s == null || s.length() <= 2000 ? s : s.substring(0, 2000);
     }
 
     private static double moist(double m) {
@@ -1406,6 +1588,104 @@ public final class FireModel {
         }
     }
 
+    /**
+     * Sends a run as one file through ATAK's own send dialog: contacts, groups, feeds,
+     * other apps, whatever this phone can send to. Fire Cast never picks the
+     * destination. The file is written on the worker, the dialog shown on the main
+     * thread. Main thread.
+     */
+    public void send(final Run r) {
+        if (r == null || r.result == null)
+            return;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                final File f;
+                try {
+                    final JSONObject saved = toJson(r);
+                    // A run passed on keeps the name of whoever ran it.
+                    saved.put("by", r.by != null ? r.by : mapView.getDeviceCallsign())
+                            .put("engine", "behave d4acc8a").put("pluginVersion", pluginVersion());
+                    saved.put("byUid", r.by != null ? (r.byUid == null ? "" : r.byUid) : MapView.getDeviceUid());
+                    f = RunFile.write(r, saved, card(r));
+                    Log.d(TAG, "run file written: " + f.getName() + ", " + f.length() + " bytes");
+                } catch (Exception e) {
+                    Log.w(TAG, "run file failed", e);
+                    status = "Could not write the run's file: " + e.getMessage();
+                    changed();
+                    return;
+                }
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            new com.atakmap.android.importexport.send.SendDialog.Builder(mapView)
+                                    .setName(r.label())
+                                    .setIcon(pluginContext.getDrawable(com.atakmap.android.firecast.plugin.R.drawable.ic_toolbar))
+                                    .addFile(f)
+                                    .build()
+                                    .show();
+                        } catch (Exception e) {
+                            Log.w(TAG, "send dialog failed", e);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    private String pluginVersion() {
+        try {
+            return pluginContext.getPackageManager().getPackageInfo(pluginContext.getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** The run in plain words, for the file's card: what went in, what came out, what it does not mean. */
+    static String card(Run r) {
+        final StringBuilder c = new StringBuilder();
+        c.append("Fire Cast model run, ").append(new java.text.SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.US)
+                .format(new java.util.Date(r.ranAt))).append(".\n");
+        c.append(r.perimeter != null ? "From a drawn perimeter around " : "Start at ")
+                .append(String.format(Locale.US, "%.5f, %.5f.\n", r.lat, r.lon));
+        if (r.fuelName != null)
+            c.append("Fuel: ").append(r.fuelName).append(" (LANDFIRE 2024).\n");
+        c.append(String.format(Locale.US, "Wind %.0f mph from %s", r.windMph, Units.compass(r.windFromDeg)));
+        if (r.windNote != null && !r.windNote.isEmpty())
+            c.append(": ").append(r.windNote);
+        c.append(".\n");
+        c.append(String.format(Locale.US, "Fuel moisture 1 h %.0f%%, 10 h %.0f%%, 100 h %.0f%%, live grass %.0f%%, live brush %.0f%%.",
+                r.m1, r.m10, r.m100, r.mHerb, r.mWoody));
+        if (r.moistureNote != null)
+            c.append(' ').append(r.moistureNote);
+        c.append('\n');
+        if (r.hourly != null && r.hourly.length > 1) {
+            c.append("Hour by hour:");
+            for (Hour h : r.hourly)
+                c.append(String.format(Locale.US, " %s %.0f mph from %s, 1 h %.0f%%;", stamp(h.at), h.windMph,
+                        Units.compass(h.windFromDeg), h.m1));
+            c.append('\n');
+        }
+        for (int i = 0; i < r.steps.length; i++) {
+            c.append("By ").append(stamp(r.ranAt + r.steps[i] * 60000L)).append(" (").append(r.steps[i]).append(" min): ")
+                    .append(acresText(r.acres(r.steps[i])));
+            if (r.structures != null)
+                c.append(", ").append(r.structures[i]).append(r.structures[i] == 1 ? " building" : " buildings");
+            c.append(".\n");
+        }
+        if (r.ground != null && r.startCanopy != null) {
+            final double[] crown = r.ground.crownAcres(r.steps[r.steps.length - 1]);
+            if (crown[0] >= 0.05 || crown[1] >= 0.05)
+                c.append("Crown fire: ").append(acresText(crown[0])).append(" crowning, ").append(acresText(crown[1]))
+                        .append(" torching.\n");
+        }
+        c.append("What this does not mean: a planning-grade model. Real fuel and slope cell by cell, the weather as "
+                + "read and forecast, embers across walls narrower than their reach; no suppression, no fire-made "
+                + "wind. Run again as conditions change.");
+        return c.toString();
+    }
+
     /** Takes one run off the map and forgets it: the operator's own Clear. */
     public void clear(final Run r) {
         runs.remove(r);
@@ -1423,6 +1703,7 @@ public final class FireModel {
                 synchronized (lock) {
                     dropLocked(r);
                 }
+                RunFile.delete(r.runId);
                 save();
                 changed();
             }
@@ -1431,6 +1712,7 @@ public final class FireModel {
 
     /** Takes every run and the start marker off the map and forgets them all. */
     public void clearAll() {
+        final List<Run> gone = new ArrayList<>(runs);
         runs.clear();
         last = null;
         status = "";
@@ -1442,6 +1724,8 @@ public final class FireModel {
                 synchronized (lock) {
                     dropAllLocked();
                 }
+                for (Run g : gone)
+                    RunFile.delete(g.runId);
                 if (saveFile.isFile() && !saveFile.delete())
                     Log.w(TAG, "could not delete " + saveFile);
                 changed();
@@ -1735,9 +2019,15 @@ public final class FireModel {
             o.put(key, v);
     }
 
-    private static JSONObject toJson(Run r) throws Exception {
+    static JSONObject toJson(Run r) throws Exception {
         {
             final JSONObject o = new JSONObject();
+            o.put("runId", r.runId);
+            if (r.by != null) {
+                o.put("by", r.by).put("receivedAt", r.receivedAt);
+                if (r.byUid != null)
+                    o.put("byUid", r.byUid);
+            }
             o.put("lat", r.lat).put("lon", r.lon).put("ranAt", r.ranAt);
             o.put("fuelModel", r.site.fuelModel).put("slopeDeg", r.site.slopeDeg)
                     .put("aspectDeg", r.site.aspectDeg).put("coverPct", r.site.coverPct);
@@ -1834,8 +2124,14 @@ public final class FireModel {
             if (arr == null)
                 arr = new org.json.JSONArray().put(file);   // the single-run file from before
             final List<Run> read = new ArrayList<>();
-            for (int i = 0; i < arr.length(); i++)
-                read.add(fromJson(arr.getJSONObject(i)));
+            for (int i = 0; i < arr.length(); i++) {
+                try {
+                    read.add(fromJson(arr.getJSONObject(i)));
+                } catch (Throwable t) {
+                    // One bad run must not stop ATAK at every start.
+                    Log.w(TAG, "a saved run could not be read back", t);
+                }
+            }
             if (!runs.isEmpty())
                 return;   // a run finished first
             for (Run r : read) {
@@ -1860,44 +2156,67 @@ public final class FireModel {
     private Run fromJson(JSONObject o) {
         try {
             final Run r = new Run();
+            // Our own id or a new one: it names a file, so nothing else is taken.
+            final String id = o.optString("runId", "");
+            if (id.matches("[0-9a-f-]{36}"))
+                r.runId = id;
+            if (o.has("receivedAt")) {
+                r.by = callsign(o.optString("by", ""));
+                r.byUid = deviceUid(o.optString("byUid", ""));
+                r.receivedAt = o.optLong("receivedAt", 0);
+            }
+            // Every number is held to what a run of ours can produce: this reads our own
+            // file and a file someone sent, and a size or an index from either reaches
+            // allocations, array indexes and the native engine.
             r.lat = o.getDouble("lat");
             r.lon = o.getDouble("lon");
+            if (!(Math.abs(r.lat) <= 90) || !(Math.abs(r.lon) <= 180))
+                return null;
             r.ranAt = o.optLong("ranAt", 0L);
-            r.site = new Landfire.Site(o.getInt("fuelModel"), o.optDouble("slopeDeg", 0),
-                    o.optDouble("aspectDeg", 0), o.optDouble("coverPct", 0));
-            r.m1 = o.optDouble("m1", 4);
-            r.m10 = o.optDouble("m10", 5);
-            r.m100 = o.optDouble("m100", 7);
-            r.mHerb = o.optDouble("mHerb", 30);
-            r.mWoody = o.optDouble("mWoody", 60);
-            r.windMph = o.optDouble("windMph", 0);
+            r.site = new Landfire.Site(o.getInt("fuelModel"), clamp(o.optDouble("slopeDeg", 0), 0, 90, 0),
+                    (clamp(o.optDouble("aspectDeg", 0), -1e6, 1e6, 0) % 360 + 360) % 360, clamp(o.optDouble("coverPct", 0), 0, 100, 0));
+            r.m1 = moist(o.optDouble("m1", 4));
+            r.m10 = moist(o.optDouble("m10", 5));
+            r.m100 = moist(o.optDouble("m100", 7));
+            r.mHerb = clamp(o.optDouble("mHerb", 30), 20, 400, 30);
+            r.mWoody = clamp(o.optDouble("mWoody", 60), 20, 400, 60);
+            r.windMph = clamp(o.optDouble("windMph", 0), 0, 150, 0);
             // behave walks a direction down by 360 at a time; a huge one from a damaged file would never finish.
             r.windFromDeg = (o.optDouble("windFromDeg", 0) % 360 + 360) % 360;
             if (Double.isNaN(r.windFromDeg))
                 r.windFromDeg = 0;
-            r.windNote = o.optString("windNote", "");
+            r.windNote = text(o.optString("windNote", ""));
             r.tenMeterWind = o.optBoolean("tenMeterWind", false);
-            r.moistureNote = o.optString("moistureNote", "");
-            r.canopyHeightFt = o.optDouble("canopyHeightFt", 0);
-            r.crownRatio = o.optDouble("crownRatio", 0);
-            r.conditions = o.optString("conditions", COND_OBSERVED);
+            r.moistureNote = text(o.optString("moistureNote", ""));
+            r.canopyHeightFt = clamp(o.optDouble("canopyHeightFt", 0), 0, 400, 0);
+            r.crownRatio = clamp(o.optDouble("crownRatio", 0), 0, 1, 0);
+            final String cond = o.optString("conditions", COND_OBSERVED);
+            r.conditions = COND_GUST.equals(cond) || COND_DRY.equals(cond) || COND_DRY_WINDY.equals(cond) ? cond : COND_OBSERVED;
             r.visible = o.optBoolean("visible", true);
-            r.halfKm = o.optDouble("halfKm", HALF_KM);
+            // The grid is (2 halfKm / cell)^2 cells: only the two sizes a run makes, and a
+            // whole number of km, which is how the ground is kept on disk.
+            r.cellM = o.optDouble("cellM", 15) >= 30 ? 30 : 15;
+            r.halfKm = r.cellM >= 30 ? 10 : HALF_KM;
             r.startedAt = o.optLong("startedAt", 0);
-            r.cellM = o.optDouble("cellM", 15);
             final org.json.JSONArray stepsA = o.optJSONArray("steps");
-            if (stepsA != null && stepsA.length() > 0) {
-                r.steps = new int[stepsA.length()];
-                for (int i = 0; i < stepsA.length(); i++)
-                    r.steps[i] = stepsA.optInt(i);
+            if (stepsA != null && stepsA.length() > 0 && stepsA.length() <= 6) {
+                final int[] st = new int[stepsA.length()];
+                boolean ok = true;
+                for (int i = 0; i < st.length; i++) {
+                    st[i] = stepsA.optInt(i);
+                    if (st[i] < 1 || st[i] > 180 || (i > 0 && st[i] <= st[i - 1]))
+                        ok = false;
+                }
+                if (ok)
+                    r.steps = st;
             }
-            r.rateScale = o.optDouble("rateScale", 1);
-            r.calibrationNote = o.optString("calibrationNote", null);
+            r.rateScale = clamp(o.optDouble("rateScale", 1), 0.3, 3, 1);
+            r.calibrationNote = text(o.optString("calibrationNote", null));
             r.atMinutes = Math.max(0, Math.min(r.steps[r.steps.length - 1], o.optInt("atMinutes", 0)));
             r.mFoliar = Math.max(60, Math.min(300, o.optDouble("mFoliar", 100)));
             if (Double.isNaN(r.mFoliar))
                 r.mFoliar = 100;
-            r.foliarNote = o.optString("foliarNote", null);
+            r.foliarNote = text(o.optString("foliarNote", null));
             final org.json.JSONArray hs = o.optJSONArray("hourly");
             if (hs != null && hs.length() > 0 && hs.length() <= 6) {
                 final Hour[] hours = new Hour[hs.length()];
@@ -1908,13 +2227,13 @@ public final class FireModel {
                         break;
                     }
                     // Back into the ranges the engine is given on a fresh run.
-                    hours[i] = new Hour(h.optLong(0), Math.max(0, Math.min(150, h.optDouble(1, 0))),
-                            (h.optDouble(2, 0) % 360 + 360) % 360, moist(h.optDouble(3, 4)), moist(h.optDouble(4, 5)),
-                            moist(h.optDouble(5, 7)));
+                    hours[i] = new Hour(h.optLong(0), clamp(h.optDouble(1, 0), 0, 150, 0),
+                            (clamp(h.optDouble(2, 0), -1e6, 1e6, 0) % 360 + 360) % 360, moist(h.optDouble(3, 4)),
+                            moist(h.optDouble(4, 5)), moist(h.optDouble(5, 7)));
                 }
                 if (hours[0] != null)
                     r.hourly = hours;
-                r.hourlyNote = o.optString("hourlyNote", null);
+                r.hourlyNote = text(o.optString("hourlyNote", null));
             }
             r.fieldWind = o.optBoolean("fieldWind", false);
             if (r.fieldWind && o.has("fieldRun")) {
@@ -1928,10 +2247,15 @@ public final class FireModel {
             }
 
             final org.json.JSONArray pa = o.optJSONArray("perimeter");
-            if (pa != null && pa.length() >= 3) {
-                r.perimeter = new double[pa.length()][];
-                for (int i = 0; i < pa.length(); i++)
-                    r.perimeter[i] = new double[] { pa.getJSONArray(i).getDouble(0), pa.getJSONArray(i).getDouble(1) };
+            if (pa != null && pa.length() >= 3 && pa.length() <= 5000) {
+                final double[][] per = new double[pa.length()][];
+                for (int i = 0; i < pa.length() && per != null; i++) {
+                    final double la = pa.getJSONArray(i).getDouble(0), lo = pa.getJSONArray(i).getDouble(1);
+                    if (!(Math.abs(la) <= 90) || !(Math.abs(lo) <= 180))
+                        return null;
+                    per[i] = new double[] { la, lo };
+                }
+                r.perimeter = per;
             }
             r.fuelName = Behave.name(r.site.fuelModel);
             r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
@@ -1955,9 +2279,10 @@ public final class FireModel {
                         r.people[i] = pp.optDouble(i, 0);
                     }
                 }
-                r.structureNote = o.optString("structureNote", null);
+                r.structureNote = text(o.optString("structureNote", null));
                 final org.json.JSONArray ba = o.optJSONArray("bArrival"), bh = o.optJSONArray("bHome"), bp = o.optJSONArray("bPeople");
-                if (ba != null && bh != null && bp != null && ba.length() == bh.length() && ba.length() == bp.length()) {
+                if (ba != null && bh != null && bp != null && ba.length() == bh.length() && ba.length() == bp.length()
+                        && ba.length() <= Structures.MAX) {
                     r.bArrival = new float[ba.length()];
                     r.bHome = new boolean[ba.length()];
                     r.bPeople = new float[ba.length()];
@@ -1969,14 +2294,16 @@ public final class FireModel {
                 }
                 final org.json.JSONArray cr = o.optJSONArray("critical");
                 if (cr != null)
-                    for (int i = 0; i < cr.length(); i++) {
+                    for (int i = 0; i < cr.length() && r.critical.size() < 40; i++) {
                         final org.json.JSONArray c = cr.optJSONArray(i);
-                        if (c != null && c.length() == 4)
-                            r.critical.add(new Object[] { c.optString(0), c.optDouble(1), c.optDouble(2), c.optInt(3) });
+                        // The step index picks a step on the page: held to the run's own.
+                        if (c != null && c.length() == 4 && c.optInt(3, -1) >= 0 && c.optInt(3, -1) < r.steps.length
+                                && Math.abs(c.optDouble(1, 999)) <= 90 && Math.abs(c.optDouble(2, 999)) <= 180)
+                            r.critical.add(new Object[] { text(c.optString(0)), c.optDouble(1), c.optDouble(2), c.optInt(3) });
                     }
             }
             return r;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.w(TAG, "could not read a saved model run", e);
             return null;
         }

@@ -447,7 +447,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         if (r.windFieldNote != null)
             in.append('\n').append(r.windFieldNote);
         section("What went in", in.toString());
-        section("When", FireModel.stamp(r.ranAt) + " run");
+        section("When", FireModel.stamp(r.ranAt) + " run" + (r.by == null ? ""
+                : ", received " + FireModel.stamp(r.receivedAt) + ". The file says it was run by " + r.by
+                        + "; ATAK does not confirm who sent it. Drawn here from the file's inputs with this phone's own "
+                        + "engine, ground and building count."));
         final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.model_action_row, null);
         final Button act = row.findViewById(R.id.action);
         act.setEnabled(!model.isRunning());
@@ -459,6 +462,18 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             }
         });
         body.addView(row);
+        // The run as one file, through ATAK's own send dialog: a contact, a feed, another app.
+        final View sendRow = PluginLayoutInflater.inflate(pluginContext, R.layout.model_action_row, null);
+        final Button send = sendRow.findViewById(R.id.action);
+        send.setText("Send this run");
+        send.setEnabled(r.result != null && r.problem == null);
+        send.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                model.send(r);
+            }
+        });
+        body.addView(sendRow);
     }
 
     private static String clock(long t) {
