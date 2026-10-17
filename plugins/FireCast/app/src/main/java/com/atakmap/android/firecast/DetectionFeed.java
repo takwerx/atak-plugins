@@ -568,8 +568,10 @@ public class DetectionFeed {
                 mapView.removeLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
             if (overlay != null)
                 mapView.getMapOverlayManager().removeOverlay(overlay);
-            if (store != null)
-                store.dispose();
+            // The store is deliberately NOT disposed. Removing the layer does not stop a
+            // query already running on the renderer's worker thread; that thread calls
+            // back into Java, a closed store throws, and JNI aborts the whole ATAK
+            // process. ATAK closes the file when it exits.
         } catch (Exception e) {
             Log.w(TAG, "detach failed", e);
         }
