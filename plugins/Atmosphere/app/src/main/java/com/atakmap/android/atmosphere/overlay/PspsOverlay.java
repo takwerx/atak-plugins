@@ -145,19 +145,20 @@ public final class PspsOverlay extends OutlookOverlay {
      * Which labels show, by what ATAK's scale bar reads (operator, 2026-10-16, over
      * 1,400 circuit labels on the coast: "like 5 miles they are individual. but further
      * out ... make one in an area if they are multiple", and at 380 miles: "at this
-     * level no labels"). Up to 10 miles each circuit has its own label; to 25, 60 and
-     * 150 miles nearby circuits share pills worked out for that range; past 150 there
-     * are none. A county's name shows to 60 miles, where 31 of them start to cover each
-     * other. The plugin picks the range when the map settles and shows that range's
+     * level no labels"). Up to 10 miles each circuit has its own label; to 20, 40, 60,
+     * 100 and 150 miles nearby circuits share pills worked out for that range; past 150
+     * there are none. A county's name shows to 60 miles, where 31 of them start to cover
+     * each other. The ranges are narrow because a pill's grouping is worked out for a
+     * range's far edge: from 25 to 60 miles it merged circuits 70 miles apart. The plugin picks the range when the map settles and shows that range's
      * sets: ATAK's own zoom bands on a set test a window two tile steps wide around the
      * map, and drew three ranges' pills at once (XCover).
      */
-    private static final double[] BAND_MILES = { 10, 25, 60, 150 };
+    private static final double[] BAND_MILES = { 10, 20, 40, 60, 100, 150 };
     /** The range where each circuit has its own label, and the one past every range. */
     private static final int OWN = 0, NONE = BAND_MILES.length;
-    private static final int COUNTY_LABELS_BAND = 2;
+    private static final int COUNTY_LABELS_BAND = 3;
     /** How far apart two circuits may be and share a pill, in pill widths. */
-    private static final double JOIN_WIDTHS = 1.5;
+    private static final double JOIN_WIDTHS = 1.0;
     private static final long SETTLE_MS = 400;
 
     private final MapView mapView;
@@ -202,28 +203,30 @@ public final class PspsOverlay extends OutlookOverlay {
     }
 
     /**
-     * For each range from 10 to 150 miles, the circuits close enough to crowd one
-     * pill's space make a group, whatever their utility or kind, and the group shows
-     * one pill per utility and kind, "SCE - PSPS (23)", stacked shut off over watched.
-     * The stack sits on the group's own circuit nearest its middle: the middle of
-     * circuits along a curved coast can be out at sea, and moving pills apart by a
-     * pill's height put them there (XCover, 2026-10-16). Counties keep their own labels.
+     * For each range from 10 to 150 miles, the circuits of one utility and kind close
+     * enough to crowd one pill's space share a pill, "SCE - PSPS (23)", on the point
+     * inside the group's own circuit nearest its middle (the point a lone circuit's
+     * label takes). Grouping every utility together labeled 14 PG&E circuits in Amador
+     * on an SCE circuit at the Nevada line, and the middle of a circuit's box can be
+     * open ground between its pieces (XCover, 2026-10-16). A watched pill that would
+     * cover a shut-off one moves down one pill, once; moving pills again and again put
+     * them out at sea. Counties keep their own labels.
      */
     @Override
     protected List<AtmosphereFeatures.Drawn> drawnTogether(List<Area> areas,
             List<com.atakmap.map.layer.feature.geometry.Geometry> shapes) {
         final List<AtmosphereFeatures.Drawn> out = new ArrayList<>();
-        final List<double[]> centers = new ArrayList<>();
+        final List<double[]> points = new ArrayList<>();
         final List<Area> circuits = new ArrayList<>();
         for (int i = 0; i < areas.size(); i++) {
             final Area a = areas.get(i);
             if (Psps.POSSIBLE.equals(a.label))
                 continue;
-            final com.atakmap.map.layer.feature.geometry.Envelope e = shapes.get(i).getEnvelope();
-            if (e == null)
+            final double[] p = AtmosphereFeatures.labelPoint(shapes.get(i));
+            if (p == null)
                 continue;
             circuits.add(a);
-            centers.add(new double[] { (e.minY + e.maxY) / 2, (e.minX + e.maxX) / 2 });
+            points.add(p);
         }
         if (circuits.isEmpty())
             return out;
@@ -246,52 +249,64 @@ public final class PspsOverlay extends OutlookOverlay {
             final double join = JOIN_WIDTHS * pillW * mpp;
             final List<Group> groups = new ArrayList<>();
             for (int i = 0; i < circuits.size(); i++) {
-                final double[] c = centers.get(i);
+                final Area a = circuits.get(i);
+                final double[] c = points.get(i);
                 Group near = null;
                 for (Group g : groups)
-                    if (meters(g.lat(), g.lon(), c[0], c[1]) < join) {
+                    if (g.title.equals(a.title) && meters(g.lat(), g.lon(), c[0], c[1]) < join) {
                         near = g;
                         break;
                     }
                 if (near == null) {
-                    near = new Group();
+                    near = new Group(a.title, a.label);
                     groups.add(near);
                 }
-                near.add(circuits.get(i), c);
+                near.add(c);
             }
-            // A pill's height in degrees of latitude in this range, for the stack.
-            final double rowLat = pillH * 1.1 * mpp / 110_540d;
+            // Shut off first, the biggest first: those keep their place.
+            java.util.Collections.sort(groups, new java.util.Comparator<Group>() {
+                @Override
+                public int compare(Group x, Group y) {
+                    final boolean xo = Psps.OFF.equals(x.kind), yo = Psps.OFF.equals(y.kind);
+                    if (xo != yo)
+                        return xo ? -1 : 1;
+                    return y.points.size() - x.points.size();
+                }
+            });
+            final double w = pillW * mpp, h = pillH * 1.1 * mpp;
+            final List<double[]> placed = new ArrayList<>();
             for (Group g : groups) {
                 final double[] at = g.anchor();
-                final List<String> titles = g.titles();
-                for (int row = 0; row < titles.size(); row++) {
-                    final String title = titles.get(row);
-                    final int n = g.count(title);
-                    final String kind = title.endsWith(Psps.WATCH) ? Psps.WATCH : Psps.OFF;
-                    final double lat = at[0] + ((titles.size() - 1) / 2.0 - row) * rowLat;
-                    final AtmosphereFeatures.Drawn d = clusterPill(PILLS + b,
-                            n == 1 ? title : title + " (" + n + ")", Psps.textColor(kind),
-                            Psps.color(kind), lat, at[1], Double.MAX_VALUE, 0d);
-                    if (d != null)
-                        out.add(d);
-                }
+                double lat = at[0];
+                if (covers(placed, lat, at[1], w, h))
+                    lat -= h / 110_540d;
+                placed.add(new double[] { lat, at[1] });
+                final int n = g.points.size();
+                final AtmosphereFeatures.Drawn d = clusterPill(PILLS + b,
+                        n == 1 ? g.title : g.title + " (" + n + ")", Psps.textColor(g.kind),
+                        Psps.color(g.kind), lat, at[1], Double.MAX_VALUE, 0d);
+                if (d != null)
+                    out.add(d);
             }
         }
         return out;
     }
 
-    /** Circuits close together in one range, of any utility and kind. */
+    /** Circuits of one utility and kind close together in one range. */
     private static final class Group {
+        final String title, kind;
         final List<double[]> points = new ArrayList<>();
-        final java.util.Map<String, Integer> byTitle = new java.util.HashMap<>();
         double sumLat, sumLon;
 
-        void add(Area a, double[] c) {
+        Group(String title, String kind) {
+            this.title = title;
+            this.kind = kind;
+        }
+
+        void add(double[] c) {
             points.add(c);
             sumLat += c[0];
             sumLon += c[1];
-            final Integer n = byTitle.get(a.title);
-            byTitle.put(a.title, n == null ? 1 : n + 1);
         }
 
         double lat() {
@@ -315,26 +330,17 @@ public final class PspsOverlay extends OutlookOverlay {
             }
             return best;
         }
+    }
 
-        /** Shut off before watched, then by utility, so every stack reads the same way. */
-        List<String> titles() {
-            final List<String> t = new ArrayList<>(byTitle.keySet());
-            java.util.Collections.sort(t, new java.util.Comparator<String>() {
-                @Override
-                public int compare(String x, String y) {
-                    final boolean xw = x.endsWith(Psps.WATCH), yw = y.endsWith(Psps.WATCH);
-                    if (xw != yw)
-                        return xw ? 1 : -1;
-                    return x.compareTo(y);
-                }
-            });
-            return t;
+    /** Whether a pill w by h meters at this point would cover one already placed. */
+    private static boolean covers(List<double[]> placed, double lat, double lon, double w, double h) {
+        for (double[] p : placed) {
+            final double dy = Math.abs(p[0] - lat) * 110_540d;
+            final double dx = Math.abs(p[1] - lon) * 111_320d * Math.cos(Math.toRadians(lat));
+            if (dx < w && dy < h)
+                return true;
         }
-
-        int count(String title) {
-            final Integer n = byTitle.get(title);
-            return n == null ? 0 : n;
-        }
+        return false;
     }
 
     /** Meters between two points, flat: plenty for a few pill widths. */
