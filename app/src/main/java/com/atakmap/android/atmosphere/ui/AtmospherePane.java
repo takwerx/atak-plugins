@@ -587,6 +587,11 @@ public final class AtmospherePane {
                     }
 
                     @Override
+                    public String pointWords() {
+                        return paneOrigin.words();
+                    }
+
+                    @Override
                     public UnitSystem units() {
                         return units;
                     }
@@ -7304,6 +7309,8 @@ public final class AtmospherePane {
                 reportsPage.pointChanged();
             rainPage.pointChanged();
             discussion.pointChanged();
+            if (spotPage != null)
+                spotPage.pointChanged();
         }
     };
 
@@ -7492,6 +7499,8 @@ public final class AtmospherePane {
             reportsPage.pointChanged();
             rainPage.pointChanged();
             discussion.pointChanged();
+        if (spotPage != null)
+            spotPage.pointChanged();
         if (selected == null) {
             statusText.setText(R.string.no_sources);
             return;

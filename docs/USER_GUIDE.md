@@ -542,8 +542,9 @@ report is not drawn there.
 
 The layer draws every spot forecast request the National Weather Service has
 open, with the forecast the office wrote for each. The page lists them — All,
-Near me, On map, by State or by Region — **Newest** or **Closest** first, and a
-search box finds one by incident name. Tap a request for its forecast.
+Nearby, On map, by State or by Region — **Newest** or **Closest** first, and a
+search box finds one by incident name. Nearby and Closest measure from the
+point chosen in the top row. Tap a request for its forecast.
 
 <img src="screenshots/58_spots.jpg" width="420"> <img src="screenshots/59_spot_list.png" width="420">
 
