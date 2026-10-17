@@ -1048,9 +1048,10 @@ classes, lower 48 only.
 #v(4pt)
 The *Spot Weather Forecast* layer draws every open spot forecast request: W
 for a wildfire, P for a prescribed fire, S for search and rescue. The *Spot
-Weather Forecast* page lists them - all, near you, on the map, by state or
-region - *Newest* or *Closest* first, with a search by incident name. Tap one
-for the forecast the office wrote.
+Weather Forecast* page lists them - all, nearby, on the map, by state or
+region - *Newest* or *Closest* first, with a search by incident name. Nearby
+and Closest measure from the point chosen in the top row. Tap one for the
+forecast the office wrote.
 ]
 
 #tak-slide[
