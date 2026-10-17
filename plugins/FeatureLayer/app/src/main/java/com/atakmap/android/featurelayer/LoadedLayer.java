@@ -1382,7 +1382,7 @@ public class LoadedLayer {
         if ("box".equals(spec.scopeKind) && Boundaries.handles(spec) && Boundaries.mosaic(spec.kind)) {
             try {
                 final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
-                return b != null && spec.scopeBox != null && !Boundaries.covers(spec.scopeBox, b);
+                return b != null && spec.scopeBox != null && !Boundaries.coversWithRoom(spec.scopeBox, b);
             } catch (RuntimeException e) {
                 return false;
             }
@@ -1530,7 +1530,7 @@ public class LoadedLayer {
                 final com.atakmap.coremap.maps.coords.GeoBounds b = mapView.getBounds();
                 if (b == null)
                     throw new IllegalStateException("the map has no extent yet");
-                if (spec.scopeBox == null || !Boundaries.covers(spec.scopeBox, b))
+                if (spec.scopeBox == null || !Boundaries.coversWithRoom(spec.scopeBox, b))
                     spec.scopeBox = Boundaries.boxFor(b);
             }
             if (spec.scopeBox == null)

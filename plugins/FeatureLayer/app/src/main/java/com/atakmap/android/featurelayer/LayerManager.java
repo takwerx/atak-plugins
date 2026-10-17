@@ -46,6 +46,12 @@ public class LayerManager {
     private final String clientId;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    /**
+     * The land layers fetch side by side: five of them one after another on the single
+     * worker was ten seconds after a pan (operator, 2026-10-16). Each layer holds its
+     * own store and lock, so their refreshes do not touch each other.
+     */
+    private final ExecutorService landPool = Executors.newFixedThreadPool(3);
     private final File root, iconDir, legacyIconDir, layersDir, stateFile;
     private final Map<String, String> nwcgIcons = new HashMap<>();
     private final Map<String, String> sarcopIcons = new HashMap<>();
@@ -302,6 +308,7 @@ public class LayerManager {
                 a.dispose();
         }
         worker.shutdownNow();
+        landPool.shutdownNow();
     }
 
     // ---- layers -------------------------------------------------------------------
@@ -527,7 +534,7 @@ public class LayerManager {
                 final Long last = lastMoveFetch.get(l.spec.id);
                 // A land layer's square is sized to the view and fetches in a few
                 // seconds; it may follow the map more closely than a live feed.
-                final long gap = Boundaries.handles(l.spec) && Boundaries.mosaic(l.spec.kind) ? 6_000 : MOVE_MIN_GAP_MS;
+                final long gap = Boundaries.handles(l.spec) && Boundaries.mosaic(l.spec.kind) ? 3_000 : MOVE_MIN_GAP_MS;
                 if (last != null && now - last < gap)
                     continue;
                 lastMoveFetch.put(l.spec.id, now);
@@ -780,7 +787,8 @@ public class LayerManager {
     public void refresh(final LoadedLayer l) {
         if (l.refreshing)
             return;
-        worker.execute(new Runnable() {
+        final ExecutorService on = Boundaries.handles(l.spec) && Boundaries.mosaic(l.spec.kind) ? landPool : worker;
+        on.execute(new Runnable() {
             @Override
             public void run() {
                 refreshNow(l);

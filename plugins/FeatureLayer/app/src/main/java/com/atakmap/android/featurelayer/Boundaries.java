@@ -787,6 +787,19 @@ public final class Boundaries {
     }
 
     /**
+     * Whether the view is still well inside the loaded square, with a fifth of the
+     * square's width to spare on every side: the next square starts loading while the
+     * current one still fills the screen, so it is usually there before its edge is.
+     */
+    public static boolean coversWithRoom(double[] box, com.atakmap.coremap.maps.coords.GeoBounds b) {
+        if (box == null || b == null)
+            return false;
+        final double mLat = (box[2] - box[0]) * 0.2, mLon = (box[3] - box[1]) * 0.2;
+        return b.getSouth() >= box[0] + mLat && b.getWest() >= box[1] + mLon
+                && b.getNorth() <= box[2] - mLat && b.getEast() <= box[3] - mLon;
+    }
+
+    /**
      * South, west, north, east of the square to load for a view: the view plus half
      * its size each way, never less than 25 miles each way from the center (a zoomed-in
      * phone still gets the county around it), never more than 75 (a state-wide view
