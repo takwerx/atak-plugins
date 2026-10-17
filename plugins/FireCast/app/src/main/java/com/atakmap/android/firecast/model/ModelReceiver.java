@@ -303,6 +303,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             return;
         }
         final Behave.Result o = r.result;
+        body.addView(timeSlider(r));
         if (r.ground != null)
             body.addView(stepTable(r));
         final StringBuilder goes = new StringBuilder();
@@ -434,6 +435,89 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         if (a < 10)
             return String.format(Locale.US, "%.1f acres", a);
         return String.format(Locale.US, "%,.0f acres", a);
+    }
+
+    /**
+     * "Where it is by": a slider from the run to its last step in five-minute notches.
+     * The fire's edge at that moment is drawn on the map in white as it moves, and the
+     * line above it says the clock, acres, reach and buildings. A plain ScrollView
+     * page, no pager, so the bar keeps sideways drags and the page keeps vertical ones.
+     */
+    private View timeSlider(final FireModel.Run r) {
+        final LinearLayout wrap = new LinearLayout(view.getContext());
+        wrap.setOrientation(LinearLayout.VERTICAL);
+        wrap.addView(headingView("Where it is by"));
+        final TextView label = bodyView(timeText(r, r.atMinutes));
+        wrap.addView(label);
+        final int last = r.steps[r.steps.length - 1];
+        final android.widget.SeekBar bar = new android.widget.SeekBar(view.getContext());
+        bar.setMax(last / 5);
+        bar.setProgress(Math.max(0, Math.min(last, r.atMinutes)) / 5);
+        bar.setPadding(dp(18), dp(16), dp(18), dp(16));
+        bar.setMinimumHeight(dp(52));
+        final android.content.res.ColorStateList white = android.content.res.ColorStateList.valueOf(Color.WHITE);
+        bar.setThumbTintList(white);
+        bar.setProgressTintList(white);
+        bar.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        bar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser)
+                    return;
+                label.setText(timeText(r, progress * 5));
+                model.showAt(r, progress * 5, false);
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar sb) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar sb) {
+                model.showAt(r, sb.getProgress() * 5, true);
+            }
+        });
+        wrap.addView(bar);
+        // The bar's two ends, so the range reads without touching it.
+        final LinearLayout ends = new LinearLayout(view.getContext());
+        ends.setOrientation(LinearLayout.HORIZONTAL);
+        final TextView from = bodyView("Run, " + clock(r.ranAt));
+        final TextView to = bodyView(clock(r.ranAt + last * 60000L));
+        from.setTextSize(13f);
+        to.setTextSize(13f);
+        from.setTextColor(0xFFB0B0B0);
+        to.setTextColor(0xFFB0B0B0);
+        from.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        to.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        to.setGravity(Gravity.END);
+        ends.addView(from);
+        ends.addView(to);
+        wrap.addView(ends);
+        return wrap;
+    }
+
+    /** "By 14:35, in 35 min: 42 acres, farthest 0.6 mi to the NE; 3 buildings (2 homes)." */
+    private static String timeText(FireModel.Run r, int minutes) {
+        final int last = r.steps[r.steps.length - 1];
+        if (minutes <= 0)
+            return "Slide to see where the fire is at any time up to " + clock(r.ranAt + last * 60000L)
+                    + ". Its edge is drawn on the map in white.";
+        final StringBuilder sb = new StringBuilder("By ").append(clock(r.ranAt + minutes * 60000L))
+                .append(", in ").append(minutes < 60 ? minutes + " min"
+                        : minutes % 60 == 0 ? (minutes / 60) + " h" : (minutes / 60) + " h " + (minutes % 60) + " min")
+                .append(": ").append(acres(r.acres(minutes))).append(", farthest ").append(Units.format(r.headM(minutes)))
+                .append(" to the ").append(Units.compass(r.headDeg(minutes)));
+        final double[] b = r.reachedBy(minutes);
+        if (b != null) {
+            final int n = (int) b[0], h = (int) b[1];
+            sb.append("; ").append(n).append(n == 1 ? " building" : " buildings");
+            if (h > 0)
+                sb.append(" (").append(h).append(h == 1 ? " home)" : " homes)");
+            if (b[2] >= 1)
+                sb.append(", about ").append(Math.round(b[2])).append(" people");
+        }
+        return sb.append('.').toString();
     }
 
     /** The card: a row per step with the clock, acres, structures and people, its color at the left. */

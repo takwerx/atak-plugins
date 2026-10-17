@@ -152,6 +152,29 @@ public final class FireModel {
         public java.util.List<Object[]> critical = new java.util.ArrayList<>();
         /** On the map, or hidden by its switch. Hidden is not deleted. */
         public boolean visible = true;
+        /** Each building the last step reaches: minutes until the fire does, a home or not, people; null when not counted. */
+        public float[] bArrival, bPeople;
+        public boolean[] bHome;
+        /** The time the operator slid to, minutes after the run; 0 for none. */
+        public int atMinutes;
+        /** The features drawing that time's edge, in this run's own set. */
+        final List<Long> atFids = new ArrayList<>();
+
+        /** {buildings, homes, people} the fire reaches by a time; null when buildings were not counted. */
+        public double[] reachedBy(double minutes) {
+            if (bArrival == null || bHome == null || bPeople == null)
+                return null;
+            int n = 0, h = 0;
+            double p = 0;
+            for (int i = 0; i < bArrival.length; i++)
+                if (bArrival[i] <= minutes) {
+                    n++;
+                    if (bHome[i])
+                        h++;
+                    p += bPeople[i];
+                }
+            return new double[] { n, h, p };
+        }
 
         /** "20:43 run, SH2, 10 mph from SE": how a run is named in a list. */
         public String label() {
@@ -1131,6 +1154,8 @@ public final class FireModel {
         final int[] count = new int[r.steps.length], homes = new int[r.steps.length];
         final double[] people = new double[r.steps.length];
         final java.util.List<Object[]> critical = new java.util.ArrayList<>();
+        // Every reached building's own time, for the slider's count at any minute.
+        final List<float[]> reached = new ArrayList<>();
         for (Structures.Building b : buildings) {
             final int x = (int) Math.floor((b.lon - g.lon0) / g.dLon), y = (int) Math.floor((b.lat - g.lat0) / g.dLat);
             if (x < 0 || y < 0 || x >= g.nx || y >= g.ny)
@@ -1144,6 +1169,8 @@ public final class FireModel {
                     if (xx >= 0 && yy >= 0 && xx < g.nx && yy < g.ny)
                         t = Math.min(t, g.arrival[yy * g.nx + xx]);
                 }
+            if (t <= last)
+                reached.add(new float[] { t, b.residential() ? 1 : 0, (float) b.population });
             int firstStep = -1;
             for (int i = 0; i < r.steps.length; i++) {
                 if (t <= r.steps[i]) {
@@ -1169,6 +1196,14 @@ public final class FireModel {
         r.structures = count;
         r.homes = homes;
         r.people = people;
+        r.bArrival = new float[reached.size()];
+        r.bHome = new boolean[reached.size()];
+        r.bPeople = new float[reached.size()];
+        for (int i = 0; i < reached.size(); i++) {
+            r.bArrival[i] = reached.get(i)[0];
+            r.bHome[i] = reached.get(i)[1] > 0;
+            r.bPeople[i] = reached.get(i)[2];
+        }
         r.structureNote = buildings.size() >= Structures.MAX
                 ? "The inventory stopped at " + Structures.MAX + " buildings, so these counts are a floor."
                 : null;
@@ -1342,12 +1377,93 @@ public final class FireModel {
                                 Feature.AltitudeMode.ClampToGround, 0d));
                     }
                 }
+                r.atFids.clear();
+                insertAtLocked(r);
             }
         } catch (Exception e) {
             Log.w(TAG, "model draw failed", e);
         } finally {
             if (bulk)
                 store.releaseModifyLock();
+        }
+    }
+
+    private final ExecutorService atWorker = Executors.newSingleThreadExecutor();
+    private final java.util.concurrent.atomic.AtomicBoolean atQueued = new java.util.concurrent.atomic.AtomicBoolean();
+    private volatile Run atRun;
+
+    /**
+     * Draws where a run's fire is at a time the operator slid to, in white over its
+     * steps. A drag fires this many times a second; the worker draws only the latest
+     * value, so the edge follows the finger without a queue of stale ones behind it.
+     * {@code keep} saves it, on the finger's release, so it comes back after a restart.
+     * Main thread.
+     */
+    public void showAt(final Run r, int minutes, boolean keep) {
+        if (r == null)
+            return;
+        r.atMinutes = Math.max(0, minutes);
+        atRun = r;
+        if (atQueued.compareAndSet(false, true))
+            atWorker.execute(new Runnable() {
+                @Override
+                public void run() {
+                    atQueued.set(false);
+                    final Run x = atRun;
+                    synchronized (lock) {
+                        drawAtLocked(x);
+                    }
+                }
+            });
+        if (keep)
+            worker.execute(new Runnable() {
+                @Override
+                public void run() {
+                    save();
+                }
+            });
+    }
+
+    /** Replaces a run's slid-to edge. Lock held. */
+    private void drawAtLocked(Run r) {
+        if (store == null || r == null || r.fsid <= 0)
+            return;
+        boolean bulk = false;
+        try {
+            store.acquireModifyLock(true);
+            bulk = true;
+            for (Long fid : r.atFids)
+                store.deleteFeature(fid);
+            r.atFids.clear();
+            insertAtLocked(r);
+        } catch (Exception e) {
+            Log.w(TAG, "model time edge failed", e);
+        } finally {
+            if (bulk)
+                store.releaseModifyLock();
+        }
+    }
+
+    /** The slid-to edge's features, inserted after the steps so they draw on top. Lock and modify lock held. */
+    private void insertAtLocked(Run r) throws Exception {
+        if (r.atMinutes <= 0 || r.result == null)
+            return;
+        // White over a dark halo reads on imagery, terrain and the step colors alike.
+        final Style style = new CompositeStyle(new Style[] {
+                new BasicFillStyle(0x28FFFFFF),
+                new BasicStrokeStyle(0xC0000000, 7f),
+                new BasicStrokeStyle(0xFFFFFFFF, 4f) });
+        final List<Polygon> shapes = new ArrayList<>();
+        if (r.ground != null)
+            shapes.addAll(r.ground.rings(r.atMinutes));
+        else
+            shapes.add(ellipse(r, r.atMinutes));
+        final String title = "By " + stamp(r.ranAt + r.atMinutes * 60000L);
+        for (Polygon p : shapes) {
+            final AttributeSet a = new AttributeSet();
+            a.setAttribute("_title", title);
+            r.atFids.add(store.insertFeature(new Feature(r.fsid, title, p, style, a,
+                    Feature.AltitudeMode.ClampToGround, 0d)));
         }
     }
 
@@ -1516,6 +1632,16 @@ public final class FireModel {
             }
             if (r.structureNote != null)
                 o.put("structureNote", r.structureNote);
+            if (r.bArrival != null) {
+                final org.json.JSONArray ba = new org.json.JSONArray(), bh = new org.json.JSONArray(), bp = new org.json.JSONArray();
+                for (int i = 0; i < r.bArrival.length; i++) {
+                    ba.put(Math.round(r.bArrival[i] * 10) / 10d);
+                    bh.put(r.bHome[i] ? 1 : 0);
+                    bp.put(Math.round(r.bPeople[i] * 10) / 10d);
+                }
+                o.put("bArrival", ba).put("bHome", bh).put("bPeople", bp);
+            }
+            o.put("atMinutes", r.atMinutes);
             final org.json.JSONArray cr = new org.json.JSONArray();
             for (Object[] c : r.critical)
                 cr.put(new org.json.JSONArray().put(c[0]).put(c[1]).put(c[2]).put(c[3]));
@@ -1609,6 +1735,7 @@ public final class FireModel {
             }
             r.rateScale = o.optDouble("rateScale", 1);
             r.calibrationNote = o.optString("calibrationNote", null);
+            r.atMinutes = Math.max(0, Math.min(r.steps[r.steps.length - 1], o.optInt("atMinutes", 0)));
 
             final org.json.JSONArray pa = o.optJSONArray("perimeter");
             if (pa != null && pa.length() >= 3) {
@@ -1639,6 +1766,17 @@ public final class FireModel {
                     }
                 }
                 r.structureNote = o.optString("structureNote", null);
+                final org.json.JSONArray ba = o.optJSONArray("bArrival"), bh = o.optJSONArray("bHome"), bp = o.optJSONArray("bPeople");
+                if (ba != null && bh != null && bp != null && ba.length() == bh.length() && ba.length() == bp.length()) {
+                    r.bArrival = new float[ba.length()];
+                    r.bHome = new boolean[ba.length()];
+                    r.bPeople = new float[ba.length()];
+                    for (int i = 0; i < ba.length(); i++) {
+                        r.bArrival[i] = (float) ba.optDouble(i, Double.POSITIVE_INFINITY);
+                        r.bHome[i] = bh.optInt(i) == 1;
+                        r.bPeople[i] = (float) bp.optDouble(i, 0);
+                    }
+                }
                 final org.json.JSONArray cr = o.optJSONArray("critical");
                 if (cr != null)
                     for (int i = 0; i < cr.length(); i++) {
