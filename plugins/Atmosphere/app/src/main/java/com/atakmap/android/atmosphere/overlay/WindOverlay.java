@@ -45,6 +45,10 @@ public final class WindOverlay {
 
     private static final String PREF_ON = "weather.layer.wind.on";
     private static final String PREF_LEVEL = "weather.layer.wind.level";
+    private static final String PREF_HEAT = "weather.layer.wind.heat";
+    /** Screen pixels a heat map cell gets; the raster layer scales it to the map. */
+    private static final int HEAT_PX_PER_CELL = 2;
+    private static final int HEAT_ALPHA = 0x8C;
     /**
      * Columns a projected grid is resampled onto. 160 is about 5 km across an HRRR box
      * and about 27 km across a RAP region, either side of those models' own cells; a
@@ -73,6 +77,13 @@ public final class WindOverlay {
     private final MapView mapView;
     private final EgressPolicy egress;
     private WindView view;
+    /**
+     * The wind speed as a colored field under the particles, in the particles' own
+     * bands, so the legend serves both (operator, 2026-10-11: "do we have our wind
+     * heat map yet?"). Off by default; its switch remembers.
+     */
+    private final RasterLayer heat = new RasterLayer("Atmosphere wind speed");
+    private boolean heatOn;
     private final Map<String, WindGrid> cache = new LinkedHashMap<String, WindGrid>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, WindGrid> eldest) {
@@ -195,8 +206,11 @@ public final class WindOverlay {
         mapView.addView(view, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         mapView.addOnMapMovedListener(moved);
+        mapView.addLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, heat);
+        heat.setVisible(false);
         final SharedPreferences p = MapCompat.prefs();
         if (p != null) {
+            heatOn = p.getBoolean(PREF_HEAT, false);
             final int saved = p.getInt(PREF_LEVEL, 0);
             if (saved >= 0 && saved < NomadsWind.Level.values().length)
                 level = NomadsWind.Level.values()[saved];
@@ -221,7 +235,53 @@ public final class WindOverlay {
                 parent.removeView(view);
             view = null;
         }
+        heat.clear();
+        heat.setVisible(false);
+        mapView.removeLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, heat);
         cache.clear();
+    }
+
+    public boolean heatOn() {
+        return heatOn;
+    }
+
+    public void setHeatOn(boolean value) {
+        if (heatOn == value)
+            return;
+        heatOn = value;
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putBoolean(PREF_HEAT, value).apply();
+        if (value && on && shown != null)
+            showHeat(shown);
+        else {
+            heat.clear();
+            heat.setVisible(false);
+        }
+    }
+
+    /** The grid's speed, cell by cell, in the band colors, over the grid's own extent. */
+    private void showHeat(WindGrid g) {
+        final int w = Math.max(32, Math.min(1024, g.nx * HEAT_PX_PER_CELL));
+        final int h = Math.max(32, Math.min(1024, g.ny * HEAT_PX_PER_CELL));
+        final int[] px = new int[w * h];
+        final double dLon = (g.east - g.west) / w, dLat = (g.north - g.south) / h;
+        final float[] uv = new float[2];
+        for (int r = 0; r < h; r++) {
+            final double lat = g.north - (r + 0.5) * dLat;
+            final int row = r * w;
+            for (int c = 0; c < w; c++) {
+                final float[] s = g.sample(lat, g.west + (c + 0.5) * dLon, uv);
+                if (s == null || Float.isNaN(s[0]) || Float.isNaN(s[1]))
+                    continue;
+                final float ms = (float) Math.sqrt(s[0] * s[0] + s[1] * s[1]);
+                px[row + c] = (HEAT_ALPHA << 24) | (WindView.BAND_COLORS[WindView.band(ms)] & 0x00FFFFFF);
+            }
+        }
+        heat.setImage(android.graphics.Bitmap.createBitmap(px, w, h,
+                android.graphics.Bitmap.Config.ARGB_8888),
+                new GeoBounds(g.north, g.west, g.south, g.east));
+        heat.setVisible(true);
     }
 
     public boolean isOn() {
@@ -235,6 +295,10 @@ public final class WindOverlay {
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
             p.edit().putBoolean(PREF_ON, value).apply();
+        if (!value) {
+            heat.clear();
+            heat.setVisible(false);
+        }
         if (value) {
             setRun(model.latestRun(System.currentTimeMillis()));
             if (listener != null)
@@ -527,6 +591,8 @@ public final class WindOverlay {
         region = new GeoBounds(grid.north, grid.west, grid.south, grid.east);
         if (view != null)
             view.setGrid(grid);
+        if (heatOn)
+            showHeat(grid);
         mapView.removeCallbacks(ticker);
         mapView.post(ticker);
         if (listener != null)

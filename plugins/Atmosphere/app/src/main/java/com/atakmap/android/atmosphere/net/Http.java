@@ -63,7 +63,13 @@ public final class Http {
      * three sat asleep on stalled polls while a page waited on this queue behind
      * them, silently, for minutes.
      */
-    private static final ExecutorService LARGE = Executors.newSingleThreadExecutor(
+    /**
+     * Three lanes, not one: with one, a slow state file (California's fuel samples
+     * took a minute on 2026-10-12) held every other large feed behind it, and the
+     * Earthquakes layer sat on with nothing drawn and nothing in the log.
+     */
+    private static final int LARGE_LANES = 3;
+    private static final ExecutorService LARGE = Executors.newFixedThreadPool(LARGE_LANES,
             new ThreadFactory() {
                 @Override
                 public Thread newThread(Runnable r) {
@@ -92,6 +98,7 @@ public final class Http {
             @Override
             public void run() {
                 try {
+                    Log.d(TAG, "GET (large) " + safeUrl(url));
                     deliver(callback, new String(requestBytes(url, userAgent, headers,
                             LARGE_READ_TIMEOUT_MS), "UTF-8"), null);
                 } catch (IOException e) {

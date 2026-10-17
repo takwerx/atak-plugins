@@ -134,9 +134,39 @@ public final class DepotClient {
     public interface ForestCallback {
         /** Every package kind comes from the one catalog document, so they arrive together. */
         void onForests(List<Depot.Forest> forests, List<Depot.RecMap> recMaps,
-                Depot.Sheets sheets, long savedAt);
+                Depot.Sheets sheets, Depot.Storms storms, long savedAt);
 
         void onError(String message);
+    }
+
+    public interface StormsCallback {
+        /** From the saved copy on this phone; never the network. */
+        void onStorms(Depot.Storms storms);
+    }
+
+    /**
+     * The storms section of the catalog saved on this phone, read without
+     * asking the depot, so the flight outlines can be drawn at start before
+     * the pane has been opened. Answers nothing when there is no saved copy.
+     */
+    public void cachedStorms(final StormsCallback cb) {
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final Depot.Storms storms =
+                            Depot.parseStorms(read(new File(cacheDir, CATALOG)));
+                    main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            cb.onStorms(storms);
+                        }
+                    });
+                } catch (Exception none) {
+                    Log.d(TAG, "no saved catalog for the outlines: " + describe(none));
+                }
+            }
+        });
     }
 
     public interface SheetFileCallback {
@@ -254,15 +284,16 @@ public final class DepotClient {
                     final List<Depot.Forest> forests = Depot.parseForests(body);
                     final List<Depot.RecMap> recMaps = Depot.parseRecMaps(body);
                     final Depot.Sheets sheets = Depot.parseSheets(body);
+                    final Depot.Storms storms = Depot.parseStorms(body);
                     write(cache, body);
-                    postForests(cb, forests, recMaps, sheets, 0L);
+                    postForests(cb, forests, recMaps, sheets, storms, 0L);
                 } catch (final Exception e) {
                     Log.w(TAG, "package fetch failed: " + describe(e));
                     try {
                         final String cached = read(cache);
                         postForests(cb, Depot.parseForests(cached),
                                 Depot.parseRecMaps(cached), Depot.parseSheets(cached),
-                                savedAt(cache));
+                                Depot.parseStorms(cached), savedAt(cache));
                     } catch (Exception noCache) {
                         final String msg = describe(e);
                         main.post(new Runnable() {
@@ -279,11 +310,11 @@ public final class DepotClient {
 
     private void postForests(final ForestCallback cb,
             final List<Depot.Forest> forests, final List<Depot.RecMap> recMaps,
-            final Depot.Sheets sheets, final long savedAt) {
+            final Depot.Sheets sheets, final Depot.Storms storms, final long savedAt) {
         main.post(new Runnable() {
             @Override
             public void run() {
-                cb.onForests(forests, recMaps, sheets, savedAt);
+                cb.onForests(forests, recMaps, sheets, storms, savedAt);
             }
         });
     }

@@ -14,7 +14,7 @@
     <string name="back">‹ Back</string>
     <string name="loading_catalog">Loading catalog…</string>
     <string name="cancel">Cancel</string>
-    <string name="cancel_download">Cancel download</string>
+    <string name="cancel_download">Cancel Download</string>
     <string name="ok">OK</string>
     <string name="installed">Installed</string>
     <string name="remove">Remove</string>
@@ -32,13 +32,14 @@
     <string name="series_fstopo">USFS Topo 24K</string>
     <string name="search_sheets">Search</string>
     <string name="search_regional">Search</string>
-    <string name="near_map">Near: map center</string>
-    <string name="near_me">Near: me</string>
+    <string name="near_map">Near: Map Center</string>
+    <string name="near_me">Near: Me</string>
+    <string name="newest_first">Newest First</string>
     <string name="no_position">No position fix yet; measuring from the map center.</string>
     <string name="search_recmaps">Search</string>
     <string name="partial">Partial</string>
     <string name="choose_category">Category</string>
-    <string name="all_categories">All categories</string>
+    <string name="all_categories">All Categories</string>
     <string name="choose_country">Country</string>
     <string name="prefs_summary">Open the Map Depot user guide</string>
     <string name="manual_title">Plugin Documentation</string>
@@ -50,15 +51,26 @@
     <string name="home_forests_blocked">Offline Public Land Vector Tiles is not available on ATAK %1$s: ATAK does not start with these maps installed. Update ATAK to %2$s or newer to use them.</string>
     <string name="nifc_heading">Incident Maps (NIFC)</string>
     <string name="uaswfc_heading">Drone IR Maps (UASWFC)</string>
+    <string name="storms_heading">Disaster Aerials</string>
+    <string name="choose_storm">Event</string>
+    <string name="all_events">All Events</string>
+    <string name="search_flights">Search</string>
+    <string name="no_storms">No disaster aerials in the catalog yet.</string>
     <string name="beacon_heading">Beacon Box Maps</string>
     <string name="download">Download</string>
-    <string name="outlines_on">Outlines on</string>
-    <string name="outlines_off">Outlines off</string>
+    <!-- For a streaming source: what is added is a pointer, the tiles stream -->
+    <string name="add">Add</string>
+    <string name="add_online">Add Online</string>
+    <string name="remove_online">Remove Online</string>
+    <string name="download_offline">Download Offline</string>
+    <string name="remove_offline">Remove Offline</string>
+    <string name="outlines_on">Outlines On</string>
+    <string name="outlines_off">Outlines Off</string>
     <string name="pin">Pin</string>
     <string name="pinned">Pinned</string>
     <string name="show_map">Show</string>
     <string name="hide_map">Hide</string>
-    <string name="nifc_pick_gacc">Pick your area</string>
+    <string name="nifc_pick_gacc">Pick Your Area</string>
     <string name="nifc_loading">Loading…</string>
     <string name="nifc_empty">Nothing posted here</string>
 </resources>

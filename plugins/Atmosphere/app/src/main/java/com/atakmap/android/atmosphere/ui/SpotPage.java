@@ -175,6 +175,33 @@ public final class SpotPage {
     private int radiusIndex = 1;
     /** The request whose details are showing, or null for the list. */
     private Spot.Request showing;
+    private static final long SETTLE_MS = 700;
+    /**
+     * The map settled: "On map (N)" counts the map as it now sits, and an On map list
+     * is read again. The count stayed at the map it was painted for, so a page over a
+     * map full of spots read "On map (0)" until the button was tapped (operator,
+     * 2026-10-15). Counting a few hundred requests against a box is cheap.
+     */
+    private final Runnable settled = new Runnable() {
+        @Override
+        public void run() {
+            if (showing != null || requests.isEmpty())
+                return;
+            if (filter == Filter.MAP)
+                render();
+            else
+                paintFilters();
+        }
+    };
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener moved =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView v, boolean animate) {
+                    // GL thread: only post.
+                    mapView.removeCallbacks(settled);
+                    mapView.postDelayed(settled, SETTLE_MS);
+                }
+            };
 
     public SpotPage(Context pluginContext, MapView mapView, EgressPolicy egress, Host host) {
         this.pluginContext = pluginContext;
@@ -261,6 +288,7 @@ public final class SpotPage {
         }
         wire();
         showGateOrList();
+        mapView.addOnMapMovedListener(moved);
     }
 
     public View view() {
@@ -315,6 +343,8 @@ public final class SpotPage {
     }
 
     public void dispose() {
+        mapView.removeOnMapMovedListener(moved);
+        mapView.removeCallbacks(settled);
         resizeForKeyboard(false);
         listGeneration++;
         detailGeneration++;
@@ -1616,9 +1646,10 @@ public final class SpotPage {
     private TextView heading(int res) {
         final TextView h = new TextView(pluginContext);
         h.setText(res);
-        h.setTextSize(10);
+        h.setTextSize(12f);
         h.setAllCaps(true);
-        h.setAlpha(0.6f);
+        h.setTypeface(Typeface.DEFAULT_BOLD);
+        h.setTextColor(0xFF00E5FF);
         h.setPadding(0, dp(10), 0, dp(2));
         return h;
     }

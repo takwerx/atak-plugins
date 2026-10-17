@@ -131,6 +131,33 @@ public abstract class ImageOverlay {
         return picture;
     }
 
+    /**
+     * More pictures of the same box at the same size, asked for once the picture is
+     * in, to fill what its server left out; null for none (the default). Main thread,
+     * once per picture, after {@link #repaint}.
+     */
+    protected String[] fillUrls(Bitmap picture, double west, double south, double east, double north, int px,
+            int py) {
+        return null;
+    }
+
+    /**
+     * The picture with the fill pictures worked in, all of them in hand and the same
+     * size as it. Main thread. Return it, or a new bitmap.
+     */
+    protected Bitmap fill(Bitmap picture, Bitmap[] fills) {
+        return picture;
+    }
+
+    /** A fill picture could not be had; the server's picture stays as it came. */
+    protected void fillFailed() {
+    }
+
+    /** What the status says while the fill pictures come. */
+    protected String fillingWords() {
+        return "Getting the " + noun() + "…";
+    }
+
     /** The widest box asked for, degrees; a wider view is cropped around its center. */
     protected double maxSpanLon() {
         return 40;
@@ -325,6 +352,7 @@ public abstract class ImageOverlay {
             return;
         pendingKey = key;
         final int mine = generation;
+        final int wide = px, high = py;
         status("Getting the " + noun() + "…");
         Http.getBitmap(url(rw, rs, re, rn, px, py), egress.userAgent(), new Http.BitmapCallback() {
             @Override
@@ -337,9 +365,19 @@ public abstract class ImageOverlay {
                 fetchedAt = System.currentTimeMillis();
                 failures = 0;
                 final String size = bitmap.getWidth() + "x" + bitmap.getHeight();
-                layer.setImage(translucent(repaint(bitmap), alpha()), r);
+                final Bitmap painted = repaint(bitmap);
+                final String[] more = painted == null ? null : fillUrls(painted, rw, rs, re, rn, wide, high);
                 Log.d(tag, "picture " + size + " for " + key);
-                status(shown());
+                if (more == null || more.length == 0) {
+                    layer.setImage(translucent(painted, alpha()), r);
+                    status(shown());
+                    return;
+                }
+                // The server's picture goes up at once, holes and all, and is
+                // replaced once the fill pictures are in.
+                layer.setImage(translucent(painted.copy(Bitmap.Config.ARGB_8888, false), alpha()), r);
+                status(fillingWords());
+                fetchFills(painted, more, new Bitmap[more.length], 0, mine, r);
             }
 
             @Override
@@ -358,6 +396,48 @@ public abstract class ImageOverlay {
                 } else {
                     status(capitalize(noun()) + ": " + error);
                 }
+            }
+        });
+    }
+
+    /**
+     * The fill pictures, one at a time and in order (a server that keeps an archive
+     * turns away fast askers), then worked into the picture. A failure leaves the
+     * server's picture up as it came.
+     */
+    private void fetchFills(final Bitmap picture, final String[] urls, final Bitmap[] got, final int i,
+            final int mine, final GeoBounds r) {
+        if (i == urls.length) {
+            final Bitmap done = fill(picture, got);
+            for (Bitmap b : got)
+                if (b != null && b != done)
+                    b.recycle();
+            if (done != picture)
+                picture.recycle();
+            layer.setImage(translucent(done, alpha()), r);
+            Log.d(tag, "filled from " + urls.length + " more pictures");
+            status(shown());
+            return;
+        }
+        Http.getBitmap(urls[i], egress.userAgent(), new Http.BitmapCallback() {
+            @Override
+            public void onSuccess(Bitmap b) {
+                if (mine != generation || !on || region != r) {
+                    if (b != null)
+                        b.recycle();
+                    return;
+                }
+                got[i] = b;
+                fetchFills(picture, urls, got, i + 1, mine, r);
+            }
+
+            @Override
+            public void onFailure(String error) {
+                if (mine != generation || !on || region != r)
+                    return;
+                Log.w(tag, "fill picture " + (i + 1) + " of " + urls.length + " failed (" + error + ")");
+                fillFailed();
+                status(shown());
             }
         });
     }
