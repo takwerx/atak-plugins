@@ -292,6 +292,9 @@ it is a direction.
   *Wind* draws the forecast wind as moving streaks colored by speed, with the
   key under the time strip in mph, kt or km/h. *Heat map* under the key draws
   the same speed as a colored field beneath the streaks, in the key's colors.
+  Wind and *Radar* can be on together, the time strip under the one switched
+  on last; the heat map would paint over the radar, so turning one on turns
+  the other off.
 
   The line under it reads the wind *Here*, at the pane's point: speed and
   where it comes from. Outside the area being drawn it says so.

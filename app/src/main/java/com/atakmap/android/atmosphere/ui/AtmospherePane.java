@@ -1881,14 +1881,18 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> times, int shown) {
                 radarFrames = times;
-                if (radar.isOn())
+                // The strip is the radar's only while it owns it: with Wind switched
+                // on after it, the strip stays on the wind's hours (#6).
+                if (stripLayer() == TimeLayer.RADAR) {
                     setWhenTimes(radarTimes(), shown, Math.max(0, times.size() - 1));
+                    stripShowing = TimeLayer.RADAR;
+                }
                 updateLayerControls();
             }
 
             @Override
             public void onFrameShown(int index, String time) {
-                if (!radar.isOn())
+                if (stripLayer() != TimeLayer.RADAR)
                     return;
                 showWhen(index);
                 scrubberLabel.setText(frameLabel(index, time));
@@ -1896,7 +1900,7 @@ public final class AtmospherePane {
 
             @Override
             public void onStatus(String status) {
-                if (!radar.isOn())
+                if (stripLayer() != TimeLayer.RADAR)
                     return;
                 if (!status.isEmpty())
                     scrubberLabel.setText(status);
@@ -1919,8 +1923,10 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> labels, int shown) {
                 windHours = Math.max(0, labels.size() - 1);
-                if (wind.isOn())
+                if (stripLayer() == TimeLayer.WIND) {
                     setWhenTimes(windTimes(), shown, 0);
+                    stripShowing = TimeLayer.WIND;
+                }
                 updateLayerControls();
             }
 
@@ -1928,8 +1934,12 @@ public final class AtmospherePane {
             public void onFrameShown(int index, long validTime) {
                 if (!wind.isOn())
                     return;
-                showWhen(index);
-                scrubberLabel.setText(windLabel(index, validTime));
+                // The strip and its line only while the strip is the wind's; the
+                // level and the reading are the wind's own, whoever has the strip.
+                if (stripLayer() == TimeLayer.WIND) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
                 // The model can change with the height, so the level line follows.
                 updateWindLevel();
                 // And the reading, which is read off the grid now on the map: it
@@ -1942,11 +1952,13 @@ public final class AtmospherePane {
             public void onStatus(String status) {
                 if (!wind.isOn())
                     return;
-                if (!status.isEmpty())
-                    scrubberLabel.setText(status);
-                else
-                    scrubberLabel.setText(
-                            windLabel(wind.hourIndex(), wind.validTime(wind.hourIndex())));
+                if (stripLayer() == TimeLayer.WIND) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(wind.hourIndex(), wind.validTime(wind.hourIndex())));
+                }
                 updateWindReading();
             }
         });
@@ -1965,8 +1977,10 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> labels, int shown) {
                 smokeHours = Math.max(0, labels.size() - 1);
-                if (smoke.isOn())
+                if (stripLayer() == TimeLayer.SMOKE) {
                     setWhenTimes(smokeTimes(), shown, 0);
+                    stripShowing = TimeLayer.SMOKE;
+                }
                 updateLayerControls();
             }
 
@@ -1974,8 +1988,10 @@ public final class AtmospherePane {
             public void onFrameShown(int index, long validTime) {
                 if (!smoke.isOn())
                     return;
-                showWhen(index);
-                scrubberLabel.setText(windLabel(index, validTime));
+                if (stripLayer() == TimeLayer.SMOKE) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
                 // A new hour is a new picture, so the number at the point moves too.
                 updateSmokeReading();
             }
@@ -1984,11 +2000,13 @@ public final class AtmospherePane {
             public void onStatus(String status) {
                 if (!smoke.isOn())
                     return;
-                if (!status.isEmpty())
-                    scrubberLabel.setText(status);
-                else
-                    scrubberLabel.setText(
-                            windLabel(smoke.hourIndex(), smoke.validTime(smoke.hourIndex())));
+                if (stripLayer() == TimeLayer.SMOKE) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(smoke.hourIndex(), smoke.validTime(smoke.hourIndex())));
+                }
                 updateSmokeReading();
             }
         });
@@ -3222,7 +3240,11 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 if (wind == null)
                     return;
-                wind.setHeatOn(!wind.heatOn());
+                final boolean heat = !wind.heatOn();
+                // The heat map paints over the radar: the two never share the map.
+                if (heat && radar != null && radar.isOn())
+                    radar.setOn(false);
+                wind.setHeatOn(heat);
                 updateLayerControls();
             }
         });
@@ -3333,8 +3355,10 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> labels, int shown) {
                 wavesHours = Math.max(0, labels.size() - 1);
-                if (waves.isOn())
+                if (stripLayer() == TimeLayer.WAVES) {
                     setWhenTimes(wavesTimes(), shown, 0);
+                    stripShowing = TimeLayer.WAVES;
+                }
                 updateLayerControls();
             }
 
@@ -3342,8 +3366,10 @@ public final class AtmospherePane {
             public void onFrameShown(int index, long validTime) {
                 if (!waves.isOn())
                     return;
-                showWhen(index);
-                scrubberLabel.setText(windLabel(index, validTime));
+                if (stripLayer() == TimeLayer.WAVES) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
                 updateWavesReading();
             }
 
@@ -3351,11 +3377,13 @@ public final class AtmospherePane {
             public void onStatus(String status) {
                 if (!waves.isOn())
                     return;
-                if (!status.isEmpty())
-                    scrubberLabel.setText(status);
-                else
-                    scrubberLabel.setText(
-                            windLabel(waves.hourIndex(), waves.validTime(waves.hourIndex())));
+                if (stripLayer() == TimeLayer.WAVES) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(waves.hourIndex(), waves.validTime(waves.hourIndex())));
+                }
                 updateWavesReading();
             }
         });
@@ -3383,8 +3411,10 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> labels, int shown) {
                 rainHours = Math.max(0, labels.size() - 1);
-                if (rain.isOn())
+                if (stripLayer() == TimeLayer.RAIN) {
                     setWhenTimes(rainTimes(), shown, 0);
+                    stripShowing = TimeLayer.RAIN;
+                }
                 updateLayerControls();
             }
 
@@ -3392,8 +3422,10 @@ public final class AtmospherePane {
             public void onFrameShown(int index, long validTime) {
                 if (!rain.isOn())
                     return;
-                showWhen(index);
-                scrubberLabel.setText(windLabel(index, validTime));
+                if (stripLayer() == TimeLayer.RAIN) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
                 updateRainReading();
             }
 
@@ -3401,11 +3433,13 @@ public final class AtmospherePane {
             public void onStatus(String status) {
                 if (!rain.isOn())
                     return;
-                if (!status.isEmpty())
-                    scrubberLabel.setText(status);
-                else
-                    scrubberLabel.setText(
-                            windLabel(rain.hourIndex(), rain.validTime(rain.hourIndex())));
+                if (stripLayer() == TimeLayer.RAIN) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(rain.hourIndex(), rain.validTime(rain.hourIndex())));
+                }
                 updateRainReading();
             }
         });
@@ -3654,6 +3688,62 @@ public final class AtmospherePane {
         return b;
     }
 
+    /** The layers that share the one time strip. */
+    private enum TimeLayer { RADAR, WIND, SMOKE, WAVES, RAIN }
+
+    /** The time layer switched on last: the strip is its, while it is on. */
+    private TimeLayer stripOwner;
+    /** The layer whose times the strip holds now, to load another's when it changes. */
+    private TimeLayer stripShowing;
+
+    private boolean timeLayerOn(TimeLayer t) {
+        switch (t) {
+            case RADAR:
+                return radar != null && radar.isOn();
+            case WIND:
+                return wind != null && wind.isOn();
+            case SMOKE:
+                return smoke != null && smoke.isOn();
+            case WAVES:
+                return waves != null && waves.isOn();
+            default:
+                return rain != null && rain.isOn();
+        }
+    }
+
+    /**
+     * Which layer the strip drives: the one switched on last while it is on; else,
+     * after it went off or after All on, the first of the time layers still on, in
+     * the order the strip always took them. Null when none is on.
+     */
+    private TimeLayer stripLayer() {
+        if (stripOwner != null && timeLayerOn(stripOwner))
+            return stripOwner;
+        for (TimeLayer t : new TimeLayer[] { TimeLayer.WIND, TimeLayer.SMOKE, TimeLayer.WAVES,
+                TimeLayer.RAIN, TimeLayer.RADAR })
+            if (timeLayerOn(t))
+                return t;
+        return null;
+    }
+
+    /** The strip's times, reloaded when the layer that owns it changes. */
+    private void followStripOwner() {
+        final TimeLayer owner = stripLayer();
+        if (owner == stripShowing)
+            return;
+        stripShowing = owner;
+        if (owner == TimeLayer.RADAR)
+            setWhenTimes(radarTimes(), radar.frameIndex(), Math.max(0, radarFrames.size() - 1));
+        else if (owner == TimeLayer.WIND)
+            setWhenTimes(windTimes(), wind.hourIndex(), 0);
+        else if (owner == TimeLayer.SMOKE)
+            setWhenTimes(smokeTimes(), smoke.hourIndex(), 0);
+        else if (owner == TimeLayer.WAVES)
+            setWhenTimes(wavesTimes(), waves.hourIndex(), 0);
+        else if (owner == TimeLayer.RAIN)
+            setWhenTimes(rainTimes(), rain.hourIndex(), 0);
+    }
+
     /** Send a pick to whichever layer owns the strip. */
     private void pickWhen(int index) {
         if (index < 0 || index >= whenTimes.size())
@@ -3662,19 +3752,22 @@ public final class AtmospherePane {
         // the label is only written when it does, so the heading sat on the old time
         // while the buttons had already moved, which reads as a control that did not
         // take (XCover, 2026-09-22).
-        if (wind != null && wind.isOn()) {
+        // Only the strip's layer moves: with Radar and Wind both on, the other stays
+        // at its own time (takwerx/atmosphere#6).
+        final TimeLayer owner = stripLayer();
+        if (owner == TimeLayer.WIND) {
             wind.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
-        } else if (smoke != null && smoke.isOn()) {
+        } else if (owner == TimeLayer.SMOKE) {
             smoke.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
-        } else if (waves != null && waves.isOn()) {
+        } else if (owner == TimeLayer.WAVES) {
             waves.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
-        } else if (rain != null && rain.isOn()) {
+        } else if (owner == TimeLayer.RAIN) {
             rain.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
-        } else if (radar != null && radar.isOn()) {
+        } else if (owner == TimeLayer.RADAR) {
             radar.setFrameIndex(index);
             scrubberLabel.setText(frameLabel(index,
                     index < radarFrames.size() ? radarFrames.get(index) : null));
@@ -4508,6 +4601,9 @@ public final class AtmospherePane {
             buoyLayer.setOn(on);
         else if (buoyLayer != null && on)
             blocked++;
+        // The wind's heat map paints over the radar, here as from the switches (#6).
+        if (on && radar != null && radar.isOn() && wind != null && wind.isOn() && wind.heatOn())
+            wind.setHeatOn(false);
         final Context ctx = MapCompat.atakContext();
         if (blocked > 0 && ctx != null)
             Toast.makeText(ctx, blocked + (blocked == 1 ? " layer is" : " layers are")
@@ -5208,27 +5304,32 @@ public final class AtmospherePane {
                 .show();
     }
 
-    /** One time-enabled layer at a time (WxReport's rule): the scrubber is one strip. */
+    /**
+     * Radar and Wind run together; Smoke, Waves and Rain stay one at a time with
+     * every time layer (takwerx/atmosphere#6: "When I turn on either the Radar or the
+     * Wind overlays, the other one will turn off"). Wind's speed heat map paints over
+     * the radar, so the two never share the map: Radar coming on takes the heat map
+     * off, and the heat map coming on takes Radar off. The one time strip follows the
+     * layer switched on last ({@link #stripLayer}).
+     */
     private void turnRadarOn() {
-        if (wind != null && wind.isOn())
-            wind.setOn(false);
         if (smoke != null && smoke.isOn())
             smoke.setOn(false);
         if (waves != null && waves.isOn())
             waves.setOn(false);
         if (rain != null && rain.isOn())
             rain.setOn(false);
+        if (wind != null && wind.isOn() && wind.heatOn())
+            wind.setHeatOn(false);
         if (radar != null) {
             radar.setOn(true);
-            setWhenTimes(radarTimes(), radar.frameIndex(),
-                    Math.max(0, radarFrames.size() - 1));
+            stripOwner = TimeLayer.RADAR;
         }
         updateLayerControls();
     }
 
+    /** See {@link #turnRadarOn}: Wind runs with Radar, its heat map does not. */
     private void turnWindOn() {
-        if (radar != null && radar.isOn())
-            radar.setOn(false);
         if (smoke != null && smoke.isOn())
             smoke.setOn(false);
         if (waves != null && waves.isOn())
@@ -5236,13 +5337,15 @@ public final class AtmospherePane {
         if (rain != null && rain.isOn())
             rain.setOn(false);
         if (wind != null) {
+            if (radar != null && radar.isOn() && wind.heatOn())
+                wind.setHeatOn(false);
             wind.setOn(true);
-            setWhenTimes(windTimes(), wind.hourIndex(), 0);
+            stripOwner = TimeLayer.WIND;
         }
         updateLayerControls();
     }
 
-    /** One time-enabled layer at a time, because they share the one strip. */
+    /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
     private void turnSmokeOn() {
         if (radar != null && radar.isOn())
             radar.setOn(false);
@@ -5254,12 +5357,12 @@ public final class AtmospherePane {
             rain.setOn(false);
         if (smoke != null) {
             smoke.setOn(true);
-            setWhenTimes(smokeTimes(), smoke.hourIndex(), 0);
+            stripOwner = TimeLayer.SMOKE;
         }
         updateLayerControls();
     }
 
-    /** One time-enabled layer at a time, because they share the one strip. */
+    /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
     private void turnWavesOn() {
         if (radar != null && radar.isOn())
             radar.setOn(false);
@@ -5271,12 +5374,12 @@ public final class AtmospherePane {
             rain.setOn(false);
         if (waves != null) {
             waves.setOn(true);
-            setWhenTimes(wavesTimes(), waves.hourIndex(), 0);
+            stripOwner = TimeLayer.WAVES;
         }
         updateLayerControls();
     }
 
-    /** One time-enabled layer at a time, because they share the one strip. */
+    /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
     private void turnRainOn() {
         if (radar != null && radar.isOn())
             radar.setOn(false);
@@ -5288,7 +5391,7 @@ public final class AtmospherePane {
             waves.setOn(false);
         if (rain != null) {
             rain.setOn(true);
-            setWhenTimes(rainTimes(), rain.hourIndex(), 0);
+            stripOwner = TimeLayer.RAIN;
         }
         updateLayerControls();
     }
@@ -6469,15 +6572,17 @@ public final class AtmospherePane {
             updateWindUnitRow();
             updateWindLevel();
         }
-        if (windOn)
+        followStripOwner();
+        final TimeLayer owner = stripLayer();
+        if (owner == TimeLayer.WIND)
             hostScrubberIn(windSettings);
-        else if (smokeOn)
+        else if (owner == TimeLayer.SMOKE)
             hostScrubberIn(smokeSettings);
-        else if (wavesOn)
+        else if (owner == TimeLayer.WAVES)
             hostScrubberIn(wavesSettings);
-        else if (rainOn)
+        else if (owner == TimeLayer.RAIN)
             hostScrubberIn(rainSettings);
-        else if (radarOn)
+        else if (owner == TimeLayer.RADAR)
             hostScrubberIn(radarSettings);
         scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn || rainOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
@@ -6487,9 +6592,10 @@ public final class AtmospherePane {
 
     /**
      * Put the time strip under the layer that owns it. One strip, not one per layer:
-     * only one time-enabled layer can be on at a time (WxReport's rule), so moving
-     * the one view beats keeping two in step. It goes first in the block, above that
-     * layer's own controls.
+     * Radar and Wind can be on together (takwerx/atmosphere#6), but the strip drives
+     * one of them, the one switched on last ({@link #stripLayer}), so moving the one
+     * view beats keeping two in step. It goes first in the block, above that layer's
+     * own controls.
      */
     private void hostScrubberIn(LinearLayout container) {
         final ViewParent parent = scrubber.getParent();

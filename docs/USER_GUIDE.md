@@ -159,7 +159,7 @@ opening the plugin.
 | Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber |
 | Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches the open ocean where no radar does |
 | Wind | Rain | The model's rain rate, light to violent, hour by hour for five days with the rate "Here"; a forecast, not radar |
-| Wind | Wind | The forecast wind as moving streaks colored by speed, or as a heat map under them in the same colors, with a time scrubber, heights to the jet stream, and the wind "Here" |
+| Wind | Wind | The forecast wind as moving streaks colored by speed, or as a heat map under them in the same colors, with a time scrubber, heights to the jet stream, and the wind "Here". Runs together with Radar; the heat map and Radar take turns |
 | Storms | Storm Reports | Every report the NWS offices logged in the last 24, 48 or 72 hours: tornado, wind, hail, flood, rain, snow and ice, landslide; the type and size in the pill, the remarks behind a tap |
 | Storms | Tornado Paths | The tracks NWS survey teams walked in the last 2 days, 7 days, 30 days or year, each line in its EF rating's color with a pill at the touchdown; length, width, peak wind, injuries, deaths and the survey behind a tap |
 | Fire | Fire Weather Outlook | Elevated, critical and extreme areas and dry thunderstorms, Day 1, 2, 3 or all; from Day 3 as a chance of critical |

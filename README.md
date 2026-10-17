@@ -119,7 +119,8 @@ customers out and when power is expected back, with labels that group as the
 map zooms out; Weather Stations, River Gauges, Buoys and the Spot Weather
 Forecast page measure from the point chosen in the pane's top row; each page's
 map switch is a small "Map ON" on its heading line; status lines say when the
-zoom hides a layer; and a group's count is its layers, not their settings.
+zoom hides a layer; a group's count is its layers, not their settings; and
+Radar and Wind run together (takwerx/atmosphere#6).
 0.16 brought rain totals for
 any time on both rain layers: the last 24 hours, 3, 7 or 30 days, since October 1
 or January 1, one day, or the hours before a date and time, such as when a fire
