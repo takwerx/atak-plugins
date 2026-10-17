@@ -66,6 +66,8 @@ public final class GLRasterLayer extends GLAbstractLayer
     private Data frame;
     /** Where the picture on the map is, so the ground is repainted when it goes. */
     private GeoBounds drawn;
+    /** The picture last handed to the renderer: the same one again is a fade, not an upload. */
+    private Bitmap uploaded;
 
     public GLRasterLayer(MapRenderer surface, RasterLayer subject) {
         super(surface, subject);
@@ -86,8 +88,11 @@ public final class GLRasterLayer extends GLAbstractLayer
         if (d == null || d.texture == null || !d.valid)
             return;
         view.forward(d.points, d.vertexCoordinates);
-        d.texture.draw(4, GLES20FixedPipeline.GL_FLOAT, d.textureCoordinates,
-                d.vertexCoordinates);
+        // The layer's opacity rides on the draw, so a transparency change needs no
+        // new texture (the radar's slider, takwerx/atmosphere#7).
+        GLTexture.draw(d.texture.getTexId(), GLES20FixedPipeline.GL_TRIANGLE_FAN, 4, 2,
+                GLES20FixedPipeline.GL_FLOAT, d.textureCoordinates, 2, GLES20FixedPipeline.GL_FLOAT,
+                d.vertexCoordinates, 1f, 1f, 1f, subject.getAlpha());
     }
 
     @Override
@@ -106,9 +111,20 @@ public final class GLRasterLayer extends GLAbstractLayer
         final GeoPoint[] pts = layer.getPoints();
         final GeoBounds bounds = layer.getBounds();
         final GeoBounds was;
+        final boolean same;
         synchronized (this) {
             was = drawn;
+            same = bitmap != null && bitmap == uploaded && bounds != null && was != null
+                    && was.getNorth() == bounds.getNorth() && was.getSouth() == bounds.getSouth()
+                    && was.getEast() == bounds.getEast() && was.getWest() == bounds.getWest();
             drawn = bitmap == null || pts == null ? null : bounds;
+            uploaded = drawn == null ? null : bitmap;
+        }
+        // The same picture in the same place: only its opacity changed, so the
+        // ground under it is redrawn and the texture kept.
+        if (same) {
+            markDirty(bounds);
+            return;
         }
         // The ground the old picture covered is repainted too. The surface keeps
         // what it drew, so a layer turned off left its last picture on the map

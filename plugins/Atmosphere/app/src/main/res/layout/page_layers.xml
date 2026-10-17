@@ -1497,7 +1497,27 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:visibility="gone" />
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/TakwerxSectionHeading"
+                    android:id="@+id/radar_transparency_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/raintotals_opacity_heading" />
+
+                <!-- Transparency is a continuous range, a slider as on Rain Totals
+                     (takwerx/atmosphere#7). It takes the whole gesture, so a drag on it
+                     never turns the page. -->
+                <SeekBar
+                    android:id="@+id/radar_transparency"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="4dp"
+                    android:max="90" />
+            </LinearLayout>
 
             <!-- The GOES satellite picture, infrared or visible, the newest frame, as a
                  picture on the map surface. Not time-enabled. -->
