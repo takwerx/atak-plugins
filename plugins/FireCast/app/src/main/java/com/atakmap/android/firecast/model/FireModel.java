@@ -1162,6 +1162,12 @@ public final class FireModel {
      * as ours: the rings, acres and counts are this phone's. Any thread.
      */
     void importRun(final JSONObject saved, final File source) {
+        // ATAK saves a sent data package on the sending phone too, and imports it there:
+        // a run carrying this phone's own id is its own run coming back, and is left out.
+        if (ownRun(saved.optString("byUid", ""))) {
+            Log.d(TAG, "own run file, not taken in again: " + source.getName());
+            return;
+        }
         worker.execute(new Runnable() {
             @Override
             public void run() {
@@ -1235,6 +1241,16 @@ public final class FireModel {
                 }
             }
         });
+    }
+
+    /** Whether a device uid from a run file is this phone's. */
+    static boolean ownRun(String byUid) {
+        try {
+            final String me = MapView.getDeviceUid();
+            return me != null && !me.isEmpty() && me.equals(byUid);
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /** A received run keeps its file under its own id, so it can be sent on; the sender's file name is never used. */
@@ -1610,7 +1626,7 @@ public final class FireModel {
                     saved.put("by", r.by != null ? r.by : mapView.getDeviceCallsign())
                             .put("engine", "behave d4acc8a").put("pluginVersion", pluginVersion());
                     saved.put("byUid", r.by != null ? (r.byUid == null ? "" : r.byUid) : MapView.getDeviceUid());
-                    f = RunFile.write(r, saved, card(r), startIcon());
+                    f = RunFile.write(r, saved, card(r), startIcon(), saved.optString("by", ""));
                     named = RunFile.readableCopy(f, title);
                     Log.d(TAG, "run file written: " + f.getName() + ", " + f.length() + " bytes");
                 } catch (Exception e) {
@@ -1633,6 +1649,13 @@ public final class FireModel {
                             m.addFile(named, null);
                             m.setRemarks(card(r));
                             m.getConfiguration().setImportInstructions(true, false, null);
+                            // ATAK sends a package already saved at this path as it is ("Send
+                            // Only"), and the receiver skips one it holds by checksum: the last
+                            // send's copy goes, so this one is built from the run as it is now.
+                            final File old = new File(m.getPath());
+                            if (old.isFile() && !old.delete())
+                                Log.w(TAG, "could not replace the last sent package");
+                            Log.d(TAG, "package at " + m.getPath() + (old.isFile() ? " (still there)" : ""));
                             new com.atakmap.android.importexport.send.SendDialog.Builder(mapView)
                                     .setName(title)
                                     .setIcon(pluginContext.getDrawable(com.atakmap.android.firecast.plugin.R.drawable.ic_toolbar))
@@ -1648,11 +1671,11 @@ public final class FireModel {
         });
     }
 
-    /** The start's icon for the run file, the plugin's own launcher tile; null when it cannot be read. */
+    /** The start's marker for the run file (an orange-red dot in a white ring, 72 px); null when it cannot be read. */
     private byte[] startIcon() {
         try {
             final java.io.InputStream in = pluginContext.getResources().openRawResource(
-                    com.atakmap.android.firecast.plugin.R.drawable.ic_launcher);
+                    com.atakmap.android.firecast.plugin.R.drawable.firecast_start);
             try {
                 final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
                 final byte[] buf = new byte[16384];
@@ -2171,6 +2194,12 @@ public final class FireModel {
             for (Run r : read) {
                 if (r == null)
                     continue;
+                if (r.by != null && ownRun(r.byUid)) {
+                    // This phone's own run, taken back in from its own sent package before
+                    // that was caught (2026-10-17): the original is in the list already.
+                    RunFile.delete(r.runId);
+                    continue;
+                }
                 synchronized (lock) {
                     drawLocked(r);
                 }

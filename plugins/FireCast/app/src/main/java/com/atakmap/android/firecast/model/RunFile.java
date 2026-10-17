@@ -64,15 +64,16 @@ public final class RunFile {
      * @param saved the run's saved form, with who ran it and the engine added
      * @param card  the run's inputs and outputs in plain words
      * @param icon  the start's icon, a PNG, or null for the viewer's own pin
+     * @param by    who ran it, for the descriptions a viewer without Fire Cast reads
      */
-    static File write(FireModel.Run r, JSONObject saved, String card, byte[] icon) throws Exception {
+    static File write(FireModel.Run r, JSONObject saved, String card, byte[] icon, String by) throws Exception {
         final File f = fileFor(r.runId);
         final File tmp = new File(f.getPath() + ".tmp");
         final ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tmp));
         try {
             // The KML first: a KMZ reader takes the first .kml it finds as the document.
             zip.putNextEntry(new ZipEntry(KML_ENTRY));
-            zip.write(kml(r, card, icon != null).getBytes("UTF-8"));
+            zip.write(kml(r, card, icon != null, by).getBytes("UTF-8"));
             zip.closeEntry();
             zip.putNextEntry(new ZipEntry(JSON_ENTRY));
             zip.write(saved.toString().getBytes("UTF-8"));
@@ -209,10 +210,17 @@ public final class RunFile {
     // ---- the KML ----------------------------------------------------------------
 
     static String kml(FireModel.Run r, String card) {
-        return kml(r, card, false);
+        return kml(r, card, false, null);
     }
 
-    static String kml(FireModel.Run r, String card, boolean icon) {
+    /**
+     * What a phone without Fire Cast shows: the rings named by the clock ("By 10:52
+     * (40 min), 131 acres"), each with a short description saying what it is and who
+     * made it, and the start as a small marker of its own. The full card is the
+     * document's description and the data package's remarks.
+     */
+    static String kml(FireModel.Run r, String card, boolean icon, String by) {
+        final String who = by == null || by.isEmpty() ? "" : " by " + by;
         final StringBuilder k = new StringBuilder(64 * 1024);
         k.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
                 .append("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n<Document>\n")
@@ -227,7 +235,7 @@ public final class RunFile {
         k.append("<Style id=\"perimeter\"><LineStyle><color>ffffffff</color><width>2</width></LineStyle>")
                 .append("<PolyStyle><fill>0</fill></PolyStyle></Style>\n");
         if (icon)
-            k.append("<Style id=\"start\"><IconStyle><scale>0.2</scale><Icon><href>").append(ICON_ENTRY)
+            k.append("<Style id=\"start\"><IconStyle><scale>0.6</scale><Icon><href>").append(ICON_ENTRY)
                     .append("</href></Icon></IconStyle></Style>\n");
         // Largest first, the way the map draws them, so the first ring is on top.
         final double tolerance = r.cellM / 2d;
@@ -239,8 +247,15 @@ public final class RunFile {
                 shapes.add(FireModel.ellipse(r, r.steps[i]));
             if (shapes.isEmpty())
                 continue;
-            k.append("<Placemark><name>").append(esc(r.steps[i] + " min, by " + FireModel.stamp(r.ranAt + r.steps[i] * 60000L)))
-                    .append("</name><styleUrl>#step").append(i).append("</styleUrl><MultiGeometry>\n");
+            final String clock = FireModel.stamp(r.ranAt + r.steps[i] * 60000L);
+            final String acres = FireModel.acresText(r.acres(r.steps[i]));
+            k.append("<Placemark><name>").append(esc("By " + clock + " (" + r.steps[i] + " min), " + acres))
+                    .append("</name><description>").append(esc("Fire Cast model run" + who + " at "
+                            + FireModel.stamp(r.ranAt) + ": where the fire is expected to be by " + clock + ", "
+                            + r.steps[i] + " minutes after the run, " + acres + ". A planning-grade estimate from the "
+                            + "fuel, slope and weather it read; the data package's remarks list them. Run again as "
+                            + "conditions change."))
+                    .append("</description><styleUrl>#step").append(i).append("</styleUrl><MultiGeometry>\n");
             for (Polygon p : shapes)
                 polygon(k, p.getExteriorRing(), tolerance);
             k.append("</MultiGeometry></Placemark>\n");
@@ -253,7 +268,9 @@ public final class RunFile {
             coord(k, r.perimeter[0][1], r.perimeter[0][0]);
             k.append("</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>\n");
         }
-        k.append("<Placemark><name>Fire start</name>").append(icon ? "<styleUrl>#start</styleUrl>" : "")
+        k.append("<Placemark><name>").append(esc("Fire start, " + FireModel.stamp(r.ranAt))).append("</name><description>")
+                .append(esc("Where the Fire Cast model run" + who + " at " + FireModel.stamp(r.ranAt) + " started."))
+                .append("</description>").append(icon ? "<styleUrl>#start</styleUrl>" : "")
                 .append("<Point><coordinates>");
         coord(k, r.lon, r.lat);
         k.append("</coordinates></Point></Placemark>\n</Document>\n</kml>\n");
