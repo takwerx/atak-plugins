@@ -146,8 +146,11 @@ public final class BuoyPage {
                     : "No point to measure from yet \u2014 pick one at the top.";
         if (total == 0)
             return "No buoys within " + layer.miles() + " mi.";
+        final String hint = com.atakmap.android.atmosphere.compat.ScaleBar.zoomInHint(
+                com.atakmap.android.maps.MapView.getMapView(), layer.gate());
         return shown.size() + " of " + total + " buoys, nearest first, within "
-                + layer.miles() + " mi of " + layer.originSource().words();
+                + layer.miles() + " mi of " + layer.originSource().words()
+                + (hint.isEmpty() ? "" : "\n" + hint);
     }
 
     private void buildFilterRow(int total, int wind, int waves, int rough, int starred) {
@@ -379,7 +382,7 @@ public final class BuoyPage {
 
         detail.setVisibility(View.VISIBLE);
         list.setVisibility(View.GONE);
-        heading.setVisibility(View.GONE);
+        headingLine().setVisibility(View.GONE);
         filterRow.setVisibility(View.GONE);
         status.setVisibility(View.GONE);
     }
@@ -709,7 +712,7 @@ public final class BuoyPage {
         showing = null;
         detail.setVisibility(View.GONE);
         list.setVisibility(View.VISIBLE);
-        heading.setVisibility(View.VISIBLE);
+        headingLine().setVisibility(View.VISIBLE);
         filterRow.setVisibility(View.VISIBLE);
         status.setVisibility(View.VISIBLE);
     }
@@ -759,5 +762,16 @@ public final class BuoyPage {
         } catch (RuntimeException e) {
             // A pan that will not happen is not worth a crash.
         }
+    }
+
+    /**
+     * The heading, or the line the pane put it on beside the page's map switch: a
+     * record hides them together, rather than leaving the switch alone on a row.
+     */
+    private View headingLine() {
+        final android.view.ViewParent p = heading.getParent();
+        return p instanceof LinearLayout
+                && ((LinearLayout) p).getOrientation() == LinearLayout.HORIZONTAL
+                ? (View) p : heading;
     }
 }

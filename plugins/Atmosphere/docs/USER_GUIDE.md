@@ -1,12 +1,12 @@
 # Atmosphere for ATAK — User Guide
 
-**Version 0.16 · takwerx**
+**Version 0.17 · takwerx**
 
-**Download Atmosphere 0.16** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.17** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -168,7 +168,7 @@ opening the plugin.
 | Fire | Fire Danger | Every Predictive Service Area in the lower 48 shaded by its Energy Release Component, observed yesterday or forecast today; the GACC's ERC chart behind a tap on an area's name |
 | Fire | Fuel Moisture | Every fuel sampling site in the state under the map, a dot colored by its newest sample's moisture (critical, high, moderate, low, on the live-fuel or the timelag class's own breaks) with the fuel and percent in the pill; every fuel sampled there, with dates, behind a tap; 30 days, 90 days or a year back; live fuels, dead fuels or both |
 | Fire | Lightning | NOAA's lightning strike density, the newest 15 minutes, in five bands from under 1 to over 150 strikes in a 5-mile square |
-| Fire | PSPS | California's Public Safety Power Shutoffs from Cal OES: counties warned, power off, power back on |
+| Fire | PSPS | California's Public Safety Power Shutoffs: counties warned, circuits watched, areas shut off, by utility |
 | Fire | Smoke | Forecast smoke at the ground or through the whole sky, with the amount "Here"; the same forecast at every zoom, so the smoke keeps its shape as you zoom |
 | Fire | Air Quality | The EPA's air quality areas and the index "Here" |
 | Rain and rivers | Flash Flood Outlook | Excessive rainfall areas for three days, marginal to high |
@@ -377,14 +377,19 @@ reason to call it safe to be outside.
 
 <img src="screenshots/83_lightning_map.jpg" width="360"> <img src="screenshots/82_lightning_layer_block.png" width="420">
 
-**PSPS** draws California's Public Safety Power Shutoffs as Cal OES reports
-them from PG&E, SCE and SDG&E: a county a utility has warned may have a shutoff
-in amber, where the power is off in red, off because a line feeding it was cut
-in orange, and back on in green. Tap one for its details. The line under the
-switch says what is warned and off and when Cal OES last updated; if Cal OES
-goes quiet for 45 minutes it says the status is unknown rather than none. It
-does not cover PacifiCorp, Liberty, Bear Valley or any other state: ask the
-utility.
+**PSPS** draws California's Public Safety Power Shutoffs: a county a utility
+has warned Cal OES may have a shutoff in amber, a circuit SCE or SDG&E is
+watching for one in orange (**PSPS Watch**), and the areas a utility has shut
+off in red, each named by its utility, such as "PG&E - PSPS". Tap one for its
+circuit, customers out, the shutoff window and when power is expected back.
+From about 10 miles in on the scale bar each area has its own label; farther
+out, nearby areas share one, "SCE - PSPS (23)", and past 150 miles the colors
+stand alone. The line under the switch counts what is warned, watched and shut
+off, by utility, and when it was updated; a source that goes quiet for 45
+minutes is said to be unknown, never none. It comes from Cal OES (PG&E and the
+warned counties), Southern California Edison and San Diego Gas & Electric,
+through takwerx's server. It does not cover PacifiCorp, Liberty, Bear Valley or
+any other state: ask the utility.
 
 <img src="screenshots/85_psps_map.jpg" width="420"> <img src="screenshots/84_psps_layer_block.png" width="420">
 
@@ -577,8 +582,8 @@ Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
   Fire Weather Watches on its fire weather zones. IPAWS Alerts does the rest.
 - Its lightning is a 15-minute density map that arrives 10 to 25 minutes
   late, not single strikes as they happen, and not a lightning safety trigger.
-- Its power shutoffs are California's three big utilities only, as Cal OES
-  reports them; anywhere else, ask the utility.
+- Its power shutoffs are California's three big utilities only, as Cal OES,
+  SCE and SDG&E publish them; anywhere else, ask the utility.
 - Its storm reports are preliminary, as the offices received them, and its
   tornado paths are each office's survey until it finalizes it; its debris-flow
   hazard is the USGS's for one design storm, not a forecast of rain; its

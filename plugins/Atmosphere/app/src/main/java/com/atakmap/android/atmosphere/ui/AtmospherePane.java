@@ -3938,6 +3938,17 @@ public final class AtmospherePane {
      * The station layer. Its controls on this page are not built yet; it is held so
      * the plugin can hand it over once, and turned on from the layer's own toggle.
      */
+    /** Each layer's last count, said again with the zoom hint when the map settles. */
+    private String stationsCount = "", gaugesCount = "", buoysCount = "";
+
+    /** A layer's count, and what its zoom setting hides right now; see {@link ScaleBar#zoomInHint}. */
+    private String withZoomHint(String count, double gate) {
+        if (count.isEmpty())
+            return count;
+        final String hint = ScaleBar.zoomInHint(mapView(), gate);
+        return hint.isEmpty() ? count : count + "\n" + hint;
+    }
+
     public void setStations(StationOverlay overlay) {
         stationLayer = overlay;
         if (overlay != null)
@@ -3956,15 +3967,14 @@ public final class AtmospherePane {
                     int utilityCritical) {
                 // The utility stations are counted apart, and said to be hidden when
                 // the zoom hides them: a count the map does not show reads as a fault.
+                stationsCount = total == 0 ? "" : drawn + " stations, " + critical
+                        + " at criteria" + (utility == 0 ? "" : "\n" + utility
+                                + " utility stations, " + utilityCritical + " at criteria"
+                                + (stationLayer.drawingNow(stationLayer.utilityGate())
+                                        ? "" : ", shown when zoomed in"));
                 if (stationsStatus != null)
                     stationsStatus.setText(total == 0 ? noStationsText()
-                            : drawn + " stations, " + critical + " at criteria"
-                                    + (utility == 0 ? "" : "\n" + utility
-                                            + " utility stations, " + utilityCritical
-                                            + " at criteria"
-                                            + (stationLayer.drawingNow(
-                                                    stationLayer.utilityGate())
-                                                    ? "" : ", shown when zoomed in")));
+                            : withZoomHint(stationsCount, stationLayer.stationGate()));
                 if (stationPage != null)
                     stationPage.refresh();
                 updateLayerControls();
@@ -3992,6 +4002,8 @@ public final class AtmospherePane {
                 // now in the wrong order even though nothing was refetched.
                 if (stationPage != null)
                     stationPage.refresh();
+                if (stationsStatus != null && !stationsCount.isEmpty())
+                    stationsStatus.setText(withZoomHint(stationsCount, stationLayer.stationGate()));
                 updateLayerControls();      // the gate readouts quote the scale bar
             }
         });
@@ -4014,9 +4026,9 @@ public final class AtmospherePane {
 
             @Override
             public void onBuoysDrawn(int drawn, int total, int windy) {
+                buoysCount = total == 0 ? "" : drawn + " buoys, " + windy + " reporting wind";
                 if (buoysStatus != null)
-                    buoysStatus.setText(total == 0 ? "" : drawn + " buoys, " + windy
-                            + " reporting wind");
+                    buoysStatus.setText(withZoomHint(buoysCount, buoyLayer.gate()));
                 if (buoyPage != null)
                     buoyPage.refresh();
                 updateLayerControls();
@@ -4026,6 +4038,8 @@ public final class AtmospherePane {
             public void onOriginMoved() {
                 if (buoyPage != null)
                     buoyPage.refresh();
+                if (buoysStatus != null && !buoysCount.isEmpty())
+                    buoysStatus.setText(withZoomHint(buoysCount, buoyLayer.gate()));
             }
         });
         if (buoyPage != null)
@@ -4047,10 +4061,11 @@ public final class AtmospherePane {
 
             @Override
             public void onGaugesDrawn(int drawn, int total, int flooding) {
+                gaugesCount = total == 0 ? "" : drawn + " gauges, "
+                        + (flooding == 0 ? "none at action stage or above"
+                                : flooding + " at action stage or above");
                 if (gaugesStatus != null)
-                    gaugesStatus.setText(total == 0 ? "" : drawn + " gauges, "
-                            + (flooding == 0 ? "none at action stage or above"
-                                    : flooding + " at action stage or above"));
+                    gaugesStatus.setText(withZoomHint(gaugesCount, gaugeLayer.gate()));
                 if (gaugePage != null)
                     gaugePage.refresh();
                 updateLayerControls();
@@ -4060,6 +4075,8 @@ public final class AtmospherePane {
             public void onOriginMoved() {
                 if (gaugePage != null)
                     gaugePage.refresh();
+                if (gaugesStatus != null && !gaugesCount.isEmpty())
+                    gaugesStatus.setText(withZoomHint(gaugesCount, gaugeLayer.gate()));
             }
         });
         if (gaugePage != null)
@@ -5919,10 +5936,17 @@ public final class AtmospherePane {
     }
 
     /** Layer switches under a view that read ON: every layer toggle says "<Name> ON" or "OFF". */
-    private static int countOn(View v) {
+    /**
+     * How many layers under a view are on: main layer switches only, never a setting
+     * inside a layer's block (operator, 2026-10-15: "the number of layers on should
+     * just track the main layer not sub settings etc."). Counting every button that
+     * read " ON" made a group say "2 ON" with every layer off, from a hidden "Readings
+     * and names ON" and "Utility Stations ON" (signed 0.16, S22).
+     */
+    private int countOn(View v) {
         if (v instanceof Button) {
             final CharSequence t = ((Button) v).getText();
-            return t != null && t.toString().endsWith(" ON") ? 1 : 0;
+            return isLayerSwitch(v) && t != null && t.toString().endsWith(" ON") ? 1 : 0;
         }
         int n = 0;
         if (v instanceof android.view.ViewGroup) {
@@ -5931,6 +5955,22 @@ public final class AtmospherePane {
                 n += countOn(g.getChildAt(i));
         }
         return n;
+    }
+
+    /** The switches named "_toggle" that are a setting inside a layer, not a layer. */
+    private static final java.util.Set<String> SETTING_TOGGLES = new java.util.HashSet<>(
+            java.util.Arrays.asList("stations_guide_toggle", "wind_heat_toggle"));
+
+    /** A layer's own switch: "<layer>_toggle" on the Layers page, so a new layer counts. */
+    private boolean isLayerSwitch(View v) {
+        if (v.getId() == View.NO_ID)
+            return false;
+        try {
+            final String name = pluginContext.getResources().getResourceEntryName(v.getId());
+            return name.endsWith("_toggle") && !SETTING_TOGGLES.contains(name);
+        } catch (android.content.res.Resources.NotFoundException e) {
+            return false;
+        }
     }
 
     /**

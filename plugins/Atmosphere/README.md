@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.16** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.17** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.16/ATAK-Plugin-Atmosphere-0.16--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -112,7 +112,15 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.16, for ATAK-CIV 5.6, 5.7 and 5.8 (0.15 was a 5.8-only build for the pictures). New: rain totals for
+0.17, for ATAK-CIV 5.6, 5.7 and 5.8. New: Public Safety Power Shutoffs from
+takwerx's relay of Cal OES, SCE and SDG&E, after Cal OES put its shutoff areas
+behind a login: areas shut off by utility, the circuits a utility is watching,
+customers out and when power is expected back, with labels that group as the
+map zooms out; Weather Stations, River Gauges, Buoys and the Spot Weather
+Forecast page measure from the point chosen in the pane's top row; each page's
+map switch is a small "Map ON" on its heading line; status lines say when the
+zoom hides a layer; and a group's count is its layers, not their settings.
+0.16 brought rain totals for
 any time on both rain layers: the last 24 hours, 3, 7 or 30 days, since October 1
 or January 1, one day, or the hours before a date and time, such as when a fire
 started; Rain Gauges from the USGS, county flood control, RAWS and airport

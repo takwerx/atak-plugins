@@ -113,6 +113,25 @@ public final class ScaleBar {
         return (mv == null ? 1 : mv.getMapResolution()) * FALLBACK_BAR_PIXELS;
     }
 
+    /**
+     * What a layer's count leaves out at this zoom, for its status line: "Not on the
+     * map at this zoom: zoom in to 16 mi to see them.", or empty when the layer draws.
+     * A gate is a map resolution, meters per pixel; one of 1e12 or more means
+     * "always". A count the map does not show reads as a fault: on the signed 0.16 the
+     * stations status said "253 stations, 2 at criteria" over an empty map, in the
+     * middle of a weather event (operator, 2026-10-15: "can't turn the stations on").
+     */
+    public static String zoomInHint(MapView mv, double gate) {
+        if (!(gate < 1e12) || mv == null)
+            return "";
+        final double res = mv.getMapResolution();
+        if (res <= 0 || gate >= res)
+            return "";
+        final double bar = meters(mv);
+        final double px = bar > 0 ? bar / res : FALLBACK_BAR_PIXELS;
+        return "Not on the map at this zoom: zoom in to " + describe(gate * px) + " to see them.";
+    }
+
     /** Format a bar-width distance the way ATAK would, in the operator's units. */
     public static String describe(double barMeters) {
         try {
