@@ -1,12 +1,12 @@
 # Atmosphere for ATAK — User Guide
 
-**Version 0.17 · takwerx**
+**Version 0.18 · takwerx**
 
-**Download Atmosphere 0.17** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.18** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.17/ATAK-Plugin-Atmosphere-0.17--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.18/ATAK-Plugin-Atmosphere-0.18--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.18/ATAK-Plugin-Atmosphere-0.18--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.18/ATAK-Plugin-Atmosphere-0.18--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -494,8 +494,9 @@ gauges. Where a center has not produced it yet (all of California on October 15,
 2026) its picture is grey; for 7 days the radar estimate for the same 7 days
 fills the grey in, and for longer the status line says so. Before a date and time
 is the radar estimate as it stood at that hour, kept hour by hour by the Iowa
-Environmental Mesonet: the picture is of the hour at or before the time you
-pick, 1, 24, 48 or 72 hours of it. The radar is good at where it rained and the
+Environmental Mesonet and, for the last 45 days, on takwerx's server, where
+Atmosphere gets it: the picture is of the hour at or before the time you pick,
+1, 24, 48 or 72 hours of it, and the calendar starts 45 days back. The radar is good at where it rained and the
 shape of the storm, fair on how much: a sprinkle often shows where a gauge
 caught nothing, and a 1 km square with no rain is left clear, so light rain
 leaves square gaps. Use it for where it rained and a gauge for how much. The
@@ -514,7 +515,10 @@ faulty gauge does; the status line says how many were left off. The gauges
 come from the USGS, the NOAA Regional Climate Centers (airports and observers,
 for runs of days) and the Iowa Environmental Mesonet (the NWS gauge feed the
 forecast offices write their rainfall reports from, and the airports' hourly
-reports). For 3 or 7 days and for the hours before a moment, the USGS, county
+reports), through takwerx's server, which keeps their hours for 45 days.
+Further back, the county and RAWS gauges show whole days, from the day the
+time starts to the day you picked, and the airports are left out; the status
+line says so. For 3 or 7 days and for the hours before a moment, the USGS, county
 and RAWS gauges wait for the map to be zoomed in to about 150 miles across, and
 the status line says so; airports and observers show at any zoom. For a month
 or more only the USGS gauges that keep daily totals show. The map's area and

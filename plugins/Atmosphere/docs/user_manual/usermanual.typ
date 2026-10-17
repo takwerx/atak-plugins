@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.17",
+   plugin-version: "0.18",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -774,6 +774,9 @@ office's report is a table in the same colors, *Most rain first* or *Closest*.
 a moment you pick, such as when a fire started: the gauges exact to the hour,
 the radar picture for the hour at or before it. For 3 or 7 days the USGS and
 county gauges wait for the map to be zoomed in to about 150 miles across.
+The county gauges' hours, the airports and the radar go back 45 days: further
+back the county and RAWS gauges show whole days and the airports are left
+out, and the radar calendar starts 45 days back.
 ]
 
 #tak-slide[
@@ -1152,8 +1155,9 @@ Only what you ask for:
   Reports*, *Tornado Paths* and *Earthquakes*, which are whole national or
   worldwide files; *Debris Flow*, *Rain Totals* and *Rain Gauges* send the
   area the map shows, padded; *Fuel Moisture* sends the two-letter code of the
-  state under the map center, and *Rain Gauges* the codes of the states under
-  the map with the dates, found on this device. The office's rainfall report and the synopsis
+  state under the map center, *Rain Gauges* the codes of the states under
+  the map, and both rain layers the 2-degree squares under it, with the dates,
+  found on this device. The office's rainfall report and the synopsis
   find the office by the half-degree square the point is in, and only while
   NWS is the forecast service.
 - An *address* you type goes to the US Census Bureau, and to ATAK's own
@@ -1163,8 +1167,9 @@ Only what you ask for:
 
 All of it is outbound HTTPS: to the National Weather Service and its centers,
 NOAA and its Regional Climate Centers, the EPA, the USGS, the Forest Service,
-Cal OES, Environment Canada, RainViewer, the avalanche centers and the Iowa
-Environmental Mesonet, and to the one weather service you pick.
+Environment Canada, RainViewer, the avalanche centers and takwerx's own
+server, which relays Cal OES, the utilities and the Iowa Environmental
+Mesonet, and to the one weather service you pick.
 ]
 
 #tak-slide[
