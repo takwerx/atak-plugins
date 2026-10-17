@@ -366,9 +366,14 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
 
         inputs(r);
 
+        final boolean byHour = r.hourly != null && r.hourly.length > 1;
         section("What this does not mean", r.ground != null
-                ? "The fuel and slope are the real ground, cell by cell, but the wind is one reading for the whole "
-                        + "run and the whole hour. Spotting is the longest ember flight, straight downwind, across walls "
+                ? "The fuel and slope are the real ground, cell by cell, but the wind is "
+                        + (r.fieldWind && r.windField != null ? "a 3 km field, too coarse to know a canyon"
+                                : byHour ? "one reading over the whole ground, changing by the hour with the forecast"
+                                : "one reading for the whole run and the whole hour")
+                        + (byHour ? ", and the fuel moisture steps by the hour, not within it" : "")
+                        + ". Spotting is the longest ember flight, straight downwind, across walls "
                         + "narrower than it; no crown fire, no suppression. House-to-house spread is an "
                         + "average over past conflagrations, not this street. Run again as the wind changes."
                 : "One fuel, one slope and one wind for the whole run, read at the start point. Real fire crosses "
@@ -407,6 +412,14 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                     r.m1, r.m10, r.m100, r.mHerb, r.mWoody));
             if (r.moistureNote != null)
                 in.append(' ').append(r.moistureNote);
+            if (r.hourly != null && r.hourly.length > 1) {
+                in.append("\nHour by hour:");
+                for (FireModel.Hour h : r.hourly)
+                    in.append(String.format(Locale.US, "\n%s  %.0f mph from %s, 1 h %.0f%%, 10 h %.0f%%",
+                            clock(h.at), h.windMph, Units.compass(h.windFromDeg), h.m1, h.m10));
+                if (r.hourlyNote != null)
+                    in.append('\n').append(r.hourlyNote);
+            }
         }
         if (r.windFieldNote != null)
             in.append('\n').append(r.windFieldNote);

@@ -91,6 +91,21 @@ public final class FireModel {
         void onModelChanged();
     }
 
+    /** One hour of a run's weather: the wind at the start and the dead fuel moisture, percent. */
+    public static final class Hour {
+        public final long at;
+        public final double windMph, windFromDeg, m1, m10, m100;
+
+        Hour(long at, double windMph, double windFromDeg, double m1, double m10, double m100) {
+            this.at = at;
+            this.windMph = windMph;
+            this.windFromDeg = windFromDeg;
+            this.m1 = m1;
+            this.m10 = m10;
+            this.m100 = m100;
+        }
+    }
+
     /** Everything about one run: where, what went in, what came out. */
     public static final class Run {
         public double lat, lon;
@@ -141,6 +156,14 @@ public final class FireModel {
         /** The HRRR field the run used, or null for one wind. */
         public WindField windField;
         public String windFieldNote;
+        /** Whether the run's wind came from that field, cell by cell. */
+        public boolean fieldWind;
+        /** The NWS forecast for the start at each hour of the run; not saved, the hours below are. */
+        public Weather.Reading[] forecast;
+        /** The run's weather hour by hour; the first is what went in. Null for runs saved before it existed. */
+        public Hour[] hourly;
+        /** Where the later hours came from, in words. */
+        public String hourlyNote;
 
         /** The grid's reach each way from the start, km. */
         public double halfKm = HALF_KM;
@@ -749,10 +772,14 @@ public final class FireModel {
                     } catch (Exception e) {
                         Log.w(TAG, "NWS stations failed", e);
                     }
+                    final int hoursN = Math.max(1, (r.steps[r.steps.length - 1] + 59) / 60);
                     try {
-                        final Weather.Reading fc = Weather.forecastAt(lat, lon, r.ranAt);
-                        if (fc != null)
-                            r.stations.add(0, fc);
+                        final long[] times = new long[hoursN];
+                        for (int h = 0; h < hoursN; h++)
+                            times[h] = r.ranAt + h * 3_600_000L;
+                        r.forecast = Weather.forecastAt(lat, lon, times);
+                        if (r.forecast[0] != null)
+                            r.stations.add(0, r.forecast[0]);
                     } catch (Exception e) {
                         Log.w(TAG, "NWS forecast grid failed", e);
                     }
@@ -760,7 +787,7 @@ public final class FireModel {
                         // The 3 km wind field over the run's box, this hour and the next.
                         final double dLat = r.halfKm * 1000d / 111320d;
                         final double dLon = r.halfKm * 1000d / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(lat))));
-                        r.windField = WindField.fetch(lat - dLat, lon - dLon, lat + dLat, lon + dLon, r.ranAt);
+                        r.windField = WindField.fetch(lat - dLat, lon - dLon, lat + dLat, lon + dLon, r.ranAt, hoursN + 1);
                         final double[] w = r.windField.at(lat, lon, r.ranAt);
                         if (w != null)
                             r.stations.add(0, new Weather.Reading("HRRR", "HRRR", "HRRR 3 km wind field, this hour",
@@ -847,6 +874,7 @@ public final class FireModel {
         // The weather reading the moisture and the wind are read from.
         Weather.Reading w = r.weather;
         final boolean fieldWind = w != null && "HRRR".equals(w.source) && r.windField != null;
+        r.fieldWind = fieldWind;
         if (fieldWind) {
             // The field gives wind only; humidity, temperature and the stick come from
             // the forecast grid or the best station, whichever is there.
@@ -893,6 +921,7 @@ public final class FireModel {
             r.windFromDeg = 0;
             r.windNote = "no station with a wind reading within 50 mi; run with no wind";
         }
+        hourly(r);
         r.canopyHeightFt = r.site.coverPct >= 10 ? 30 : 0;
         r.crownRatio = r.site.coverPct >= 10 ? 0.5 : 0;
         r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
@@ -989,6 +1018,79 @@ public final class FireModel {
         r.moistureNote = note.toString();
     }
 
+    /**
+     * The run's weather hour by hour. The first hour is what went in. Each later hour
+     * carries the forecast's change since the first onto it, so a station reading 25 mph
+     * where the forecast said 15 stays 10 above the forecast as it changes: the station's
+     * own fuel moisture forecast for the dead fuel, the NWS forecast for this spot for the
+     * wind (and for the fine fuel when there is no station), the wind field where it is
+     * the run's wind. A preset holds through the run.
+     */
+    private static void hourly(Run r) {
+        final int n = Math.max(1, (r.steps[r.steps.length - 1] + 59) / 60);
+        r.hourly = new Hour[n];
+        r.hourly[0] = new Hour(r.ranAt, r.windMph, r.windFromDeg, r.m1, r.m10, r.m100);
+        r.hourlyNote = null;
+        if (n == 1)
+            return;
+        final boolean dry = COND_DRY.equals(r.conditions) || COND_DRY_WINDY.equals(r.conditions);
+        final boolean windy = COND_DRY_WINDY.equals(r.conditions), gust = COND_GUST.equals(r.conditions);
+        final FuelMoisture.Hour d0 = r.dead == null ? null : r.dead.at(r.ranAt);
+        final Weather.Reading f0 = r.forecast == null ? null : r.forecast[0];
+        String windFrom = null, wetFrom = null;
+        for (int h = 1; h < n; h++) {
+            final long at = r.ranAt + h * 3_600_000L;
+            final Weather.Reading fh = r.forecast == null || h >= r.forecast.length ? null : r.forecast[h];
+            double mph = r.windMph, from = r.windFromDeg;
+            if (r.fieldWind && !windy && r.windField != null) {
+                final double[] fw = r.windField.at(r.lat, r.lon, at);
+                if (fw != null) {
+                    mph = fw[0];
+                    from = fw[1];
+                    windFrom = "the 3 km wind field";
+                }
+            } else if (!windy && f0 != null && fh != null && f0.hasWind() && fh.hasWind()) {
+                final double s0 = gust && !Double.isNaN(f0.gustMph) ? f0.gustMph : f0.windMph;
+                final double sh = gust && !Double.isNaN(fh.gustMph) ? fh.gustMph : fh.windMph;
+                // The forecast is a 10 m wind; a RAWS reads at 20 ft, about 0.87 of it.
+                final double k = r.tenMeterWind ? 1d : 0.87d;
+                mph = Math.max(0, r.windMph + (sh - s0) * k);
+                from = (r.windFromDeg + (((fh.windFromDeg - f0.windFromDeg) % 360 + 540) % 360 - 180) + 360) % 360;
+                windFrom = "the NWS forecast for this spot";
+            }
+            double m1 = r.m1, m10 = r.m10, m100 = r.m100;
+            if (!dry) {
+                final FuelMoisture.Hour dh = r.dead == null ? null : r.dead.at(at);
+                if (d0 != null && dh != null) {
+                    m1 += dh.m1 - d0.m1;
+                    m10 += dh.m10 - d0.m10;
+                    m100 += dh.m100 - d0.m100;
+                    wetFrom = r.dead.station.name + "'s fuel moisture forecast";
+                } else if (f0 != null && fh != null) {
+                    final double e0 = Weather.fineFuelMoisture(f0.relativeHumidity, f0.airTempF);
+                    final double eh = Weather.fineFuelMoisture(fh.relativeHumidity, fh.airTempF);
+                    if (!Double.isNaN(e0) && !Double.isNaN(eh)) {
+                        // The 1 h follows the air within the hour; the 10 h a tenth of the way an hour.
+                        m1 += eh - e0;
+                        m10 += (eh - e0) * (1 - Math.exp(-h / 10d));
+                        wetFrom = "the forecast humidity and temperature";
+                    }
+                }
+                m1 = Math.max(1, Math.min(60, m1));
+                m10 = Math.max(1, Math.min(60, m10));
+                m100 = Math.max(1, Math.min(60, m100));
+            }
+            r.hourly[h] = new Hour(at, mph, from, m1, m10, m100);
+        }
+        r.hourlyNote = "Later hours: the wind " + (windy ? "held at the preset" : windFrom == null
+                ? "held as read (no forecast reached)" : "follows " + windFrom) + "; the dead fuel "
+                + (dry ? "held at the preset" : wetFrom == null ? "held as read" : "follows " + wetFrom) + ".";
+    }
+
+    private static double moist(double m) {
+        return Double.isNaN(m) ? 5 : Math.max(1, Math.min(60, m));
+    }
+
     /** "chamise measured at Quigley Canyon, 4.2 mi away, 17 days ago." */
     private static String measured(FuelMoisture.Sample s) {
         final long days = Math.max(0, (System.currentTimeMillis() - s.sampledAt) / 86_400_000L);
@@ -1049,16 +1151,20 @@ public final class FireModel {
             return;
         }
         final long t0 = System.currentTimeMillis();
-        final boolean useField = r.windField != null && r.weather != null && "HRRR".equals(r.weather.source)
-                && !COND_DRY_WINDY.equals(r.conditions);
+        final boolean useField = r.windField != null && r.fieldWind && !COND_DRY_WINDY.equals(r.conditions);
         final Spread.Behavior behavior = new Spread.Behavior() {
                     @Override
-                    public double[] run(int fuelModel, double slopeDeg, double aspectDeg, double windMph, double windFrom) {
+                    public double[] run(int fuelModel, double slopeDeg, double aspectDeg, double windMph, double windFrom, int hour) {
                         final double cover = r.site.coverPct;
+                        final Hour hr = r.hourly == null || r.hourly.length == 0 ? null
+                                : r.hourly[Math.max(0, Math.min(r.hourly.length - 1, hour))];
                         final boolean own = Double.isNaN(windMph);
-                        final double mph = own ? r.windMph : windMph, from = own ? r.windFromDeg : windFrom;
+                        final double mph = own ? (hr == null ? r.windMph : hr.windMph) : windMph;
+                        final double from = own ? (hr == null ? r.windFromDeg : hr.windFromDeg) : windFrom;
                         final boolean tenM = own ? r.tenMeterWind : true;
-                        final Behave.Result b = Behave.surface(fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
+                        final double m1 = hr == null ? r.m1 : hr.m1, m10 = hr == null ? r.m10 : hr.m10,
+                                m100 = hr == null ? r.m100 : hr.m100;
+                        final Behave.Result b = Behave.surface(fuelModel, m1, m10, m100, r.mHerb, r.mWoody,
                                 mph, tenM, from, slopeDeg, aspectDeg,
                                 cover, r.canopyHeightFt, r.crownRatio);
                         if (b == null)
@@ -1102,7 +1208,7 @@ public final class FireModel {
             }
         };
         final Spread.Result g = Spread.run(land, r.lat, r.lon, r.halfKm, r.steps[r.steps.length - 1],
-                behavior, r.perimeter, r.rateScale, field, r.ranAt, r.cellM);
+                behavior, r.perimeter, r.rateScale, field, r.ranAt, r.cellM, r.hourly == null ? 1 : r.hourly.length);
         Log.d(TAG, "ground run: " + g.cellsSeen + " cells reached of " + g.cellsBurnable + " burnable, "
                 + g.fuelsCrossed + " fuels, " + (System.currentTimeMillis() - t0) + " ms");
         if (g.cellsSeen < 2) {
@@ -1642,6 +1748,18 @@ public final class FireModel {
                 o.put("bArrival", ba).put("bHome", bh).put("bPeople", bp);
             }
             o.put("atMinutes", r.atMinutes);
+            if (r.hourly != null) {
+                final org.json.JSONArray hs = new org.json.JSONArray();
+                for (Hour h : r.hourly)
+                    hs.put(new org.json.JSONArray().put(h.at).put(h.windMph).put(h.windFromDeg)
+                            .put(h.m1).put(h.m10).put(h.m100));
+                o.put("hourly", hs);
+                if (r.hourlyNote != null)
+                    o.put("hourlyNote", r.hourlyNote);
+            }
+            o.put("fieldWind", r.fieldWind);
+            if (r.windField != null)
+                o.put("fieldRun", r.windField.run).put("fieldHour", r.windField.firstHour).put("fieldHours", r.windField.size());
             final org.json.JSONArray cr = new org.json.JSONArray();
             for (Object[] c : r.critical)
                 cr.put(new org.json.JSONArray().put(c[0]).put(c[1]).put(c[2]).put(c[3]));
@@ -1716,7 +1834,10 @@ public final class FireModel {
             r.mHerb = o.optDouble("mHerb", 30);
             r.mWoody = o.optDouble("mWoody", 60);
             r.windMph = o.optDouble("windMph", 0);
-            r.windFromDeg = o.optDouble("windFromDeg", 0);
+            // behave walks a direction down by 360 at a time; a huge one from a damaged file would never finish.
+            r.windFromDeg = (o.optDouble("windFromDeg", 0) % 360 + 360) % 360;
+            if (Double.isNaN(r.windFromDeg))
+                r.windFromDeg = 0;
             r.windNote = o.optString("windNote", "");
             r.tenMeterWind = o.optBoolean("tenMeterWind", false);
             r.moistureNote = o.optString("moistureNote", "");
@@ -1736,6 +1857,34 @@ public final class FireModel {
             r.rateScale = o.optDouble("rateScale", 1);
             r.calibrationNote = o.optString("calibrationNote", null);
             r.atMinutes = Math.max(0, Math.min(r.steps[r.steps.length - 1], o.optInt("atMinutes", 0)));
+            final org.json.JSONArray hs = o.optJSONArray("hourly");
+            if (hs != null && hs.length() > 0 && hs.length() <= 6) {
+                final Hour[] hours = new Hour[hs.length()];
+                for (int i = 0; i < hs.length(); i++) {
+                    final org.json.JSONArray h = hs.optJSONArray(i);
+                    if (h == null || h.length() < 6) {
+                        hours[0] = null;
+                        break;
+                    }
+                    // Back into the ranges the engine is given on a fresh run.
+                    hours[i] = new Hour(h.optLong(0), Math.max(0, Math.min(150, h.optDouble(1, 0))),
+                            (h.optDouble(2, 0) % 360 + 360) % 360, moist(h.optDouble(3, 4)), moist(h.optDouble(4, 5)),
+                            moist(h.optDouble(5, 7)));
+                }
+                if (hours[0] != null)
+                    r.hourly = hours;
+                r.hourlyNote = o.optString("hourlyNote", null);
+            }
+            r.fieldWind = o.optBoolean("fieldWind", false);
+            if (r.fieldWind && o.has("fieldRun")) {
+                // From disk only: a run coming back at start must not wait on the network.
+                final double dLat = r.halfKm * 1000d / 111320d;
+                final double dLon = r.halfKm * 1000d / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(r.lat))));
+                r.windField = WindField.fromDisk(r.lat - dLat, r.lon - dLon, r.lat + dLat, r.lon + dLon,
+                        o.optLong("fieldRun"), o.optInt("fieldHour"), o.optInt("fieldHours", 2));
+                if (r.windField == null)
+                    r.windFieldNote = "The wind field this run used is no longer on the phone; it is redrawn with one wind.";
+            }
 
             final org.json.JSONArray pa = o.optJSONArray("perimeter");
             if (pa != null && pa.length() >= 3) {

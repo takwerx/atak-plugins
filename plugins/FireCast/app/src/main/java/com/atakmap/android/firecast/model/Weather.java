@@ -159,16 +159,28 @@ public final class Weather {
      * is used, which the engine scales. Worker thread; null when the grid has no wind.
      */
     public static Reading forecastAt(double lat, double lon, long whenMillis) throws Exception {
+        return forecastAt(lat, lon, new long[] { whenMillis })[0];
+    }
+
+    /** The forecast grid at a point at several moments, from one fetch; an entry is null where the grid has no wind. */
+    public static Reading[] forecastAt(double lat, double lon, long[] when) throws Exception {
+        final Reading[] out = new Reading[when.length];
         final JSONObject pt = new JSONObject(Esri.get(String.format(Locale.US,
                 "https://api.weather.gov/points/%.4f,%.4f", lat, lon))).optJSONObject("properties");
         if (pt == null)
-            return null;
+            return out;
         final String gridUrl = pt.optString("forecastGridData", "");
         if (!gridUrl.startsWith("https://api.weather.gov/gridpoints/"))
-            return null;
+            return out;
         final JSONObject g = new JSONObject(Esri.get(gridUrl)).optJSONObject("properties");
         if (g == null)
-            return null;
+            return out;
+        for (int i = 0; i < when.length; i++)
+            out[i] = gridAt(g, lat, lon, when[i]);
+        return out;
+    }
+
+    private static Reading gridAt(JSONObject g, double lat, double lon, long whenMillis) {
         final double windKmh = seriesAt(g, "windSpeed", whenMillis), dir = seriesAt(g, "windDirection", whenMillis);
         final double gustKmh = seriesAt(g, "windGust", whenMillis), rh = seriesAt(g, "relativeHumidity", whenMillis);
         final double tempC = seriesAt(g, "temperature", whenMillis);

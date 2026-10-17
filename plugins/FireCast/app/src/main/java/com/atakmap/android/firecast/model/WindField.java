@@ -14,7 +14,7 @@ import java.net.URL;
 import java.util.Locale;
 
 /**
- * The HRRR 3 km wind over the run's box for the run hour and the next, from NOMADS's
+ * The HRRR 3 km wind over the run's box for every hour of the run, from NOMADS's
  * grib filter, decoded on the phone with the reader copied forward from Atmosphere
  * (387 bytes for an 8 km box, measured 2026-10-12). Sampled per cell and per time as
  * the fire reaches each cell, so a run carries the wind's turn with the terrain and
@@ -26,15 +26,25 @@ public final class WindField {
     private static final String TAG = "FireCast";
     private final WindGrid[] hours;
     private final long[] validAt;
+    /** The HRRR run the field came from and its first forecast hour, so a saved run can find the files again. */
+    public final long run;
+    public final int firstHour;
 
-    private WindField(WindGrid[] hours, long[] validAt) {
+    private WindField(WindGrid[] hours, long[] validAt, long run, int firstHour) {
         this.hours = hours;
         this.validAt = validAt;
+        this.run = run;
+        this.firstHour = firstHour;
     }
 
     /** Which run and forecast hours this field holds, for the page. */
     public String describe() {
         return "HRRR 3 km, " + hours.length + " hourly fields";
+    }
+
+    /** How many hourly fields it holds. */
+    public int size() {
+        return hours.length;
     }
 
     /**
@@ -73,48 +83,93 @@ public final class WindField {
     }
 
     /**
-     * The field over a box for the hour containing {@code when} and the hour after.
-     * Worker thread. Throws when NOMADS does not answer and nothing is on disk.
+     * The field over a box for the hour containing {@code when} and the {@code count - 1}
+     * hours after it. Worker thread. Throws when NOMADS does not answer and nothing is on
+     * disk. A later hour that is missing ends the field there; the first must be had.
      */
-    public static WindField fetch(double south, double west, double north, double east, long when) throws Exception {
+    public static WindField fetch(double south, double west, double north, double east, long when, int count) throws Exception {
         final NomadsWind.Model m = NomadsWind.Model.HRRR;
         long run = m.latestRun(when);
-        final File dir = FileSystemUtils.getItem("tools/firecast/wind");
-        if (!dir.isDirectory() && !dir.mkdirs())
-            Log.w(TAG, "could not create " + dir);
-        final WindGrid[] grids = new WindGrid[2];
-        final long[] valid = new long[2];
-        for (int attempt = 0; attempt < 2 && grids[0] == null; attempt++) {
+        final File dir = dir();
+        count = Math.max(1, Math.min(6, count));
+        for (int attempt = 0; attempt < 2; attempt++) {
             final long hour0 = (when / 3_600_000L) * 3_600_000L;
             final int fh0 = (int) ((hour0 - run) / 3_600_000L);
-            if (fh0 < 0 || fh0 + 1 > m.forecastHours(run)) {
+            if (fh0 < 0 || fh0 + count - 1 > m.forecastHours(run)) {
                 run = m.previousRun(run);
                 continue;
             }
+            final java.util.List<WindGrid> grids = new java.util.ArrayList<>();
+            final java.util.List<Long> valid = new java.util.ArrayList<>();
             try {
-                for (int k = 0; k < 2; k++) {
+                for (int k = 0; k < count; k++) {
                     final int fh = fh0 + k;
-                    final File f = new File(dir, String.format(Locale.US, "hrrr_%d_%02d_%.2f_%.2f.grib2", run / 3_600_000L, fh, south, west));
+                    final File f = file(dir, run, fh, south, west);
                     byte[] body = f.isFile() ? readAll(f) : null;
                     if (body == null || !NomadsWind.looksLikeGrib(body)) {
-                        body = get(NomadsWind.url(m, run, fh, west - 0.05, south - 0.05, east + 0.05, north + 0.05));
-                        if (!NomadsWind.looksLikeGrib(body))
-                            throw new IllegalStateException("NOMADS has no HRRR file for that hour yet");
+                        try {
+                            body = get(NomadsWind.url(m, run, fh, west - 0.05, south - 0.05, east + 0.05, north + 0.05));
+                        } catch (Exception e) {
+                            if (k == 0)
+                                throw e;
+                            break;
+                        }
+                        if (!NomadsWind.looksLikeGrib(body)) {
+                            if (k == 0)
+                                throw new IllegalStateException("NOMADS has no HRRR file for that hour yet");
+                            break;
+                        }
                         write(f, body);
                     }
-                    grids[k] = NomadsWind.read(body, 24);
-                    valid[k] = run + fh * 3_600_000L;
+                    grids.add(NomadsWind.read(body, 24));
+                    valid.add(run + fh * 3_600_000L);
                 }
+                return make(grids, valid, run, fh0);
             } catch (Exception e) {
                 Log.w(TAG, "HRRR run " + (run / 3_600_000L) + " not usable: " + e);
-                grids[0] = null;
                 run = m.previousRun(run);
             }
         }
-        if (grids[0] == null)
-            throw new IllegalStateException("no HRRR wind for this hour");
-        return grids[1] == null ? new WindField(new WindGrid[] { grids[0] }, new long[] { valid[0] })
-                : new WindField(grids, valid);
+        throw new IllegalStateException("no HRRR wind for this hour");
+    }
+
+    /** A field fetched before, from disk only: a restored run must not wait on the network. Null when the files are gone. */
+    public static WindField fromDisk(double south, double west, double north, double east, long run, int fh0, int count) {
+        final java.util.List<WindGrid> grids = new java.util.ArrayList<>();
+        final java.util.List<Long> valid = new java.util.ArrayList<>();
+        try {
+            for (int k = 0; k < Math.max(1, Math.min(6, count)); k++) {
+                final File f = file(dir(), run, fh0 + k, south, west);
+                if (!f.isFile())
+                    break;
+                final byte[] body = readAll(f);
+                if (!NomadsWind.looksLikeGrib(body))
+                    break;
+                grids.add(NomadsWind.read(body, 24));
+                valid.add(run + (fh0 + k) * 3_600_000L);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "HRRR field from disk failed: " + e);
+        }
+        return grids.isEmpty() ? null : make(grids, valid, run, fh0);
+    }
+
+    private static WindField make(java.util.List<WindGrid> grids, java.util.List<Long> valid, long run, int fh0) {
+        final long[] v = new long[valid.size()];
+        for (int i = 0; i < v.length; i++)
+            v[i] = valid.get(i);
+        return new WindField(grids.toArray(new WindGrid[0]), v, run, fh0);
+    }
+
+    private static File file(File dir, long run, int fh, double south, double west) {
+        return new File(dir, String.format(Locale.US, "hrrr_%d_%02d_%.2f_%.2f.grib2", run / 3_600_000L, fh, south, west));
+    }
+
+    private static File dir() {
+        final File dir = FileSystemUtils.getItem("tools/firecast/wind");
+        if (!dir.isDirectory() && !dir.mkdirs())
+            Log.w(TAG, "could not create " + dir);
+        return dir;
     }
 
     private static byte[] get(String url) throws Exception {
