@@ -103,6 +103,12 @@ public final class FireModel {
         public double startElevFt = Double.NaN;
         /** The moistures used, percent: 1 h, 10 h, 100 h, live herb, live woody. */
         public double m1, m10, m100, mHerb, mWoody;
+        /** The fire danger station's hours around the run, or null; not saved, the moistures above are. */
+        public FuelMoisture.Dead dead;
+        /** The nearest measured brush, grass and needles; not saved. */
+        public FuelMoisture.Live live;
+        /** {10 h, 100 h} from the 10 km grid when no station answered, else null. */
+        public double[] moistureGrid;
         public double windMph, windFromDeg;
         public boolean tenMeterWind;
         public String windNote;
@@ -758,6 +764,24 @@ public final class FireModel {
                     } catch (Exception e) {
                         Log.w(TAG, "RAWS failed", e);
                     }
+                    // Fuel moisture: the nearest fire danger station's hours (the RAWS the
+                    // weather came from, when it is one), and the nearest measured brush,
+                    // grass and needles.
+                    try {
+                        r.dead = FuelMoisture.dead(lat, lon, r.startElevFt,
+                                r.weather != null && "RAWS".equals(r.weather.source) ? r.weather.station : null, r.ranAt);
+                    } catch (Exception e) {
+                        Log.w(TAG, "fuel moisture stations failed: " + e);
+                    }
+                    if (r.dead == null)
+                        r.moistureGrid = FuelMoisture.grid(lat, lon);
+                    r.live = FuelMoisture.live(lat, lon, r.ranAt);
+                    Log.d(TAG, "moisture: station " + (r.dead == null ? "none" : r.dead.station.name + " "
+                            + Math.round(r.dead.station.distanceM) + " m, " + r.dead.hours.size() + " hours")
+                            + (r.moistureGrid != null ? ", grid " + r.moistureGrid[0] + "/" + r.moistureGrid[1] : "")
+                            + ", brush " + (r.live.brush == null ? "none" : r.live.brush.value + " " + r.live.brush.site)
+                            + ", grass " + (r.live.grass == null ? "none" : r.live.grass.value + " " + r.live.grass.site)
+                            + ", needles " + (r.live.needles == null ? "none" : r.live.needles.value + " " + r.live.needles.site));
                     compute(r);
                     if (r.problem == null)
                         acrossTheGround(r);
@@ -797,8 +821,7 @@ public final class FireModel {
         } else {
             r.fuelName = Behave.name(r.site.fuelModel);
         }
-        // Fuel moisture: the nearest station's 10-hour stick when it has one, dry fall
-        // defaults when it does not. Live fuels at cured-season values.
+        // The weather reading the moisture and the wind are read from.
         Weather.Reading w = r.weather;
         final boolean fieldWind = w != null && "HRRR".equals(w.source) && r.windField != null;
         if (fieldWind) {
@@ -818,30 +841,7 @@ public final class FireModel {
             if (other != null)
                 w = other;
         }
-        final boolean dry = COND_DRY.equals(r.conditions) || COND_DRY_WINDY.equals(r.conditions);
-        if (dry) {
-            r.m1 = 4;
-            r.m10 = 5;
-            r.m100 = 7;
-            r.moistureNote = "Dry day preset.";
-        } else if (w != null && !Double.isNaN(w.fuelMoisture) && w.fuelMoisture > 0 && w.fuelMoisture < 40) {
-            r.m10 = w.fuelMoisture;
-            r.m1 = Math.max(2, w.fuelMoisture - 1);
-            r.m100 = w.fuelMoisture + 2;
-            r.moistureNote = "The 10 h is the station's fuel stick.";
-        } else if (w != null && !Double.isNaN(Weather.fineFuelMoisture(w.relativeHumidity, w.airTempF))) {
-            r.m1 = Weather.fineFuelMoisture(w.relativeHumidity, w.airTempF);
-            r.m10 = r.m1 + 1;
-            r.m100 = r.m1 + 3;
-            r.moistureNote = "The 1 h is estimated from the station's humidity and temperature; it has no fuel stick.";
-        } else {
-            r.m1 = 4;
-            r.m10 = 5;
-            r.m100 = 7;
-            r.moistureNote = "Dry-season defaults; no station reading to go on.";
-        }
-        r.mHerb = 30;
-        r.mWoody = 60;
+        moisture(r, w);
         if (fieldWind && !COND_DRY_WINDY.equals(r.conditions)) {
             r.windMph = r.weather.windMph;
             r.windFromDeg = r.weather.windFromDeg;
@@ -878,18 +878,119 @@ public final class FireModel {
         finish(r);
     }
 
+    /**
+     * The five moistures and where each came from, in words. Dead fuel from the fire
+     * danger station when one answered; its 1 h only when the station is within 25 km
+     * and 1,500 ft of the start, since fine fuel follows the air it sits in within the
+     * hour and the run's own weather reading is then the nearer one. Live fuel from the
+     * nearest measurement, else the station's seasonal figure, else dry-season defaults.
+     */
+    private static void moisture(Run r, Weather.Reading w) {
+        final StringBuilder note = new StringBuilder();
+        final boolean dry = COND_DRY.equals(r.conditions) || COND_DRY_WINDY.equals(r.conditions);
+        final FuelMoisture.Hour h = r.dead == null ? null : r.dead.at(r.ranAt);
+        final double emc = w == null ? Double.NaN : Weather.fineFuelMoisture(w.relativeHumidity, w.airTempF);
+        if (dry) {
+            r.m1 = 4;
+            r.m10 = 5;
+            r.m100 = 7;
+            note.append("Dead fuel: dry day preset.");
+        } else if (h != null) {
+            final FuelMoisture.Station s = r.dead.station;
+            final boolean near = s.distanceM <= 25_000 && (Double.isNaN(r.startElevFt) || s.elevFt <= 0
+                    || Math.abs(s.elevFt - r.startElevFt) <= 1500);
+            r.m10 = h.m10;
+            r.m100 = h.m100;
+            note.append("Dead fuel is the Forest Service's figure for the ").append(s.name).append(" station, ")
+                    .append(Units.format(s.distanceM)).append(" away").append(heightNote(r, s.elevFt))
+                    .append(h.observed ? ", from its " + stamp(h.at) + " reading." : ", forecast for " + stamp(h.at) + ".");
+            if (near || Double.isNaN(emc)) {
+                r.m1 = h.m1;
+            } else {
+                r.m1 = emc;
+                note.append(" The 1 h is worked out from the humidity and temperature at ").append(w.station)
+                        .append(", which sits nearer the fire.");
+            }
+        } else if (r.moistureGrid != null) {
+            r.m10 = r.moistureGrid[0];
+            r.m100 = r.moistureGrid[1];
+            r.m1 = Double.isNaN(emc) ? Math.max(2, r.m10 - 1) : emc;
+            note.append("No fire danger station answered; the 10 h and 100 h are today's driest from the Forest "
+                    + "Service's grid of ").append(Units.format(11_000)).append(" squares")
+                    .append(Double.isNaN(emc) ? ", and the 1 h is a point under the 10 h."
+                            : ", and the 1 h is worked out from the humidity and temperature at " + w.station + ".");
+        } else if (w != null && !Double.isNaN(w.fuelMoisture) && w.fuelMoisture > 0 && w.fuelMoisture < 40) {
+            r.m10 = w.fuelMoisture;
+            r.m1 = Math.max(2, w.fuelMoisture - 1);
+            r.m100 = w.fuelMoisture + 2;
+            note.append("No fire danger station answered; the 10 h is ").append(w.station).append("'s fuel stick.");
+        } else if (!Double.isNaN(emc)) {
+            r.m1 = emc;
+            r.m10 = r.m1 + 1;
+            r.m100 = r.m1 + 3;
+            note.append("No fire danger station answered; the 1 h is worked out from the humidity and temperature at ")
+                    .append(w.station).append(", and the 10 h and 100 h are set just above it.");
+        } else {
+            r.m1 = 4;
+            r.m10 = 5;
+            r.m100 = 7;
+            note.append("Dead fuel: dry-season defaults; no station reading to go on.");
+        }
+
+        final FuelMoisture.Live live = r.live;
+        final String reach = Units.format(FuelMoisture.REACH_M);
+        if (live != null && live.brush != null) {
+            r.mWoody = live.brush.value;
+            note.append(String.format(Locale.US, " Live brush %.0f%%: ", r.mWoody)).append(measured(live.brush));
+        } else if (h != null && !Double.isNaN(h.woody)) {
+            r.mWoody = h.woody;
+            note.append(String.format(Locale.US, " Live brush %.0f%%: the seasonal figure at %s; none measured within %s "
+                    + "in the last 45 days.", r.mWoody, r.dead.station.name, reach));
+        } else {
+            r.mWoody = 60;
+            note.append(String.format(Locale.US, " Live brush 60%%: dry-season default; none measured within %s in the "
+                    + "last 45 days.", reach));
+        }
+        if (live != null && live.grass != null) {
+            r.mHerb = live.grass.value;
+            note.append(String.format(Locale.US, " Live grass %.0f%%%s: ", r.mHerb, r.mHerb <= 30 ? " (cured)" : ""))
+                    .append(measured(live.grass));
+        } else if (h != null && !Double.isNaN(h.herb)) {
+            r.mHerb = h.herb;
+            note.append(String.format(Locale.US, " Live grass %.0f%%%s: the seasonal figure at %s.", r.mHerb,
+                    r.mHerb <= 30 ? " (cured)" : "", r.dead.station.name));
+        } else {
+            r.mHerb = 30;
+            note.append(" Live grass 30% (cured): dry-season default.");
+        }
+        r.moistureNote = note.toString();
+    }
+
+    /** "chamise measured at Quigley Canyon, 4.2 mi away, 17 days ago." */
+    private static String measured(FuelMoisture.Sample s) {
+        final long days = Math.max(0, (System.currentTimeMillis() - s.sampledAt) / 86_400_000L);
+        return s.what + " measured at " + s.site + ", " + Units.format(s.distanceM) + " away, "
+                + (days == 0 ? "today" : days == 1 ? "yesterday" : days + " days ago")
+                + (s.kinds > 1 ? ", the driest of " + s.kinds + " plants sampled there." : ".");
+    }
+
+    /** ", 2,100 ft above the start" for a height in feet far from the start's; "" otherwise. */
+    static String heightNote(Run r, int elevFt) {
+        if (Double.isNaN(r.startElevFt) || elevFt <= 0)
+            return "";
+        final double d = elevFt - r.startElevFt;
+        if (Math.abs(d) < 300)
+            return "";
+        return String.format(Locale.US, ", %,.0f ft %s the start", Math.abs(d), d > 0 ? "above" : "below");
+    }
+
     static String acresText(double a) {
         return a < 10 ? String.format(Locale.US, "%.1f acres", a) : String.format(Locale.US, "%,.0f acres", a);
     }
 
     /** ", 2,100 ft above the start" when the station's height is far from the start's; "" otherwise. */
     static String heightNote(Run r, Weather.Reading w) {
-        if (w == null || Double.isNaN(r.startElevFt) || w.elevationFt <= 0)
-            return "";
-        final double d = w.elevationFt - r.startElevFt;
-        if (Math.abs(d) < 300)
-            return "";
-        return String.format(Locale.US, ", %,.0f ft %s the start", Math.abs(d), d > 0 ? "above" : "below");
+        return w == null ? "" : heightNote(r, w.elevationFt);
     }
 
     /**

@@ -258,12 +258,19 @@ public final class Esri {
     private static final int MAX_CHARS = 32 << 20;
 
     public static String get(String url) throws Exception {
+        return get(url, new String[0]);
+    }
+
+    /** The same GET with more request headers, name and value in turn, for a service that asks for them. */
+    public static String get(String url, String... headers) throws Exception {
         if (!url.startsWith("https://"))
             throw new IllegalStateException("not https: " + hostOf(url));
         final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(20000);
         c.setReadTimeout(60000);
         c.setRequestProperty("User-Agent", "FireCast (ATAK plugin)");
+        for (int i = 0; i + 1 < headers.length; i += 2)
+            c.setRequestProperty(headers[i], headers[i + 1]);
         try {
             final int code = c.getResponseCode();
             final URL landed = c.getURL();
