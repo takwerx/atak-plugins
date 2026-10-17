@@ -34,7 +34,7 @@ public final class Sources {
     /** Every feed the plugin reads, in the order the filters list them. */
     public static List<DetectionSource> all() {
         return Arrays.asList(PolarSource.viirs(), PolarSource.modis(),
-                new GoesSource(), new RadrSource());
+                new NgfsSource(), new RadrSource());
     }
 
     /**

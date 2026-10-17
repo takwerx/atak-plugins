@@ -32,7 +32,7 @@ import java.util.Locale;
  */
 public class Footprint {
 
-    public enum Kind { MEASURED, DERIVED, MAPPED, NOMINAL }
+    public enum Kind { MEASURED, DERIVED, MAPPED, NOMINAL, PIXEL }
 
     public final Kind kind;
     /** The long axis, meters. For a polar scanner this is across-scan (roughly east-west). */
@@ -66,6 +66,24 @@ public class Footprint {
     public static Footprint mapped(Geometry geometry, String sensor) {
         return new Footprint(Kind.MAPPED, 0, 0, 0, geometry,
                 "mapped from " + (sensor == null ? "satellite imagery" : sensor) + " imagery, not a sensor pixel");
+    }
+
+    /**
+     * A pixel's own ground polygon as the service computed its corners (NOAA's NGFS
+     * portal). The axes are read off the polygon so the size still reads in words.
+     */
+    public static Footprint pixel(Geometry polygon, double lat, double lon, Double zenithDeg) {
+        double alongScan = 0, alongTrack = 0;
+        try {
+            final com.atakmap.map.layer.feature.geometry.Envelope e = polygon.getEnvelope();
+            final double mLat = 111320d, mLon = 111320d * Math.max(0.02d, Math.cos(Math.toRadians(lat)));
+            alongScan = (e.maxX - e.minX) * mLon;
+            alongTrack = (e.maxY - e.minY) * mLat;
+        } catch (Exception ignored) {
+        }
+        return new Footprint(Kind.PIXEL, alongScan, alongTrack, 90d, polygon,
+                "the pixel's own four corners as NOAA computed them"
+                        + (zenithDeg == null ? "" : String.format(Locale.US, ", seen at a %.0f degree view angle", zenithDeg)));
     }
 
     /** When a record carries no size at all: the sensor's nominal one, said out loud. */

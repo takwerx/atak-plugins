@@ -129,6 +129,7 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
             case MEASURED:
             case DERIVED:
             case NOMINAL:
+            case PIXEL:
                 sb.append("Something inside this box was hot when the satellite looked. The center of the box is the center of the sensor pixel, not the fire.");
                 break;
             default:
