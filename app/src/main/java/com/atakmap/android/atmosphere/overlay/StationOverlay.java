@@ -62,7 +62,6 @@ public final class StationOverlay {
 
     private static final String PREF_ON = "weather.layer.stations.on";
     private static final String PREF_MILES = "weather.layer.stations.miles";
-    private static final String PREF_FROM_ME = "weather.layer.stations.fromme";
     private static final String PREF_LABELS = "weather.layer.stations.labels";
     private static final String PREF_SHOW = "weather.layer.stations.show";
 
@@ -187,7 +186,8 @@ public final class StationOverlay {
     private int generation;
     private long lastPoll;
     private int miles;
-    private boolean fromMe, labels;
+    private boolean labels;
+    private volatile Origin source = Origin.MAP_CENTER;
     private int show;
     /** Coarsest meters per pixel at which each still draws. */
     private double stationGate, labelGate;
@@ -248,7 +248,6 @@ public final class StationOverlay {
         this.favorites = new StationFavorites(mapView.getContext());
         final SharedPreferences p = MapCompat.prefs();
         miles = p == null ? DEFAULT_MILES : p.getInt(PREF_MILES, DEFAULT_MILES);
-        fromMe = p == null || p.getBoolean(PREF_FROM_ME, true);
         labels = p == null || p.getBoolean(PREF_LABELS, true);
         show = p == null ? SHOW_ALL : p.getInt(PREF_SHOW, SHOW_ALL);
         stationGate = storedGate(p, PREF_GATE_STATIONS, ALWAYS_GATE);
@@ -758,7 +757,7 @@ public final class StationOverlay {
      * drag still triggers exactly once when it has gone far enough.
      */
     private void followMapCenter() {
-        if (fromMe || inFlight)
+        if (!source.followsMap() || inFlight)
             return;
         final GeoPoint now = origin();
         if (now == null)
@@ -852,18 +851,8 @@ public final class StationOverlay {
     }
 
     /** How far out stations are asked for, in miles. */
-    /** Whether the radius is measured from the operator rather than the map. */
-    public boolean fromMe() {
-        return fromMe;
-    }
-
     public int miles() {
         return miles;
-    }
-
-    /** Whether the radius is measured from the operator or from the middle of the map. */
-    public boolean isFromMe() {
-        return fromMe;
     }
 
     public void setMiles(int value) {
@@ -878,15 +867,21 @@ public final class StationOverlay {
         refresh(true);
     }
 
-    public void setFromMe(boolean value) {
-        if (fromMe == value)
-            return;
-        fromMe = value;
+    /** Measure from the pane's point; see {@link Origin}. */
+    public void setOrigin(Origin origin) {
+        source = origin == null ? Origin.MAP_CENTER : origin;
         fetchedFrom = null;
-        final SharedPreferences p = MapCompat.prefs();
-        if (p != null)
-            p.edit().putBoolean(PREF_FROM_ME, value).apply();
+    }
+
+    /** The pane's point moved to another place or kind: ask around the new one. */
+    public void originChanged() {
+        fetchedFrom = null;
         refresh(true);
+    }
+
+    /** Where the radius is measured from. */
+    public Origin originSource() {
+        return source;
     }
 
     /**
@@ -986,7 +981,7 @@ public final class StationOverlay {
 
     /** Where the radius is measured from, or null when there is no such point yet. */
     private GeoPoint origin() {
-        final GeoPoint p = fromMe ? MapCompat.selfPoint() : MapCompat.mapCenter();
+        final GeoPoint p = source.point();
         return p != null && p.isValid() ? p : null;
     }
 
@@ -1001,8 +996,8 @@ public final class StationOverlay {
         if (from == null) {
             // Said plainly, because the fix is the operator's: they can switch the
             // radius to the map instead of waiting for a fix that may not come indoors.
-            status(fromMe ? "No position yet — switch to the map, or wait for a fix"
-                    : "The map has no center yet");
+            status(source.self() ? "No position yet \u2014 pick Map center at the top, or wait for a fix"
+                    : "No point to measure from yet \u2014 pick one at the top");
             return;
         }
         lastPoll = now;
@@ -1171,7 +1166,7 @@ public final class StationOverlay {
         Log.d(TAG, String.format(Locale.US,
                 "drew %d of %d stations (%d utility) within %d mi of %s, %d at criteria, "
                         + "labels=%b, took %d ms",
-                n, total, fromUtilities, miles, fromMe ? "me" : "the map", red, withLabels,
+                n, total, fromUtilities, miles, source.logWords(), red, withLabels,
                 android.os.SystemClock.elapsedRealtime() - began));
     }
 

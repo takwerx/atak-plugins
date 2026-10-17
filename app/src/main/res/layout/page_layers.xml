@@ -245,20 +245,6 @@
                         android:textSize="13sp"
                         android:text="" />
 
-                    <TextView
-                        style="@style/TakwerxSectionHeading"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/stations_around_heading" />
-
-                    <!-- Measured from the operator or from the middle of the map, which is
-                         how a crew looks at a fire they are not standing on. -->
-                    <LinearLayout
-                        android:id="@+id/stations_origin_row"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal" />
 
                     <TextView
                         style="@style/TakwerxSectionHeading"
@@ -1985,19 +1971,6 @@
                         android:textSize="13sp"
                         android:text="" />
 
-                    <TextView
-                        style="@style/TakwerxSectionHeading"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/stations_around_heading" />
-
-                    <LinearLayout
-                        android:id="@+id/gauges_origin_row"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:orientation="horizontal" />
 
                     <TextView
                         style="@style/TakwerxSectionHeading"
@@ -2414,19 +2387,6 @@
                         android:textSize="13sp"
                         android:text="" />
 
-                    <TextView
-                        style="@style/TakwerxSectionHeading"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/stations_around_heading" />
-
-                    <LinearLayout
-                        android:id="@+id/buoys_origin_row"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:orientation="horizontal" />
 
                     <TextView
                         style="@style/TakwerxSectionHeading"

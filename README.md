@@ -219,8 +219,9 @@ PORTS REQUIRED
   User-Agent naming the plugin and its version, which the public services
   require. No callsign, device identifier or TAK server detail is sent. The
   device's position leaves it only for the forecast the operator asks for,
-  rounded, and for the station, gauge and buoy layers when set to "My
-  position", rounded the same way; every other layer sends the map's area.
+  rounded, and for the station, gauge and buoy layers, which measure from the
+  same point (the device's position when the pane is set to My position),
+  rounded the same way; every other layer sends the map's area.
 
 _________________________________________________________________
 EQUIPMENT REQUIRED

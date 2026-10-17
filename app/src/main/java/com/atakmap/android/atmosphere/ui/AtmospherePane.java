@@ -61,6 +61,7 @@ import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
 import com.atakmap.android.atmosphere.overlay.ErcOverlay;
 import com.atakmap.android.atmosphere.overlay.LightningOverlay;
+import com.atakmap.android.atmosphere.overlay.Origin;
 import com.atakmap.android.atmosphere.overlay.PspsOverlay;
 import com.atakmap.android.atmosphere.overlay.StormReportsOverlay;
 import com.atakmap.android.atmosphere.overlay.TornadoPathsOverlay;
@@ -496,7 +497,7 @@ public final class AtmospherePane {
     private Button stationsToggle;
     private ImageButton stationsExpand;
     private View stationsSettings;
-    private LinearLayout stationsOriginRow, stationsDistanceRow, stationsLegend;
+    private LinearLayout stationsDistanceRow, stationsLegend;
     private LinearLayout stationsGateRow, stationsLabelGateRow, stationsShowRow;
     private TextView stationsGateText, stationsLabelGateText, stationsUtilityGateText;
     private LinearLayout stationsUtilityGateRow;
@@ -516,7 +517,7 @@ public final class AtmospherePane {
     private Button gaugesToggle;
     private ImageButton gaugesExpand;
     private View gaugesSettings;
-    private LinearLayout gaugesOriginRow, gaugesDistanceRow, gaugesLegend;
+    private LinearLayout gaugesDistanceRow, gaugesLegend;
     private boolean gaugesOpen;
     private BuoyOverlay buoyLayer;
     private BuoyPage buoyPage;
@@ -527,7 +528,7 @@ public final class AtmospherePane {
     private Button buoysToggle;
     private ImageButton buoysExpand;
     private View buoysSettings;
-    private LinearLayout buoysOriginRow, buoysDistanceRow, buoysLegend;
+    private LinearLayout buoysDistanceRow, buoysLegend;
     private boolean buoysOpen;
     private boolean spotOpen = true;
 
@@ -1030,7 +1031,6 @@ public final class AtmospherePane {
         stationsToggle = find(R.id.stations_toggle);
         stationsExpand = find(R.id.stations_expand);
         stationsSettings = find(R.id.stations_settings);
-        stationsOriginRow = find(R.id.stations_origin_row);
         stationsDistanceRow = find(R.id.stations_distance_row);
         stationsLegend = find(R.id.stations_legend);
         stationsGateRow = find(R.id.stations_gate_row);
@@ -1050,7 +1050,6 @@ public final class AtmospherePane {
         gaugesExpand = find(R.id.gauges_expand);
         gaugesSettings = find(R.id.gauges_settings);
         gaugesStatus = find(R.id.gauges_status);
-        gaugesOriginRow = find(R.id.gauges_origin_row);
         gaugesDistanceRow = find(R.id.gauges_distance_row);
         gaugesLegend = find(R.id.gauges_legend);
         gaugesShowRow = find(R.id.gauges_show_row);
@@ -1072,7 +1071,6 @@ public final class AtmospherePane {
         buoysExpand = find(R.id.buoys_expand);
         buoysSettings = find(R.id.buoys_settings);
         buoysStatus = find(R.id.buoys_status);
-        buoysOriginRow = find(R.id.buoys_origin_row);
         buoysDistanceRow = find(R.id.buoys_distance_row);
         buoysLegend = find(R.id.buoys_legend);
         buoysShowRow = find(R.id.buoys_show_row);
@@ -3937,6 +3935,8 @@ public final class AtmospherePane {
      */
     public void setStations(StationOverlay overlay) {
         stationLayer = overlay;
+        if (overlay != null)
+            overlay.setOrigin(paneOrigin);
         if (stationLayer == null)
             return;
         stationLayer.setListener(new StationOverlay.Listener() {
@@ -3975,11 +3975,10 @@ public final class AtmospherePane {
                 final GeoPoint o = stationLayer.originPoint();
                 final String where = o == null ? "" : String.format(Locale.US, " (%.2f, %.2f)",
                         o.getLatitude(), o.getLongitude());
-                if (stationLayer.fromMe())
-                    return "No stations within " + stationLayer.miles() + " mi of your position"
-                            + where + ". No GPS fix here? Pick Map center.";
-                return "No stations within " + stationLayer.miles() + " mi of the map center"
-                        + where + ".";
+                final Origin from = stationLayer.originSource();
+                return "No stations within " + stationLayer.miles() + " mi of " + from.words()
+                        + where + (from.self() ? ". No GPS fix here? Pick Map center at the top."
+                                : ".");
             }
 
             @Override
@@ -3997,6 +3996,8 @@ public final class AtmospherePane {
 
     public void setBuoys(BuoyOverlay overlay) {
         buoyLayer = overlay;
+        if (overlay != null)
+            overlay.setOrigin(paneOrigin);
         if (buoyLayer == null)
             return;
         buoyLayer.setListener(new BuoyOverlay.Listener() {
@@ -4028,6 +4029,8 @@ public final class AtmospherePane {
 
     public void setGauges(GaugeOverlay overlay) {
         gaugeLayer = overlay;
+        if (overlay != null)
+            overlay.setOrigin(paneOrigin);
         if (gaugeLayer == null)
             return;
         gaugeLayer.setListener(new GaugeOverlay.Listener() {
@@ -4104,27 +4107,6 @@ public final class AtmospherePane {
                         })
                 .setNegativeButton(pluginContext.getString(R.string.close), null)
                 .show();
-    }
-
-    private void buildBuoysOriginRow() {
-        buoysOriginRow.removeAllViews();
-        final boolean fromMe = buoyLayer.isFromMe();
-        buoysOriginRow.addView(choiceTile(pluginContext.getString(R.string.stations_from_me),
-                fromMe, new Runnable() {
-                    @Override
-                    public void run() {
-                        buoyLayer.setFromMe(true);
-                        updateLayerControls();
-                    }
-                }));
-        buoysOriginRow.addView(choiceTile(pluginContext.getString(R.string.stations_from_map),
-                !fromMe, new Runnable() {
-                    @Override
-                    public void run() {
-                        buoyLayer.setFromMe(false);
-                        updateLayerControls();
-                    }
-                }));
     }
 
     private void buildBuoysDistanceRow() {
@@ -4246,29 +4228,6 @@ public final class AtmospherePane {
                 .show();
     }
 
-    private void buildGaugesOriginRow() {
-        gaugesOriginRow.removeAllViews();
-        final boolean fromMe = gaugeLayer.isFromMe();
-        gaugesOriginRow.addView(choiceTile(
-                pluginContext.getString(R.string.stations_from_me), fromMe,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        gaugeLayer.setFromMe(true);
-                        updateLayerControls();
-                    }
-                }));
-        gaugesOriginRow.addView(choiceTile(
-                pluginContext.getString(R.string.stations_from_map), !fromMe,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        gaugeLayer.setFromMe(false);
-                        updateLayerControls();
-                    }
-                }));
-    }
-
     private void buildGaugesDistanceRow() {
         gaugesDistanceRow.removeAllViews();
         final int current = gaugeLayer.miles();
@@ -4368,33 +4327,6 @@ public final class AtmospherePane {
                         })
                 .setNegativeButton(pluginContext.getString(R.string.close), null)
                 .show();
-    }
-
-    /**
-     * Measured from the operator or from the middle of the map -- the second is how a
-     * crew looks at a fire they are not standing on.
-     */
-    private void buildStationsOriginRow() {
-        stationsOriginRow.removeAllViews();
-        final boolean fromMe = stationLayer.isFromMe();
-        stationsOriginRow.addView(choiceTile(
-                pluginContext.getString(R.string.stations_from_me), fromMe,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        stationLayer.setFromMe(true);
-                        updateLayerControls();
-                    }
-                }));
-        stationsOriginRow.addView(choiceTile(
-                pluginContext.getString(R.string.stations_from_map), !fromMe,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        stationLayer.setFromMe(false);
-                        updateLayerControls();
-                    }
-                }));
     }
 
     private void buildStationsDistanceRow() {
@@ -4791,7 +4723,7 @@ public final class AtmospherePane {
     /** One tile of a row of choices: the chosen one green, the Traffic convention. */
     private View choiceTile(String label, boolean chosen, final Runnable onPick) {
         final Button b = (Button) LayoutInflater.from(pluginContext)
-                .inflate(R.layout.trend_chip, stationsOriginRow, false);
+                .inflate(R.layout.trend_chip, stationsDistanceRow, false);
         b.setText(label);
         b.setTextSize(13);
         // Green text on a plain face for the chosen one, never a colored button.
@@ -6237,7 +6169,6 @@ public final class AtmospherePane {
             stationsUtility.setTextColor(pluginContext.getResources().getColor(
                     utilityOn ? R.color.state_on : R.color.state_off));
             stationsUtilitySettings.setVisibility(utilityOn ? View.VISIBLE : View.GONE);
-            buildStationsOriginRow();
             buildStationsDistanceRow();
             buildStationsShowRow();
             buildStationsGateRows();
@@ -6257,7 +6188,6 @@ public final class AtmospherePane {
         gaugesExpand.setRotation(gaugesOpen ? 180f : 0f);
         gaugesSettings.setVisibility(gaugesOn && gaugesOpen ? View.VISIBLE : View.GONE);
         if (gaugesOn) {
-            buildGaugesOriginRow();
             buildGaugesDistanceRow();
             buildGaugesShowRow();
             buildGaugesGateRows();
@@ -6275,7 +6205,6 @@ public final class AtmospherePane {
         buoysExpand.setRotation(buoysOpen ? 180f : 0f);
         buoysSettings.setVisibility(buoysOn && buoysOpen ? View.VISIBLE : View.GONE);
         if (buoysOn) {
-            buildBuoysOriginRow();
             buildBuoysDistanceRow();
             buildBuoysShowRow();
             buildBuoysGateRows();
@@ -7269,6 +7198,42 @@ public final class AtmospherePane {
 
     // ---- the point ---------------------------------------------------------------
 
+    /**
+     * The pane's point as the station, gauge and buoy layers measure from it: their
+     * own My position | Map center rows went (operator, 2026-10-16: "it should be
+     * driven by that top menu"), so a picked point or a favorite is theirs too.
+     */
+    private final Origin paneOrigin = new Origin() {
+        @Override
+        public GeoPoint point() {
+            return AtmospherePane.this.point();
+        }
+
+        @Override
+        public boolean followsMap() {
+            return mode == PointMode.CENTER;
+        }
+
+        @Override
+        public boolean self() {
+            return mode == PointMode.SELF;
+        }
+
+        @Override
+        public String words() {
+            switch (mode) {
+                case SELF:
+                    return "you";
+                case PICKED:
+                    return "the picked point";
+                case FAVORITE:
+                    return favorite == null ? "the favorite" : favorite.name;
+                default:
+                    return "the map center";
+            }
+        }
+    };
+
     private void setMode(PointMode m) {
         disarmPick();
         mode = m;
@@ -7291,6 +7256,12 @@ public final class AtmospherePane {
         snapshot = null;
         refresh(false);
         updateHereLines();
+        if (stationLayer != null)
+            stationLayer.originChanged();
+        if (gaugeLayer != null)
+            gaugeLayer.originChanged();
+        if (buoyLayer != null)
+            buoyLayer.originChanged();
     }
 
     /**

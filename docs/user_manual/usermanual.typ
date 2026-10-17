@@ -61,7 +61,9 @@ shaded, and the zones page lists them.
 
   - *My position*, *Map center* and *Pick a point* choose the point every
     reading is for. The one in use is green. Map center follows the map: the
-    forecast and the fire weather zone are read again when the map stops.
+    forecast and the fire weather zone are read again when the map stops. The
+    Weather Stations, River Gauges and Buoys lists are measured from this point
+    too, nearest first, and say which point in their status line.
   - The star is *Favorites*: places kept by name.
   - *Units* switches every number between US, metric and aviation units.
   - *Full size* makes the pane full width and back.
@@ -1130,8 +1132,8 @@ Only what you ask for:
 - A *forecast* sends the point it is for, rounded to about 100 m, to the
   service picked in *Forecast settings*: NWS unless you pick Open-Meteo.
 - A *map layer*, once you have allowed it, sends the area of the map it is drawing, never your position,
-  except the station, gauge and buoy layers when set to *My position*, which
-  send that position rounded.
+  except the station, gauge and buoy layers, which send the point chosen at the
+  top of the pane, rounded the same way.
 - The *Fire Weather Zones* page finds your zone by sending the half-degree
   square the point is in, about 30 miles across, never the point. The Red Flag
   Warning and Fire Weather Watch list is one request for the whole country.
