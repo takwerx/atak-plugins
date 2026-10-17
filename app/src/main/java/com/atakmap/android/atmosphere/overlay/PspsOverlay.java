@@ -2,6 +2,7 @@ package com.atakmap.android.atmosphere.overlay;
 
 import android.content.Context;
 
+import com.atakmap.android.atmosphere.compat.ScaleBar;
 import com.atakmap.android.atmosphere.data.Psps;
 import com.atakmap.android.atmosphere.net.EgressPolicy;
 import com.atakmap.android.maps.MapView;
@@ -59,6 +60,34 @@ public final class PspsOverlay extends OutlookOverlay {
 
     public PspsOverlay(MapView mapView, Context pluginContext, EgressPolicy egress) {
         super(mapView, pluginContext, egress, "AtmospherePsps", LAYER_ID, "PSPS");
+        this.mapView = mapView;
+        setSetFilter(new AtmosphereFeatures.SetFilter() {
+            @Override
+            public boolean shown(String set) {
+                final int b = band;
+                if (set.startsWith(COUNTIES + " labels"))
+                    return b <= COUNTY_LABELS_BAND;
+                if (set.startsWith(CIRCUITS + " labels"))
+                    return b == OWN;
+                if (set.startsWith(PILLS))
+                    return set.equals(PILLS + b);
+                return true;
+            }
+        });
+    }
+
+    @Override
+    public void start() {
+        super.start();
+        settle.run();
+        mapView.addOnMapMovedListener(moved);
+    }
+
+    @Override
+    public void stop() {
+        mapView.removeOnMapMovedListener(moved);
+        mapView.removeCallbacks(settle);
+        super.stop();
     }
 
     @Override
@@ -80,8 +109,12 @@ public final class PspsOverlay extends OutlookOverlay {
      */
     @Override
     protected String setName(Area a) {
-        return "Public Safety Power Shutoffs, California";
+        return a != null && Psps.POSSIBLE.equals(a.label) ? COUNTIES : CIRCUITS;
     }
+
+    /** The two kinds of area live in sets of their own, so their labels can be shown apart. */
+    private static final String COUNTIES = "Public Safety Power Shutoffs, warned counties",
+            CIRCUITS = "Public Safety Power Shutoffs, California", PILLS = "PSPS pills ";
 
     @Override
     protected long pollMs() {
@@ -108,10 +141,207 @@ public final class PspsOverlay extends OutlookOverlay {
         return new int[] { Psps.textColor(a.label), Psps.color(a.label) };
     }
 
-    /** A county is big; a shutoff area is a few circuits, labeled once it is a few miles across. */
+    /**
+     * Which labels show, by what ATAK's scale bar reads (operator, 2026-10-16, over
+     * 1,400 circuit labels on the coast: "like 5 miles they are individual. but further
+     * out ... make one in an area if they are multiple", and at 380 miles: "at this
+     * level no labels"). Up to 10 miles each circuit has its own label; to 25, 60 and
+     * 150 miles nearby circuits share pills worked out for that range; past 150 there
+     * are none. A county's name shows to 60 miles, where 31 of them start to cover each
+     * other. The plugin picks the range when the map settles and shows that range's
+     * sets: ATAK's own zoom bands on a set test a window two tile steps wide around the
+     * map, and drew three ranges' pills at once (XCover).
+     */
+    private static final double[] BAND_MILES = { 10, 25, 60, 150 };
+    /** The range where each circuit has its own label, and the one past every range. */
+    private static final int OWN = 0, NONE = BAND_MILES.length;
+    private static final int COUNTY_LABELS_BAND = 2;
+    /** How far apart two circuits may be and share a pill, in pill widths. */
+    private static final double JOIN_WIDTHS = 1.5;
+    private static final long SETTLE_MS = 400;
+
+    private final MapView mapView;
+    private volatile int band = OWN;
+    /** How many pixels ATAK's scale bar spans, read when the map settles. */
+    private volatile double barPixels = ScaleBar.FALLBACK_BAR_PIXELS;
+
+    private final com.atakmap.map.AtakMapView.OnMapMovedListener moved =
+            new com.atakmap.map.AtakMapView.OnMapMovedListener() {
+                @Override
+                public void onMapMoved(com.atakmap.map.AtakMapView v, boolean animate) {
+                    // GL thread. Nothing is touched here but the callback queue.
+                    mapView.removeCallbacks(settle);
+                    mapView.postDelayed(settle, SETTLE_MS);
+                }
+            };
+
+    /** On main: the range the scale bar is in now, and the sets for it if it changed. */
+    private final Runnable settle = new Runnable() {
+        @Override
+        public void run() {
+            final double bar = ScaleBar.meters(mapView);
+            final double res = mapView.getMapResolution();
+            if (bar <= 0)
+                return;
+            if (res > 0)
+                barPixels = bar / res;
+            int b = 0;
+            while (b < BAND_MILES.length && bar > BAND_MILES[b] * 1609.344)
+                b++;
+            if (b == band)
+                return;
+            band = b;
+            applySetFilter();
+        }
+    };
+
+    /** A county is big; drawn as soon as the scale bar says so, see {@link #BAND_MILES}. */
     @Override
     protected double labelMaxResolution() {
-        return 500d;
+        return Double.MAX_VALUE;
+    }
+
+    /**
+     * For each range from 10 to 150 miles, the circuits close enough to crowd one
+     * pill's space make a group, whatever their utility or kind, and the group shows
+     * one pill per utility and kind, "SCE - PSPS (23)", stacked shut off over watched.
+     * The stack sits on the group's own circuit nearest its middle: the middle of
+     * circuits along a curved coast can be out at sea, and moving pills apart by a
+     * pill's height put them there (XCover, 2026-10-16). Counties keep their own labels.
+     */
+    @Override
+    protected List<AtmosphereFeatures.Drawn> drawnTogether(List<Area> areas,
+            List<com.atakmap.map.layer.feature.geometry.Geometry> shapes) {
+        final List<AtmosphereFeatures.Drawn> out = new ArrayList<>();
+        final List<double[]> centers = new ArrayList<>();
+        final List<Area> circuits = new ArrayList<>();
+        for (int i = 0; i < areas.size(); i++) {
+            final Area a = areas.get(i);
+            if (Psps.POSSIBLE.equals(a.label))
+                continue;
+            final com.atakmap.map.layer.feature.geometry.Envelope e = shapes.get(i).getEnvelope();
+            if (e == null)
+                continue;
+            circuits.add(a);
+            centers.add(new double[] { (e.minY + e.maxY) / 2, (e.minX + e.maxX) / 2 });
+        }
+        if (circuits.isEmpty())
+            return out;
+        // The size a pill takes, from the longest title; a count adds a little.
+        int pillW = 0, pillH = 0;
+        for (String kind : new String[] { Psps.OFF, Psps.WATCH }) {
+            final int[] px = pillPixels("SDG&E - " + kind + " (000)", Psps.textColor(kind),
+                    Psps.color(kind));
+            if (px != null) {
+                pillW = Math.max(pillW, px[0]);
+                pillH = Math.max(pillH, px[1]);
+            }
+        }
+        if (pillW == 0)
+            return out;
+        final double barPx = barPixels;
+        for (int b = OWN + 1; b < NONE; b++) {
+            // Ground per pixel at the range's far edge: where a pill covers the most.
+            final double mpp = BAND_MILES[b] * 1609.344 / barPx;
+            final double join = JOIN_WIDTHS * pillW * mpp;
+            final List<Group> groups = new ArrayList<>();
+            for (int i = 0; i < circuits.size(); i++) {
+                final double[] c = centers.get(i);
+                Group near = null;
+                for (Group g : groups)
+                    if (meters(g.lat(), g.lon(), c[0], c[1]) < join) {
+                        near = g;
+                        break;
+                    }
+                if (near == null) {
+                    near = new Group();
+                    groups.add(near);
+                }
+                near.add(circuits.get(i), c);
+            }
+            // A pill's height in degrees of latitude in this range, for the stack.
+            final double rowLat = pillH * 1.1 * mpp / 110_540d;
+            for (Group g : groups) {
+                final double[] at = g.anchor();
+                final List<String> titles = g.titles();
+                for (int row = 0; row < titles.size(); row++) {
+                    final String title = titles.get(row);
+                    final int n = g.count(title);
+                    final String kind = title.endsWith(Psps.WATCH) ? Psps.WATCH : Psps.OFF;
+                    final double lat = at[0] + ((titles.size() - 1) / 2.0 - row) * rowLat;
+                    final AtmosphereFeatures.Drawn d = clusterPill(PILLS + b,
+                            n == 1 ? title : title + " (" + n + ")", Psps.textColor(kind),
+                            Psps.color(kind), lat, at[1], Double.MAX_VALUE, 0d);
+                    if (d != null)
+                        out.add(d);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Circuits close together in one range, of any utility and kind. */
+    private static final class Group {
+        final List<double[]> points = new ArrayList<>();
+        final java.util.Map<String, Integer> byTitle = new java.util.HashMap<>();
+        double sumLat, sumLon;
+
+        void add(Area a, double[] c) {
+            points.add(c);
+            sumLat += c[0];
+            sumLon += c[1];
+            final Integer n = byTitle.get(a.title);
+            byTitle.put(a.title, n == null ? 1 : n + 1);
+        }
+
+        double lat() {
+            return sumLat / points.size();
+        }
+
+        double lon() {
+            return sumLon / points.size();
+        }
+
+        /** The group's own circuit nearest its middle, so a pill is always on one. */
+        double[] anchor() {
+            double[] best = points.get(0);
+            double bestD = Double.MAX_VALUE;
+            for (double[] p : points) {
+                final double d = meters(lat(), lon(), p[0], p[1]);
+                if (d < bestD) {
+                    bestD = d;
+                    best = p;
+                }
+            }
+            return best;
+        }
+
+        /** Shut off before watched, then by utility, so every stack reads the same way. */
+        List<String> titles() {
+            final List<String> t = new ArrayList<>(byTitle.keySet());
+            java.util.Collections.sort(t, new java.util.Comparator<String>() {
+                @Override
+                public int compare(String x, String y) {
+                    final boolean xw = x.endsWith(Psps.WATCH), yw = y.endsWith(Psps.WATCH);
+                    if (xw != yw)
+                        return xw ? 1 : -1;
+                    return x.compareTo(y);
+                }
+            });
+            return t;
+        }
+
+        int count(String title) {
+            final Integer n = byTitle.get(title);
+            return n == null ? 0 : n;
+        }
+    }
+
+    /** Meters between two points, flat: plenty for a few pill widths. */
+    private static double meters(double lat1, double lon1, double lat2, double lon2) {
+        final double dy = (lat2 - lat1) * 110_540d;
+        final double dx = (lon2 - lon1) * 111_320d * Math.cos(Math.toRadians((lat1 + lat2) / 2));
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     @Override

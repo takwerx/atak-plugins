@@ -205,7 +205,45 @@ public abstract class OutlookOverlay {
                 lc == null
                         ? AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title)
                         : AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title,
-                                lc[0], lc[1], labelMaxResolution()), s);
+                                lc[0], lc[1], labelMaxResolution(a)), s);
+    }
+
+    /**
+     * What is drawn for the areas as a group, after each has been drawn: labels that
+     * stand for several areas when zoomed out, say. Nothing by default. Worker thread.
+     */
+    protected List<AtmosphereFeatures.Drawn> drawnTogether(List<Area> areas, List<Geometry> shapes) {
+        return Collections.emptyList();
+    }
+
+    /** Shows only the sets this filter names; see {@link AtmosphereFeatures#setSetFilter}. */
+    protected final void setSetFilter(AtmosphereFeatures.SetFilter filter) {
+        features.setSetFilter(filter);
+    }
+
+    /** Applies the filter again to what is drawn, off the main thread. */
+    protected final void applySetFilter() {
+        try {
+            worker.execute(new Runnable() {
+                @Override
+                public void run() {
+                    features.applySetFilter();
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException stopped) {
+            // Stopped: nothing is drawn to show or hide.
+        }
+    }
+
+    /** See {@link AtmosphereFeatures#clusterPill}. */
+    protected final AtmosphereFeatures.Drawn clusterPill(String setName, String text, int textColor,
+            int fillColor, double lat, double lon, double minGsd, double maxGsd) {
+        return features.clusterPill(setName, text, textColor, fillColor, lat, lon, minGsd, maxGsd);
+    }
+
+    /** See {@link AtmosphereFeatures#pillPixels}. */
+    protected final int[] pillPixels(String text, int textColor, int fillColor) {
+        return features.pillPixels(text, textColor, fillColor);
     }
 
     /**
@@ -382,6 +420,11 @@ public abstract class OutlookOverlay {
     /** With {@link #labelColors}: the coarsest map resolution, meters per pixel, the label draws at. */
     protected double labelMaxResolution() {
         return 14d;
+    }
+
+    /** The same for one area; the layer's own by default. */
+    protected double labelMaxResolution(Area a) {
+        return labelMaxResolution();
     }
 
     /** The edge's color for an area, opaque; the category's own color by default. */
@@ -705,6 +748,8 @@ public abstract class OutlookOverlay {
                     return;
                 }
                 final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
+                final List<Area> drawnAreas = new ArrayList<>();
+                final List<Geometry> drawnShapes = new ArrayList<>();
                 final int showDay = day;
                 for (Area a : snapshot) {
                     if (!shown(a, showDay))
@@ -725,9 +770,16 @@ public abstract class OutlookOverlay {
                         s.setAttribute("_ref", a.ref);
                     try {
                         drawn.addAll(drawnAll(a, g, s));
+                        drawnAreas.add(a);
+                        drawnShapes.add(g);
                     } catch (RuntimeException e) {
                         Log.w(tag, "could not draw " + a.title, e);
                     }
+                }
+                try {
+                    drawn.addAll(drawnTogether(drawnAreas, drawnShapes));
+                } catch (RuntimeException e) {
+                    Log.w(tag, "could not draw the group labels", e);
                 }
                 features.rewrite(drawn);
                 final String line = summary(snapshot);
