@@ -30,7 +30,7 @@ public final class RunFile {
 
     private static final String TAG = "FireCast";
     public static final String SUFFIX = ".firerun.kmz";
-    public static final String KML_ENTRY = "doc.kml", JSON_ENTRY = "firecast-run.json";
+    public static final String KML_ENTRY = "doc.kml", JSON_ENTRY = "firecast-run.json", ICON_ENTRY = "start.png";
 
     private RunFile() {
     }
@@ -63,19 +63,25 @@ public final class RunFile {
      *
      * @param saved the run's saved form, with who ran it and the engine added
      * @param card  the run's inputs and outputs in plain words
+     * @param icon  the start's icon, a PNG, or null for the viewer's own pin
      */
-    static File write(FireModel.Run r, JSONObject saved, String card) throws Exception {
+    static File write(FireModel.Run r, JSONObject saved, String card, byte[] icon) throws Exception {
         final File f = fileFor(r.runId);
         final File tmp = new File(f.getPath() + ".tmp");
         final ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(tmp));
         try {
             // The KML first: a KMZ reader takes the first .kml it finds as the document.
             zip.putNextEntry(new ZipEntry(KML_ENTRY));
-            zip.write(kml(r, card).getBytes("UTF-8"));
+            zip.write(kml(r, card, icon != null).getBytes("UTF-8"));
             zip.closeEntry();
             zip.putNextEntry(new ZipEntry(JSON_ENTRY));
             zip.write(saved.toString().getBytes("UTF-8"));
             zip.closeEntry();
+            if (icon != null) {
+                zip.putNextEntry(new ZipEntry(ICON_ENTRY));
+                zip.write(icon);
+                zip.closeEntry();
+            }
         } finally {
             zip.close();
         }
@@ -84,6 +90,37 @@ public final class RunFile {
                 throw new IllegalStateException("could not keep " + f.getName());
         }
         return f;
+    }
+
+    /**
+     * A copy of the run's file under a name a person can read, for a data package: the
+     * name shows in the package's contents on every phone that gets it. The copy lives in
+     * {@code tools/firecast/runs/outbox}; nothing reads a file back by this name.
+     */
+    static File readableCopy(File f, String title) throws Exception {
+        final File dir = new File(dir(), "outbox");
+        if (!dir.isDirectory() && !dir.mkdirs())
+            Log.w(TAG, "could not create " + dir);
+        final File out = new File(dir, safeName(title) + SUFFIX);
+        final java.io.InputStream in = new java.io.FileInputStream(f);
+        final FileOutputStream o = new FileOutputStream(out);
+        try {
+            final byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0)
+                o.write(buf, 0, n);
+        } finally {
+            in.close();
+            o.close();
+        }
+        return out;
+    }
+
+    /** A title as a file name: letters, digits, spaces and a little punctuation, 80 characters at most. */
+    static String safeName(String title) {
+        final String s = title.replace(':', '-').replaceAll("[^A-Za-z0-9 .,_-]", "").replaceAll("\\s+", " ").trim();
+        final String cut = s.length() > 80 ? s.substring(0, 80).trim() : s;
+        return cut.isEmpty() ? "Fire Cast run" : cut;
     }
 
     /** Removes a run's file, if it has one; the operator's own Delete. */
@@ -172,6 +209,10 @@ public final class RunFile {
     // ---- the KML ----------------------------------------------------------------
 
     static String kml(FireModel.Run r, String card) {
+        return kml(r, card, false);
+    }
+
+    static String kml(FireModel.Run r, String card, boolean icon) {
         final StringBuilder k = new StringBuilder(64 * 1024);
         k.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
                 .append("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n<Document>\n")
@@ -185,6 +226,9 @@ public final class RunFile {
         }
         k.append("<Style id=\"perimeter\"><LineStyle><color>ffffffff</color><width>2</width></LineStyle>")
                 .append("<PolyStyle><fill>0</fill></PolyStyle></Style>\n");
+        if (icon)
+            k.append("<Style id=\"start\"><IconStyle><scale>0.2</scale><Icon><href>").append(ICON_ENTRY)
+                    .append("</href></Icon></IconStyle></Style>\n");
         // Largest first, the way the map draws them, so the first ring is on top.
         final double tolerance = r.cellM / 2d;
         for (int i = r.steps.length - 1; i >= 0; i--) {
@@ -209,7 +253,8 @@ public final class RunFile {
             coord(k, r.perimeter[0][1], r.perimeter[0][0]);
             k.append("</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>\n");
         }
-        k.append("<Placemark><name>Fire start</name><Point><coordinates>");
+        k.append("<Placemark><name>Fire start</name>").append(icon ? "<styleUrl>#start</styleUrl>" : "")
+                .append("<Point><coordinates>");
         coord(k, r.lon, r.lat);
         k.append("</coordinates></Point></Placemark>\n</Document>\n</kml>\n");
         return k.toString();

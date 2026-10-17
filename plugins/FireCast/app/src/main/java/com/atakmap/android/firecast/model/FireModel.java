@@ -1600,14 +1600,18 @@ public final class FireModel {
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                final File f;
+                final File f, named;
+                // The package's title is also its file name on every phone, and Android
+                // storage refuses a colon in a file name ("10:12" failed with EPERM).
+                final String title = RunFile.safeName("Fire Cast - " + r.label());
                 try {
                     final JSONObject saved = toJson(r);
                     // A run passed on keeps the name of whoever ran it.
                     saved.put("by", r.by != null ? r.by : mapView.getDeviceCallsign())
                             .put("engine", "behave d4acc8a").put("pluginVersion", pluginVersion());
                     saved.put("byUid", r.by != null ? (r.byUid == null ? "" : r.byUid) : MapView.getDeviceUid());
-                    f = RunFile.write(r, saved, card(r));
+                    f = RunFile.write(r, saved, card(r), startIcon());
+                    named = RunFile.readableCopy(f, title);
                     Log.d(TAG, "run file written: " + f.getName() + ", " + f.length() + " bytes");
                 } catch (Exception e) {
                     Log.w(TAG, "run file failed", e);
@@ -1619,10 +1623,20 @@ public final class FireModel {
                     @Override
                     public void run() {
                         try {
+                            // A data package, not a bare file: it keeps its title and stays
+                            // in Data Packages on every phone it reaches, its run imported
+                            // (a KML overlay, or a run where Fire Cast is installed). Its id is
+                            // the run's, so a resend updates the package instead of adding one.
+                            final com.atakmap.android.missionpackage.file.MissionPackageManifest m =
+                                    new com.atakmap.android.missionpackage.file.MissionPackageManifest(title, r.runId,
+                                            FileSystemUtils.getItem("tools/datapackage").getPath());
+                            m.addFile(named, null);
+                            m.setRemarks(card(r));
+                            m.getConfiguration().setImportInstructions(true, false, null);
                             new com.atakmap.android.importexport.send.SendDialog.Builder(mapView)
-                                    .setName(r.label())
+                                    .setName(title)
                                     .setIcon(pluginContext.getDrawable(com.atakmap.android.firecast.plugin.R.drawable.ic_toolbar))
-                                    .addFile(f)
+                                    .setMissionPackage(m)
                                     .build()
                                     .show();
                         } catch (Exception e) {
@@ -1632,6 +1646,26 @@ public final class FireModel {
                 });
             }
         });
+    }
+
+    /** The start's icon for the run file, the plugin's own launcher tile; null when it cannot be read. */
+    private byte[] startIcon() {
+        try {
+            final java.io.InputStream in = pluginContext.getResources().openRawResource(
+                    com.atakmap.android.firecast.plugin.R.drawable.ic_launcher);
+            try {
+                final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                final byte[] buf = new byte[16384];
+                int n;
+                while ((n = in.read(buf)) > 0)
+                    out.write(buf, 0, n);
+                return out.toByteArray();
+            } finally {
+                in.close();
+            }
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String pluginVersion() {
