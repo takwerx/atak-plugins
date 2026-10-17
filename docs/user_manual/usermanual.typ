@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.16",
+   plugin-version: "0.17",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -635,14 +635,20 @@ numbers only.
 ][
   #image("84.png", width: 100%)
 ][
-  *PSPS* draws California's Public Safety Power Shutoffs as Cal OES reports
-  them from PG&E, SCE and SDG&E: a county a utility has warned may have a
-  shutoff in amber, where the power is off in red, off because a line feeding
-  it was cut in orange, and back on in green. Tap one for its details.
+  *PSPS* draws California's Public Safety Power Shutoffs: a county a utility
+  has warned Cal OES may have a shutoff in amber, a circuit SCE or SDG&E is
+  watching for one in orange (*PSPS Watch*), and the areas a utility has shut
+  off in red, each named by its utility, such as "PG&E - PSPS". Tap one for
+  its circuit, customers out, the shutoff window and when power is expected
+  back. From about 10 miles in each area has its own label; farther out,
+  nearby areas share one, "SCE - PSPS (23)", and past 150 miles the colors
+  stand alone.
 
-  The line under the switch says what is warned and off and when Cal OES last
-  updated; if Cal OES goes quiet for 45 minutes it says the status is unknown
-  rather than none. It does not cover PacifiCorp, Liberty, Bear Valley or any
+  The line under the switch counts what is warned, watched and shut off, by
+  utility, and when it was updated; a source quiet for 45 minutes is said to
+  be unknown, never none. It comes from Cal OES (PG&E and the warned
+  counties), Southern California Edison and San Diego Gas & Electric through
+  takwerx's server, and does not cover PacifiCorp, Liberty, Bear Valley or any
   other state: ask the utility.
 ]
 ]

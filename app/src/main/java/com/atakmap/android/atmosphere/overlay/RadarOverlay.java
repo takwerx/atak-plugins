@@ -706,7 +706,10 @@ public final class RadarOverlay {
                                 Log.w(TAG, "tile " + plan.zoom + "/" + tx + "/" + ty + ": "
                                         + (e.getCause() == null ? e : e.getCause().getMessage()));
                             }
-                            final Bitmap t = bytes == null ? null
+                            // A tile is TILE_PX square: its header says so before any
+                            // pixel is decoded, so a picture of another size is never
+                            // expanded into memory at all.
+                            final Bitmap t = bytes == null || !isTile(bytes) ? null
                                     : BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                             if (t == null || t.getWidth() != WorldRadar.TILE_PX
                                     || t.getHeight() != WorldRadar.TILE_PX) {
@@ -804,5 +807,13 @@ public final class RadarOverlay {
             listener.onStatus(s);
         if (!s.isEmpty())
             Log.d(TAG, s);
+    }
+
+    /** Whether these bytes are a picture of exactly one tile, read from the header alone. */
+    private static boolean isTile(byte[] bytes) {
+        final BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.length, o);
+        return o.outWidth == WorldRadar.TILE_PX && o.outHeight == WorldRadar.TILE_PX;
     }
 }

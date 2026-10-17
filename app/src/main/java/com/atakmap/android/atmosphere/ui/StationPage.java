@@ -150,9 +150,12 @@ public final class StationPage {
         if (total == 0)
             return "No stations reporting within " + layer.miles() + " mi.";
         final int far = layer.favoritesBeyond();
+        final String hint = com.atakmap.android.atmosphere.compat.ScaleBar.zoomInHint(
+                com.atakmap.android.maps.MapView.getMapView(), layer.stationGate());
         return shown.size() + " of " + total + " stations, nearest first, within "
                 + layer.miles() + " mi of " + layer.originSource().words()
-                + (far == 0 ? "" : ", and " + far + " favorites beyond that");
+                + (far == 0 ? "" : ", and " + far + " favorites beyond that")
+                + (hint.isEmpty() ? "" : "\n" + hint);
     }
 
     /** All, the two that matter, and the starred, each with what it costs. */
@@ -381,7 +384,7 @@ public final class StationPage {
 
         detail.setVisibility(View.VISIBLE);
         list.setVisibility(View.GONE);
-        heading.setVisibility(View.GONE);
+        headingLine().setVisibility(View.GONE);
         filterRow.setVisibility(View.GONE);
         status.setVisibility(View.GONE);
     }
@@ -390,7 +393,7 @@ public final class StationPage {
         showing = null;
         detail.setVisibility(View.GONE);
         list.setVisibility(View.VISIBLE);
-        heading.setVisibility(View.VISIBLE);
+        headingLine().setVisibility(View.VISIBLE);
         filterRow.setVisibility(View.VISIBLE);
         status.setVisibility(View.VISIBLE);
     }
@@ -443,5 +446,16 @@ public final class StationPage {
         } catch (RuntimeException e) {
             // A pan that will not happen is not worth a crash.
         }
+    }
+
+    /**
+     * The heading, or the line the pane put it on beside the page's map switch: a
+     * record hides them together, rather than leaving the switch alone on a row.
+     */
+    private View headingLine() {
+        final android.view.ViewParent p = heading.getParent();
+        return p instanceof LinearLayout
+                && ((LinearLayout) p).getOrientation() == LinearLayout.HORIZONTAL
+                ? (View) p : heading;
     }
 }
