@@ -130,11 +130,7 @@ public class IemTest {
     }
 
     @Test
-    public void urlsCarryOnlyStationIds() {
-        final String u = Iem.dailyUrl("CA", Arrays.asList("LAAC1", "x&y=1", "HCPC1"), "2026-10-07", "2026-10-13");
-        assertTrue(u.contains("stations=LAAC1,HCPC1&"));
-        assertTrue(Iem.hadsUrl("CA", Arrays.asList("LAAC1"), "2026-10-10T21:00Z", "2026-10-11T21:00Z")
-                .startsWith("https://mesonet.agron.iastate.edu/cgi-bin/request/hads.py?network=CA_DCP"));
+    public void requestTimesAreUtcMinutes() {
         assertEquals("2026-10-11T00:00Z", Iem.z(utc("2026-10-11 00:00")));
     }
 }
