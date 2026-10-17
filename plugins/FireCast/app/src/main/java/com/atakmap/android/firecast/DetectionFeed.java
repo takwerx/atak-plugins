@@ -369,8 +369,15 @@ public class DetectionFeed {
     public void followScope() {
         changed();
         final long now = System.currentTimeMillis();
-        if (refreshing || now - lastMoveFetch < MOVE_FETCH_GAP_MS)
+        // A move that lands while a fetch is running, or inside the rate limit, is
+        // asked again shortly rather than left to the minute tick: a fly-to from the
+        // list starts a fetch mid-flight, and the destination's own waited 30 s.
+        if (refreshing || now - lastMoveFetch < MOVE_FETCH_GAP_MS) {
+            main.removeCallbacks(settled);
+            main.postDelayed(settled, refreshing ? 1000L
+                    : Math.max(100L, MOVE_FETCH_GAP_MS - (now - lastMoveFetch) + 50L));
             return;
+        }
         try {
             if (movedOffTheBox()) {
                 lastMoveFetch = now;

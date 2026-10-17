@@ -423,8 +423,17 @@ public class DetectionPane implements DetectionFeed.Listener {
         } else if (feed.lastRefresh <= 0) {
             status.setText("Nothing fetched yet");
         } else {
-            final int shown = feed.shownNow();
-            status.setText(count(shown) + (shown == 1 ? " detection on the map" : " detections on the map"));
+            // The map draws the fetched box, which is wider than the screen, and the list
+            // below counts the screen. One number for each, said as such, so the top
+            // line and the list never disagree.
+            final int shown = feed.shownNow(), near = feed.inViewCount();
+            final String where = feed.filters.areaIsRadius()
+                    ? "within " + Units.formatBig(feed.filters.areaM) : "in view";
+            if (near >= shown)
+                status.setText(count(near) + (near == 1 ? " detection " : " detections ") + where);
+            else
+                status.setText((near == 0 ? "None" : count(near)) + " " + where + ", "
+                        + count(shown - near) + " more just outside");
         }
         status.setTextColor(Color.WHITE);
 
