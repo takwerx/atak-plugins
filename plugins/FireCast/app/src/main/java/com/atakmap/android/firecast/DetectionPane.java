@@ -31,7 +31,7 @@ import java.util.Locale;
  * what is in the map view, not everything fetched: a list of a thousand detections two
  * counties away is not a list.
  */
-public class DetectionPane implements DetectionFeed.Listener {
+public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listener {
 
     /** Most rows in the list. Past this the list stops being readable long before it stops being slow. */
     private static final int MAX_ROWS = 300;
@@ -39,6 +39,7 @@ public class DetectionPane implements DetectionFeed.Listener {
     private final MapView mapView;
     private final Context pluginContext;
     private final DetectionFeed feed;
+    private final FirisModels firis;
     private final View root;
     private final View header;
     private final ListView list;
@@ -90,10 +91,11 @@ public class DetectionPane implements DetectionFeed.Listener {
         }
     }
 
-    public DetectionPane(MapView mapView, Context pluginContext, DetectionFeed feed) {
+    public DetectionPane(MapView mapView, Context pluginContext, DetectionFeed feed, FirisModels firis) {
         this.mapView = mapView;
         this.pluginContext = pluginContext;
         this.feed = feed;
+        this.firis = firis;
         this.root = PluginLayoutInflater.inflate(pluginContext, R.layout.main_layout, null);
         this.list = (ListView) root;
         this.header = PluginLayoutInflater.inflate(pluginContext, R.layout.pane_header, null);
@@ -115,7 +117,90 @@ public class DetectionPane implements DetectionFeed.Listener {
         buildSourceButtons();
         buildKey();
         wireFilters();
+        wireFiris();
         refreshUi();
+    }
+
+    // ---- FIRIS model runs ---------------------------------------------------------
+
+    private void wireFiris() {
+        final Button b = header.findViewById(R.id.btn_firis);
+        if (firis == null) {
+            b.setVisibility(View.GONE);
+            return;
+        }
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                firis.setOn(!firis.isOn());
+                onFirisChanged();
+            }
+        });
+        b.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                showFirisRuns();
+                return true;
+            }
+        });
+    }
+
+    /** The runs held, newest first; a tap flies there and turns the layer on. */
+    private void showFirisRuns() {
+        final List<FirisModels.Run> runs = firis.runs;
+        if (runs.isEmpty()) {
+            new AlertDialog.Builder(mapView.getContext())
+                    .setTitle("FIRIS Model Runs")
+                    .setMessage("Nothing saved on this device yet. Turn the layer on to fetch the runs.")
+                    .setPositiveButton("Close", null)
+                    .show();
+            return;
+        }
+        final String[] items = new String[runs.size()];
+        for (int i = 0; i < items.length; i++) {
+            final FirisModels.Run r = runs.get(i);
+            items[i] = r.shortName() + "  ·  run " + FirisModels.when(r.startMs)
+                    + (r.inputs.isEmpty() ? "" : "\n" + r.inputs);
+        }
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("FIRIS Model Runs")
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (!firis.isOn())
+                            firis.setOn(true);
+                        firis.goTo(runs.get(which));
+                    }
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    @Override
+    public void onFirisChanged() {
+        if (firis == null)
+            return;
+        final Button b = header.findViewById(R.id.btn_firis);
+        final boolean on = firis.isOn();
+        final int n = firis.runs.size();
+        b.setText("FIRIS Model Runs" + (n > 0 ? "  " + n : "") + (on ? "   ON" : "   OFF"));
+        b.setTextColor(on ? 0xFF4CD964 : 0xFFFF5A5A);
+        final TextView s = header.findViewById(R.id.firis_status);
+        final StringBuilder t = new StringBuilder();
+        if (firis.busy)
+            t.append("Fetching runs…");
+        else if (firis.fetchedAt > 0) {
+            final String age = elapsed(System.currentTimeMillis() - firis.fetchedAt);
+            if (firis.problem != null)
+                t.append("No network, showing what this device saved ").append(age).append(" ago.");
+            else
+                t.append("Fetched ").append(age).append("just now".equals(age) ? "." : " ago.");
+        } else if (firis.problem != null)
+            t.append("Could not fetch the runs: ").append(firis.problem).append(".");
+        if (on && t.length() > 0)
+            t.append(" Long press for the list.");
+        s.setText(t.toString());
+        s.setVisibility(on && t.length() > 0 ? View.VISIBLE : View.GONE);
     }
 
     /**

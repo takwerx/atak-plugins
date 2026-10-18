@@ -51,6 +51,23 @@
             android:text="Fire model" />
     </LinearLayout>
 
+    <!-- Other analysts' runs, beside our own: FIRIS publishes California incidents'
+         spread runs for ATAK. A switch that says what it holds; long press says whose. -->
+    <Button
+        android:id="@+id/btn_firis"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="FIRIS Model Runs   OFF" />
+    <TextView
+        android:id="@+id/firis_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#B0B0B0"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
     <!-- Feeds -->
     <LinearLayout
         android:layout_width="match_parent"

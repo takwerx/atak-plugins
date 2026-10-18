@@ -82,6 +82,10 @@ public class FireCast implements IPlugin {
             });
             feed.start();
         }
+        if (mapView != null && firis == null) {
+            firis = new com.atakmap.android.firecast.FirisModels(mapView, pluginContext);
+            firis.start();
+        }
         if (mapView != null && model == null) {
             model = new com.atakmap.android.firecast.model.FireModel(mapView, pluginContext);
             model.start();
@@ -145,6 +149,7 @@ public class FireCast implements IPlugin {
 
     public static final String SHOW = "com.atakmap.android.firecast.SHOW";
     private android.content.BroadcastReceiver showReceiver;
+    private com.atakmap.android.firecast.FirisModels firis;
 
     @Override
     public void onStop() {
@@ -178,6 +183,11 @@ public class FireCast implements IPlugin {
             model.stop();
             model = null;
         }
+        if (firis != null) {
+            firis.setListener(null);
+            firis.stop();
+            firis = null;
+        }
         if (feed != null) {
             feed.stop();
             feed = null;
@@ -191,8 +201,12 @@ public class FireCast implements IPlugin {
         if (uiService == null || feed == null)
             return;
         if (pane == null) {
-            paneView = new DetectionPane(mapView, pluginContext, feed);
+            paneView = new DetectionPane(mapView, pluginContext, feed, firis);
             feed.setListener(paneView);
+            if (firis != null) {
+                firis.setListener(paneView);
+                paneView.onFirisChanged();
+            }
             pane = new PaneBuilder(paneView.view())
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)
                     .setMetaValue(Pane.PREFERRED_WIDTH_RATIO, 0.5D)
