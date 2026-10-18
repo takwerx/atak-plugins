@@ -192,8 +192,10 @@ public final class RadarOverlay {
 
     private static final String PREF_ON = "weather.layer.radar.on";
     private static final String PREF_TRANSPARENCY = "weather.layer.radar.transparency";
-    /** How see-through the radar is, 0 (solid, as it always was) to this. */
+    /** How see-through the radar is, 0 (solid) to this. */
     public static final int MAX_TRANSPARENCY = 90;
+    /** A little of the map shows through until the operator moves the slider (operator, 2026-10-17: "default needs to be set at like 20"). */
+    private static final int DEFAULT_TRANSPARENCY = 20;
     /**
      * Frames a loop plays: up to the cache's worth, so every loop after the first
      * plays from memory. The NWS gives a frame every two minutes for two hours;
@@ -329,8 +331,8 @@ public final class RadarOverlay {
         mapView.addLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
         layer.setVisible(false);
         final SharedPreferences tp = MapCompat.prefs();
-        transparency = tp == null ? 0
-                : Math.max(0, Math.min(MAX_TRANSPARENCY, tp.getInt(PREF_TRANSPARENCY, 0)));
+        transparency = tp == null ? DEFAULT_TRANSPARENCY
+                : Math.max(0, Math.min(MAX_TRANSPARENCY, tp.getInt(PREF_TRANSPARENCY, DEFAULT_TRANSPARENCY)));
         layer.setAlpha((100 - transparency) / 100f);
         mapView.addOnMapMovedListener(moved);
         worker = Executors.newSingleThreadExecutor(new ThreadFactory() {
