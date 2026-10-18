@@ -77,6 +77,34 @@ public final class FirisModels {
         public long startMs;
         final List<Ring> rings = new ArrayList<>();
 
+        /** The run's isochrone times, ascending, without repeats. */
+        public double[] hours() {
+            final java.util.TreeSet<Double> s = new java.util.TreeSet<>();
+            for (Ring g : rings)
+                s.add(g.hours);
+            final double[] out = new double[s.size()];
+            int i = 0;
+            for (double h : s)
+                out[i++] = h;
+            return out;
+        }
+
+        /** Acres inside the isochrone at that time, from the area the source states; -1 if not given. */
+        public double acres(double h) {
+            double m2 = 0;
+            for (Ring g : rings)
+                if (g.hours == h) {
+                    if (g.areaM2 < 0)
+                        return -1;
+                    m2 += g.areaM2;
+                }
+            return m2 / 4046.8564224;
+        }
+
+        public String key() {
+            return fire + "|" + started;
+        }
+
         /** "SPRINGS", out of "CA-MNF-SPRINGS-20261017-2002". */
         public String shortName() {
             final String[] p = fire.split("-");
@@ -85,7 +113,7 @@ public final class FirisModels {
     }
 
     static final class Ring {
-        double hours;
+        double hours, areaM2 = -1;
         int color;
         Geometry geom;
     }
@@ -132,6 +160,7 @@ public final class FirisModels {
             public void run() {
                 synchronized (lock) {
                     showLocked(on);
+                    redrawAtLocked();
                 }
                 if (on && System.currentTimeMillis() - fetchedAt > EVERY_MS)
                     fetch();
@@ -156,6 +185,7 @@ public final class FirisModels {
                         synchronized (lock) {
                             runs = saved;
                             drawLocked();
+                            redrawAtLocked();
                         }
                     }
                 } catch (Throwable t) {
@@ -219,6 +249,79 @@ public final class FirisModels {
                 mapView.getWidth(), mapView.getHeight());
     }
 
+    // ---- where it is by ----------------------------------------------------------
+
+    /** The run the slider is on, by key, and the time shown; kept across a restart. */
+    public String focusKey() {
+        return prefs.getString("firis.focus", null);
+    }
+
+    public double focusHours() {
+        return prefs.getFloat("firis.focusHours", 0f);
+    }
+
+    public Run focus() {
+        final String k = focusKey();
+        if (k != null)
+            for (Run r : runs)
+                if (k.equals(r.key()))
+                    return r;
+        return null;
+    }
+
+    /** Puts the slider on a run, or takes it off with null. */
+    public void setFocus(Run r) {
+        prefs.edit().putString("firis.focus", r == null ? null : r.key()).putFloat("firis.focusHours", 0f).apply();
+        showAt(r, 0);
+    }
+
+    /** Draws a run's edge at that time in white over its rings; 0 draws none. */
+    public void showAt(final Run r, final double h) {
+        prefs.edit().putFloat("firis.focusHours", (float) h).apply();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock) {
+                    drawAtLocked(r, h);
+                }
+            }
+        });
+    }
+
+    private long atFsid = -1;
+
+    /** Lock held. */
+    private void drawAtLocked(Run r, double h) {
+        if (store == null)
+            return;
+        boolean bulk = false;
+        try {
+            store.acquireModifyLock(true);
+            bulk = true;
+            if (atFsid >= 0) {
+                store.deleteFeatureSet(atFsid);
+                atFsid = -1;
+            }
+            if (r == null || h <= 0 || !isOn())
+                return;
+            atFsid = store.insertFeatureSet(new FeatureSet("FireCast", "FIRIS", "FIRIS at", Double.MAX_VALUE, 0d));
+            store.setFeatureSetVisible(atFsid, true);
+            final String name = r.shortName() + ", " + hoursText(h) + " after " + when(r.startMs);
+            for (Ring g : r.rings)
+                if (g.hours == h) {
+                    final AttributeSet a = new AttributeSet();
+                    a.setAttribute("_title", name);
+                    store.insertFeature(new Feature(atFsid, name, g.geom, new BasicStrokeStyle(0xFFFFFFFF, 4f), a,
+                            Feature.AltitudeMode.ClampToGround, 0d));
+                }
+        } catch (Exception e) {
+            Log.w(TAG, "FIRIS edge draw failed", e);
+        } finally {
+            if (bulk)
+                store.releaseModifyLock();
+        }
+    }
+
     // ---- fetch ---------------------------------------------------------------------
 
     /** Worker thread. */
@@ -245,6 +348,7 @@ public final class FirisModels {
                 synchronized (lock) {
                     runs = got;
                     drawLocked();
+                    redrawAtLocked();
                 }
             }
         } catch (Throwable t) {
@@ -396,6 +500,11 @@ public final class FirisModels {
         final Ring g = new Ring();
         g.hours = hours(a.get("elapsed_minutes"));
         g.color = color;
+        try {
+            if (a.containsKey("st_area(shape)"))
+                g.areaM2 = Double.parseDouble(a.get("st_area(shape)"));
+        } catch (NumberFormatException ignored) {
+        }
         if (polys.size() == 1) {
             g.geom = polys.get(0);
         } else {
@@ -445,11 +554,15 @@ public final class FirisModels {
         }
     }
 
+    public static String clock(long ms) {
+        return new SimpleDateFormat("HH:mm", Locale.US).format(new Date(ms));
+    }
+
     public static String when(long ms) {
         return ms <= 0 ? "time not given" : new SimpleDateFormat("MMM d HH:mm", Locale.US).format(new Date(ms));
     }
 
-    private static String hoursText(double h) {
+    public static String hoursText(double h) {
         return (h == Math.floor(h) ? String.valueOf((int) h) : String.valueOf(h)) + " h";
     }
 
@@ -502,6 +615,7 @@ public final class FirisModels {
             bulk = true;
             for (long id : setIdsLocked())
                 store.deleteFeatureSet(id);
+            atFsid = -1;
             for (Run r : runs) {
                 final long fsid = store.insertFeatureSet(new FeatureSet("FireCast", "FIRIS",
                         r.fire + " " + r.started, Double.MAX_VALUE, 0d));
@@ -540,6 +654,11 @@ public final class FirisModels {
         } catch (Exception e) {
             Log.w(TAG, "FIRIS visibility", e);
         }
+    }
+
+    /** Lock held: the white edge comes back with the runs, after a restart or a fetch. */
+    private void redrawAtLocked() {
+        drawAtLocked(focus(), focusHours());
     }
 
     private void changed() {

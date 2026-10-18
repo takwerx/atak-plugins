@@ -169,7 +169,9 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
                     public void onClick(DialogInterface d, int which) {
                         if (!firis.isOn())
                             firis.setOn(true);
+                        firis.setFocus(runs.get(which));
                         firis.goTo(runs.get(which));
+                        onFirisChanged();
                     }
                 })
                 .setNegativeButton("Close", null)
@@ -201,6 +203,132 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             t.append(" Long press for the list.");
         s.setText(t.toString());
         s.setVisibility(on && t.length() > 0 ? View.VISIBLE : View.GONE);
+        buildFirisSlider(on ? firis.focus() : null);
+    }
+
+    private String firisSliderFor;
+
+    /**
+     * The same "where it is by" as our own model's page: a slider over the run's rings,
+     * the edge at that time in white on the map, and the clock and acres above it.
+     * Rebuilt only when the run changes, so a refresh does not yank the bar from a finger.
+     */
+    private void buildFirisSlider(final FirisModels.Run r) {
+        final LinearLayout box = header.findViewById(R.id.firis_slider);
+        final String key = r == null ? null : r.key();
+        if (key == null ? firisSliderFor == null && box.getChildCount() == 0 : key.equals(firisSliderFor))
+            return;
+        firisSliderFor = key;
+        box.removeAllViews();
+        if (r == null) {
+            box.setVisibility(View.GONE);
+            return;
+        }
+        final double[] hs = r.hours();
+        if (hs.length == 0) {
+            box.setVisibility(View.GONE);
+            return;
+        }
+        final Context c = mapView.getContext();
+        final float dp = c.getResources().getDisplayMetrics().density;
+        final LinearLayout head = new LinearLayout(c);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        final TextView title = new TextView(c);
+        title.setText(r.shortName() + ", run " + FirisModels.when(r.startMs));
+        title.setTextColor(0xFF00E5FF);
+        title.setTextSize(12f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setAllCaps(true);
+        title.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        head.addView(title);
+        final Button close = (Button) PluginLayoutInflater.inflate(pluginContext, R.layout.source_button, null);
+        close.setText("Close");
+        close.setTextColor(Color.WHITE);
+        close.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        close.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                firis.setFocus(null);
+                onFirisChanged();
+            }
+        });
+        head.addView(close);
+        box.addView(head);
+        final TextView label = new TextView(c);
+        label.setTextColor(Color.WHITE);
+        label.setTextSize(15f);
+        int at = 0;
+        for (int i = 0; i < hs.length; i++)
+            if (hs[i] == firis.focusHours())
+                at = i + 1;
+        label.setText(firisAtText(r, hs, at));
+        box.addView(label);
+        final android.widget.SeekBar bar = new android.widget.SeekBar(c);
+        bar.setMax(hs.length);
+        bar.setProgress(at);
+        bar.setPadding((int) (18 * dp), (int) (16 * dp), (int) (18 * dp), (int) (16 * dp));
+        bar.setMinimumHeight((int) (52 * dp));
+        final android.content.res.ColorStateList white = android.content.res.ColorStateList.valueOf(Color.WHITE);
+        bar.setThumbTintList(white);
+        bar.setProgressTintList(white);
+        bar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar sb, int p, boolean fromUser) {
+                if (!fromUser)
+                    return;
+                label.setText(firisAtText(r, hs, p));
+                firis.showAt(r, p == 0 ? 0 : hs[p - 1]);
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar sb) {
+                // The list is the pane's scroller; it must not take the drag.
+                sb.getParent().requestDisallowInterceptTouchEvent(true);
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar sb) {
+            }
+        });
+        box.addView(bar);
+        final LinearLayout ends = new LinearLayout(c);
+        final TextView from = new TextView(c), to = new TextView(c);
+        from.setText("Run, " + FirisModels.clock(r.startMs));
+        to.setText(FirisModels.clock(r.startMs + (long) (hs[hs.length - 1] * 3_600_000L)));
+        for (TextView v : new TextView[] { from, to }) {
+            v.setTextSize(13f);
+            v.setTextColor(0xFFB0B0B0);
+            v.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        to.setGravity(android.view.Gravity.END);
+        ends.addView(from);
+        ends.addView(to);
+        box.addView(ends);
+        if (!r.inputs.isEmpty()) {
+            final TextView in = new TextView(c);
+            in.setText("Run with: " + r.inputs);
+            in.setTextColor(0xFFB0B0B0);
+            in.setTextSize(13f);
+            box.addView(in);
+        }
+        box.setVisibility(View.VISIBLE);
+    }
+
+    /** "By 22:02, in 2 h: 340 acres." */
+    private static String firisAtText(FirisModels.Run r, double[] hs, int p) {
+        if (p <= 0)
+            return "Slide to see where the run has the fire at any time up to "
+                    + FirisModels.clock(r.startMs + (long) (hs[hs.length - 1] * 3_600_000L))
+                    + ". Its edge is drawn on the map in white.";
+        final double h = hs[p - 1];
+        final StringBuilder s = new StringBuilder("By ")
+                .append(FirisModels.clock(r.startMs + (long) (h * 3_600_000L)))
+                .append(", in ").append(FirisModels.hoursText(h));
+        final double ac = r.acres(h);
+        if (ac >= 0)
+            s.append(": ").append(String.format(Locale.US, ac < 10 ? "%.1f" : "%,.0f", ac)).append(" acres");
+        return s.append(".").toString();
     }
 
     /**
