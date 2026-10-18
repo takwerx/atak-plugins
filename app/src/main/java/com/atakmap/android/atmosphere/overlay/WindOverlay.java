@@ -144,6 +144,40 @@ public final class WindOverlay {
         }
     };
 
+    /** How often a wind left on looks for a newer model run. */
+    private static final long RUN_CHECK_MS = 10 * 60 * 1000L;
+
+    /**
+     * A newer run, once the model has one. The run was chosen only when Wind was
+     * switched on, so a device left on kept the morning's forecast and its "now"
+     * never moved, and two devices showed different wind (operator, 2026-10-17:
+     * "if you just leave it on its not updating. look at xcover vs s22").
+     */
+    private final Runnable runCheck = new Runnable() {
+        @Override
+        public void run() {
+            if (!on)
+                return;
+            final long latest = model.latestRun(System.currentTimeMillis());
+            final long ahead = (System.currentTimeMillis() - latest) / 3_600_000L;
+            if (latest != run || ahead != firstHour) {
+                // Keep the time shown, on the new run.
+                final long shownTime = run + hour * 3_600_000L;
+                setRun(latest);
+                hour = (int) Math.max(firstHour, Math.min(hours, Math.round((shownTime - latest) / 3_600_000.0)));
+                cache.clear();
+                region = null;
+                generation++;
+                pendingKey = null;
+                Log.d(TAG, "newer run " + latest + ", refetching");
+                if (listener != null)
+                    listener.onFrames(labels(), hourIndex());
+                ensureRegion();
+            }
+            mapView.postDelayed(this, RUN_CHECK_MS);
+        }
+    };
+
     private final Runnable moveSettled = new Runnable() {
         @Override
         public void run() {
@@ -228,6 +262,7 @@ public final class WindOverlay {
         mapView.removeCallbacks(moveSettled);
         mapView.removeCallbacks(scrubSettled);
         mapView.removeCallbacks(ticker);
+        mapView.removeCallbacks(runCheck);
         generation++;
         if (view != null) {
             final ViewGroup parent = (ViewGroup) view.getParent();
@@ -306,9 +341,12 @@ public final class WindOverlay {
             if (view != null)
                 view.setVisibility(android.view.View.VISIBLE);
             ensureRegion();
+            mapView.removeCallbacks(runCheck);
+            mapView.postDelayed(runCheck, RUN_CHECK_MS);
         } else {
             generation++;
             mapView.removeCallbacks(ticker);
+            mapView.removeCallbacks(runCheck);
             if (view != null) {
                 view.setVisibility(android.view.View.GONE);
                 view.setGrid(null);
