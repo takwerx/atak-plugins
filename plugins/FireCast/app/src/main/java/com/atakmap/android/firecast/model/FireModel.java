@@ -1285,6 +1285,20 @@ public final class FireModel {
         return null;
     }
 
+    /** Opens a run's page and flies to it, as the arrival notice does. Any thread. */
+    boolean open(String runId) {
+        if (find(runId) == null)
+            return false;
+        try {
+            com.atakmap.android.ipc.AtakBroadcast.getInstance().sendBroadcast(
+                    new android.content.Intent(ModelReceiver.ACTION).putExtra(EXTRA_RUN, runId));
+            return true;
+        } catch (Throwable t) {
+            Log.w(TAG, "could not open run " + runId, t);
+            return false;
+        }
+    }
+
     /** Its data package was deleted: the run goes too. Any thread. */
     void deleteReceived(final String runId) {
         main.post(new Runnable() {

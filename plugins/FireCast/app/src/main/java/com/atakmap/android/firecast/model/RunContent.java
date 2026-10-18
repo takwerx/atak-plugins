@@ -40,7 +40,13 @@ final class RunContent implements URIContentResolver {
         }
     }
 
-    private final class Handler extends FileContentHandler {
+    /**
+     * GoTo is a tap on the run in the package's contents: fly there and open its page.
+     * Visibility is the package's eye: the run's own ON/OFF. Without them ATAK's list
+     * showed the run and did nothing when it was tapped (dev-2, 2026-10-17).
+     */
+    private final class Handler extends FileContentHandler
+            implements com.atakmap.android.hierarchy.action.GoTo, com.atakmap.android.hierarchy.action.Visibility {
         private final String runId;
 
         Handler(File file, String runId) {
@@ -67,6 +73,11 @@ final class RunContent implements URIContentResolver {
         public String getTitle() {
             final FireModel.Run r = model.find(runId);
             return r == null ? CONTENT_TYPE : r.label();
+        }
+
+        @Override
+        public boolean goTo(boolean select) {
+            return model.open(runId);
         }
 
         @Override
