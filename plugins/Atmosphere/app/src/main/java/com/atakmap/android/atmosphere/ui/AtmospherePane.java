@@ -61,6 +61,7 @@ import com.atakmap.android.atmosphere.overlay.FireWxOutlookOverlay;
 import com.atakmap.android.atmosphere.overlay.SawtiOverlay;
 import com.atakmap.android.atmosphere.overlay.ErcOverlay;
 import com.atakmap.android.atmosphere.overlay.LightningOverlay;
+import com.atakmap.android.atmosphere.overlay.Origin;
 import com.atakmap.android.atmosphere.overlay.PspsOverlay;
 import com.atakmap.android.atmosphere.overlay.StormReportsOverlay;
 import com.atakmap.android.atmosphere.overlay.TornadoPathsOverlay;
@@ -430,6 +431,10 @@ public final class AtmospherePane {
     /** Which storms are showing their own list of maps. By storm id, not by slot. */
     private final Set<String> stormOpen = new HashSet<>();
     private final LinearLayout radarSettings;
+    private final android.widget.SeekBar radarTransparency;
+    private final TextView radarTransparencyLabel;
+    /** The strip's Play/Stop button, keyed apart from Live, the days and the hours. */
+    private static final String PLAY_TAG = "play";
     private final LinearLayout windSettings;
     private final ImageButton radarExpand;
     private final ImageButton windExpand;
@@ -496,7 +501,7 @@ public final class AtmospherePane {
     private Button stationsToggle;
     private ImageButton stationsExpand;
     private View stationsSettings;
-    private LinearLayout stationsOriginRow, stationsDistanceRow, stationsLegend;
+    private LinearLayout stationsDistanceRow, stationsLegend;
     private LinearLayout stationsGateRow, stationsLabelGateRow, stationsShowRow;
     private TextView stationsGateText, stationsLabelGateText, stationsUtilityGateText;
     private LinearLayout stationsUtilityGateRow;
@@ -516,7 +521,7 @@ public final class AtmospherePane {
     private Button gaugesToggle;
     private ImageButton gaugesExpand;
     private View gaugesSettings;
-    private LinearLayout gaugesOriginRow, gaugesDistanceRow, gaugesLegend;
+    private LinearLayout gaugesDistanceRow, gaugesLegend;
     private boolean gaugesOpen;
     private BuoyOverlay buoyLayer;
     private BuoyPage buoyPage;
@@ -527,7 +532,7 @@ public final class AtmospherePane {
     private Button buoysToggle;
     private ImageButton buoysExpand;
     private View buoysSettings;
-    private LinearLayout buoysOriginRow, buoysDistanceRow, buoysLegend;
+    private LinearLayout buoysDistanceRow, buoysLegend;
     private boolean buoysOpen;
     private boolean spotOpen = true;
 
@@ -583,6 +588,11 @@ public final class AtmospherePane {
                     @Override
                     public String pointLabel() {
                         return modeLabel();
+                    }
+
+                    @Override
+                    public String pointWords() {
+                        return paneOrigin.words();
                     }
 
                     @Override
@@ -991,6 +1001,8 @@ public final class AtmospherePane {
         snotelLegend = find(R.id.snotel_legend);
         buildStormScale();
         radarSettings = find(R.id.radar_settings);
+        radarTransparency = find(R.id.radar_transparency);
+        radarTransparencyLabel = find(R.id.radar_transparency_label);
         windSettings = find(R.id.wind_settings);
         radarExpand = find(R.id.radar_expand);
         windExpand = find(R.id.wind_expand);
@@ -1030,7 +1042,6 @@ public final class AtmospherePane {
         stationsToggle = find(R.id.stations_toggle);
         stationsExpand = find(R.id.stations_expand);
         stationsSettings = find(R.id.stations_settings);
-        stationsOriginRow = find(R.id.stations_origin_row);
         stationsDistanceRow = find(R.id.stations_distance_row);
         stationsLegend = find(R.id.stations_legend);
         stationsGateRow = find(R.id.stations_gate_row);
@@ -1050,7 +1061,6 @@ public final class AtmospherePane {
         gaugesExpand = find(R.id.gauges_expand);
         gaugesSettings = find(R.id.gauges_settings);
         gaugesStatus = find(R.id.gauges_status);
-        gaugesOriginRow = find(R.id.gauges_origin_row);
         gaugesDistanceRow = find(R.id.gauges_distance_row);
         gaugesLegend = find(R.id.gauges_legend);
         gaugesShowRow = find(R.id.gauges_show_row);
@@ -1072,7 +1082,6 @@ public final class AtmospherePane {
         buoysExpand = find(R.id.buoys_expand);
         buoysSettings = find(R.id.buoys_settings);
         buoysStatus = find(R.id.buoys_status);
-        buoysOriginRow = find(R.id.buoys_origin_row);
         buoysDistanceRow = find(R.id.buoys_distance_row);
         buoysLegend = find(R.id.buoys_legend);
         buoysShowRow = find(R.id.buoys_show_row);
@@ -1878,14 +1887,18 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> times, int shown) {
                 radarFrames = times;
-                if (radar.isOn())
+                // The strip is the radar's only while it owns it: with Wind switched
+                // on after it, the strip stays on the wind's hours (#6).
+                if (stripLayer() == TimeLayer.RADAR) {
                     setWhenTimes(radarTimes(), shown, Math.max(0, times.size() - 1));
+                    stripShowing = TimeLayer.RADAR;
+                }
                 updateLayerControls();
             }
 
             @Override
             public void onFrameShown(int index, String time) {
-                if (!radar.isOn())
+                if (stripLayer() != TimeLayer.RADAR)
                     return;
                 showWhen(index);
                 scrubberLabel.setText(frameLabel(index, time));
@@ -1893,7 +1906,7 @@ public final class AtmospherePane {
 
             @Override
             public void onStatus(String status) {
-                if (!radar.isOn())
+                if (stripLayer() != TimeLayer.RADAR)
                     return;
                 if (!status.isEmpty())
                     scrubberLabel.setText(status);
@@ -1902,6 +1915,51 @@ public final class AtmospherePane {
                     scrubberLabel.setText(frameLabel(i,
                             i < 0 || i >= radarFrames.size() ? null : radarFrames.get(i)));
                 }
+            }
+
+            @Override
+            public void onPlaying(boolean playing) {
+                if (stripLayer() != TimeLayer.RADAR || radar == null)
+                    return;
+                // Playing hides the hours, as Live does; stopped, the frame it
+                // stopped on is green among them, or Live when it is the newest.
+                liveMode = playing || radar.frameIndex() == whenLive;
+                buildWhenPicker();
+            }
+        });
+        radarTransparency.setMax(RadarOverlay.MAX_TRANSPARENCY);
+        radarTransparency.setProgress(radar.transparency());
+        radarTransparencyLabel.setText(pluginContext.getString(R.string.raintotals_opacity_heading)
+                + " " + radar.transparency() + "%");
+        // The bar owns the touch from down to up, or the pager takes a sideways drag
+        // as a page turn. Applied on every tick: the renderer fades what it holds.
+        radarTransparency.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                final int a = e.getActionMasked();
+                if (a == android.view.MotionEvent.ACTION_DOWN)
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                else if (a == android.view.MotionEvent.ACTION_UP
+                        || a == android.view.MotionEvent.ACTION_CANCEL)
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                return false;
+            }
+        });
+        radarTransparency.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar bar, int progress, boolean fromUser) {
+                radarTransparencyLabel.setText(pluginContext.getString(
+                        R.string.raintotals_opacity_heading) + " " + progress + "%");
+                if (fromUser && radar != null)
+                    radar.setTransparency(progress);
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar bar) {
             }
         });
         updateLayerControls();
@@ -1916,8 +1974,10 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> labels, int shown) {
                 windHours = Math.max(0, labels.size() - 1);
-                if (wind.isOn())
+                if (stripLayer() == TimeLayer.WIND) {
                     setWhenTimes(windTimes(), shown, 0);
+                    stripShowing = TimeLayer.WIND;
+                }
                 updateLayerControls();
             }
 
@@ -1925,8 +1985,12 @@ public final class AtmospherePane {
             public void onFrameShown(int index, long validTime) {
                 if (!wind.isOn())
                     return;
-                showWhen(index);
-                scrubberLabel.setText(windLabel(index, validTime));
+                // The strip and its line only while the strip is the wind's; the
+                // level and the reading are the wind's own, whoever has the strip.
+                if (stripLayer() == TimeLayer.WIND) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
                 // The model can change with the height, so the level line follows.
                 updateWindLevel();
                 // And the reading, which is read off the grid now on the map: it
@@ -1939,11 +2003,13 @@ public final class AtmospherePane {
             public void onStatus(String status) {
                 if (!wind.isOn())
                     return;
-                if (!status.isEmpty())
-                    scrubberLabel.setText(status);
-                else
-                    scrubberLabel.setText(
-                            windLabel(wind.hourIndex(), wind.validTime(wind.hourIndex())));
+                if (stripLayer() == TimeLayer.WIND) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(wind.hourIndex(), wind.validTime(wind.hourIndex())));
+                }
                 updateWindReading();
             }
         });
@@ -1962,8 +2028,10 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> labels, int shown) {
                 smokeHours = Math.max(0, labels.size() - 1);
-                if (smoke.isOn())
+                if (stripLayer() == TimeLayer.SMOKE) {
                     setWhenTimes(smokeTimes(), shown, 0);
+                    stripShowing = TimeLayer.SMOKE;
+                }
                 updateLayerControls();
             }
 
@@ -1971,8 +2039,10 @@ public final class AtmospherePane {
             public void onFrameShown(int index, long validTime) {
                 if (!smoke.isOn())
                     return;
-                showWhen(index);
-                scrubberLabel.setText(windLabel(index, validTime));
+                if (stripLayer() == TimeLayer.SMOKE) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
                 // A new hour is a new picture, so the number at the point moves too.
                 updateSmokeReading();
             }
@@ -1981,11 +2051,13 @@ public final class AtmospherePane {
             public void onStatus(String status) {
                 if (!smoke.isOn())
                     return;
-                if (!status.isEmpty())
-                    scrubberLabel.setText(status);
-                else
-                    scrubberLabel.setText(
-                            windLabel(smoke.hourIndex(), smoke.validTime(smoke.hourIndex())));
+                if (stripLayer() == TimeLayer.SMOKE) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(smoke.hourIndex(), smoke.validTime(smoke.hourIndex())));
+                }
                 updateSmokeReading();
             }
         });
@@ -2522,9 +2594,13 @@ public final class AtmospherePane {
             raingaugesLegend.addView(legendLine(row[0], Color.parseColor(row[1])));
     }
 
-    /** The radar estimate before a moment: the day, the time, then 1, 24, 48 or 72 hours before. */
+    /**
+     * The radar estimate before a moment: the day, the time, then 1, 24, 48 or 72 hours
+     * before. The relay keeps 45 days, so the calendar starts there.
+     */
     private void pickRainTotalsMoment(android.content.Context ctx) {
-        MomentPicker.pick(ctx, raintotals.moment(), com.atakmap.android.atmosphere.data.IemRadar.HOURS,
+        MomentPicker.pick(ctx, raintotals.moment(), RainTotalsOverlay.earliestMoment(),
+                com.atakmap.android.atmosphere.data.IemRadar.HOURS,
                 raintotals.beforeHours(), pluginContext.getString(R.string.rain_window_title), new MomentPicker.Words() {
                     @Override
                     public String of(int hours, long millis) {
@@ -3219,7 +3295,11 @@ public final class AtmospherePane {
             public void onClick(View v) {
                 if (wind == null)
                     return;
-                wind.setHeatOn(!wind.heatOn());
+                final boolean heat = !wind.heatOn();
+                // The heat map paints over the radar: the two never share the map.
+                if (heat && radar != null && radar.isOn())
+                    radar.setOn(false);
+                wind.setHeatOn(heat);
                 updateLayerControls();
             }
         });
@@ -3330,8 +3410,10 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> labels, int shown) {
                 wavesHours = Math.max(0, labels.size() - 1);
-                if (waves.isOn())
+                if (stripLayer() == TimeLayer.WAVES) {
                     setWhenTimes(wavesTimes(), shown, 0);
+                    stripShowing = TimeLayer.WAVES;
+                }
                 updateLayerControls();
             }
 
@@ -3339,8 +3421,10 @@ public final class AtmospherePane {
             public void onFrameShown(int index, long validTime) {
                 if (!waves.isOn())
                     return;
-                showWhen(index);
-                scrubberLabel.setText(windLabel(index, validTime));
+                if (stripLayer() == TimeLayer.WAVES) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
                 updateWavesReading();
             }
 
@@ -3348,11 +3432,13 @@ public final class AtmospherePane {
             public void onStatus(String status) {
                 if (!waves.isOn())
                     return;
-                if (!status.isEmpty())
-                    scrubberLabel.setText(status);
-                else
-                    scrubberLabel.setText(
-                            windLabel(waves.hourIndex(), waves.validTime(waves.hourIndex())));
+                if (stripLayer() == TimeLayer.WAVES) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(waves.hourIndex(), waves.validTime(waves.hourIndex())));
+                }
                 updateWavesReading();
             }
         });
@@ -3380,8 +3466,10 @@ public final class AtmospherePane {
             @Override
             public void onFrames(List<String> labels, int shown) {
                 rainHours = Math.max(0, labels.size() - 1);
-                if (rain.isOn())
+                if (stripLayer() == TimeLayer.RAIN) {
                     setWhenTimes(rainTimes(), shown, 0);
+                    stripShowing = TimeLayer.RAIN;
+                }
                 updateLayerControls();
             }
 
@@ -3389,8 +3477,10 @@ public final class AtmospherePane {
             public void onFrameShown(int index, long validTime) {
                 if (!rain.isOn())
                     return;
-                showWhen(index);
-                scrubberLabel.setText(windLabel(index, validTime));
+                if (stripLayer() == TimeLayer.RAIN) {
+                    showWhen(index);
+                    scrubberLabel.setText(windLabel(index, validTime));
+                }
                 updateRainReading();
             }
 
@@ -3398,11 +3488,13 @@ public final class AtmospherePane {
             public void onStatus(String status) {
                 if (!rain.isOn())
                     return;
-                if (!status.isEmpty())
-                    scrubberLabel.setText(status);
-                else
-                    scrubberLabel.setText(
-                            windLabel(rain.hourIndex(), rain.validTime(rain.hourIndex())));
+                if (stripLayer() == TimeLayer.RAIN) {
+                    if (!status.isEmpty())
+                        scrubberLabel.setText(status);
+                    else
+                        scrubberLabel.setText(
+                                windLabel(rain.hourIndex(), rain.validTime(rain.hourIndex())));
+                }
                 updateRainReading();
             }
         });
@@ -3494,13 +3586,24 @@ public final class AtmospherePane {
         // Live, then one button per day the times cover. A single day is not worth
         // a button of its own: the hours below it are already that day.
         final List<Button> dayButtons = new ArrayList<>();
+        final boolean playing = radarPlaying();
         dayButtons.add(whenButton("Live", null, new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 liveMode = true;
                 pickWhen(whenLive);
             }
-        }, liveMode));
+        }, liveMode && !playing));
+        // The radar plays its last two hours as a loop, to show which way the cells
+        // move (takwerx/atmosphere#7). Any other pick on the strip stops it.
+        if (stripLayer() == TimeLayer.RADAR && radar != null && whenTimes.size() > 1)
+            dayButtons.add(whenButton(playing ? "Stop" : "Play", PLAY_TAG, new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (radar != null)
+                        radar.setPlaying(!radar.isPlaying());
+                }
+            }, playing));
         final List<Long> days = new ArrayList<>();
         for (Long t : whenTimes) {
             final long d = startOfDay(t);
@@ -3624,8 +3727,10 @@ public final class AtmospherePane {
                 on = !liveMode && (Integer) tag == whenIndex;
             else if (tag instanceof Long)
                 on = !liveMode && ((Long) tag).longValue() == day;
+            else if (PLAY_TAG.equals(tag))
+                on = radarPlaying();
             else
-                on = liveMode;
+                on = liveMode && !radarPlaying();
             ((Button) v).setTextColor(on
                     ? pluginContext.getResources().getColor(R.color.state_on) : Color.WHITE);
         }
@@ -3651,6 +3756,67 @@ public final class AtmospherePane {
         return b;
     }
 
+    /** The radar's loop is playing on the strip it owns. */
+    private boolean radarPlaying() {
+        return radar != null && radar.isPlaying() && stripLayer() == TimeLayer.RADAR;
+    }
+
+    /** The layers that share the one time strip. */
+    private enum TimeLayer { RADAR, WIND, SMOKE, WAVES, RAIN }
+
+    /** The time layer switched on last: the strip is its, while it is on. */
+    private TimeLayer stripOwner;
+    /** The layer whose times the strip holds now, to load another's when it changes. */
+    private TimeLayer stripShowing;
+
+    private boolean timeLayerOn(TimeLayer t) {
+        switch (t) {
+            case RADAR:
+                return radar != null && radar.isOn();
+            case WIND:
+                return wind != null && wind.isOn();
+            case SMOKE:
+                return smoke != null && smoke.isOn();
+            case WAVES:
+                return waves != null && waves.isOn();
+            default:
+                return rain != null && rain.isOn();
+        }
+    }
+
+    /**
+     * Which layer the strip drives: the one switched on last while it is on; else,
+     * after it went off or after All on, the first of the time layers still on, in
+     * the order the strip always took them. Null when none is on.
+     */
+    private TimeLayer stripLayer() {
+        if (stripOwner != null && timeLayerOn(stripOwner))
+            return stripOwner;
+        for (TimeLayer t : new TimeLayer[] { TimeLayer.WIND, TimeLayer.SMOKE, TimeLayer.WAVES,
+                TimeLayer.RAIN, TimeLayer.RADAR })
+            if (timeLayerOn(t))
+                return t;
+        return null;
+    }
+
+    /** The strip's times, reloaded when the layer that owns it changes. */
+    private void followStripOwner() {
+        final TimeLayer owner = stripLayer();
+        if (owner == stripShowing)
+            return;
+        stripShowing = owner;
+        if (owner == TimeLayer.RADAR)
+            setWhenTimes(radarTimes(), radar.frameIndex(), Math.max(0, radarFrames.size() - 1));
+        else if (owner == TimeLayer.WIND)
+            setWhenTimes(windTimes(), wind.hourIndex(), 0);
+        else if (owner == TimeLayer.SMOKE)
+            setWhenTimes(smokeTimes(), smoke.hourIndex(), 0);
+        else if (owner == TimeLayer.WAVES)
+            setWhenTimes(wavesTimes(), waves.hourIndex(), 0);
+        else if (owner == TimeLayer.RAIN)
+            setWhenTimes(rainTimes(), rain.hourIndex(), 0);
+    }
+
     /** Send a pick to whichever layer owns the strip. */
     private void pickWhen(int index) {
         if (index < 0 || index >= whenTimes.size())
@@ -3659,19 +3825,22 @@ public final class AtmospherePane {
         // the label is only written when it does, so the heading sat on the old time
         // while the buttons had already moved, which reads as a control that did not
         // take (XCover, 2026-09-22).
-        if (wind != null && wind.isOn()) {
+        // Only the strip's layer moves: with Radar and Wind both on, the other stays
+        // at its own time (takwerx/atmosphere#6).
+        final TimeLayer owner = stripLayer();
+        if (owner == TimeLayer.WIND) {
             wind.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
-        } else if (smoke != null && smoke.isOn()) {
+        } else if (owner == TimeLayer.SMOKE) {
             smoke.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
-        } else if (waves != null && waves.isOn()) {
+        } else if (owner == TimeLayer.WAVES) {
             waves.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
-        } else if (rain != null && rain.isOn()) {
+        } else if (owner == TimeLayer.RAIN) {
             rain.setHourIndex(index);
             scrubberLabel.setText(windLabel(index, whenTimes.get(index)));
-        } else if (radar != null && radar.isOn()) {
+        } else if (owner == TimeLayer.RADAR) {
             radar.setFrameIndex(index);
             scrubberLabel.setText(frameLabel(index,
                     index < radarFrames.size() ? radarFrames.get(index) : null));
@@ -3935,8 +4104,21 @@ public final class AtmospherePane {
      * The station layer. Its controls on this page are not built yet; it is held so
      * the plugin can hand it over once, and turned on from the layer's own toggle.
      */
+    /** Each layer's last count, said again with the zoom hint when the map settles. */
+    private String stationsCount = "", gaugesCount = "", buoysCount = "";
+
+    /** A layer's count, and what its zoom setting hides right now; see {@link ScaleBar#zoomInHint}. */
+    private String withZoomHint(String count, double gate) {
+        if (count.isEmpty())
+            return count;
+        final String hint = ScaleBar.zoomInHint(mapView(), gate);
+        return hint.isEmpty() ? count : count + "\n" + hint;
+    }
+
     public void setStations(StationOverlay overlay) {
         stationLayer = overlay;
+        if (overlay != null)
+            overlay.setOrigin(paneOrigin);
         if (stationLayer == null)
             return;
         stationLayer.setListener(new StationOverlay.Listener() {
@@ -3951,15 +4133,14 @@ public final class AtmospherePane {
                     int utilityCritical) {
                 // The utility stations are counted apart, and said to be hidden when
                 // the zoom hides them: a count the map does not show reads as a fault.
+                stationsCount = total == 0 ? "" : drawn + " stations, " + critical
+                        + " at criteria" + (utility == 0 ? "" : "\n" + utility
+                                + " utility stations, " + utilityCritical + " at criteria"
+                                + (stationLayer.drawingNow(stationLayer.utilityGate())
+                                        ? "" : ", shown when zoomed in"));
                 if (stationsStatus != null)
                     stationsStatus.setText(total == 0 ? noStationsText()
-                            : drawn + " stations, " + critical + " at criteria"
-                                    + (utility == 0 ? "" : "\n" + utility
-                                            + " utility stations, " + utilityCritical
-                                            + " at criteria"
-                                            + (stationLayer.drawingNow(
-                                                    stationLayer.utilityGate())
-                                                    ? "" : ", shown when zoomed in")));
+                            : withZoomHint(stationsCount, stationLayer.stationGate()));
                 if (stationPage != null)
                     stationPage.refresh();
                 updateLayerControls();
@@ -3975,11 +4156,10 @@ public final class AtmospherePane {
                 final GeoPoint o = stationLayer.originPoint();
                 final String where = o == null ? "" : String.format(Locale.US, " (%.2f, %.2f)",
                         o.getLatitude(), o.getLongitude());
-                if (stationLayer.fromMe())
-                    return "No stations within " + stationLayer.miles() + " mi of your position"
-                            + where + ". No GPS fix here? Pick Map center.";
-                return "No stations within " + stationLayer.miles() + " mi of the map center"
-                        + where + ".";
+                final Origin from = stationLayer.originSource();
+                return "No stations within " + stationLayer.miles() + " mi of " + from.words()
+                        + where + (from.self() ? ". No GPS fix here? Pick Map center at the top."
+                                : ".");
             }
 
             @Override
@@ -3988,6 +4168,8 @@ public final class AtmospherePane {
                 // now in the wrong order even though nothing was refetched.
                 if (stationPage != null)
                     stationPage.refresh();
+                if (stationsStatus != null && !stationsCount.isEmpty())
+                    stationsStatus.setText(withZoomHint(stationsCount, stationLayer.stationGate()));
                 updateLayerControls();      // the gate readouts quote the scale bar
             }
         });
@@ -3997,6 +4179,8 @@ public final class AtmospherePane {
 
     public void setBuoys(BuoyOverlay overlay) {
         buoyLayer = overlay;
+        if (overlay != null)
+            overlay.setOrigin(paneOrigin);
         if (buoyLayer == null)
             return;
         buoyLayer.setListener(new BuoyOverlay.Listener() {
@@ -4008,9 +4192,9 @@ public final class AtmospherePane {
 
             @Override
             public void onBuoysDrawn(int drawn, int total, int windy) {
+                buoysCount = total == 0 ? "" : drawn + " buoys, " + windy + " reporting wind";
                 if (buoysStatus != null)
-                    buoysStatus.setText(total == 0 ? "" : drawn + " buoys, " + windy
-                            + " reporting wind");
+                    buoysStatus.setText(withZoomHint(buoysCount, buoyLayer.gate()));
                 if (buoyPage != null)
                     buoyPage.refresh();
                 updateLayerControls();
@@ -4020,6 +4204,8 @@ public final class AtmospherePane {
             public void onOriginMoved() {
                 if (buoyPage != null)
                     buoyPage.refresh();
+                if (buoysStatus != null && !buoysCount.isEmpty())
+                    buoysStatus.setText(withZoomHint(buoysCount, buoyLayer.gate()));
             }
         });
         if (buoyPage != null)
@@ -4028,6 +4214,8 @@ public final class AtmospherePane {
 
     public void setGauges(GaugeOverlay overlay) {
         gaugeLayer = overlay;
+        if (overlay != null)
+            overlay.setOrigin(paneOrigin);
         if (gaugeLayer == null)
             return;
         gaugeLayer.setListener(new GaugeOverlay.Listener() {
@@ -4039,10 +4227,11 @@ public final class AtmospherePane {
 
             @Override
             public void onGaugesDrawn(int drawn, int total, int flooding) {
+                gaugesCount = total == 0 ? "" : drawn + " gauges, "
+                        + (flooding == 0 ? "none at action stage or above"
+                                : flooding + " at action stage or above");
                 if (gaugesStatus != null)
-                    gaugesStatus.setText(total == 0 ? "" : drawn + " gauges, "
-                            + (flooding == 0 ? "none at action stage or above"
-                                    : flooding + " at action stage or above"));
+                    gaugesStatus.setText(withZoomHint(gaugesCount, gaugeLayer.gate()));
                 if (gaugePage != null)
                     gaugePage.refresh();
                 updateLayerControls();
@@ -4052,6 +4241,8 @@ public final class AtmospherePane {
             public void onOriginMoved() {
                 if (gaugePage != null)
                     gaugePage.refresh();
+                if (gaugesStatus != null && !gaugesCount.isEmpty())
+                    gaugesStatus.setText(withZoomHint(gaugesCount, gaugeLayer.gate()));
             }
         });
         if (gaugePage != null)
@@ -4104,27 +4295,6 @@ public final class AtmospherePane {
                         })
                 .setNegativeButton(pluginContext.getString(R.string.close), null)
                 .show();
-    }
-
-    private void buildBuoysOriginRow() {
-        buoysOriginRow.removeAllViews();
-        final boolean fromMe = buoyLayer.isFromMe();
-        buoysOriginRow.addView(choiceTile(pluginContext.getString(R.string.stations_from_me),
-                fromMe, new Runnable() {
-                    @Override
-                    public void run() {
-                        buoyLayer.setFromMe(true);
-                        updateLayerControls();
-                    }
-                }));
-        buoysOriginRow.addView(choiceTile(pluginContext.getString(R.string.stations_from_map),
-                !fromMe, new Runnable() {
-                    @Override
-                    public void run() {
-                        buoyLayer.setFromMe(false);
-                        updateLayerControls();
-                    }
-                }));
     }
 
     private void buildBuoysDistanceRow() {
@@ -4246,29 +4416,6 @@ public final class AtmospherePane {
                 .show();
     }
 
-    private void buildGaugesOriginRow() {
-        gaugesOriginRow.removeAllViews();
-        final boolean fromMe = gaugeLayer.isFromMe();
-        gaugesOriginRow.addView(choiceTile(
-                pluginContext.getString(R.string.stations_from_me), fromMe,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        gaugeLayer.setFromMe(true);
-                        updateLayerControls();
-                    }
-                }));
-        gaugesOriginRow.addView(choiceTile(
-                pluginContext.getString(R.string.stations_from_map), !fromMe,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        gaugeLayer.setFromMe(false);
-                        updateLayerControls();
-                    }
-                }));
-    }
-
     private void buildGaugesDistanceRow() {
         gaugesDistanceRow.removeAllViews();
         final int current = gaugeLayer.miles();
@@ -4368,33 +4515,6 @@ public final class AtmospherePane {
                         })
                 .setNegativeButton(pluginContext.getString(R.string.close), null)
                 .show();
-    }
-
-    /**
-     * Measured from the operator or from the middle of the map -- the second is how a
-     * crew looks at a fire they are not standing on.
-     */
-    private void buildStationsOriginRow() {
-        stationsOriginRow.removeAllViews();
-        final boolean fromMe = stationLayer.isFromMe();
-        stationsOriginRow.addView(choiceTile(
-                pluginContext.getString(R.string.stations_from_me), fromMe,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        stationLayer.setFromMe(true);
-                        updateLayerControls();
-                    }
-                }));
-        stationsOriginRow.addView(choiceTile(
-                pluginContext.getString(R.string.stations_from_map), !fromMe,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        stationLayer.setFromMe(false);
-                        updateLayerControls();
-                    }
-                }));
     }
 
     private void buildStationsDistanceRow() {
@@ -4554,6 +4674,9 @@ public final class AtmospherePane {
             buoyLayer.setOn(on);
         else if (buoyLayer != null && on)
             blocked++;
+        // The wind's heat map paints over the radar, here as from the switches (#6).
+        if (on && radar != null && radar.isOn() && wind != null && wind.isOn() && wind.heatOn())
+            wind.setHeatOn(false);
         final Context ctx = MapCompat.atakContext();
         if (blocked > 0 && ctx != null)
             Toast.makeText(ctx, blocked + (blocked == 1 ? " layer is" : " layers are")
@@ -4791,7 +4914,7 @@ public final class AtmospherePane {
     /** One tile of a row of choices: the chosen one green, the Traffic convention. */
     private View choiceTile(String label, boolean chosen, final Runnable onPick) {
         final Button b = (Button) LayoutInflater.from(pluginContext)
-                .inflate(R.layout.trend_chip, stationsOriginRow, false);
+                .inflate(R.layout.trend_chip, stationsDistanceRow, false);
         b.setText(label);
         b.setTextSize(13);
         // Green text on a plain face for the chosen one, never a colored button.
@@ -5254,27 +5377,32 @@ public final class AtmospherePane {
                 .show();
     }
 
-    /** One time-enabled layer at a time (WxReport's rule): the scrubber is one strip. */
+    /**
+     * Radar and Wind run together; Smoke, Waves and Rain stay one at a time with
+     * every time layer (takwerx/atmosphere#6: "When I turn on either the Radar or the
+     * Wind overlays, the other one will turn off"). Wind's speed heat map paints over
+     * the radar, so the two never share the map: Radar coming on takes the heat map
+     * off, and the heat map coming on takes Radar off. The one time strip follows the
+     * layer switched on last ({@link #stripLayer}).
+     */
     private void turnRadarOn() {
-        if (wind != null && wind.isOn())
-            wind.setOn(false);
         if (smoke != null && smoke.isOn())
             smoke.setOn(false);
         if (waves != null && waves.isOn())
             waves.setOn(false);
         if (rain != null && rain.isOn())
             rain.setOn(false);
+        if (wind != null && wind.isOn() && wind.heatOn())
+            wind.setHeatOn(false);
         if (radar != null) {
             radar.setOn(true);
-            setWhenTimes(radarTimes(), radar.frameIndex(),
-                    Math.max(0, radarFrames.size() - 1));
+            stripOwner = TimeLayer.RADAR;
         }
         updateLayerControls();
     }
 
+    /** See {@link #turnRadarOn}: Wind runs with Radar, its heat map does not. */
     private void turnWindOn() {
-        if (radar != null && radar.isOn())
-            radar.setOn(false);
         if (smoke != null && smoke.isOn())
             smoke.setOn(false);
         if (waves != null && waves.isOn())
@@ -5282,13 +5410,15 @@ public final class AtmospherePane {
         if (rain != null && rain.isOn())
             rain.setOn(false);
         if (wind != null) {
+            if (radar != null && radar.isOn() && wind.heatOn())
+                wind.setHeatOn(false);
             wind.setOn(true);
-            setWhenTimes(windTimes(), wind.hourIndex(), 0);
+            stripOwner = TimeLayer.WIND;
         }
         updateLayerControls();
     }
 
-    /** One time-enabled layer at a time, because they share the one strip. */
+    /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
     private void turnSmokeOn() {
         if (radar != null && radar.isOn())
             radar.setOn(false);
@@ -5300,12 +5430,12 @@ public final class AtmospherePane {
             rain.setOn(false);
         if (smoke != null) {
             smoke.setOn(true);
-            setWhenTimes(smokeTimes(), smoke.hourIndex(), 0);
+            stripOwner = TimeLayer.SMOKE;
         }
         updateLayerControls();
     }
 
-    /** One time-enabled layer at a time, because they share the one strip. */
+    /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
     private void turnWavesOn() {
         if (radar != null && radar.isOn())
             radar.setOn(false);
@@ -5317,12 +5447,12 @@ public final class AtmospherePane {
             rain.setOn(false);
         if (waves != null) {
             waves.setOn(true);
-            setWhenTimes(wavesTimes(), waves.hourIndex(), 0);
+            stripOwner = TimeLayer.WAVES;
         }
         updateLayerControls();
     }
 
-    /** One time-enabled layer at a time, because they share the one strip. */
+    /** One at a time with every time layer, Radar and Wind included (see {@link #turnRadarOn}). */
     private void turnRainOn() {
         if (radar != null && radar.isOn())
             radar.setOn(false);
@@ -5334,7 +5464,7 @@ public final class AtmospherePane {
             waves.setOn(false);
         if (rain != null) {
             rain.setOn(true);
-            setWhenTimes(rainTimes(), rain.hourIndex(), 0);
+            stripOwner = TimeLayer.RAIN;
         }
         updateLayerControls();
     }
@@ -5982,10 +6112,17 @@ public final class AtmospherePane {
     }
 
     /** Layer switches under a view that read ON: every layer toggle says "<Name> ON" or "OFF". */
-    private static int countOn(View v) {
+    /**
+     * How many layers under a view are on: main layer switches only, never a setting
+     * inside a layer's block (operator, 2026-10-15: "the number of layers on should
+     * just track the main layer not sub settings etc."). Counting every button that
+     * read " ON" made a group say "2 ON" with every layer off, from a hidden "Readings
+     * and names ON" and "Utility Stations ON" (signed 0.16, S22).
+     */
+    private int countOn(View v) {
         if (v instanceof Button) {
             final CharSequence t = ((Button) v).getText();
-            return t != null && t.toString().endsWith(" ON") ? 1 : 0;
+            return isLayerSwitch(v) && t != null && t.toString().endsWith(" ON") ? 1 : 0;
         }
         int n = 0;
         if (v instanceof android.view.ViewGroup) {
@@ -5994,6 +6131,22 @@ public final class AtmospherePane {
                 n += countOn(g.getChildAt(i));
         }
         return n;
+    }
+
+    /** The switches named "_toggle" that are a setting inside a layer, not a layer. */
+    private static final java.util.Set<String> SETTING_TOGGLES = new java.util.HashSet<>(
+            java.util.Arrays.asList("stations_guide_toggle", "wind_heat_toggle"));
+
+    /** A layer's own switch: "<layer>_toggle" on the Layers page, so a new layer counts. */
+    private boolean isLayerSwitch(View v) {
+        if (v.getId() == View.NO_ID)
+            return false;
+        try {
+            final String name = pluginContext.getResources().getResourceEntryName(v.getId());
+            return name.endsWith("_toggle") && !SETTING_TOGGLES.contains(name);
+        } catch (android.content.res.Resources.NotFoundException e) {
+            return false;
+        }
     }
 
     /**
@@ -6079,7 +6232,10 @@ public final class AtmospherePane {
      * Puts a page's map layer switch at its top: a mirror of that layer's switch on the
      * Layers page, which it clicks, so allowing, turning on and off go one way wherever
      * they start (operator, 2026-10-14: "some way from a page to turn that layer on for
-     * all the pages we host").
+     * all the pages we host"). It sits small at the end of the page's heading line, as
+     * "Map ON", the heading naming the layer; a row of its own took the space of a list
+     * item on every page (operator, 2026-10-16: "it needs to be small and in line with
+     * something else that is already on the page to allow space for list items").
      */
     private void addPageSwitch(View page, int toggleId) {
         final View t = pages[LAYERS_PAGE].findViewById(toggleId);
@@ -6103,16 +6259,66 @@ public final class AtmospherePane {
                 syncPageSwitches();
             }
         });
-        column.addView(sw, 0);
+        final TextView heading = firstHeading(column);
+        if (heading != null && heading.getParent() instanceof LinearLayout) {
+            // The heading and the switch on one line: the heading takes what is left,
+            // the switch its own width, and the line keeps the heading's place and its
+            // space above.
+            final LinearLayout parent = (LinearLayout) heading.getParent();
+            final int at = parent.indexOfChild(heading);
+            final LinearLayout line = new LinearLayout(pluginContext);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.setPadding(0, heading.getPaddingTop(), 0, 0);
+            final ViewGroup.LayoutParams lp = heading.getLayoutParams();
+            parent.removeViewAt(at);
+            heading.setPadding(heading.getPaddingLeft(), 0, heading.getPaddingRight(),
+                    heading.getPaddingBottom());
+            line.addView(heading, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            final LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            swLp.leftMargin = (int) (8 * pluginContext.getResources().getDisplayMetrics().density);
+            sw.setGravity(Gravity.CENTER);
+            sw.setTag(COMPACT);
+            // As wide as "Map OFF" both ways, so the switch does not jump as it flips.
+            sw.setMinWidth(sw.getPaddingLeft() + sw.getPaddingRight() + (int) Math.ceil(
+                    sw.getPaint().measureText(pluginContext.getString(R.string.page_map_off))));
+            line.addView(sw, swLp);
+            parent.addView(line, at, lp != null ? lp : new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        } else
+            column.addView(sw, 0);
         pageSwitches.add(new Button[] { sw, toggle });
-        sw.setText(toggle.getText());
-        sw.setTextColor(toggle.getCurrentTextColor());
+        syncPageSwitches();
+    }
+
+    /** Marks a page switch that sits on its heading's line and says only "Map ON". */
+    private static final String COMPACT = "compact";
+
+    /**
+     * A page's heading: its first text, down through first children. Null when a page
+     * starts with something else, and the switch then takes a row of its own.
+     */
+    private static TextView firstHeading(ViewGroup column) {
+        View v = column.getChildCount() > 0 ? column.getChildAt(0) : null;
+        while (v instanceof LinearLayout && ((LinearLayout) v).getChildCount() > 0)
+            v = ((LinearLayout) v).getChildAt(0);
+        return v instanceof TextView && !(v instanceof Button) ? (TextView) v : null;
     }
 
     /** The page switches say what their Layers page switches say. */
     private void syncPageSwitches() {
         for (Button[] pair : pageSwitches) {
-            pair[0].setText(pair[1].getText());
+            final String full = pair[1].getText().toString();
+            String shown = full;
+            if (COMPACT.equals(pair[0].getTag())) {
+                if (full.endsWith(" ON"))
+                    shown = pluginContext.getString(R.string.page_map_on);
+                else if (full.endsWith(" OFF"))
+                    shown = pluginContext.getString(R.string.page_map_off);
+            }
+            pair[0].setText(shown);
             pair[0].setTextColor(pair[1].getCurrentTextColor());
         }
     }
@@ -6184,7 +6390,6 @@ public final class AtmospherePane {
             stationsUtility.setTextColor(pluginContext.getResources().getColor(
                     utilityOn ? R.color.state_on : R.color.state_off));
             stationsUtilitySettings.setVisibility(utilityOn ? View.VISIBLE : View.GONE);
-            buildStationsOriginRow();
             buildStationsDistanceRow();
             buildStationsShowRow();
             buildStationsGateRows();
@@ -6204,7 +6409,6 @@ public final class AtmospherePane {
         gaugesExpand.setRotation(gaugesOpen ? 180f : 0f);
         gaugesSettings.setVisibility(gaugesOn && gaugesOpen ? View.VISIBLE : View.GONE);
         if (gaugesOn) {
-            buildGaugesOriginRow();
             buildGaugesDistanceRow();
             buildGaugesShowRow();
             buildGaugesGateRows();
@@ -6222,7 +6426,6 @@ public final class AtmospherePane {
         buoysExpand.setRotation(buoysOpen ? 180f : 0f);
         buoysSettings.setVisibility(buoysOn && buoysOpen ? View.VISIBLE : View.GONE);
         if (buoysOn) {
-            buildBuoysOriginRow();
             buildBuoysDistanceRow();
             buildBuoysShowRow();
             buildBuoysGateRows();
@@ -6442,15 +6645,20 @@ public final class AtmospherePane {
             updateWindUnitRow();
             updateWindLevel();
         }
-        if (windOn)
+        followStripOwner();
+        final TimeLayer owner = stripLayer();
+        // The loop's Stop is on the strip: a radar that loses the strip stops playing.
+        if (radar != null && radar.isPlaying() && owner != TimeLayer.RADAR)
+            radar.setPlaying(false);
+        if (owner == TimeLayer.WIND)
             hostScrubberIn(windSettings);
-        else if (smokeOn)
+        else if (owner == TimeLayer.SMOKE)
             hostScrubberIn(smokeSettings);
-        else if (wavesOn)
+        else if (owner == TimeLayer.WAVES)
             hostScrubberIn(wavesSettings);
-        else if (rainOn)
+        else if (owner == TimeLayer.RAIN)
             hostScrubberIn(rainSettings);
-        else if (radarOn)
+        else if (owner == TimeLayer.RADAR)
             hostScrubberIn(radarSettings);
         scrubber.setVisibility(radarOn || windOn || smokeOn || wavesOn || rainOn ? View.VISIBLE : View.GONE);
         creditTheLayers(radarOn, windOn);
@@ -6460,9 +6668,10 @@ public final class AtmospherePane {
 
     /**
      * Put the time strip under the layer that owns it. One strip, not one per layer:
-     * only one time-enabled layer can be on at a time (WxReport's rule), so moving
-     * the one view beats keeping two in step. It goes first in the block, above that
-     * layer's own controls.
+     * Radar and Wind can be on together (takwerx/atmosphere#6), but the strip drives
+     * one of them, the one switched on last ({@link #stripLayer}), so moving the one
+     * view beats keeping two in step. It goes first in the block, above that layer's
+     * own controls.
      */
     private void hostScrubberIn(LinearLayout container) {
         final ViewParent parent = scrubber.getParent();
@@ -7216,6 +7425,42 @@ public final class AtmospherePane {
 
     // ---- the point ---------------------------------------------------------------
 
+    /**
+     * The pane's point as the station, gauge and buoy layers measure from it: their
+     * own My position | Map center rows went (operator, 2026-10-16: "it should be
+     * driven by that top menu"), so a picked point or a favorite is theirs too.
+     */
+    private final Origin paneOrigin = new Origin() {
+        @Override
+        public GeoPoint point() {
+            return AtmospherePane.this.point();
+        }
+
+        @Override
+        public boolean followsMap() {
+            return mode == PointMode.CENTER;
+        }
+
+        @Override
+        public boolean self() {
+            return mode == PointMode.SELF;
+        }
+
+        @Override
+        public String words() {
+            switch (mode) {
+                case SELF:
+                    return "you";
+                case PICKED:
+                    return "the picked point";
+                case FAVORITE:
+                    return favorite == null ? "the favorite" : favorite.name;
+                default:
+                    return "the map center";
+            }
+        }
+    };
+
     private void setMode(PointMode m) {
         disarmPick();
         mode = m;
@@ -7238,6 +7483,12 @@ public final class AtmospherePane {
         snapshot = null;
         refresh(false);
         updateHereLines();
+        if (stationLayer != null)
+            stationLayer.originChanged();
+        if (gaugeLayer != null)
+            gaugeLayer.originChanged();
+        if (buoyLayer != null)
+            buoyLayer.originChanged();
     }
 
     /**
@@ -7280,6 +7531,8 @@ public final class AtmospherePane {
                 reportsPage.pointChanged();
             rainPage.pointChanged();
             discussion.pointChanged();
+            if (spotPage != null)
+                spotPage.pointChanged();
         }
     };
 
@@ -7468,6 +7721,8 @@ public final class AtmospherePane {
             reportsPage.pointChanged();
             rainPage.pointChanged();
             discussion.pointChanged();
+        if (spotPage != null)
+            spotPage.pointChanged();
         if (selected == null) {
             statusText.setText(R.string.no_sources);
             return;

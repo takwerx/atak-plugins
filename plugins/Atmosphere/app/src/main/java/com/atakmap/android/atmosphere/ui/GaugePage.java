@@ -52,7 +52,7 @@ public final class GaugePage {
     private final MapView mapView;
     private final Host host;
     private final View root;
-    private final LinearLayout filterRow, scopeRow;
+    private final LinearLayout filterRow;
     private final TextView status, heading;
     private final ListView list;
     private final View detail;
@@ -70,7 +70,6 @@ public final class GaugePage {
         this.host = host;
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.page_stations, null);
         filterRow = root.findViewById(R.id.stations_filter_row);
-        scopeRow = root.findViewById(R.id.stations_scope_row);
         status = root.findViewById(R.id.stations_page_status);
         list = root.findViewById(R.id.stations_list);
         list.setAdapter(adapter);
@@ -113,7 +112,6 @@ public final class GaugePage {
             });
         shown = keep;
         buildFilterRow(all.size(), high, starred);
-        buildScopeRow();
         status.setText(summary(all.size(), from));
         adapter.notifyDataSetChanged();
         if (showing != null)
@@ -124,12 +122,16 @@ public final class GaugePage {
         if (layer == null || !layer.isOn())
             return "Turn the river gauges layer on to see them here.";
         if (from == null)
-            return layer.isFromMe() ? "No position yet — switch to the map center."
-                    : "The map has no center yet.";
+            return layer.originSource().self()
+                    ? "No position yet \u2014 pick Map center at the top."
+                    : "No point to measure from yet \u2014 pick one at the top.";
         if (total == 0)
             return "No gauges within " + layer.miles() + " mi.";
+        final String hint = com.atakmap.android.atmosphere.compat.ScaleBar.zoomInHint(
+                com.atakmap.android.maps.MapView.getMapView(), layer.gate());
         return shown.size() + " of " + total + " gauges, nearest first, within "
-                + layer.miles() + " mi of " + (layer.isFromMe() ? "you" : "the map");
+                + layer.miles() + " mi of " + layer.originSource().words()
+                + (hint.isEmpty() ? "" : "\n" + hint);
     }
 
     private void buildFilterRow(int total, int high, int starred) {
@@ -142,13 +144,6 @@ public final class GaugePage {
                 StationPage.STAR_ON, GaugeOverlay.SHOW_FAVORITES);
         ((LinearLayout.LayoutParams) fav.getLayoutParams()).weight = 0.6f;
         filterRow.addView(fav);
-    }
-
-    private void buildScopeRow() {
-        scopeRow.removeAllViews();
-        final boolean me = layer.isFromMe();
-        scopeRow.addView(scopeTile(pluginContext.getString(R.string.stations_from_me), me, true));
-        scopeRow.addView(scopeTile(pluginContext.getString(R.string.stations_from_map), !me, false));
     }
 
     private void styleStar(TextView star, Nwps.Gauge g) {
@@ -170,19 +165,6 @@ public final class GaugePage {
             @Override
             public void onClick(View v) {
                 filter = value;
-                refresh();
-            }
-        });
-        return b;
-    }
-
-    private View scopeTile(String label, boolean chosen, final boolean fromMe) {
-        final Button b = chip(label, chosen, 0);
-        b.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (layer != null)
-                    layer.setFromMe(fromMe);
                 refresh();
             }
         });
@@ -379,9 +361,8 @@ public final class GaugePage {
 
         detail.setVisibility(View.VISIBLE);
         list.setVisibility(View.GONE);
-        heading.setVisibility(View.GONE);
+        headingLine().setVisibility(View.GONE);
         filterRow.setVisibility(View.GONE);
-        scopeRow.setVisibility(View.GONE);
         status.setVisibility(View.GONE);
     }
 
@@ -445,9 +426,8 @@ public final class GaugePage {
         showing = null;
         detail.setVisibility(View.GONE);
         list.setVisibility(View.VISIBLE);
-        heading.setVisibility(View.VISIBLE);
+        headingLine().setVisibility(View.VISIBLE);
         filterRow.setVisibility(View.VISIBLE);
-        scopeRow.setVisibility(View.VISIBLE);
         status.setVisibility(View.VISIBLE);
     }
 
@@ -496,5 +476,16 @@ public final class GaugePage {
         } catch (RuntimeException e) {
             // A pan that will not happen is not worth a crash.
         }
+    }
+
+    /**
+     * The heading, or the line the pane put it on beside the page's map switch: a
+     * record hides them together, rather than leaving the switch alone on a row.
+     */
+    private View headingLine() {
+        final android.view.ViewParent p = heading.getParent();
+        return p instanceof LinearLayout
+                && ((LinearLayout) p).getOrientation() == LinearLayout.HORIZONTAL
+                ? (View) p : heading;
     }
 }

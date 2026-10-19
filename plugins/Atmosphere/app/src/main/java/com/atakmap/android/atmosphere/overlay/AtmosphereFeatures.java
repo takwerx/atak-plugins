@@ -399,6 +399,82 @@ final class AtmosphereFeatures {
         labelTapMaxResolution = maxResolution;
     }
 
+    /** Which of the layer's sets are shown, by name. */
+    interface SetFilter {
+        boolean shown(String setName);
+    }
+
+    private volatile SetFilter setFilter;
+
+    /** Shows only the sets this filter names, from the next rewrite or {@link #applySetFilter}. */
+    void setSetFilter(SetFilter filter) {
+        setFilter = filter;
+    }
+
+    private boolean shown(String setName) {
+        final SetFilter f = setFilter;
+        return f == null || f.shown(setName);
+    }
+
+    /**
+     * Shows and hides the sets already written, by the filter: a few rows in the
+     * store, where a rewrite is every shape again. <b>Worker thread only.</b>
+     */
+    void applySetFilter() {
+        if (!awaitStore())
+            return;
+        synchronized (lock) {
+            if (store == null || detached)
+                return;
+            boolean bulk = false;
+            try {
+                store.acquireModifyLock(true);
+                bulk = true;
+                for (Map.Entry<String, Long> e : sets.entrySet())
+                    store.setFeatureSetVisible(e.getValue(), shown(e.getKey()));
+            } catch (Exception e) {
+                Log.w(tag, layerName + " could not show and hide its sets", e);
+            } finally {
+                if (bulk)
+                    store.releaseModifyLock();
+            }
+        }
+        mapView.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final Object r = mapView.getRenderer3();
+                    if (r instanceof com.atakmap.map.MapRenderer)
+                        ((com.atakmap.map.MapRenderer) r).requestRefresh();
+                } catch (Exception ignored) {
+                    // The next frame lays out anyway.
+                }
+            }
+        });
+    }
+
+    /**
+     * A pill standing for several areas at a zoom where their own labels would pile on
+     * each other: a label-only point drawn over its own band of zoom, which a tap passes
+     * through to the areas under it. Null when the pill cannot be written. Worker thread.
+     */
+    Drawn clusterPill(String setName, String text, int textColor, int fillColor, double lat,
+            double lon, double minGsd, double maxGsd) {
+        final ZonePills.Pill pill = ratingPill(text, textColor, fillColor);
+        if (pill == null)
+            return null;
+        final AttributeSet la = new AttributeSet();
+        la.setAttribute("_labelOnly", 1);
+        return new Drawn(setName, text, point(lat, lon), icon(pill.uri, pill.width, pill.height),
+                la, minGsd, maxGsd);
+    }
+
+    /** A pill's size on screen, {width, height} in device pixels; null when it cannot be written. */
+    int[] pillPixels(String text, int textColor, int fillColor) {
+        final ZonePills.Pill pill = ratingPill(text, textColor, fillColor);
+        return pill == null ? null : new int[] { pill.pxWidth, pill.pxHeight };
+    }
+
     /** A rating's pill, composer made on first use; null when it cannot be written. */
     private ZonePills.Pill ratingPill(String text, int textColor, int fillColor) {
         if (ratingPills == null)
@@ -865,6 +941,11 @@ final class AtmosphereFeatures {
             final FeatureDataStore2.FeatureQueryParameters visibleOnly =
                     new FeatureDataStore2.FeatureQueryParameters();
             visibleOnly.visibleOnly = true;
+            // Drawn in the order written, the last on top. Without it the store draws
+            // its sets in hash order, and PSPS drew SCE's watched circuits over the
+            // ones it had shut off (XCover, 2026-10-16).
+            visibleOnly.order = java.util.Collections.<FeatureDataStore2.FeatureQueryParameters.Order>singletonList(
+                    new FeatureDataStore2.FeatureQueryParameters.Order.ID());
             layer = new FeatureLayer3(layerName, store, visibleOnly);
 
             // A field, not a local: it is built here with the store and used when the
@@ -1389,7 +1470,7 @@ final class AtmosphereFeatures {
                         fsid = store.insertFeatureSet(
                                 new FeatureSet(PROVIDER, type, d.setName,
                                         d.minGsd, d.maxGsd));
-                        store.setFeatureSetVisible(fsid, true);
+                        store.setFeatureSetVisible(fsid, shown(d.setName));
                         fresh.put(d.setName, fsid);
                     }
                     // A polygon's label rides its edge when it is part of the polygon's
@@ -1440,14 +1521,19 @@ final class AtmosphereFeatures {
                             final ZonePills.Pill pill = colored ? ratingPill(centered, text,
                                     own.getBackgroundColor()) : null;
                             if (pill != null) {
-                                final String labelSet = d.setName + " labels";
+                                // Keyed by the band as well as the set: one layer's labels
+                                // can start at different zooms (PSPS: a county's from far
+                                // out, a circuit's from ten miles in), and a set takes the
+                                // band of the first label put in it.
+                                final String labelSet = d.setName + " labels "
+                                        + own.getLabelMinRenderResolution();
                                 Long lsid = fresh.get(labelSet);
                                 if (lsid == null) {
                                     lsid = store.insertFeatureSet(new FeatureSet(PROVIDER, type,
                                             labelSet, Math.min(d.minGsd,
                                                     own.getLabelMinRenderResolution()),
                                             d.maxGsd));
-                                    store.setFeatureSetVisible(lsid, true);
+                                    store.setFeatureSetVisible(lsid, shown(labelSet));
                                     fresh.put(labelSet, lsid);
                                 }
                                 if (d.attrs != null) {

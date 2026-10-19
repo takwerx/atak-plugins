@@ -239,9 +239,14 @@ public final class Http {
                 String error = null;
                 try {
                     final byte[] bytes = requestBytes(url, userAgent, null);
-                    bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                    if (bitmap == null)
-                        error = "the provider did not return an image";
+                    final String tooBig = checkPictureSize(bytes);
+                    if (tooBig != null) {
+                        error = tooBig;
+                    } else {
+                        bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                        if (bitmap == null)
+                            error = "the provider did not return an image";
+                    }
                 } catch (IOException e) {
                     Log.w(TAG, "GET failed: " + safeUrl(url), e);
                     error = describe(e);
@@ -347,6 +352,28 @@ public final class Http {
             if (conn != null)
                 conn.disconnect();
         }
+    }
+
+    /** The largest picture decoded: twice a screen-sized map picture each way. */
+    private static final int MAX_PICTURE_SIDE = 4096;
+    private static final long MAX_PICTURE_PIXELS = 16L * 1024 * 1024;
+
+    /**
+     * Reads a picture's size from its header before it is decoded: 8 MB of PNG can
+     * describe a picture of gigabytes, and decoding it would take ATAK's memory with
+     * it. Null when it may be decoded, else what to say.
+     */
+    private static String checkPictureSize(byte[] bytes) {
+        final BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0)
+            return "the provider did not return an image";
+        if (bounds.outWidth > MAX_PICTURE_SIDE || bounds.outHeight > MAX_PICTURE_SIDE
+                || (long) bounds.outWidth * bounds.outHeight > MAX_PICTURE_PIXELS)
+            return "the provider returned a picture too large to show ("
+                    + bounds.outWidth + " x " + bounds.outHeight + ")";
+        return null;
     }
 
     private static byte[] read(InputStream in) throws IOException {

@@ -52,4 +52,22 @@ public class RadarOverlayTest {
         assertTrue(((List<?>) m.invoke(null, "<Layer/>")).isEmpty());
         assertTrue(((List<?>) m.invoke(null, (Object) null)).isEmpty());
     }
+
+    /** The loop plays up to twenty frames, evenly spread, oldest first, always ending at the newest. */
+    @Test
+    public void loopSpreadsTwentyFramesEndingAtTheNewest() {
+        // The NWS: a frame every two minutes for two hours.
+        final List<Integer> nws = RadarOverlay.playFrames(61);
+        assertEquals(20, nws.size());
+        assertEquals(0, (int) nws.get(0));
+        assertEquals(60, (int) nws.get(19));
+        for (int i = 1; i < nws.size(); i++)
+            assertTrue(nws.get(i) - nws.get(i - 1) >= 3 && nws.get(i) - nws.get(i - 1) <= 4);
+        // RainViewer's thirteen: all of them.
+        final List<Integer> world = RadarOverlay.playFrames(13);
+        assertEquals(13, world.size());
+        assertEquals(0, (int) world.get(0));
+        assertEquals(12, (int) world.get(12));
+        assertTrue(RadarOverlay.playFrames(0).isEmpty());
+    }
 }

@@ -2,11 +2,26 @@ package com.atakmap.android.atmosphere.overlay;
 
 import android.content.SharedPreferences;
 
-import com.atakmap.android.atmosphere.compat.MapCompat;
-import com.atakmap.android.atmosphere.net.EgressPolicy;
-import com.atakmap.android.maps.MapView;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 
+import com.atakmap.android.atmosphere.compat.MapCompat;
+import com.atakmap.android.atmosphere.data.IemRadar;
+import com.atakmap.android.atmosphere.net.EgressPolicy;
+import com.atakmap.android.atmosphere.net.Http;
+import com.atakmap.android.maps.MapView;
+import com.atakmap.coremap.log.Log;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Rain that fell, as a picture, from two NWS map services in their own colors (read
@@ -152,7 +167,7 @@ public final class RainTotalsOverlay extends ImageOverlay {
     public String windowLabel() {
         if (window == WINDOW_BEFORE)
             return RainGaugesOverlay.hoursWords(beforeHours) + " before "
-                    + RainGaugesOverlay.momentName(com.atakmap.android.atmosphere.data.IemRadar.hourOf(endMs));
+                    + RainGaugesOverlay.momentName(IemRadar.hourOf(endMs));
         return WINDOWS[window];
     }
 
@@ -183,12 +198,18 @@ public final class RainTotalsOverlay extends ImageOverlay {
         reask();
     }
 
-    /** One of the stretches the archive keeps, and a moment it can hold: 2014 on. */
+    /** One of the stretches the relay keeps, and an hour it holds: the last 45 days. */
     private static boolean validMoment(long millis, int hours) {
         boolean known = false;
-        for (int h : com.atakmap.android.atmosphere.data.IemRadar.HOURS)
+        for (int h : IemRadar.HOURS)
             known |= h == hours;
-        return known && millis > 1_388_534_400_000L && millis <= System.currentTimeMillis() + 60_000L;
+        final long now = System.currentTimeMillis();
+        return known && IemRadar.hourOf(millis) >= IemRadar.since(now) && millis <= now + 60_000L;
+    }
+
+    /** The earliest moment the date picker offers: the oldest radar hour the relay holds. */
+    public static long earliestMoment() {
+        return IemRadar.since(System.currentTimeMillis());
     }
 
     public int transparency() {
@@ -239,7 +260,7 @@ public final class RainTotalsOverlay extends ImageOverlay {
             }
             Integer to = memo.get(c);
             if (to == null) {
-                final double in = com.atakmap.android.atmosphere.data.IemRadar.inches(c);
+                final double in = IemRadar.inches(c);
                 final Integer key = Double.isNaN(in) ? null : colorIn(LEGEND_MRMS, FROM_MRMS, in);
                 to = key == null ? 0 : key;
                 memo.put(c, to);
@@ -265,7 +286,8 @@ public final class RainTotalsOverlay extends ImageOverlay {
      * is grey, and on 2026-10-15 every RFC window was grey across California while the
      * gauges there held up to 3 in (operator: "if the data is there we need to show
      * it"). Seven days is three of the mesonet's radar pictures end to end, 72 + 72 + 24
-     * hours, ending at the newest hour it has finished (it lags by up to an hour).
+     * hours, ending two hours back: the mesonet finishes an hour's picture up to an hour
+     * late, and the relay takes it in within the next ten minutes.
      */
     @Override
     protected String[] fillUrls(android.graphics.Bitmap picture, double west, double south, double east,
@@ -281,13 +303,11 @@ public final class RainTotalsOverlay extends ImageOverlay {
         greyed = greyCount(pixels) > pixels.length / 500;
         if (!greyed || window != WINDOW_7_DAYS)
             return null;
-        final long end = com.atakmap.android.atmosphere.data.IemRadar.hourOf(
-                System.currentTimeMillis() - 75 * 60_000L);
+        final long end = IemRadar.hourOf(System.currentTimeMillis() - FILL_LAG_MS);
         final long day = 24 * 3_600_000L;
-        return new String[] {
-                com.atakmap.android.atmosphere.data.IemRadar.url(72, end, west, south, east, north, w, h),
-                com.atakmap.android.atmosphere.data.IemRadar.url(72, end - 3 * day, west, south, east, north, w, h),
-                com.atakmap.android.atmosphere.data.IemRadar.url(24, end - 6 * day, west, south, east, north, w, h) };
+        return new String[] { IemRadar.spec(72, end, west, south, east, north, w, h),
+                IemRadar.spec(72, end - 3 * day, west, south, east, north, w, h),
+                IemRadar.spec(24, end - 6 * day, west, south, east, north, w, h) };
     }
 
     @Override
@@ -349,7 +369,7 @@ public final class RainTotalsOverlay extends ImageOverlay {
                     continue;
                 Double v = memo.get(c);
                 if (v == null) {
-                    v = com.atakmap.android.atmosphere.data.IemRadar.inches(c);
+                    v = IemRadar.inches(c);
                     memo.put(c, v);
                 }
                 if (Double.isNaN(v)) {
@@ -363,6 +383,191 @@ public final class RainTotalsOverlay extends ImageOverlay {
             final Integer key = colorIn(LEGEND_RFC, FROM_RFC, inches);
             pixels[i] = key == null ? 0 : key;
         }
+    }
+
+    /** How far back the 7-day fill ends: the newest hour the relay is sure to hold. */
+    private static final long FILL_LAG_MS = 2 * 3_600_000L;
+    /** Tiles fetched at once for a past picture; a picture of the map's box is up to a few dozen. */
+    private static final int TILE_FETCHERS = 4;
+    /**
+     * Builds a past picture from the relay's tiles, one picture at a time, off main;
+     * and fetches its tiles four at a time. Made at start and shut down at stop, so a
+     * reloaded plugin leaves no thread pinning the old generation.
+     */
+    private ExecutorService worker, tileFetch;
+
+    @Override
+    public void start() {
+        if (worker == null)
+            worker = Executors.newSingleThreadExecutor(named("wx-raintotals-tiles"));
+        if (tileFetch == null)
+            tileFetch = Executors.newFixedThreadPool(TILE_FETCHERS, named("wx-raintotals-fetch"));
+        super.start();
+    }
+
+    @Override
+    public void stop() {
+        super.stop();
+        if (worker != null) {
+            worker.shutdownNow();
+            worker = null;
+        }
+        if (tileFetch != null) {
+            tileFetch.shutdownNow();
+            tileFetch = null;
+        }
+    }
+
+    private static ThreadFactory named(final String name) {
+        return new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                final Thread t = new Thread(r, name);
+                t.setDaemon(true);
+                return t;
+            }
+        };
+    }
+
+    /**
+     * A past picture: the hour's index from the relay, then the tiles under the box
+     * that hold rain, each pixel of the box taking the tile's pixel under it. A tile
+     * the index lists as outside the radar, or one that could not be had, reads as no
+     * data, never as dry ground; a tile in neither list is dry.
+     */
+    @Override
+    protected void getPicture(final String url, final Http.BitmapCallback callback) {
+        final IemRadar.Spec spec = IemRadar.Spec.parse(url);
+        if (spec == null) {
+            super.getPicture(url, callback);
+            return;
+        }
+        final ExecutorService w = worker, fetch = tileFetch;
+        if (w == null || fetch == null)
+            return;
+        final String ua = egress.userAgent();
+        try {
+            w.execute(new Runnable() {
+                @Override
+                public void run() {
+                    Bitmap bitmap = null;
+                    String error;
+                    try {
+                        bitmap = build(spec, fetch, ua);
+                        error = bitmap == null ? "the radar for that hour could not be read" : null;
+                    } catch (Http.StatusException e) {
+                        error = e.status == 404 ? notHeld(spec) : "the server answered " + e.status;
+                    } catch (IOException e) {
+                        error = e.getMessage() == null ? "network error" : e.getMessage();
+                    } catch (InterruptedException e) {
+                        return;
+                    } catch (RuntimeException e) {
+                        Log.e("AtmosphereRainTotals", "past radar failed hard", e);
+                        error = "request failed";
+                    }
+                    final Bitmap b = bitmap;
+                    final String err = error;
+                    mapView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (err == null)
+                                callback.onSuccess(b);
+                            else
+                                callback.onFailure(err);
+                        }
+                    });
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException stopped) {
+            // The plugin is stopping.
+        }
+    }
+
+    /** Why an hour the relay does not have is missing, in words. */
+    private static String notHeld(IemRadar.Spec spec) {
+        return olderThanKept(spec, System.currentTimeMillis()) ? "the radar is kept for 45 days"
+                : "the radar for that hour is not on the server yet";
+    }
+
+    private static boolean olderThanKept(IemRadar.Spec spec, long now) {
+        final java.util.regex.Matcher m = java.util.regex.Pattern.compile("/(\\d{10})/index\\.json$")
+                .matcher(spec.indexUrl);
+        return m.find() && m.group(1).compareTo(hourName(IemRadar.since(now))) < 0;
+    }
+
+    private static String hourName(long millis) {
+        final java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyyMMddHH", Locale.US);
+        f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        return f.format(new java.util.Date(millis));
+    }
+
+    /** The picture of a spec, on the worker. */
+    private static Bitmap build(IemRadar.Spec spec, ExecutorService fetch, final String ua)
+            throws IOException, InterruptedException {
+        final IemRadar.Index index = IemRadar.Index.parse(new String(Http.fetchBytes(spec.indexUrl, ua), "UTF-8"));
+        if (index == null)
+            return null;
+        final IemRadar.Plan plan = IemRadar.plan(spec.west, spec.south, spec.east, spec.north, spec.px, spec.py);
+        final int[] out = new int[spec.px * spec.py];
+        final List<String> rain = new ArrayList<>();
+        for (String t : plan.tiles()) {
+            if (index.rain.contains(t))
+                rain.add(t);
+            else if (index.noData.contains(t))
+                IemRadar.paint(plan, t, null, IemRadar.NO_DATA, out);
+        }
+        final List<Future<byte[]>> fetches = new ArrayList<>();
+        try {
+            for (String t : rain) {
+                final String u = spec.tileUrl(t);
+                fetches.add(fetch.submit(new Callable<byte[]>() {
+                    @Override
+                    public byte[] call() throws IOException {
+                        return Http.fetchBytes(u, ua);
+                    }
+                }));
+            }
+            int missing = 0;
+            for (int k = 0; k < rain.size(); k++) {
+                final String t = rain.get(k);
+                final int[] box = IemRadar.tileBox(t);
+                byte[] bytes = null;
+                try {
+                    bytes = fetches.get(k).get();
+                } catch (ExecutionException e) {
+                    Log.w("AtmosphereRainTotals", "radar tile " + t + ": "
+                            + (e.getCause() == null ? e : e.getCause().getMessage()));
+                }
+                // The header says the tile's size before a pixel is decoded: a picture of
+                // another size is never expanded into memory.
+                final Bitmap b = bytes == null || !sized(bytes, box[2], box[3]) ? null
+                        : BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (b == null || b.getWidth() != box[2] || b.getHeight() != box[3]) {
+                    if (b != null)
+                        b.recycle();
+                    missing++;
+                    IemRadar.paint(plan, t, null, IemRadar.NO_DATA, out);
+                    continue;
+                }
+                final int[] px = new int[box[2] * box[3]];
+                b.getPixels(px, 0, box[2], 0, 0, box[2], box[3]);
+                b.recycle();
+                IemRadar.paint(plan, t, px, 0, out);
+            }
+            if (missing > 0)
+                Log.w("AtmosphereRainTotals", missing + " of " + rain.size() + " radar tiles missing, drawn as no data");
+            return Bitmap.createBitmap(out, spec.px, spec.py, Bitmap.Config.ARGB_8888);
+        } finally {
+            for (Future<byte[]> f : fetches)
+                f.cancel(true);
+        }
+    }
+
+    private static boolean sized(byte[] bytes, int w, int h) {
+        final BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.length, o);
+        return o.outWidth == w && o.outHeight == h;
     }
 
     /** Another window: the picture up is the wrong one, so it is asked for again. */
@@ -385,8 +590,7 @@ public final class RainTotalsOverlay extends ImageOverlay {
                 + "&bboxSR=4326&imageSR=4326&size=" + px + "," + py
                 + "&format=png32&transparent=true&f=image";
         if (window == WINDOW_BEFORE)
-            return com.atakmap.android.atmosphere.data.IemRadar.url(beforeHours, endMs, west, south, east, north,
-                    px, py);
+            return IemRadar.spec(beforeHours, endMs, west, south, east, north, px, py);
         if (window < MRMS_FUNCTIONS.length)
             return MRMS_EXPORT + box + "&renderingRule=%7B%22rasterFunction%22%3A%22"
                     + MRMS_FUNCTIONS[window] + "%22%7D";

@@ -205,7 +205,45 @@ public abstract class OutlookOverlay {
                 lc == null
                         ? AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title)
                         : AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title,
-                                lc[0], lc[1], labelMaxResolution()), s);
+                                lc[0], lc[1], labelMaxResolution(a)), s);
+    }
+
+    /**
+     * What is drawn for the areas as a group, after each has been drawn: labels that
+     * stand for several areas when zoomed out, say. Nothing by default. Worker thread.
+     */
+    protected List<AtmosphereFeatures.Drawn> drawnTogether(List<Area> areas, List<Geometry> shapes) {
+        return Collections.emptyList();
+    }
+
+    /** Shows only the sets this filter names; see {@link AtmosphereFeatures#setSetFilter}. */
+    protected final void setSetFilter(AtmosphereFeatures.SetFilter filter) {
+        features.setSetFilter(filter);
+    }
+
+    /** Applies the filter again to what is drawn, off the main thread. */
+    protected final void applySetFilter() {
+        try {
+            worker.execute(new Runnable() {
+                @Override
+                public void run() {
+                    features.applySetFilter();
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException stopped) {
+            // Stopped: nothing is drawn to show or hide.
+        }
+    }
+
+    /** See {@link AtmosphereFeatures#clusterPill}. */
+    protected final AtmosphereFeatures.Drawn clusterPill(String setName, String text, int textColor,
+            int fillColor, double lat, double lon, double minGsd, double maxGsd) {
+        return features.clusterPill(setName, text, textColor, fillColor, lat, lon, minGsd, maxGsd);
+    }
+
+    /** See {@link AtmosphereFeatures#pillPixels}. */
+    protected final int[] pillPixels(String text, int textColor, int fillColor) {
+        return features.pillPixels(text, textColor, fillColor);
     }
 
     /**
@@ -271,6 +309,29 @@ public abstract class OutlookOverlay {
     }
 
     protected abstract List<Area> parse(int index, String body);
+
+    /**
+     * Thrown by {@link #parse(int, String)} for an answer that is not the data: the
+     * request is then a failed one, and what is drawn stays with the status saying so.
+     * An empty list would read as "none", and on 2026-10-16 PSPS said "Power off:
+     * none" over a "Token Required" while 528 areas were off.
+     */
+    protected static final class Refused extends RuntimeException {
+        public Refused(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * An ArcGIS refusal: it comes as HTTP 200 with a small {@code {"error": ...}} body
+     * ("Token Required" when a layer goes private), which a parser would read as no
+     * features.
+     */
+    static boolean arcgisRefusal(String body) {
+        if (body == null || body.length() > 4096)
+            return false;
+        return body.replaceAll("\\s", "").startsWith("{\"error\":{");
+    }
 
     /**
      * The answer to {@code url}, the request as it went out: a layer whose chain
@@ -343,6 +404,11 @@ public abstract class OutlookOverlay {
         return skipped(index);
     }
 
+    /** {@link #skipped(int, String)} with the failure in words: "no data for this point (HTTP 404)". */
+    protected List<Area> skipped(int index, String url, String error) {
+        return skipped(index, url);
+    }
+
     /** The fill's alpha for an area; 0 draws the outline alone. */
     protected int fillAlpha(Area a) {
         return FILL_ALPHA;
@@ -359,6 +425,11 @@ public abstract class OutlookOverlay {
     /** With {@link #labelColors}: the coarsest map resolution, meters per pixel, the label draws at. */
     protected double labelMaxResolution() {
         return 14d;
+    }
+
+    /** The same for one area; the layer's own by default. */
+    protected double labelMaxResolution(Area a) {
+        return labelMaxResolution();
     }
 
     /** The edge's color for an area, opaque; the category's own color by default. */
@@ -605,16 +676,30 @@ public abstract class OutlookOverlay {
                             // A parser slip on a server's answer is a line in the log
                             // and nothing drawn from that answer, never ATAK going down.
                             List<Area> parsed;
+                            String refused = null;
                             try {
+                                if (arcgisRefusal(body))
+                                    throw new Refused("the server turned the request away");
                                 parsed = parse(index, url, body);
+                            } catch (Refused e) {
+                                Log.w(tag, "request " + index + " refused: " + e.getMessage()
+                                        + " " + (body == null ? "" : body.substring(0,
+                                                Math.min(200, body.length()))));
+                                parsed = Collections.emptyList();
+                                refused = e.getMessage();
                             } catch (RuntimeException e) {
                                 Log.w(tag, "unreadable answer to request " + index, e);
                                 parsed = Collections.emptyList();
                             }
                             final List<Area> answer = parsed;
+                            final String failed = refused;
                             mapView.post(new Runnable() {
                                 @Override
                                 public void run() {
+                                    if (failed != null) {
+                                        onFailure(failed);
+                                        return;
+                                    }
                                     got.addAll(answer);
                                     fetch(index + 1, got, mine);
                                 }
@@ -633,7 +718,7 @@ public abstract class OutlookOverlay {
                 if (mine != generation)
                     return;
                 if (optional(index)) {
-                    got.addAll(skipped(index, url));
+                    got.addAll(skipped(index, url, error));
                     fetch(index + 1, got, mine);
                     return;
                 }
@@ -668,6 +753,8 @@ public abstract class OutlookOverlay {
                     return;
                 }
                 final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
+                final List<Area> drawnAreas = new ArrayList<>();
+                final List<Geometry> drawnShapes = new ArrayList<>();
                 final int showDay = day;
                 for (Area a : snapshot) {
                     if (!shown(a, showDay))
@@ -688,9 +775,16 @@ public abstract class OutlookOverlay {
                         s.setAttribute("_ref", a.ref);
                     try {
                         drawn.addAll(drawnAll(a, g, s));
+                        drawnAreas.add(a);
+                        drawnShapes.add(g);
                     } catch (RuntimeException e) {
                         Log.w(tag, "could not draw " + a.title, e);
                     }
+                }
+                try {
+                    drawn.addAll(drawnTogether(drawnAreas, drawnShapes));
+                } catch (RuntimeException e) {
+                    Log.w(tag, "could not draw the group labels", e);
                 }
                 features.rewrite(drawn);
                 final String line = summary(snapshot);
