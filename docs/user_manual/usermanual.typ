@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.18",
+   plugin-version: "0.19",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
