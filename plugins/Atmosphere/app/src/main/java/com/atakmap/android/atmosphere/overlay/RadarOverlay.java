@@ -270,12 +270,41 @@ public final class RadarOverlay {
     private boolean playing;
     private final List<Integer> playList = new ArrayList<>();
     private int playPos = -1;
+    private final LoopTurn turn = new LoopTurn();
+
+    /**
+     * Whether the frame going on the map is the loop's own, and so schedules the
+     * loop's next step. Only that one may: a map move re-shows the frame already
+     * up, about once a second with the map locked on GPS, and when that re-show
+     * rescheduled the step the hold on the newest frame was pushed back every
+     * second and the loop stopped there with Stop still lit.
+     */
+    public static final class LoopTurn {
+        private boolean owed;
+
+        /** The loop moved to a frame, or found none yet: the next showing is its. */
+        public void owe() {
+            owed = true;
+        }
+
+        /** A frame is on the map, or could not be had: true once per {@link #owe}. */
+        public boolean take() {
+            final boolean t = owed;
+            owed = false;
+            return t;
+        }
+    }
 
     /** The loop's next frame, once the one before it is on the map. */
     private final Runnable playStep = new Runnable() {
         @Override
         public void run() {
-            if (!playing || !on || frames.isEmpty())
+            if (!playing || !on)
+                return;
+            // A step that finds no frames (the mosaic just changed) still owes
+            // one, so the capabilities answer can start the loop again.
+            turn.owe();
+            if (frames.isEmpty())
                 return;
             if (playList.isEmpty())
                 playList.addAll(playFrames(frames.size()));
@@ -449,6 +478,7 @@ public final class RadarOverlay {
             return;
         playing = value;
         playList.clear();
+        turn.take();
         if (value) {
             playList.addAll(playFrames(frames.size()));
             playPos = -1;
@@ -484,9 +514,12 @@ public final class RadarOverlay {
         showFrame();
     }
 
-    /** A loop frame is on the map, or could not be had: the next after a beat. */
+    /**
+     * A frame is on the map, or could not be had: if it is the loop's, the next
+     * after a beat. Any other showing leaves a step already waiting alone.
+     */
     private void stepLoop() {
-        if (!playing)
+        if (!playing || !turn.take())
             return;
         mapView.removeCallbacks(playStep);
         final boolean last = !playList.isEmpty() && playPos == playList.size() - 1;
@@ -514,6 +547,7 @@ public final class RadarOverlay {
             mapView.removeCallbacks(playStep);
             playing = false;
             playList.clear();
+            turn.take();
         }
         if (i != index) {
             index = i;
