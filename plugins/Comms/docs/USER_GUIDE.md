@@ -1,10 +1,10 @@
 # Comms — user guide
 
-**Download Comms 0.8** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Comms 0.10** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.8/ATAK-Plugin-Comms-0.8--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/comms/releases/download/v0.10/ATAK-Plugin-Comms-0.10--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/comms/releases/download/v0.10/ATAK-Plugin-Comms-0.10--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/comms/releases/download/v0.10/ATAK-Plugin-Comms-0.10--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/comms/releases
 
@@ -71,8 +71,9 @@ county, and the nets on it.
 
 ## Site details
 
-Tap a row — or **Details** on a site's radial menu — for the county, elevation,
-distance and bearing, and every net on the mountain with the tone that opens it.
+Tap a row, or a site on the map, for the county, elevation, distance and bearing,
+and every net on the mountain with the tone that opens it. A tap on the map opens
+the details in the side pane straight away, with no radial menu first.
 
 ![Site details](screenshots/09_site_details.png)
 
@@ -81,6 +82,11 @@ print two, but the other belongs to the net and is the same at every site on it,
 so it can never tell you which mountain to use. Where the catalog does not hold a
 tone, the row says which kind of nothing it is — a digital trunked channel has no
 CTCSS tone at all, and a plan can withhold one — rather than leaving you to guess.
+
+A California site shows the tone's number as well as its frequency, "Tone 8
+(103.5)", because every California plan numbers the same 32 tones the same way. A
+site anywhere else shows the frequency alone: other plans number their tones
+differently, and Boise's Tone 9 is 179.9 Hz where California's is 100.0.
 
 A mountain often carries several agencies, each on its own tone. Sierra Peak has
 the Cleveland National Forest, CAL FIRE and Orange County on it, on three
@@ -100,10 +106,7 @@ match it to how you actually work rather than to a number.
 
 ![Setting the draw zoom](screenshots/11_draw_on_the_map.png)
 
-Tapping a site opens ATAK's radial menu on it, with Details, a pairing line and
-polar.
-
-![The radial menu on a site](screenshots/13_radial_menu.png)
+Tapping a site opens its details in the side pane.
 
 ## Which repeaters can I reach from here
 

@@ -27,12 +27,10 @@
                 android:paddingBottom="6dp" />
 
             <TextView
+                style="@style/TakwerxSectionHeading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Nets on this site"
-                android:textSize="10sp"
-                android:textAllCaps="true"
-                android:alpha="0.6" />
+                android:text="Nets on this site" />
 
             <LinearLayout
                 android:id="@+id/nets"
