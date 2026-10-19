@@ -1,5 +1,6 @@
 package com.atakmap.android.comms.model;
 
+import com.atakmap.android.comms.data.Tones;
 import com.atakmap.coremap.log.Log;
 
 import org.json.JSONArray;
@@ -131,7 +132,7 @@ public final class Catalog {
     /** One net on one site. */
     public static final class Channel {
         public final String siteId, netId, callsign, notes, source, asOf;
-        /** The tone used at this site, Hz or NaN; the number is the CA standard tone number or 0. */
+        /** The tone used at this site, Hz or NaN; the number is the site's plan's own number for it, or 0. */
         public final double txTone, rxTone;
         public final int txToneNum, rxToneNum;
         /** A frequency the source gives for this site that differs from the plan; empty otherwise. */
@@ -174,6 +175,24 @@ public final class Catalog {
 
         public double effectiveRxTone() {
             return Double.isNaN(rxTone) ? net.rxTone : rxTone;
+        }
+
+        /** The plan's number for {@link #effectiveTxTone()}, or 0 when it has none. */
+        public int effectiveTxToneNum() {
+            return Double.isNaN(txTone) ? netToneNum(net.txTone) : txToneNum;
+        }
+
+        public int effectiveRxToneNum() {
+            return Double.isNaN(rxTone) ? netToneNum(net.rxTone) : rxToneNum;
+        }
+
+        /**
+         * A net's own tone carries no number in the catalog. Every California plan
+         * numbers its tones by the standard 32, so there the table is right; anywhere
+         * else the same number means a different frequency, and none is shown.
+         */
+        private int netToneNum(double hz) {
+            return site != null && "CA".equals(site.st) ? Tones.californiaNumberOf(hz) : 0;
         }
     }
 
