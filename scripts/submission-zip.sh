@@ -104,6 +104,21 @@ echo "==> branch contains main (shared rules current; merged in now if it was no
 "$REPO_ROOT/scripts/check-main-merged.sh" --merge || {
     echo "error: not zipping from a branch behind main; see above for why main could not be merged in" >&2; exit 1; }
 
+# The download block at the top of README and guide names the version, and the
+# zip carries the README. Re-stamp it to PLUGIN_VERSION here and commit, so the
+# bump and the block move together: Cursorwerx 0.3 and 0.4 both reached the
+# ship prompt still linking the release before, fixed by hand each time.
+echo "==> download block names $PLUGIN_VERSION (re-stamped and committed if it did not)"
+"$REPO_ROOT/scripts/check-download-links.sh" "$NAME" --fix >/dev/null 2>&1 || true
+if ! git -C "$REPO_ROOT" diff --quiet -- "plugins/$NAME/README.md" "plugins/$NAME/docs/USER_GUIDE.md"; then
+    git -C "$REPO_ROOT" commit -q -m "$NAME $PLUGIN_VERSION: download block names the v$PLUGIN_VERSION release" \
+        -- "plugins/$NAME/README.md" "plugins/$NAME/docs/USER_GUIDE.md" || {
+        echo "error: could not commit the re-stamped download block" >&2; exit 1; }
+    echo "  PASS  re-stamped to $PLUGIN_VERSION and committed ($(git -C "$REPO_ROOT" log -1 --format=%h))"
+else
+    echo "  PASS  already $PLUGIN_VERSION"
+fi
+
 mkdir -p "$DIST"
 rm -f "$OUT"
 
