@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.18** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.19** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.18/ATAK-Plugin-Atmosphere-0.18--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.18/ATAK-Plugin-Atmosphere-0.18--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.18/ATAK-Plugin-Atmosphere-0.18--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.19/ATAK-Plugin-Atmosphere-0.19--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.19/ATAK-Plugin-Atmosphere-0.19--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.19/ATAK-Plugin-Atmosphere-0.19--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -112,8 +112,10 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.18, for ATAK-CIV 5.6, 5.7 and 5.8 (0.17 was built but never released; its
-changes are here). New: Rain Gauges' county, RAWS and airport gauges and Rain
+0.19, for ATAK-CIV 5.6, 5.7 and 5.8: 0.18 (never released) with the manual's
+pictures from its signed build, and Fire Danger waiting longer for a slow
+server. 0.17 and 0.18 were built but never released; their changes are
+here. New: Rain Gauges' county, RAWS and airport gauges and Rain
 Totals' past radar come from takwerx's relay of the Iowa Environmental
 Mesonet, which turns away a phone that asks it fast; the relay keeps their
 hours 45 days, and further back the county and RAWS gauges show whole days.
