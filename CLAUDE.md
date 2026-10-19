@@ -920,9 +920,11 @@ was never created, because 1.5 was folded into 1.6 and the block was never
 re-stamped. `scripts/check-download-links.sh <Plugin>` checks the block against
 `PLUGIN_VERSION` with no network, `--live` proves each link returns 200 once the
 release exists, and `.claude/hooks/release-links-guard.sh` blocks the subtree
-push and `gh release create` when the check fails. When a version is skipped
-or folded into the next one, re-stamp the block in the same commit that bumps
-`PLUGIN_VERSION`.
+push and `gh release create` when the check fails. `--fix` re-stamps the
+block to `PLUGIN_VERSION` (download line, guide version header, every asset
+link's tag and APK name, nothing else), and `submission-zip.sh` runs it and
+commits the result before zipping, so the block moves with the bump by itself.
+Cursorwerx 0.3 and 0.4 both reached the ship prompt linking the release before.
 
 ## Downloaded data survives a restart with no network
 
