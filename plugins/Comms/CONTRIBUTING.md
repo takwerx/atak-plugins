@@ -24,7 +24,7 @@ row per site per net.
 | Column | What it is |
 |---|---|
 | `site` | The site's name, as the people who use it say it |
-| `state` | **Required.** Two letters |
+| `state` | **Required.** Two letters. A row without one is refused |
 | `county` | Filled from TIGER when blank |
 | `lat`, `lon` | Decimal degrees. **Supply these outside California** — see below |
 | `elev_m` | Ground elevation. Filled from USGS when blank |
@@ -32,7 +32,7 @@ row per site per net.
 | `net` | The net's identifier: a MACS 441-1 designator where one exists, otherwise whatever the local plan calls the channel |
 | `net_name` | The readable name. Where `net` is a local string, this is what makes it legible |
 | `rx`, `tx` | The **mobile's** view: `rx` is what you listen on (the repeater's output), `tx` is what you transmit on |
-| `rx_tone`, `tx_tone` | **This site's** tones, in Hz |
+| `rx_tone`, `tx_tone` | **This site's** tones, in Hz. Not a tone number: each plan numbers its tones differently (Boise's Tone 9 is 179.9 Hz, California's is 100.0), so the builder refuses one outside California |
 | `net_rx_tone`, `net_tx_tone` | The **net-wide** pair. A repeater net has one pair and a different tone at every site — these two are not the same thing as the two above, and mixing them up is the easiest mistake to make here |
 | `callsign` | The FCC license identifier for the station |
 | `agency` | The filter bucket the site appears under in the plugin — `CAL FIRE`, `Cal OES`, `ARES`, whatever fits. A new string makes a new bucket; no code change needed |
