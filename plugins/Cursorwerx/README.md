@@ -1,10 +1,10 @@
 ATAK Plugin — Cursorwerx
 
-**Download Cursorwerx 0.3** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Cursorwerx 0.4** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/cursorwerx/releases/download/v0.3/ATAK-Plugin-Cursorwerx-0.3--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/cursorwerx/releases/download/v0.3/ATAK-Plugin-Cursorwerx-0.3--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/cursorwerx/releases/download/v0.3/ATAK-Plugin-Cursorwerx-0.3--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/cursorwerx/releases/download/v0.4/ATAK-Plugin-Cursorwerx-0.4--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/cursorwerx/releases/download/v0.4/ATAK-Plugin-Cursorwerx-0.4--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/cursorwerx/releases/download/v0.4/ATAK-Plugin-Cursorwerx-0.4--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/cursorwerx/releases
 
@@ -35,8 +35,8 @@ On the map:
 In panes and menus:
 
   - The wheel scrolls the pane or list under the cursor, and never zooms the
-    map behind it. A trackpad swipe moves a list about a page, a mouse click
-    about a row.
+    map behind it. A two-finger swipe moves a list a few rows and a mouse
+    click about a row, at the same pace however fast you swipe or spin.
   - A Back button on the left edge, and the Escape key, are Back.
   - Clicks land in text fields, so you can type; on an emulator whose pointer
     reaches Android as a tablet (mouse and stylus sources at once), presses
@@ -81,6 +81,18 @@ the one that matches your ATAK.
 
 _________________________________________________________________
 STATUS
+
+Version 0.4: lists keep their pace however fast the wheel turns. Android
+multiplies wheel input by up to four when it comes quickly, and a Mac trackpad
+always sends it quickly, so 0.3's pace held only for slow input: on a MacBook
+one two-finger swipe still ran ATAK's Tools list about twenty rows, past the
+plugins in its middle. Cursorwerx now takes Android's multiplier back out
+before it scrolls a list, so a 37-event swipe moves it five and a half rows
+where it moved twenty-one, and every mouse click about a row, slow or fast.
+Map zoom is unchanged. Verified on ATAK-CIV 5.8.0.3 in Google's Android
+Emulator 37.1.11 on Android 15, debug and release builds, with wheel input
+written to the emulator's own pointer device at a trackpad's 60 events a
+second.
 
 Version 0.3: a trackpad scrolls lists at a usable pace. On Android 15 in the
 TAKwerx ATAK Terminal one two-finger swipe ran ATAK's Tools list from end to
