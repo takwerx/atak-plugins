@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.16",
+   plugin-version: "0.19",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -61,7 +61,9 @@ shaded, and the zones page lists them.
 
   - *My position*, *Map center* and *Pick a point* choose the point every
     reading is for. The one in use is green. Map center follows the map: the
-    forecast and the fire weather zone are read again when the map stops.
+    forecast and the fire weather zone are read again when the map stops. The
+    Weather Stations, River Gauges and Buoys lists are measured from this point
+    too, nearest first, and say which point in their status line.
   - The star is *Favorites*: places kept by name.
   - *Units* switches every number between US, metric and aviation units.
   - *Full size* makes the pane full width and back.
@@ -239,7 +241,9 @@ it is a direction.
   Canada's over Canada. It picks the right one by itself as the map moves.
 
   The time strip under it scrubs back through the last two to three hours of
-  frames. *Live* follows the newest.
+  frames. *Live* follows the newest. *Play* runs those hours as a loop, to show
+  which way the storm cells move; *Stop* or any time picked ends it. The
+  *Transparency* slider lets the map show through.
 ]
 ]
 
@@ -290,6 +294,9 @@ it is a direction.
   *Wind* draws the forecast wind as moving streaks colored by speed, with the
   key under the time strip in mph, kt or km/h. *Heat map* under the key draws
   the same speed as a colored field beneath the streaks, in the key's colors.
+  Wind and *Radar* can be on together, the time strip under the one switched
+  on last; the heat map would paint over the radar, so turning one on turns
+  the other off.
 
   The line under it reads the wind *Here*, at the pane's point: speed and
   where it comes from. Outside the area being drawn it says so.
@@ -633,14 +640,20 @@ numbers only.
 ][
   #image("84.png", width: 100%)
 ][
-  *PSPS* draws California's Public Safety Power Shutoffs as Cal OES reports
-  them from PG&E, SCE and SDG&E: a county a utility has warned may have a
-  shutoff in amber, where the power is off in red, off because a line feeding
-  it was cut in orange, and back on in green. Tap one for its details.
+  *PSPS* draws California's Public Safety Power Shutoffs: a county a utility
+  has warned Cal OES may have a shutoff in amber, a circuit SCE or SDG&E is
+  watching for one in orange (*PSPS Watch*), and the areas a utility has shut
+  off in red, each named by its utility, such as "PG&E - PSPS". Tap one for
+  its circuit, customers out, the shutoff window and when power is expected
+  back. From about 10 miles in each area has its own label; farther out,
+  nearby areas share one, "SCE - PSPS (23)", and past 150 miles the colors
+  stand alone.
 
-  The line under the switch says what is warned and off and when Cal OES last
-  updated; if Cal OES goes quiet for 45 minutes it says the status is unknown
-  rather than none. It does not cover PacifiCorp, Liberty, Bear Valley or any
+  The line under the switch counts what is warned, watched and shut off, by
+  utility, and when it was updated; a source quiet for 45 minutes is said to
+  be unknown, never none. It comes from Cal OES (PG&E and the warned
+  counties), Southern California Edison and San Diego Gas & Electric through
+  takwerx's server, and does not cover PacifiCorp, Liberty, Bear Valley or any
   other state: ask the utility.
 ]
 ]
@@ -763,6 +776,9 @@ office's report is a table in the same colors, *Most rain first* or *Closest*.
 a moment you pick, such as when a fire started: the gauges exact to the hour,
 the radar picture for the hour at or before it. For 3 or 7 days the USGS and
 county gauges wait for the map to be zoomed in to about 150 miles across.
+The county gauges' hours, the airports and the radar go back 45 days: further
+back the county and RAWS gauges show whole days and the airports are left
+out, and the radar calendar starts 45 days back.
 ]
 
 #tak-slide[
@@ -1046,9 +1062,10 @@ classes, lower 48 only.
 #v(4pt)
 The *Spot Weather Forecast* layer draws every open spot forecast request: W
 for a wildfire, P for a prescribed fire, S for search and rescue. The *Spot
-Weather Forecast* page lists them - all, near you, on the map, by state or
-region - *Newest* or *Closest* first, with a search by incident name. Tap one
-for the forecast the office wrote.
+Weather Forecast* page lists them - all, nearby, on the map, by state or
+region - *Newest* or *Closest* first, with a search by incident name. Nearby
+and Closest measure from the point chosen in the top row. Tap one for the
+forecast the office wrote.
 ]
 
 #tak-slide[
@@ -1130,8 +1147,8 @@ Only what you ask for:
 - A *forecast* sends the point it is for, rounded to about 100 m, to the
   service picked in *Forecast settings*: NWS unless you pick Open-Meteo.
 - A *map layer*, once you have allowed it, sends the area of the map it is drawing, never your position,
-  except the station, gauge and buoy layers when set to *My position*, which
-  send that position rounded.
+  except the station, gauge and buoy layers, which send the point chosen at the
+  top of the pane, rounded the same way.
 - The *Fire Weather Zones* page finds your zone by sending the half-degree
   square the point is in, about 30 miles across, never the point. The Red Flag
   Warning and Fire Weather Watch list is one request for the whole country.
@@ -1140,8 +1157,9 @@ Only what you ask for:
   Reports*, *Tornado Paths* and *Earthquakes*, which are whole national or
   worldwide files; *Debris Flow*, *Rain Totals* and *Rain Gauges* send the
   area the map shows, padded; *Fuel Moisture* sends the two-letter code of the
-  state under the map center, and *Rain Gauges* the codes of the states under
-  the map with the dates, found on this device. The office's rainfall report and the synopsis
+  state under the map center, *Rain Gauges* the codes of the states under
+  the map, and both rain layers the 2-degree squares under it, with the dates,
+  found on this device. The office's rainfall report and the synopsis
   find the office by the half-degree square the point is in, and only while
   NWS is the forecast service.
 - An *address* you type goes to the US Census Bureau, and to ATAK's own
@@ -1151,8 +1169,9 @@ Only what you ask for:
 
 All of it is outbound HTTPS: to the National Weather Service and its centers,
 NOAA and its Regional Climate Centers, the EPA, the USGS, the Forest Service,
-Cal OES, Environment Canada, RainViewer, the avalanche centers and the Iowa
-Environmental Mesonet, and to the one weather service you pick.
+Environment Canada, RainViewer, the avalanche centers and takwerx's own
+server, which relays Cal OES, the utilities and the Iowa Environmental
+Mesonet, and to the one weather service you pick.
 ]
 
 #tak-slide[

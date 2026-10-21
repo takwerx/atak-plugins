@@ -60,8 +60,8 @@ import java.util.concurrent.Executors;
  * pane builds it, hands it the page slot and tells it when it is looked at.
  *
  * <p>Nothing is fetched until the operator allows it, and then only when the page is
- * looked at and the list is more than a few minutes old. The operator's position never
- * leaves the phone: the whole country's list comes down and "near me" is worked out
+ * looked at and the list is more than a few minutes old. The pane's point never
+ * leaves the phone: the whole country's list comes down and "nearby" is worked out
  * here.
  */
 public final class SpotPage {
@@ -98,6 +98,9 @@ public final class SpotPage {
 
         /** What the pane calls that point: "My position", "Map center"... */
         String pointLabel();
+
+        /** The point as a sentence ends: "you", "the map center", "Denver". */
+        String pointWords();
 
         UnitSystem units();
 
@@ -296,6 +299,19 @@ public final class SpotPage {
     }
 
     /**
+     * The pane's point changed, or the map settled under Map center: Nearby and Closest
+     * are measured from it, and their counts on the filters too.
+     */
+    public void pointChanged() {
+        if (showing != null || requests.isEmpty())
+            return;
+        if (filter == Filter.NEAR || closest)
+            render();
+        else
+            paintFilters();
+    }
+
+    /**
      * The shared status filter changed on the layers page; redraw what is listed.
      * Nothing is refetched -- it is the same requests, a different slice of them.
      */
@@ -450,13 +466,14 @@ public final class SpotPage {
     }
 
     /**
-     * Where "closest" is measured from: the operator's position, or the map's center
-     * when there is no fix yet. Null when neither is known.
+     * Where "closest" and "nearby" are measured from: the pane's point, chosen in its
+     * top row like every page's (operator, 2026-10-16: "might as well leverage that"),
+     * or the map's center while that point is not known. Null when neither is.
      */
     private GeoPoint closestFrom() {
-        final GeoPoint self = MapCompat.selfPoint();
-        if (self != null)
-            return self;
+        final GeoPoint from = host.point();
+        if (from != null)
+            return from;
         final double[] box = viewBox();
         return box == null ? null : new GeoPoint((box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
     }
@@ -663,7 +680,7 @@ public final class SpotPage {
         list.removeAllViews();
         if (requests.isEmpty())
             return;
-        final GeoPoint self = MapCompat.selfPoint();
+        final GeoPoint self = host.point();
         // The same list the map layer draws from, so the two can never disagree about
         // whether an incident exists.
         final List<Spot.Request> pool = visible();
@@ -672,12 +689,13 @@ public final class SpotPage {
         switch (filter) {
             case NEAR:
                 if (self == null) {
-                    status.setText("No position for you yet");
+                    status.setText(host.pointLabel() + " is not known yet. Pick Map center at"
+                            + " the top, or wait for a fix.");
                     return;
                 }
                 shown = Spot.near(pool, self.getLatitude(), self.getLongitude(),
                         radiusMeters());
-                what = "within " + radiusLabel(radiusIndex) + " of you";
+                what = "within " + radiusLabel(radiusIndex) + " of " + host.pointWords();
                 break;
             case MAP: {
                 final double[] box = viewBox();
@@ -775,7 +793,7 @@ public final class SpotPage {
 
     /** Each filter says what it would show before it is tapped. */
     private void paintFilters() {
-        final GeoPoint self = MapCompat.selfPoint();
+        final GeoPoint self = host.point();
         // Counted off the same list the rows come from, so a button never promises
         // more than the list beneath it will show.
         final List<Spot.Request> can = visible();

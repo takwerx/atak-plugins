@@ -83,8 +83,10 @@ main checkout; `git -C ~/GitHub/atak-plugins branch --show-current` must print
     → PASS. The download block at the top of `README.md` and
     `docs/USER_GUIDE.md` must name `PLUGIN_VERSION` and link the `v<version>`
     assets, and when `~/atak-dist/signed/` holds this version's APKs each one must be
-    linked. A FAIL stops the ship: fix the block, commit it on the branch,
-    re-run. Map Depot 1.6 shipped with every link aimed at a v1.5 release that
+    linked. A FAIL stops the ship: `./scripts/check-download-links.sh <Plugin>
+    --fix` re-stamps the block to `PLUGIN_VERSION`; commit it on the branch,
+    re-run. (`submission-zip.sh` does this itself since 2026-10-19, so a FAIL
+    here means the zips predate that or the block is malformed.) Map Depot 1.6 shipped with every link aimed at a v1.5 release that
     was never created, and the 404s were found by a user.
     `.claude/hooks/release-links-guard.sh` also blocks the subtree push and
     the `gh release create` mechanically, so a ship that skips this step still

@@ -55,6 +55,24 @@ echo "==> version code (the MDM must see this as an update)"
 "$REPO_ROOT/scripts/check-version-code.sh" "$NAME" --target "$ATAK_VERSION" || {
     echo "error: not zipping a version an MDM could not push as an update — bump PLUGIN_VERSION" >&2; exit 1; }
 
+PF="${ATAK_PREFLIGHT:-$HOME/atak-plugin-preflight}"
+# Josh Fuller's preflight scans the source the way the pipeline's reviewers
+# will: semgrep rules, secrets, dependencies. It is his tool and moves fast, so
+# pull the latest every run rather than keeping a copy. PREFLIGHT_ARGS passes
+# flags through (e.g. --allow-gaps); PREFLIGHT_SKIP=1 skips it on purpose.
+echo "==> preflight (joshuafuller/atak-plugin-preflight)"
+if [ "${PREFLIGHT_SKIP:-}" = 1 ]; then
+    echo "    skipped: PREFLIGHT_SKIP=1"
+elif [ -f "$PF/preflight.py" ]; then
+    git -C "$PF" pull -q --ff-only 2>/dev/null \
+        || echo "    warning: could not update $PF, running the copy on disk"
+    # shellcheck disable=SC2086
+    python3 "$PF/preflight.py" ${PREFLIGHT_ARGS:-} "$PROJECT" || {
+        echo "error: preflight is not clean; read its report and fix the source (PREFLIGHT_ARGS=--allow-gaps for a missing scanner)" >&2; exit 1; }
+else
+    echo "    not installed: git clone https://github.com/joshuafuller/atak-plugin-preflight.git \"$PF\""
+fi
+
 # Manual pictures, before anything is built. A release that changes a screen
 # the manual shows has to carry new pictures of it, and a picture of the
 # plugin's own UI (pane, dialog, menu, settings) is shot on the dev phone and
@@ -103,6 +121,21 @@ fi
 echo "==> branch contains main (shared rules current; merged in now if it was not)"
 "$REPO_ROOT/scripts/check-main-merged.sh" --merge || {
     echo "error: not zipping from a branch behind main; see above for why main could not be merged in" >&2; exit 1; }
+
+# The download block at the top of README and guide names the version, and the
+# zip carries the README. Re-stamp it to PLUGIN_VERSION here and commit, so the
+# bump and the block move together: Cursorwerx 0.3 and 0.4 both reached the
+# ship prompt still linking the release before, fixed by hand each time.
+echo "==> download block names $PLUGIN_VERSION (re-stamped and committed if it did not)"
+"$REPO_ROOT/scripts/check-download-links.sh" "$NAME" --fix >/dev/null 2>&1 || true
+if ! git -C "$REPO_ROOT" diff --quiet -- "plugins/$NAME/README.md" "plugins/$NAME/docs/USER_GUIDE.md"; then
+    git -C "$REPO_ROOT" commit -q -m "$NAME $PLUGIN_VERSION: download block names the v$PLUGIN_VERSION release" \
+        -- "plugins/$NAME/README.md" "plugins/$NAME/docs/USER_GUIDE.md" || {
+        echo "error: could not commit the re-stamped download block" >&2; exit 1; }
+    echo "  PASS  re-stamped to $PLUGIN_VERSION and committed ($(git -C "$REPO_ROOT" log -1 --format=%h))"
+else
+    echo "  PASS  already $PLUGIN_VERSION"
+fi
 
 mkdir -p "$DIST"
 rm -f "$OUT"

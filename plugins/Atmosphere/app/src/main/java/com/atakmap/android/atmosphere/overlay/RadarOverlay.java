@@ -191,6 +191,18 @@ public final class RadarOverlay {
     }
 
     private static final String PREF_ON = "weather.layer.radar.on";
+    private static final String PREF_TRANSPARENCY = "weather.layer.radar.transparency";
+    /** How see-through the radar is, 0 (solid) to this. */
+    public static final int MAX_TRANSPARENCY = 90;
+    /** A little of the map shows through until the operator moves the slider (operator, 2026-10-17: "default needs to be set at like 20"). */
+    private static final int DEFAULT_TRANSPARENCY = 20;
+    /**
+     * Frames a loop plays: up to the cache's worth, so every loop after the first
+     * plays from memory. The NWS gives a frame every two minutes for two hours;
+     * twenty spread over them is one every six minutes.
+     */
+    static final int PLAY_FRAMES = 20;
+    private static final long PLAY_STEP_MS = 500L, PLAY_HOLD_MS = 1500L;
     private static final int MAX_PX = 1024;
     private static final int CACHE_FRAMES = 24;
     private static final long CAPS_REFRESH_MS = 3 * 60 * 1000L;
@@ -205,6 +217,8 @@ public final class RadarOverlay {
         void onFrameShown(int index, String time);
         /** Something the operator should read: fetching, out of coverage, an error. */
         void onStatus(String status);
+        /** The loop started or stopped. */
+        void onPlaying(boolean playing);
     }
 
     private final MapView mapView;
@@ -251,6 +265,24 @@ public final class RadarOverlay {
     /** Bumped on main whenever what is in flight no longer matters; read by the worker as a hint to stop. */
     private volatile int generation;
     private Listener listener;
+    private int transparency;
+    /** Playing the loop, and where in it: indexes into frames, oldest first. */
+    private boolean playing;
+    private final List<Integer> playList = new ArrayList<>();
+    private int playPos = -1;
+
+    /** The loop's next frame, once the one before it is on the map. */
+    private final Runnable playStep = new Runnable() {
+        @Override
+        public void run() {
+            if (!playing || !on || frames.isEmpty())
+                return;
+            if (playList.isEmpty())
+                playList.addAll(playFrames(frames.size()));
+            playPos = (playPos + 1) % playList.size();
+            moveTo(playList.get(playPos));
+        }
+    };
 
     private final Runnable moveSettled = new Runnable() {
         @Override
@@ -298,6 +330,10 @@ public final class RadarOverlay {
         GLRasterLayer.register();
         mapView.addLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
         layer.setVisible(false);
+        final SharedPreferences tp = MapCompat.prefs();
+        transparency = tp == null ? DEFAULT_TRANSPARENCY
+                : Math.max(0, Math.min(MAX_TRANSPARENCY, tp.getInt(PREF_TRANSPARENCY, DEFAULT_TRANSPARENCY)));
+        layer.setAlpha((100 - transparency) / 100f);
         mapView.addOnMapMovedListener(moved);
         worker = Executors.newSingleThreadExecutor(new ThreadFactory() {
             @Override
@@ -328,6 +364,8 @@ public final class RadarOverlay {
         mapView.removeOnMapMovedListener(moved);
         mapView.removeCallbacks(moveSettled);
         mapView.removeCallbacks(scrubSettled);
+        mapView.removeCallbacks(playStep);
+        playing = false;
         generation++;
         layer.clear();
         mapView.removeLayer(MapView.RenderStack.MAP_SURFACE_OVERLAYS, layer);
@@ -365,10 +403,94 @@ public final class RadarOverlay {
             refreshFrames(true);
         } else {
             generation++;
+            setPlaying(false);
             layer.setVisible(false);
             layer.clear();
             status("");
         }
+    }
+
+    public int transparency() {
+        return transparency;
+    }
+
+    /**
+     * Percent see-through, so the map under a storm shows (takwerx/atmosphere#7).
+     * The renderer fades what it holds: the slider moves the picture at once.
+     */
+    public void setTransparency(int percent) {
+        final int v = Math.max(0, Math.min(MAX_TRANSPARENCY, percent));
+        if (v == transparency)
+            return;
+        transparency = v;
+        layer.setAlpha((100 - v) / 100f);
+        final SharedPreferences p = MapCompat.prefs();
+        if (p != null)
+            p.edit().putInt(PREF_TRANSPARENCY, v).apply();
+    }
+
+    public boolean isPlaying() {
+        return playing;
+    }
+
+    /**
+     * Play the last two hours as a loop, to see which way the cells move
+     * (takwerx/atmosphere#7): up to {@link #PLAY_FRAMES} frames, oldest first, each
+     * once the one before it is on the map, the newest held a moment before it
+     * starts over. A frame still to fetch is fetched when its turn comes, so the
+     * first loop runs at the server's pace and the rest from memory. Stopping
+     * leaves the frame showing; a pick on the strip stops it.
+     */
+    public void setPlaying(boolean value) {
+        if (value && (!on || frames.size() < 2))
+            return;
+        mapView.removeCallbacks(playStep);
+        if (playing == value)
+            return;
+        playing = value;
+        playList.clear();
+        if (value) {
+            playList.addAll(playFrames(frames.size()));
+            playPos = -1;
+            mapView.post(playStep);
+        }
+        if (listener != null)
+            listener.onPlaying(value);
+    }
+
+    /** The frames a loop plays, oldest first, ending at the newest: evenly spread, at most PLAY_FRAMES. */
+    public static List<Integer> playFrames(int count) {
+        final List<Integer> out = new ArrayList<>();
+        final int n = Math.min(count, PLAY_FRAMES);
+        if (n <= 0)
+            return out;
+        if (n == 1) {
+            out.add(count - 1);
+            return out;
+        }
+        // From the oldest to the newest, as even as whole frames allow.
+        for (int j = 0; j < n; j++)
+            out.add((int) Math.round(j * (count - 1) / (double) (n - 1)));
+        return out;
+    }
+
+    /** A frame of the loop: shown or fetched now, never waiting on a scrub to pause. */
+    private void moveTo(int i) {
+        if (i < 0 || i >= frames.size())
+            return;
+        index = i;
+        followLatest = i == frames.size() - 1;
+        mapView.removeCallbacks(scrubSettled);
+        showFrame();
+    }
+
+    /** A loop frame is on the map, or could not be had: the next after a beat. */
+    private void stepLoop() {
+        if (!playing)
+            return;
+        mapView.removeCallbacks(playStep);
+        final boolean last = !playList.isEmpty() && playPos == playList.size() - 1;
+        mapView.postDelayed(playStep, last ? PLAY_HOLD_MS : PLAY_STEP_MS);
     }
 
     public List<String> frames() {
@@ -379,24 +501,34 @@ public final class RadarOverlay {
         return index;
     }
 
-    /** Scrub to a frame. The last index means "latest", and new frames follow it. */
+    /** Scrub to a frame. The last index means "latest", and new frames follow it. A scrub stops the loop. */
     public void setFrameIndex(int i) {
         if (frames.isEmpty())
             return;
         i = Math.max(0, Math.min(i, frames.size() - 1));
         followLatest = i == frames.size() - 1;
-        if (i == index)
-            return;
-        index = i;
-        // A cached frame shows at once, so a scrub over fetched frames plays live;
-        // an uncached one waits for the finger to pause, so a drag across the strip
-        // does not fire a request per frame it crosses.
-        final String time = frames.get(index);
-        mapView.removeCallbacks(scrubSettled);
-        if (region != null && cache.containsKey(cacheKey(time)))
-            showFrame();
-        else
-            mapView.postDelayed(scrubSettled, SCRUB_SETTLE_MS);
+        // The loop stops on the frame picked, and says so once that frame is the
+        // index, so the strip shows the pick and not where the loop was.
+        final boolean wasPlaying = playing;
+        if (wasPlaying) {
+            mapView.removeCallbacks(playStep);
+            playing = false;
+            playList.clear();
+        }
+        if (i != index) {
+            index = i;
+            // A cached frame shows at once, so a scrub over fetched frames plays live;
+            // an uncached one waits for the finger to pause, so a drag across the strip
+            // does not fire a request per frame it crosses.
+            final String time = frames.get(index);
+            mapView.removeCallbacks(scrubSettled);
+            if (region != null && cache.containsKey(cacheKey(time)))
+                showFrame();
+            else
+                mapView.postDelayed(scrubSettled, SCRUB_SETTLE_MS);
+        }
+        if (wasPlaying && listener != null)
+            listener.onPlaying(false);
     }
 
     // ---- frames ----------------------------------------------------------------
@@ -443,9 +575,16 @@ public final class RadarOverlay {
                             index = times.size() - 1;
                         else
                             index = times.indexOf(shownTime);
+                        if (playing) {
+                            playList.clear();
+                            playList.addAll(playFrames(times.size()));
+                            playPos = Math.min(playPos, playList.size() - 1);
+                        }
                         if (listener != null)
                             listener.onFrames(frames(), index);
                         ensureRegion();
+                        if (playing)
+                            stepLoop();
                     }
 
                     @Override
@@ -612,6 +751,7 @@ public final class RadarOverlay {
             if (listener != null)
                 listener.onFrameShown(index, time);
             status("");
+            stepLoop();
             return;
         }
         if (key.equals(pendingKey))
@@ -639,6 +779,7 @@ public final class RadarOverlay {
                 if (listener != null)
                     listener.onFrameShown(index, time);
                 status("");
+                stepLoop();
             }
 
             @Override
@@ -648,6 +789,7 @@ public final class RadarOverlay {
                 if (mine != generation)
                     return;
                 status(error);
+                stepLoop();
             }
         });
     }
@@ -706,7 +848,10 @@ public final class RadarOverlay {
                                 Log.w(TAG, "tile " + plan.zoom + "/" + tx + "/" + ty + ": "
                                         + (e.getCause() == null ? e : e.getCause().getMessage()));
                             }
-                            final Bitmap t = bytes == null ? null
+                            // A tile is TILE_PX square: its header says so before any
+                            // pixel is decoded, so a picture of another size is never
+                            // expanded into memory at all.
+                            final Bitmap t = bytes == null || !isTile(bytes) ? null
                                     : BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                             if (t == null || t.getWidth() != WorldRadar.TILE_PX
                                     || t.getHeight() != WorldRadar.TILE_PX) {
@@ -749,6 +894,7 @@ public final class RadarOverlay {
                         }
                         if (err != null) {
                             status(err);
+                            stepLoop();
                             return;
                         }
                         cache.put(key, b);
@@ -760,6 +906,7 @@ public final class RadarOverlay {
                         if (listener != null)
                             listener.onFrameShown(index, time);
                         status("");
+                        stepLoop();
                     }
                 });
             }
@@ -804,5 +951,13 @@ public final class RadarOverlay {
             listener.onStatus(s);
         if (!s.isEmpty())
             Log.d(TAG, s);
+    }
+
+    /** Whether these bytes are a picture of exactly one tile, read from the header alone. */
+    private static boolean isTile(byte[] bytes) {
+        final BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.length, o);
+        return o.outWidth == WorldRadar.TILE_PX && o.outHeight == WorldRadar.TILE_PX;
     }
 }

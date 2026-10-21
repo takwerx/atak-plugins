@@ -7,6 +7,7 @@ import com.atakmap.android.atmosphere.compat.GeneratedFiles;
 import com.atakmap.android.atmosphere.compat.MapCompat;
 import com.atakmap.android.atmosphere.data.Acis;
 import com.atakmap.android.atmosphere.data.Iem;
+import com.atakmap.android.atmosphere.data.IemRelay;
 import com.atakmap.android.atmosphere.data.States;
 import com.atakmap.android.atmosphere.data.UsgsRain;
 import com.atakmap.coremap.log.Log;
@@ -41,7 +42,9 @@ import java.util.Locale;
  *
  * <p>Hours ending at a moment (the last 24 h, or before a date and time) are exact:
  * every USGS gauge's readings, the airports' hourly reports and the county, RAWS and
- * agency gauges of the NWS feed, from the Iowa Environmental Mesonet. A run of days,
+ * agency gauges of the NWS feed, from the Iowa Environmental Mesonet through takwerx's
+ * relay, which keeps their hours 45 days; before that the agency gauges show whole days
+ * and the airports are left out. A run of days,
  * from the last three to since January 1 or one day picked, is the airports and NWS
  * observers of the climate record for the states under the map, added up by the
  * Regional Climate Centers, the mesonet's daily totals for the agency gauges, and the
@@ -171,10 +174,25 @@ public final class RainGaugesOverlay extends OutlookOverlay {
     private volatile long runStartMs, runEndMs;
     /** The center of the map at the ask, for choosing the agency gauges nearest it. */
     private volatile double[] askedCenter;
-    /** Network lists from the mesonet ("CA_DCP"), kept a week on the phone. */
+    /** Network lists from the relay ("CA_DCP"), kept a week on the phone. */
     private final Map<String, List<Iem.Station>> networks = new java.util.concurrent.ConcurrentHashMap<>();
-    /** Which network list or data request a mesonet URL is: "CA_DCP|list", "CA|dcp". */
+    /** Which network list a relay URL is: "CA|list" for the gauges, "CA|alist" for the airports. */
     private final Map<String, String> iemPart = new java.util.concurrent.ConcurrentHashMap<>();
+    /** The relay files of a part that comes in several, by URL. */
+    private final Map<String, Gather> gathers = new java.util.concurrent.ConcurrentHashMap<>();
+    /** States whose gauge list is still coming; the gauges are asked for once none is. */
+    private final java.util.Set<String> listsDue = java.util.Collections.synchronizedSet(
+            new java.util.HashSet<String>());
+    private volatile boolean agencyAsked;
+    /** Every state's gauges asked for, together: the agency gauges' names and places. */
+    private volatile List<Iem.Station> agencyList = new ArrayList<>();
+    /**
+     * Hours older than the relay keeps: the agency gauges show the whole days from the
+     * start's day to the end's, the phone's days, and the airports are left out.
+     */
+    private volatile String fallStart = "", fallEnd = "";
+    /** A month of daily totals was not on the relay: not harvested yet, or before it begins. */
+    private volatile boolean relayMissing;
     /** Gauges placed this refresh with their totals, {lat, lon, inches}: the agency gauges' neighbors. */
     private final List<double[]> placed = new CopyOnWriteArrayList<>();
     /** USGS gauges' places, so the agency feed's copy of one is not drawn twice. */
@@ -618,6 +636,13 @@ public final class RainGaugesOverlay extends OutlookOverlay {
         readingsFailed = false;
         leftOff.set(0);
         iemPart.clear();
+        gathers.clear();
+        listsDue.clear();
+        agencyAsked = false;
+        agencyList = new ArrayList<>();
+        fallStart = "";
+        fallEnd = "";
+        relayMissing = false;
         placed.clear();
         usgsPlaces.clear();
         agencyCapped = 0;
@@ -653,20 +678,27 @@ public final class RainGaugesOverlay extends OutlookOverlay {
                 url = UsgsRain.readingsUrl(box[0], box[1], box[2], box[3], Iem.z(runStartMs), Iem.z(runEndMs));
                 chain.add(url);
             }
-            if (!st.isEmpty())
+            // The relay keeps hours 45 days; older, the agency gauges' whole days.
+            final boolean hoursHeld = runStartMs >= IemRelay.hoursSince(System.currentTimeMillis());
+            if (!hoursHeld) {
+                fallStart = localDay(runStartMs);
+                fallEnd = localDay(runEndMs);
+            }
+            if (!st.isEmpty() && hoursHeld)
                 for (String one : st.split(",")) {
                     if (network(one, "ASOS") == null) {
-                        final String l = Iem.networkUrl(one, "ASOS");
+                        final String l = IemRelay.networkUrl(one, "ASOS");
                         iemPart.put(l, one + "|alist");
                         chain.add(l);
                     }
-                    final String u = Iem.asosUrl(one, Iem.z(runStartMs), Iem.z(runEndMs + 15 * 60_000L));
-                    iemPart.put(u, one + "|asos");
-                    chain.add(u);
+                    final List<String> days = IemRelay.utcDays(runStartMs, runEndMs + 15 * 60_000L);
+                    final Gather g = new Gather(one, null, null, new IemRelay.Reports(runStartMs, runEndMs),
+                            days.size());
+                    for (String day : days)
+                        ask(IemRelay.asosUrl(day, one), g);
                 }
             if (box != null && !st.isEmpty())
-                for (String one : st.split(","))
-                    askAgency(one);
+                askAgencyLists(st);
             return;
         }
     // Every daily gauge of the states under the map, added up for the run, then
@@ -698,29 +730,135 @@ public final class RainGaugesOverlay extends OutlookOverlay {
             chain.add(url);
         }
         if (box != null && !st.isEmpty())
-            for (String one : st.split(","))
-                askAgency(one);
+            askAgencyLists(st);
     }
 
     /**
-     * The agency gauges of a state: its list from the phone when held, else asked for
-     * first, and the gauges' totals asked for once the list is in hand.
+     * The agency gauges of the states under the map: each state's list from the phone
+     * when held, else asked for first, and the gauges' totals asked for once every list
+     * is in hand, the nearest the map's center first across the states.
      */
-    private void askAgency(String st) {
-        final List<Iem.Station> list = network(st, "DCP");
-        if (list == null) {
-            final String u = Iem.networkUrl(st, "DCP");
-            iemPart.put(u, st + "|list");
-            chain.add(u);
+    private void askAgencyLists(String st) {
+        for (String one : st.split(","))
+            if (network(one, "DCP") == null) {
+                final String u = IemRelay.networkUrl(one, "DCP");
+                iemPart.put(u, one + "|list");
+                listsDue.add(one);
+                chain.add(u);
+            }
+        if (listsDue.isEmpty())
+            askAgency();
+    }
+
+    /** A state's list came, or could not: the gauges are asked for after the last. */
+    private void listDone(String st) {
+        listsDue.remove(st);
+        if (listsDue.isEmpty())
+            askAgency();
+    }
+
+    /**
+     * The relay files the agency gauges' totals are in: the readings by UTC day and
+     * 2-degree tile for hours, the daily totals by state and month for days.
+     */
+    private void askAgency() {
+        if (agencyAsked)
             return;
+        agencyAsked = true;
+        final List<Iem.Station> all = new ArrayList<>();
+        final Map<String, String> stateOf = new HashMap<>();
+        for (String one : state.split(",")) {
+            final List<Iem.Station> list = one.isEmpty() ? null : network(one, "DCP");
+            if (list == null)
+                continue;
+            all.addAll(list);
+            for (Iem.Station s : list)
+                stateOf.put(s.id, one);
         }
-        final List<String> ids = agencyIds(list);
+        final List<String> ids = agencyIds(all);
         if (ids.isEmpty())
             return;
-        final String u = exactRun() ? Iem.hadsUrl(st, ids, Iem.z(runStartMs), Iem.z(runEndMs))
-                : Iem.dailyUrl(st, ids, runStart, runEnd);
-        iemPart.put(u, st + "|dcp");
-        chain.add(u);
+        agencyList = all;
+        final java.util.Set<String> want = new java.util.HashSet<>(ids);
+        if (exactRun() && fallStart.isEmpty()) {
+            final List<Iem.Station> asked = new ArrayList<>();
+            for (Iem.Station s : all)
+                if (want.contains(s.id))
+                    asked.add(s);
+            final List<String> urls = new ArrayList<>();
+            for (String day : IemRelay.utcDays(runStartMs, runEndMs))
+                for (String tile : IemRelay.tiles(asked))
+                    urls.add(IemRelay.hadsUrl(day, tile));
+            final Gather g = new Gather("", null, new IemRelay.Readings(want, runStartMs, runEndMs), null,
+                    urls.size());
+            for (String u : urls)
+                ask(u, g);
+            return;
+        }
+        final String start = exactRun() ? fallStart : runStart, end = exactRun() ? fallEnd : runEnd;
+        final java.util.Set<String> states = new java.util.TreeSet<>();
+        for (String id : ids)
+            states.add(stateOf.get(id));
+        final List<String> urls = new ArrayList<>();
+        for (String one : states)
+            for (String month : IemRelay.months(start, end)) {
+                if (month.compareTo(IemRelay.DAILY_SINCE.substring(0, 7)) < 0) {
+                    relayMissing = true;
+                    continue;
+                }
+                urls.add(IemRelay.dailyUrl(one, month));
+            }
+        if (urls.isEmpty())
+            return;
+        final Gather g = new Gather("", new IemRelay.Days(want, start, end), null, null, urls.size());
+        for (String u : urls)
+            ask(u, g);
+    }
+
+    private void ask(String url, Gather g) {
+        gathers.put(url, g);
+        chain.add(url);
+    }
+
+    /**
+     * A part of the relay's answer that comes in several files -- a state's months,
+     * the readings' days and tiles, an airport day -- read as each comes and finished
+     * at the last, answered or not.
+     */
+    private static final class Gather {
+        /** The state, for the airports. */
+        final String st;
+        final IemRelay.Days days;
+        final IemRelay.Readings readings;
+        final IemRelay.Reports reports;
+        private int left;
+
+        Gather(String st, IemRelay.Days days, IemRelay.Readings readings, IemRelay.Reports reports, int files) {
+            this.st = st;
+            this.days = days;
+            this.readings = readings;
+            this.reports = reports;
+            this.left = files;
+        }
+
+        /** One file read or passed over; true at the last. */
+        synchronized boolean done() {
+            return --left == 0;
+        }
+
+        synchronized void add(String body) {
+            if (days != null)
+                days.add(body);
+            else if (readings != null)
+                readings.add(body);
+            else if (reports != null)
+                reports.add(body);
+        }
+    }
+
+    /** The phone's day of a moment, yyyy-MM-dd. */
+    private static String localDay(long millis) {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date(millis));
     }
 
     /**
@@ -848,17 +986,11 @@ public final class RainGaugesOverlay extends OutlookOverlay {
     /**
      * Every request of a refresh is asked for at once, the slowest setting the wait
      * rather than the sum of them (30 days took about 40 s one after another,
-     * 2026-10-14). The mesonet only one at a time: it turns an address away that asks
-     * fast.
+     * 2026-10-14). The mesonet had to be asked one at a time, as it turns away an
+     * address that asks fast; the relay's files need not be.
      */
     @Override
     protected boolean prefetch(int index) {
-        final String u = asked(index);
-        if (!u.contains(Iem.HOST))
-            return true;
-        for (int i = 0; i < index; i++)
-            if (asked(i).contains(Iem.HOST))
-                return false;
         return true;
     }
 
@@ -888,7 +1020,7 @@ public final class RainGaugesOverlay extends OutlookOverlay {
     @Override
     protected boolean large(int index) {
         final String asked = asked(index);
-        return asked.contains(Acis.HOST) || asked.contains(Iem.HOST) || asked.contains("/nwis/dv/")
+        return asked.contains(Acis.HOST) || asked.contains("/nwis/dv/")
                 || asked.contains("format=rdb");
     }
 
@@ -910,6 +1042,33 @@ public final class RainGaugesOverlay extends OutlookOverlay {
         return skipped(index, asked(index));
     }
 
+    /**
+     * A relay file that is not there: a day with no readings in a tile, or airports
+     * with no reports, is a quiet day; a month of daily totals is one not harvested
+     * yet. Anything else did not answer.
+     */
+    @Override
+    protected List<Area> skipped(int index, String asked, String error) {
+        final boolean absent = error != null && error.contains("HTTP 404");
+        final Gather g = gathers.get(asked);
+        if (g != null) {
+            if (!absent)
+                iemFailed = true;
+            else if (g.days != null)
+                relayMissing = true;
+            return g.done() ? finish(g) : Collections.<Area>emptyList();
+        }
+        final String part = iemPart.get(asked);
+        if (part != null) {
+            if (!absent)
+                iemFailed = true;
+            if (part.endsWith("|list"))
+                listDone(part.substring(0, part.indexOf('|')));
+            return Collections.emptyList();
+        }
+        return skipped(index, asked);
+    }
+
     @Override
     protected List<Area> skipped(int index, String asked) {
         if (asked.contains("/nwis/iv/") && asked.contains("format=rdb")) {
@@ -920,10 +1079,6 @@ public final class RainGaugesOverlay extends OutlookOverlay {
         }
         if (asked.contains("/nwis/iv/"))
             return spans(null);
-        if (iemPart.containsKey(asked)) {
-            iemFailed = true;
-            return Collections.emptyList();
-        }
         final String part = acisPart.get(asked);
         if (part != null) {
             final String st = part.substring(0, part.indexOf('|'));
@@ -995,7 +1150,7 @@ public final class RainGaugesOverlay extends OutlookOverlay {
                 return out;
             return acisAreas(run, got);
         }
-        if (asked.contains(Iem.HOST))
+        if (asked.contains(IemRelay.HOST))
             return parseIem(asked, body);
         if (asked.contains("/nwis/site/")) {
             heldSites = UsgsRain.parseSites(body);
@@ -1024,8 +1179,12 @@ public final class RainGaugesOverlay extends OutlookOverlay {
 
     /** Whether a gauge has no record for a whole day of the run; today may still be coming. */
     private boolean missedADay(Map<String, Double> byDay) {
-        final String lastWhole = runEnd.equals(runToday) ? plusDays(runToday, -1) : runEnd;
-        for (String d = runStart; d.compareTo(lastWhole) <= 0; d = plusDays(d, 1))
+        return missedADay(byDay, runStart, runEnd);
+    }
+
+    private boolean missedADay(Map<String, Double> byDay, String start, String end) {
+        final String lastWhole = end.equals(runToday) ? plusDays(runToday, -1) : end;
+        for (String d = start; d.compareTo(lastWhole) <= 0; d = plusDays(d, 1))
             if (!byDay.containsKey(d))
                 return true;
         return false;
@@ -1038,50 +1197,67 @@ public final class RainGaugesOverlay extends OutlookOverlay {
         java.util.TreeMap<String, Double> byDay = new java.util.TreeMap<>();
     }
 
-    /** What a mesonet answer is, by the part its URL was asked as. */
+    /** What a relay file is, by the part its URL was asked as. */
     private List<Area> parseIem(String asked, String body) {
-        final List<Area> out = new ArrayList<>();
+        final Gather g = gathers.get(asked);
+        if (g != null) {
+            g.add(body);
+            return g.done() ? finish(g) : new ArrayList<Area>();
+        }
         final String part = iemPart.get(asked);
         if (part == null)
-            return out;
+            return new ArrayList<>();
         final String st = part.substring(0, part.indexOf('|'));
-        if (part.endsWith("|list") || part.endsWith("|alist")) {
-            final String key = st + (part.endsWith("|list") ? "_DCP" : "_ASOS");
-            final List<Iem.Station> list = Iem.parseNetwork(body);
-            if (list.isEmpty())
-                return out;
+        final String key = st + (part.endsWith("|list") ? "_DCP" : "_ASOS");
+        final List<Iem.Station> list = IemRelay.parseNetwork(body);
+        if (!list.isEmpty()) {
             networks.put(key, list);
             saveNetwork(key, list);
-            if (part.endsWith("|list"))
-                askAgency(st);
-            return out;
         }
-        if (part.endsWith("|asos"))
-            return airportAreas(st, Iem.parseAsos(body, runStartMs, runEndMs));
-        final List<Iem.Station> list = networks.get(st + "_DCP");
-        if (list == null)
-            return out;
+        if (part.endsWith("|list"))
+            listDone(st);
+        return new ArrayList<>();
+    }
+
+    /** A part's files are all in: its gauges, added up. */
+    private List<Area> finish(Gather g) {
+        if (g.reports != null)
+            return airportAreas(g.st, g.reports.totals());
         final Map<String, Agg> got = new java.util.LinkedHashMap<>();
-        if (exactRun()) {
-            for (Iem.Total t : Iem.parseHads(body, runStartMs, runEndMs).values()) {
+        if (g.readings != null) {
+            for (Iem.Total t : g.readings.totals().values()) {
                 final Agg a = new Agg();
                 a.total = t.inches;
                 a.complete = t.complete;
                 got.put(t.id, a);
             }
-        } else {
-            for (Map.Entry<String, java.util.TreeMap<String, Double>> e : Iem.parseDaily(body).entrySet()) {
-                final Agg a = new Agg();
-                for (Map.Entry<String, Double> d : e.getValue().entrySet())
-                    if (d.getKey().compareTo(runStart) >= 0 && d.getKey().compareTo(runEnd) <= 0) {
-                        a.byDay.put(d.getKey(), d.getValue());
-                        a.total += d.getValue();
-                    }
-                a.complete = !missedADay(a.byDay);
-                got.put(e.getKey(), a);
-            }
+            return agencyAreas(agencyList, got, runWords());
         }
-        return agencyAreas(list, got);
+        final boolean whole = !fallStart.isEmpty();
+        final String start = whole ? fallStart : runStart, end = whole ? fallEnd : runEnd;
+        for (Map.Entry<String, java.util.TreeMap<String, Double>> e : g.days.byGauge().entrySet()) {
+            final Agg a = new Agg();
+            for (Map.Entry<String, Double> d : e.getValue().entrySet()) {
+                a.byDay.put(d.getKey(), d.getValue());
+                a.total += d.getValue();
+            }
+            a.complete = !missedADay(a.byDay, start, end);
+            got.put(e.getKey(), a);
+        }
+        return agencyAreas(agencyList, got, whole ? fallWords() : runWords());
+    }
+
+    /**
+     * "Fri Oct 9 to Sat Oct 10, in whole days", or "Fri Oct 16 to now": what the agency
+     * gauges add up when their hours are not kept.
+     */
+    private String fallWords() {
+        final String pattern = "EEE MMM d" + (sameYear(fallStart) ? "" : ", yyyy");
+        final boolean now = fallEnd.equals(runToday);
+        if (fallStart.equals(fallEnd))
+            return now ? "today so far" : "on " + dayName(fallStart, pattern) + ", the whole day";
+        return dayName(fallStart, pattern) + " to " + (now ? "now" : dayName(fallEnd, "EEE MMM d"))
+                + ", in whole days";
     }
 
     /**
@@ -1090,7 +1266,7 @@ public final class RainGaugesOverlay extends OutlookOverlay {
      * a gauge that read inches on a dry day or nothing through a storm would otherwise
      * be on the map as fact.
      */
-    private List<Area> agencyAreas(List<Iem.Station> list, Map<String, Agg> got) {
+    private List<Area> agencyAreas(List<Iem.Station> list, Map<String, Agg> got, String words) {
         final Map<String, Iem.Station> byId = new HashMap<>();
         for (Iem.Station s : list)
             byId.put(s.id, s);
@@ -1121,7 +1297,7 @@ public final class RainGaugesOverlay extends OutlookOverlay {
                 continue;
             final String amount = inches(a.total);
             final StringBuilder b = new StringBuilder();
-            b.append(amount).append(' ').append(runWords()).append('\n').append(s.name).append(" (").append(s.id)
+            b.append(amount).append(' ').append(words).append('\n').append(s.name).append(" (").append(s.id)
                     .append(')');
             if (a.byDay.size() > 1 && a.byDay.size() <= 31) {
                 b.append("\nBy the day:");
@@ -1442,6 +1618,12 @@ public final class RainGaugesOverlay extends OutlookOverlay {
             b.append(" The county and RAWS gauges nearest the map center are shown; zoom in for the rest.");
         if (iemFailed)
             b.append(" The county, RAWS or airport gauges did not answer just now; asking again in 15 minutes.");
+        if (!fallStart.isEmpty() && !zoomedOut)
+            b.append(" Hours go back to ").append(momentName(IemRelay.hoursSince(System.currentTimeMillis())))
+                    .append(" only, so the county and RAWS gauges show ").append(fallWords())
+                    .append(", and the airports are left out.");
+        if (relayMissing && !zoomedOut)
+            b.append(" The county and RAWS gauges for part of this time are not ready yet.");
         if (!zoomedOut && !readingsRun() && !exactRun())
             b.append(" For a month or more, only the USGS gauges that keep daily totals show.");
         return b.toString();
