@@ -118,15 +118,24 @@ public final class PyrecastForecasts {
             return slug + "|" + run;
         }
 
-        /** "Bee Haven (FL)", out of "fl-bee-haven". */
+        /**
+         * "Bee Haven", out of "fl-bee-haven". The two letters in front are not always
+         * the state the fire is in ("or-garda-falls" burns on Mount Rainier, in
+         * Washington), so they are left off rather than shown as a place.
+         */
         public String name() {
             final String[] p = slug.split("-");
-            if (p.length < 2)
-                return title(slug);
+            final int from = p.length >= 2 && p[0].length() == 2 ? 1 : 0;
             final StringBuilder s = new StringBuilder();
-            for (int i = 1; i < p.length; i++)
-                s.append(i > 1 ? " " : "").append(title(p[i]));
-            return s + " (" + p[0].toUpperCase(Locale.US) + ")";
+            for (int i = from; i < p.length; i++)
+                s.append(i > from ? " " : "").append(title(p[i]));
+            return s.toString();
+        }
+
+        /** Latitude and longitude of the middle of the ground the forecast covers. */
+        public double[] center() {
+            final GeoTiffGrid g = grid(50);
+            return g.latLon(g.nx / 2.0, g.ny / 2.0);
         }
 
         /** How far out the run goes, in hours. */

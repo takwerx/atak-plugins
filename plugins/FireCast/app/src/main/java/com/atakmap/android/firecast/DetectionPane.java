@@ -482,9 +482,12 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             return;
         }
         final String[] items = new String[fs.size()];
+        final double[] me = feed.ownPosition();
         for (int i = 0; i < items.length; i++) {
             final PyrecastForecasts.Forecast f = fs.get(i);
-            items[i] = f.name() + "  ·  run " + PyrecastForecasts.when(f.runMs)
+            final double[] c = f.center();
+            items[i] = f.name() + (me == null ? "" : "  ·  " + Units.rangeBearing(me, c[0], c[1]))
+                    + "  ·  run " + PyrecastForecasts.when(f.runMs)
                     + "\n" + acresText(f.acres(pyrecast.pct(), 24)) + " by 24 h, out to " + PyrecastForecasts.spanText(f.maxHours(pyrecast.pct()));
         }
         new AlertDialog.Builder(mapView.getContext())

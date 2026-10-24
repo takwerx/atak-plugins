@@ -626,7 +626,8 @@ public class DetectionFeed {
     // ---- the area: what is in view, or a circle around the operator -------------
 
     /** The operator's own position, or null without a fix. A point at 0,0 is not a fix. */
-    private double[] ownPosition() {
+    /** The device's own position, or null with no fix. */
+    public double[] ownPosition() {
         try {
             final com.atakmap.android.maps.Marker self = mapView.getSelfMarker();
             final com.atakmap.coremap.maps.coords.GeoPoint p = self == null ? null : self.getPoint();
