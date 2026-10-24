@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.19",
+   plugin-version: "0.20",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -374,12 +374,14 @@ it is a direction.
   #image("107.jpg", width: 100%)
   #image("108.jpg", width: 100%)
 ][
-  The *Storm Reports* page lists the reports and the tornado paths together:
-  *US*, *Near* the point in the pane's top row, on the *Map* as it sits
-  (read again whenever the map settles), or by *State*; *Newest* or *Closest*
-  first; and a picker of switches for any mix of the eight families and
-  *Tornado*, which covers the dots and the paths. What you tick is what the map
-  draws.
+  The *Storm Reports* page lists the reports and the tornado paths together,
+  under one row of buttons. The first reads where the list looks and how many
+  it holds, and opens the choices beneath it: *US*, *Near* the point in the
+  pane's top row, on the *Map* as it sits (read again whenever the map
+  settles), or by *State*. The next flips between *Newest* and *Closest*
+  first. *All Types* is a picker of switches for any mix of the eight families
+  and *Tornado*, which covers the dots and the paths; what you tick is what the
+  map draws. The last steps through the window: *24 h*, *48 h*, *72 h*.
 
   A row flies the map to the report and opens its details in one tap. *Open
   the list* under the layer's switch jumps here.
@@ -1062,10 +1064,12 @@ classes, lower 48 only.
 #v(4pt)
 The *Spot Weather Forecast* layer draws every open spot forecast request: W
 for a wildfire, P for a prescribed fire, S for search and rescue. The *Spot
-Weather Forecast* page lists them - all, nearby, on the map, by state or
-region - *Newest* or *Closest* first, with a search by incident name. Nearby
-and Closest measure from the point chosen in the top row. Tap one for the
-forecast the office wrote.
+Weather Forecast* page lists them under one row of buttons: the first reads
+where the list looks and how many it holds, and opens the choices beneath it
+(all, nearby, on the map, by state or region); the next flips between
+*Newest* and *Closest* first; and a search by incident name sits under the
+row. Nearby and Closest measure from the point chosen in the top row. Tap one
+for the forecast the office wrote.
 ]
 
 #tak-slide[
