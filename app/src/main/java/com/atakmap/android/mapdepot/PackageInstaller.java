@@ -614,8 +614,13 @@ public final class PackageInstaller {
         // A GeoPDF overlay is listed under its file name; a map source XML
         // under the <name> inside it, which the depot writes to match the
         // file minus its extension.
+        // A satellite pack is listed under the name in its own metadata
+        // table, which is for people; its file name is a contract with
+        // Damage Assessment and is not the listed name.
         final String lower = f.getName().toLowerCase(java.util.Locale.US);
-        final String name = lower.endsWith(".xml")
+        final String name = pkg instanceof Depot.Named
+                ? ((Depot.Named) pkg).layerName()
+                : lower.endsWith(".xml")
                 ? f.getName().substring(0, f.getName().length() - 4)
                 : lower.endsWith(".mbtiles")
                         ? f.getName().substring(0, f.getName().length() - 8)
