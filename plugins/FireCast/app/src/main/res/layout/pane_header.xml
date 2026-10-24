@@ -103,7 +103,7 @@
         <ImageView
             android:id="@+id/pyrecast_logo"
             android:layout_width="wrap_content"
-            android:layout_height="26dp"
+            android:layout_height="34dp"
             android:adjustViewBounds="true"
             android:contentDescription="PyreCast"
             android:src="@drawable/pyrecast_logo" />
@@ -115,7 +115,7 @@
             android:paddingLeft="10dp"
             android:textColor="#B0B0B0"
             android:textSize="12sp"
-            android:text="Forecasts by PyreCast. Tap for pyrecast.com" />
+            android:text="Forecasts by PyreCast, used with permission. Tap for pyrecast.com" />
     </LinearLayout>
     <!-- Which of PyreCast's runs is drawn: they are ranked by the area burned at the
          end, so the middle one is shown unless an end is picked. -->
