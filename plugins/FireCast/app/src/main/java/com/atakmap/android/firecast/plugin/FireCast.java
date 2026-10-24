@@ -86,6 +86,10 @@ public class FireCast implements IPlugin {
             firis = new com.atakmap.android.firecast.FirisModels(mapView, pluginContext);
             firis.start();
         }
+        if (mapView != null && pyrecast == null) {
+            pyrecast = new com.atakmap.android.firecast.PyrecastForecasts(mapView, pluginContext);
+            pyrecast.start();
+        }
         if (mapView != null && model == null) {
             model = new com.atakmap.android.firecast.model.FireModel(mapView, pluginContext);
             model.start();
@@ -150,6 +154,7 @@ public class FireCast implements IPlugin {
     public static final String SHOW = "com.atakmap.android.firecast.SHOW";
     private android.content.BroadcastReceiver showReceiver;
     private com.atakmap.android.firecast.FirisModels firis;
+    private com.atakmap.android.firecast.PyrecastForecasts pyrecast;
 
     @Override
     public void onStop() {
@@ -188,6 +193,11 @@ public class FireCast implements IPlugin {
             firis.stop();
             firis = null;
         }
+        if (pyrecast != null) {
+            pyrecast.setListener(null);
+            pyrecast.stop();
+            pyrecast = null;
+        }
         if (feed != null) {
             feed.stop();
             feed = null;
@@ -201,11 +211,15 @@ public class FireCast implements IPlugin {
         if (uiService == null || feed == null)
             return;
         if (pane == null) {
-            paneView = new DetectionPane(mapView, pluginContext, feed, firis);
+            paneView = new DetectionPane(mapView, pluginContext, feed, firis, pyrecast);
             feed.setListener(paneView);
             if (firis != null) {
                 firis.setListener(paneView);
                 paneView.onFirisChanged();
+            }
+            if (pyrecast != null) {
+                pyrecast.setListener(paneView);
+                paneView.onPyrecastChanged();
             }
             pane = new PaneBuilder(paneView.view())
                     .setMetaValue(Pane.RELATIVE_LOCATION, Pane.Location.Default)

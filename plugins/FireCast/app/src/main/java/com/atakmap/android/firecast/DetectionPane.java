@@ -31,7 +31,7 @@ import java.util.Locale;
  * what is in the map view, not everything fetched: a list of a thousand detections two
  * counties away is not a list.
  */
-public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listener {
+public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listener, PyrecastForecasts.Listener {
 
     /** Most rows in the list. Past this the list stops being readable long before it stops being slow. */
     private static final int MAX_ROWS = 300;
@@ -40,6 +40,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
     private final Context pluginContext;
     private final DetectionFeed feed;
     private final FirisModels firis;
+    private final PyrecastForecasts pyrecast;
     private final View root;
     private final View header;
     private final ListView list;
@@ -91,11 +92,13 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         }
     }
 
-    public DetectionPane(MapView mapView, Context pluginContext, DetectionFeed feed, FirisModels firis) {
+    public DetectionPane(MapView mapView, Context pluginContext, DetectionFeed feed, FirisModels firis,
+            PyrecastForecasts pyrecast) {
         this.mapView = mapView;
         this.pluginContext = pluginContext;
         this.feed = feed;
         this.firis = firis;
+        this.pyrecast = pyrecast;
         this.root = PluginLayoutInflater.inflate(pluginContext, R.layout.main_layout, null);
         this.list = (ListView) root;
         this.header = PluginLayoutInflater.inflate(pluginContext, R.layout.pane_header, null);
@@ -118,6 +121,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         buildKey();
         wireFilters();
         wireFiris();
+        wirePyrecast();
         refreshUi();
     }
 
@@ -203,22 +207,38 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             t.append(" Long press for the list.");
         s.setText(t.toString());
         s.setVisibility(on && t.length() > 0 ? View.VISIBLE : View.GONE);
-        buildFirisSlider(on ? firis.focus() : null);
+        final FirisModels.Run fr = on ? firis.focus() : null;
+        buildSlider(R.id.firis_slider, fr == null ? null : firisSlide(fr));
     }
 
-    private String firisSliderFor;
+    /** What a time slider over a run needs; the one control serves FIRIS and PyreCast. */
+    private interface Slide {
+        String key();
+        String title();
+        double[] hours();
+        double at();
+        String text(double[] hs, int p);
+        void show(double h);
+        void close();
+        String from();
+        String to(double lastH);
+        String inputs();
+    }
+
+    private final java.util.Map<Integer, String> sliderFor = new java.util.HashMap<>();
 
     /**
-     * The same "where it is by" as our own model's page: a slider over the run's rings,
-     * the edge at that time in white on the map, and the clock and acres above it.
-     * Rebuilt only when the run changes, so a refresh does not yank the bar from a finger.
+     * The same "where it is by" as our own model's page: a slider over the run's hours,
+     * the edge at that time on the map, and the clock and acres above it. Rebuilt only
+     * when the run changes, so a refresh does not yank the bar from a finger.
      */
-    private void buildFirisSlider(final FirisModels.Run r) {
-        final LinearLayout box = header.findViewById(R.id.firis_slider);
+    private void buildSlider(final int boxId, final Slide r) {
+        final LinearLayout box = header.findViewById(boxId);
         final String key = r == null ? null : r.key();
-        if (key == null ? firisSliderFor == null && box.getChildCount() == 0 : key.equals(firisSliderFor))
+        final String was = sliderFor.get(boxId);
+        if (key == null ? was == null && box.getChildCount() == 0 : key.equals(was))
             return;
-        firisSliderFor = key;
+        sliderFor.put(boxId, key);
         box.removeAllViews();
         if (r == null) {
             box.setVisibility(View.GONE);
@@ -235,7 +255,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(android.view.Gravity.CENTER_VERTICAL);
         final TextView title = new TextView(c);
-        title.setText(r.shortName() + ", run " + FirisModels.when(r.startMs));
+        title.setText(r.title());
         title.setTextColor(0xFF00E5FF);
         title.setTextSize(12f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -249,8 +269,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         close.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                firis.setFocus(null);
-                onFirisChanged();
+                r.close();
             }
         });
         head.addView(close);
@@ -260,9 +279,9 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         label.setTextSize(15f);
         int at = 0;
         for (int i = 0; i < hs.length; i++)
-            if (hs[i] == firis.focusHours())
+            if (hs[i] == r.at())
                 at = i + 1;
-        label.setText(firisAtText(r, hs, at));
+        label.setText(r.text(hs, at));
         box.addView(label);
         final android.widget.SeekBar bar = new android.widget.SeekBar(c);
         bar.setMax(hs.length);
@@ -277,8 +296,8 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             public void onProgressChanged(android.widget.SeekBar sb, int p, boolean fromUser) {
                 if (!fromUser)
                     return;
-                label.setText(firisAtText(r, hs, p));
-                firis.showAt(r, p == 0 ? 0 : hs[p - 1]);
+                label.setText(r.text(hs, p));
+                r.show(p == 0 ? 0 : hs[p - 1]);
             }
 
             @Override
@@ -294,8 +313,8 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         box.addView(bar);
         final LinearLayout ends = new LinearLayout(c);
         final TextView from = new TextView(c), to = new TextView(c);
-        from.setText("Run, " + FirisModels.clock(r.startMs));
-        to.setText(FirisModels.clock(r.startMs + (long) (hs[hs.length - 1] * 3_600_000L)));
+        from.setText(r.from());
+        to.setText(r.to(hs[hs.length - 1]));
         for (TextView v : new TextView[] { from, to }) {
             v.setTextSize(13f);
             v.setTextColor(0xFFB0B0B0);
@@ -305,14 +324,69 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         ends.addView(from);
         ends.addView(to);
         box.addView(ends);
-        if (!r.inputs.isEmpty()) {
+        if (!r.inputs().isEmpty()) {
             final TextView in = new TextView(c);
-            in.setText("Run with: " + r.inputs);
+            in.setText(r.inputs());
             in.setTextColor(0xFFB0B0B0);
             in.setTextSize(13f);
             box.addView(in);
         }
         box.setVisibility(View.VISIBLE);
+    }
+
+    private Slide firisSlide(final FirisModels.Run r) {
+        return new Slide() {
+            @Override
+            public String key() {
+                return r.key();
+            }
+
+            @Override
+            public String title() {
+                return r.shortName() + ", run " + FirisModels.when(r.startMs);
+            }
+
+            @Override
+            public double[] hours() {
+                return r.hours();
+            }
+
+            @Override
+            public double at() {
+                return firis.focusHours();
+            }
+
+            @Override
+            public String text(double[] hs, int p) {
+                return firisAtText(r, hs, p);
+            }
+
+            @Override
+            public void show(double h) {
+                firis.showAt(r, h);
+            }
+
+            @Override
+            public void close() {
+                firis.setFocus(null);
+                onFirisChanged();
+            }
+
+            @Override
+            public String from() {
+                return "Run, " + FirisModels.clock(r.startMs);
+            }
+
+            @Override
+            public String to(double lastH) {
+                return FirisModels.clock(r.startMs + (long) (lastH * 3_600_000L));
+            }
+
+            @Override
+            public String inputs() {
+                return r.inputs.isEmpty() ? "" : "Run with: " + r.inputs;
+            }
+        };
     }
 
     /** "By 22:02, in 2 h: 340 acres." */
@@ -331,6 +405,210 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         return s.append(".").toString();
     }
 
+    // ---- PyreCast forecasts ---------------------------------------------------------
+
+    private void wirePyrecast() {
+        final Button b = header.findViewById(R.id.btn_pyrecast);
+        final View credit = header.findViewById(R.id.pyrecast_credit);
+        if (pyrecast == null) {
+            b.setVisibility(View.GONE);
+            credit.setVisibility(View.GONE);
+            return;
+        }
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                pyrecast.setOn(!pyrecast.isOn());
+                onPyrecastChanged();
+            }
+        });
+        b.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                showPyrecastForecasts();
+                return true;
+            }
+        });
+        final Button pct = header.findViewById(R.id.btn_pyrecast_pct);
+        pct.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final String[] items = new String[PyrecastForecasts.PERCENTILES.length];
+                int at = 0;
+                for (int i = 0; i < items.length; i++) {
+                    final int p = PyrecastForecasts.PERCENTILES[i];
+                    items[i] = PyrecastForecasts.pctName(p) + "\n" + PyrecastForecasts.pctText(p);
+                    if (p == pyrecast.pct())
+                        at = i;
+                }
+                new AlertDialog.Builder(mapView.getContext())
+                        .setTitle("Which PyreCast run to show")
+                        .setSingleChoiceItems(items, at, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                pyrecast.setPct(PyrecastForecasts.PERCENTILES[which]);
+                                onPyrecastChanged();
+                                d.dismiss();
+                            }
+                        })
+                        .setNegativeButton("Close", null)
+                        .show();
+            }
+        });
+        credit.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try {
+                    final android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse(PyrecastForecasts.SITE));
+                    i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    mapView.getContext().startActivity(i);
+                } catch (Exception e) {
+                    android.widget.Toast.makeText(mapView.getContext(), "No browser on this device", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
+
+    /** The forecasts held, newest run first; a tap flies there and turns the layer on. */
+    private void showPyrecastForecasts() {
+        final List<PyrecastForecasts.Forecast> fs = pyrecast.forecasts;
+        if (fs.isEmpty()) {
+            new AlertDialog.Builder(mapView.getContext())
+                    .setTitle("PyreCast Forecasts")
+                    .setMessage("Nothing saved on this device yet. Turn the layer on to fetch the forecasts.")
+                    .setPositiveButton("Close", null)
+                    .show();
+            return;
+        }
+        final String[] items = new String[fs.size()];
+        for (int i = 0; i < items.length; i++) {
+            final PyrecastForecasts.Forecast f = fs.get(i);
+            items[i] = f.name() + "  ·  run " + PyrecastForecasts.when(f.runMs)
+                    + "\n" + acresText(f.acres(pyrecast.pct(), 24)) + " by 24 h, out to " + PyrecastForecasts.spanText(f.maxHours(pyrecast.pct()));
+        }
+        new AlertDialog.Builder(mapView.getContext())
+                .setTitle("PyreCast Forecasts")
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        if (!pyrecast.isOn())
+                            pyrecast.setOn(true);
+                        pyrecast.setFocus(fs.get(which));
+                        pyrecast.goTo(fs.get(which));
+                        onPyrecastChanged();
+                    }
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    @Override
+    public void onPyrecastChanged() {
+        if (pyrecast == null)
+            return;
+        final Button b = header.findViewById(R.id.btn_pyrecast);
+        final boolean on = pyrecast.isOn();
+        final int n = pyrecast.forecasts.size();
+        b.setText("PyreCast Forecasts" + (n > 0 ? "  " + n : "") + (on ? "   ON" : "   OFF"));
+        b.setTextColor(on ? 0xFF4CD964 : 0xFFFF5A5A);
+        final TextView s = header.findViewById(R.id.pyrecast_status);
+        final StringBuilder t = new StringBuilder();
+        if (pyrecast.busy)
+            t.append("Fetching forecasts…");
+        else if (pyrecast.fetchedAt > 0) {
+            final String age = elapsed(System.currentTimeMillis() - pyrecast.fetchedAt);
+            if ("no network".equals(pyrecast.problem))
+                t.append("No network, showing what this device saved ").append(age).append(" ago.");
+            else if (pyrecast.problem != null)
+                t.append("Fetched ").append(age).append(" ago, but ").append(pyrecast.problem).append(".");
+            else
+                t.append("Fetched ").append(age).append("just now".equals(age) ? "." : " ago.");
+        } else if (pyrecast.problem != null)
+            t.append("Could not fetch the forecasts: ").append(pyrecast.problem).append(".");
+        if (on && n == 0 && !pyrecast.busy && pyrecast.problem == null && pyrecast.fetchedAt > 0)
+            t.append(" No large fires are being forecast right now.");
+        if (on && t.length() > 0)
+            t.append(" Long press for the list.");
+        s.setText(t.toString());
+        s.setVisibility(on && t.length() > 0 ? View.VISIBLE : View.GONE);
+        header.findViewById(R.id.pyrecast_credit).setVisibility(on ? View.VISIBLE : View.GONE);
+        final Button pb = header.findViewById(R.id.btn_pyrecast_pct);
+        pb.setText("Forecast run: " + PyrecastForecasts.pctName(pyrecast.pct()));
+        pb.setVisibility(on ? View.VISIBLE : View.GONE);
+        final PyrecastForecasts.Forecast f = on ? pyrecast.focus() : null;
+        buildSlider(R.id.pyrecast_slider, f == null ? null : pyrecastSlide(f));
+    }
+
+    private Slide pyrecastSlide(final PyrecastForecasts.Forecast f) {
+        return new Slide() {
+            @Override
+            public String key() {
+                return f.key() + "|" + pyrecast.pct();
+            }
+
+            @Override
+            public String title() {
+                return f.name() + ", PyreCast run " + PyrecastForecasts.when(f.runMs);
+            }
+
+            @Override
+            public double[] hours() {
+                return f.hours(pyrecast.pct());
+            }
+
+            @Override
+            public double at() {
+                return pyrecast.focusHours();
+            }
+
+            @Override
+            public String text(double[] hs, int p) {
+                return pyrecastAtText(f, hs, p);
+            }
+
+            @Override
+            public void show(double h) {
+                pyrecast.showAt(f, h);
+            }
+
+            @Override
+            public void close() {
+                pyrecast.setFocus(null);
+                onPyrecastChanged();
+            }
+
+            @Override
+            public String from() {
+                return "Run, " + PyrecastForecasts.clockFrom(f.runMs, 0);
+            }
+
+            @Override
+            public String to(double lastH) {
+                return PyrecastForecasts.clockFrom(f.runMs, lastH);
+            }
+
+            @Override
+            public String inputs() {
+                return PyrecastForecasts.pctText(pyrecast.pct()) + " Its edge is drawn on the map in white.";
+            }
+        };
+    }
+
+    /** "By Nov 6 10:50, in 12 h: 340 acres." */
+    private String pyrecastAtText(PyrecastForecasts.Forecast f, double[] hs, int p) {
+        if (p <= 0)
+            return "Slide to see where PyreCast has the fire at any time up to "
+                    + PyrecastForecasts.clockFrom(f.runMs, hs[hs.length - 1]) + ".";
+        final double h = hs[p - 1];
+        return "By " + PyrecastForecasts.clockFrom(f.runMs, h) + ", in " + PyrecastForecasts.hoursText(h)
+                + ": " + acresText(f.acres(pyrecast.pct(), h)) + ".";
+    }
+
+    private static String acresText(double ac) {
+        return String.format(Locale.US, ac < 10 ? "%.1f" : "%,.0f", ac) + " acres";
+    }
+
     /**
      * The map key: a swatch per color, drawn the way the map draws it (a filled box
      * with its outline) from the same color function, so the key and the map cannot
@@ -345,6 +623,17 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             key.addView(keyRow(DetectionStyles.ageColor(age), false, DetectionStyles.ageBand(age)));
         key.addView(keyRow(DetectionStyles.burnScarColor(), false, "Burned ground, mapped from a pass (RADR)"));
         key.addView(keyRow(DetectionStyles.suspectColor(), true, "Known industrial heat source"));
+        final TextView fc = new TextView(mapView.getContext());
+        fc.setText("PyreCast forecast, the fire's edge after the run");
+        fc.setTextSize(12f);
+        fc.setTextColor(0xFF00E5FF);
+        fc.setTypeface(null, android.graphics.Typeface.BOLD);
+        fc.setAllCaps(true);
+        fc.setPadding(0, dp(8), 0, dp(2));
+        key.addView(fc);
+        for (int hr : PyrecastForecasts.RING_HOURS)
+            key.addView(keyRow(PyrecastForecasts.ringColor(hr) & 0xFFFFFF, false, PyrecastForecasts.hoursText(hr)));
+        key.addView(keyRow(0xFFFFFF, false, "Where the slider has it"));
         final TextView note = new TextView(mapView.getContext());
         note.setText("Each box is the ground a detection covers. The fire was somewhere inside it when the satellite looked.");
         note.setTextSize(12f);

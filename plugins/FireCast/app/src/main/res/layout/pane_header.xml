@@ -75,6 +75,64 @@
         android:orientation="vertical"
         android:visibility="gone" />
 
+    <!-- PyreCast's ELMFIRE forecasts for large fires, by permission: their logo and a
+         link to pyrecast.com sit beside the forecasts whenever they are shown. -->
+    <Button
+        android:id="@+id/btn_pyrecast"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="PyreCast Forecasts   OFF" />
+    <TextView
+        android:id="@+id/pyrecast_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#B0B0B0"
+        android:textSize="12sp"
+        android:visibility="gone" />
+    <LinearLayout
+        android:id="@+id/pyrecast_credit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="4dp"
+        android:paddingBottom="2dp"
+        android:visibility="gone">
+        <ImageView
+            android:id="@+id/pyrecast_logo"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="PyreCast"
+            android:src="@drawable/pyrecast_logo" />
+        <TextView
+            android:id="@+id/pyrecast_link"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:paddingLeft="10dp"
+            android:textColor="#B0B0B0"
+            android:textSize="12sp"
+            android:text="Forecasts by PyreCast. Tap for pyrecast.com" />
+    </LinearLayout>
+    <!-- Which of PyreCast's runs is drawn: they are ranked by the area burned at the
+         end, so the middle one is shown unless an end is picked. -->
+    <Button
+        android:id="@+id/btn_pyrecast_pct"
+        style="@style/TakwerxButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:text="Forecast run: Middle" />
+    <LinearLayout
+        android:id="@+id/pyrecast_slider"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone" />
+
     <!-- Feeds -->
     <LinearLayout
         android:layout_width="match_parent"

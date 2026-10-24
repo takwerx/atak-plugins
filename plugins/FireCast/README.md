@@ -35,6 +35,17 @@ window from three hours to three days; a confidence filter; and a list of what i
 in the map view, newest first, that opens the same detail panel as tapping the
 map.
 
+Beside the detections, two layers of other people's fire spread runs, each a switch
+in the pane with a list behind a long press and a time slider on the run you pick:
+
+  - FIRIS Model Runs: the spread runs California's fire analysts publish for ATAK.
+  - PyreCast Forecasts: the ELMFIRE forecasts PyreCast (CloudFire, Inc.) publishes
+    for large fires across the country, shown with their permission, with their
+    logo and a link to pyrecast.com beside them. PyreCast ranks its runs by the
+    area burned at the end of the forecast; the plugin shows the middle run
+    unless you pick the smaller or larger end. Forecasts are kept on the device
+    and come back with no signal.
+
 The detail panel is the point of the plugin. It says how big the footprint is and
 how that was arrived at, when the satellite saw it and how long it has been
 burning where the feed tracks that, the radiative power and brightness

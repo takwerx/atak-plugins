@@ -614,8 +614,8 @@ public final class Spread {
      * crossing each cell edge at the interpolated point, chained into loops and
      * rounded off. Coordinates are cell indices of cell centers.
      */
-    static final class Isoline {
-        static List<List<double[]>> trace(float[] arrival, int nx, int ny, float t) {
+    public static final class Isoline {
+        public static List<List<double[]>> trace(float[] arrival, int nx, int ny, float t) {
             // Unreached cells count as far, so the line falls between a reached cell and
             // its unreached neighbor rather than at infinity.
             final float far = t * 3f;
