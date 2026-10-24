@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.20** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.21** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.20/ATAK-Plugin-Atmosphere-0.20--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.20/ATAK-Plugin-Atmosphere-0.20--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.20/ATAK-Plugin-Atmosphere-0.20--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
