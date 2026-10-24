@@ -98,6 +98,15 @@
 
         <Button
             style="@style/TakwerxButton"
+            android:id="@+id/btn_footprints"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="2dp"
+            android:minHeight="44dp"
+            android:text="@string/footprints_heading" />
+
+        <Button
+            style="@style/TakwerxButton"
             android:id="@+id/btn_beacon"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

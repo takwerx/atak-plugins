@@ -171,7 +171,7 @@ public class MapDepot implements IPlugin {
      * mode says which list it is showing.
      */
     private enum PackageMode {
-        FORESTS, RECMAPS, STORMS, SATELLITE
+        FORESTS, RECMAPS, STORMS, SATELLITE, FOOTPRINTS
     }
 
     /** NOAA post-disaster imagery, newest event first; see {@link Depot.Storm}. */
@@ -204,6 +204,15 @@ public class MapDepot implements IPlugin {
     private final List<Depot.Package> allSatPacks = new ArrayList<>();
 
     private String satelliteBuiltAt = "";
+
+    /**
+     * Building outlines per county, for Damage Assessment to count from on
+     * the phone. Map Depot carries them and never draws them: three million
+     * polygons are not a map layer.
+     */
+    private final List<Depot.County> allCounties = new ArrayList<>();
+
+    private String footprintsBuiltAt = "";
 
     private PackageMode packageMode = PackageMode.FORESTS;
 
@@ -812,6 +821,13 @@ public class MapDepot implements IPlugin {
                         showPackages(PackageMode.SATELLITE);
                     }
                 });
+        root.findViewById(R.id.btn_footprints).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        showPackages(PackageMode.FOOTPRINTS);
+                    }
+                });
         nearButton = root.findViewById(R.id.near_anchor);
         nearButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -873,6 +889,13 @@ public class MapDepot implements IPlugin {
                         if (position < 0 || position >= shownPackages.size())
                             return;
                         Depot.Package pkg = shownPackages.get(position);
+                        if (pkg instanceof Depot.County) {
+                            if (PackageInstaller.showBounds(((Depot.County) pkg).bounds()))
+                                forestStatus.setText("Showing " + pkg.name()
+                                        + ". The outlines are for Damage Assessment and"
+                                        + " are not drawn on the map.");
+                            return;
+                        }
                         if (!installedPackages.contains(pkg.id())
                                 && pkg instanceof Depot.Flight
                                 && ((Depot.Flight) pkg).pack != null
@@ -1142,6 +1165,8 @@ public class MapDepot implements IPlugin {
                     : stormIndex < allStorms.size()
                             ? allStorms.get(stormIndex).flights
                             : java.util.Collections.<Depot.Package>emptyList();
+        if (packageMode == PackageMode.FOOTPRINTS)
+            return allCounties;
         if (packageMode == PackageMode.SATELLITE)
             return satIndex < 0 ? allSatPacks
                     : satIndex < allSatellite.size()
@@ -1178,7 +1203,8 @@ public class MapDepot implements IPlugin {
         nearButton.setText(pluginContext.getString(
                 eventMode() && newestFirst ? R.string.newest_first
                         : nearMe ? R.string.near_me : R.string.near_map));
-        forestSearch.setHint(storms || satellite ? R.string.search_flights
+        forestSearch.setHint(packageMode == PackageMode.FOOTPRINTS ? R.string.search_counties
+                : storms || satellite ? R.string.search_flights
                 : !sheets ? R.string.search_forests
                 : series == Series.DISTRICT ? R.string.search_recmaps
                         : series == Series.REGIONAL ? R.string.search_regional
@@ -2095,7 +2121,11 @@ public class MapDepot implements IPlugin {
             @Override
             public void onForests(List<Depot.Forest> fetched,
                     List<Depot.RecMap> recMaps, Depot.Sheets sheets,
-                    Depot.Storms storms, Depot.Satellite satellite, long savedAt) {
+                    Depot.Storms storms, Depot.Satellite satellite,
+                    Depot.Footprints footprints, long savedAt) {
+                allCounties.clear();
+                allCounties.addAll(footprints.counties);
+                footprintsBuiltAt = footprints.builtAt;
                 forestsSavedAt = savedAt;
                 allStorms.clear();
                 allStorms.addAll(storms.events);
@@ -2155,6 +2185,16 @@ public class MapDepot implements IPlugin {
         }
         for (Depot.SatEvent e : allSatellite)
             installedPackages.addAll(PackageInstaller.installedIds(e.packs));
+        // A county is on the phone when every one of its files is.
+        for (Depot.County c : allCounties) {
+            final java.util.Set<String> have = PackageInstaller.installedIds(c.files);
+            installedPackages.addAll(have);
+            boolean all = true;
+            for (Depot.CountyFile f : c.files)
+                all &= have.contains(f.id());
+            if (all)
+                installedPackages.add(c.id());
+        }
     }
 
     private void applyForestFilter() {
@@ -2334,6 +2374,8 @@ public class MapDepot implements IPlugin {
             return stormsStatus(query, hidden, total);
         if (packageMode == PackageMode.SATELLITE)
             return satelliteStatus(query, hidden, total);
+        if (packageMode == PackageMode.FOOTPRINTS)
+            return footprintsStatus(query, hidden, total);
         if (total == 0) {
             if (packageMode != PackageMode.RECMAPS)
                 return "No packages in the catalog yet.";
@@ -2443,12 +2485,43 @@ public class MapDepot implements IPlugin {
     }
 
     /**
+     * Says what the outlines are for, since a download that draws nothing
+     * on the map would otherwise read as broken, and what the list is cut to.
+     */
+    private String footprintsStatus(String query, int hidden, int total) {
+        final String built = footprintsBuiltAt.length() >= 10
+                ? " · catalog " + Depot.prettyDate(footprintsBuiltAt.substring(0, 10)) : "";
+        if (allCounties.isEmpty())
+            return pluginContext.getString(R.string.no_footprints) + built;
+        if (shownPackages.isEmpty()) {
+            if (packageShown == Shown.INSTALLED)
+                return "No county on the phone yet." + built;
+            if (packageShown == Shown.AVAILABLE)
+                return "Every county listed is on the phone." + built;
+            return "Nothing matches \"" + query + "\"." + built;
+        }
+        int held = 0;
+        for (Depot.County c : allCounties)
+            if (installedPackages.contains(c.id()))
+                held++;
+        return "For Damage Assessment to count buildings, not drawn on the map · "
+                + held + " of " + total + (total == 1 ? " county" : " counties")
+                + " on the phone"
+                + (hidden > 0 ? " · nearest " + shownPackages.size() + " shown" : "")
+                + built;
+    }
+
+    /**
      * Search the unit as well as the name: someone looking for a district often
      * knows the forest it sits in rather than the district's own name.
      */
     private static boolean matches(Depot.Package p, String q) {
         if (p.name().toLowerCase().contains(q))
             return true;
+        if (p instanceof Depot.County) {
+            final Depot.County c = (Depot.County) p;
+            return c.fips.startsWith(q) || c.state.toLowerCase().contains(q);
+        }
         if (p instanceof Depot.SatPack) {
             final Depot.SatPack sp = (Depot.SatPack) p;
             return sp.event.name.toLowerCase().contains(q) || sp.date.contains(q)
@@ -2476,6 +2549,10 @@ public class MapDepot implements IPlugin {
             toast("Already downloading — let it finish first.");
             return;
         }
+        if (pkg instanceof Depot.County) {
+            installCounty((Depot.County) pkg);
+            return;
+        }
         activeForestId = pkg.id();
         forestDone = 0;
         forestTotal = pkg.bytes();
@@ -2487,8 +2564,227 @@ public class MapDepot implements IPlugin {
     }
 
     private void uninstallPackage(final Depot.Package pkg) {
+        if (pkg instanceof Depot.County) {
+            uninstallCounty((Depot.County) pkg);
+            return;
+        }
         forestStatus.setText("Removing " + pkg.name() + "…");
         packages.uninstall(pkg, packageCallback());
+    }
+
+    /**
+     * A county is one row and one or more files. They come down one after
+     * another under one progress bar; a cancel or a failure part way takes
+     * the parts already on the phone back off, so Damage Assessment never
+     * counts from half a county.
+     */
+    private void installCounty(final Depot.County c) {
+        activeForestId = c.id();
+        forestDone = 0;
+        forestTotal = c.bytes;
+        forestStatus.setText("Getting " + c.name() + " — " + Depot.bytes(c.bytes));
+        showCancelBar(true);
+        packageAdapter.notifyDataSetChanged();
+        installCountyFile(c, 0, 0L);
+    }
+
+    private void installCountyFile(final Depot.County c, final int i, final long before) {
+        final Depot.CountyFile f = c.files.get(i);
+        packages.install(f, new PackageInstaller.Callback() {
+            @Override
+            public void onProgress(Depot.Package p, long done, long total) {
+                forestDone = before + done;
+                forestTotal = c.bytes;
+                forestStatus.setText(c.name()
+                        + (c.files.size() > 1
+                                ? " · file " + (i + 1) + " of " + c.files.size() : "")
+                        + " — " + Depot.bytes(forestDone) + " of " + Depot.bytes(c.bytes));
+                packageAdapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onInstalled(Depot.Package p, java.io.File dest) {
+                installedPackages.add(f.id());
+                // Cancelled between two files: the cancel bar has already
+                // let go of the row, so take back what arrived.
+                if (!c.id().equals(activeForestId)) {
+                    removeCountyParts(c, i + 1);
+                    forestStatus.setText(c.name() + " cancelled — nothing kept.");
+                    return;
+                }
+                if (i + 1 < c.files.size()) {
+                    installCountyFile(c, i + 1, before + f.bytes);
+                    return;
+                }
+                activeForestId = null;
+                showCancelBar(false);
+                installedPackages.add(c.id());
+                forestStatus.setText(c.name() + " saved — "
+                        + String.format(Locale.US, "%,d", c.buildings)
+                        + " buildings ready for Damage Assessment, with or without signal.");
+                packageAdapter.notifyDataSetChanged();
+                checkFootprints(c);
+            }
+
+            @Override
+            public void onRemoved(Depot.Package p) {
+            }
+
+            @Override
+            public void onError(Depot.Package p, String message) {
+                activeForestId = null;
+                showCancelBar(false);
+                removeCountyParts(c, i);
+                packageAdapter.notifyDataSetChanged();
+                if (PackageInstaller.CANCELLED.equals(message)) {
+                    forestStatus.setText(c.name() + " cancelled — nothing kept.");
+                    return;
+                }
+                Log.w(TAG, "county " + c.fips + " file " + f.id() + ": " + message);
+                forestStatus.setText(c.name() + " failed: " + message);
+            }
+        });
+    }
+
+    /** Removes the first {@code n} files of a county, quietly. */
+    private void removeCountyParts(final Depot.County c, int n) {
+        for (int k = 0; k < n && k < c.files.size(); k++)
+            packages.uninstall(c.files.get(k), new PackageInstaller.Callback() {
+                @Override
+                public void onProgress(Depot.Package p, long done, long total) {
+                }
+
+                @Override
+                public void onInstalled(Depot.Package p, java.io.File dest) {
+                }
+
+                @Override
+                public void onRemoved(Depot.Package p) {
+                    installedPackages.remove(p.id());
+                    packageAdapter.notifyDataSetChanged();
+                }
+
+                @Override
+                public void onError(Depot.Package p, String message) {
+                    Log.w(TAG, "could not take back " + p.id() + ": " + message);
+                }
+            });
+    }
+
+    private void uninstallCounty(final Depot.County c) {
+        forestStatus.setText("Removing " + c.name() + "…");
+        final int[] left = { c.files.size() };
+        for (final Depot.CountyFile f : c.files)
+            packages.uninstall(f, new PackageInstaller.Callback() {
+                @Override
+                public void onProgress(Depot.Package p, long done, long total) {
+                }
+
+                @Override
+                public void onInstalled(Depot.Package p, java.io.File dest) {
+                }
+
+                @Override
+                public void onRemoved(Depot.Package p) {
+                    installedPackages.remove(f.id());
+                    if (--left[0] == 0) {
+                        installedPackages.remove(c.id());
+                        forestStatus.setText(c.name() + " removed.");
+                        applyForestFilter();
+                    }
+                }
+
+                @Override
+                public void onError(Depot.Package p, String message) {
+                    Log.w(TAG, "remove " + f.id() + ": " + message);
+                    forestStatus.setText(c.name() + ": " + message);
+                    refreshInstalledPackages();
+                    applyForestFilter();
+                }
+            });
+    }
+
+    /**
+     * Opens what just arrived the way Damage Assessment will, with Android's
+     * own SQLite, read-only, and checks the count against the catalog. That
+     * SQLite has no R*Tree module (Android 12, measured 2026-10-23), so the
+     * check goes through the plain centroid index the packs carry. A pack
+     * that does not open here is said to be broken now, not at a fire.
+     */
+    private void checkFootprints(final Depot.County c) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                long count = 0;
+                long nearCenter = 0;
+                String problem = null;
+                for (Depot.CountyFile f : c.files) {
+                    final java.io.File file = new java.io.File(
+                            PackageInstaller.dirFor(f), f.fileName());
+                    android.database.sqlite.SQLiteDatabase db = null;
+                    android.database.Cursor q = null;
+                    try {
+                        // A handler that does nothing: Android's default one
+                        // deletes a file it finds corrupt, silently, and this
+                        // check is here to say so instead.
+                        db = android.database.sqlite.SQLiteDatabase.openDatabase(
+                                file.getAbsolutePath(), null,
+                                android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                                        | android.database.sqlite.SQLiteDatabase
+                                                .NO_LOCALIZED_COLLATORS,
+                                new android.database.DatabaseErrorHandler() {
+                                    @Override
+                                    public void onCorruption(
+                                            android.database.sqlite.SQLiteDatabase d) {
+                                        Log.w(TAG, "footprint pack reads as corrupt: "
+                                                + file.getName());
+                                    }
+                                });
+                        q = db.rawQuery("SELECT buildings FROM takwerx_pack", null);
+                        if (q.moveToFirst())
+                            count += q.getLong(0);
+                        q.close();
+                        final double[] b = c.bounds();
+                        if (b != null) {
+                            final double la = (b[0] + b[2]) / 2.0, lo = (b[1] + b[3]) / 2.0;
+                            q = db.rawQuery("SELECT count(*) FROM buildings"
+                                    + " WHERE cy BETWEEN ? AND ? AND cx BETWEEN ? AND ?",
+                                    new String[] { String.valueOf(la - 0.05),
+                                            String.valueOf(la + 0.05),
+                                            String.valueOf(lo - 0.05),
+                                            String.valueOf(lo + 0.05) });
+                            if (q.moveToFirst())
+                                nearCenter += q.getLong(0);
+                        }
+                    } catch (RuntimeException bad) {
+                        problem = f.fileName() + ": " + bad.getMessage();
+                    } finally {
+                        if (q != null)
+                            q.close();
+                        if (db != null)
+                            db.close();
+                    }
+                }
+                final long total = count;
+                final String why = problem != null ? problem
+                        : total != c.buildings
+                                ? "holds " + total + " buildings, catalog says " + c.buildings
+                                : null;
+                Log.i(TAG, "footprints " + c.fips + " opened with Android SQLite: "
+                        + total + " buildings, " + nearCenter
+                        + " by centroid index near the center"
+                        + (why == null ? "" : " — " + why));
+                if (why != null)
+                    forestStatus.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            forestStatus.setText(c.name()
+                                    + " arrived but does not read right: " + why
+                                    + ". Remove it and download again.");
+                        }
+                    });
+            }
+        }, "mapdepot-footprints-check").start();
     }
 
     private PackageInstaller.Callback packageCallback() {
@@ -2882,7 +3178,8 @@ public class MapDepot implements IPlugin {
             // The satellite packs have no outlines: three packs share one
             // box, and a row says where. The button would promise nothing.
             if (label == null
-                    || (b == forestOutlines && packageMode == PackageMode.SATELLITE)) {
+                    || (b == forestOutlines && (packageMode == PackageMode.SATELLITE
+                            || packageMode == PackageMode.FOOTPRINTS))) {
                 b.setVisibility(View.GONE);
                 continue;
             }
@@ -3758,7 +4055,8 @@ public class MapDepot implements IPlugin {
             eye.setVisibility(View.GONE);
             // Hide / Show drives whatever of this flight is on the phone: the
             // online layer when it is added, else the offline copy.
-            final Depot.Package shown = done ? pkg : packDone ? pack : null;
+            final Depot.Package shown = pkg instanceof Depot.County ? null
+                    : done ? pkg : packDone ? pack : null;
             if (shown != null && !active && !packActive) {
                 final Boolean visible = PackageInstaller.isVisible(shown);
                 if (visible != null) {
@@ -3787,7 +4085,9 @@ public class MapDepot implements IPlugin {
                 // tree once a few things are installed.
                 // Its own line, as on the incident rows: appended to a forest,
                 // a state and a size it wrapped wherever the width ran out.
-                final String hint = "\ntap to go there";
+                final String hint = pkg instanceof Depot.County
+                        ? "\nready for Damage Assessment · tap to see where"
+                        : "\ntap to go there";
                 final SpannableString line =
                         new SpannableString(describeRow(pkg) + hint);
                 line.setSpan(

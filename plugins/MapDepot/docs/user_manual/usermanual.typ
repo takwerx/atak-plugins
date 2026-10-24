@@ -49,6 +49,8 @@ itself where ATAK expects to find it.
     or tornado by NOAA, the Civil Air Patrol and Maxar, one overlay per flight.
   - *Satellite Before and After* -- Sentinel-2 true color before and after
     an event and the burn severity between them, 10 m, built per event.
+  - *Building Outlines* -- every mapped building in a county, for Damage
+    Assessment to count from. Carried, not drawn.
 ]
 ]
 
@@ -598,13 +600,32 @@ covers before deciding to turn it on.
 ]
 
 #tak-slide[
+= Building Outlines
+
+  Every building outline Microsoft has mapped in a county, about a million
+  in a large one, packed for the *Damage Assessment* plugin to count from.
+  Map Depot only carries them: they are not drawn on the map, and nothing
+  appears when one is downloaded. Damage Assessment uses them to say how
+  many buildings sit inside an area you draw, with or without signal.
+
+  Counties are listed nearest the map first, with the number of buildings
+  and the size. A large county comes in parts of about 260 MB; the row
+  downloads all of them, and a download cancelled or failed part way keeps
+  nothing. After a download Map Depot opens the file the way Damage
+  Assessment will and checks the count. Tap a row to see where the county
+  is.
+
+  Building outlines: Microsoft Building Footprints, ODbL.
+]
+
+#tak-slide[
 = Finding what you have installed
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("11.png", width: 60%)
 ][
-  Every page has a filter button, next to *Back*, that cycles *All* →
-  *Installed* → *Available*. Set to *Installed*, the page becomes a list of
+  Every page has a filter button, next to *Back*, that cycles *All* --
+  *Installed* -- *Available*. Set to *Installed*, the page becomes a list of
   what is on this device.
 ]
 ]
@@ -647,14 +668,17 @@ indistinguishable from data put there by hand.
 
 #v(6pt)
 #toolbox.side-by-side(columns: (7fr, 5fr))[
-  - Elevation → `atak/DTED/`, one file per one-degree square.
-  - Streaming base maps → `atak/imagery/`, as map source files.
-  - Streaming overlays and disaster aerials → `atak/grg/`, as map source
+  - Elevation -- `atak/DTED/`, one file per one-degree square.
+  - Streaming base maps -- `atak/imagery/`, as map source files.
+  - Streaming overlays and disaster aerials -- `atak/grg/`, as map source
     files, so ATAK lists them under Image Overlay; offline copies of
     flights as MBTiles in the same folder.
-  - Offline public land vector tiles → `atak/imagery/`, as vector tile packages.
-  - Forest Service map sheets → `atak/grg/`, as georeferenced PDFs.
-  - Incident and drone maps → `atak/grg/` for a PDF, `atak/overlays/` for a
+  - Satellite before, after and burn severity -- `atak/grg/`, as MBTiles.
+  - Building outlines -- `atak/tools/damageassessment/footprints/`, as
+    GeoPackages, read by Damage Assessment and not drawn.
+  - Offline public land vector tiles -- `atak/imagery/`, as vector tile packages.
+  - Forest Service map sheets -- `atak/grg/`, as georeferenced PDFs.
+  - Incident and drone maps -- `atak/grg/` for a PDF, `atak/overlays/` for a
     KMZ.
 
   #v(6pt)

@@ -135,7 +135,7 @@ public final class DepotClient {
         /** Every package kind comes from the one catalog document, so they arrive together. */
         void onForests(List<Depot.Forest> forests, List<Depot.RecMap> recMaps,
                 Depot.Sheets sheets, Depot.Storms storms, Depot.Satellite satellite,
-                long savedAt);
+                Depot.Footprints footprints, long savedAt);
 
         void onError(String message);
     }
@@ -287,8 +287,10 @@ public final class DepotClient {
                     final Depot.Sheets sheets = Depot.parseSheets(body);
                     final Depot.Storms storms = Depot.parseStorms(body);
                     final Depot.Satellite satellite = Depot.parseSatellite(body);
+                    final Depot.Footprints footprints = Depot.parseFootprints(body);
                     write(cache, body);
-                    postForests(cb, forests, recMaps, sheets, storms, satellite, 0L);
+                    postForests(cb, forests, recMaps, sheets, storms, satellite,
+                            footprints, 0L);
                 } catch (final Exception e) {
                     Log.w(TAG, "package fetch failed: " + describe(e));
                     try {
@@ -296,7 +298,7 @@ public final class DepotClient {
                         postForests(cb, Depot.parseForests(cached),
                                 Depot.parseRecMaps(cached), Depot.parseSheets(cached),
                                 Depot.parseStorms(cached), Depot.parseSatellite(cached),
-                                savedAt(cache));
+                                Depot.parseFootprints(cached), savedAt(cache));
                     } catch (Exception noCache) {
                         final String msg = describe(e);
                         main.post(new Runnable() {
@@ -314,11 +316,13 @@ public final class DepotClient {
     private void postForests(final ForestCallback cb,
             final List<Depot.Forest> forests, final List<Depot.RecMap> recMaps,
             final Depot.Sheets sheets, final Depot.Storms storms,
-            final Depot.Satellite satellite, final long savedAt) {
+            final Depot.Satellite satellite, final Depot.Footprints footprints,
+            final long savedAt) {
         main.post(new Runnable() {
             @Override
             public void run() {
-                cb.onForests(forests, recMaps, sheets, storms, satellite, savedAt);
+                cb.onForests(forests, recMaps, sheets, storms, satellite, footprints,
+                        savedAt);
             }
         });
     }
