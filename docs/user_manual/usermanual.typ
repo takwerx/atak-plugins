@@ -301,6 +301,10 @@ it is a direction.
   The line under it reads the wind *Here*, at the pane's point: speed and
   where it comes from. Outside the area being drawn it says so.
 
+  In 3D the streaks lie on the ground and follow it over ridges and down into
+  valleys, around the point the map looks at and out to a few screen widths;
+  the ground farther toward the horizon is left clear.
+
   The height buttons further down draw the wind from 10 m up to the jet
   stream.
 ]
