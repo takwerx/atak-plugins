@@ -86,6 +86,24 @@ public class MapDepot implements IPlugin {
     private Context pluginContext;
     private IHostUIService uiService;
     private ToolbarItem toolbarItem;
+
+    /**
+     * Opens the pane from a broadcast, so a session driving the phone over
+     * adb can open it without walking ATAK's Tools list (a stray tap there
+     * opens another plugin's pane). System-registered: a plain
+     * registerReceiver is process-local and {@code am broadcast} cannot
+     * reach it.
+     */
+    public static final String ACTION_SHOW = "com.atakmap.android.mapdepot.SHOW";
+
+    private final android.content.BroadcastReceiver showReceiver =
+            new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(Context c, android.content.Intent i) {
+                    if (uiService != null)
+                        showPane();
+                }
+            };
     private Pane pane;
 
     private DepotClient client;
@@ -153,7 +171,7 @@ public class MapDepot implements IPlugin {
      * mode says which list it is showing.
      */
     private enum PackageMode {
-        FORESTS, RECMAPS, STORMS
+        FORESTS, RECMAPS, STORMS, SATELLITE
     }
 
     /** NOAA post-disaster imagery, newest event first; see {@link Depot.Storm}. */
@@ -171,6 +189,21 @@ public class MapDepot implements IPlugin {
 
     /** When the depot built the storms section, so the list can say how fresh "newest flight" is. */
     private String stormsBuiltAt = "";
+
+    /**
+     * Sentinel-2 before/after packs per event, newest event first; see
+     * {@link Depot.SatEvent}. Same screen and controls as the aerials: an
+     * event chooser over a list of dated rows.
+     */
+    private final List<Depot.SatEvent> allSatellite = new ArrayList<>();
+
+    /** Index into {@link #allSatellite}, or -1 for every event's packs at once. */
+    private int satIndex = -1;
+
+    /** Every pack of every event, for the All Events view. */
+    private final List<Depot.Package> allSatPacks = new ArrayList<>();
+
+    private String satelliteBuiltAt = "";
 
     private PackageMode packageMode = PackageMode.FORESTS;
 
@@ -392,6 +425,9 @@ public class MapDepot implements IPlugin {
         baseMaps = new BaseMapInstaller();
         packages = new PackageInstaller();
         uiService.addToolbarItem(toolbarItem);
+        com.atakmap.android.ipc.AtakBroadcast.getInstance().registerSystemReceiver(
+                showReceiver, new com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter(
+                        ACTION_SHOW, "Open the Map Depot pane"));
         registerPreferences();
         final com.atakmap.android.maps.MapView mv =
                 com.atakmap.android.maps.MapView.getMapView();
@@ -621,6 +657,12 @@ public class MapDepot implements IPlugin {
     @Override
     public void onStop() {
         unregisterPreferences();
+        try {
+            com.atakmap.android.ipc.AtakBroadcast.getInstance()
+                    .unregisterSystemReceiver(showReceiver);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "show receiver was not registered", e);
+        }
 
         // A fetch in flight when the client is shut down never calls back,
         // and a flag left true would make the next FSTopo pick do nothing.
@@ -749,6 +791,8 @@ public class MapDepot implements IPlugin {
             public void onClick(View v) {
                 if (packageMode == PackageMode.STORMS)
                     chooseStorm();
+                else if (packageMode == PackageMode.SATELLITE)
+                    chooseSatEvent();
                 else
                     chooseSeries();
             }
@@ -761,26 +805,33 @@ public class MapDepot implements IPlugin {
                         showPackages(PackageMode.STORMS);
                     }
                 });
+        root.findViewById(R.id.btn_satellite).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        showPackages(PackageMode.SATELLITE);
+                    }
+                });
         nearButton = root.findViewById(R.id.near_anchor);
         nearButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 // Storms: Newest first -> Near: map center -> Near: me.
                 // Elsewhere: map center <-> me.
-                if (packageMode == PackageMode.STORMS && newestFirst) {
+                if (eventMode() && newestFirst) {
                     newestFirst = false;
                     nearMe = false;
                 } else if (!nearMe) {
                     if (Distance.selfPoint() == null) {
                         toast(pluginContext.getString(R.string.no_position));
-                        if (packageMode == PackageMode.STORMS)
+                        if (eventMode())
                             newestFirst = true;
                     } else {
                         nearMe = true;
                     }
                 } else {
                     nearMe = false;
-                    if (packageMode == PackageMode.STORMS)
+                    if (eventMode())
                         newestFirst = true;
                 }
                 refreshSeriesControls();
@@ -1091,6 +1142,11 @@ public class MapDepot implements IPlugin {
                     : stormIndex < allStorms.size()
                             ? allStorms.get(stormIndex).flights
                             : java.util.Collections.<Depot.Package>emptyList();
+        if (packageMode == PackageMode.SATELLITE)
+            return satIndex < 0 ? allSatPacks
+                    : satIndex < allSatellite.size()
+                            ? allSatellite.get(satIndex).packs
+                            : java.util.Collections.<Depot.Package>emptyList();
         switch (series) {
             case REGIONAL:
                 return allRegional;
@@ -1107,18 +1163,22 @@ public class MapDepot implements IPlugin {
     private void refreshSeriesControls() {
         final boolean sheets = packageMode == PackageMode.RECMAPS;
         final boolean storms = packageMode == PackageMode.STORMS;
+        final boolean satellite = packageMode == PackageMode.SATELLITE;
         final boolean located = locatedList();
-        seriesRow.setVisibility(sheets || storms || located ? View.VISIBLE : View.GONE);
-        seriesButton.setVisibility(sheets || storms ? View.VISIBLE : View.GONE);
+        seriesRow.setVisibility(sheets || storms || satellite || located
+                ? View.VISIBLE : View.GONE);
+        seriesButton.setVisibility(sheets || storms || satellite ? View.VISIBLE : View.GONE);
         if (sheets)
             seriesButton.setText(seriesLabel(series, true) + "  \u25be");
         else if (storms)
             seriesButton.setText(stormLabel(stormIndex, true) + "  \u25be");
+        else if (satellite)
+            seriesButton.setText(satLabel(satIndex, true) + "  \u25be");
         nearButton.setVisibility(located ? View.VISIBLE : View.GONE);
         nearButton.setText(pluginContext.getString(
-                storms && newestFirst ? R.string.newest_first
+                eventMode() && newestFirst ? R.string.newest_first
                         : nearMe ? R.string.near_me : R.string.near_map));
-        forestSearch.setHint(storms ? R.string.search_flights
+        forestSearch.setHint(storms || satellite ? R.string.search_flights
                 : !sheets ? R.string.search_forests
                 : series == Series.DISTRICT ? R.string.search_recmaps
                         : series == Series.REGIONAL ? R.string.search_regional
@@ -1213,6 +1273,50 @@ public class MapDepot implements IPlugin {
                             public void onClick(DialogInterface d, int which) {
                                 d.dismiss();
                                 stormIndex = which - 1;
+                                refreshSeriesControls();
+                                forestSearch.setText("");
+                                applyForestFilter();
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.cancel), null)
+                .show();
+    }
+
+    /** The modes whose rows are dated events: Newest first is a sort there. */
+    private boolean eventMode() {
+        return packageMode == PackageMode.STORMS || packageMode == PackageMode.SATELLITE;
+    }
+
+    /** "Eaton Fire 2025 (3)": the event, and how many packs choosing it lists. */
+    private String satLabel(int i, boolean withCount) {
+        if (i < 0)
+            return pluginContext.getString(R.string.all_events)
+                    + (withCount ? " (" + allSatPacks.size() + ")" : "");
+        if (i >= allSatellite.size())
+            return pluginContext.getString(R.string.choose_storm);
+        final Depot.SatEvent e = allSatellite.get(i);
+        final String label = e.name
+                + (e.year > 0 && !e.name.contains(String.valueOf(e.year))
+                        ? " " + e.year : "");
+        return withCount ? label + " (" + e.packs.size() + ")" : label;
+    }
+
+    private void chooseSatEvent() {
+        if (allSatellite.isEmpty()) {
+            toast(pluginContext.getString(R.string.no_satellite));
+            return;
+        }
+        final String[] items = new String[allSatellite.size() + 1];
+        for (int i = 0; i < items.length; i++)
+            items[i] = satLabel(i - 1, true);
+        new AlertDialog.Builder(hostContext())
+                .setTitle(pluginContext.getString(R.string.choose_storm))
+                .setSingleChoiceItems(items, satIndex + 1,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                d.dismiss();
+                                satIndex = which - 1;
                                 refreshSeriesControls();
                                 forestSearch.setText("");
                                 applyForestFilter();
@@ -1991,7 +2095,7 @@ public class MapDepot implements IPlugin {
             @Override
             public void onForests(List<Depot.Forest> fetched,
                     List<Depot.RecMap> recMaps, Depot.Sheets sheets,
-                    Depot.Storms storms, long savedAt) {
+                    Depot.Storms storms, Depot.Satellite satellite, long savedAt) {
                 forestsSavedAt = savedAt;
                 allStorms.clear();
                 allStorms.addAll(storms.events);
@@ -2001,6 +2105,14 @@ public class MapDepot implements IPlugin {
                 stormsBuiltAt = storms.builtAt;
                 if (stormIndex >= allStorms.size())
                     stormIndex = -1;
+                allSatellite.clear();
+                allSatellite.addAll(satellite.events);
+                allSatPacks.clear();
+                for (Depot.SatEvent e : allSatellite)
+                    allSatPacks.addAll(e.packs);
+                satelliteBuiltAt = satellite.builtAt;
+                if (satIndex >= allSatellite.size())
+                    satIndex = -1;
                 Log.i(TAG, "onForests forests=" + fetched.size()
                         + " recmaps=" + recMaps.size()
                         + " regional=" + sheets.regional.size()
@@ -2041,6 +2153,8 @@ public class MapDepot implements IPlugin {
             installedPackages.addAll(PackageInstaller.installedIds(s.flights));
             installedPackages.addAll(PackageInstaller.installedIds(s.packs()));
         }
+        for (Depot.SatEvent e : allSatellite)
+            installedPackages.addAll(PackageInstaller.installedIds(e.packs));
     }
 
     private void applyForestFilter() {
@@ -2116,7 +2230,24 @@ public class MapDepot implements IPlugin {
                         Distance.bearing(center, m.lat(), m.lon()) });
             }
         }
-        if (packageMode == PackageMode.STORMS && newestFirst) {
+        if (packageMode == PackageMode.SATELLITE && newestFirst) {
+            // Newest event first; within an event before, after, severity,
+            // each by date, so the three rows read as a story.
+            Collections.sort(shownPackages, new Comparator<Depot.Package>() {
+                @Override
+                public int compare(Depot.Package a, Depot.Package b) {
+                    final Depot.SatPack pa = (Depot.SatPack) a, pb = (Depot.SatPack) b;
+                    int c = pb.event.start.compareTo(pa.event.start);
+                    if (c == 0)
+                        c = pa.event.id.compareTo(pb.event.id);
+                    if (c == 0)
+                        c = Integer.compare(kindOrder(pa.kind), kindOrder(pb.kind));
+                    if (c == 0)
+                        c = pa.date.compareTo(pb.date);
+                    return c;
+                }
+            });
+        } else if (packageMode == PackageMode.STORMS && newestFirst) {
             Collections.sort(shownPackages, new Comparator<Depot.Package>() {
                 @Override
                 public int compare(Depot.Package a, Depot.Package b) {
@@ -2161,6 +2292,10 @@ public class MapDepot implements IPlugin {
         return hidden;
     }
 
+    private static int kindOrder(String kind) {
+        return "pre".equals(kind) ? 0 : "post".equals(kind) ? 1 : 2;
+    }
+
     /** The flight a storms row belongs to: itself, or the flight its pack copies. */
     private static Depot.Flight flightOf(Depot.Package p) {
         if (p instanceof Depot.Flight)
@@ -2197,6 +2332,8 @@ public class MapDepot implements IPlugin {
         final int total = sourceList().size();
         if (packageMode == PackageMode.STORMS)
             return stormsStatus(query, hidden, total);
+        if (packageMode == PackageMode.SATELLITE)
+            return satelliteStatus(query, hidden, total);
         if (total == 0) {
             if (packageMode != PackageMode.RECMAPS)
                 return "No packages in the catalog yet.";
@@ -2276,12 +2413,47 @@ public class MapDepot implements IPlugin {
     }
 
     /**
+     * The satellite list says what it is and what it is not: 10 m shows
+     * which blocks burned, never which houses, and that line stays on the
+     * screen the whole time, not only on one row.
+     */
+    private String satelliteStatus(String query, int hidden, int total) {
+        final String built = satelliteBuiltAt.length() >= 10
+                ? " · catalog " + Depot.prettyDate(satelliteBuiltAt.substring(0, 10)) : "";
+        if (allSatellite.isEmpty())
+            return pluginContext.getString(R.string.no_satellite) + built;
+        int held = 0;
+        for (Depot.Package p : sourceList())
+            if (installedPackages.contains(p.id()))
+                held++;
+        if (satIndex < 0)
+            return allSatellite.size() + (allSatellite.size() == 1 ? " event" : " events")
+                    + " · Sentinel-2, 10 m: blocks, not houses · " + held + " of "
+                    + allSatPacks.size() + " packs on the phone" + built;
+        final Depot.SatEvent e = allSatellite.get(satIndex);
+        if (shownPackages.isEmpty() && total > 0) {
+            if (packageShown == Shown.INSTALLED)
+                return "None of " + e.name + " on the phone yet." + built;
+            if (packageShown == Shown.AVAILABLE)
+                return "All of " + e.name + " is on the phone." + built;
+            return "Nothing matches \"" + query + "\" in " + e.name + "." + built;
+        }
+        return e.name + " · " + e.span() + " · 10 m: blocks, not houses · " + held + " of "
+                + total + " on the phone" + built;
+    }
+
+    /**
      * Search the unit as well as the name: someone looking for a district often
      * knows the forest it sits in rather than the district's own name.
      */
     private static boolean matches(Depot.Package p, String q) {
         if (p.name().toLowerCase().contains(q))
             return true;
+        if (p instanceof Depot.SatPack) {
+            final Depot.SatPack sp = (Depot.SatPack) p;
+            return sp.event.name.toLowerCase().contains(q) || sp.date.contains(q)
+                    || sp.kind.contains(q) || String.valueOf(sp.event.year).contains(q);
+        }
         final Depot.Flight f = flightOf(p);
         if (f != null)
             return f.name.toLowerCase().contains(q) || f.date.contains(q)
@@ -2336,7 +2508,8 @@ public class MapDepot implements IPlugin {
                 showCancelBar(false);
                 installedPackages.add(p.id());
                 packageAdapter.notifyDataSetChanged();
-                if (p instanceof Depot.Flight || p instanceof Depot.Pack) {
+                if (p instanceof Depot.Flight || p instanceof Depot.Pack
+                        || p instanceof Depot.SatPack) {
                     syncOutlines();
                     // ATAK keeps an on/off state per overlay name and a
                     // fresh download of a name that was hidden came in
@@ -2351,7 +2524,9 @@ public class MapDepot implements IPlugin {
                     }, 1500L);
                 }
                 forestStatus.setText(p.name()
-                        + (p instanceof Depot.Pack
+                        + (p instanceof Depot.SatPack
+                                ? " saved — drawing over the map, works with no signal."
+                                : p instanceof Depot.Pack
                                 ? " saved — this flight now works with no signal."
                                 : p instanceof Depot.Flight
                                 ? " installed — drawing over the map; tap the row to go there."
@@ -2704,7 +2879,10 @@ public class MapDepot implements IPlugin {
                 nifcOutlines, forestOutlines }) {
             if (b == null)
                 continue;
-            if (label == null) {
+            // The satellite packs have no outlines: three packs share one
+            // box, and a row says where. The button would promise nothing.
+            if (label == null
+                    || (b == forestOutlines && packageMode == PackageMode.SATELLITE)) {
                 b.setVisibility(View.GONE);
                 continue;
             }

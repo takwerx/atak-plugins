@@ -408,7 +408,49 @@ copy the morning after.
 
 ---
 
-## 9. Finding what you already have
+## 9. Satellite Before and After
+
+Before any aircraft has flown a fire, the Sentinel-2 satellites have already
+passed over it: a pass every five days, 10 m a pixel, free. Map Depot builds
+three packs per event from the clearest pass before the event and the
+clearest pass after it, and lists them here, newest event first:
+
+- **Before**, true color from the pass before the event.
+- **After**, true color from the pass after it.
+- **Burn Severity**, the change between the two scenes cut into the standard
+  USGS burn severity classes: yellow low, orange moderate, red
+  moderate-high, purple high. Unburned ground is left clear so the map shows
+  through, and ground the satellite could not see in one of the two scenes
+  (cloud, shadow, water, snow) is grey rather than clear, so a cloud never
+  reads as unburned.
+
+**10 m shows which blocks burned, not which houses.** The row and the status
+line say so, because the picture looks sharper than it is. A burned house on
+a block of burned houses reads as burned ground; a single house does not.
+
+![The satellite packs of one event](screenshots/55_satellite.png)
+
+Each row carries the scene date, how many days before or after the event it
+was taken, the cloud cover over the event in that scene, and the pack's
+size, a few MB each. **Download** puts the pack on the phone; it draws over
+whatever map you have, comes back after a restart with no network, and
+**Hide** turns it off without removing it. Tap a row before downloading and
+the map goes to where the event is; after, **tap to go there**.
+
+The event button under the search box starts on **All Events** and narrows
+to one. The list says when the catalog was last built. In the days after a
+fire the first pass is often smoky; the server looks again every night and
+when a clearer pass arrives it is added beside the earlier one, dated, so
+both are there to compare.
+
+The packs are in `atak/grg/` under fixed names, `<event>-s2-pre-<date>`,
+`-post-` and `-dnbr-`, so the Damage Assessment plugin can read the burn
+severity under building footprints. Imagery: Contains modified Copernicus
+Sentinel data.
+
+---
+
+## 10. Finding what you already have
 
 Every page has a filter button, next to **Back**, that cycles **All** →
 **Installed** → **Available**. Set to **Installed**, the page becomes a list of
@@ -445,7 +487,7 @@ on at a time.
 
 ---
 
-## 10. Removing
+## 11. Removing
 
 **Remove** appears on anything installed, and says what removing actually frees
 before it does it.
@@ -467,7 +509,7 @@ deletes nothing. A pin is a shortcut, not a download.
 
 ---
 
-## 11. Where files go
+## 12. Where files go
 
 Map Depot writes into ATAK's own folders, so what it installs is
 indistinguishable from data put there by hand.
@@ -492,7 +534,7 @@ so no layer is left pointing at something that is gone.
 
 ---
 
-## 12. In the plugin
+## 13. In the plugin
 
 The same guide ships inside the plugin as a PDF, for when you are in the field
 without this page. In ATAK go to **Settings → Tool Preferences → Map Depot →

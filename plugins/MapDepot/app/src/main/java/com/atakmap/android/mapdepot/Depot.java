@@ -911,8 +911,14 @@ public final class Depot {
 
     // ------------------------------------------------------------ storms
 
-    /** An event slug on storms.ngs.noaa.gov, which becomes a depot path. */
-    private static final Pattern EVENT_ID = Pattern.compile("[a-z0-9_]{1,40}");
+    /**
+     * An event slug on storms.ngs.noaa.gov, or one the Maxar and CAP ingests
+     * make, which becomes a depot path. 64, not 40: 1.13 refused
+     * {@code maxar_spokane_washington_wildfire_aug_2026} (42) and fourteen
+     * CAP and Maxar offline copies whose pack path ran past 40, so phones
+     * never saw them (measured on dev 5.8, 2026-10-23).
+     */
+    private static final Pattern EVENT_ID = Pattern.compile("[a-z0-9_]{1,64}");
 
     /**
      * NOAA's tile set name, {@code 20250823b-rgb}; a CAP job, {@code cap-katy-tx-1};
@@ -923,7 +929,7 @@ public final class Depot {
 
     /** The depot path of a generated XML, and nothing else. */
     private static final Pattern STORM_FILE =
-            Pattern.compile("storms/v1/[a-z0-9_]{1,40}/[a-z0-9-]{1,40}\\.(xml|mbtiles)");
+            Pattern.compile("storms/v1/[a-z0-9_]{1,64}/[a-z0-9-]{1,72}\\.(xml|mbtiles)");
 
     private static final Pattern ISO_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
 
@@ -1358,6 +1364,284 @@ public final class Depot {
             }
         });
         return new Storms(section.optString("builtAt", ""), out);
+    }
+
+    // --------------------------------------------------------------- satellite
+
+    /**
+     * The depot path of a Sentinel-2 pack, and nothing else. The stem is a
+     * contract with Damage Assessment, which opens the dnbr pack by this
+     * name and reads the pixels under each building footprint:
+     * {@code <event>-s2-<pre|post|dnbr>-<yyyymmdd>.mbtiles}.
+     */
+    private static final Pattern SAT_FILE = Pattern.compile(
+            "satellite/v1/[a-z0-9_]{1,64}/[a-z0-9_]{1,64}-s2-(pre|post|dnbr)-\\d{8}\\.mbtiles");
+
+    private static final Pattern LAYER_NAME = Pattern.compile("[\\x20-\\x7e]{1,128}");
+
+    /** The pack id is the file stem: the event id, the kind and the scene date. */
+    private static final Pattern SAT_PACK_ID =
+            Pattern.compile("[a-z0-9_]{1,64}-s2-(pre|post|dnbr)-\\d{8}");
+
+    /**
+     * A package ATAK lists under a name that is not its file stem. An
+     * MBTiles is listed by the {@code name} in its own metadata table, and a
+     * satellite pack's file name is a contract while its listed name is for
+     * people, so the two differ and the go-to must know the listed one.
+     */
+    public interface Named {
+        String layerName();
+    }
+
+    /**
+     * One event with Sentinel-2 before-and-after packs: a fire, a flood, a
+     * storm. Its packs are the packages: true color before, true color
+     * after, and the burn severity between them, each dated. 10 m a pixel:
+     * it shows which blocks burned, never which houses, and every row says
+     * so.
+     */
+    public static final class SatEvent {
+        public final String id;
+        public final String name;
+        public final int year;
+        public final String kind;
+        /** The ignition or landfall date, ISO. */
+        public final String start;
+        public final String preDate, postDate;
+        public final String license;
+        /** south, west, north, east of the window the packs cover. */
+        public final double[] bounds;
+        /** before, after, severity, in that order and by date. */
+        public final List<Package> packs = new ArrayList<>();
+
+        SatEvent(JSONObject o) {
+            id = o.optString("id");
+            if (!EVENT_ID.matcher(id).matches())
+                throw new IllegalArgumentException("invalid satellite event id: " + id);
+            name = o.optString("name", id);
+            year = o.optInt("year");
+            kind = o.optString("kind", "other");
+            start = o.optString("start", "");
+            if (!ISO_DATE.matcher(start).matches())
+                throw new IllegalArgumentException("satellite event " + id + " has no start date");
+            preDate = o.optString("preDate", "");
+            postDate = o.optString("postDate", "");
+            license = o.optString("license", "Contains modified Copernicus Sentinel data");
+            bounds = box(o.optJSONArray("bounds"));
+
+            final JSONArray arr = o.optJSONArray("packs");
+            if (arr != null)
+                for (int i = 0; i < arr.length(); i++) {
+                    final JSONObject p = arr.optJSONObject(i);
+                    if (p == null)
+                        continue;
+                    try {
+                        packs.add(new SatPack(p, this));
+                    } catch (IllegalArgumentException bad) {
+                        com.atakmap.coremap.log.Log.w("MapDepot",
+                                "rejected satellite pack: " + bad.getMessage());
+                    }
+                }
+            if (packs.isEmpty())
+                throw new IllegalArgumentException("satellite event " + id + " has no packs");
+        }
+
+        /** "before Jan 2, after Jan 12, 2025", the two scene dates. */
+        public String span() {
+            if (!ISO_DATE.matcher(preDate).matches() || !ISO_DATE.matcher(postDate).matches())
+                return prettyDate(start);
+            if (preDate.substring(0, 4).equals(postDate.substring(0, 4)))
+                return "before " + monthDay(preDate) + ", after " + monthDay(postDate)
+                        + ", " + postDate.substring(0, 4);
+            return "before " + prettyDate(preDate) + ", after " + prettyDate(postDate);
+        }
+    }
+
+    /**
+     * One Sentinel-2 pack of an event, built on the depot from the public
+     * scenes and downloaded whole, so it draws with no signal. Lands in
+     * {@code grg/} like a disaster aerial's offline copy.
+     */
+    public static final class SatPack implements Package, Located, Bounded, Digested, Named {
+        public final SatEvent event;
+        public final String id;
+        /** "pre", "post" or "dnbr". */
+        public final String kind;
+        public final String date;
+        /** For a dnbr pack, the before scene it was differenced against. */
+        public final String preDate;
+        public final String file;
+        public final long bytes;
+        public final String sha256;
+        /** Cloud over the window, percent; for dnbr the worse of the two scenes. */
+        public final double cloud;
+        /** Days after the event start (negative: before). */
+        public final int days;
+        public final int maxZoom;
+        public final int tiles;
+        public final String layer;
+
+        SatPack(JSONObject o, SatEvent event) {
+            this.event = event;
+            id = o.optString("id");
+            if (!SAT_PACK_ID.matcher(id).matches())
+                throw new IllegalArgumentException("invalid pack id: " + id);
+            kind = o.optString("kind");
+            if (!"pre".equals(kind) && !"post".equals(kind) && !"dnbr".equals(kind))
+                throw new IllegalArgumentException("pack " + id + " has kind " + kind);
+            date = o.optString("date", "");
+            if (!ISO_DATE.matcher(date).matches())
+                throw new IllegalArgumentException("pack " + id + " has no date");
+            preDate = o.optString("preDate", "");
+            file = o.optString("file");
+            if (!SAT_FILE.matcher(file).matches()
+                    || !file.endsWith("/" + id + ".mbtiles"))
+                throw new IllegalArgumentException("pack " + id + " has no usable file");
+            bytes = o.optLong("bytes");
+            sha256 = o.optString("sha256");
+            if (bytes <= 0 || sha256.length() != 64)
+                throw new IllegalArgumentException("pack " + id + " has no size or digest");
+            cloud = o.optDouble("cloud", -1);
+            days = o.optInt("days", 0);
+            maxZoom = o.optInt("maxZoom", 14);
+            tiles = o.optInt("tiles");
+            // The listed name is only ever matched against ATAK's own layer
+            // list; a catalog cannot name a path through it. Printable
+            // ASCII, bounded, else the id (security review 2026-10-23).
+            final String ln = o.optString("layer", id);
+            layer = LAYER_NAME.matcher(ln).matches() ? ln : id;
+        }
+
+        @Override
+        public boolean located() {
+            return event.bounds != null;
+        }
+
+        @Override
+        public double lat() {
+            return event.bounds == null ? Double.NaN : (event.bounds[0] + event.bounds[2]) / 2.0;
+        }
+
+        @Override
+        public double lon() {
+            return event.bounds == null ? Double.NaN : (event.bounds[1] + event.bounds[3]) / 2.0;
+        }
+
+        @Override
+        public double[] bounds() {
+            return event.bounds;
+        }
+
+        @Override
+        public String sha256() {
+            return sha256;
+        }
+
+        @Override
+        public String id() {
+            return id;
+        }
+
+        @Override
+        public String layerName() {
+            return layer;
+        }
+
+        /** "Before · Jan 2, 2025", "After · Jan 12, 2025", "Burn Severity · Jan 12, 2025". */
+        @Override
+        public String name() {
+            final String what = "pre".equals(kind) ? "Before"
+                    : "post".equals(kind) ? "After" : "Burn Severity";
+            return what + " · " + prettyDate(date);
+        }
+
+        @Override
+        public String url() {
+            return DepotClient.baseUrl() + "/" + file;
+        }
+
+        /** The contract name, exactly; see {@link #SAT_FILE}. */
+        @Override
+        public String fileName() {
+            return id + ".mbtiles";
+        }
+
+        @Override
+        public String legacyFileName() {
+            return id + ".mbtiles";
+        }
+
+        /** grg: an overlay drawn over whatever map the crew has, under the roads GRG. */
+        @Override
+        public String destination() {
+            return "grg";
+        }
+
+        @Override
+        public long bytes() {
+            return bytes;
+        }
+
+        @Override
+        public String describe() {
+            final StringBuilder sb = new StringBuilder();
+            if ("dnbr".equals(kind)) {
+                sb.append("Shows which blocks burned, not which houses");
+                if (ISO_DATE.matcher(preDate).matches())
+                    sb.append(" · ").append(monthDay(preDate)).append(" to ")
+                            .append(monthDay(date));
+            } else {
+                sb.append("Satellite, 10 m");
+                final int d = Math.abs(days);
+                sb.append(" · ").append(d).append(d == 1 ? " day " : " days ")
+                        .append(days < 0 ? "before" : "after");
+            }
+            if (cloud >= 0)
+                sb.append(" · ").append(Math.round(cloud)).append("% cloud");
+            sb.append(" · ").append(Depot.bytes(bytes));
+            return sb.toString();
+        }
+    }
+
+    /** The satellite section: when it was built, and the events newest first. */
+    public static final class Satellite {
+        public final String builtAt;
+        public final List<SatEvent> events;
+
+        Satellite(String builtAt, List<SatEvent> events) {
+            this.builtAt = builtAt;
+            this.events = events;
+        }
+
+        public static final Satellite NONE = new Satellite("", Collections.<SatEvent>emptyList());
+    }
+
+    public static Satellite parseSatellite(String json) throws Exception {
+        final JSONObject root = new JSONObject(json);
+        final JSONObject section = root.optJSONObject("satellite");
+        if (section == null)
+            return Satellite.NONE;
+        final JSONArray arr = section.optJSONArray("events");
+        final List<SatEvent> out = new ArrayList<>();
+        if (arr != null)
+            for (int i = 0; i < arr.length(); i++) {
+                final JSONObject o = arr.optJSONObject(i);
+                if (o == null)
+                    continue;
+                try {
+                    out.add(new SatEvent(o));
+                } catch (IllegalArgumentException bad) {
+                    com.atakmap.coremap.log.Log.w("MapDepot",
+                            "rejected satellite event: " + bad.getMessage());
+                }
+            }
+        Collections.sort(out, new Comparator<SatEvent>() {
+            @Override
+            public int compare(SatEvent a, SatEvent b) {
+                return b.start.compareTo(a.start);
+            }
+        });
+        return new Satellite(section.optString("builtAt", ""), out);
     }
 
     public static List<BaseMap> parseBaseMaps(String json) throws Exception {
