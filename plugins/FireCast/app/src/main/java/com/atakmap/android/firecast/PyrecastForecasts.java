@@ -53,7 +53,7 @@ import java.util.regex.Pattern;
  * the end of the forecast, so a percentile is one whole run (the 90th: nine in ten runs
  * ended smaller), and runs need not nest hour by hour; the plugin shows one at a time,
  * the middle one unless the operator picks an end, as the fire's edge at fixed hours
- * after the run, and a picked forecast gets the slider with that run's edge in white.
+ * after the run, and a picked forecast gets the slider with that run's edge in cyan.
  *
  * <p>Reference data for a crew, so it is kept: every raster is saved under
  * tools/firecast/pyrecast and comes back at start with no network; off hides the sets
@@ -405,7 +405,7 @@ public final class PyrecastForecasts {
         showAt(f, 0);
     }
 
-    /** Draws a forecast's edge at that hour in white over its rings; 0 draws none. */
+    /** Draws a forecast's edge at that hour in cyan over its rings; 0 draws none. */
     public void showAt(final Forecast f, final double h) {
         prefs.edit().putFloat("pyrecast.focusHours", (float) h).apply();
         worker.execute(new Runnable() {
@@ -438,7 +438,7 @@ public final class PyrecastForecasts {
             store.setFeatureSetVisible(atFsid, true);
             final String name = "PyreCast: " + f.name() + ", " + hoursText(h) + " after " + when(f.runMs);
             for (Polygon p : f.rings(pct(), h))
-                insert(atFsid, name, p, new BasicStrokeStyle(0xFFFFFFFF, 4f));
+                insert(atFsid, name, p, new com.atakmap.map.layer.feature.style.CompositeStyle(new com.atakmap.map.layer.feature.style.Style[] { new BasicStrokeStyle(0xC0000000, 7f), new BasicStrokeStyle(0xFF00E5FF, 4f) }));
         } catch (Exception e) {
             Log.w(TAG, "PyreCast edge draw failed", e);
         } finally {
@@ -447,7 +447,7 @@ public final class PyrecastForecasts {
         }
     }
 
-    private void insert(long fsid, String name, Polygon p, BasicStrokeStyle style) throws Exception {
+    private void insert(long fsid, String name, Polygon p, com.atakmap.map.layer.feature.style.Style style) throws Exception {
         final AttributeSet a = new AttributeSet();
         a.setAttribute("_title", name);
         store.insertFeature(new Feature(fsid, name, p, style, a, Feature.AltitudeMode.ClampToGround, 0d));

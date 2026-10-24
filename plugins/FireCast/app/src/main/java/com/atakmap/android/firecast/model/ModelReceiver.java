@@ -376,6 +376,19 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         }
         section("Where it goes", goes.toString());
 
+        if (r.sizeAcres != null) {
+            // PyreCast's words for its own ensemble, so the two read the same.
+            final StringBuilder sz = new StringBuilder();
+            for (int i = FireModel.SIZE_PCT.length - 1; i >= 0; i--)
+                sz.append(com.atakmap.android.firecast.PyrecastForecasts.pctName(FireModel.SIZE_PCT[i]))
+                        .append(' ').append(acres(r.sizeAcres[i])).append(i > 0 ? "\n" : "");
+            sz.append("\nby ").append(r.steps[r.steps.length - 1]).append(" min. From ").append(r.sizeRuns)
+                    .append(" runs of this fire with the wind's speed and direction and the dead fuel moisture nudged"
+                            + " the way a forecast misses. The dashed lines on the map are the Smallest and Largest edges;"
+                            + " the colored rings are the run as it stands.");
+            section("Predicted Fire Size", sz.toString());
+        }
+
         final String flame = String.format(Locale.US, "Flame length %s. Fireline intensity %.0f BTU/ft/s.",
                 Units.format(o.flameLengthFt * 0.3048d), o.firelineIntensity)
                 + (o.flameLengthFt > 11 ? " Past what a hand crew can hold at the head."
@@ -499,7 +512,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
 
     /**
      * "Where it is by": a slider from the run to its last step in five-minute notches.
-     * The fire's edge at that moment is drawn on the map in white as it moves, and the
+     * The fire's edge at that moment is drawn on the map in cyan as it moves, and the
      * line above it says the clock, acres, reach and buildings. A plain ScrollView
      * page, no pager, so the bar keeps sideways drags and the page keeps vertical ones.
      */
@@ -562,7 +575,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         final int last = r.steps[r.steps.length - 1];
         if (minutes <= 0)
             return "Slide to see where the fire is at any time up to " + clock(r.ranAt + last * 60000L)
-                    + ". Its edge is drawn on the map in white.";
+                    + ". Its edge is drawn on the map in cyan.";
         final StringBuilder sb = new StringBuilder("By ").append(clock(r.ranAt + minutes * 60000L))
                 .append(", in ").append(minutes < 60 ? minutes + " min"
                         : minutes % 60 == 0 ? (minutes / 60) + " h" : (minutes / 60) + " h " + (minutes % 60) + " min")

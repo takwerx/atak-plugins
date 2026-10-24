@@ -275,7 +275,7 @@ public final class FirisModels {
         showAt(r, 0);
     }
 
-    /** Draws a run's edge at that time in white over its rings; 0 draws none. */
+    /** Draws a run's edge at that time in cyan over its rings; 0 draws none. */
     public void showAt(final Run r, final double h) {
         prefs.edit().putFloat("firis.focusHours", (float) h).apply();
         worker.execute(new Runnable() {
@@ -311,7 +311,7 @@ public final class FirisModels {
                 if (g.hours == h) {
                     final AttributeSet a = new AttributeSet();
                     a.setAttribute("_title", name);
-                    store.insertFeature(new Feature(atFsid, name, g.geom, new BasicStrokeStyle(0xFFFFFFFF, 4f), a,
+                    store.insertFeature(new Feature(atFsid, name, g.geom, new com.atakmap.map.layer.feature.style.CompositeStyle(new com.atakmap.map.layer.feature.style.Style[] { new BasicStrokeStyle(0xC0000000, 7f), new BasicStrokeStyle(0xFF00E5FF, 4f) }), a,
                             Feature.AltitudeMode.ClampToGround, 0d));
                 }
         } catch (Exception e) {
@@ -656,7 +656,7 @@ public final class FirisModels {
         }
     }
 
-    /** Lock held: the white edge comes back with the runs, after a restart or a fetch. */
+    /** Lock held: the cyan edge comes back with the runs, after a restart or a fetch. */
     private void redrawAtLocked() {
         drawAtLocked(focus(), focusHours());
     }

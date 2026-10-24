@@ -392,7 +392,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         if (p <= 0)
             return "Slide to see where the run has the fire at any time up to "
                     + FirisModels.clock(r.startMs + (long) (hs[hs.length - 1] * 3_600_000L))
-                    + ". Its edge is drawn on the map in white.";
+                    + ". Its edge is drawn on the map in cyan.";
         final double h = hs[p - 1];
         final StringBuilder s = new StringBuilder("By ")
                 .append(FirisModels.clock(r.startMs + (long) (h * 3_600_000L)))
@@ -656,7 +656,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         key.addView(fc);
         for (int hr : PyrecastForecasts.RING_HOURS)
             key.addView(keyRow(PyrecastForecasts.ringColor(hr) & 0xFFFFFF, false, PyrecastForecasts.hoursText(hr)));
-        key.addView(keyRow(0xFFFFFF, false, "Where the slider has it"));
+        key.addView(keyRow(0x00E5FF, false, "Where the slider has it"));
         final TextView note = new TextView(mapView.getContext());
         note.setText("Each box is the ground a detection covers. The fire was somewhere inside it when the satellite looked.");
         note.setTextSize(12f);

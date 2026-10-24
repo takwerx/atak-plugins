@@ -181,6 +181,18 @@ public final class FireModel {
 
         /** The grid's reach each way from the start, km. */
         public double halfKm = HALF_KM;
+        /**
+         * Predicted Fire Size, PyreCast's words for it: acres at the end of the run for the
+         * 10th, 30th, 50th, 70th and 90th percentile of the same fire run many times with
+         * the wind and the dead fuel moisture nudged; null when it was not run.
+         */
+        public double[] sizeAcres;
+        /** How many runs the sizes come from. */
+        public int sizeRuns;
+        /** The nudges that made the Smallest (10th) and Largest (90th) runs: {wind x, direction + deg, moisture x}. */
+        public double[] smallNudge, largeNudge;
+        /** Those two runs' edges at the end, drawn dashed. Not saved: run again from the nudges. */
+        public List<Polygon> smallEdge, largeEdge;
         /** Buildings reached by each step, homes among them, and people, from FEMA's inventory; null when not fetched. */
         public int[] structures, homes;
         public double[] people;
@@ -857,8 +869,11 @@ public final class FireModel {
                         if (r.weather == null) {
                             final java.util.List<Weather.Reading> observed = new java.util.ArrayList<>();
                             for (Weather.Reading s : r.stations)
-                                if (!"NWS forecast".equals(s.source) && !"HRRR".equals(s.source))
+                                if (!"NWS forecast".equals(s.source) && !"HRRR".equals(s.source) && fresh(s, r.ranAt))
                                     observed.add(s);
+                            // No station read in the last 3 hours: the HRRR field or the
+                            // forecast, which are always current, rather than a station
+                            // that stopped reporting (a portable RAWS a month gone).
                             r.weather = Weather.representative(observed, r.startElevFt);
                             if (r.weather == null && !r.stations.isEmpty())
                                 r.weather = r.stations.get(0);
@@ -943,7 +958,7 @@ public final class FireModel {
             if (other == null) {
                 final java.util.List<Weather.Reading> observed = new java.util.ArrayList<>();
                 for (Weather.Reading s : r.stations)
-                    if (!"NWS forecast".equals(s.source) && !"HRRR".equals(s.source))
+                    if (!"NWS forecast".equals(s.source) && !"HRRR".equals(s.source) && fresh(s, r.ranAt))
                         observed.add(s);
                 other = Weather.representative(observed, r.startElevFt);
             }
@@ -1464,6 +1479,138 @@ public final class FireModel {
      * cell by cell. Falls back to the ellipse, and says so, when the ground cannot
      * be had (no network and nothing on disk). Worker thread.
      */
+    /**
+     * How a cell burns for this run, with the wind's speed times {@code windX}, its
+     * direction turned by {@code dirPlus} degrees, and the dead fuel moisture times
+     * {@code moistX}; (1, 0, 1) is the run as it stands.
+     */
+    private static Spread.Behavior behaviorFor(final Run r, final double windX, final double dirPlus, final double moistX) {
+        return new Spread.Behavior() {
+                    @Override
+                    public double[] run(Spread.Ground g, double windMph, double windFrom, int hour) {
+                        final Hour hr = r.hourly == null || r.hourly.length == 0 ? null
+                                : r.hourly[Math.max(0, Math.min(r.hourly.length - 1, hour))];
+                        final boolean own = Double.isNaN(windMph);
+                        final double mph = windX * (own ? (hr == null ? r.windMph : hr.windMph) : windMph);
+                        final double from = dirPlus + (own ? (hr == null ? r.windFromDeg : hr.windFromDeg) : windFrom);
+                        final boolean tenM = own ? r.tenMeterWind : true;
+                        final double m1 = moistX * (hr == null ? r.m1 : hr.m1), m10 = moistX * (hr == null ? r.m10 : hr.m10),
+                                m100 = moistX * (hr == null ? r.m100 : hr.m100);
+                        if (g.canopy()) {
+                            // Trees over it: whether the fire stays down, torches or crowns.
+                            final Behave.Crown c = Behave.crown(g.fuel, m1, m10, m100, r.mHerb, r.mWoody, r.mFoliar,
+                                    mph, tenM, from, g.slopeDeg, g.aspectDeg, g.coverPct, g.heightFt, g.baseFt, g.density);
+                            if (c == null)
+                                return null;
+                            return new double[] { c.rosFtPerMin, c.headingDeg, c.aFtPerMin, c.bFtPerMin, c.cFtPerMin,
+                                    c.flameLengthFt, c.spotM, c.fireType };
+                        }
+                        // Open ground, or no canopy grids: the start's canopy as before.
+                        final boolean known = !Double.isNaN(g.coverPct);
+                        final double cover = known ? 0 : r.site.coverPct, heightFt = known ? 0 : r.canopyHeightFt,
+                                ratio = known ? 0 : r.crownRatio;
+                        final Behave.Result b = Behave.surface(g.fuel, m1, m10, m100, r.mHerb, r.mWoody,
+                                mph, tenM, from, g.slopeDeg, g.aspectDeg, cover, heightFt, ratio);
+                        if (b == null)
+                            return null;
+                        // Embers from this kind of cell: Albini's surface-fire reach at the
+                        // 20 ft wind (a 10 m wind scaled down to 20 ft), over open ground
+                        // or the canopy here.
+                        final double wind20 = tenM ? mph * 0.87d : mph;
+                        final double spotM = Behave.spotDistanceM(b.flameLengthFt, wind20, heightFt);
+                        return new double[] { b.rosFtPerMin, b.headingDeg, b.aFtPerMin, b.bFtPerMin, b.cFtPerMin,
+                                b.flameLengthFt, spotM, Behave.SURFACE };
+                    }
+                };
+    }
+
+    /** The run's HRRR field with the same nudge to its wind; null for a run on one wind. */
+    private static Spread.Wind fieldFor(final Run r, final boolean useField, final double windX, final double dirPlus) {
+        if (!useField)
+            return null;
+        return new Spread.Wind() {
+            @Override
+            public double[] at(double lat, double lon, long whenMillis) {
+                final double[] w = r.windField.at(lat, lon, whenMillis);
+                return w == null ? null : new double[] { w[0] * windX, w[1] + dirPlus };
+            }
+        };
+    }
+
+    /** How many times the fire is run with the weather nudged, and the most time that may take. */
+    static final int SIZE_RUNS = 30, SIZE_RUNS_MIN = 10;
+    static final long SIZE_MS = 45_000L;
+    static final int[] SIZE_PCT = { 10, 30, 50, 70, 90 };
+
+    /**
+     * Predicted Fire Size: the same fire run again and again, each time with the wind's
+     * speed, its direction and the dead fuel moisture nudged the way a forecast misses
+     * (speed within about a quarter either way, direction about 15 degrees, moisture
+     * about a sixth), then ranked by the acres at the end, the way PyreCast ranks its
+     * ensemble. The run as it stands stays the one everything else on the page uses.
+     * Seeded from the run's id, so the same run gives the same sizes on every phone.
+     */
+    private void sizes(Run r, Landscape land, boolean useField) {
+        final java.util.Random rnd = new java.util.Random(r.runId.hashCode());
+        final int last = r.steps[r.steps.length - 1];
+        final int hours = r.hourly == null ? 1 : r.hourly.length;
+        final List<double[]> nudges = new ArrayList<>();
+        final List<Double> acres = new ArrayList<>();
+        final long t0 = System.currentTimeMillis();
+        for (int k = 0; k < SIZE_RUNS; k++) {
+            if (Thread.currentThread().isInterrupted())
+                return;
+            if (k >= SIZE_RUNS_MIN && System.currentTimeMillis() - t0 > SIZE_MS)
+                break;
+            final double[] n = {
+                    clamp(Math.exp(0.25 * rnd.nextGaussian()), 0.5, 1.8, 1),
+                    clamp(15 * rnd.nextGaussian(), -40, 40, 0),
+                    clamp(Math.exp(0.15 * rnd.nextGaussian()), 0.7, 1.4, 1) };
+            status = "Running the fire " + (k + 1) + " of " + SIZE_RUNS + " times with the weather nudged…";
+            changed();
+            final Spread.Result m = Spread.run(land, r.lat, r.lon, r.halfKm, last, behaviorFor(r, n[0], n[1], n[2]),
+                    r.perimeter, r.rateScale, fieldFor(r, useField, n[0], n[1]), r.ranAt, r.cellM, hours);
+            nudges.add(n);
+            acres.add(m.acres(last));
+        }
+        final int count = acres.size();
+        final Integer[] order = new Integer[count];
+        for (int i = 0; i < count; i++)
+            order[i] = i;
+        java.util.Arrays.sort(order, new java.util.Comparator<Integer>() {
+            @Override
+            public int compare(Integer a, Integer b) {
+                return Double.compare(acres.get(a), acres.get(b));
+            }
+        });
+        r.sizeAcres = new double[SIZE_PCT.length];
+        for (int i = 0; i < SIZE_PCT.length; i++)
+            r.sizeAcres[i] = acres.get(order[(int) Math.round(SIZE_PCT[i] / 100d * (count - 1))]);
+        r.sizeRuns = count;
+        r.smallNudge = nudges.get(order[(int) Math.round(0.1 * (count - 1))]);
+        r.largeNudge = nudges.get(order[(int) Math.round(0.9 * (count - 1))]);
+        Log.d(TAG, "sizes: " + count + " runs in " + (System.currentTimeMillis() - t0) + " ms, acres "
+                + java.util.Arrays.toString(r.sizeAcres));
+        sizeEdges(r, land, useField);
+    }
+
+    /** The Smallest and Largest runs again from their nudges, for their edges at the end. */
+    private void sizeEdges(Run r, Landscape land, boolean useField) {
+        if (r.smallNudge == null || r.largeNudge == null)
+            return;
+        final int last = r.steps[r.steps.length - 1];
+        final int hours = r.hourly == null ? 1 : r.hourly.length;
+        final double[][] ns = { r.smallNudge, r.largeNudge };
+        final List<List<Polygon>> edges = new ArrayList<>();
+        for (double[] n : ns) {
+            final Spread.Result m = Spread.run(land, r.lat, r.lon, r.halfKm, last, behaviorFor(r, n[0], n[1], n[2]),
+                    r.perimeter, r.rateScale, fieldFor(r, useField, n[0], n[1]), r.ranAt, r.cellM, hours);
+            edges.add(m.rings(last));
+        }
+        r.smallEdge = edges.get(0);
+        r.largeEdge = edges.get(1);
+    }
+
     private void acrossTheGroundNoStructures(final Run r) {
         skipStructures = true;
         try {
@@ -1500,43 +1647,7 @@ public final class FireModel {
         }
         final long t0 = System.currentTimeMillis();
         final boolean useField = r.windField != null && r.fieldWind && !COND_DRY_WINDY.equals(r.conditions);
-        final Spread.Behavior behavior = new Spread.Behavior() {
-                    @Override
-                    public double[] run(Spread.Ground g, double windMph, double windFrom, int hour) {
-                        final Hour hr = r.hourly == null || r.hourly.length == 0 ? null
-                                : r.hourly[Math.max(0, Math.min(r.hourly.length - 1, hour))];
-                        final boolean own = Double.isNaN(windMph);
-                        final double mph = own ? (hr == null ? r.windMph : hr.windMph) : windMph;
-                        final double from = own ? (hr == null ? r.windFromDeg : hr.windFromDeg) : windFrom;
-                        final boolean tenM = own ? r.tenMeterWind : true;
-                        final double m1 = hr == null ? r.m1 : hr.m1, m10 = hr == null ? r.m10 : hr.m10,
-                                m100 = hr == null ? r.m100 : hr.m100;
-                        if (g.canopy()) {
-                            // Trees over it: whether the fire stays down, torches or crowns.
-                            final Behave.Crown c = Behave.crown(g.fuel, m1, m10, m100, r.mHerb, r.mWoody, r.mFoliar,
-                                    mph, tenM, from, g.slopeDeg, g.aspectDeg, g.coverPct, g.heightFt, g.baseFt, g.density);
-                            if (c == null)
-                                return null;
-                            return new double[] { c.rosFtPerMin, c.headingDeg, c.aFtPerMin, c.bFtPerMin, c.cFtPerMin,
-                                    c.flameLengthFt, c.spotM, c.fireType };
-                        }
-                        // Open ground, or no canopy grids: the start's canopy as before.
-                        final boolean known = !Double.isNaN(g.coverPct);
-                        final double cover = known ? 0 : r.site.coverPct, heightFt = known ? 0 : r.canopyHeightFt,
-                                ratio = known ? 0 : r.crownRatio;
-                        final Behave.Result b = Behave.surface(g.fuel, m1, m10, m100, r.mHerb, r.mWoody,
-                                mph, tenM, from, g.slopeDeg, g.aspectDeg, cover, heightFt, ratio);
-                        if (b == null)
-                            return null;
-                        // Embers from this kind of cell: Albini's surface-fire reach at the
-                        // 20 ft wind (a 10 m wind scaled down to 20 ft), over open ground
-                        // or the canopy here.
-                        final double wind20 = tenM ? mph * 0.87d : mph;
-                        final double spotM = Behave.spotDistanceM(b.flameLengthFt, wind20, heightFt);
-                        return new double[] { b.rosFtPerMin, b.headingDeg, b.aFtPerMin, b.bFtPerMin, b.cFtPerMin,
-                                b.flameLengthFt, spotM, Behave.SURFACE };
-                    }
-                };
+        final Spread.Behavior behavior = behaviorFor(r, 1, 0, 1);
         // Calibration: with a perimeter and a start time, the model is run from the
         // perimeter's middle for the time elapsed, and the ratio of what the fire has
         // actually covered to what the model would have gives the rate scale, by the
@@ -1561,12 +1672,7 @@ public final class FireModel {
                 }
             }
         }
-        final Spread.Wind field = !useField ? null : new Spread.Wind() {
-            @Override
-            public double[] at(double lat, double lon, long whenMillis) {
-                return r.windField.at(lat, lon, whenMillis);
-            }
-        };
+        final Spread.Wind field = fieldFor(r, useField, 1, 0);
         final Spread.Result g = Spread.run(land, r.lat, r.lon, r.halfKm, r.steps[r.steps.length - 1],
                 behavior, r.perimeter, r.rateScale, field, r.ranAt, r.cellM, r.hourly == null ? 1 : r.hourly.length);
         Log.d(TAG, "ground run: " + g.cellsSeen + " cells reached of " + g.cellsBurnable + " burnable, "
@@ -1582,6 +1688,10 @@ public final class FireModel {
             return;
         }
         r.ground = g;
+        if (skipStructures)
+            sizeEdges(r, land, useField);
+        else
+            sizes(r, land, useField);
         if (!skipStructures)
             countStructures(r);
     }
@@ -1996,6 +2106,26 @@ public final class FireModel {
                                 Feature.AltitudeMode.ClampToGround, 0d));
                     }
                 }
+                // Predicted Fire Size: the Smallest and Largest runs' edges at the end, dashed.
+                final List<Polygon> range = new ArrayList<>();
+                if (r.smallEdge != null)
+                    range.addAll(r.smallEdge);
+                if (r.largeEdge != null)
+                    range.addAll(r.largeEdge);
+                // White dashes over a solid dark line, so it reads on light and dark base maps alike.
+                final Style dash = new CompositeStyle(new Style[] {
+                        new BasicStrokeStyle(0xCC000000, 5f),
+                        new com.atakmap.map.layer.feature.style.PatternStrokeStyle(2, (short) 0xF0F0,
+                                1f, 1f, 1f, 1f, 3f) });
+                for (int i = 0; i < range.size(); i++) {
+                    final boolean small = r.smallEdge != null && i < r.smallEdge.size();
+                    final String name = (small ? "Smallest" : "Largest") + " Predicted Fire Size, "
+                            + r.steps[r.steps.length - 1] + " min";
+                    final AttributeSet a = new AttributeSet();
+                    a.setAttribute("_title", name);
+                    store.insertFeature(new Feature(fsid, name, range.get(i), dash, a,
+                            Feature.AltitudeMode.ClampToGround, 0d));
+                }
                 r.atFids.clear();
                 insertAtLocked(r);
             }
@@ -2012,7 +2142,7 @@ public final class FireModel {
     private volatile Run atRun;
 
     /**
-     * Draws where a run's fire is at a time the operator slid to, in white over its
+     * Draws where a run's fire is at a time the operator slid to, in cyan over its
      * steps. A drag fires this many times a second; the worker draws only the latest
      * value, so the edge follows the finger without a queue of stale ones behind it.
      * {@code keep} saves it, on the finger's release, so it comes back after a restart.
@@ -2067,11 +2197,12 @@ public final class FireModel {
     private void insertAtLocked(Run r) throws Exception {
         if (r.atMinutes <= 0 || r.result == null)
             return;
-        // White over a dark halo reads on imagery, terrain and the step colors alike.
+        // Cyan over a dark halo reads on imagery, terrain and the step colors alike,
+        // and is the plugin's highlight color everywhere else.
         final Style style = new CompositeStyle(new Style[] {
-                new BasicFillStyle(0x28FFFFFF),
+                new BasicFillStyle(0x2800E5FF),
                 new BasicStrokeStyle(0xC0000000, 7f),
-                new BasicStrokeStyle(0xFFFFFFFF, 4f) });
+                new BasicStrokeStyle(0xFF00E5FF, 4f) });
         final List<Polygon> shapes = new ArrayList<>();
         if (r.ground != null)
             shapes.addAll(r.ground.rings(r.atMinutes));
@@ -2241,6 +2372,14 @@ public final class FireModel {
             o.put("steps", stepsA);
             if (r.calibrationNote != null)
                 o.put("calibrationNote", r.calibrationNote);
+            if (r.sizeAcres != null && r.smallNudge != null && r.largeNudge != null) {
+                final org.json.JSONArray sa = new org.json.JSONArray();
+                for (double v : r.sizeAcres)
+                    sa.put(v);
+                o.put("sizeAcres", sa).put("sizeRuns", r.sizeRuns)
+                        .put("smallNudge", new org.json.JSONArray().put(r.smallNudge[0]).put(r.smallNudge[1]).put(r.smallNudge[2]))
+                        .put("largeNudge", new org.json.JSONArray().put(r.largeNudge[0]).put(r.largeNudge[1]).put(r.largeNudge[2]));
+            }
 
             if (r.perimeter != null) {
                 final org.json.JSONArray pa = new org.json.JSONArray();
@@ -2476,6 +2615,25 @@ public final class FireModel {
             finish(r);
             if (r.problem != null)
                 return null;
+            // Predicted Fire Size: held to the bounds the nudges are drawn in, since a
+            // sent run's file comes from another phone.
+            final org.json.JSONArray sa = o.optJSONArray("sizeAcres"), sn = o.optJSONArray("smallNudge"),
+                    ln = o.optJSONArray("largeNudge");
+            if (sa != null && sa.length() == SIZE_PCT.length && sn != null && sn.length() == 3 && ln != null && ln.length() == 3) {
+                final double[] acres = new double[SIZE_PCT.length];
+                boolean ok = true;
+                for (int i = 0; i < acres.length; i++) {
+                    acres[i] = sa.optDouble(i, Double.NaN);
+                    ok &= acres[i] >= 0 && acres[i] < 1e7;
+                }
+                final double[] small = nudge(sn), large = nudge(ln);
+                if (ok && small != null && large != null) {
+                    r.sizeAcres = acres;
+                    r.sizeRuns = Math.max(0, Math.min(SIZE_RUNS, o.optInt("sizeRuns", 0)));
+                    r.smallNudge = small;
+                    r.largeNudge = large;
+                }
+            }
             if (o.optBoolean("ground", false)) {
                 // The grids are on disk, so the ground run needs no network; the
                 // building counts are kept from the run, not fetched again.
@@ -2519,6 +2677,22 @@ public final class FireModel {
             Log.w(TAG, "could not read a saved model run", e);
             return null;
         }
+    }
+
+    /** How old an observation may be and still stand for the weather now. */
+    static final long FRESH_MS = 3 * 3_600_000L;
+
+    /** Read within {@link #FRESH_MS} of the run. */
+    static boolean fresh(Weather.Reading w, long at) {
+        return w.observedAt > 0 && Math.abs(at - w.observedAt) <= FRESH_MS;
+    }
+
+    /** A saved nudge, or null when it is outside what {@link #sizes} draws. */
+    private static double[] nudge(org.json.JSONArray a) {
+        final double w = a.optDouble(0, Double.NaN), d = a.optDouble(1, Double.NaN), m = a.optDouble(2, Double.NaN);
+        if (!(w >= 0.5 && w <= 1.8) || !(d >= -40 && d <= 40) || !(m >= 0.7 && m <= 1.4))
+            return null;
+        return new double[] { w, d, m };
     }
 
     private void changed() {
