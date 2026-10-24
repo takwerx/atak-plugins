@@ -1067,9 +1067,10 @@ for a wildfire, P for a prescribed fire, S for search and rescue. The *Spot
 Weather Forecast* page lists them under one row of buttons: the first reads
 where the list looks and how many it holds, and opens the choices beneath it
 (all, nearby, on the map, by state or region); the next flips between
-*Newest* and *Closest* first; and a search by incident name sits under the
-row. Nearby and Closest measure from the point chosen in the top row. Tap one
-for the forecast the office wrote.
+*Newest* and *Closest* first; and the magnifier at the end of the row opens a
+search by incident name, which a second tap closes and clears. Nearby and
+Closest measure from the point chosen in the top row. Tap one for the forecast
+the office wrote.
 ]
 
 #tak-slide[
