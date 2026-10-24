@@ -114,8 +114,9 @@ public final class SpotPage {
     private final Host host;
     private final View root;
     private final View gate, browse, detail;
-    private final Button all, near, onMap, state, region;
-    private final Button sortNewest, sortClosest, kindButton;
+    private final Button all, near, onMap, state, region, whereHead;
+    private final View whereBody;
+    private final Button sortButton, kindButton;
     private boolean closest;
     private final TextView status;
     private final android.widget.EditText search;
@@ -220,8 +221,9 @@ public final class SpotPage {
         onMap = root.findViewById(R.id.spot_map);
         state = root.findViewById(R.id.spot_state);
         region = root.findViewById(R.id.spot_region);
-        sortNewest = root.findViewById(R.id.spot_sort_newest);
-        sortClosest = root.findViewById(R.id.spot_sort_closest);
+        whereHead = root.findViewById(R.id.spot_where);
+        whereBody = root.findViewById(R.id.spot_where_body);
+        sortButton = root.findViewById(R.id.spot_sort);
         kindButton = root.findViewById(R.id.spot_kind);
         status = root.findViewById(R.id.spot_status);
         search = root.findViewById(R.id.spot_search);
@@ -416,16 +418,17 @@ public final class SpotPage {
                 pickRegion();
             }
         });
-        sortNewest.setOnClickListener(new View.OnClickListener() {
+        whereHead.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                setClosest(false);
+                whereBody.setVisibility(whereBody.getVisibility() == View.VISIBLE ? View.GONE
+                        : View.VISIBLE);
             }
         });
-        sortClosest.setOnClickListener(new View.OnClickListener() {
+        sortButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                setClosest(true);
+                setClosest(!closest);
             }
         });
         kindButton.setOnClickListener(new View.OnClickListener() {
@@ -506,6 +509,7 @@ public final class SpotPage {
 
     private void setFilter(Filter f) {
         filter = f;
+        whereBody.setVisibility(View.GONE);
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
             p.edit().putString(PREF_FILTER, f.name()).putString(PREF_STATE, stateCode)
@@ -809,8 +813,8 @@ public final class SpotPage {
                 : Spot.stateName(stateCode) + count(Spot.inState(can, stateCode).size()));
         region.setText(regionCode.isEmpty() ? pluginContext.getString(R.string.spot_region)
                 : Spot.regionName(regionCode) + count(Spot.inRegion(can, regionCode).size()));
-        green(sortNewest, !closest);
-        green(sortClosest, closest);
+        sortButton.setText(pluginContext.getString(closest ? R.string.spot_sort_closest
+                : R.string.spot_sort_newest));
         final String kind = com.atakmap.android.atmosphere.overlay.SpotOverlay.kindFilter();
         kindButton.setText(kind.isEmpty() ? pluginContext.getString(R.string.spot_kind_all)
                 : com.atakmap.android.atmosphere.overlay.SpotOverlay.kindName(kind));
@@ -820,6 +824,9 @@ public final class SpotPage {
         green(onMap, filter == Filter.MAP);
         green(state, filter == Filter.STATE);
         green(region, filter == Filter.REGION);
+        final Button picked = filter == Filter.ALL ? all : filter == Filter.NEAR ? near
+                : filter == Filter.MAP ? onMap : filter == Filter.STATE ? state : region;
+        whereHead.setText(picked.getText() + " \u25BE");
     }
 
     private String count(int n) {

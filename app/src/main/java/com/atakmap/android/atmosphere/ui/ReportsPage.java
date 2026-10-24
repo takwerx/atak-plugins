@@ -120,9 +120,10 @@ public final class ReportsPage {
     private final EgressPolicy egress;
     private final Host host;
     private final ScrollView root;
-    private final LinearLayout gate, browse, detail, list, windowRow;
+    private final LinearLayout gate, browse, detail, list, whereBody;
     private final TextView gateText, status, detailTitle, detailFacts;
-    private final Button gateButton, all, near, onMap, state, sortNewest, sortClosest, typeButton;
+    private final Button gateButton, all, near, onMap, state, whereHead, sortButton, typeButton,
+            windowButton;
     private StormReportsOverlay overlay;
     private TornadoPathsOverlay paths;
     private Filter filter = Filter.ALL;
@@ -210,7 +211,22 @@ public final class ReportsPage {
         browse = new LinearLayout(pluginContext);
         browse.setOrientation(LinearLayout.VERTICAL);
         body.addView(browse);
-        final LinearLayout where = row();
+        // One row above the list, so the list starts higher (operator, 2026-10-19: "the
+        // where can be like a button that gets expanded, the next filter a button that
+        // you click through ... like newest closest"). Where reads the current pick and
+        // opens its choices beneath; the order and the window cycle on a tap.
+        final LinearLayout top = row();
+        whereHead = chip("");
+        sortButton = chip("");
+        typeButton = chip(pluginContext.getString(R.string.reports_type_all));
+        windowButton = chip("");
+        top.addView(whereHead, weight(1.3f, true));
+        top.addView(sortButton, weight(1f, true));
+        top.addView(typeButton, weight(1.2f, true));
+        top.addView(windowButton, weight(0.9f, false));
+        browse.addView(top);
+        whereBody = row();
+        whereBody.setVisibility(View.GONE);
         all = chip(pluginContext.getString(R.string.reports_anywhere));
         near = chip(pluginContext.getString(R.string.reports_near));
         onMap = chip(pluginContext.getString(R.string.reports_map));
@@ -218,18 +234,8 @@ public final class ReportsPage {
         // Four chips with counts share one row; "Nationwide (143)" was cut to "Nationw..."
         // on a phone-width pane (operator, 2026-10-12), so the first reads "US".
         for (Button b : new Button[] { all, near, onMap, state })
-            where.addView(b, weight(1f, b != state));
-        browse.addView(where);
-        final LinearLayout order = row();
-        sortNewest = chip(pluginContext.getString(R.string.spot_sort_newest));
-        sortClosest = chip(pluginContext.getString(R.string.spot_sort_closest));
-        typeButton = chip(pluginContext.getString(R.string.reports_type_all));
-        order.addView(sortNewest, weight(1f, true));
-        order.addView(sortClosest, weight(1f, true));
-        order.addView(typeButton, weight(1.4f, false));
-        browse.addView(order);
-        windowRow = row();
-        browse.addView(windowRow);
+            whereBody.addView(b, weight(1f, b != state));
+        browse.addView(whereBody);
         status = text(13, false);
         status.setPadding(0, dp(6), 0, 0);
         browse.addView(status);
@@ -391,16 +397,27 @@ public final class ReportsPage {
                 pickState();
             }
         });
-        sortNewest.setOnClickListener(new View.OnClickListener() {
+        whereHead.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                setClosest(false);
+                whereBody.setVisibility(whereBody.getVisibility() == View.VISIBLE ? View.GONE
+                        : View.VISIBLE);
             }
         });
-        sortClosest.setOnClickListener(new View.OnClickListener() {
+        sortButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                setClosest(true);
+                setClosest(!closest);
+            }
+        });
+        windowButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final OutlookOverlay layer = overlay;
+                if (layer == null)
+                    return;
+                layer.setDay(layer.day() % layer.days() + 1);
+                render();
             }
         });
         typeButton.setOnClickListener(new View.OnClickListener() {
@@ -413,6 +430,7 @@ public final class ReportsPage {
 
     private void setFilter(Filter f) {
         filter = f;
+        whereBody.setVisibility(View.GONE);
         final SharedPreferences p = MapCompat.prefs();
         if (p != null)
             p.edit().putString(PREF_FILTER, f.name()).putString(PREF_STATE, stateCode)
@@ -464,7 +482,7 @@ public final class ReportsPage {
     private void render() {
         if (overlay == null)
             return;
-        buildWindowRow();
+        paintWindow();
         paintFilters();
         list.removeAllViews();
         final List<Item> pool = pool();
@@ -552,25 +570,12 @@ public final class ReportsPage {
         return n == 1 ? StormReports.FAMILIES[which].toLowerCase(Locale.US) : "selected";
     }
 
-    /** The window chips, the layer's own: 24 h, 48 h, 72 h. */
-    private void buildWindowRow() {
-        windowRow.removeAllViews();
+    /** The window button, the layer's own: 24 h, 48 h, 72 h, one tap to the next. */
+    private void paintWindow() {
         final OutlookOverlay layer = overlay;
-        if (layer == null)
-            return;
-        for (int d = 1; d <= layer.days(); d++) {
-            final int value = d;
-            final Button b = chip(layer.dayLabel(d));
-            green(b, layer.day() == d);
-            b.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    layer.setDay(value);
-                    render();
-                }
-            });
-            windowRow.addView(b, weight(1f, d < layer.days()));
-        }
+        windowButton.setVisibility(layer == null ? View.GONE : View.VISIBLE);
+        if (layer != null)
+            windowButton.setText(layer.dayLabel(layer.day()));
     }
 
     /** Each filter says what it would show before it is tapped. */
@@ -586,14 +591,17 @@ public final class ReportsPage {
                 + (box == null ? "" : count(can, inBox(can, box).size())));
         state.setText(stateCode.isEmpty() ? pluginContext.getString(R.string.spot_state)
                 : Spot.stateName(stateCode) + count(can, inState(can, stateCode).size()));
-        green(sortNewest, !closest);
-        green(sortClosest, closest);
+        sortButton.setText(pluginContext.getString(closest ? R.string.spot_sort_closest
+                : R.string.spot_sort_newest));
         typeButton.setText(typeWords());
         green(typeButton, !overlay.allFamilies());
         green(all, filter == Filter.ALL);
         green(near, filter == Filter.NEAR);
         green(onMap, filter == Filter.MAP);
         green(state, filter == Filter.STATE);
+        final Button picked = filter == Filter.ALL ? all : filter == Filter.NEAR ? near
+                : filter == Filter.MAP ? onMap : state;
+        whereHead.setText(picked.getText() + " \u25BE");
     }
 
     private static String count(List<?> pool, int n) {
