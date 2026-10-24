@@ -556,9 +556,10 @@ The layer draws every spot forecast request the National Weather Service has
 open, with the forecast the office wrote for each. The page lists them under
 one row of buttons: the first reads where the list looks and how many it holds,
 and opens the choices beneath it (All, Nearby, On map, by State or by Region);
-the next flips between **Newest** and **Closest** first; and a search box under
-the row finds one by incident name. Nearby and Closest measure from the point
-chosen in the top row. Tap a request for its forecast.
+the next flips between **Newest** and **Closest** first; and the magnifier at
+the end of the row opens a search box that finds one by incident name, which a
+second tap closes and clears. Nearby and Closest measure from the point chosen
+in the top row. Tap a request for its forecast.
 
 <img src="screenshots/58_spots.jpg" width="420"> <img src="screenshots/59_spot_list.png" width="420">
 

@@ -121,6 +121,8 @@ public final class SpotPage {
     private final TextView status;
     private final android.widget.EditText search;
     private final TextView searchCount;
+    private final View searchRow;
+    private final android.widget.ImageButton searchOpen;
     /** What has been typed, lowercased. Applied on top of whichever scope is picked. */
     private String query = "";
     private final LinearLayout list;
@@ -273,6 +275,17 @@ public final class SpotPage {
                         search.setText("");
                     }
                 });
+        // The box lives behind a magnifier at the end of the row, so the list starts
+        // a row higher; opening it puts the cursor in the box with the keyboard up,
+        // closing it clears the search so nothing filters the list unseen.
+        searchRow = root.findViewById(R.id.spot_search_row);
+        searchOpen = root.findViewById(R.id.spot_search_open);
+        searchOpen.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showSearch(searchRow.getVisibility() != View.VISIBLE);
+            }
+        });
         list = root.findViewById(R.id.spot_list);
         detailTitle = root.findViewById(R.id.spot_detail_title);
         detailFacts = root.findViewById(R.id.spot_detail_facts);
@@ -632,6 +645,22 @@ public final class SpotPage {
                 scroller.smoothScrollTo(0, row.getTop());
             }
         }, 250L);
+    }
+
+    private void showSearch(boolean open) {
+        searchRow.setVisibility(open ? View.VISIBLE : View.GONE);
+        final android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) mapView
+                .getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        if (open) {
+            search.requestFocus();
+            if (imm != null)
+                imm.showSoftInput(search, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+        } else {
+            search.setText("");
+            if (imm != null)
+                imm.hideSoftInputFromWindow(search.getWindowToken(), 0);
+            search.clearFocus();
+        }
     }
 
     /** ATAK's own soft-input mode, so it can be handed back unchanged. */
