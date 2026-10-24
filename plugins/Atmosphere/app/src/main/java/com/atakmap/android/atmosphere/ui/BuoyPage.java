@@ -161,6 +161,7 @@ public final class BuoyPage {
         filterRow.setOrientation(LinearLayout.VERTICAL);
         final LinearLayout reports = new LinearLayout(pluginContext);
         reports.setOrientation(LinearLayout.HORIZONTAL);
+        reports.setBaselineAligned(false); // two-line tiles beside one-line ones
         reports.addView(tile("All (" + total + ")", filter == BuoyOverlay.SHOW_ALL, 0,
                 BuoyOverlay.SHOW_ALL));
         reports.addView(tile("Wind (" + wind + ")", filter == BuoyOverlay.SHOW_WIND,
@@ -169,6 +170,7 @@ public final class BuoyPage {
                 0, BuoyOverlay.SHOW_WAVES));
         final LinearLayout means = new LinearLayout(pluginContext);
         means.setOrientation(LinearLayout.HORIZONTAL);
+        means.setBaselineAligned(false); // two-line tiles beside one-line ones
         // Small craft criteria or worse by the buoy's own reading, the station list's
         // "Red Flag (n)" for the water (operator, 2026-09-26).
         means.addView(tile("Rough (" + rough + ")", filter == BuoyOverlay.SHOW_ROUGH,
@@ -199,6 +201,7 @@ public final class BuoyPage {
 
     private View tile(String label, boolean chosen, int color, final int value) {
         final Button b = chip(label, chosen, color);
+        StationPage.nameOverCount(b, label);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
