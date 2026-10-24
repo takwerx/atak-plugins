@@ -60,6 +60,12 @@ nothing has to be imported by hand afterwards:
     the event on the row; the post scene is re-picked nightly as the smoke
     clears and a clearer one is added beside the earlier.
 
+  * Building outlines. Microsoft Building Footprints (ODbL) as one
+    GeoPackage per county, split into parts of about 260 MB for large
+    counties, downloaded whole into tools/damageassessment/footprints for
+    the Damage Assessment plugin to count buildings from, with or without
+    signal. Map Depot carries them and never draws them on the map.
+
   * Offline public land vector tiles. US Forest Service vector basemap packages, one per
     national forest or grassland, fetched directly from ArcGIS Online.
 
@@ -99,7 +105,9 @@ fires.
 _________________________________________________________________
 STATUS
 
-Version 1.14: Satellite Before and After, a new section with Sentinel-2
+Version 1.14: Building Outlines, a new section carrying Microsoft
+Building Footprints per county for Damage Assessment. Satellite Before
+and After, a new section with Sentinel-2
 true-color before and after packs and a burn severity pack per event,
 downloaded whole into the grg folder. The pack names are fixed so Damage
 Assessment can read the burn severity under building footprints. Also:

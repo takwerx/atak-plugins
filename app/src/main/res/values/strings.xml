@@ -58,6 +58,9 @@
     <string name="no_storms">No disaster aerials in the catalog yet.</string>
     <string name="satellite_heading">Satellite Before and After</string>
     <string name="no_satellite">No satellite packs in the catalog yet.</string>
+    <string name="footprints_heading">Building Outlines</string>
+    <string name="no_footprints">No building outlines in the catalog yet.</string>
+    <string name="search_counties">Search counties</string>
     <string name="beacon_heading">Beacon Box Maps</string>
     <string name="download">Download</string>
     <!-- For a streaming source: what is added is a pointer, the tiles stream -->

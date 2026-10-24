@@ -450,7 +450,26 @@ Sentinel data.
 
 ---
 
-## 10. Finding what you already have
+## 10. Building Outlines
+
+Every building outline Microsoft has mapped in a county, about a million in
+a large one, packed for the **Damage Assessment** plugin to count from. Map
+Depot only carries them: they are not drawn on the map, and nothing appears
+when one is downloaded. Damage Assessment uses them to say how many
+buildings sit inside an area you draw, with or without signal.
+
+Counties are listed nearest the map first, with the number of buildings and
+the size. A large county comes in parts of about 260 MB; the row downloads
+all of them, and if the download is cancelled or fails part way nothing is
+kept. After a download Map Depot opens the file the way Damage Assessment
+will and checks the count, and says so if it does not read right. Tap a row
+to see where the county is.
+
+Building outlines: Microsoft Building Footprints, ODbL.
+
+---
+
+## 11. Finding what you already have
 
 Every page has a filter button, next to **Back**, that cycles **All** →
 **Installed** → **Available**. Set to **Installed**, the page becomes a list of
@@ -487,7 +506,7 @@ on at a time.
 
 ---
 
-## 11. Removing
+## 12. Removing
 
 **Remove** appears on anything installed, and says what removing actually frees
 before it does it.
@@ -509,7 +528,7 @@ deletes nothing. A pin is a shortcut, not a download.
 
 ---
 
-## 12. Where files go
+## 13. Where files go
 
 Map Depot writes into ATAK's own folders, so what it installs is
 indistinguishable from data put there by hand.
@@ -520,6 +539,8 @@ indistinguishable from data put there by hand.
 | Streaming base maps | `atak/imagery/`, as map source files |
 | Streaming overlays and disaster aerials | `atak/grg/`, as map source files, so ATAK lists them under Image Overlay |
 | Disaster aerials, offline copies | `atak/grg/`, as MBTiles, listed under Image Overlay too |
+| Satellite before, after and burn severity | `atak/grg/`, as MBTiles named `<event>-s2-pre-<date>`, `-post-`, `-dnbr-`, listed under Image Overlay |
+| Building outlines | `atak/tools/damageassessment/footprints/`, as GeoPackages; not on the map, read by Damage Assessment |
 | Offline public land vector tiles | `atak/imagery/`, as vector tile packages |
 | Forest Service map sheets | `atak/grg/`, as georeferenced PDFs |
 | Incident and drone maps (PDF) | `atak/grg/`, as georeferenced PDFs |
@@ -534,7 +555,7 @@ so no layer is left pointing at something that is gone.
 
 ---
 
-## 13. In the plugin
+## 14. In the plugin
 
 The same guide ships inside the plugin as a PDF, for when you are in the field
 without this page. In ATAK go to **Settings → Tool Preferences → Map Depot →
