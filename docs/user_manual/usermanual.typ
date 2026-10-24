@@ -886,8 +886,9 @@ the flooded ground.
 ][
   *Buoys* draws the buoys and coastal stations as diamonds: yellow when the
   reading is recent, red when the station has been silent for more than
-  eight hours. The *Buoys* page lists them nearest first, with filters that
-  say how many each will show: wind, seas, rough water, favorites.
+  eight hours. The *Buoys* page lists them nearest first. The button beside
+  the page name reads the filter in force and opens the others, each saying
+  how many it will show: wind, seas, rough water, favorites.
 ]
 ]
 
@@ -994,8 +995,9 @@ classes, lower 48 only.
   The station layer draws the weather stations around you with a barb for the
   wind and the readings beside it: wind, gusts and humidity. A station is
   colored by how close it is to the Red Flag criteria for its own fire weather
-  zone. The *Weather Stations* page lists them nearest first, with filters that say
-  how many each will show.
+  zone. The *Weather Stations* page lists them nearest first. The button beside
+  the page name reads the filter in force and opens the others, each saying how
+  many it will show.
 ]
 ]
 
