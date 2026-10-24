@@ -161,6 +161,7 @@ public final class GaugePage {
 
     private View tile(String label, boolean chosen, int color, final int value) {
         final Button b = chip(label, chosen, color);
+        StationPage.nameOverCount(b, label);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

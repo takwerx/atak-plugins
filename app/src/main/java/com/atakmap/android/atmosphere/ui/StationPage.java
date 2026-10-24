@@ -174,6 +174,25 @@ public final class StationPage {
         filterRow.addView(fav);
     }
 
+    /**
+     * A filter tile's words on two lines at 12sp, the name over its count, the way
+     * the page button reads: four tiles across a phone-width pane cut "Red Flag (12)"
+     * to "Red Flag (..." (operator, 2026-10-23: "can we have perhaps the text smaller
+     * but two rows"). A tile with no name before its count ("\u2605 (3)") stays on one
+     * line. Shared by the Stations, River Gauges and Buoys pages.
+     */
+    static void nameOverCount(Button b, String label) {
+        final int at = label.lastIndexOf(" (");
+        if (at > 1)
+            b.setText(label.substring(0, at) + "\n" + label.substring(at + 1));
+        b.setSingleLine(false);
+        b.setMaxLines(2);
+        b.setTextSize(12);
+        b.setLineSpacing(0f, 0.9f);
+        final float d = b.getResources().getDisplayMetrics().density;
+        b.setPadding(Math.round(4 * d), Math.round(2 * d), Math.round(4 * d), Math.round(2 * d));
+    }
+
     /** Paint one star, wherever it lives. */
     private void styleStar(TextView star, Raws.Station s) {
         final boolean on = layer != null && layer.isFavorite(s);
@@ -194,6 +213,7 @@ public final class StationPage {
 
     private View tile(String label, boolean chosen, final int color, final int value) {
         final Button b = chip(label, chosen, color);
+        nameOverCount(b, label);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
