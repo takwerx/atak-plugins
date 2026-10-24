@@ -602,6 +602,9 @@ covers before deciding to turn it on.
 #tak-slide[
 = Building Outlines
 
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("57.png", width: 92%)
+][
   Every building outline Microsoft has mapped in a county, about a million
   in a large one, packed for the *Damage Assessment* plugin to count from.
   Map Depot only carries them: they are not drawn on the map, and nothing
@@ -616,6 +619,7 @@ covers before deciding to turn it on.
   is.
 
   Building outlines: Microsoft Building Footprints, ODbL.
+]
 ]
 
 #tak-slide[

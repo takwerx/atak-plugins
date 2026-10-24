@@ -458,6 +458,8 @@ Depot only carries them: they are not drawn on the map, and nothing appears
 when one is downloaded. Damage Assessment uses them to say how many
 buildings sit inside an area you draw, with or without signal.
 
+![Building outlines by county](screenshots/57_building_outlines.png)
+
 Counties are listed nearest the map first, with the number of buildings and
 the size. A large county comes in parts of about 260 MB; the row downloads
 all of them, and if the download is cancelled or fails part way nothing is
