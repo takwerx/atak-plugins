@@ -2460,7 +2460,7 @@ public class MapDepot implements IPlugin {
      * screen the whole time, not only on one row.
      */
     private String satelliteStatus(String query, int hidden, int total) {
-        final String built = satelliteBuiltAt.length() >= 10
+        final String built = forestsSavedAt == 0 && satelliteBuiltAt.length() >= 10
                 ? " · catalog " + Depot.prettyDate(satelliteBuiltAt.substring(0, 10)) : "";
         if (allSatellite.isEmpty())
             return pluginContext.getString(R.string.no_satellite) + built;
@@ -2470,8 +2470,8 @@ public class MapDepot implements IPlugin {
                 held++;
         if (satIndex < 0)
             return allSatellite.size() + (allSatellite.size() == 1 ? " event" : " events")
-                    + " · Sentinel-2, 10 m: blocks, not houses · " + held + " of "
-                    + allSatPacks.size() + " packs on the phone" + built;
+                    + " · 10 m: blocks, not houses · " + held + " of "
+                    + allSatPacks.size() + " on the phone" + built;
         final Depot.SatEvent e = allSatellite.get(satIndex);
         if (shownPackages.isEmpty() && total > 0) {
             if (packageShown == Shown.INSTALLED)
@@ -2489,7 +2489,10 @@ public class MapDepot implements IPlugin {
      * on the map would otherwise read as broken, and what the list is cut to.
      */
     private String footprintsStatus(String query, int hidden, int total) {
-        final String built = footprintsBuiltAt.length() >= 10
+        // The status line holds three lines and the offline note takes the
+        // last; with no network that note carries the time, so the catalog
+        // date gives way (s10-dev-2, 2026-10-24: the note was cut off).
+        final String built = forestsSavedAt == 0 && footprintsBuiltAt.length() >= 10
                 ? " · catalog " + Depot.prettyDate(footprintsBuiltAt.substring(0, 10)) : "";
         if (allCounties.isEmpty())
             return pluginContext.getString(R.string.no_footprints) + built;
@@ -2504,7 +2507,7 @@ public class MapDepot implements IPlugin {
         for (Depot.County c : allCounties)
             if (installedPackages.contains(c.id()))
                 held++;
-        return "For Damage Assessment to count buildings, not drawn on the map · "
+        return "Not drawn; Damage Assessment counts from these · "
                 + held + " of " + total + (total == 1 ? " county" : " counties")
                 + " on the phone"
                 + (hidden > 0 ? " · nearest " + shownPackages.size() + " shown" : "")
