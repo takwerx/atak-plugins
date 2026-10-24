@@ -160,11 +160,11 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
                     .show();
             return;
         }
-        final String[] items = new String[runs.size()];
+        final CharSequence[] items = new CharSequence[runs.size()];
         for (int i = 0; i < items.length; i++) {
             final FirisModels.Run r = runs.get(i);
-            items[i] = r.shortName() + "  ·  run " + FirisModels.when(r.startMs)
-                    + (r.inputs.isEmpty() ? "" : "\n" + r.inputs);
+            items[i] = listItem(r.shortName(), "  ·  run " + FirisModels.when(r.startMs)
+                    + (r.inputs.isEmpty() ? "" : "\n" + r.inputs));
         }
         new AlertDialog.Builder(mapView.getContext())
                 .setTitle("FIRIS Model Runs")
@@ -203,9 +203,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
                 t.append("Fetched ").append(age).append("just now".equals(age) ? "." : " ago.");
         } else if (firis.problem != null)
             t.append("Could not fetch the runs: ").append(firis.problem).append(".");
-        if (on && t.length() > 0)
-            t.append(" Long press for the list.");
-        s.setText(t.toString());
+        s.setText(on && t.length() > 0 ? withHint(t.toString()) : t.toString());
         s.setVisibility(on && t.length() > 0 ? View.VISIBLE : View.GONE);
         final FirisModels.Run fr = on ? firis.focus() : null;
         buildSlider(R.id.firis_slider, fr == null ? null : firisSlide(fr));
@@ -481,14 +479,14 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
                     .show();
             return;
         }
-        final String[] items = new String[fs.size()];
+        final CharSequence[] items = new CharSequence[fs.size()];
         final double[] me = feed.ownPosition();
         for (int i = 0; i < items.length; i++) {
             final PyrecastForecasts.Forecast f = fs.get(i);
             final double[] c = f.center();
-            items[i] = f.name() + (me == null ? "" : "  ·  " + Units.rangeBearing(me, c[0], c[1]))
+            items[i] = listItem(f.name(), (me == null ? "" : "  ·  " + Units.rangeBearing(me, c[0], c[1]))
                     + "  ·  run " + PyrecastForecasts.when(f.runMs)
-                    + "\n" + acresText(f.acres(pyrecast.pct(), 24)) + " by 24 h, out to " + PyrecastForecasts.spanText(f.maxHours(pyrecast.pct()));
+                    + "\n" + acresText(f.acres(pyrecast.pct(), 24)) + " by 24 h, out to " + PyrecastForecasts.spanText(f.maxHours(pyrecast.pct())));
         }
         new AlertDialog.Builder(mapView.getContext())
                 .setTitle("PyreCast Forecasts")
@@ -531,9 +529,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             t.append("Could not fetch the forecasts: ").append(pyrecast.problem).append(".");
         if (on && n == 0 && !pyrecast.busy && pyrecast.problem == null && pyrecast.fetchedAt > 0)
             t.append(" No large fires are being forecast right now.");
-        if (on && t.length() > 0)
-            t.append(" Long press for the list.");
-        s.setText(t.toString());
+        s.setText(on && t.length() > 0 ? withHint(t.toString()) : t.toString());
         s.setVisibility(on && t.length() > 0 ? View.VISIBLE : View.GONE);
         header.findViewById(R.id.pyrecast_credit).setVisibility(on ? View.VISIBLE : View.GONE);
         final Button pb = header.findViewById(R.id.btn_pyrecast_pct);
@@ -610,6 +606,26 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
 
     private static String acresText(double ac) {
         return String.format(Locale.US, ac < 10 ? "%.1f" : "%,.0f", ac) + " acres";
+    }
+
+    private static final int CYAN = 0xFF00E5FF;
+
+    /** A list row with its name in cyan, so each row starts where the eye expects. */
+    private static CharSequence listItem(String name, String rest) {
+        final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(name);
+        b.setSpan(new android.text.style.ForegroundColorSpan(CYAN), 0, name.length(),
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return b.append(rest);
+    }
+
+    /** A status line with "Long press for the list." after it in cyan, the one hint that the list exists. */
+    private static CharSequence withHint(String status) {
+        final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(status).append(" ");
+        final int from = b.length();
+        b.append("Long press for the list.");
+        b.setSpan(new android.text.style.ForegroundColorSpan(CYAN), from, b.length(),
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return b;
     }
 
     /**
