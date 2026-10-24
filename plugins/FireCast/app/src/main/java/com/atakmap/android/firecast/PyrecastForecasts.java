@@ -68,7 +68,11 @@ public final class PyrecastForecasts {
     private static final int MAX_FIRES = 60;
     private static final long MAX_FILE = 24L << 20;
     private static final int MAX_DIM = 8192, MARGIN = 2;
-    public static final int[] PERCENTILES = { 10, 50, 90 };
+    /** PyreCast's "Predicted Fire Size" choices, in the order its own menu lists them. */
+    public static final int[] PERCENTILES = { 90, 70, 50, 30, 10 };
+    /** PyreCast's own words for what the choice is, from its map's help text. */
+    public static final String SIZE_HELP = "Each fire forecast is an ensemble of 1,000 separate simulations to account"
+            + " for uncertainty in model inputs. This leads to a range of predicted fire sizes.";
 
     /** The hours after the run the layer draws the likely edge at, and their colors, warm near the fire. */
     public static final int[] RING_HOURS = { 1, 3, 6, 12, 24, 48, 72, 168, 336 };
@@ -98,20 +102,29 @@ public final class PyrecastForecasts {
     public static final class Forecast {
         public final String slug, run;
         public final long runMs;
-        private final GeoTiffGrid[] grids;
+        private final java.util.Map<Integer, GeoTiffGrid> grids;
 
-        Forecast(String slug, String run, GeoTiffGrid[] grids) {
+        /** @param grids by percentile; the 50th is always there */
+        Forecast(String slug, String run, java.util.Map<Integer, GeoTiffGrid> grids) {
             this.slug = slug;
             this.run = run;
             this.runMs = utc(run);
             this.grids = grids;
         }
 
+        /** This device holds that Predicted Fire Size. */
+        public boolean has(int pct) {
+            return grids.containsKey(pct);
+        }
+
+        boolean complete() {
+            return grids.size() == PERCENTILES.length;
+        }
+
+        /** That percentile's raster, or the median's if this device has not fetched it yet. */
         GeoTiffGrid grid(int pct) {
-            for (int i = 0; i < PERCENTILES.length; i++)
-                if (PERCENTILES[i] == pct)
-                    return grids[i];
-            return grids[1];
+            final GeoTiffGrid g = grids.get(pct);
+            return g != null ? g : grids.get(50);
         }
 
         public String key() {
@@ -236,24 +249,29 @@ public final class PyrecastForecasts {
         return prefs.getBoolean("pyrecast.on", false);
     }
 
-    /** Which of PyreCast's runs is shown: 10, 50 or 90. */
+    /** Which Predicted Fire Size is shown: one of {@link #PERCENTILES}, the median unless picked. */
     public int pct() {
         final int p = prefs.getInt("pyrecast.pct", 50);
-        return p == 10 || p == 90 ? p : 50;
+        for (int q : PERCENTILES)
+            if (q == p)
+                return p;
+        return 50;
     }
 
-    /** "Middle", in the words the pane uses. */
+    /** PyreCast's word for the choice: "Median". */
     public static String pctName(int pct) {
-        return pct == 10 ? "Smaller end" : pct == 90 ? "Larger end" : "Middle";
+        switch (pct) {
+            case 90: return "Largest";
+            case 70: return "Larger";
+            case 30: return "Smaller";
+            case 10: return "Smallest";
+            default: return "Median";
+        }
     }
 
-    /** What a percentile is, for the operator: one whole run, ranked by where it ended. */
-    public static String pctText(int pct) {
-        if (pct == 10)
-            return "PyreCast's smaller run: nine in ten of its runs ended larger.";
-        if (pct == 90)
-            return "PyreCast's larger run: nine in ten of its runs ended smaller.";
-        return "PyreCast's middle run: half of its runs ended larger, half smaller.";
+    /** PyreCast's whole label: "Median (50th percentile)". */
+    public static String pctLabel(int pct) {
+        return pctName(pct) + " (" + pct + "th percentile)";
     }
 
     public void setPct(int pct) {
@@ -279,7 +297,7 @@ public final class PyrecastForecasts {
                     showLocked(on);
                     redrawAtLocked();
                 }
-                if (on && System.currentTimeMillis() - fetchedAt > (forecasts.isEmpty() ? 10 * 60_000L : EVERY_MS))
+                if (on && System.currentTimeMillis() - fetchedAt > (forecasts.isEmpty() || anyIncomplete() ? 10 * 60_000L : EVERY_MS))
                     fetch();
                 changed();
             }
@@ -314,11 +332,19 @@ public final class PyrecastForecasts {
             public void run() {
                 // An empty layer asks again sooner: one small page, and a fire that has
                 // just been picked up shows within ten minutes of being switched on.
-                final long every = forecasts.isEmpty() ? 10 * 60_000L : EVERY_MS;
+                final long every = forecasts.isEmpty() || anyIncomplete() ? 10 * 60_000L : EVERY_MS;
                 if (isOn() && System.currentTimeMillis() - fetchedAt > every - 60_000L)
                     fetch();
             }
         }, 5, 60, TimeUnit.SECONDS);
+    }
+
+    /** A forecast is missing a Predicted Fire Size: ask again sooner than every half hour. */
+    private boolean anyIncomplete() {
+        for (Forecast f : forecasts)
+            if (!f.complete())
+                return true;
+        return false;
     }
 
     public void stop() {
@@ -496,11 +522,20 @@ public final class PyrecastForecasts {
         return out;
     }
 
+    /** Every Predicted Fire Size is on this device. */
     private static boolean complete(File dir) {
         for (int p : PERCENTILES)
             if (!new File(dir, "toa" + p + ".tif").isFile())
                 return false;
         return true;
+    }
+
+    /**
+     * Enough to show: the median. A run saved before the 30th and 70th were fetched
+     * still comes back with no network; the missing sizes arrive with the next fetch.
+     */
+    private static boolean usable(File dir) {
+        return new File(dir, "toa50.tif").isFile();
     }
 
     /** The rasters land in a temporary directory, each read once to prove it, before the run appears. */
@@ -571,7 +606,7 @@ public final class PyrecastForecasts {
                 continue;
             final List<String> names = new ArrayList<>();
             for (File r : runs)
-                if (r.isDirectory() && RUN.matcher(r.getName()).matches() && complete(r))
+                if (r.isDirectory() && RUN.matcher(r.getName()).matches() && usable(r))
                     names.add(r.getName());
             if (names.isEmpty())
                 continue;
@@ -579,9 +614,12 @@ public final class PyrecastForecasts {
             final String run = names.get(names.size() - 1);
             final File dir = new File(fire, run);
             try {
-                final GeoTiffGrid[] grids = new GeoTiffGrid[PERCENTILES.length];
-                for (int i = 0; i < grids.length; i++)
-                    grids[i] = GeoTiffGrid.read(new File(dir, "toa" + PERCENTILES[i] + ".tif"), MAX_FILE, MAX_DIM, MARGIN);
+                final java.util.Map<Integer, GeoTiffGrid> grids = new java.util.HashMap<>();
+                for (int p : PERCENTILES) {
+                    final File f = new File(dir, "toa" + p + ".tif");
+                    if (f.isFile())
+                        grids.put(p, GeoTiffGrid.read(f, MAX_FILE, MAX_DIM, MARGIN));
+                }
                 out.add(new Forecast(fire.getName(), run, grids));
             } catch (Throwable t) {
                 Log.w(TAG, "PyreCast " + fire.getName() + " " + run + " will not read: " + t);

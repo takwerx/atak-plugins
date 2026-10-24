@@ -431,16 +431,16 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         pct.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final String[] items = new String[PyrecastForecasts.PERCENTILES.length];
+                final CharSequence[] items = new CharSequence[PyrecastForecasts.PERCENTILES.length];
                 int at = 0;
                 for (int i = 0; i < items.length; i++) {
                     final int p = PyrecastForecasts.PERCENTILES[i];
-                    items[i] = PyrecastForecasts.pctName(p) + "\n" + PyrecastForecasts.pctText(p);
+                    items[i] = listItem(PyrecastForecasts.pctName(p), " (" + p + "th percentile)");
                     if (p == pyrecast.pct())
                         at = i;
                 }
                 new AlertDialog.Builder(mapView.getContext())
-                        .setTitle("Which PyreCast run to show")
+                        .setTitle("Predicted Fire Size")
                         .setSingleChoiceItems(items, at, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface d, int which) {
@@ -533,7 +533,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         s.setVisibility(on && t.length() > 0 ? View.VISIBLE : View.GONE);
         header.findViewById(R.id.pyrecast_credit).setVisibility(on ? View.VISIBLE : View.GONE);
         final Button pb = header.findViewById(R.id.btn_pyrecast_pct);
-        pb.setText("Forecast run: " + PyrecastForecasts.pctName(pyrecast.pct()));
+        pb.setText("Predicted Fire Size: " + PyrecastForecasts.pctName(pyrecast.pct()));
         pb.setVisibility(on ? View.VISIBLE : View.GONE);
         final PyrecastForecasts.Forecast f = on ? pyrecast.focus() : null;
         buildSlider(R.id.pyrecast_slider, f == null ? null : pyrecastSlide(f));
@@ -589,7 +589,11 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
 
             @Override
             public String inputs() {
-                return PyrecastForecasts.pctText(pyrecast.pct()) + " Its edge is drawn on the map in white.";
+                final int p = pyrecast.pct();
+                if (!f.has(p))
+                    return "Predicted Fire Size: " + PyrecastForecasts.pctLabel(p)
+                            + " is not on this device yet. Showing the Median until the next fetch.";
+                return "Predicted Fire Size: " + PyrecastForecasts.pctLabel(p) + ". " + PyrecastForecasts.SIZE_HELP;
             }
         };
     }

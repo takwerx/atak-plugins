@@ -117,15 +117,15 @@
             android:textSize="12sp"
             android:text="Forecasts by PyreCast, used with permission. Tap for pyrecast.com" />
     </LinearLayout>
-    <!-- Which of PyreCast's runs is drawn: they are ranked by the area burned at the
-         end, so the middle one is shown unless an end is picked. -->
+    <!-- PyreCast's own "Predicted Fire Size" choice, in its words: one of five runs
+         ranked by the area burned at the end, the median unless another is picked. -->
     <Button
         android:id="@+id/btn_pyrecast_pct"
         style="@style/TakwerxButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:visibility="gone"
-        android:text="Forecast run: Middle" />
+        android:text="Predicted Fire Size: Median" />
     <LinearLayout
         android:id="@+id/pyrecast_slider"
         android:layout_width="match_parent"
