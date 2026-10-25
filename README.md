@@ -112,7 +112,17 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.19, for ATAK-CIV 5.6, 5.7 and 5.8: 0.18 (never released) with the manual's
+0.21, for ATAK-CIV 5.6, 5.7 and 5.8: Wind draws in 3D. Tilt the map and the
+streaks lie on the ground, over ridges and down into valleys, around the point
+the map looks at; the flat map is as it was. It carries 0.20, which was built
+but never released: Storm Reports and the Spot Weather Forecast page put their
+filters in one row above the list (the first button names where the list looks
+and opens the choices, Newest and Closest change with a tap, as does Storm
+Reports' 24, 48 or 72 h, and Spot's search sits behind a magnifier); Weather
+Stations, River Gauges and Buoys fold their filters into one button on the
+page's heading line, so the list starts higher; and Radar's Play keeps looping
+with the map locked on GPS.
+0.19 was 0.18 (never released) with the manual's
 pictures from its signed build, and Fire Danger waiting longer for a slow
 server. 0.17 and 0.18 were built but never released; their changes are
 here. New: Rain Gauges' county, RAWS and airport gauges and Rain
