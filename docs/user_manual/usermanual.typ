@@ -29,7 +29,7 @@ itself where ATAK expects to find it.
 #toolbox.side-by-side(columns: (4fr, 8fr))[
   #image("02.png", width: 78%)
 ][
-  Nine kinds of data, each on its own page:
+  Eight kinds of data, each on its own page:
 
   - *Elevation (DTED2)* -- terrain, by state or province. What viewsheds and
     elevation readouts need.
@@ -47,8 +47,6 @@ itself where ATAK expects to find it.
     georeferenced PDFs and KMZs.
   - *Disaster Aerials* -- the imagery flown after a hurricane, flood, fire
     or tornado by NOAA, the Civil Air Patrol and Maxar, one overlay per flight.
-  - *Building Outlines* -- every mapped building in a county, for Damage
-    Assessment to count from. Carried, not drawn.
 ]
 ]
 
@@ -569,29 +567,6 @@ covers before deciding to turn it on.
 ]
 
 #tak-slide[
-= Building Outlines
-
-#toolbox.side-by-side(columns: (5fr, 7fr))[
-  #image("57.png", width: 92%)
-][
-  Every building outline Microsoft has mapped in a county, about a million
-  in a large one, packed for the *Damage Assessment* plugin to count from.
-  Map Depot only carries them: they are not drawn on the map, and nothing
-  appears when one is downloaded. Damage Assessment uses them to say how
-  many buildings sit inside an area you draw, with or without signal.
-
-  Counties are listed nearest the map first, with the number of buildings
-  and the size. A large county comes in parts of about 260 MB; the row
-  downloads all of them, and a download cancelled or failed part way keeps
-  nothing. After a download Map Depot opens the file the way Damage
-  Assessment will and checks the count. Tap a row to see where the county
-  is.
-
-  Building outlines: Microsoft Building Footprints, ODbL.
-]
-]
-
-#tak-slide[
 = Finding what you have installed
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
@@ -646,8 +621,6 @@ indistinguishable from data put there by hand.
   - Streaming overlays and disaster aerials -- `atak/grg/`, as map source
     files, so ATAK lists them under Image Overlay; offline copies of
     flights as MBTiles in the same folder.
-  - Building outlines -- `atak/tools/damageassessment/footprints/`, as
-    GeoPackages, read by Damage Assessment and not drawn.
   - Offline public land vector tiles -- `atak/imagery/`, as vector tile packages.
   - Forest Service map sheets -- `atak/grg/`, as georeferenced PDFs.
   - Incident and drone maps -- `atak/grg/` for a PDF, `atak/overlays/` for a
