@@ -47,8 +47,6 @@ itself where ATAK expects to find it.
     georeferenced PDFs and KMZs.
   - *Disaster Aerials* -- the imagery flown after a hurricane, flood, fire
     or tornado by NOAA, the Civil Air Patrol and Maxar, one overlay per flight.
-  - *Satellite Before and After* -- Sentinel-2 true color before and after
-    an event and the burn severity between them, 10 m, built per event.
   - *Building Outlines* -- every mapped building in a county, for Damage
     Assessment to count from. Carried, not drawn.
 ]
@@ -571,35 +569,6 @@ covers before deciding to turn it on.
 ]
 
 #tak-slide[
-= Satellite Before and After
-
-#toolbox.side-by-side(columns: (5fr, 7fr))[
-  #image("55.png", width: 92%)
-][
-  Before any aircraft has flown a fire, the Sentinel-2 satellites have
-  passed over it: every five days, 10 m a pixel, free. Map Depot builds
-  three packs per event from the clearest pass before the event and the
-  clearest pass after it: *Before* and *After* in true color, and *Burn
-  Severity*, the change between the two cut into the standard USGS classes
-  (yellow low, orange moderate, red moderate-high, purple high). Unburned
-  ground is left clear; ground the satellite could not see in either scene
-  is grey, never clear, so a cloud does not read as unburned.
-
-  *10 m shows which blocks burned, not which houses.* The row and the
-  status line say so. Each row carries the scene date, the days before or
-  after the event, the cloud over the event and the pack size, a few MB.
-  *Download* puts it on the phone, where it draws over whatever map is
-  selected and comes back after a restart with no signal; *Hide* turns it
-  off. The server looks again every night and adds a clearer after-scene
-  beside the earlier one, dated.
-
-  The packs sit in grg under fixed names so Damage Assessment can read the
-  burn severity under building footprints. Contains modified Copernicus
-  Sentinel data.
-]
-]
-
-#tak-slide[
 = Building Outlines
 
 #toolbox.side-by-side(columns: (5fr, 7fr))[
@@ -677,7 +646,6 @@ indistinguishable from data put there by hand.
   - Streaming overlays and disaster aerials -- `atak/grg/`, as map source
     files, so ATAK lists them under Image Overlay; offline copies of
     flights as MBTiles in the same folder.
-  - Satellite before, after and burn severity -- `atak/grg/`, as MBTiles.
   - Building outlines -- `atak/tools/damageassessment/footprints/`, as
     GeoPackages, read by Damage Assessment and not drawn.
   - Offline public land vector tiles -- `atak/imagery/`, as vector tile packages.

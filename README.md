@@ -50,16 +50,6 @@ nothing has to be imported by hand afterwards:
     during a storm appear the next day and their offline copies the morning
     after. Outlines show where each flight on the phone is.
 
-  * Satellite before and after. Copernicus Sentinel-2 scenes (10 m, free
-    with attribution) per event: a true-color pack from the clearest pass
-    before the event, one from the clearest pass after it, and a burn
-    severity pack (dNBR, USGS classes) between them, all built on the depot
-    and downloaded whole into the grg folder, so they draw with no signal
-    and other plugins can read them. 10 m shows which blocks burned, not
-    which houses, and every row says so. Scene dates and cloud cover over
-    the event on the row; the post scene is re-picked nightly as the smoke
-    clears and a clearer one is added beside the earlier.
-
   * Building outlines. Microsoft Building Footprints (ODbL) as one
     GeoPackage per county, split into parts of about 260 MB for large
     counties, downloaded whole into tools/damageassessment/footprints for
@@ -106,11 +96,8 @@ _________________________________________________________________
 STATUS
 
 Version 1.14: Building Outlines, a new section carrying Microsoft
-Building Footprints per county for Damage Assessment. Satellite Before
-and After, a new section with Sentinel-2
-true-color before and after packs and a burn severity pack per event,
-downloaded whole into the grg folder. The pack names are fixed so Damage
-Assessment can read the burn severity under building footprints. Also:
+Building Footprints per county for Damage Assessment to count the
+buildings in an area, with or without signal. Also:
 the catalog reader accepted event ids and pack paths only up to 40
 characters, which silently dropped one Maxar event and fourteen Civil Air
 Patrol and Maxar offline copies from the Disaster Aerials list; the limit
