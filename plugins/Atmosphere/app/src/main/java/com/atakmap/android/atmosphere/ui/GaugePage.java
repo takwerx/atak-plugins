@@ -53,6 +53,7 @@ public final class GaugePage {
     private final Host host;
     private final View root;
     private final LinearLayout filterRow;
+    private final FilterFold fold;
     private final TextView status, heading;
     private final ListView list;
     private final View detail;
@@ -70,6 +71,7 @@ public final class GaugePage {
         this.host = host;
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.page_stations, null);
         filterRow = root.findViewById(R.id.stations_filter_row);
+        fold = new FilterFold(pluginContext, filterRow);
         status = root.findViewById(R.id.stations_page_status);
         list = root.findViewById(R.id.stations_list);
         list.setAdapter(adapter);
@@ -77,6 +79,11 @@ public final class GaugePage {
         detailBody = root.findViewById(R.id.stations_detail_body);
         heading = root.findViewById(R.id.stations_page_heading);
         heading.setText(R.string.gauges_page_heading);
+    }
+
+    /** The folded filter's button, for the heading's line beside the Map switch. */
+    public View filterHead() {
+        return fold.head;
     }
 
     public View view() {
@@ -161,10 +168,14 @@ public final class GaugePage {
 
     private View tile(String label, boolean chosen, int color, final int value) {
         final Button b = chip(label, chosen, color);
+        StationPage.nameOverCount(b, label);
+        if (chosen)
+            fold.label(label, color, value != GaugeOverlay.SHOW_ALL);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 filter = value;
+                fold.close();
                 refresh();
             }
         });
@@ -362,7 +373,7 @@ public final class GaugePage {
         detail.setVisibility(View.VISIBLE);
         list.setVisibility(View.GONE);
         headingLine().setVisibility(View.GONE);
-        filterRow.setVisibility(View.GONE);
+        fold.listShown(false);
         status.setVisibility(View.GONE);
     }
 
@@ -427,7 +438,7 @@ public final class GaugePage {
         detail.setVisibility(View.GONE);
         list.setVisibility(View.VISIBLE);
         headingLine().setVisibility(View.VISIBLE);
-        filterRow.setVisibility(View.VISIBLE);
+        fold.listShown(true);
         status.setVisibility(View.VISIBLE);
     }
 
