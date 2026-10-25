@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Map Depot",
-   plugin-version: "1.13",
+   plugin-version: "1.14",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -29,7 +29,7 @@ itself where ATAK expects to find it.
 #toolbox.side-by-side(columns: (4fr, 8fr))[
   #image("02.png", width: 78%)
 ][
-  Seven kinds of data, each on its own page:
+  Eight kinds of data, each on its own page:
 
   - *Elevation (DTED2)* -- terrain, by state or province. What viewsheds and
     elevation readouts need.
@@ -572,8 +572,8 @@ covers before deciding to turn it on.
 #toolbox.side-by-side(columns: (5fr, 7fr))[
   #image("11.png", width: 60%)
 ][
-  Every page has a filter button, next to *Back*, that cycles *All* →
-  *Installed* → *Available*. Set to *Installed*, the page becomes a list of
+  Every page has a filter button, next to *Back*, that cycles *All* --
+  *Installed* -- *Available*. Set to *Installed*, the page becomes a list of
   what is on this device.
 ]
 ]
@@ -616,14 +616,14 @@ indistinguishable from data put there by hand.
 
 #v(6pt)
 #toolbox.side-by-side(columns: (7fr, 5fr))[
-  - Elevation → `atak/DTED/`, one file per one-degree square.
-  - Streaming base maps → `atak/imagery/`, as map source files.
-  - Streaming overlays and disaster aerials → `atak/grg/`, as map source
+  - Elevation -- `atak/DTED/`, one file per one-degree square.
+  - Streaming base maps -- `atak/imagery/`, as map source files.
+  - Streaming overlays and disaster aerials -- `atak/grg/`, as map source
     files, so ATAK lists them under Image Overlay; offline copies of
     flights as MBTiles in the same folder.
-  - Offline public land vector tiles → `atak/imagery/`, as vector tile packages.
-  - Forest Service map sheets → `atak/grg/`, as georeferenced PDFs.
-  - Incident and drone maps → `atak/grg/` for a PDF, `atak/overlays/` for a
+  - Offline public land vector tiles -- `atak/imagery/`, as vector tile packages.
+  - Forest Service map sheets -- `atak/grg/`, as georeferenced PDFs.
+  - Incident and drone maps -- `atak/grg/` for a PDF, `atak/overlays/` for a
     KMZ.
 
   #v(6pt)

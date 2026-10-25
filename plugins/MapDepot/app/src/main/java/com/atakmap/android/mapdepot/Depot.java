@@ -911,8 +911,14 @@ public final class Depot {
 
     // ------------------------------------------------------------ storms
 
-    /** An event slug on storms.ngs.noaa.gov, which becomes a depot path. */
-    private static final Pattern EVENT_ID = Pattern.compile("[a-z0-9_]{1,40}");
+    /**
+     * An event slug on storms.ngs.noaa.gov, or one the Maxar and CAP ingests
+     * make, which becomes a depot path. 64, not 40: 1.13 refused
+     * {@code maxar_spokane_washington_wildfire_aug_2026} (42) and fourteen
+     * CAP and Maxar offline copies whose pack path ran past 40, so phones
+     * never saw them (measured on dev 5.8, 2026-10-23).
+     */
+    private static final Pattern EVENT_ID = Pattern.compile("[a-z0-9_]{1,64}");
 
     /**
      * NOAA's tile set name, {@code 20250823b-rgb}; a CAP job, {@code cap-katy-tx-1};
@@ -923,7 +929,7 @@ public final class Depot {
 
     /** The depot path of a generated XML, and nothing else. */
     private static final Pattern STORM_FILE =
-            Pattern.compile("storms/v1/[a-z0-9_]{1,40}/[a-z0-9-]{1,40}\\.(xml|mbtiles)");
+            Pattern.compile("storms/v1/[a-z0-9_]{1,64}/[a-z0-9-]{1,72}\\.(xml|mbtiles)");
 
     private static final Pattern ISO_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
 
