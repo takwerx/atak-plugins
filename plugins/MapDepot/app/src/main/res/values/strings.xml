@@ -56,8 +56,6 @@
     <string name="all_events">All Events</string>
     <string name="search_flights">Search</string>
     <string name="no_storms">No disaster aerials in the catalog yet.</string>
-    <string name="satellite_heading">Satellite Before and After</string>
-    <string name="no_satellite">No satellite packs in the catalog yet.</string>
     <string name="footprints_heading">Building Outlines</string>
     <string name="no_footprints">No building outlines in the catalog yet.</string>
     <string name="search_counties">Search counties</string>
