@@ -238,10 +238,8 @@ public final class PackageInstaller {
                 // the depot rebuilds copies and a size that no longer matched
                 // turned a 349 MB file on the phone back into "Download"
                 // (2026-10-11). The digest is checked at download, not here.
-                // A building-outline file is the same: the depot rebuilds a
-                // county under the same release name.
                 if (len != null && (pkg.bytes() <= 0 || len == pkg.bytes()
-                        || pkg instanceof Depot.Pack || pkg instanceof Depot.CountyFile)) {
+                        || pkg instanceof Depot.Pack)) {
                     out.add(pkg.id());
                     break;
                 }
@@ -274,7 +272,7 @@ public final class PackageInstaller {
                 continue;
             }
             if (f.isFile() && (pkg.bytes() <= 0 || f.length() == pkg.bytes()
-                    || pkg instanceof Depot.Pack || pkg instanceof Depot.CountyFile))
+                    || pkg instanceof Depot.Pack))
                 return f;
         }
         return null;
@@ -1149,11 +1147,6 @@ public final class PackageInstaller {
         return "application/octet-stream";
     }
 
-    /** Data another plugin reads from {@code tools/}; ATAK never hears of it. */
-    static boolean isPrivate(Depot.Package pkg) {
-        return pkg.destination().startsWith("tools/");
-    }
-
     private static boolean retire(Depot.Package pkg, File f) {
         if ("grg".equals(pkg.destination())
                 || "overlays".equals(pkg.destination()))
@@ -1164,7 +1157,7 @@ public final class PackageInstaller {
         // the file is gone. An overlay was handed to the import pipeline, and
         // handing that pipeline a file that no longer exists only logs "No file
         // to import" -- so it is asked to unload, not to import.
-        if (gone && "imagery".equals(pkg.destination()) && !isPrivate(pkg))
+        if (gone && "imagery".equals(pkg.destination()))
             announce(pkg, new File(dirFor(pkg), pkg.fileName()));
         return gone;
     }
@@ -1186,11 +1179,6 @@ public final class PackageInstaller {
         // Imagery is found by the scanner. A GRG is not, and neither is an
         // overlay -- both need the import pipeline to be registered live.
         final String where = pkg.destination();
-        // A pack under tools/ is another plugin's data, not a map: ATAK is
-        // told nothing, or it would try to draw three million building
-        // footprints as a layer.
-        if (isPrivate(pkg))
-            return;
         if (!"grg".equals(where) && !"overlays".equals(where)) {
             BaseMapInstaller.requestLayerScan(dest);
             return;

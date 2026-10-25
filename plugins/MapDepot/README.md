@@ -50,12 +50,6 @@ nothing has to be imported by hand afterwards:
     during a storm appear the next day and their offline copies the morning
     after. Outlines show where each flight on the phone is.
 
-  * Building outlines. Microsoft Building Footprints (ODbL) as one
-    GeoPackage per county, split into parts of about 260 MB for large
-    counties, downloaded whole into tools/damageassessment/footprints for
-    the Damage Assessment plugin to count buildings from, with or without
-    signal. Map Depot carries them and never draws them on the map.
-
   * Offline public land vector tiles. US Forest Service vector basemap packages, one per
     national forest or grassland, fetched directly from ArcGIS Online.
 
@@ -95,13 +89,12 @@ fires.
 _________________________________________________________________
 STATUS
 
-Version 1.14: Building Outlines, a new section carrying Microsoft
-Building Footprints per county for Damage Assessment to count the
-buildings in an area, with or without signal. Also:
-the catalog reader accepted event ids and pack paths only up to 40
-characters, which silently dropped one Maxar event and fourteen Civil Air
-Patrol and Maxar offline copies from the Disaster Aerials list; the limit
-is 64 now and they are listed.
+Version 1.14: the catalog reader accepted event ids and pack paths only up
+to 40 characters, which silently dropped one Maxar event and fourteen Civil
+Air Patrol and Maxar offline copies from the Disaster Aerials list; the
+limit is 64 now and they are listed. The landing page picture in the guide
+and manual shows every section, and the manual prints no question marks
+where it had arrows.
 
 Version 1.13: pictures from the signed build in the guide and manual
 (outlines, a flight with the roads overlay on top, the sectioned overlay
