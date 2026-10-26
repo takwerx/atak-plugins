@@ -792,6 +792,10 @@ public class ZoneLayer {
         final boolean normalize = statusField != null && !isPoint;
         final Set<String> dates = info.dateFields;
         final String setName = source.layers.get(0) == lay ? info.name : source.layers.get(0).publisher;
+        // A static map is pre-drawn pieces that share a letter: Hillsborough's 834
+        // polygons are five zones, North Carolina's 66 are 21 counties' A to E. Keyed by
+        // name, all but the first of each letter were dropped; every piece is its own zone.
+        final boolean everyPiece = "static".equals(source.kind);
 
         Esri.query(lay.url, lay.layer, lay.where, Math.min(1000, info.maxRecordCount),
                 source.maxFeatures, lay.simplify, new Esri.FeatureSink() {
@@ -801,6 +805,7 @@ public class ZoneLayer {
                         final String name = Esri.firstNonEmpty(str(props, nameField), str(props, displayField), cls, info.name);
                         final String statusText = Esri.firstNonEmpty(str(props, statusField), cls);
                         final String zoneKey = isPoint ? lay.publisher + ":" + name + ":" + g.getEnvelope().minX + "," + g.getEnvelope().minY
+                                : everyPiece ? shortLabel(name) + "#" + seen[0]
                                 : shortLabel(name);
                         Pending existing = byKey.get(zoneKey);
                         if (existing == null && !authority && !isPoint && !isLine)
@@ -846,7 +851,13 @@ public class ZoneLayer {
                             at = labelPoint(g);
                             if (at != null) {
                                 final GeometryCollection gc = new GeometryCollection(2);
-                                gc.addGeometry(g);
+                                // A multipart zone's parts go in flat, beside the label point.
+                                if (g instanceof GeometryCollection) {
+                                    for (Geometry part : ((GeometryCollection) g).getGeometries())
+                                        gc.addGeometry(part);
+                                } else {
+                                    gc.addGeometry(g);
+                                }
                                 gc.addGeometry(at);
                                 geometry = gc;
                                 style = Styles.withNameLabel(style);
