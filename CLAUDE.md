@@ -127,6 +127,19 @@ people offered work on takwerx/comms in September 2026 and neither could open a
 pull request, and the same question sat unanswered on takwerx/map-depot for a
 week.
 
+**Every plugin carries its issue forms and SECURITY.md.** `.github/ISSUE_TEMPLATE/`
+(`bug.yml`, `feature.yml`, `config.yml`) and `SECURITY.md`, so a bug report
+arrives with the plugin version, ATAK version and device already in it instead
+of after a round trip, and a vulnerability goes to the repo's private reporting
+rather than a public issue. The text lives once in
+`scripts/templates/community-health/`; `scripts/add-community-health.sh
+<Plugin>|--all [--force]` writes it, filling in the display name and public
+repo name from the README (title line and the `All releases:` link), and
+`new-plugin.sh` runs it. Change the template, re-run with `--force`, and
+publish each plugin with `/ship <Plugin> docs`. No email address goes in these
+files: publish-scrub blocks them, and SECURITY.md points at GitHub's private
+reporting instead.
+
 The exception matters and is not boilerplate. A plugin's classes load into
 ATAK's process and call its API directly, so the AGPL needs an additional
 permission under §7 for the TAK Software; and `new-plugin.sh` copies the SDK's

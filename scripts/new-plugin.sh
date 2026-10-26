@@ -247,6 +247,13 @@ sed -i '' "1s/.*/$DISPLAY/" "$DEST/README.md"
 echo "==> writing LICENSE, LICENSE-EXCEPTION, CONTRIBUTING and CLA (AGPL-3.0-or-later)"
 "$REPO_ROOT/scripts/add-license.sh" "$NAME"
 
+# The public repo's bug form, feature form and SECURITY.md. The form text needs
+# the plugin's public repo name, which the README only has once its download
+# block is written, so a new plugin may have to run this again later.
+echo "==> writing issue forms and SECURITY.md"
+"$REPO_ROOT/scripts/add-community-health.sh" "$NAME" \
+  || echo "    (run scripts/add-community-health.sh $NAME once the README names the public repo)"
+
 echo
 echo "created plugins/$NAME"
 echo "  entry class: com.atakmap.android.$PKG.plugin.$CLASS"
