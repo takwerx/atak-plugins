@@ -43,7 +43,8 @@ Capabilities:
     and what is not shown (outside the radius, hidden by the zoom threshold).
 
 Coverage grows the way Cam Depot's did: built and tested in California, with
-Oregon, British Columbia and two Florida counties from public data. If your
+Oregon, British Columbia, two Florida counties and North Carolina's coastal
+counties from public data. If your
 state or county publishes evacuation zones and they are not here, point us at
 the data through the issue tracker below and they go into the catalog without
 a plugin release.
