@@ -1,12 +1,12 @@
 # Evac Zone for ATAK — User Guide
 
-**Version 0.5 · takwerx**
+**Version 0.6 · takwerx**
 
-**Download Evac Zone 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Evac Zone 0.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/evac-zone/releases/download/v0.5/ATAK-Plugin-EvacZone-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/evac-zone/releases/download/v0.5/ATAK-Plugin-EvacZone-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/evac-zone/releases/download/v0.5/ATAK-Plugin-EvacZone-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/evac-zone/releases/download/v0.6/ATAK-Plugin-EvacZone-0.6--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/evac-zone/releases/download/v0.6/ATAK-Plugin-EvacZone-0.6--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/evac-zone/releases/download/v0.6/ATAK-Plugin-EvacZone-0.6--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/evac-zone/releases
 
@@ -24,8 +24,9 @@ go to it.
   fetched it keeps drawing without a connection and tells you how old it is.
 - Nothing is sent from your phone: no location, no callsign.
 - Built and tested in California. Other states are there where public data
-  was found: Oregon, British Columbia, and hurricane zones for two Florida
-  counties (lettered A to E, no live status; the county calls zones by letter).
+  was found: Oregon, British Columbia, hurricane zones for two Florida
+  counties, and North Carolina's coastal zones for 21 counties (lettered A to
+  E, no live status; the county calls zones by letter).
   If your state publishes evacuation zones and they are not here, point us at
   the data: https://github.com/takwerx/evac-zone/issues
 

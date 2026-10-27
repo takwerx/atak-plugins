@@ -1,10 +1,10 @@
 ATAK Plugin — Evac Zone
 
-**Download Evac Zone 0.5** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Evac Zone 0.6** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/evac-zone/releases/download/v0.5/ATAK-Plugin-EvacZone-0.5--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/evac-zone/releases/download/v0.5/ATAK-Plugin-EvacZone-0.5--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/evac-zone/releases/download/v0.5/ATAK-Plugin-EvacZone-0.5--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/evac-zone/releases/download/v0.6/ATAK-Plugin-EvacZone-0.6--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/evac-zone/releases/download/v0.6/ATAK-Plugin-EvacZone-0.6--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/evac-zone/releases/download/v0.6/ATAK-Plugin-EvacZone-0.6--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/evac-zone/releases
 
@@ -43,7 +43,8 @@ Capabilities:
     and what is not shown (outside the radius, hidden by the zoom threshold).
 
 Coverage grows the way Cam Depot's did: built and tested in California, with
-Oregon, British Columbia and two Florida counties from public data. If your
+Oregon, British Columbia, two Florida counties and North Carolina's coastal
+counties from public data. If your
 state or county publishes evacuation zones and they are not here, point us at
 the data through the issue tracker below and they go into the catalog without
 a plugin release.
@@ -53,6 +54,12 @@ A step-by-step user guide lives at docs/USER_GUIDE.md in the repository
 
 _________________________________________________________________
 STATUS
+
+Version 0.6: North Carolina's coastal evacuation zones (21 counties, zones A to E),
+and a drawing fix: zones made of several separate parts now draw every part, and
+static maps keep every piece of a zone letter (Hillsborough County, Florida draws
+all 834 of its zones instead of 5). Tapping a zone on the map opens its details in
+the pane, with no radial menu in between.
 
 Version 0.5: one versionCode per APK. The same plugin as 0.4, rebuilt so that
 each ATAK target's APK carries its own versionCode, the plugin version and the

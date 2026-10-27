@@ -905,9 +905,14 @@ public class EvacZone implements IPlugin {
         // state's feed that is still on is not this state's news.
         final Map<String, Integer> totals = new LinkedHashMap<>();
         final Map<String, Integer> colors = new LinkedHashMap<>();
+        // Counts only where the status moves. Static maps (hurricane zones) say what each
+        // color is and nothing more: how many zones carry a letter tells a crew nothing.
+        boolean anyLive = false;
         for (ZoneLayer l : manager.snapshot()) {
             if (!l.isVisible() || (state != null && !l.source.st.equalsIgnoreCase(state)))
                 continue;
+            if ("live".equals(l.source.kind))
+                anyLive = true;
             // What is on the map, after the county and radius filters: the legend and
             // the map agree by construction.
             for (ZoneLayer.ZoneInfo z : l.zones) {
@@ -923,7 +928,7 @@ public class EvacZone implements IPlugin {
         // catalog's date are not the operator's concern; the only other line is one
         // that tells them why the map is empty and what to do about it.
         updateStatusLine();
-        legend.setText(legendText(totals, colors));
+        legend.setText(legendText(totals, colors, anyLive));
 
         final List<Catalog.Source> srcs = state == null ? new ArrayList<Catalog.Source>() : c.forState(state);
 
@@ -988,7 +993,8 @@ public class EvacZone implements IPlugin {
      * "Order 37 · Warning 48 · Advisory 16", each label in its own color, in order of
      * severity: an Order is the first word whichever count arrived first.
      */
-    private static CharSequence legendText(Map<String, Integer> totals, Map<String, Integer> colors) {
+    private static CharSequence legendText(Map<String, Integer> totals, Map<String, Integer> colors,
+            boolean counts) {
         final List<Map.Entry<String, Integer>> entries = new ArrayList<>(totals.entrySet());
         final List<String> arrival = new ArrayList<>(totals.keySet());
         Collections.sort(entries, new java.util.Comparator<Map.Entry<String, Integer>>() {
@@ -1003,10 +1009,15 @@ public class EvacZone implements IPlugin {
         });
         final SpannableStringBuilder out = new SpannableStringBuilder();
         for (Map.Entry<String, Integer> e : entries) {
+            // A key with no counts has nothing to say about a zone the source never classed.
+            if (!counts && "(no status)".equals(e.getKey()))
+                continue;
             if (out.length() > 0)
                 out.append("  ·  ");
             final int start = out.length();
-            out.append(e.getKey()).append(' ').append(String.valueOf(e.getValue()));
+            out.append(e.getKey());
+            if (counts)
+                out.append(' ').append(String.valueOf(e.getValue()));
             final Integer col = colors.get(e.getKey());
             if (col != null)
                 out.setSpan(new ForegroundColorSpan(col), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
