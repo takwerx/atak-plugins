@@ -39,6 +39,7 @@ public class EsriRenderer {
         String value;              // uniqueValue match (fields joined by delimiter)
         double min = Double.NaN, max = Double.NaN; // classBreaks
         Style style;
+        int color;                 // the symbol's fill color, opaque; 0 when it has none
     }
 
     private final String type;
@@ -79,6 +80,7 @@ public class EsriRenderer {
                     rule.value = u.optString("value", "");
                     rule.label = u.optString("label", rule.value);
                     rule.style = symbol(u.optJSONObject("symbol"), rule.value);
+                    rule.color = opaque(u.optJSONObject("symbol"));
                     rules.add(rule);
                 }
                 defaultStyle = symbol(r.optJSONObject("defaultSymbol"), "default");
@@ -116,6 +118,64 @@ public class EsriRenderer {
         if (rule != null && rule.style != null)
             return rule.style;
         return defaultStyle != null ? defaultStyle : fallback;
+    }
+
+    /**
+     * The usual hurricane-zone colors, A red to E blue, for a static map whose service
+     * draws every zone one flat color (Lee County does). Hillsborough's own service uses
+     * these, so a letter reads the same across Florida.
+     */
+    private static final int[][] LETTER_RGB = {
+            { 230, 0, 0 }, { 255, 170, 0 }, { 255, 255, 0 }, { 56, 168, 0 }, { 0, 112, 255 } };
+
+    /** True when the service colors every feature alike: no unique values, no class breaks. */
+    public boolean isFlat() {
+        return !"uniqueValue".equals(type) && !"classBreaks".equals(type);
+    }
+
+    /** The opaque color for zone letter A to E, or 0. */
+    public static int letterColor(String letter) {
+        if (letter == null || letter.length() != 1)
+            return 0;
+        final int i = letter.charAt(0) - 'A';
+        if (i < 0 || i >= LETTER_RGB.length)
+            return 0;
+        return 0xFF000000 | (LETTER_RGB[i][0] << 16) | (LETTER_RGB[i][1] << 8) | LETTER_RGB[i][2];
+    }
+
+    /** A zone fill in {@link #letterColor}, same outline and opacity as a service's own fill. */
+    public Style letterStyle(String letter) {
+        final int c = letterColor(letter);
+        if (c == 0)
+            return null;
+        try {
+            final JSONObject s = new JSONObject();
+            s.put("type", "esriSFS");
+            s.put("style", "esriSFSSolid");
+            s.put("color", new JSONArray(new int[] { (c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, 255 }));
+            final JSONObject o = new JSONObject();
+            o.put("type", "esriSLS");
+            o.put("style", "esriSLSSolid");
+            o.put("color", new JSONArray(new int[] { 110, 110, 110, 255 }));
+            o.put("width", 0.75);
+            s.put("outline", o);
+            return symbol(s, "letter_" + letter);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** The fill color of a symbol, opaque, or 0 when it has none. */
+    private static int opaque(JSONObject symbol) {
+        if (symbol == null || !"esriSFS".equals(symbol.optString("type")) || "esriSFSNull".equals(symbol.optString("style")))
+            return 0;
+        return argb(symbol.optJSONArray("color"), 0) | 0xFF000000;
+    }
+
+    /** The legend color of a feature: its class's fill, or 0 for plain text. */
+    public int colorFor(JSONObject attrs) {
+        final Rule rule = match(attrs);
+        return rule == null ? 0 : rule.color;
     }
 
     private Rule match(JSONObject attrs) {

@@ -841,6 +841,18 @@ public class ZoneLayer {
                         } else {
                             style = renderer.styleFor(props);
                             key = statusText == null ? "(no status)" : statusText;
+                            if (!isLine && !isPoint)
+                                color = renderer.colorFor(props);
+                            // A static map the service draws one flat color (Lee County): the
+                            // letters are the only classes there are, so color by letter.
+                            if (everyPiece && !isLine && !isPoint && renderer.isFlat()) {
+                                final String letter = shortLabel(name);
+                                final Style byLetter = renderer.letterStyle(letter);
+                                if (byLetter != null) {
+                                    style = byLetter;
+                                    color = EsriRenderer.letterColor(letter);
+                                }
+                            }
                         }
                         Geometry geometry = g;
                         String featureName = name;
@@ -862,6 +874,18 @@ public class ZoneLayer {
                                 geometry = gc;
                                 style = Styles.withNameLabel(style);
                                 featureName = shortLabel(name);
+                                // A static map whose rows name their county reads "A-Tyrrell"; a bare
+                                // letter repeated down a coast does not say whose zone it is.
+                                if (everyPiece) {
+                                    // The row's own county, else the county the whole map is for
+                                    // (Hillsborough and Lee publish one county each).
+                                    String cty = countyField != null && !props.isNull(countyField)
+                                            ? props.optString(countyField, "") : "";
+                                    if (cty.isEmpty() && lay.county != null)
+                                        cty = lay.county;
+                                    if (!cty.isEmpty())
+                                        featureName += "-" + cty;
+                                }
                             } else {
                                 style = Styles.silentLabel(style);
                             }
