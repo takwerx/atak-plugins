@@ -58,7 +58,8 @@ STATUS
 Version 0.6: North Carolina's coastal evacuation zones (21 counties, zones A to E),
 and a drawing fix: zones made of several separate parts now draw every part, and
 static maps keep every piece of a zone letter (Hillsborough County, Florida draws
-all 834 of its zones instead of 5).
+all 834 of its zones instead of 5). Tapping a zone on the map opens its details in
+the pane, with no radial menu in between.
 
 Version 0.5: one versionCode per APK. The same plugin as 0.4, rebuilt so that
 each ATAK target's APK carries its own versionCode, the plugin version and the
