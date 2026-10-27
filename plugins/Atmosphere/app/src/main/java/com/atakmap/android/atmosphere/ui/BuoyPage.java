@@ -67,7 +67,8 @@ public final class BuoyPage {
     private final MapView mapView;
     private final Host host;
     private final View root;
-    private final LinearLayout filterRow, scopeRow;
+    private final LinearLayout filterRow;
+    private final FilterFold fold;
     private final TextView status, heading;
     private final ListView list;
     private final View detail;
@@ -85,7 +86,7 @@ public final class BuoyPage {
         this.host = host;
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.page_stations, null);
         filterRow = root.findViewById(R.id.stations_filter_row);
-        scopeRow = root.findViewById(R.id.stations_scope_row);
+        fold = new FilterFold(pluginContext, filterRow);
         status = root.findViewById(R.id.stations_page_status);
         list = root.findViewById(R.id.stations_list);
         list.setAdapter(adapter);
@@ -93,6 +94,11 @@ public final class BuoyPage {
         detailBody = root.findViewById(R.id.stations_detail_body);
         heading = root.findViewById(R.id.stations_page_heading);
         heading.setText(R.string.buoys_page_heading);
+    }
+
+    /** The folded filter's button, for the heading's line beside the Map switch. */
+    public View filterHead() {
+        return fold.head;
     }
 
     public View view() {
@@ -132,7 +138,6 @@ public final class BuoyPage {
             });
         shown = keep;
         buildFilterRow(all.size(), wind, waves, rough, starred);
-        buildScopeRow();
         status.setText(summary(all.size(), from));
         adapter.notifyDataSetChanged();
         if (showing != null)
@@ -143,12 +148,16 @@ public final class BuoyPage {
         if (layer == null || !layer.isOn())
             return "Turn the buoys layer on to see them here.";
         if (from == null)
-            return layer.isFromMe() ? "No position yet — switch to the map center."
-                    : "The map has no center yet.";
+            return layer.originSource().self()
+                    ? "No position yet \u2014 pick Map center at the top."
+                    : "No point to measure from yet \u2014 pick one at the top.";
         if (total == 0)
             return "No buoys within " + layer.miles() + " mi.";
+        final String hint = com.atakmap.android.atmosphere.compat.ScaleBar.zoomInHint(
+                com.atakmap.android.maps.MapView.getMapView(), layer.gate());
         return shown.size() + " of " + total + " buoys, nearest first, within "
-                + layer.miles() + " mi of " + (layer.isFromMe() ? "you" : "the map");
+                + layer.miles() + " mi of " + layer.originSource().words()
+                + (hint.isEmpty() ? "" : "\n" + hint);
     }
 
     private void buildFilterRow(int total, int wind, int waves, int rough, int starred) {
@@ -159,6 +168,7 @@ public final class BuoyPage {
         filterRow.setOrientation(LinearLayout.VERTICAL);
         final LinearLayout reports = new LinearLayout(pluginContext);
         reports.setOrientation(LinearLayout.HORIZONTAL);
+        reports.setBaselineAligned(false); // two-line tiles beside one-line ones
         reports.addView(tile("All (" + total + ")", filter == BuoyOverlay.SHOW_ALL, 0,
                 BuoyOverlay.SHOW_ALL));
         reports.addView(tile("Wind (" + wind + ")", filter == BuoyOverlay.SHOW_WIND,
@@ -167,6 +177,7 @@ public final class BuoyPage {
                 0, BuoyOverlay.SHOW_WAVES));
         final LinearLayout means = new LinearLayout(pluginContext);
         means.setOrientation(LinearLayout.HORIZONTAL);
+        means.setBaselineAligned(false); // two-line tiles beside one-line ones
         // Small craft criteria or worse by the buoy's own reading, the station list's
         // "Red Flag (n)" for the water (operator, 2026-09-26).
         means.addView(tile("Rough (" + rough + ")", filter == BuoyOverlay.SHOW_ROUGH,
@@ -180,13 +191,6 @@ public final class BuoyPage {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         under.topMargin = dp(4);
         filterRow.addView(means, under);
-    }
-
-    private void buildScopeRow() {
-        scopeRow.removeAllViews();
-        final boolean me = layer.isFromMe();
-        scopeRow.addView(scopeTile(pluginContext.getString(R.string.stations_from_me), me, true));
-        scopeRow.addView(scopeTile(pluginContext.getString(R.string.stations_from_map), !me, false));
     }
 
     private void styleStar(TextView star, Ndbc.Buoy g) {
@@ -204,23 +208,14 @@ public final class BuoyPage {
 
     private View tile(String label, boolean chosen, int color, final int value) {
         final Button b = chip(label, chosen, color);
+        StationPage.nameOverCount(b, label);
+        if (chosen)
+            fold.label(label, color, value != BuoyOverlay.SHOW_ALL);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 filter = value;
-                refresh();
-            }
-        });
-        return b;
-    }
-
-    private View scopeTile(String label, boolean chosen, final boolean fromMe) {
-        final Button b = chip(label, chosen, 0);
-        b.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (layer != null)
-                    layer.setFromMe(fromMe);
+                fold.close();
                 refresh();
             }
         });
@@ -400,9 +395,8 @@ public final class BuoyPage {
 
         detail.setVisibility(View.VISIBLE);
         list.setVisibility(View.GONE);
-        heading.setVisibility(View.GONE);
-        filterRow.setVisibility(View.GONE);
-        scopeRow.setVisibility(View.GONE);
+        headingLine().setVisibility(View.GONE);
+        fold.listShown(false);
         status.setVisibility(View.GONE);
     }
 
@@ -731,9 +725,8 @@ public final class BuoyPage {
         showing = null;
         detail.setVisibility(View.GONE);
         list.setVisibility(View.VISIBLE);
-        heading.setVisibility(View.VISIBLE);
-        filterRow.setVisibility(View.VISIBLE);
-        scopeRow.setVisibility(View.VISIBLE);
+        headingLine().setVisibility(View.VISIBLE);
+        fold.listShown(true);
         status.setVisibility(View.VISIBLE);
     }
 
@@ -782,5 +775,16 @@ public final class BuoyPage {
         } catch (RuntimeException e) {
             // A pan that will not happen is not worth a crash.
         }
+    }
+
+    /**
+     * The heading, or the line the pane put it on beside the page's map switch: a
+     * record hides them together, rather than leaving the switch alone on a row.
+     */
+    private View headingLine() {
+        final android.view.ViewParent p = heading.getParent();
+        return p instanceof LinearLayout
+                && ((LinearLayout) p).getOrientation() == LinearLayout.HORIZONTAL
+                ? (View) p : heading;
     }
 }

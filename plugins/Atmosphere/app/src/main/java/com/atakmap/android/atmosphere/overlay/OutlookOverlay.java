@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -104,6 +105,8 @@ public abstract class OutlookOverlay {
     /** Told on main whenever what is drawn changed: a fetch landed, a filter moved, the layer went off. */
     private Runnable dataListener;
     private boolean started, on, inFlight;
+    /** The answers are in and the map is being drawn from them. */
+    private volatile boolean drawing;
     private long lastPoll;
     private int generation;
     private List<Area> areas = new ArrayList<>();
@@ -202,7 +205,45 @@ public abstract class OutlookOverlay {
                 lc == null
                         ? AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title)
                         : AtmosphereFeatures.area(strokeColor(a), WEIGHT, fill, a.title,
-                                lc[0], lc[1], labelMaxResolution()), s);
+                                lc[0], lc[1], labelMaxResolution(a)), s);
+    }
+
+    /**
+     * What is drawn for the areas as a group, after each has been drawn: labels that
+     * stand for several areas when zoomed out, say. Nothing by default. Worker thread.
+     */
+    protected List<AtmosphereFeatures.Drawn> drawnTogether(List<Area> areas, List<Geometry> shapes) {
+        return Collections.emptyList();
+    }
+
+    /** Shows only the sets this filter names; see {@link AtmosphereFeatures#setSetFilter}. */
+    protected final void setSetFilter(AtmosphereFeatures.SetFilter filter) {
+        features.setSetFilter(filter);
+    }
+
+    /** Applies the filter again to what is drawn, off the main thread. */
+    protected final void applySetFilter() {
+        try {
+            worker.execute(new Runnable() {
+                @Override
+                public void run() {
+                    features.applySetFilter();
+                }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException stopped) {
+            // Stopped: nothing is drawn to show or hide.
+        }
+    }
+
+    /** See {@link AtmosphereFeatures#clusterPill}. */
+    protected final AtmosphereFeatures.Drawn clusterPill(String setName, String text, int textColor,
+            int fillColor, double lat, double lon, double minGsd, double maxGsd) {
+        return features.clusterPill(setName, text, textColor, fillColor, lat, lon, minGsd, maxGsd);
+    }
+
+    /** See {@link AtmosphereFeatures#pillPixels}. */
+    protected final int[] pillPixels(String text, int textColor, int fillColor) {
+        return features.pillPixels(text, textColor, fillColor);
     }
 
     /**
@@ -269,6 +310,38 @@ public abstract class OutlookOverlay {
 
     protected abstract List<Area> parse(int index, String body);
 
+    /**
+     * Thrown by {@link #parse(int, String)} for an answer that is not the data: the
+     * request is then a failed one, and what is drawn stays with the status saying so.
+     * An empty list would read as "none", and on 2026-10-16 PSPS said "Power off:
+     * none" over a "Token Required" while 528 areas were off.
+     */
+    protected static final class Refused extends RuntimeException {
+        public Refused(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * An ArcGIS refusal: it comes as HTTP 200 with a small {@code {"error": ...}} body
+     * ("Token Required" when a layer goes private), which a parser would read as no
+     * features.
+     */
+    static boolean arcgisRefusal(String body) {
+        if (body == null || body.length() > 4096)
+            return false;
+        return body.replaceAll("\\s", "").startsWith("{\"error\":{");
+    }
+
+    /**
+     * The answer to {@code url}, the request as it went out: a layer whose chain
+     * changes under a refresh reads which request this was from here, never from the
+     * chain as it stands now (security review, 2026-10-14). By default, {@link #parse(int, String)}.
+     */
+    protected List<Area> parse(int index, String url, String body) {
+        return parse(index, body);
+    }
+
     /** "Day 1: none. Day 2: Elevated." */
     protected abstract String summary(List<Area> areas);
 
@@ -313,6 +386,29 @@ public abstract class OutlookOverlay {
         return false;
     }
 
+    /** Extra request headers, "Accept-Encoding: gzip" for a feed that compresses well. None by default. */
+    protected Map<String, String> headers(int index) {
+        return new HashMap<>();
+    }
+
+    /**
+     * What to draw in place of an optional request that failed, on main: what an
+     * earlier answer held back waiting for this one. Nothing by default.
+     */
+    protected List<Area> skipped(int index) {
+        return Collections.emptyList();
+    }
+
+    /** {@link #skipped(int)} with the request as it went out. */
+    protected List<Area> skipped(int index, String url) {
+        return skipped(index);
+    }
+
+    /** {@link #skipped(int, String)} with the failure in words: "no data for this point (HTTP 404)". */
+    protected List<Area> skipped(int index, String url, String error) {
+        return skipped(index, url);
+    }
+
     /** The fill's alpha for an area; 0 draws the outline alone. */
     protected int fillAlpha(Area a) {
         return FILL_ALPHA;
@@ -329,6 +425,11 @@ public abstract class OutlookOverlay {
     /** With {@link #labelColors}: the coarsest map resolution, meters per pixel, the label draws at. */
     protected double labelMaxResolution() {
         return 14d;
+    }
+
+    /** The same for one area; the layer's own by default. */
+    protected double labelMaxResolution(Area a) {
+        return labelMaxResolution();
     }
 
     /** The edge's color for an area, opaque; the category's own color by default. */
@@ -430,6 +531,23 @@ public abstract class OutlookOverlay {
             rebuild(generation);
     }
 
+    /**
+     * Drop what is held and ask again from the start, abandoning a refresh in flight:
+     * what is drawn no longer answers the question asked, so it must not stay up
+     * while the new answer comes.
+     */
+    protected void restart() {
+        if (!started || !on)
+            return;
+        generation++;
+        inFlight = false;
+        areas = new ArrayList<>();
+        drawNothing();
+        if (dataListener != null)
+            dataListener.run();
+        refresh(true);
+    }
+
     /** Ask for every layer, one after another, unless that was done very recently. */
     public void refresh(boolean force) {
         if (!on || !started || inFlight) {
@@ -443,13 +561,87 @@ public abstract class OutlookOverlay {
         lastPoll = now;
         inFlight = true;
         onRefreshStart();
-        status(areas.isEmpty() ? "Getting the " + noun() + "…" : "");
+        status(areas.isEmpty() ? fetchingWords() : updatingWords());
+        // Asked all at once where the layer allows it, then read in order as before.
+        early.clear();
+        final String[] first = urls();
+        for (int i = 0; i < first.length; i++)
+            if (prefetch(i))
+                early.put(first[i], ask(i, first[i], null));
         fetch(0, new ArrayList<Area>(), generation);
+    }
+
+    /** An answer asked for ahead of its turn: held until fetch() reaches it. */
+    private static final class Early {
+        boolean done;
+        String body, error;
+        Http.Callback waiter;
+    }
+
+    private final Map<String, Early> early = new HashMap<>();
+
+    /** Asks for one URL; the answer goes to {@code cb}, or is held in the returned Early. */
+    private Early ask(int index, String url, final Http.Callback cb) {
+        final Early e = new Early();
+        final Http.Callback hold = new Http.Callback() {
+            @Override
+            public void onSuccess(String body) {
+                e.done = true;
+                e.body = body;
+                if (e.waiter != null)
+                    e.waiter.onSuccess(body);
+            }
+
+            @Override
+            public void onFailure(String error) {
+                e.done = true;
+                e.error = error;
+                if (e.waiter != null)
+                    e.waiter.onFailure(error);
+            }
+        };
+        e.waiter = cb;
+        if (large(index))
+            Http.getLarge(url, egress.userAgent(), headers(index), hold);
+        else
+            Http.get(url, egress.userAgent(), headers(index), hold);
+        return e;
+    }
+
+    /**
+     * Whether a request of the chain may be asked for at the start, beside the others,
+     * rather than after the one before it answered. Answers are still read in chain
+     * order. Off by default.
+     */
+    protected boolean prefetch(int index) {
+        return false;
+    }
+
+    /** What the status line says while the first answers are coming. */
+    protected String fetchingWords() {
+        return "Getting the " + noun() + "…";
+    }
+
+    /** What the status line says while a refresh replaces what is drawn; empty by default. */
+    protected String updatingWords() {
+        return "";
+    }
+
+    /** Asking or drawing: what is on the map is about to change. */
+    public boolean busy() {
+        return inFlight || drawing;
+    }
+
+    /** Tells the page that something changed: a refresh started, say. Main thread. */
+    protected void notifyData() {
+        if (dataListener != null)
+            dataListener.run();
     }
 
     private void fetch(final int index, final List<Area> got, final int mine) {
         if (mine != generation || !on) {
-            inFlight = false;
+            if (mine == generation)
+                inFlight = false;
             return;
         }
         final String[] urls = urls();
@@ -461,11 +653,15 @@ public abstract class OutlookOverlay {
             onRefreshDone();
             return;
         }
+        final String url = urls[index];
         final Http.Callback cb = new Http.Callback() {
             @Override
             public void onSuccess(final String body) {
                 if (mine != generation || !on) {
-                    inFlight = false;
+                    // A late answer of an abandoned refresh: the refresh in flight now
+                    // is another's, and it is not this one's to end.
+                    if (mine == generation)
+                        inFlight = false;
                     return;
                 }
                 // Parsed on the worker, then back to main for the next request: the
@@ -477,25 +673,52 @@ public abstract class OutlookOverlay {
                     worker.execute(new Runnable() {
                         @Override
                         public void run() {
-                            final List<Area> parsed = parse(index, body);
+                            // A parser slip on a server's answer is a line in the log
+                            // and nothing drawn from that answer, never ATAK going down.
+                            List<Area> parsed;
+                            String refused = null;
+                            try {
+                                if (arcgisRefusal(body))
+                                    throw new Refused("the server turned the request away");
+                                parsed = parse(index, url, body);
+                            } catch (Refused e) {
+                                Log.w(tag, "request " + index + " refused: " + e.getMessage()
+                                        + " " + (body == null ? "" : body.substring(0,
+                                                Math.min(200, body.length()))));
+                                parsed = Collections.emptyList();
+                                refused = e.getMessage();
+                            } catch (RuntimeException e) {
+                                Log.w(tag, "unreadable answer to request " + index, e);
+                                parsed = Collections.emptyList();
+                            }
+                            final List<Area> answer = parsed;
+                            final String failed = refused;
                             mapView.post(new Runnable() {
                                 @Override
                                 public void run() {
-                                    got.addAll(parsed);
+                                    if (failed != null) {
+                                        onFailure(failed);
+                                        return;
+                                    }
+                                    got.addAll(answer);
                                     fetch(index + 1, got, mine);
                                 }
                             });
                         }
                     });
                 } catch (java.util.concurrent.RejectedExecutionException stopped) {
-                    inFlight = false;
+                    if (mine == generation)
+                        inFlight = false;
                 }
             }
 
             @Override
             public void onFailure(String error) {
                 Log.w(tag, "request " + index + ": " + error);
+                if (mine != generation)
+                    return;
                 if (optional(index)) {
+                    got.addAll(skipped(index, url, error));
                     fetch(index + 1, got, mine);
                     return;
                 }
@@ -505,21 +728,33 @@ public abstract class OutlookOverlay {
                 onRefreshDone();
             }
         };
-        if (large(index))
-            Http.getLarge(urls[index], egress.userAgent(), new HashMap<String, String>(), cb);
-        else
-            Http.get(urls[index], egress.userAgent(), new HashMap<String, String>(), cb);
+        final Early held = early.remove(urls[index]);
+        if (held != null) {
+            if (!held.done)
+                held.waiter = cb;
+            else if (held.error == null)
+                cb.onSuccess(held.body);
+            else
+                cb.onFailure(held.error);
+            return;
+        }
+        ask(index, urls[index], cb);
     }
 
     private void rebuild(final int mine) {
+        drawing = true;
         final List<Area> snapshot = new ArrayList<>(areas);
         snapshot.addAll(extraAreas());
         worker.execute(new Runnable() {
             @Override
             public void run() {
-                if (mine != generation)
+                if (mine != generation) {
+                    drawing = false;
                     return;
+                }
                 final List<AtmosphereFeatures.Drawn> drawn = new ArrayList<>();
+                final List<Area> drawnAreas = new ArrayList<>();
+                final List<Geometry> drawnShapes = new ArrayList<>();
                 final int showDay = day;
                 for (Area a : snapshot) {
                     if (!shown(a, showDay))
@@ -540,15 +775,23 @@ public abstract class OutlookOverlay {
                         s.setAttribute("_ref", a.ref);
                     try {
                         drawn.addAll(drawnAll(a, g, s));
+                        drawnAreas.add(a);
+                        drawnShapes.add(g);
                     } catch (RuntimeException e) {
                         Log.w(tag, "could not draw " + a.title, e);
                     }
+                }
+                try {
+                    drawn.addAll(drawnTogether(drawnAreas, drawnShapes));
+                } catch (RuntimeException e) {
+                    Log.w(tag, "could not draw the group labels", e);
                 }
                 features.rewrite(drawn);
                 final String line = summary(snapshot);
                 mapView.post(new Runnable() {
                     @Override
                     public void run() {
+                        drawing = false;
                         if (mine != generation || !on)
                             return;
                         Log.d(tag, "drew " + drawn.size() + " areas: " + line);

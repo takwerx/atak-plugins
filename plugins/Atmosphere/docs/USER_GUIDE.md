@@ -1,12 +1,12 @@
 # Atmosphere for ATAK — User Guide
 
-**Version 0.14 · takwerx**
+**Version 0.21 · takwerx**
 
-**Download Atmosphere 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.21** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -54,7 +54,9 @@ The pane opens at half width. The top row is the same on every page:
 
 - **My position**, **Map center** and **Pick a point** choose the point every
   reading is for; the one in use is green. Map center follows the map: the
-  forecast and the fire weather zone are read again when the map stops.
+  forecast and the fire weather zone are read again when the map stops. The
+  Weather Stations, River Gauges and Buoys lists are measured from this point
+  too, nearest first, and say which point in their status line.
 - The star is **Favorites**: places kept by name.
 - **Units** switches every number between US, metric and aviation units.
 - **Full size** makes the pane full width and back; at full size every button
@@ -62,17 +64,21 @@ The pane opens at half width. The top row is the same on every page:
 - The stacked sheets are **Layers**: straight to the Layers page from any page.
   It is green while Layers is showing.
 - The arrows step through the pages; the page name between them opens a list of
-  all nine.
+  all eleven.
 
 <img src="screenshots/3_pane_half.png" width="420"> <img src="screenshots/5_page_list.png" width="420">
 
-The nine pages are **Forecast**, the readout for a point; **Layers**, every map
+The eleven pages are **Forecast**, the readout for a point; **Layers**, every map
 layer with its switch and settings; **Spot Weather Forecast**, the open spot
 forecast requests; **Fire Weather Zones**, the planning forecast for a zone;
 **SAWTI**, the Santa Ana Wildfire Threat Index; **Fire Danger**, an area's
-Energy Release Component and its GACC's chart; and **Weather Stations**,
-**River Gauges** and **Buoys**, the ones around you as lists. Back closes the
-pane, or narrows a full-size one first.
+Energy Release Component and its GACC's chart; **Weather Stations**, **River
+Gauges** and **Buoys**, the ones around you as lists; **Storm Reports**; and
+**Rain Gauges**. Back closes the pane, or narrows a full-size one first.
+
+A page whose data is a map layer starts with that layer's switch, the same
+switch as on the Layers page: turn the layer on or off from either and both
+say so.
 
 <img src="screenshots/4_pane_wide.png" width="860">
 
@@ -150,10 +156,10 @@ opening the plugin.
 |---|---|---|
 | | Spot Weather Forecast | Every open spot forecast request, with the office's forecast behind a tap |
 | | Weather Stations | The stations around you, wind barb and readings, colored against the Red Flag criteria for their zone; in California, the utilities' stations too |
-| Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber |
+| Wind | Radar | The NWS radar mosaics over the US, Environment Canada's over Canada, and RainViewer's composite of the world's public radars everywhere else, whichever the map is over, with a time scrubber, Play to loop the last two hours and see which way the cells move, and a transparency slider |
 | Wind | Satellite | The newest GOES picture, infrared (day and night) or visible; reaches the open ocean where no radar does |
 | Wind | Rain | The model's rain rate, light to violent, hour by hour for five days with the rate "Here"; a forecast, not radar |
-| Wind | Wind | The forecast wind as moving streaks colored by speed, or as a heat map under them in the same colors, with a time scrubber, heights to the jet stream, and the wind "Here" |
+| Wind | Wind | The forecast wind as moving streaks colored by speed, or as a heat map under them in the same colors, with a time scrubber, heights to the jet stream, and the wind "Here". Runs together with Radar; the heat map and Radar take turns |
 | Storms | Storm Reports | Every report the NWS offices logged in the last 24, 48 or 72 hours: tornado, wind, hail, flood, rain, snow and ice, landslide; the type and size in the pill, the remarks behind a tap |
 | Storms | Tornado Paths | The tracks NWS survey teams walked in the last 2 days, 7 days, 30 days or year, each line in its EF rating's color with a pill at the touchdown; length, width, peak wind, injuries, deaths and the survey behind a tap |
 | Fire | Fire Weather Outlook | Elevated, critical and extreme areas and dry thunderstorms, Day 1, 2, 3 or all; from Day 3 as a chance of critical |
@@ -162,14 +168,14 @@ opening the plugin.
 | Fire | Fire Danger | Every Predictive Service Area in the lower 48 shaded by its Energy Release Component, observed yesterday or forecast today; the GACC's ERC chart behind a tap on an area's name |
 | Fire | Fuel Moisture | Every fuel sampling site in the state under the map, a dot colored by its newest sample's moisture (critical, high, moderate, low, on the live-fuel or the timelag class's own breaks) with the fuel and percent in the pill; every fuel sampled there, with dates, behind a tap; 30 days, 90 days or a year back; live fuels, dead fuels or both |
 | Fire | Lightning | NOAA's lightning strike density, the newest 15 minutes, in five bands from under 1 to over 150 strikes in a 5-mile square |
-| Fire | PSPS | California's Public Safety Power Shutoffs from Cal OES: counties warned, power off, power back on |
+| Fire | PSPS | California's Public Safety Power Shutoffs: counties warned, circuits watched, areas shut off, by utility |
 | Fire | Smoke | Forecast smoke at the ground or through the whole sky, with the amount "Here"; the same forecast at every zoom, so the smoke keeps its shape as you zoom |
 | Fire | Air Quality | The EPA's air quality areas and the index "Here" |
 | Rain and rivers | Flash Flood Outlook | Excessive rainfall areas for three days, marginal to high |
 | Rain and rivers | River Gauges | Gauges colored by flood category; stage, flow and hydrograph behind a tap |
 | Rain and rivers | Flooded Ground | Where the river model puts water over the banks, now or at the worst of the next 5 days (experimental) |
-| Rain and rivers | Rain Totals | The rain that fell, as a picture: the NWS radar estimate for the last 1 h, 6 h, 24 h or 3 days, the gauge-corrected analysis for 7 days, in the NWS colors, with a transparency slider |
-| Rain and rivers | Rain Gauges | USGS rain gauges around the map with their 24 h totals, the CoCoRaHS volunteer gauges of the states under the map with their morning reading, and the forecast office's own rainfall report gauges, inches in the pill; the day by the hour, the report, or the volunteer's reading behind a tap |
+| Rain and rivers | Rain Totals | The rain that fell, as a picture: the NWS radar estimate for the last hour to 3 days, the gauge-corrected analysis for 7 or 30 days, since Oct 1 or Jan 1, or the radar estimate of the hours before a date and time you pick; in the NWS colors, with a transparency slider |
+| Rain and rivers | Rain Gauges | Measured rain gauges around the map (USGS, airports, NWS observers, county flood control, RAWS) with their total for the time you pick, from the last 24 hours to since Jan 1, one day, or the hours before a date and time; inches in the pill, in the Rain Totals colors |
 | Rain and rivers | Streams Running High | Stream stretches over their high-water mark, colored by how rare the flow is; the numbers behind a tap |
 | Rain and rivers | Debris Flow | The USGS post-fire assessments: every fire of the last three years marked; a fire's page shows or hides its perimeter and stream basins, filled Low, Moderate or High for a 15-minute burst of rain, with likelihood and volume behind a tap |
 | Ocean | Buoys | Buoys and coastal stations, readings colored by sea state; tides, currents and the marine forecast behind a tap |
@@ -303,6 +309,14 @@ issue time is under it, and an issue more than a day old says so. When the wind
 and fuel numbers cannot be had, the gauges say *Not available* and the page asks
 again the next time you look.
 
+The page and the map show the same day: a day picked here is the day the map
+draws, a day picked on the Layers page shows here, and picking a day here turns
+the SAWTI layer on. While the page is open, the zone it shows has a white
+outline on the map, so you can find it among the others; leave the page and the
+outline goes.
+
+<img src="screenshots/123_sawti_outline.jpg" width="560">
+
 <img src="screenshots/76_sawti_page_top.png" width="420"> <img src="screenshots/77_sawti_page_middle.png" width="420">
 
 <img src="screenshots/78_sawti_page_table.png" width="420"> <img src="screenshots/79_sawti_zone_picker.png" width="420">
@@ -363,14 +377,19 @@ reason to call it safe to be outside.
 
 <img src="screenshots/83_lightning_map.jpg" width="360"> <img src="screenshots/82_lightning_layer_block.png" width="420">
 
-**PSPS** draws California's Public Safety Power Shutoffs as Cal OES reports
-them from PG&E, SCE and SDG&E: a county a utility has warned may have a shutoff
-in amber, where the power is off in red, off because a line feeding it was cut
-in orange, and back on in green. Tap one for its details. The line under the
-switch says what is warned and off and when Cal OES last updated; if Cal OES
-goes quiet for 45 minutes it says the status is unknown rather than none. It
-does not cover PacifiCorp, Liberty, Bear Valley or any other state: ask the
-utility.
+**PSPS** draws California's Public Safety Power Shutoffs: a county a utility
+has warned Cal OES may have a shutoff in amber, a circuit SCE or SDG&E is
+watching for one in orange (**PSPS Watch**), and the areas a utility has shut
+off in red, each named by its utility, such as "PG&E - PSPS". Tap one for its
+circuit, customers out, the shutoff window and when power is expected back.
+From about 10 miles in on the scale bar each area has its own label; farther
+out, nearby areas share one, "SCE - PSPS (23)", and past 150 miles the colors
+stand alone. The line under the switch counts what is warned, watched and shut
+off, by utility, and when it was updated; a source that goes quiet for 45
+minutes is said to be unknown, never none. It comes from Cal OES (PG&E and the
+warned counties), Southern California Edison and San Diego Gas & Electric,
+through takwerx's server. It does not cover PacifiCorp, Liberty, Bear Valley or
+any other state: ask the utility.
 
 <img src="screenshots/85_psps_map.jpg" width="420"> <img src="screenshots/84_psps_layer_block.png" width="420">
 
@@ -395,13 +414,16 @@ layer.
 <img src="screenshots/97_reports_layer_block.png" width="420"> <img src="screenshots/101_reports_map.jpg" width="420">
 
 **The Storm Reports page** lists the same reports, and the tornado paths with
-them: **US**, **Near** the point in the pane's top row (your position,
-the map center or a picked point), on the **Map** as it sits, re-read whenever
-the map settles, or by **State**; **Newest** or **Closest** first; and a type
-picker of switches, any mix of the eight families and **Tornado**, which covers
-the dots and the paths. What you tick is what the map draws. A row flies the
-map to the report and opens its details in one tap. **Open the list** under the
-layer's switch jumps to the page.
+them, under one row of buttons. The first reads where the list looks and how
+many it holds, and opens the choices beneath it: **US**, **Near** the point in
+the pane's top row (your position, the map center or a picked point), on the
+**Map** as it sits, re-read whenever the map settles, or by **State**. The next
+flips between **Newest** and **Closest** first. **All Types** is a type picker
+of switches, any mix of the eight families and **Tornado**, which covers the
+dots and the paths; what you tick is what the map draws. The last steps through
+the window: **24 h**, **48 h**, **72 h**. A row flies the map to the report and
+opens its details in one tap. **Open the list** under the layer's switch jumps
+to the page.
 
 <img src="screenshots/107_reports_page.jpg" width="420"> <img src="screenshots/108_reports_types.png" width="420">
 
@@ -457,60 +479,87 @@ minutes.
 
 ## 10. Rain Totals and Rain Gauges
 
+Both say how much rain fell, for the time you pick with the **Totals:** button
+under each switch: the last 24 hours, 3, 7 or 30 days, since October 1 (the
+water year), since January 1, one day, or **Before a date and time**, the hours
+before a moment you pick, such as when a fire started. Rain Totals also offers
+the last hour and 6 hours. While it works, the Rain Gauges page says "Getting
+the rain for ..." over a moving bar.
+
+<img src="screenshots/120_rain_totals_choices.jpg" width="420"> <img src="screenshots/121_rain_before_choices.jpg" width="420">
+
 **Rain Totals** draws the rain that fell as a picture over the map, in the
-NWS's own colors with the key under the switch. The row picks the last 1 h,
-6 h, 24 h or 3 days, which come from the NWS radar estimate at 1 km, updated
-every hour, so a storm that just ended is there at once; or 7 days, from the
-River Forecast Centers' analysis of radar corrected by the rain gauges, the
-better total once the center has produced it (grey is where it has not). The
-radar estimate is good at where it rained and the shape of the storm and fair
-on how much: in the mountains it reads low, in a downpour high. Use it for
-where it poured and a gauge for how much. The **Transparency** slider lets the
-map show through. Lower 48 only.
+NWS's own colors, with the key under the switch; the key changes with the time
+picked. Up to 3 days it is the NWS radar estimate at 1 km, updated every hour,
+so a storm that just ended is there at once. For 7 and 30 days and the seasons
+it is the River Forecast Centers' analysis of radar corrected by the rain
+gauges. Where a center has not produced it yet (all of California on October 15,
+2026) its picture is grey; for 7 days the radar estimate for the same 7 days
+fills the grey in, and for longer the status line says so. Before a date and time
+is the radar estimate as it stood at that hour, kept hour by hour by the Iowa
+Environmental Mesonet and, for the last 45 days, on takwerx's server, where
+Atmosphere gets it: the picture is of the hour at or before the time you pick,
+1, 24, 48 or 72 hours of it, and the calendar starts 45 days back. The radar is good at where it rained and the
+shape of the storm, fair on how much: a sprinkle often shows where a gauge
+caught nothing, and a 1 km square with no rain is left clear, so light rain
+leaves square gaps. Use it for where it rained and a gauge for how much. The
+**Transparency** slider lets the map show through. Lower 48 only.
 
 <img src="screenshots/109_raintotals_block.jpg" width="420">
 
-**Rain Gauges** draws three kinds of gauge, each a dot in the color of its
-last 24 hours with the gauge's name and the inches in the pill, "Palomar CRS
-6.20 in". White-ringed: the USGS rain gauges
-around the map, the day by the hour behind a tap. Cyan-ringed: the CoCoRaHS
-volunteer gauges of the states under the map (the center and the corners, so a
-state line shows both sides), each read once a day
-around 7 am, so the number is the 24 hours to that morning; today's reports
-and yesterday's are both asked for, and a station that reported both mornings
-shows today's. Dark-ringed: the forecast office's own rainfall report gauges,
-once the Rain Gauges page has fetched the report. The USGS gauges are asked for
-the map's extent, padded, and asked again when the map settles outside it;
-CoCoRaHS is asked by state. Your position is not sent. Northern California
-has no office report and few USGS rain gauges, so the volunteers are most of
-what draws there.
+**Rain Gauges** draws each gauge as a dot in the same colors as Rain Totals for
+the same time, with its name and its inches in the pill, "Camp 9 0.37 in", so a
+dot reads like the shading under it. White-ringed: USGS gauges. Dark-ringed:
+airports, NWS weather observers, county flood control, RAWS and other agency
+gauges. Only measured gauges, no volunteer gauges. A gauge that missed part of
+the time picked is left off, since its total would read as dry ground where it
+is a gap, and so is one that disagrees with every gauge around it, the way a
+faulty gauge does; the status line says how many were left off. The gauges
+come from the USGS, the NOAA Regional Climate Centers (airports and observers,
+for runs of days) and the Iowa Environmental Mesonet (the NWS gauge feed the
+forecast offices write their rainfall reports from, and the airports' hourly
+reports), through takwerx's server, which keeps their hours for 45 days.
+Further back, the county and RAWS gauges show whole days, from the day the
+time starts to the day you picked, and the airports are left out; the status
+line says so. For 3 or 7 days and for the hours before a moment, the USGS, county
+and RAWS gauges wait for the map to be zoomed in to about 150 miles across, and
+the status line says so; airports and observers show at any zoom. For a month
+or more only the USGS gauges that keep daily totals show. The map's area and
+the states under it are sent with the dates, not your position.
 
 <img src="screenshots/110_raingauges_block.jpg" width="420">
 
-**The Rain Gauges page** shows the forecast office's rainfall report for the
-point in the pane's top row: the gauges the office lists, with their inches for
-the period the office names (during a storm a day or two; the line under the
-office says which), **Most rain first** or **Closest** to your point, with the
-miles on each row and a green **Go to** under every gauge the page could
-place (the row flies the map in close and opens the gauge's details, the
-inches, period, id and elevation, with **Back** and **Go to** at the top; the
-USGS rows below do the same), the gauges nothing could place under their
-own heading, and the whole report as the office wrote it behind a button. A
-gauge is placed once, by its name against NIFC's RAWS and by its id against
-NWS, and kept; the ones nothing can place are the counties' own flood-control
-gauges.
-Under it, the USGS gauges around the map with Go to. Thirty-three offices
-publish such a report, Los Angeles and San Diego among them; the page says so
-when the office here does not. It needs NWS as the forecast service.
+With both layers on the same time, each dot sits on shading of its own color, so
+a gauge that caught more or less than the radar shows stands out:
 
-<img src="screenshots/111_rain_page.jpg" width="420">
+<img src="screenshots/113_rain_7d_gauges_on_totals.jpg" width="560">
+
+**The Rain Gauges page** has the Totals button at the top, then the gauges in
+the map's view, **Most rain first** or **Closest** to your point, with the
+miles on each row and a green **Go to** that flies the map in close and opens
+the gauge's details: its inches, for a run of days day by day, where it comes
+from and its link. At the bottom, **Show the NWS office's rainfall report**
+opens the forecast office's own report for the point in the pane's top row, for
+the period the forecaster names, as a table in the same colors, Most rain first
+or Closest, and the report as the office wrote it one tap further. Thirty-three
+offices publish such a report, Los Angeles and San Diego among them; it needs
+NWS as the forecast service. Its gauges are among the ones on the map, so the
+report is not drawn there.
+
+<img src="screenshots/111_rain_page.jpg" width="420"> <img src="screenshots/114_rain_gauges_7d.jpg" width="420">
+
+<img src="screenshots/122_rain_report_table.jpg" width="560">
 
 ## 11. Spot Weather Forecast
 
 The layer draws every spot forecast request the National Weather Service has
-open, with the forecast the office wrote for each. The page lists them — All,
-Near me, On map, by State or by Region — **Newest** or **Closest** first, and a
-search box finds one by incident name. Tap a request for its forecast.
+open, with the forecast the office wrote for each. The page lists them under
+one row of buttons: the first reads where the list looks and how many it holds,
+and opens the choices beneath it (All, Nearby, On map, by State or by Region);
+the next flips between **Newest** and **Closest** first; and the magnifier at
+the end of the row opens a search box that finds one by incident name, which a
+second tap closes and clears. Nearby and Closest measure from the point chosen
+in the top row. Tap a request for its forecast.
 
 <img src="screenshots/58_spots.jpg" width="420"> <img src="screenshots/59_spot_list.png" width="420">
 
@@ -543,8 +592,8 @@ Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
   Fire Weather Watches on its fire weather zones. IPAWS Alerts does the rest.
 - Its lightning is a 15-minute density map that arrives 10 to 25 minutes
   late, not single strikes as they happen, and not a lightning safety trigger.
-- Its power shutoffs are California's three big utilities only, as Cal OES
-  reports them; anywhere else, ask the utility.
+- Its power shutoffs are California's three big utilities only, as Cal OES,
+  SCE and SDG&E publish them; anywhere else, ask the utility.
 - Its storm reports are preliminary, as the offices received them, and its
   tornado paths are each office's survey until it finalizes it; its debris-flow
   hazard is the USGS's for one design storm, not a forecast of rain; its
@@ -553,11 +602,12 @@ Preferences**, **Specific Tool Preferences**, **Atmosphere**, and tap
 - It records nothing about you: no callsign, device identifier or TAK server
   detail is ever sent. Your position leaves the device only for the forecast
   when it is set to My position, rounded to about 100 m, and for the station,
-  gauge and buoy lists when they are set to My position. The Fire Weather Zones
+  gauge and buoy lists, which are measured from the same point, rounded the
+  same way. The Fire Weather Zones
   page finds your zone by sending the half-degree square the point is in, about
   30 miles across, never the point. Debris Flow, Rain Totals and Rain Gauges
-  send the area the map shows, padded. Fuel Moisture and the Rain Gauges
-  volunteer reports send the two-letter code of the state under the map
-  center, found on this device. The office's rainfall report and the
+  send the area the map shows, padded. Fuel Moisture sends the two-letter code
+  of the state under the map center, and Rain Gauges the codes of the states
+  under the map with the dates, found on this device. The office's rainfall report and the
   synopsis find the office by the same half-degree square, and only while NWS
   is the forecast service.

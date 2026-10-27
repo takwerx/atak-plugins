@@ -23,14 +23,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:orientation="horizontal" />
-
-    <LinearLayout
-        android:id="@+id/stations_scope_row"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:orientation="horizontal" />
+        android:orientation="horizontal"
+        android:baselineAligned="false" />
 
     <TextView
         android:id="@+id/stations_page_status"

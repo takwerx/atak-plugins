@@ -1,6 +1,7 @@
 package com.atakmap.android.atmosphere;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.atakmap.android.atmosphere.overlay.RadarOverlay;
@@ -51,5 +52,44 @@ public class RadarOverlayTest {
         m.setAccessible(true);
         assertTrue(((List<?>) m.invoke(null, "<Layer/>")).isEmpty());
         assertTrue(((List<?>) m.invoke(null, (Object) null)).isEmpty());
+    }
+
+    /** The loop plays up to twenty frames, evenly spread, oldest first, always ending at the newest. */
+    @Test
+    public void loopSpreadsTwentyFramesEndingAtTheNewest() {
+        // The NWS: a frame every two minutes for two hours.
+        final List<Integer> nws = RadarOverlay.playFrames(61);
+        assertEquals(20, nws.size());
+        assertEquals(0, (int) nws.get(0));
+        assertEquals(60, (int) nws.get(19));
+        for (int i = 1; i < nws.size(); i++)
+            assertTrue(nws.get(i) - nws.get(i - 1) >= 3 && nws.get(i) - nws.get(i - 1) <= 4);
+        // RainViewer's thirteen: all of them.
+        final List<Integer> world = RadarOverlay.playFrames(13);
+        assertEquals(13, world.size());
+        assertEquals(0, (int) world.get(0));
+        assertEquals(12, (int) world.get(12));
+        assertTrue(RadarOverlay.playFrames(0).isEmpty());
+    }
+
+    /**
+     * Only the loop's own frame schedules its next step. With the map locked on GPS
+     * a move re-shows the frame on the map every second; when that rescheduled the
+     * step, the 1.5 s hold on the newest frame never ran out and the loop stuck there.
+     */
+    @Test
+    public void aMapMoveDoesNotPushBackTheLoopsStep() {
+        final RadarOverlay.LoopTurn turn = new RadarOverlay.LoopTurn();
+        // The loop moves to the newest frame and it goes on the map: the hold is scheduled.
+        turn.owe();
+        assertTrue(turn.take());
+        // The map re-centres on the operator, three times during the hold: each re-show leaves it alone.
+        assertFalse(turn.take());
+        assertFalse(turn.take());
+        assertFalse(turn.take());
+        // The hold runs out, the loop starts over, and that frame schedules the next step.
+        turn.owe();
+        assertTrue(turn.take());
+        assertFalse(turn.take());
     }
 }

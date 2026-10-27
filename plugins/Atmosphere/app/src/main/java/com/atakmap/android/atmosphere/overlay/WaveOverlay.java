@@ -194,6 +194,7 @@ public final class WaveOverlay {
         on = false;
         mapView.removeOnMapMovedListener(moved);
         mapView.removeCallbacks(moveSettled);
+        mapView.removeCallbacks(runCheck);
         mapView.removeCallbacks(scrubSettled);
         mapView.removeCallbacks(ticker);
         generation++;
@@ -218,6 +219,39 @@ public final class WaveOverlay {
         return on;
     }
 
+    /** How often a layer left on looks for a newer model run. */
+    private static final long RUN_CHECK_MS = 10 * 60 * 1000L;
+
+    /**
+     * A newer run, once the model has one. The run was chosen only when the layer
+     * was switched on, so a device left on kept an old forecast and its "now" never
+     * moved (operator, 2026-10-17, on the wind: "if you just leave it on its not
+     * updating"). The time shown stays the time shown.
+     */
+    private final Runnable runCheck = new Runnable() {
+        @Override
+        public void run() {
+            if (!on)
+                return;
+            final long now = System.currentTimeMillis();
+            final long latest = NomadsWaves.latestRun(now);
+            if (latest != run || (now - latest) / 3_600_000L != firstHour) {
+                final long shownTime = run + hour * 3_600_000L;
+                setRun(latest);
+                hour = (int) Math.max(firstHour, Math.min(hours, Math.round((shownTime - latest) / 3_600_000.0)));
+                cache.clear();
+                region = null;
+                generation++;
+                pendingKey = null;
+                Log.d(TAG, "newer run " + latest + ", refetching");
+                if (listener != null)
+                    listener.onFrames(labels(), hourIndex());
+                ensureRegion();
+            }
+            mapView.postDelayed(this, RUN_CHECK_MS);
+        }
+    };
+
     public void setOn(boolean value) {
         if (!started || on == value)
             return;
@@ -233,8 +267,11 @@ public final class WaveOverlay {
             if (crests != null)
                 crests.setVisibility(android.view.View.VISIBLE);
             ensureRegion();
+            mapView.removeCallbacks(runCheck);
+            mapView.postDelayed(runCheck, RUN_CHECK_MS);
         } else {
             generation++;
+            mapView.removeCallbacks(runCheck);
             mapView.removeCallbacks(ticker);
             layer.setVisible(false);
             layer.clear();

@@ -1,10 +1,10 @@
 ATAK Plugin — Atmosphere
 
-**Download Atmosphere 0.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.21** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.14/ATAK-Plugin-Atmosphere-0.14--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -55,8 +55,10 @@ Capabilities:
   - SAWTI, the Forest Service's Santa Ana Wildfire Threat Index, on the map by
     level for four days and as a page with the site's gauges, the forecaster's
     words and the recommended actions; NOAA's 15-minute lightning strike
-    density; California's Public Safety Power Shutoffs from Cal OES (counties
-    warned, power off, power back on), saying what it does not cover.
+    density; California's Public Safety Power Shutoffs from Cal OES, SCE and
+    SDG&E (counties warned, circuits watched, where the power is shut off,
+    customers out and when it is expected back), saying what it does not
+    cover.
   - Fire danger: every Predictive Service Area in the lower 48 shaded by its
     Energy Release Component percentile, observed or forecast, from the
     Forest Service's national service; tap an area's name for its ERC and
@@ -82,12 +84,14 @@ Capabilities:
   - Storm Reports as a page: the reports and the tornado paths in one list,
     nationwide, near the pane's point, on the map or by state, newest or
     closest first, any mix of types; a row flies to it and opens it.
-  - Rain that fell: the NWS rainfall picture for the last hour to seven days
-    in the service's own colors with a transparency slider; the USGS rain
-    gauges with their 24 hour totals and the CoCoRaHS volunteer gauges of the
-    state under the map with their morning reading; and the forecast office's
-    own rainfall report as a list, most rain first or closest, its gauges on
-    the map too.
+  - Rain that fell, for the time picked: the last hour to 30 days, since
+    October 1 or January 1, one day, or the hours before a date and time (the
+    rain before a fire started). The NWS rainfall picture in the service's own
+    colors with a transparency slider; the measured gauges around the map
+    (USGS, airports, NWS observers, county flood control, RAWS) with their
+    totals in the same colors, a gauge that missed part of the time or reads
+    far off its neighbors left off; and the forecast office's own rainfall
+    report as a table, most rain first or closest.
   - The forecaster's synopsis on the Forecast page, from the Area Forecast
     Discussion for the office covering the point, the other sections a tap
     away.
@@ -108,7 +112,43 @@ Capabilities:
 _________________________________________________________________
 STATUS
 
-0.14, for ATAK-CIV 5.6, 5.7 and 5.8 (0.13 was a 5.8-only build for the pictures). New: a Storms group with Storm Reports
+0.21, for ATAK-CIV 5.6, 5.7 and 5.8: Wind draws in 3D. Tilt the map and the
+streaks lie on the ground, over ridges and down into valleys, around the point
+the map looks at; the flat map is as it was. It carries 0.20, which was built
+but never released: Storm Reports and the Spot Weather Forecast page put their
+filters in one row above the list (the first button names where the list looks
+and opens the choices, Newest and Closest change with a tap, as does Storm
+Reports' 24, 48 or 72 h, and Spot's search sits behind a magnifier); Weather
+Stations, River Gauges and Buoys fold their filters into one button on the
+page's heading line, so the list starts higher; and Radar's Play keeps looping
+with the map locked on GPS.
+0.19 was 0.18 (never released) with the manual's
+pictures from its signed build, and Fire Danger waiting longer for a slow
+server. 0.17 and 0.18 were built but never released; their changes are
+here. New: Rain Gauges' county, RAWS and airport gauges and Rain
+Totals' past radar come from takwerx's relay of the Iowa Environmental
+Mesonet, which turns away a phone that asks it fast; the relay keeps their
+hours 45 days, and further back the county and RAWS gauges show whole days.
+Radar plays its last two hours as a loop and has a transparency slider
+(takwerx/atmosphere#7). Public Safety Power Shutoffs from
+takwerx's relay of Cal OES, SCE and SDG&E, after Cal OES put its shutoff areas
+behind a login: areas shut off by utility, the circuits a utility is watching,
+customers out and when power is expected back, with labels that group as the
+map zooms out; Weather Stations, River Gauges, Buoys and the Spot Weather
+Forecast page measure from the point chosen in the pane's top row; each page's
+map switch is a small "Map ON" on its heading line; status lines say when the
+zoom hides a layer; a group's count is its layers, not their settings; and
+Radar and Wind run together (takwerx/atmosphere#6).
+0.16 brought rain totals for
+any time on both rain layers: the last 24 hours, 3, 7 or 30 days, since October 1
+or January 1, one day, or the hours before a date and time, such as when a fire
+started; Rain Gauges from the USGS, county flood control, RAWS and airport
+gauges, no volunteer gauges, in Rain Totals' colors, with a gauge that missed
+part of the time or disagrees with its neighbors left off; where the NWS has not
+produced its 7-day analysis, the radar estimate fills it in; the SAWTI page and
+map on one day, the page's zone outlined on the map while it is open; every page
+with a map layer starts with that layer's switch; and filter counts that follow
+the map. 0.14 brought a Storms group with Storm Reports
 (the NWS Local Storm Reports of the last three days) and Tornado Paths (the
 NWS Damage Assessment Toolkit's surveyed tracks of the last year, by EF
 rating); Debris Flow (the USGS post-fire debris-flow assessments, fires marked
@@ -177,9 +217,27 @@ PORTS REQUIRED
     api.avalanche.org               avalanche forecast zones
     wcc.sc.egov.usda.gov            snow stations (NRCS)
     services.arcgis.com             EPA AirNow air quality areas
-    services3.arcgis.com            the interagency weather station feed
+    services3.arcgis.com            the interagency weather station feed, the
+                                    Energy Release Component, the RAWS a
+                                    rainfall report names
+    fsapps.nwcg.gov                 SAWTI (Forest Service)
+    gacc.nifc.gov                   Fire Danger charts (the GACCs)
+    www.nfmdb.org                   fuel moisture samples (NFMD)
+    services.dat.noaa.gov           tornado paths (NWS Damage Assessment Toolkit)
+    earthquake.usgs.gov             earthquakes, debris flow basins (USGS)
+    waterservices.usgs.gov          USGS rain gauges
+    data.rcc-acis.org               airports and NWS observers' rain over a run
+                                    of days (NOAA Regional Climate Centers)
     geocoding.geo.census.gov        address search for a spot request, only
                                     when the operator types an address
+    mapdepot.takwerx.org            takwerx's relays: Public Safety Power
+                                    Shutoffs (Cal OES's warned counties and
+                                    PG&E's areas, SCE's and SDG&E's circuits,
+                                    as one file); county flood control, RAWS
+                                    and agency gauges, airports' hourly rain
+                                    and past radar rain pictures, by state,
+                                    day and 2-degree square (the Iowa
+                                    Environmental Mesonet's, kept 45 days)
 
   An operator-supplied weather service definition can name a different host;
   the dialog that enables it lists the hosts it will contact.
@@ -189,8 +247,9 @@ PORTS REQUIRED
   User-Agent naming the plugin and its version, which the public services
   require. No callsign, device identifier or TAK server detail is sent. The
   device's position leaves it only for the forecast the operator asks for,
-  rounded, and for the station, gauge and buoy layers when set to "My
-  position", rounded the same way; every other layer sends the map's area.
+  rounded, and for the station, gauge and buoy layers, which measure from the
+  same point (the device's position when the pane is set to My position),
+  rounded the same way; every other layer sends the map's area.
 
 _________________________________________________________________
 EQUIPMENT REQUIRED
