@@ -69,8 +69,8 @@ tools, and the zone list. The top row stays put.
 
   Built and tested in California. Oregon and British Columbia carry their
   agencies' live orders and alerts. Florida carries hurricane zones for two
-  counties, lettered A to E, with no live status; the county calls zones by
-  letter.
+  counties and North Carolina its coastal zones for 21, lettered A to E, with
+  no live status; the county calls zones by letter.
 
   A state that is not here is one whose data has not been found yet. Point us
   at it and it goes in.
@@ -312,7 +312,7 @@ on from earlier. Both say so on their buttons; the counties reset every start.
 = Where the zones come from
 
 The catalog lists public ArcGIS services: state emergency management (Cal OES,
-Oregon OEM, EmergencyInfoBC), CAL FIRE, and the counties and cities that publish
+Oregon OEM, EmergencyInfoBC, NCEM), CAL FIRE, and the counties and cities that publish
 their own zone maps. It is read from takwerx's server when the plugin starts, so
 a feed can be added or corrected without a new plugin, and the copy built into
 the plugin is used when there is no connection.
