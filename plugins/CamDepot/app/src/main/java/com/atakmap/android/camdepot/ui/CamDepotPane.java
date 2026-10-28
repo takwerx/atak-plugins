@@ -2335,6 +2335,8 @@ public final class CamDepotPane implements CameraStore.Listener {
             }
         });
 
+        warmStream(c);
+
         final Button video = v.findViewById(R.id.video);
         // Say up front whether this camera can stream. Only Caltrans publishes HLS;
         // the rest are stills, and offering "Video" on those promises something ATAK
@@ -2455,6 +2457,31 @@ public final class CamDepotPane implements CameraStore.Listener {
      * {@code gov.tak.api.video.ConnectionEntry} on 5.8, so it breaks a build for
      * an older target, which is exactly what a submission has to produce.
      */
+    /**
+     * Ask for a Texas camera's playlist as its details open, and ignore the answer.
+     *
+     * <p>Texas cameras are pulled on demand: a cold one answers its first playlist
+     * after about 14 s, ATAK's player gives up at 12 s, so the first Live video tap
+     * failed and the second played. The relay waits and caches, so one request made
+     * while the operator reads the pane has the camera warm by the time they tap.
+     * Only the catalog's own https stream URL is requested, the same one the player
+     * would open, and nothing is shown or kept from the reply.
+     */
+    private void warmStream(Camera c) {
+        if (!"TX".equalsIgnoreCase(c.state) || !c.hasStream()
+                || !c.stream.startsWith("https://"))
+            return;
+        Http.get(c.stream, new Http.Callback() {
+            @Override
+            public void onSuccess(byte[] body) {
+            }
+
+            @Override
+            public void onFailure(String error) {
+            }
+        });
+    }
+
     private void playVideo(Camera c) {
         launchVideo(c);
     }
