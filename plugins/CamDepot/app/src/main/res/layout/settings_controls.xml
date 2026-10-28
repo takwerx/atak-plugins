@@ -102,7 +102,10 @@
         android:paddingTop="4dp"
         android:visibility="gone">
 
-        <!-- Inclusive: ticking more shows more; none ticked means everything. -->
+        <!-- Inclusive: ticking more shows more; none ticked means everything.
+             Video and Still take only the width of their text and Fire takes the rest:
+             any weights fitted to one state's counts wrapped another's, "Video
+             (3,010)" in an equal third and "Fire (1,585)" in a weighted one. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -110,15 +113,13 @@
 
             <CheckBox
                 android:id="@+id/live_only"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Video" />
 
             <CheckBox
                 android:id="@+id/still_only"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Still" />
 
