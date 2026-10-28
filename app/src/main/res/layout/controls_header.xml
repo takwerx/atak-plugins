@@ -99,6 +99,7 @@
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:hint="@string/search_hint"
+            android:textColorHint="#00E5FF"
             android:inputType="text"
             android:maxLines="1"
             android:textSize="14sp" />

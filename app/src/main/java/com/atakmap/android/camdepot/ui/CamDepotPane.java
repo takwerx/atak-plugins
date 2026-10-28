@@ -1318,7 +1318,9 @@ public final class CamDepotPane implements CameraStore.Listener {
         // Gold star, the same gold the starred rows wear. The button is a filter that
         // stays on across everything else the operator does, so it has to read as ON
         // from across the panel rather than by being read word by word.
-        final String text = String.format(Locale.US, "\u2605 Favorites First (%d)", n);
+        // No "First" in the label: it clipped to "Favorites F..." in the weighted third
+        // beside Settings. The gold star and the status line say it is pinned.
+        final String text = String.format(Locale.US, "\u2605 Favorites (%d)", n);
         final android.text.SpannableString styled =
                 new android.text.SpannableString(text);
         styled.setSpan(new android.text.style.ForegroundColorSpan(STAR_ON), 0, 1,
