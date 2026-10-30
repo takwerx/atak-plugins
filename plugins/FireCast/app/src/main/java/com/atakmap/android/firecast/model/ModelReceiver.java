@@ -374,13 +374,12 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             if (r.groundNote != null)
                 goes.append('\n').append(r.groundNote);
         }
-        section("Where it goes", goes.toString());
-
+        String sizeText = null;
         if (r.sizeAcres != null) {
             // PyreCast's own control and words, so the two read the same: one size at a
             // time, Median unless another is picked, and everything on the page is that run.
             final String name = com.atakmap.android.firecast.PyrecastForecasts.pctName(r.sizePct);
-            section("Predicted Fire Size", "Showing the " + name + " of " + r.sizeRuns
+            sizeText = ("Showing the " + name + " of " + r.sizeRuns
                     + " runs of this fire, with the wind's speed and direction and the dead fuel moisture nudged"
                     + " the way a forecast misses. The rings, the slider, the acres and the buildings on this page"
                     + " are that run.");
@@ -424,6 +423,14 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 }
             });
             body.addView(sizeRow);
+        }
+        beginFold("Where it goes");
+        section("Where it goes", goes.toString());
+        endFold();
+        if (sizeText != null) {
+            beginFold("About Predicted Fire Size");
+            section("About Predicted Fire Size", sizeText);
+            endFold();
         }
 
         final String flame = String.format(Locale.US, "Flame length %s. Fireline intensity %.0f BTU/ft/s.",
