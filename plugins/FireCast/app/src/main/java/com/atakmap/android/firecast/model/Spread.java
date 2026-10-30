@@ -100,6 +100,13 @@ public final class Spread {
         public final int fuelsCrossed;
         /** Where the run began when the start itself did not burn: meters and bearing from the start; 0 when it began there. */
         public double startOffsetM, startOffsetDeg;
+        /**
+         * True when the front ran out of ground it could enter before the run's end: walls
+         * or fuel that will not carry all round. False when the run reached its end still
+         * moving, however slowly; a litter fire under trees in a light wind can cover two
+         * cells in an hour and is a real answer, not a refusal.
+         */
+        public boolean walled;
         /** How each cell burned, {@link Behave#SURFACE} to {@link Behave#CROWNING}; null for an engine without canopy. */
         public byte[] fireType;
 
@@ -349,28 +356,37 @@ public final class Spread {
                 }
             if (lit == 0 && cells[start] != BARRIER)
                 arrival[start] = 0;
-        } else if (cells[start] == BARRIER) {
-            // Light the nearest burnable cell instead of refusing: the tap was on a road
-            // or a roof. Up to 8 cells (120 m) away, and the result says how far.
+        } else {
+            // Light the start when it carries fire in the first hour; otherwise the nearest
+            // cell that does, instead of refusing: the tap was on a road or a roof, or on
+            // fuel too sparse or wet to carry. Up to 8 cells (120 m) away, and the result
+            // says how far. A cell that is not a wall but will not carry is no start: the
+            // fire would sit on it.
             int best = -1;
             double bestD = Double.MAX_VALUE;
-            for (int i = 0; i < cells.length; i++) {
-                if (cells[i] == BARRIER)
-                    continue;
-                final double dx = i % nx - half, dy = i / nx - half, d = dx * dx + dy * dy;
-                if (d < bestD) {
+            if (cells[start] != BARRIER
+                    && at(start, 0, cells, kindOf, kinds, kindCell, byHour, byKindHour, behavior, rateScale, hours).rate > 0) {
+                best = start;
+                bestD = 0;
+            } else {
+                for (int i = 0; i < cells.length; i++) {
+                    if (cells[i] == BARRIER)
+                        continue;
+                    final double dx = i % nx - half, dy = i / nx - half, d = dx * dx + dy * dy;
+                    if (d >= bestD || d > 64)
+                        continue;
+                    if (at(i, 0, cells, kindOf, kinds, kindCell, byHour, byKindHour, behavior, rateScale, hours).rate <= 0)
+                        continue;
                     bestD = d;
                     best = i;
                 }
             }
-            if (best < 0 || bestD > 64)
+            if (best < 0)
                 return new Result(nx, ny, cell, lat0, lon0, dLat, dLon, arrival, new double[0], 0, burnable, 0);
             arrival[best] = 0;
             final double dx = (best % nx - half) * cell, dy = (best / nx - half) * cell;
             offsetM = Math.sqrt(dx * dx + dy * dy);
-            offsetDeg = (Math.toDegrees(Math.atan2(dx, dy)) + 360d) % 360d;
-        } else {
-            arrival[start] = 0;
+            offsetDeg = offsetM == 0 ? 0 : (Math.toDegrees(Math.atan2(dx, dy)) + 360d) % 360d;
         }
         final PriorityQueue<long[]> q = new PriorityQueue<>(1024, new java.util.Comparator<long[]>() {
             @Override
@@ -383,6 +399,7 @@ public final class Spread {
                 q.add(new long[] { Double.doubleToLongBits(0), i });
         final boolean[] done = new boolean[nx * ny];
         int seen = 0, spotCrossings = 0;
+        boolean ranOut = true;
         double maxSpot = 0;
         final double[] moveLen = new double[MOVES.length], moveBearing = new double[MOVES.length];
         for (int m = 0; m < MOVES.length; m++) {
@@ -397,8 +414,10 @@ public final class Spread {
                 continue;
             done[i] = true;
             seen++;
-            if (t > maxMin)
+            if (t > maxMin) {
+                ranOut = false;
                 break;
+            }
             final int x = i % nx, y = i / nx;
             // The hour the fire is in when it leaves this cell; the last one holds past the end.
             final int hour = Math.min(hours - 1, (int) (t / 60d));
@@ -488,6 +507,7 @@ public final class Spread {
         final Result res = new Result(nx, ny, cell, lat0, lon0, dLat, dLon, arrival, flameByStep(flame, arrival), seen, burnable, fuels.size());
         res.startOffsetM = offsetM;
         res.startOffsetDeg = offsetDeg;
+        res.walled = ranOut;
         res.maxSpotM = maxSpot;
         res.spotCrossings = spotCrossings;
         res.fireType = fireType;

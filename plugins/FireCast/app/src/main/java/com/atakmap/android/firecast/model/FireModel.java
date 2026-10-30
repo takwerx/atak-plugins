@@ -1710,10 +1710,10 @@ public final class FireModel {
             r.groundNote = "The ground run did not take: the start sits on ground that does not burn. This is the one-fuel ellipse.";
             return;
         }
-        if (g.cellsSeen <= 4) {
-            r.problem = "The fire cannot leave the start: LANDFIRE marks the ground around it as commercial, water, bare or "
-                    + "farmed in 30 m cells, and this model does not spot across that. Move the start onto fuel or "
-                    + "into a neighborhood and run again.";
+        if (g.cellsSeen <= 4 && g.walled) {
+            r.problem = "The fire cannot leave the start: within 120 m the ground is not fuel (commercial, water, "
+                    + "bare or farmed in LANDFIRE's 30 m cells) or is too wet or sparse to carry fire in these conditions. "
+                    + "Move the start, or try Dry day to see what a drier day would do.";
             return;
         }
         r.ground = g;

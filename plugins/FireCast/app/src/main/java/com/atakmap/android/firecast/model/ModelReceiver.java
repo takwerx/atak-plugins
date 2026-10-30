@@ -350,9 +350,16 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             if (r.perimeter != null)
                 goes.append("Run from the drawn perimeter: everything inside it was burning at the start.\n");
             if (r.ground.startOffsetM > 0 && r.perimeter == null)
-                goes.append("The start itself is on ground LANDFIRE marks as not burnable (a road, a roof, bare ground), so the run began "
+                goes.append("The start itself is on ground that does not carry fire here (a road, a roof, bare ground, or fuel too "
+                        + "wet or sparse), so the run began "
                         + "from the nearest fuel, ").append(Units.format(r.ground.startOffsetM)).append(" to the ")
                         .append(Units.compass(r.ground.startOffsetDeg)).append(".\n");
+            final int end = r.steps[r.steps.length - 1];
+            if (r.acres(end) < 0.5)
+                goes.append("A slow fire: the fuel here carries fire at ").append(rate(o.rosFtPerMin))
+                        .append(" at this wind, so it covers ").append(acres(r.acres(end))).append(" by ")
+                        .append(clock(r.ranAt + end * 60000L)).append(". A stronger wind or a drier day moves it much "
+                        + "faster; Conditions: Dry and 20 mph wind shows how much.\n");
             if (r.structureNote != null)
                 goes.append(r.structureNote).append('\n');
             else if (r.structures != null)
