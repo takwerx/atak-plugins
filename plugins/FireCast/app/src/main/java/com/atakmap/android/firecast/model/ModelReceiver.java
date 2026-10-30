@@ -431,9 +431,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 + (o.flameLengthFt > 11 ? " Past what a hand crew can hold at the head."
                         : o.flameLengthFt > 8 ? " Too hot for a hand line at the head; equipment or retardant."
                         : o.flameLengthFt > 4 ? " Hand line at the head is marginal." : " Hand line can hold the head.");
+        beginFold("Burn behavior");
         section("How hard it burns", flame);
-
-        inputs(r);
 
         final boolean byHour = r.hourly != null && r.hourly.length > 1;
         section("What this does not mean", r.ground != null
@@ -452,6 +451,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                         + "fuel changes, terrain and a wind that shifts; this is the direction and the order of "
                         + "distance, not a perimeter to plan on. No spotting, no crown fire, no barriers. "
                         + "Run again as the wind changes.");
+        endFold();
+        inputs(r);
     }
 
     private void inputs(FireModel.Run r) {
@@ -505,11 +506,13 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         }
         if (r.windFieldNote != null)
             in.append('\n').append(r.windFieldNote);
+        beginFold("What went in");
         section("What went in", in.toString());
         section("When", FireModel.stamp(r.ranAt) + " run" + (r.by == null ? ""
                 : ", received " + FireModel.stamp(r.receivedAt) + ". The file says it was run by " + r.by
                         + "; ATAK does not confirm who sent it. Drawn here from the file's inputs with this phone's own "
                         + "engine, ground and building count."));
+        endFold();
         final View row = PluginLayoutInflater.inflate(pluginContext, R.layout.model_action_row, null);
         final Button act = row.findViewById(R.id.action);
         act.setEnabled(!model.isRunning());
@@ -712,8 +715,89 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
     // ---- the same page furniture as the detail page ---------------------------------
 
     private void section(String heading, String text) {
-        body.addView(headingView(heading));
-        body.addView(bodyView(text));
+        if (foldContent == null) {
+            body.addView(headingView(heading));
+            body.addView(bodyView(text));
+            return;
+        }
+        // Inside a fold the pill is the heading; a second section keeps its own small one.
+        if (!heading.equals(foldTitle)) {
+            final TextView h = headingView(heading);
+            h.setTextSize(12f);
+            foldContent.addView(h);
+        }
+        foldContent.addView(bodyView(text));
+        if (foldSummary == null) {
+            final String first = text.split("\\n")[0];
+            foldSummary = first.length() > 70 ? first.substring(0, 67) + "..." : first;
+        }
+    }
+
+    /** Sections held open or shut, kept while ATAK runs so a redraw does not close what was opened. */
+    private static final java.util.Set<String> OPEN_FOLDS = new java.util.HashSet<>();
+    private LinearLayout foldContent;
+    private String foldTitle, foldSummary;
+    private TextView foldPill;
+
+    /** The sections that follow go behind one pill, shut until it is tapped. */
+    private void beginFold(String title) {
+        foldTitle = title;
+        foldSummary = null;
+        foldPill = new TextView(view.getContext());
+        foldContent = new LinearLayout(view.getContext());
+        foldContent.setOrientation(LinearLayout.VERTICAL);
+        foldContent.setPadding(dp(12), dp(4), dp(12), dp(8));
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(10);
+        foldPill.setLayoutParams(lp);
+        foldPill.setMinHeight(dp(44));
+        foldPill.setGravity(Gravity.CENTER_VERTICAL);
+        foldPill.setPadding(dp(14), dp(6), dp(14), dp(6));
+        final android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0xFF1E2430);
+        bg.setCornerRadius(dp(22));
+        bg.setStroke(dp(1), 0xFF3A4458);
+        foldPill.setBackground(bg);
+        body.addView(foldPill);
+        body.addView(foldContent);
+    }
+
+    private void endFold() {
+        if (foldContent == null)
+            return;
+        final LinearLayout content = foldContent;
+        final TextView pill = foldPill;
+        final String title = foldTitle, summary = foldSummary;
+        foldContent = null;
+        paintFold(pill, content, title, summary);
+        pill.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!OPEN_FOLDS.remove(title))
+                    OPEN_FOLDS.add(title);
+                paintFold(pill, content, title, summary);
+            }
+        });
+    }
+
+    private void paintFold(TextView pill, LinearLayout content, String title, String summary) {
+        final boolean open = OPEN_FOLDS.contains(title);
+        final android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+        sb.append(title.toUpperCase(Locale.US));
+        sb.setSpan(new android.text.style.ForegroundColorSpan(0xFF00E5FF), 0, sb.length(), 0);
+        sb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, sb.length(), 0);
+        sb.setSpan(new android.text.style.AbsoluteSizeSpan(14, true), 0, sb.length(), 0);
+        if (!open && summary != null && !summary.isEmpty()) {
+            final int at = sb.length();
+            sb.append("\n").append(summary);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(0xFFA0A8B8), at, sb.length(), 0);
+            sb.setSpan(new android.text.style.AbsoluteSizeSpan(13, true), at, sb.length(), 0);
+        }
+        pill.setText(sb);
+        pill.setCompoundDrawablesWithIntrinsicBounds(0, 0, open ? android.R.drawable.arrow_up_float
+                : android.R.drawable.arrow_down_float, 0);
+        content.setVisibility(open ? View.VISIBLE : View.GONE);
     }
 
     private TextView headingView(String text) {
