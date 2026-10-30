@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Fire Cast",
-   plugin-version: "0.1",
+   plugin-version: "0.2",
    platform: "ATAK",
    platform-version: "5.7.0",
 )
@@ -107,6 +107,21 @@ ground, or that a hot pixel is a wildfire and not a flare or a solar farm.
 ]
 
 #tak-slide[
+= The start on the map
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("08.png", width: 80%)
+][
+  The *Fire start* marker sits where you tapped. Drag it, or use Fine Adjust on
+  its menu, to put it exactly where the fire is.
+
+  #v(6pt)
+
+  Then set the conditions and tap *Run model*.
+]
+]
+
+#tak-slide[
 = What the model uses
 
 The fuel, slope and canopy are the real ground from LANDFIRE, cell by cell. Wind
@@ -140,6 +155,23 @@ the fire is the usual reason.
 ]
 
 #tak-slide[
+= A run on the map
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("09.png", width: 80%)
+][
+  Each time step is a ring, red for the first, then orange, then yellow, with
+  the burned ground filled in.
+
+  #v(6pt)
+
+  A run can be small: a litter fire under trees in a light wind may cover a
+  fraction of an acre in an hour, and the page says so. Set *Conditions* to
+  *Dry and 20 mph wind* to see what a bad day would do.
+]
+]
+
+#tak-slide[
 = Predicted Fire Size
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
@@ -155,6 +187,21 @@ the fire is the usual reason.
   Median. The rings, the slider, the acres and the buildings all become that
   one run.
 ]
+]
+
+#tak-slide[
+= Smallest and Largest
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("10.png", width: 80%)
+  Smallest
+][
+  #image("11.png", width: 80%)
+  Largest
+]
+
+The same start and the same map. In a light wind the two are close; the stronger
+the wind, the further apart they come.
 ]
 
 #tak-slide[
@@ -202,6 +249,28 @@ Each is a switch in the pane. Long press a switch for its list, and pick a fire
 to put its time slider on it. PyreCast ranks its runs by what burned at the end
 of the forecast; Fire Cast shows the middle run unless you pick the smaller or
 larger end.
+]
+
+#tak-slide[
+= A PyreCast forecast
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("12.png", width: 72%)
+][
+  #image("13.png", width: 96%)
+
+  Long press the switch for the list and pick a fire. Each forecast runs out to
+  about two weeks, drawn from yellow for the first hours to blue for the last.
+]
+]
+
+#tak-slide[
+= The slider
+
+#image("14.png", width: 92%)
+
+Drag the slider to any time. The edge at that time is drawn in cyan, and the pane
+says where the fire is by then and how big.
 ]
 
 #tak-slide[

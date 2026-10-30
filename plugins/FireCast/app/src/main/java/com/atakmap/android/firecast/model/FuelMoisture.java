@@ -427,10 +427,15 @@ public final class FuelMoisture {
         return Float.isNaN(f) || Float.isInfinite(f) ? Double.NaN : f;
     }
 
+    /** The most one range read asks for: the 4 KB header. Offsets come from the file's own header. */
+    private static final int MAX_RANGE = 4096;
+
     /** Bytes {@code from} to {@code to} of a file; refuses a server that sends the whole thing. */
     private static byte[] range(String url, long from, long to) throws Exception {
         if (!url.startsWith("https://"))
             throw new IllegalStateException("not https");
+        if (from < 0 || to < from || to - from + 1 > MAX_RANGE)
+            throw new IllegalStateException("range out of bounds");
         final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(20000);
         c.setReadTimeout(30000);
@@ -441,7 +446,7 @@ public final class FuelMoisture {
                 throw new IllegalStateException("WFAS answered " + c.getResponseCode() + " to a range");
             if (!"https".equals(c.getURL().getProtocol()))
                 throw new IllegalStateException("not https");
-            final int want = (int) (to - from + 1);
+            final int want = Math.min(MAX_RANGE, (int) (to - from + 1));
             final byte[] out = new byte[want];
             final InputStream in = c.getInputStream();
             try {

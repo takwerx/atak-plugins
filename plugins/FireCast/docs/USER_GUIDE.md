@@ -64,6 +64,8 @@ Tap **Fire model**.
    - **Horizon:** one hour or three hours ahead.
 3. Tap **Run model**. It takes a few seconds.
 
+![The start placed on the map](screenshots/6_start_placed.png)
+
 The model reads the real fuel, slope and canopy from LANDFIRE, wind from the nearest weather station (and the National Weather Service forecast for hours ahead), and how dry the fuels are from the national fuel moisture data. It spreads the fire cell by cell over the real ground, carries embers, lets roads slow it, and counts the buildings and people it reaches from FEMA's building inventory.
 
 ### Reading a result
@@ -74,6 +76,12 @@ The model reads the real fuel, slope and canopy from LANDFIRE, wind from the nea
 - The **time slider** moves the rings on the map between the start and the end of the run. The edge at the slider's time is drawn in cyan.
 - The **table** lists each time step with the area in acres, buildings and people reached.
 
+![A run on the map](screenshots/8_run_on_map.png)
+
+On the map each time step is a ring, red for the first, then orange, then yellow, with the burned ground filled in.
+
+A run can be small. A litter fire under trees in a light wind may cover a fraction of an acre in an hour, and the page says so: *A slow fire: the fuel here carries fire at ...*. Set **Conditions** to *Dry and 20 mph wind* to see what a bad day would do from the same start.
+
 ### Predicted Fire Size
 
 A fire does not spread exactly as forecast. The wind misses, the fuel is drier or wetter than measured. Fire Cast repeats each run 30 times with the wind speed, wind direction and fuel moisture nudged the way a forecast misses, ranks the 30 by how much burned, and offers five of them.
@@ -81,6 +89,12 @@ A fire does not spread exactly as forecast. The wind misses, the fuel is drier o
 ![The Predicted Fire Size picker](screenshots/9_size_picker.png)
 
 Tap **Predicted Fire Size** to pick **Smallest**, **Smaller**, **Median**, **Larger** or **Largest**. It starts on Median. Everything on the page and the map becomes that one run: the rings, the slider, the acres and the buildings. The five names and the percentile wording match PyreCast's.
+
+| Smallest | Largest |
+|---|---|
+| ![Smallest](screenshots/10a_size_smallest.png) | ![Largest](screenshots/10b_size_largest.png) |
+
+The same start, the same map: the smallest of the 30 runs and the largest. In a light wind they are close; the stronger the wind, the further apart they come.
 
 ### The detail pills
 
@@ -104,7 +118,19 @@ Each run is listed with its time, fuel, wind and area. **ON** and **OFF** show o
 
 ## 4. Other forecasts
 
+![The PyreCast switch](screenshots/14_pyrecast_switch.png)
+
 **FIRIS Model Runs** shows the spread runs that California's fire analysts publish for ATAK. **PyreCast Forecasts** shows the ELMFIRE forecasts PyreCast (CloudFire, Inc.) publishes for large fires across the country, shown with their permission, with their logo and a link to pyrecast.com. Each is a switch in the pane. Long press a layer's switch for its list, and pick a fire to put its time slider on it.
+
+![The PyreCast list](screenshots/14b_pyrecast_list.png)
+
+![A PyreCast forecast on the map](screenshots/15_pyrecast_on_map.png)
+
+Each forecast runs out to about two weeks, drawn from yellow for the first hours to blue for the last.
+
+![The slider on a PyreCast forecast](screenshots/16_slider.png)
+
+Drag the slider to any time in the forecast. The edge at that time is drawn in cyan, and the pane says where the fire is by then: *By Nov 2 11:04, in 3 days: 1,236 acres.*
 
 PyreCast ranks its own runs by how much burned at the end of the forecast. Fire Cast shows the middle run unless you pick the smaller or larger end, and shows one run at a time.
 

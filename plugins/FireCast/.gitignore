@@ -37,3 +37,6 @@ captures/
 # Submission zips
 dist/
 *.zip
+
+# Uncropped device captures; only the crops are published
+docs/screenshots/raw/
