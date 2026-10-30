@@ -733,6 +733,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             h.setTextSize(12f);
             foldContent.addView(h);
         }
+        if (text.trim().isEmpty())
+            return;
         foldContent.addView(bodyView(text));
         if (foldSummary == null) {
             final String first = text.split("\\n")[0];
