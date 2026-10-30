@@ -150,6 +150,10 @@ CANDIDATES=(
     "$NAME/app/src/main/assets/"
     "$NAME/app/src/main/res/"
     "$NAME/app/src/main/java/"
+    # Native code (ndkBuild): Android.mk and the C/C++ it names. Left out, the
+    # clean-extract build dies on "ndkBuild.path ... Android.mk doesn't exist"
+    # (FireCast, 2026-10-29, the first plugin with a cpp/ tree).
+    "$NAME/app/src/main/cpp/"
     "$NAME/app/src/gov/"
     "$NAME/template.local.properties"
     "$NAME/README.md"
