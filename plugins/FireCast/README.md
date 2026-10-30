@@ -1,5 +1,16 @@
 ATAK Plugin — Fire Cast
 
+**Download Fire Cast 0.1** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+
+- **ATAK-CIV 5.6:** https://github.com/takwerx/fire-cast/releases/download/v0.1/ATAK-Plugin-FireCast-0.1--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/fire-cast/releases/download/v0.1/ATAK-Plugin-FireCast-0.1--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/fire-cast/releases/download/v0.1/ATAK-Plugin-FireCast-0.1--5.8.0-civ-release.apk
+
+All releases: https://github.com/takwerx/fire-cast/releases
+
+**User guide with screenshots: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)**
+(https://github.com/takwerx/fire-cast/blob/main/docs/USER_GUIDE.md)
+
 
 _________________________________________________________________
 PURPOSE AND CAPABILITIES
@@ -46,6 +57,16 @@ in the pane with a list behind a long press and a time slider on the run you pic
     unless you pick the smaller or larger end. Forecasts are kept on the device
     and come back with no signal.
 
+The fire model runs on the device. Tap a point or draw a perimeter, and the
+plugin spreads a fire over the real fuel, slope and canopy (LANDFIRE) with the
+wind from the nearest weather station, how dry the fuels are, and embers,
+counting the buildings and people reached from FEMA's building inventory. Each
+run is repeated 30 times with the inputs nudged the way a forecast misses, and
+the operator picks a Predicted Fire Size, Smallest to Largest, that the rings, the
+slider, the acres and the buildings all follow. Runs stay on the device and come
+back after a restart with no signal. The spread engine is the Forest Service's
+public domain `behave` library, run through the NDK.
+
 The detail panel is the point of the plugin. It says how big the footprint is and
 how that was arrived at, when the satellite saw it and how long it has been
 burning where the feed tracks that, the radiative power and brightness
@@ -57,30 +78,43 @@ empty ground, that a hot pixel is a wildfire rather than a flare or a solar farm
 _________________________________________________________________
 STATUS
 
-0.1, in development, not released. Detections only. The fire behavior model,
-structure counts and evacuation direction described in the plan are later
-versions; nothing in this build models anything.
+0.1, in development, not released. Heat detections, a fire spread model that runs
+on the device, and other agencies' published forecasts, all on the ATAK map. The
+model gives a direction and an order of magnitude, not a perimeter to plan on;
+the user guide says what it leaves out.
 
 _________________________________________________________________
 POINT OF CONTACTS
 
 Andreas Johansson, TAKwerx.
 
+Bug reports and questions:
+https://github.com/takwerx/fire-cast/issues
+
 _________________________________________________________________
 PORTS REQUIRED
 
 Outbound HTTPS (TCP 443) only; nothing inbound.
 
-  - services3.arcgis.com - NIFC's public ArcGIS organization, which hosts every
-    feed this plugin reads.
+  - services3.arcgis.com, services2.arcgis.com - NIFC's and FEMA's public ArcGIS
+    organizations: the heat detection feeds, weather stations and the building
+    inventory.
+  - fire.data.nesdis.noaa.gov - NOAA's GOES fire detections.
+  - edcintl.cr.usgs.gov - LANDFIRE fuel, slope and canopy.
+  - api.weather.gov - National Weather Service observations and gridded forecast.
+  - nomads.ncep.noaa.gov - NOAA's HRRR wind forecast.
+  - fems.fs2c.usda.gov, www.wfas.net - Forest Service fuel moisture.
+  - data.pyrecast.org - PyreCast forecasts (www.pyrecast.com for the link in the pane).
+  - atak.s3.us-west-1.amazonaws.com - FIRIS model runs.
 
-No sign-in, no token, no credential of any kind is sent or stored.
+No sign-in, no token, no credential of any kind is sent or stored. The device's
+position is sent only as part of a request to the services above.
 
 _________________________________________________________________
 EQUIPMENT REQUIRED
 
 An Android device running ATAK-CIV 5.6, 5.7 or 5.8, with a network connection to
-fetch detections. The last set fetched is kept on the device and redraws without
+fetch detections and run the model. The last set fetched is kept on the device and redraws without
 one, with its age on the pane.
 
 _________________________________________________________________
