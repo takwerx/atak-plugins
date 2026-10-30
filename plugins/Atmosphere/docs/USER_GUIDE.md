@@ -1,12 +1,12 @@
 # Atmosphere for ATAK — User Guide
 
-**Version 0.19 · takwerx**
+**Version 0.21 · takwerx**
 
-**Download Atmosphere 0.19** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Atmosphere 0.21** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.19/ATAK-Plugin-Atmosphere-0.19--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.19/ATAK-Plugin-Atmosphere-0.19--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.19/ATAK-Plugin-Atmosphere-0.19--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/atmosphere/releases/download/v0.21/ATAK-Plugin-Atmosphere-0.21--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/atmosphere/releases
 
@@ -414,13 +414,16 @@ layer.
 <img src="screenshots/97_reports_layer_block.png" width="420"> <img src="screenshots/101_reports_map.jpg" width="420">
 
 **The Storm Reports page** lists the same reports, and the tornado paths with
-them: **US**, **Near** the point in the pane's top row (your position,
-the map center or a picked point), on the **Map** as it sits, re-read whenever
-the map settles, or by **State**; **Newest** or **Closest** first; and a type
-picker of switches, any mix of the eight families and **Tornado**, which covers
-the dots and the paths. What you tick is what the map draws. A row flies the
-map to the report and opens its details in one tap. **Open the list** under the
-layer's switch jumps to the page.
+them, under one row of buttons. The first reads where the list looks and how
+many it holds, and opens the choices beneath it: **US**, **Near** the point in
+the pane's top row (your position, the map center or a picked point), on the
+**Map** as it sits, re-read whenever the map settles, or by **State**. The next
+flips between **Newest** and **Closest** first. **All Types** is a type picker
+of switches, any mix of the eight families and **Tornado**, which covers the
+dots and the paths; what you tick is what the map draws. The last steps through
+the window: **24 h**, **48 h**, **72 h**. A row flies the map to the report and
+opens its details in one tap. **Open the list** under the layer's switch jumps
+to the page.
 
 <img src="screenshots/107_reports_page.jpg" width="420"> <img src="screenshots/108_reports_types.png" width="420">
 
@@ -550,10 +553,13 @@ report is not drawn there.
 ## 11. Spot Weather Forecast
 
 The layer draws every spot forecast request the National Weather Service has
-open, with the forecast the office wrote for each. The page lists them — All,
-Nearby, On map, by State or by Region — **Newest** or **Closest** first, and a
-search box finds one by incident name. Nearby and Closest measure from the
-point chosen in the top row. Tap a request for its forecast.
+open, with the forecast the office wrote for each. The page lists them under
+one row of buttons: the first reads where the list looks and how many it holds,
+and opens the choices beneath it (All, Nearby, On map, by State or by Region);
+the next flips between **Newest** and **Closest** first; and the magnifier at
+the end of the row opens a search box that finds one by incident name, which a
+second tap closes and clears. Nearby and Closest measure from the point chosen
+in the top row. Tap a request for its forecast.
 
 <img src="screenshots/58_spots.jpg" width="420"> <img src="screenshots/59_spot_list.png" width="420">
 

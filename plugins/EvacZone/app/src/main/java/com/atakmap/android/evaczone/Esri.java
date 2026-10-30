@@ -1,6 +1,7 @@
 package com.atakmap.android.evaczone;
 
 import com.atakmap.map.layer.feature.AttributeSet;
+import com.atakmap.map.layer.feature.geometry.Envelope;
 import com.atakmap.map.layer.feature.geometry.Geometry;
 import com.atakmap.map.layer.feature.geometry.GeometryCollection;
 import com.atakmap.map.layer.feature.geometry.LineString;
@@ -16,9 +17,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -144,11 +147,87 @@ public final class Esri {
         return ls;
     }
 
-    private static Polygon polygon(JSONArray rings) throws Exception {
-        final Polygon poly = new Polygon(2);
-        for (int i = 0; i < rings.length(); i++)
-            poly.addRing(line(rings.getJSONArray(i)));
-        return poly;
+    /**
+     * Esri rings are a multipart polygon: every clockwise ring is a part's outside,
+     * every counter-clockwise one a hole in the part that holds it. Read as one
+     * polygon, ring 0 was the outside and every other part a "hole" outside it, so
+     * only the first part filled: North Carolina's zones are hundreds of parts each.
+     * One part is a polygon; several are a collection of polygons. A layer with no
+     * clockwise ring is read the old way, ring 0 outside.
+     */
+    private static Geometry polygon(JSONArray rings) throws Exception {
+        final List<LineString> outer = new ArrayList<>();
+        final List<LineString> holes = new ArrayList<>();
+        for (int i = 0; i < rings.length(); i++) {
+            final LineString r = line(rings.getJSONArray(i));
+            if (r.getNumPoints() < 3)
+                continue;
+            (signedArea(r) < 0 ? outer : holes).add(r);
+        }
+        if (outer.isEmpty()) {
+            final Polygon poly = new Polygon(2);
+            for (LineString r : holes)
+                poly.addRing(r);
+            return poly;
+        }
+        final List<Polygon> parts = new ArrayList<>();
+        final List<Envelope> boxes = new ArrayList<>();
+        final double[] areas = new double[outer.size()];
+        for (int i = 0; i < outer.size(); i++) {
+            final Polygon p = new Polygon(2);
+            p.addRing(outer.get(i));
+            parts.add(p);
+            boxes.add(outer.get(i).getEnvelope());
+            areas[i] = -signedArea(outer.get(i));
+        }
+        for (LineString h : holes) {
+            final double x = h.getX(0), y = h.getY(0);
+            int best = -1;
+            for (int i = 0; i < outer.size(); i++) {
+                final Envelope e = boxes.get(i);
+                if (x < e.minX || x > e.maxX || y < e.minY || y > e.maxY)
+                    continue;
+                if ((best < 0 || areas[i] < areas[best]) && contains(outer.get(i), x, y))
+                    best = i;
+            }
+            if (best >= 0) {
+                parts.get(best).addRing(h);
+            } else {
+                // A hole no part holds is drawn as a part, not lost.
+                final Polygon p = new Polygon(2);
+                p.addRing(h);
+                parts.add(p);
+            }
+        }
+        if (parts.size() == 1)
+            return parts.get(0);
+        final GeometryCollection gc = new GeometryCollection(2);
+        for (Polygon p : parts)
+            gc.addGeometry(p);
+        return gc;
+    }
+
+    /** Shoelace area in degrees²; negative for a clockwise ring. */
+    private static double signedArea(LineString r) {
+        double a = 0;
+        final int n = r.getNumPoints();
+        for (int i = 0; i < n; i++) {
+            final int j = (i + 1) % n;
+            a += r.getX(i) * r.getY(j) - r.getX(j) * r.getY(i);
+        }
+        return a / 2;
+    }
+
+    /** Even-odd point in ring. */
+    private static boolean contains(LineString r, double x, double y) {
+        boolean in = false;
+        final int n = r.getNumPoints();
+        for (int i = 0, j = n - 1; i < n; j = i++) {
+            final double xi = r.getX(i), yi = r.getY(i), xj = r.getX(j), yj = r.getY(j);
+            if ((yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi)
+                in = !in;
+        }
+        return in;
     }
 
     /** Every non-null property as a string; dates formatted from epoch ms. */

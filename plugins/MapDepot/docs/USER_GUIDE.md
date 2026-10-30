@@ -1,12 +1,12 @@
 # Map Depot for ATAK — User Guide
 
-**Version 1.13 · takwerx**
+**Version 1.14 · takwerx**
 
-**Download Map Depot 1.13** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.14** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.13/ATAK-Plugin-MapDepot-1.13--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.14/ATAK-Plugin-MapDepot-1.14--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.14/ATAK-Plugin-MapDepot-1.14--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.14/ATAK-Plugin-MapDepot-1.14--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
@@ -55,7 +55,7 @@ Load the plugin from ATAK's Plugins manager, then open it from the toolbar.
 
 ![Map Depot in the ATAK toolbar](screenshots/1_plugin_in_toolbar.png)
 
-The landing page offers six kinds of data, each on its own page.
+The landing page offers eight kinds of data, each on its own page.
 
 ![The Map Depot landing page](screenshots/2_landing_page.png)
 

@@ -3,7 +3,7 @@
 
 #show: userguide.with(
    plugin-name: "Atmosphere",
-   plugin-version: "0.19",
+   plugin-version: "0.21",
    platform: "ATAK",
    platform-version: "5.8.0",
 )
@@ -301,6 +301,10 @@ it is a direction.
   The line under it reads the wind *Here*, at the pane's point: speed and
   where it comes from. Outside the area being drawn it says so.
 
+  In 3D the streaks lie on the ground and follow it over ridges and down into
+  valleys, around the point the map looks at and out to a few screen widths;
+  the ground farther toward the horizon is left clear.
+
   The height buttons further down draw the wind from 10 m up to the jet
   stream.
 ]
@@ -374,12 +378,14 @@ it is a direction.
   #image("107.jpg", width: 100%)
   #image("108.jpg", width: 100%)
 ][
-  The *Storm Reports* page lists the reports and the tornado paths together:
-  *US*, *Near* the point in the pane's top row, on the *Map* as it sits
-  (read again whenever the map settles), or by *State*; *Newest* or *Closest*
-  first; and a picker of switches for any mix of the eight families and
-  *Tornado*, which covers the dots and the paths. What you tick is what the map
-  draws.
+  The *Storm Reports* page lists the reports and the tornado paths together,
+  under one row of buttons. The first reads where the list looks and how many
+  it holds, and opens the choices beneath it: *US*, *Near* the point in the
+  pane's top row, on the *Map* as it sits (read again whenever the map
+  settles), or by *State*. The next flips between *Newest* and *Closest*
+  first. *All Types* is a picker of switches for any mix of the eight families
+  and *Tornado*, which covers the dots and the paths; what you tick is what the
+  map draws. The last steps through the window: *24 h*, *48 h*, *72 h*.
 
   A row flies the map to the report and opens its details in one tap. *Open
   the list* under the layer's switch jumps here.
@@ -884,8 +890,9 @@ the flooded ground.
 ][
   *Buoys* draws the buoys and coastal stations as diamonds: yellow when the
   reading is recent, red when the station has been silent for more than
-  eight hours. The *Buoys* page lists them nearest first, with filters that
-  say how many each will show: wind, seas, rough water, favorites.
+  eight hours. The *Buoys* page lists them nearest first. The button beside
+  the page name reads the filter in force and opens the others, each saying
+  how many it will show: wind, seas, rough water, favorites.
 ]
 ]
 
@@ -992,8 +999,9 @@ classes, lower 48 only.
   The station layer draws the weather stations around you with a barb for the
   wind and the readings beside it: wind, gusts and humidity. A station is
   colored by how close it is to the Red Flag criteria for its own fire weather
-  zone. The *Weather Stations* page lists them nearest first, with filters that say
-  how many each will show.
+  zone. The *Weather Stations* page lists them nearest first. The button beside
+  the page name reads the filter in force and opens the others, each saying how
+  many it will show.
 ]
 ]
 
@@ -1062,10 +1070,13 @@ classes, lower 48 only.
 #v(4pt)
 The *Spot Weather Forecast* layer draws every open spot forecast request: W
 for a wildfire, P for a prescribed fire, S for search and rescue. The *Spot
-Weather Forecast* page lists them - all, nearby, on the map, by state or
-region - *Newest* or *Closest* first, with a search by incident name. Nearby
-and Closest measure from the point chosen in the top row. Tap one for the
-forecast the office wrote.
+Weather Forecast* page lists them under one row of buttons: the first reads
+where the list looks and how many it holds, and opens the choices beneath it
+(all, nearby, on the map, by state or region); the next flips between
+*Newest* and *Closest* first; and the magnifier at the end of the row opens a
+search by incident name, which a second tap closes and clears. Nearby and
+Closest measure from the point chosen in the top row. Tap one for the forecast
+the office wrote.
 ]
 
 #tak-slide[

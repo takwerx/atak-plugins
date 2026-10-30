@@ -780,9 +780,9 @@ public final class AtmospherePane {
         addPageSwitch(zonePage.view(), R.id.firezones_toggle);
         addPageSwitch(sawtiPage.view(), R.id.sawti_toggle);
         addPageSwitch(ercPage.view(), R.id.erc_toggle);
-        addPageSwitch(stationPage.view(), R.id.stations_toggle);
-        addPageSwitch(gaugePage.view(), R.id.gauges_toggle);
-        addPageSwitch(buoyPage.view(), R.id.buoys_toggle);
+        addPageSwitch(stationPage.view(), R.id.stations_toggle, stationPage.filterHead());
+        addPageSwitch(gaugePage.view(), R.id.gauges_toggle, gaugePage.filterHead());
+        addPageSwitch(buoyPage.view(), R.id.buoys_toggle, buoyPage.filterHead());
         addPageSwitch(reportsPage.view(), R.id.reports_toggle);
         addPageSwitch(rainPage.view(), R.id.raingauges_toggle);
         pager = root.findViewById(R.id.pager);
@@ -6238,6 +6238,14 @@ public final class AtmospherePane {
      * something else that is already on the page to allow space for list items").
      */
     private void addPageSwitch(View page, int toggleId) {
+        addPageSwitch(page, toggleId, null);
+    }
+
+    /**
+     * The page's switch on its heading's line; {@code middle}, when given, between
+     * the two -- a page's folded filter, so the filter costs the list no row of its own.
+     */
+    private void addPageSwitch(View page, int toggleId, View middle) {
         final View t = pages[LAYERS_PAGE].findViewById(toggleId);
         if (!(t instanceof Button))
             return;
@@ -6274,8 +6282,19 @@ public final class AtmospherePane {
             parent.removeViewAt(at);
             heading.setPadding(heading.getPaddingLeft(), 0, heading.getPaddingRight(),
                     heading.getPaddingBottom());
-            line.addView(heading, new LinearLayout.LayoutParams(0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            if (middle == null)
+                line.addView(heading, new LinearLayout.LayoutParams(0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            else {
+                // The heading keeps its words; the filter takes what is left between it
+                // and the switch.
+                line.addView(heading, new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                final LinearLayout.LayoutParams midLp = new LinearLayout.LayoutParams(0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                midLp.leftMargin = (int) (8 * pluginContext.getResources().getDisplayMetrics().density);
+                line.addView(middle, midLp);
+            }
             final LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             swLp.leftMargin = (int) (8 * pluginContext.getResources().getDisplayMetrics().density);

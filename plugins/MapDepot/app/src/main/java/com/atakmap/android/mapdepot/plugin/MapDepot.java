@@ -86,6 +86,24 @@ public class MapDepot implements IPlugin {
     private Context pluginContext;
     private IHostUIService uiService;
     private ToolbarItem toolbarItem;
+
+    /**
+     * Opens the pane from a broadcast, so a session driving the phone over
+     * adb can open it without walking ATAK's Tools list (a stray tap there
+     * opens another plugin's pane). System-registered: a plain
+     * registerReceiver is process-local and {@code am broadcast} cannot
+     * reach it.
+     */
+    public static final String ACTION_SHOW = "com.atakmap.android.mapdepot.SHOW";
+
+    private final android.content.BroadcastReceiver showReceiver =
+            new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(Context c, android.content.Intent i) {
+                    if (uiService != null)
+                        showPane();
+                }
+            };
     private Pane pane;
 
     private DepotClient client;
@@ -392,6 +410,9 @@ public class MapDepot implements IPlugin {
         baseMaps = new BaseMapInstaller();
         packages = new PackageInstaller();
         uiService.addToolbarItem(toolbarItem);
+        com.atakmap.android.ipc.AtakBroadcast.getInstance().registerSystemReceiver(
+                showReceiver, new com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter(
+                        ACTION_SHOW, "Open the Map Depot pane"));
         registerPreferences();
         final com.atakmap.android.maps.MapView mv =
                 com.atakmap.android.maps.MapView.getMapView();
@@ -621,6 +642,12 @@ public class MapDepot implements IPlugin {
     @Override
     public void onStop() {
         unregisterPreferences();
+        try {
+            com.atakmap.android.ipc.AtakBroadcast.getInstance()
+                    .unregisterSystemReceiver(showReceiver);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "show receiver was not registered", e);
+        }
 
         // A fetch in flight when the client is shut down never calls back,
         // and a flag left true would make the next FSTopo pick do nothing.
@@ -2318,6 +2345,7 @@ public class MapDepot implements IPlugin {
         forestStatus.setText("Removing " + pkg.name() + "…");
         packages.uninstall(pkg, packageCallback());
     }
+
 
     private PackageInstaller.Callback packageCallback() {
         return new PackageInstaller.Callback() {

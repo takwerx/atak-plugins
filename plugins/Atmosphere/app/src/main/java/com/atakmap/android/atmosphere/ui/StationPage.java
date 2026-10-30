@@ -63,6 +63,7 @@ public final class StationPage {
     private final Host host;
     private final View root;
     private final LinearLayout filterRow;
+    private final FilterFold fold;
     private final TextView status;
     private final ListView list;
     private final View detail;
@@ -81,12 +82,18 @@ public final class StationPage {
         this.host = host;
         root = PluginLayoutInflater.inflate(pluginContext, R.layout.page_stations, null);
         filterRow = root.findViewById(R.id.stations_filter_row);
+        fold = new FilterFold(pluginContext, filterRow);
         status = root.findViewById(R.id.stations_page_status);
         list = root.findViewById(R.id.stations_list);
         list.setAdapter(adapter);
         detail = root.findViewById(R.id.stations_detail);
         detailBody = root.findViewById(R.id.stations_detail_body);
         heading = root.findViewById(R.id.stations_page_heading);
+    }
+
+    /** The folded filter's button, for the heading's line beside the Map switch. */
+    public View filterHead() {
+        return fold.head;
     }
 
     public View view() {
@@ -174,6 +181,25 @@ public final class StationPage {
         filterRow.addView(fav);
     }
 
+    /**
+     * A filter tile's words on two lines at 12sp, the name over its count, the way
+     * the page button reads: four tiles across a phone-width pane cut "Red Flag (12)"
+     * to "Red Flag (..." (operator, 2026-10-23: "can we have perhaps the text smaller
+     * but two rows"). A tile with no name before its count ("\u2605 (3)") stays on one
+     * line. Shared by the Stations, River Gauges and Buoys pages.
+     */
+    static void nameOverCount(Button b, String label) {
+        final int at = label.lastIndexOf(" (");
+        if (at > 1)
+            b.setText(label.substring(0, at) + "\n" + label.substring(at + 1));
+        b.setSingleLine(false);
+        b.setMaxLines(2);
+        b.setTextSize(12);
+        b.setLineSpacing(0f, 0.9f);
+        final float d = b.getResources().getDisplayMetrics().density;
+        b.setPadding(Math.round(4 * d), Math.round(2 * d), Math.round(4 * d), Math.round(2 * d));
+    }
+
     /** Paint one star, wherever it lives. */
     private void styleStar(TextView star, Raws.Station s) {
         final boolean on = layer != null && layer.isFavorite(s);
@@ -194,10 +220,14 @@ public final class StationPage {
 
     private View tile(String label, boolean chosen, final int color, final int value) {
         final Button b = chip(label, chosen, color);
+        nameOverCount(b, label);
+        if (chosen)
+            fold.label(label, color, value != ALL);
         b.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 filter = value;
+                fold.close();
                 refresh();
             }
         });
@@ -385,7 +415,7 @@ public final class StationPage {
         detail.setVisibility(View.VISIBLE);
         list.setVisibility(View.GONE);
         headingLine().setVisibility(View.GONE);
-        filterRow.setVisibility(View.GONE);
+        fold.listShown(false);
         status.setVisibility(View.GONE);
     }
 
@@ -394,7 +424,7 @@ public final class StationPage {
         detail.setVisibility(View.GONE);
         list.setVisibility(View.VISIBLE);
         headingLine().setVisibility(View.VISIBLE);
-        filterRow.setVisibility(View.VISIBLE);
+        fold.listShown(true);
         status.setVisibility(View.VISIBLE);
     }
 

@@ -11,6 +11,7 @@ import com.atakmap.android.atmosphere.wind.WindGrid;
 import com.atakmap.android.maps.MapView;
 import com.atakmap.coremap.log.Log;
 import com.atakmap.coremap.maps.coords.GeoBounds;
+import com.atakmap.coremap.maps.coords.GeoPoint;
 import com.atakmap.map.AtakMapView;
 
 import java.io.IOException;
@@ -67,6 +68,12 @@ public final class WindOverlay {
     private static final long SCRUB_SETTLE_MS = 180L;
     private static final int CACHE_GRIDS = 24;
     private static final int RUN_STEPS_BACK = 4;
+    /**
+     * A tilted view wider than this from its focus is a continent seen edge on, where
+     * the ground is no longer flat enough for the view's perspective; it gets the
+     * globe's answer.
+     */
+    private static final double MAX_TILTED_REACH_M = 400_000;
 
     public interface Listener {
         void onFrames(List<String> labels, int shown);
@@ -462,30 +469,54 @@ public final class WindOverlay {
     private void ensureRegion() {
         if (!on)
             return;
-        final GeoBounds bounds = mapView.getBounds();
-        if (bounds == null)
-            return;
-        // On the globe the bounds come back NaN, or span the world, or cross the
-        // antimeridian; any of those means "everything", which is a job for GFS.
-        final boolean wholeWorld = Double.isNaN(bounds.getNorth()) || Double.isNaN(bounds.getSouth())
-                || Double.isNaN(bounds.getEast()) || Double.isNaN(bounds.getWest())
-                || bounds.getEast() <= bounds.getWest()
-                || bounds.getEast() - bounds.getWest() >= 355;
-        if (wholeWorld) {
-            // The view draws each trail between the four projected corners of the map,
-            // which is a quadrilateral on a flat map and not one on the globe, so the
-            // particles would land nowhere. Say so rather than fetch half a megabyte of
-            // wind and draw nothing (XCover, 2026-09-22).
-            if (view != null)
-                view.setGrid(null);
-            status("Zoom in to see the wind");
-            region = null;
-            return;
+        final double vw, ve, vs, vn;
+        if (WindView.tilted(mapView)) {
+            // A tilted (3D) view's bounds run out to the horizon, and come back NaN once
+            // the sky is in it, which read as the globe: the layer said "Zoom in to see
+            // the wind" over a 1 km view of a ridge (Note 20, 2026-10-24). Wind is wanted
+            // around the point the camera looks at, out a few screen spans.
+            final GeoPoint f = WindView.focus(mapView);
+            final double reach = WindView.tiltedReachMeters(mapView);
+            if (f == null || reach > MAX_TILTED_REACH_M) {
+                if (view != null)
+                    view.setGrid(null);
+                status("Zoom in to see the wind");
+                region = null;
+                return;
+            }
+            final double dLat = reach / 110540.0;
+            final double dLon = reach / (111320.0
+                    * Math.max(0.05, Math.cos(Math.toRadians(f.getLatitude()))));
+            vw = f.getLongitude() - dLon;
+            ve = f.getLongitude() + dLon;
+            vs = Math.max(-89.9, f.getLatitude() - dLat);
+            vn = Math.min(89.9, f.getLatitude() + dLat);
+        } else {
+            final GeoBounds bounds = mapView.getBounds();
+            if (bounds == null)
+                return;
+            // On the globe the bounds come back NaN, or span the world, or cross the
+            // antimeridian; any of those means "everything", which is a job for GFS.
+            final boolean wholeWorld = Double.isNaN(bounds.getNorth()) || Double.isNaN(bounds.getSouth())
+                    || Double.isNaN(bounds.getEast()) || Double.isNaN(bounds.getWest())
+                    || bounds.getEast() <= bounds.getWest()
+                    || bounds.getEast() - bounds.getWest() >= 355;
+            if (wholeWorld) {
+                // The view draws each trail between the four projected corners of the map,
+                // which is a quadrilateral on a flat map and not one on the globe, so the
+                // particles would land nowhere. Say so rather than fetch half a megabyte of
+                // wind and draw nothing (XCover, 2026-09-22).
+                if (view != null)
+                    view.setGrid(null);
+                status("Zoom in to see the wind");
+                region = null;
+                return;
+            }
+            vw = bounds.getWest();
+            ve = bounds.getEast();
+            vs = bounds.getSouth();
+            vn = bounds.getNorth();
         }
-        final double vw = bounds.getWest();
-        final double ve = bounds.getEast();
-        final double vs = bounds.getSouth();
-        final double vn = bounds.getNorth();
 
         final NomadsWind.Model chosen = NomadsWind.forView(vw, vs, ve, vn, level);
         final GeoBounds clamped = new GeoBounds(
