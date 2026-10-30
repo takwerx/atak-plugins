@@ -189,10 +189,10 @@ public final class FireModel {
         public double[] sizeAcres;
         /** How many runs the sizes come from. */
         public int sizeRuns;
-        /** The nudges that made the Smallest (10th) and Largest (90th) runs: {wind x, direction + deg, moisture x}. */
-        public double[] smallNudge, largeNudge;
-        /** Those two runs' edges at the end, drawn dashed. Not saved: run again from the nudges. */
-        public List<Polygon> smallEdge, largeEdge;
+        /** The nudges behind each size, in {@link #SIZE_PCT} order: {wind x, direction + deg, moisture x}. */
+        public double[][] sizeNudges;
+        /** The size shown: one of {@link #SIZE_PCT}, Median unless the operator picks another. */
+        public int sizePct = 50;
         /** Buildings reached by each step, homes among them, and people, from FEMA's inventory; null when not fetched. */
         public int[] structures, homes;
         public double[] people;
@@ -1587,28 +1587,57 @@ public final class FireModel {
         for (int i = 0; i < SIZE_PCT.length; i++)
             r.sizeAcres[i] = acres.get(order[(int) Math.round(SIZE_PCT[i] / 100d * (count - 1))]);
         r.sizeRuns = count;
-        r.smallNudge = nudges.get(order[(int) Math.round(0.1 * (count - 1))]);
-        r.largeNudge = nudges.get(order[(int) Math.round(0.9 * (count - 1))]);
+        r.sizeNudges = new double[SIZE_PCT.length][];
+        for (int i = 0; i < SIZE_PCT.length; i++)
+            r.sizeNudges[i] = nudges.get(order[(int) Math.round(SIZE_PCT[i] / 100d * (count - 1))]);
         Log.d(TAG, "sizes: " + count + " runs in " + (System.currentTimeMillis() - t0) + " ms, acres "
                 + java.util.Arrays.toString(r.sizeAcres));
-        sizeEdges(r, land, useField);
+        sizeGround(r, land, useField);
     }
 
-    /** The Smallest and Largest runs again from their nudges, for their edges at the end. */
-    private void sizeEdges(Run r, Landscape land, boolean useField) {
-        if (r.smallNudge == null || r.largeNudge == null)
+    /**
+     * The picked size becomes the run on the map: that one run again from its nudge,
+     * so the rings, the slider, the acres and the buildings all describe it. Seeded
+     * nudges, so it is the same run every time it is drawn.
+     */
+    private void sizeGround(Run r, Landscape land, boolean useField) {
+        if (r.sizeNudges == null)
             return;
-        final int last = r.steps[r.steps.length - 1];
-        final int hours = r.hourly == null ? 1 : r.hourly.length;
-        final double[][] ns = { r.smallNudge, r.largeNudge };
-        final List<List<Polygon>> edges = new ArrayList<>();
-        for (double[] n : ns) {
-            final Spread.Result m = Spread.run(land, r.lat, r.lon, r.halfKm, last, behaviorFor(r, n[0], n[1], n[2]),
-                    r.perimeter, r.rateScale, fieldFor(r, useField, n[0], n[1]), r.ranAt, r.cellM, hours);
-            edges.add(m.rings(last));
-        }
-        r.smallEdge = edges.get(0);
-        r.largeEdge = edges.get(1);
+        int i = 2;
+        for (int k = 0; k < SIZE_PCT.length; k++)
+            if (SIZE_PCT[k] == r.sizePct)
+                i = k;
+        final double[] n = r.sizeNudges[i];
+        final Spread.Result m = Spread.run(land, r.lat, r.lon, r.halfKm, r.steps[r.steps.length - 1],
+                behaviorFor(r, n[0], n[1], n[2]), r.perimeter, r.rateScale, fieldFor(r, useField, n[0], n[1]),
+                r.ranAt, r.cellM, r.hourly == null ? 1 : r.hourly.length);
+        if (m.cellsSeen > 4)
+            r.ground = m;
+    }
+
+    /** Shows another Predicted Fire Size for a run: redrawn, buildings counted again, kept. */
+    public void setSize(final Run r, final int pct) {
+        if (running)
+            return;
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    r.sizePct = pct;
+                    final Landscape land = Landscape.around(r.lat, r.lon, r.halfKm);
+                    sizeGround(r, land, r.windField != null && r.fieldWind && !COND_DRY_WINDY.equals(r.conditions));
+                    countStructures(r);
+                    synchronized (lock) {
+                        dropLocked(r);
+                        drawLocked(r);
+                    }
+                    save();
+                } catch (Throwable t) {
+                    Log.w(TAG, "size change failed: " + t);
+                }
+                changed();
+            }
+        });
     }
 
     private void acrossTheGroundNoStructures(final Run r) {
@@ -1689,7 +1718,7 @@ public final class FireModel {
         }
         r.ground = g;
         if (skipStructures)
-            sizeEdges(r, land, useField);
+            sizeGround(r, land, useField);
         else
             sizes(r, land, useField);
         if (!skipStructures)
@@ -2106,26 +2135,6 @@ public final class FireModel {
                                 Feature.AltitudeMode.ClampToGround, 0d));
                     }
                 }
-                // Predicted Fire Size: the Smallest and Largest runs' edges at the end, dashed.
-                final List<Polygon> range = new ArrayList<>();
-                if (r.smallEdge != null)
-                    range.addAll(r.smallEdge);
-                if (r.largeEdge != null)
-                    range.addAll(r.largeEdge);
-                // White dashes over a solid dark line, so it reads on light and dark base maps alike.
-                final Style dash = new CompositeStyle(new Style[] {
-                        new BasicStrokeStyle(0xCC000000, 5f),
-                        new com.atakmap.map.layer.feature.style.PatternStrokeStyle(2, (short) 0xF0F0,
-                                1f, 1f, 1f, 1f, 3f) });
-                for (int i = 0; i < range.size(); i++) {
-                    final boolean small = r.smallEdge != null && i < r.smallEdge.size();
-                    final String name = (small ? "Smallest" : "Largest") + " Predicted Fire Size, "
-                            + r.steps[r.steps.length - 1] + " min";
-                    final AttributeSet a = new AttributeSet();
-                    a.setAttribute("_title", name);
-                    store.insertFeature(new Feature(fsid, name, range.get(i), dash, a,
-                            Feature.AltitudeMode.ClampToGround, 0d));
-                }
                 r.atFids.clear();
                 insertAtLocked(r);
             }
@@ -2372,13 +2381,13 @@ public final class FireModel {
             o.put("steps", stepsA);
             if (r.calibrationNote != null)
                 o.put("calibrationNote", r.calibrationNote);
-            if (r.sizeAcres != null && r.smallNudge != null && r.largeNudge != null) {
-                final org.json.JSONArray sa = new org.json.JSONArray();
+            if (r.sizeAcres != null && r.sizeNudges != null) {
+                final org.json.JSONArray sa = new org.json.JSONArray(), sn = new org.json.JSONArray();
                 for (double v : r.sizeAcres)
                     sa.put(v);
-                o.put("sizeAcres", sa).put("sizeRuns", r.sizeRuns)
-                        .put("smallNudge", new org.json.JSONArray().put(r.smallNudge[0]).put(r.smallNudge[1]).put(r.smallNudge[2]))
-                        .put("largeNudge", new org.json.JSONArray().put(r.largeNudge[0]).put(r.largeNudge[1]).put(r.largeNudge[2]));
+                for (double[] n : r.sizeNudges)
+                    sn.put(new org.json.JSONArray().put(n[0]).put(n[1]).put(n[2]));
+                o.put("sizeAcres", sa).put("sizeRuns", r.sizeRuns).put("sizeNudges", sn).put("sizePct", r.sizePct);
             }
 
             if (r.perimeter != null) {
@@ -2617,21 +2626,25 @@ public final class FireModel {
                 return null;
             // Predicted Fire Size: held to the bounds the nudges are drawn in, since a
             // sent run's file comes from another phone.
-            final org.json.JSONArray sa = o.optJSONArray("sizeAcres"), sn = o.optJSONArray("smallNudge"),
-                    ln = o.optJSONArray("largeNudge");
-            if (sa != null && sa.length() == SIZE_PCT.length && sn != null && sn.length() == 3 && ln != null && ln.length() == 3) {
+            final org.json.JSONArray sa = o.optJSONArray("sizeAcres"), sn = o.optJSONArray("sizeNudges");
+            if (sa != null && sa.length() == SIZE_PCT.length && sn != null && sn.length() == SIZE_PCT.length) {
                 final double[] acres = new double[SIZE_PCT.length];
+                final double[][] nudges = new double[SIZE_PCT.length][];
                 boolean ok = true;
-                for (int i = 0; i < acres.length; i++) {
+                for (int i = 0; i < acres.length && ok; i++) {
                     acres[i] = sa.optDouble(i, Double.NaN);
-                    ok &= acres[i] >= 0 && acres[i] < 1e7;
+                    final org.json.JSONArray one = sn.optJSONArray(i);
+                    nudges[i] = one == null || one.length() != 3 ? null : nudge(one);
+                    ok = acres[i] >= 0 && acres[i] < 1e7 && nudges[i] != null;
                 }
-                final double[] small = nudge(sn), large = nudge(ln);
-                if (ok && small != null && large != null) {
+                if (ok) {
                     r.sizeAcres = acres;
                     r.sizeRuns = Math.max(0, Math.min(SIZE_RUNS, o.optInt("sizeRuns", 0)));
-                    r.smallNudge = small;
-                    r.largeNudge = large;
+                    r.sizeNudges = nudges;
+                    final int pct = o.optInt("sizePct", 50);
+                    for (int q : SIZE_PCT)
+                        if (q == pct)
+                            r.sizePct = pct;
                 }
             }
             if (o.optBoolean("ground", false)) {

@@ -377,16 +377,53 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         section("Where it goes", goes.toString());
 
         if (r.sizeAcres != null) {
-            // PyreCast's words for its own ensemble, so the two read the same.
-            final StringBuilder sz = new StringBuilder();
-            for (int i = FireModel.SIZE_PCT.length - 1; i >= 0; i--)
-                sz.append(com.atakmap.android.firecast.PyrecastForecasts.pctName(FireModel.SIZE_PCT[i]))
-                        .append(' ').append(acres(r.sizeAcres[i])).append(i > 0 ? "\n" : "");
-            sz.append("\nby ").append(r.steps[r.steps.length - 1]).append(" min. From ").append(r.sizeRuns)
-                    .append(" runs of this fire with the wind's speed and direction and the dead fuel moisture nudged"
-                            + " the way a forecast misses. The dashed lines on the map are the Smallest and Largest edges;"
-                            + " the colored rings are the run as it stands.");
-            section("Predicted Fire Size", sz.toString());
+            // PyreCast's own control and words, so the two read the same: one size at a
+            // time, Median unless another is picked, and everything on the page is that run.
+            final String name = com.atakmap.android.firecast.PyrecastForecasts.pctName(r.sizePct);
+            section("Predicted Fire Size", "Showing the " + name + " of " + r.sizeRuns
+                    + " runs of this fire, with the wind's speed and direction and the dead fuel moisture nudged"
+                    + " the way a forecast misses. The rings, the slider, the acres and the buildings on this page"
+                    + " are that run.");
+            final View sizeRow = PluginLayoutInflater.inflate(pluginContext, R.layout.model_action_row, null);
+            final Button pick = sizeRow.findViewById(R.id.action);
+            pick.setText("Predicted Fire Size: " + name);
+            pick.setEnabled(!model.isRunning());
+            pick.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final int[] pcts = { 90, 70, 50, 30, 10 };
+                    final CharSequence[] items = new CharSequence[pcts.length];
+                    int at = 2;
+                    for (int i = 0; i < pcts.length; i++) {
+                        int k = 0;
+                        for (int j = 0; j < FireModel.SIZE_PCT.length; j++)
+                            if (FireModel.SIZE_PCT[j] == pcts[i])
+                                k = j;
+                        final String w = com.atakmap.android.firecast.PyrecastForecasts.pctName(pcts[i]);
+                        final android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(w);
+                        b.setSpan(new android.text.style.ForegroundColorSpan(0xFF00E5FF), 0, w.length(),
+                                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        b.append(" (").append(String.valueOf(pcts[i])).append("th percentile)  ·  ")
+                                .append(acres(r.sizeAcres[k])).append(" by ")
+                                .append(String.valueOf(r.steps[r.steps.length - 1])).append(" min");
+                        items[i] = b;
+                        if (pcts[i] == r.sizePct)
+                            at = i;
+                    }
+                    new android.app.AlertDialog.Builder(getMapView().getContext())
+                            .setTitle("Predicted Fire Size")
+                            .setSingleChoiceItems(items, at, new android.content.DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(android.content.DialogInterface d, int which) {
+                                    d.dismiss();
+                                    model.setSize(r, pcts[which]);
+                                }
+                            })
+                            .setNegativeButton("Close", null)
+                            .show();
+                }
+            });
+            body.addView(sizeRow);
         }
 
         final String flame = String.format(Locale.US, "Flame length %s. Fireline intensity %.0f BTU/ft/s.",
