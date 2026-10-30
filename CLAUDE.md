@@ -313,6 +313,16 @@ which we may not ship. The supported CI path is `takrepo.url/user/password`
 (artifacts.tak.gov Artifactory) as repo secrets — wire that up if/when a tak.gov
 Artifactory account exists. Do not "solve" CI by committing the SDK.
 
+**PR checks (`.github/workflows/pr-checks.yml`, takwerx/ops#238).** The Studio can
+build them, because the SDK is on its disk: every pull request runs
+`scripts/ci-plugin-check.sh <Plugin>` (civ debug build + unit tests, through
+`heavy`) for each plugin it touches, and a free GitHub job fails any PR that adds
+SDK binaries or signing keys. The build job only runs for same-repo branches,
+never forks, and only once repo variable `TIER1_PLUGIN_BUILDS` is `true` and a
+`tak-worker` runner is registered to this repo. Branch protection requires
+`checks-ok`. The same command works by hand. A plugin with no `junit`
+dependency (the SDK template ships none) is built without running tests.
+
 ## Toolchain (already installed on the dev Mac)
 
 - JDK 17 — `/opt/homebrew/opt/openjdk@17` (`JAVA_HOME`)
