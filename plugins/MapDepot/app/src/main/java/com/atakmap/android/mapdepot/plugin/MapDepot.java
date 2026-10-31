@@ -3914,10 +3914,13 @@ public class MapDepot implements IPlugin {
                 }
             }
 
-            // The whole screen is Sentinel-2, so the row title leaves the
-            // word off and "Oct 29 True Color 10SGC" fits on one line.
+            // The whole screen is Sentinel-2 and a crew has no use for the
+            // tile code, so the row title is "Oct 29 SWIR Fire View" and fits
+            // on one line. ATAK's layer name keeps both.
             name.setText(pkg instanceof Depot.Scene
-                    ? pkg.name().replaceFirst("^Sentinel2 ", "") : pkg.name());
+                    ? pkg.name().replaceFirst("^Sentinel2 ", "")
+                            .replaceFirst(" [0-9]{2}[A-Z]{3}$", "")
+                    : pkg.name());
             if (done || packDone) {
                 // Only the hint is coloured; the size stays the same weight as
                 // every other row so the list does not turn into a christmas
