@@ -24,8 +24,9 @@ other agencies' published fire forecasts beside your own runs.
 #toolbox.side-by-side(columns: (6fr, 6fr))[
   #image("01.png", width: 62%)
 ][
-  Everything starts on this one pane: the detections in view, a summary of the
-  fire activity on screen, the Fire model, the forecast layers and the feeds.
+  Everything starts on this one pane: the detections in view, Where is it
+  burning?, Run a Model, and folded rows for Models, Feeds, Filters and the
+  map key. "In view" is the map you can see, not the part behind the pane.
 
   #v(6pt)
 
@@ -106,32 +107,80 @@ How big the footprint is and how that is known, which satellite and when.
 ]
 
 #tak-slide[
-= Where is it burning?
+= NASA Fire Event Perimeters
 
-#image("18.png", width: 88%)
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("19.png", width: 90%)
+][
+  A feed like the others: NASA's Fire Event Data Suite draws an outline around
+  each fire's VIIRS detections every 12 hours, so a fire nobody has mapped has
+  a perimeter. Magenta, brighter while active.
 
-The detections grouped into fires, biggest heat first, with the state, how long
-each has burned and when it was last seen. A fire seen in one scan only is often
-a burn pile.
+  #v(4pt)
+
+  375 m steps, up to a day old, and not the incident's mapped perimeter. It
+  always looks back three days.
+]
 ]
 
 #tak-slide[
-= The fire model
+= A NASA perimeter up close
+
+#image("20.png", width: 88%)
+
+Its acres, when NASA drew it, and what it is not. *Run a Model from this
+perimeter* starts a run from that outline.
+]
+
+#tak-slide[
+= Where is it burning?
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("21.png", width: 58%)
+][
+  One list: GOES fires burning now, then NASA perimeters with no GOES fire in
+  them, then fires seen in one scan only (often burn piles).
+
+  #v(4pt)
+
+  Pick the order and how far back above the list. Tap one and the map goes
+  there; the list stays open.
+]
+]
+
+#tak-slide[
+= Run a Model
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("03.png", width: 96%)
+  #image("22.png", width: 96%)
 ][
-  Tap *Fire model*, then *Place start* and tap the map where the fire starts.
-  Drag the marker to make it exact.
+  Tap *Run a Model*, then *Start from*:
+
+  - *A point:* tap the map. Drag the marker to make it exact.
+  - *NASA satellite perimeter:* pick a fire in the map view.
+  - *A perimeter you draw* with ATAK's shape tool.
+
+  Then the settings:
 
   - *Conditions:* as observed, at the gust, a dry day, or dry with 20 mph wind.
-  - *Station:* automatic, or pick a weather station by name.
-  - *Draw perimeter:* start from the fire's current edge: NASA's satellite
-    outline (twice a day, up to 12 h old), or trace it yourself.
-  - *Started:* how long ago it started, up to three hours.
+  - *Station:* automatic, or pick one by name.
+  - *Started:* how long ago it started.
   - *Horizon:* one or three hours ahead.
 
-  Then tap *Run model*.
+  Then *Run model*.
+]
+]
+
+#tak-slide[
+= Start from a NASA perimeter
+
+#toolbox.side-by-side(columns: (6fr, 6fr))[
+  #image("23.png", width: 96%)
+][
+  The fires in the map view with a NASA outline from the last three days, with
+  county, acres, how long burning and how old the outline is. It follows the
+  map; nothing is drawn until you tap one. The run starts from every piece of
+  it, everything inside already burning.
 ]
 ]
 
@@ -179,7 +228,8 @@ the fire is the usual reason.
     how many buildings.
   - The *time slider* moves the rings on the map. The edge at the slider's
     time is drawn in cyan.
-  - The *table* gives each time step: acres, buildings and people reached.
+  - The *table* gives each time step: acres, buildings and people reached
+    (FEMA's upper estimate, "up to").
 ]
 ]
 
@@ -198,6 +248,15 @@ the fire is the usual reason.
   fraction of an acre in an hour, and the page says so. Set *Conditions* to
   *Dry and 20 mph wind* to see what a bad day would do.
 ]
+]
+
+#tak-slide[
+= A run from a NASA perimeter
+
+#image("24.png", width: 92%)
+
+The rings grow out from the outline. On a wet night a run may not grow at all,
+and the page says why; *Dry day* shows what it would do once it dries.
 ]
 
 #tak-slide[

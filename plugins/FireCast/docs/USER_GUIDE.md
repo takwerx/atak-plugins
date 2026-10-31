@@ -25,10 +25,13 @@ Tap the FireCast icon in the toolbar. The pane opens on the right.
 From the top:
 
 - **Detections in view**, and how long ago they were fetched.
-- **Where is it burning?** A short summary of the fire activity in the area on screen.
-- **Fire model** opens the model page (section 3).
-- **FIRIS Model Runs** and **PyreCast Forecasts**: other people's spread runs, one switch each (section 4).
-- **Feeds**, the heat detection feeds, each with its own switch.
+- **Where is it burning?** The fires in the area on screen, in one list (section 2).
+- **Run a Model** opens the model page (section 3).
+- **Models**, folded: **FIRIS Model Runs** and **PyreCast Forecasts**, other people's spread runs, one switch each (section 4).
+- **Feeds**, folded: the heat detection feeds and NASA's fire perimeters, each with its own switch.
+- **Filters** and **Map key**, folded.
+
+"In view" is always the part of the map you can see, never the part behind the pane.
 
 A switch reads `<Name> ON` in green or `<Name> OFF` in red.
 
@@ -42,6 +45,7 @@ The feeds:
 - **MODIS** — Terra and Aqua. A MODIS pixel is 1 km at the center of the swath and grows past 4 km at the edge, so the drawn box grows with it.
 - **GOES** — a scan every few minutes. These have no footprint of their own, so it is worked out from the satellite's viewing angle.
 - **RADR** — burned areas mapped from satellite passes over the last fourteen days. These are real outlines of where fire has been, not where it is.
+- **NASA Fire Event Perimeters** — an outline of every fire VIIRS sees in the lower 48, drawn by NASA's Fire Event Data Suite (FEDS) around the VIIRS detections every 12 hours, day pass and night pass. Drawn in magenta, brighter while the fire is active. It gives a fire nobody has mapped yet a perimeter, and a newer one between the incident's own updates. Its edges are 375 m steps, it can be a day old, and it is not the incident's mapped perimeter. It always looks back three days, whatever **Filters** says, because NASA's outlines arrive late.
 
 ![VIIRS and GOES detections on the map](screenshots/18_detections_on_map.png)
 
@@ -53,28 +57,50 @@ Detections are colored by age, red within the hour, through amber, to gray after
 
 Tap a detection on the map or in the list for its detail panel: how big the footprint is and how that was worked out, when the satellite saw it, the radiative power, and a section called **What this does not mean**. A heat detection is a hot pixel. It does not say the fire is at the center of the box, that an empty map is empty ground, or that a hot pixel is a wildfire rather than a flare.
 
+![NASA perimeters on the map](screenshots/21_nasa_perimeters_on_map.png)
+
+![A NASA perimeter's panel](screenshots/22_nasa_perimeter_detail.png)
+
+A NASA perimeter's panel gives its acres, when NASA drew it, and what it is not. **Run a Model from this perimeter** opens the model page started from that outline.
+
+![Run a Model from this perimeter](screenshots/22b_run_from_perimeter_button.png)
+
 ### Where is it burning?
 
-![Where is it burning?](screenshots/20_where_is_it_burning.png)
+![Where is it burning?](screenshots/27_where_is_it_burning.png)
 
-**Where is it burning?** groups the detections into fires and lists them, biggest heat first: the state, how long it has been burning, how many detections and when the last one was. **Area** and **Where** narrow the list. A fire seen in only one scan says so; that is often a burn pile.
+**Where is it burning?** is one list of the fires in the area:
 
-## 3. The fire model
+- GOES fires burning now, with their state, how long they have burned, how many detections and the peak heat. A fire that sits inside a NASA perimeter says so on a second line, with the perimeter's acres and age.
+- NASA perimeters with no GOES fire in them, each with its county and state, acres, how long it has burned and how old the outline is.
+- GOES fires seen in only one scan, last; those are often burn piles.
 
-Tap **Fire model**.
+Above the list, the order (**Strongest**, **Newest**, **Nearest** or **Biggest first**) and how far back (**Last 3 hours** to **3 days**, the same setting as **Filters**). **Area** and **Where** narrow it. Tap a fire and the map goes there and draws it; a magenta mark shows the spot at once while its detections load. The list stays open for the next one.
+
+## 3. Run a Model
+
+Tap **Run a Model**.
 
 ![The model page](screenshots/5_model_page.png)
 
 ### Start a run
 
-1. Tap **Place start**, then tap the map where the fire starts. A marker labeled *Fire start* is placed. Drag it, or use Fine Adjust on its menu, to make it exact.
+1. Tap **Start from** at the top and pick one:
+   - **A point**: tap the map where the fire is. A marker labeled *Fire start* is placed. Drag it, or use Fine Adjust on its menu, to make it exact.
+   - **NASA satellite perimeter**: a list of the fires in the map view with a NASA outline from the last three days, biggest first, each with its county and state, acres, how long it has burned and how old the outline is. It follows the map as you pan and zoom; nothing is drawn until you tap one. The run then starts from every piece of that outline, with everything inside already burning.
+   - **A perimeter you draw**: trace the fire's edge with ATAK's shape tool.
+   - **Remove the perimeter** when one is set.
+
+   The button then says what the run starts from: *Start from: a point*, *NASA perimeter* or *drawn perimeter*.
+
+![Start the Run From](screenshots/25_how_the_fire_starts.png)
+
+![The NASA perimeter list](screenshots/26_nasa_perimeter_list.png)
+
 2. Set what you know:
    - **Conditions:** *As observed* at the weather station, *As observed but at the gust*, *Dry day*, or *Dry and 20 mph wind*. The last two are for planning what a bad day would do.
    - **Station:** *automatic* picks a nearby weather station by distance and height, so a station on a ridge does not stand in for a valley. Tap it to pick one by name.
-   - **Draw perimeter:** start from the fire's current edge, with everything inside already burning. Two ways:
-     - **Satellite perimeter**: NASA's outline of the fire around the start (or the middle of the map), drawn by its Fire Event Data Suite (FEDS) from the VIIRS heat detections twice a day, day pass and night pass. It is there for a fire nobody has mapped yet and between the incident's own updates. Its edges are 375 m steps, it can be up to 12 hours old, and it is not the incident's mapped perimeter; the page says how old it is.
-     - **Draw it on the map**: trace the edge yourself with ATAK's shape tool.
-   - **Started:** how long ago the fire started, from not known to three hours. With a drawn perimeter this calibrates the model's speed.
+   - **Started:** how long ago the fire started, from not known to three hours. With a perimeter this calibrates the model's speed.
    - **Horizon:** one hour or three hours ahead.
 3. Tap **Run model**. It takes a few seconds.
 
@@ -108,9 +134,9 @@ The fire moves over this in 15 m steps (30 m for three hours).
 
 **How it spreads.** Cell by cell over the real ground, each cell at its own fuel, slope, canopy and wind. Embers carry it across a road or a block narrower than they fly. Roads slow it; commercial blocks, water, bare ground and farmed ground stop it. Houses burn house to house at the rate measured in nine North American conflagrations (Moran, Seielstad and Pietruszka, 2025).
 
-**What it reaches.** Buildings and the people in them from FEMA's national building inventory (USA Structures). A building counts when the fire reaches the ground beside it.
+**What it reaches.** Buildings and the people in them from FEMA's national building inventory (USA Structures). A building counts when the fire reaches the ground beside it. People are FEMA's upper estimate for each building, shown as "up to", because its middle estimate is zero for most second homes.
 
-**From a perimeter.** A perimeter is drawn by hand or taken from NASA's satellite outline (FEDS, from openveda.cloud). With a perimeter and a start time, the model first runs from the middle of the perimeter for the time the fire has burned and compares that with what it actually covered. It then scales its rates to match, at most three times faster or slower, and says so on the page.
+**From a perimeter.** A perimeter is drawn by hand or taken from NASA's satellite outline (FEDS, from openveda.cloud), every piece of it. A perimeter wider than the model's usual square gets a bigger square, up to about 25 miles across, with coarser cells. With a perimeter and a start time, the model first runs from the middle of the perimeter for the time the fire has burned and compares that with what it actually covered. It then scales its rates to match, at most three times faster or slower, and says so on the page.
 
 **Predicted Fire Size.** The run is repeated 30 times with the wind speed, wind direction and fuel moisture nudged the way forecasts miss, and ranked by how much burned (below).
 
@@ -122,7 +148,7 @@ The fire moves over this in 15 m steps (30 m for three hours).
 
 - The line at the top says where the fire is by a time, with its area, how far it has gone and how many buildings.
 - The **time slider** moves the rings on the map between the start and the end of the run. The edge at the slider's time is drawn in cyan.
-- The **table** lists each time step with the area in acres, buildings and people reached.
+- The **table** lists each time step with the area in acres, buildings and people reached (up to).
 
 ![A run on the map](screenshots/8_run_on_map.png)
 
@@ -132,7 +158,12 @@ Drag the slider and the cyan edge moves to that time, with the line above it say
 
 On the map each time step is a ring, red for the first, then orange, then yellow, with the burned ground filled in.
 
-A run can be small. A litter fire under trees in a light wind may cover a fraction of an acre in an hour, and the page says so: *A slow fire: the fuel here carries fire at ...*. Set **Conditions** to *Dry and 20 mph wind* to see what a bad day would do from the same start.
+A run can be small. A litter fire under trees in a light wind may cover a fraction of an acre in an hour, and the page says so: *A slow fire: the fuel here carries fire at ...*. A run from a perimeter on a wet night may not grow past its edge at all, and the page says why: *No spread past the perimeter: the fine dead fuel is 28% water*. Set **Conditions** to *Dry day* or *Dry and 20 mph wind* to see what a bad day would do from the same start.
+
+![A run from a NASA perimeter](screenshots/23_run_from_nasa_perimeter.png)
+
+![The slider on a run from a NASA perimeter](screenshots/24_slider_nasa_run.png)
+
 
 ### Predicted Fire Size
 
@@ -172,7 +203,7 @@ Each run is listed with its time, fuel, wind and area. **ON** and **OFF** show o
 
 ![The PyreCast switch](screenshots/14_pyrecast_switch.png)
 
-**FIRIS Model Runs** shows the spread runs that California's fire analysts publish for ATAK. **PyreCast Forecasts** shows the ELMFIRE forecasts PyreCast (CloudFire, Inc.) publishes for large fires across the country, shown with their permission, with their logo and a link to pyrecast.com. Each is a switch in the pane. Long press a layer's switch for its list, and pick a fire to put its time slider on it.
+Under **Models** on the pane: **FIRIS Model Runs** shows the spread runs that California's fire analysts publish for ATAK. **PyreCast Forecasts** shows the ELMFIRE forecasts PyreCast (CloudFire, Inc.) publishes for large fires across the country, shown with their permission, with their logo and a link to pyrecast.com. Each is a switch. Long press a layer's switch for its list, and pick a fire to put its time slider on it.
 
 ![The PyreCast list](screenshots/14b_pyrecast_list.png)
 
@@ -188,7 +219,7 @@ PyreCast ranks its own runs by how much burned at the end of the forecast. FireC
 
 ## 5. Offline
 
-Everything FireCast has fetched or run stays on the device. After a restart of ATAK, or with no signal, your runs, the last detections and the PyreCast forecasts come back, with their age on the pane. Switching a layer off only hides it. A failed fetch never empties what you already have, and a new run with no signal says what it could not reach, for example "Could not read the fuel and slope here", and leaves your other runs alone.
+Everything FireCast has fetched or run stays on the device. After a restart of ATAK, or with no signal, your runs, the last detections, NASA's perimeters and the PyreCast forecasts come back, with their age on the pane. Switching a layer off only hides it. A failed fetch never empties what you already have, and a new run with no signal says what it could not reach, for example "Could not read the fuel and slope here", and leaves your other runs alone.
 
 ## 6. What to keep in mind
 

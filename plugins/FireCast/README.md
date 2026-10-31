@@ -38,13 +38,18 @@ Feeds, all public NIFC services and none of them needing a key or a sign-in:
     is the direction the tilt stretches the pixel.
   - RADR: burn areas mapped from Landsat and Sentinel passes over the last
     fourteen days, as real polygons - where fire has been, not where it is.
+  - NASA Fire Event Perimeters: NASA's Fire Event Data Suite (FEDS) draws an
+    outline around every fire's VIIRS detections in the lower 48 every 12 hours,
+    so a fire nobody has mapped has a perimeter. Open data on NASA VEDA, no key.
+    An algorithm's 375 m outline, never presented as the incident's own.
 
 On top of that: NIFC's static industrial heat source mask as a filter, with the
 masked ground drawable so you can see what is being flagged; age as color, red
 within the hour through amber to gray past a day, and fading with it; a time
 window from three hours to three days; a confidence filter; and a list of what is
 in the map view, newest first, that opens the same detail panel as tapping the
-map.
+map. Where is it burning? lists the GOES fires and NASA perimeters in one list,
+each with its county and state, in the order the operator picks.
 
 Beside the detections, two layers of other people's fire spread runs, each a switch
 in the pane with a list behind a long press and a time slider on the run you pick:
@@ -57,10 +62,12 @@ in the pane with a list behind a long press and a time slider on the run you pic
     unless you pick the smaller or larger end. Forecasts are kept on the device
     and come back with no signal.
 
-The fire model runs on the device. Tap a point or draw a perimeter, and the
+The fire model runs on the device. Start from a point, a perimeter you draw, or
+any NASA perimeter on the map, every piece of it, and the
 plugin spreads a fire over the real fuel, slope and canopy (LANDFIRE) with the
 wind from the nearest weather station, how dry the fuels are, and embers,
-counting the buildings and people reached from FEMA's building inventory. Each
+counting the buildings and people reached from FEMA's building inventory (people
+as FEMA's upper estimate). Each
 run is repeated 30 times with the inputs nudged the way a forecast misses, and
 the operator picks a Predicted Fire Size, Smallest to Largest, that the rings, the
 slider, the acres and the buildings all follow. Runs stay on the device and come
