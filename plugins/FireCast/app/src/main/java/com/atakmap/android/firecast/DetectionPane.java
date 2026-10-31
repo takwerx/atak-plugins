@@ -1058,10 +1058,13 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             final long age = d.ageMillis(now);
             v.findViewById(R.id.row_age_chip)
                     .setBackgroundColor(0xFF000000 | DetectionStyles.ageColor(age));
+            final boolean feds = "feds".equals(d.sourceId);
             final StringBuilder title = new StringBuilder();
             if (d.incidentName != null)
-                title.append(d.incidentName).append(" · ");
-            title.append(d.sourceTitle);
+                title.append(d.incidentName);
+            // A NASA perimeter's name already says what it is; a feed's name after it was cut off.
+            if (!feds)
+                title.append(d.incidentName != null ? " · " : "").append(d.sourceTitle);
             if (d.suspect())
                 title.append("  (industrial)");
             ((TextView) v.findViewById(R.id.row_title)).setText(title.toString());
@@ -1072,10 +1075,18 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
                     sub.append(Units.rangeBearing(from, d.lat, d.lon))
                             .append(feed.noFix ? " of map center · " : " of you · ");
             }
-            sub.append(d.footprint.sizeText());
-            if (d.frpMw != null)
-                sub.append(" · ").append(d.frpText());
-            sub.append(" · ").append(d.sensor);
+            if (feds) {
+                // How long it has burned and what drew it, where a detection has its size.
+                final Double h = d.persistenceHours;
+                sub.append(h == null ? "" : h < 12 ? "first seen in this outline · " : h < 24 ? "burning half a day · "
+                        : "burning " + Math.round(h / 24d) + (Math.round(h / 24d) == 1 ? " day · " : " days · "));
+                sub.append("outline from VIIRS");
+            } else {
+                sub.append(d.footprint.sizeText());
+                if (d.frpMw != null)
+                    sub.append(" · ").append(d.frpText());
+                sub.append(" · ").append(d.sensor);
+            }
             ((TextView) v.findViewById(R.id.row_detail)).setText(sub.toString());
             ((TextView) v.findViewById(R.id.row_age)).setText(d.ageText(now));
             return v;

@@ -187,7 +187,7 @@ public class FedsSource implements DetectionSource {
                 (e.minY + e.maxY) / 2d, (e.minX + e.maxX) / 2d, at, Footprint.outlined(g));
         final double km2 = a.optDouble("farea", Double.NaN), days = a.optDouble("duration", Double.NaN);
         final boolean active = a.optInt("isactive", 0) == 1;
-        d.incidentName = "NASA fire event perimeter" + (km2 >= 0 && km2 < 1e6 ? String.format(Locale.US, ", %,.0f acres", km2 * KM2_TO_ACRES) : "");
+        d.incidentName = "NASA perimeter" + (km2 >= 0 && km2 < 1e6 ? String.format(Locale.US, ", %,.0f acres", km2 * KM2_TO_ACRES) : "");
         d.classification = active ? "active" : "not active at the last pass";
         d.trackingId = a.optString("id", null);
         if (d.trackingId != null && !d.trackingId.matches("[A-Z]{2,12}\\|[0-9.]{1,12}\\|[0-9T:-]{10,25}"))

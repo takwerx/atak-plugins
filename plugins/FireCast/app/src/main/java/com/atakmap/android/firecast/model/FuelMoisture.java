@@ -341,7 +341,7 @@ public final class FuelMoisture {
      * (compression, tiles, a projection, another sample type) is refused.
      */
     static double gridValue(String url, double lat, double lon) throws Exception {
-        final byte[] head = range(url, 0, 4095);
+        final byte[] head = range(url, 0, HEADER_BYTES);
         final ByteBuffer b = ByteBuffer.wrap(head);
         if (head[0] == 'I' && head[1] == 'I')
             b.order(ByteOrder.LITTLE_ENDIAN);
@@ -421,21 +421,28 @@ public final class FuelMoisture {
             throw new IllegalStateException("strip table past the first read");
         final long stripOffset = stripType == 3 ? b.getShort(at) & 0xFFFF : b.getInt(at) & 0xFFFFFFFFL;
         final long offset = stripOffset + ((long) (row % rps) * width + col) * 4L;
-        final byte[] v = range(url, offset, offset + 3);
+        final byte[] v = range(url, offset, VALUE_BYTES);
         final ByteBuffer vb = ByteBuffer.wrap(v).order(b.order());
         final float f = vb.getFloat(0);
         return Float.isNaN(f) || Float.isInfinite(f) ? Double.NaN : f;
     }
 
-    /** The most one range read asks for: the 4 KB header. Offsets come from the file's own header. */
-    private static final int MAX_RANGE = 4096;
+    /**
+     * The two reads there are: the 4 KB header and one 4-byte value. Their lengths are
+     * these constants and never anything a server sent, so a hostile header can move a
+     * read but never size it (Fortify Denial of Service, 0.1 and 0.2 scans).
+     */
+    private static final int HEADER_BYTES = 4096, VALUE_BYTES = 4;
 
-    /** Bytes {@code from} to {@code to} of a file; refuses a server that sends the whole thing. */
-    private static byte[] range(String url, long from, long to) throws Exception {
+    /** {@code length} bytes of a file from {@code from}; refuses a server that sends the whole thing. */
+    private static byte[] range(String url, long from, final int length) throws Exception {
         if (!url.startsWith("https://"))
             throw new IllegalStateException("not https");
-        if (from < 0 || to < from || to - from + 1 > MAX_RANGE)
-            throw new IllegalStateException("range out of bounds");
+        if (length != HEADER_BYTES && length != VALUE_BYTES)
+            throw new IllegalArgumentException("not one of the two reads");
+        if (from < 0 || from > Integer.MAX_VALUE)
+            throw new IllegalStateException("offset out of bounds");
+        final long to = from + length - 1;
         final HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(20000);
         c.setReadTimeout(30000);
@@ -446,16 +453,15 @@ public final class FuelMoisture {
                 throw new IllegalStateException("WFAS answered " + c.getResponseCode() + " to a range");
             if (!"https".equals(c.getURL().getProtocol()))
                 throw new IllegalStateException("not https");
-            final int want = Math.min(MAX_RANGE, (int) (to - from + 1));
-            final byte[] out = new byte[want];
+            final byte[] out = new byte[length == VALUE_BYTES ? VALUE_BYTES : HEADER_BYTES];
             final InputStream in = c.getInputStream();
             try {
                 int off = 0, r;
-                while (off < want && (r = in.read(out, off, want - off)) > 0)
+                while (off < out.length && (r = in.read(out, off, out.length - off)) > 0)
                     off += r;
-                if (off < want && want <= 4)
+                if (off < out.length && out.length == VALUE_BYTES)
                     throw new IllegalStateException("short read");
-                return off == want ? out : java.util.Arrays.copyOf(out, off);
+                return off == out.length ? out : java.util.Arrays.copyOf(out, off);
             } finally {
                 in.close();
             }

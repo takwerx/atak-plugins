@@ -143,7 +143,12 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
 
     private String coverage(HeatDetection d) {
         final StringBuilder sb = new StringBuilder();
-        if (d.footprint.kind == Footprint.Kind.MAPPED) {
+        if ("feds".equals(d.sourceId)) {
+            // NASA's outline is simplified to follow its 375 m steps; "exactly as served"
+            // was RADR's sentence and not true here (operator, 2026-10-30).
+            sb.append(d.incidentName != null ? d.incidentName.replace("NASA perimeter, ", "") + " inside NASA's outline of the fire.\n"
+                    : "NASA's outline of the fire.\n");
+        } else if (d.footprint.kind == Footprint.Kind.MAPPED) {
             sb.append("A mapped area, drawn exactly as the service served it.\n");
         } else {
             sb.append(d.footprint.sizeText()).append(" on the ground");
@@ -165,7 +170,9 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
                 sb.append("Something inside each square was hot when the satellite looked. The squares are the satellite's pixels, not the fire's edge.");
                 break;
             default:
-                sb.append("The outline is the burned or radiating ground itself, at the time of the pass.");
+                sb.append("feds".equals(d.sourceId)
+                        ? "The outline is every edge the fire had reached by that pass, burning or not, drawn with its corners thinned but its shape kept."
+                        : "The outline is the burned or radiating ground itself, at the time of the pass.");
                 break;
         }
         return sb.toString();

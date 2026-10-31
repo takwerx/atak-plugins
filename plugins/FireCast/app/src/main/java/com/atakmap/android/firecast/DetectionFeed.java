@@ -1262,6 +1262,15 @@ public class DetectionFeed {
     /** Frames one detection's footprint on the map. */
     public void goTo(HeatDetection d) {
         try {
+            // An outline (NASA perimeter, RADR) is framed whole, with a margin: it has no
+            // pixel size, and the pixel rule zoomed to its middle (2026-10-30).
+            final com.atakmap.map.layer.feature.geometry.Envelope env = d.footprint.mapped == null ? null
+                    : d.footprint.mapped.getEnvelope();
+            if (env != null && !Double.isNaN(env.minX) && env.maxY > env.minY) {
+                final double padY = (env.maxY - env.minY) * 0.2 + 0.002, padX = (env.maxX - env.minX) * 0.2 + 0.002;
+                fitVisible(mapView, env.minY - padY, env.minX - padX, env.maxY + padY, env.maxX + padX);
+                return;
+            }
             final double halfDeg = Math.max(0.004d,
                     Math.max(d.footprint.alongScanM, d.footprint.alongTrackM) / 111320d * 4d);
             fitVisible(mapView, d.lat - halfDeg, d.lon - halfDeg, d.lat + halfDeg, d.lon + halfDeg);

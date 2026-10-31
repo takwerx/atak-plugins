@@ -27,7 +27,11 @@ public final class Structures {
         public final String occupancy;
         /** FEMA's primary occupancy, "Pre-K - 12 Schools", "Hospital", "Nursing Home", "Emergency Response"... */
         public final String primary;
-        /** Median population estimate for the building; 0 when FEMA has none. */
+        /**
+         * People the building may hold: FEMA's upper estimate (95%), its median when there
+         * is no upper. The median is 0 for most second homes, which read as nobody there
+         * beside "115 homes" (2026-10-30); the cautious figure is the one to plan with.
+         */
         public final double population;
 
         Building(double lat, double lon, String occupancy, String primary, double population) {
@@ -88,7 +92,7 @@ public final class Structures {
             final String url = LAYER + "/query?where=" + Esri.enc("1=1")
                     + "&geometry=" + Esri.enc(String.format(Locale.US, "%.5f,%.5f,%.5f,%.5f", west, south, east, north))
                     + "&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects"
-                    + "&outFields=" + Esri.enc("OCC_CLS,PRIM_OCC,LATITUDE,LONGITUDE,POP_MEDIAN")
+                    + "&outFields=" + Esri.enc("OCC_CLS,PRIM_OCC,LATITUDE,LONGITUDE,POP_MEDIAN,POP_CI95_UPPER")
                     + "&returnGeometry=false&orderByFields=OBJECTID&resultRecordCount=2000&resultOffset=" + offset + "&f=json";
             final JSONObject d = new JSONObject(Esri.get(url));
             if (d.has("error"))
@@ -103,12 +107,20 @@ public final class Structures {
                 final double lat = a.optDouble("LATITUDE", Double.NaN), lon = a.optDouble("LONGITUDE", Double.NaN);
                 if (Double.isNaN(lat) || Double.isNaN(lon))
                     continue;
-                out.add(new Building(lat, lon, a.optString("OCC_CLS", ""), a.optString("PRIM_OCC", ""), a.optDouble("POP_MEDIAN", 0)));
+                out.add(new Building(lat, lon, a.optString("OCC_CLS", ""), a.optString("PRIM_OCC", ""), people(a)));
             }
             if (!d.optBoolean("exceededTransferLimit", false) && feats.length() < 2000)
                 break;
             offset += feats.length();
         }
         return out;
+    }
+
+    /** FEMA's upper population estimate, else its median, else 0; never negative or absurd. */
+    private static double people(org.json.JSONObject a) {
+        double v = a.optDouble("POP_CI95_UPPER", Double.NaN);
+        if (!(v >= 0))
+            v = a.optDouble("POP_MEDIAN", 0);
+        return v >= 0 && v < 100000 ? v : 0;
     }
 }

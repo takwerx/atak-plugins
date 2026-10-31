@@ -600,7 +600,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                     if (r.homes[i] > 0)
                         goes.append(" (").append(r.homes[i]).append(r.homes[i] == 1 ? " home)" : " homes)");
                     if (r.people[i] >= 1)
-                        goes.append(", about ").append(Math.round(r.people[i])).append(" people");
+                        goes.append(", up to ").append(Math.round(r.people[i])).append(" people");
                 }
                 goes.append(".\n");
             }
@@ -646,7 +646,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             if (r.structureNote != null)
                 goes.append(r.structureNote).append('\n');
             else if (r.structures != null)
-                goes.append("Structures and people from FEMA's national building inventory; a building counts when the fire reaches the ground beside it.\n");
+                goes.append("Structures and people from FEMA's national building inventory, people as FEMA's upper estimate; a building counts when the fire reaches the ground beside it.\n");
             goes.append(String.format(Locale.US, "Across the ground: %d fuel%s crossed in %d cells of %.0f m. Neighborhoods burn house to house "
                     + "at the rate measured in nine North American conflagrations; roads slow it; commercial blocks, water and bare ground stop it. "
                     + "At the start the head would run toward %s at %s.",
@@ -930,7 +930,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             if (h > 0)
                 sb.append(" (").append(h).append(h == 1 ? " home)" : " homes)");
             if (b[2] >= 1)
-                sb.append(", about ").append(Math.round(b[2])).append(" people");
+                sb.append(", up to ").append(Math.round(b[2])).append(" people");
         }
         return sb.append('.').toString();
     }
@@ -944,7 +944,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.topMargin = dp(8);
         t.setLayoutParams(lp);
-        t.addView(tableRow(0, "", "ETA", "Acres", r.structures != null ? "Bldgs" : "", r.structures != null ? "People" : "", true));
+        t.addView(tableRow(0, "", "ETA", "Acres", r.structures != null ? "Bldgs" : "", r.structures != null ? "People, up to" : "", true));
         for (int i = 0; i < r.steps.length; i++) {
             final int min = r.steps[i];
             t.addView(tableRow(0xFF000000 | FireModel.stepColor(i, r.steps.length),
