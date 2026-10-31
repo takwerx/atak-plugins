@@ -112,6 +112,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         this.pluginContext = pluginContext;
         this.feed = feed;
         this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.activity_panel, null);
+        DetectionFeed.coveredBy(view);
         this.prefs = mapView.getContext().getSharedPreferences("firecast", Context.MODE_PRIVATE);
         area = prefs.getString("activity.area", AREA_ANY);
         areaM = prefs.getFloat("activity.areaM", (float) Units.bigToMeters(50));
@@ -392,6 +393,16 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                         fires = result;
                         perimeters = resultPerimeters != null ? resultPerimeters
                                 : new ArrayList<com.atakmap.android.firecast.model.Feds.Fire>();
+                        // Nearest first: a big outline far away is not what "in view" is asking.
+                        if (measureFrom != null)
+                            java.util.Collections.sort(perimeters, new java.util.Comparator<com.atakmap.android.firecast.model.Feds.Fire>() {
+                                @Override
+                                public int compare(com.atakmap.android.firecast.model.Feds.Fire a,
+                                        com.atakmap.android.firecast.model.Feds.Fire b) {
+                                    return Double.compare(DetectionFeed.metersBetween(measureFrom, a.lat(), a.lon()),
+                                            DetectionFeed.metersBetween(measureFrom, b.lat(), b.lon()));
+                                }
+                            });
                         matched.clear();
                         for (Activity.Fire f : fires)
                             for (com.atakmap.android.firecast.model.Feds.Fire p : perimeters)

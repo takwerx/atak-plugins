@@ -1,6 +1,7 @@
 package com.atakmap.android.firecast;
 
 import android.content.Context;
+import android.view.View;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
@@ -695,19 +696,52 @@ public class DetectionFeed {
 
     /** What the operator can see right now, as a box; null when the map cannot say. */
     public Esri.Box viewBox() {
+        final double[] v = visibleBounds(mapView);
+        return v == null ? null : new Esri.Box(v[0], v[1], v[2], v[3]);
+    }
+
+    /**
+     * Fire Cast's panes, so "in view" can leave out the map they cover. "What is in view"
+     * means the map the operator can see, as in every takwerx plugin: ATAK's own bounds
+     * run on under the side pane, and a fire in Arkansas under it topped a list for a
+     * view of the West (operator, 2026-10-30).
+     */
+    private static final java.util.List<View> PANES = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public static void coveredBy(View pane) {
+        if (pane != null && !PANES.contains(pane))
+            PANES.add(pane);
+    }
+
+    /**
+     * South, west, north, east of the map not under an open Fire Cast pane; null when the
+     * map cannot say. A side pane trims the east of the box, a bottom one the south, by
+     * the share of the screen it covers. A view across the antimeridian is null rather
+     * than the whole world the long way round.
+     */
+    public static double[] visibleBounds(MapView mapView) {
         try {
             final GeoBounds b = mapView.getBounds();
             if (b == null)
                 return null;
             double south = b.getSouth(), north = b.getNorth(), west = b.getWest(), east = b.getEast();
-            if (Double.isNaN(south) || Double.isNaN(north) || Double.isNaN(west) || Double.isNaN(east))
+            if (Double.isNaN(south) || Double.isNaN(north) || Double.isNaN(west) || Double.isNaN(east) || west > east)
                 return null;
-            // A view across the antimeridian comes back with west greater than east. Rather
-            // than fetch the whole world the long way round, the area around the center is
-            // used; the pane says the area is the middle of the view either way.
-            if (west > east)
-                return null;
-            return new Esri.Box(south, west, north, east);
+            final int mw = mapView.getWidth(), mh = mapView.getHeight();
+            int right = 0, bottom = 0;
+            for (View p : PANES) {
+                if (!p.isShown())
+                    continue;
+                if (p.getHeight() >= mh * 0.8)
+                    right = Math.max(right, p.getWidth());
+                else if (p.getWidth() >= mw * 0.8)
+                    bottom = Math.max(bottom, p.getHeight());
+            }
+            if (mw > 0 && right > 0 && right < mw)
+                east = west + (east - west) * (mw - right) / (double) mw;
+            if (mh > 0 && bottom > 0 && bottom < mh)
+                south = north - (north - south) * (mh - bottom) / (double) mh;
+            return new double[] { Math.max(-90, south), Math.max(-180, west), Math.min(90, north), Math.min(180, east) };
         } catch (Exception e) {
             Log.w(TAG, "could not read the map extent", e);
             return null;

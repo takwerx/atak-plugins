@@ -80,6 +80,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         this.model = model;
         this.reopenPane = reopenPane;
         this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.model_panel, null);
+        com.atakmap.android.firecast.DetectionFeed.coveredBy(view);
         this.body = view.findViewById(R.id.model_body);
         view.findViewById(R.id.btn_back).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -287,17 +288,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
 
     /** What is on screen as south, west, north, east; null when the map cannot say or it crosses 180. */
     private double[] viewBox() {
-        try {
-            final com.atakmap.coremap.maps.coords.GeoBounds b = getMapView().getBounds();
-            if (b == null)
-                return null;
-            final double s = b.getSouth(), n = b.getNorth(), w = b.getWest(), e = b.getEast();
-            if (Double.isNaN(s) || Double.isNaN(n) || Double.isNaN(w) || Double.isNaN(e) || w >= e || s >= n)
-                return null;
-            return new double[] { Math.max(-90, s), Math.max(-180, w), Math.min(90, n), Math.min(180, e) };
-        } catch (Exception e) {
-            return null;
-        }
+        return com.atakmap.android.firecast.DetectionFeed.visibleBounds(getMapView());
     }
 
     /** Main thread: asks NASA for the fires in view, the list redrawn when it answers. */

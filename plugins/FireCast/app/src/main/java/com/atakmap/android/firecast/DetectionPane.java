@@ -102,6 +102,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         this.root = PluginLayoutInflater.inflate(pluginContext, R.layout.main_layout, null);
         this.list = (ListView) root;
         this.header = PluginLayoutInflater.inflate(pluginContext, R.layout.pane_header, null);
+        DetectionFeed.coveredBy(root);
         this.prefs = mapView.getContext().getSharedPreferences("firecast", Context.MODE_PRIVATE);
         models = new Fold(R.id.fold_models_head, R.id.fold_models_chev, R.id.fold_models_body, "fold.models");
         feeds = new Fold(R.id.fold_feeds_head, R.id.fold_feeds_chev, R.id.source_buttons, "fold.feeds");

@@ -49,6 +49,7 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
         this.pluginContext = pluginContext;
         this.feed = feed;
         this.view = PluginLayoutInflater.inflate(pluginContext, R.layout.details, null);
+        DetectionFeed.coveredBy(view);
         this.body = view.findViewById(R.id.details_body);
         // Back closes the panel and leaves the map alone; ATAK's own close is not where a
         // thumb expects it.
