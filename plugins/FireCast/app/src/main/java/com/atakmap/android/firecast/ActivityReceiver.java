@@ -64,7 +64,8 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     private static final int NAMED_ROWS = 25;
     /** Which list is showing: the GOES fires, or NASA's perimeters. One at a time, a switch over them. */
     private boolean showPerimeters;
-    private Button which;
+    /** Two tabs over the list, the one showing lit: GOES fires | NASA perimeters, each with its count. */
+    private Button tabFires, tabPerimeters;
     private List<String> states = new ArrayList<>();
     /** Null is everywhere the feed covers. */
     private String state;
@@ -117,21 +118,11 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         area = prefs.getString("activity.area", AREA_ANY);
         areaM = prefs.getFloat("activity.areaM", (float) Units.bigToMeters(50));
         this.list = view.findViewById(R.id.activity_list);
-        final View switchRow = PluginLayoutInflater.inflate(pluginContext, R.layout.model_run_row, null);
-        switchRow.findViewById(R.id.run_toggle).setVisibility(View.GONE);
-        switchRow.findViewById(R.id.run_delete).setVisibility(View.GONE);
-        which = switchRow.findViewById(R.id.run_name);
-        which.setGravity(android.view.Gravity.CENTER);
-        which.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showPerimeters = !showPerimeters;
-                labelWhich();
-                adapter.notifyDataSetChanged();
-                list.setSelection(0);
-            }
-        });
-        list.addHeaderView(switchRow, null, false);
+        final android.widget.LinearLayout tabs = new android.widget.LinearLayout(view.getContext());
+        tabs.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        tabFires = tab(tabs, false);
+        tabPerimeters = tab(tabs, true);
+        list.addHeaderView(tabs, null, false);
         list.setAdapter(adapter);
         labelWhich();
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -249,11 +240,39 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         feed.reopenPane();
     }
 
-    /** The switch says what tapping it shows: the other list, with its count. */
+    /** One tab: a TakwerxButton, half the row; tapping it shows its list. */
+    private Button tab(android.widget.LinearLayout row, final boolean perimeterTab) {
+        final View holder = PluginLayoutInflater.inflate(pluginContext, R.layout.model_run_row, null);
+        final Button b = holder.findViewById(R.id.run_name);
+        ((ViewGroup) b.getParent()).removeView(b);
+        b.setGravity(android.view.Gravity.CENTER);
+        final android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        if (perimeterTab)
+            lp.leftMargin = (int) (6 * view.getContext().getResources().getDisplayMetrics().density);
+        row.addView(b, lp);
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (showPerimeters == perimeterTab)
+                    return;
+                showPerimeters = perimeterTab;
+                labelWhich();
+                adapter.notifyDataSetChanged();
+                list.setSelection(0);
+            }
+        });
+        return b;
+    }
+
+    /** Both tabs with their counts; the one showing in green, the other plain. */
     private void labelWhich() {
-        if (which != null)
-            which.setText(showPerimeters ? "Show: GOES fires (" + fires.size() + ")"
-                    : "Show: NASA Fire Event Perimeters (" + perimeters.size() + ")");
+        if (tabFires == null)
+            return;
+        tabFires.setText("GOES fires (" + fires.size() + ")");
+        tabPerimeters.setText("NASA perimeters (" + perimeters.size() + ")");
+        tabFires.setTextColor(showPerimeters ? 0xFFFFFFFF : 0xFF4CD964);
+        tabPerimeters.setTextColor(showPerimeters ? 0xFF4CD964 : 0xFFFFFFFF);
     }
 
     /** Takes the map to a NASA perimeter and draws it: the feed is turned on if it was off. */
@@ -412,6 +431,11 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                                     break;
                                 }
                         namePerimeters();
+                        // An empty tab is not where to land when the other has something.
+                        if (!showPerimeters && fires.isEmpty() && !perimeters.isEmpty())
+                            showPerimeters = true;
+                        else if (showPerimeters && perimeters.isEmpty() && !fires.isEmpty())
+                            showPerimeters = false;
                         labelWhich();
                         if (resultStates != null)
                             states = resultStates;
@@ -434,7 +458,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
             status("Nothing burning in " + where + " in the last " + feed.filters.windowLabel()
                     + " that GOES has seen." + (perimeters.isEmpty() ? ""
                     : " " + perimeters.size() + " NASA fire event " + (perimeters.size() == 1 ? "perimeter" : "perimeters")
-                            + " from the last 3 days: the switch above the list shows them."));
+                            + " from the last 3 days, under NASA perimeters."));
             return;
         }
         // The limit goes on the panel, not in a manual nobody has open: this is GOES, and
@@ -453,7 +477,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         if (!perimeters.isEmpty())
             sb.append(' ').append(matched.size()).append(matched.size() == 1 ? " sits" : " sit")
                     .append(" in a NASA fire event perimeter; ").append(perimeters.size())
-                    .append(perimeters.size() == 1 ? " perimeter" : " perimeters").append(" from the last 3 days: the switch above the list shows them.");
+                    .append(perimeters.size() == 1 ? " perimeter" : " perimeters").append(" from the last 3 days, under NASA perimeters.");
         status(sb.toString());
     }
 
