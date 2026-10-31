@@ -33,7 +33,7 @@ public class FedsSource implements DetectionSource {
      * Outlines are 12 hours apart and reach the service up to a day and more after the pass, so
      * a window shorter than this would show none: the window is never narrower.
      */
-    private static final long MIN_WINDOW_MS = 72L * 3600_000L;
+    private static final long MIN_WINDOW_MS = Filters.FEDS_WINDOW_MS;
     private static final double KM2_TO_ACRES = 247.105d;
 
     @Override

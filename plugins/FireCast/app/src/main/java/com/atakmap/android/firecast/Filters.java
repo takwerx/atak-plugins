@@ -93,11 +93,17 @@ public class Filters {
         return now - windowMillis();
     }
 
+    /** The shortest window NASA's fire event perimeters are shown with, the same three days their lists use. */
+    public static final long FEDS_WINDOW_MS = 72L * 3600_000L;
+
     /** Whether a fetched detection should be on the map right now. */
     public boolean shows(HeatDetection d, long now) {
         if (!isOn(d.sourceId))
             return false;
-        if (d.acquired > 0 && d.ageMillis(now) > windowMillis())
+        // NASA's outlines come every 12 hours and land up to a day late, so the window is
+        // never under three days for them; a 6 h window hid every one (2026-10-30).
+        final long window = "feds".equals(d.sourceId) ? Math.max(windowMillis(), FEDS_WINDOW_MS) : windowMillis();
+        if (d.acquired > 0 && d.ageMillis(now) > window)
             return false;
         if (industrial == INDUSTRIAL_HIDE && d.suspect())
             return false;
