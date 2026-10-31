@@ -1,10 +1,10 @@
 ATAK Plugin — Map Depot
 
-**Download Map Depot 1.15** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download Map Depot 1.16** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.15/ATAK-Plugin-MapDepot-1.15--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.15/ATAK-Plugin-MapDepot-1.15--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.15/ATAK-Plugin-MapDepot-1.15--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/map-depot/releases/download/v1.16/ATAK-Plugin-MapDepot-1.16--5.8.0-civ-release.apk
 
 All releases: https://github.com/takwerx/map-depot/releases
 
