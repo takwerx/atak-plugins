@@ -70,6 +70,10 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     private List<Object> rows = new ArrayList<>();
     /** Perimeters that have their own row: the ones no GOES fire sits in. */
     private int loosePerimeters;
+    /** How the one list is ordered (operator, 2026-10-30: "filter by time like newest"). */
+    private static final String[] SORTS = { "Strongest first", "Newest first", "Nearest first", "Biggest first" };
+    private int sort;
+    private Button sortButton, windowButton;
     private List<String> states = new ArrayList<>();
     /** Null is everywhere the feed covers. */
     private String state;
@@ -127,7 +131,66 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         area = prefs.getString("activity.area", AREA_ANY);
         areaM = prefs.getFloat("activity.areaM", (float) Units.bigToMeters(50));
         this.list = view.findViewById(R.id.activity_list);
+        // Sort and how far back, over the list: a header row so it scrolls with it.
+        final android.widget.LinearLayout controls = new android.widget.LinearLayout(view.getContext());
+        controls.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        sort = Math.max(0, Math.min(SORTS.length - 1, prefs.getInt("activity.sort", 0)));
+        sortButton = controlButton(controls, false);
+        windowButton = controlButton(controls, true);
+        sortButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("Order the list")
+                        .setSingleChoiceItems(SORTS, sort, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                                sort = which;
+                                prefs.edit().putInt("activity.sort", sort).apply();
+                                buildRows();
+                                labelControls();
+                                adapter.notifyDataSetChanged();
+                                list.setSelection(0);
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+        windowButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final String[] labels = new String[Filters.WINDOW_CHOICES.length];
+                int current = 0;
+                for (int i = 0; i < labels.length; i++) {
+                    final int h = Filters.WINDOW_CHOICES[i];
+                    labels[i] = h >= 48 ? "Last " + (h / 24) + " days" : "Last " + h + " hours";
+                    if (h == feed.filters.windowHours)
+                        current = i;
+                }
+                new AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("How far back")
+                        .setSingleChoiceItems(labels, current, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                                // The same window as the pane's Filters: one setting, so the
+                                // list and the map never answer different questions.
+                                feed.filters.windowHours = Filters.WINDOW_CHOICES[which];
+                                feed.filters.save();
+                                feed.refresh();
+                                labelControls();
+                                load();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+        list.addHeaderView(controls, null, false);
         list.setAdapter(adapter);
+        labelControls();
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
@@ -241,6 +304,27 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         // the map goes there and the feeds ask for that area now.
         keepListUntil = System.currentTimeMillis() + 4000;
         feed.refresh();
+    }
+
+    /** One of the two buttons over the list, half the row each. */
+    private Button controlButton(android.widget.LinearLayout row, boolean second) {
+        final View holder = PluginLayoutInflater.inflate(pluginContext, R.layout.model_run_row, null);
+        final Button b = holder.findViewById(R.id.run_name);
+        ((ViewGroup) b.getParent()).removeView(b);
+        b.setGravity(android.view.Gravity.CENTER);
+        final android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        if (second)
+            lp.leftMargin = (int) (6 * view.getContext().getResources().getDisplayMetrics().density);
+        row.addView(b, lp);
+        return b;
+    }
+
+    private void labelControls() {
+        if (sortButton == null)
+            return;
+        sortButton.setText(SORTS[sort]);
+        windowButton.setText("Last " + feed.filters.windowLabel());
     }
 
     /** Takes the map to a NASA perimeter and draws it: the feed is turned on if it was off. */
@@ -463,7 +547,53 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         for (Activity.Fire f : fires)
             if (!f.established())
                 out.add(f);
+        if (sort != 0)
+            java.util.Collections.sort(out, new java.util.Comparator<Object>() {
+                @Override
+                public int compare(Object a, Object b) {
+                    switch (sort) {
+                        case 1:
+                            return Long.compare(seen(b), seen(a));
+                        case 2:
+                            return Double.compare(distance(a), distance(b));
+                        default:
+                            final int c = Double.compare(acresOf(b), acresOf(a));
+                            return c != 0 ? c : Double.compare(power(b), power(a));
+                    }
+                }
+            });
         rows = out;
+    }
+
+    /** When a row was last seen: the newest detection, or when NASA drew the outline. */
+    private static long seen(Object r) {
+        return r instanceof Activity.Fire ? ((Activity.Fire) r).last : ((com.atakmap.android.firecast.model.Feds.Fire) r).atMs;
+    }
+
+    private double distance(Object r) {
+        final double[] p = from != null ? from : center();
+        if (p == null)
+            return 0;
+        if (r instanceof Activity.Fire)
+            return DetectionFeed.metersBetween(p, ((Activity.Fire) r).lat, ((Activity.Fire) r).lon);
+        final com.atakmap.android.firecast.model.Feds.Fire f = (com.atakmap.android.firecast.model.Feds.Fire) r;
+        return DetectionFeed.metersBetween(p, f.lat(), f.lon());
+    }
+
+    private double[] center() {
+        final com.atakmap.coremap.maps.coords.GeoPoint c = getMapView().getPoint().get();
+        return c == null ? null : new double[] { c.getLatitude(), c.getLongitude() };
+    }
+
+    /** Acres, from the NASA perimeter the row is or sits in; 0 when there is none. */
+    private double acresOf(Object r) {
+        final com.atakmap.android.firecast.model.Feds.Fire p = r instanceof Activity.Fire ? matched.get(r)
+                : (com.atakmap.android.firecast.model.Feds.Fire) r;
+        return p == null || Double.isNaN(p.areaKm2) ? 0 : p.areaKm2;
+    }
+
+    private static double power(Object r) {
+        return r instanceof Activity.Fire ? ((Activity.Fire) r).peakMw : 0;
     }
 
     private class Adapter extends BaseAdapter {
