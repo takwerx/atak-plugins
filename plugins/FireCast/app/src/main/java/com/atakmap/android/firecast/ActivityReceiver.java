@@ -287,22 +287,22 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
 
     /** Takes the map to a fire; the list stays open. */
     private void goTo(Activity.Fire f) {
-        keepListUntil = System.currentTimeMillis() + 4000;
+        keepListUntil = System.currentTimeMillis() + 8000;
         try {
             // Wide enough to hold a fire and its detections, not so wide that the extent
             // fetch comes back with a county's worth of industry around it.
             final double half = 0.08d;
-            final com.atakmap.coremap.maps.coords.GeoPoint[] corners = {
-                    new com.atakmap.coremap.maps.coords.GeoPoint(f.lat - half, f.lon - half),
-                    new com.atakmap.coremap.maps.coords.GeoPoint(f.lat + half, f.lon + half) };
-            com.atakmap.android.util.ATAKUtilities.scaleToFit(getMapView(), corners, 0d,
-                    getMapView().getWidth(), getMapView().getHeight());
+            DetectionFeed.fitVisible(getMapView(), f.lat - half, f.lon - half, f.lat + half, f.lon + half);
         } catch (Exception e) {
             Log.w(TAG, "go to fire failed", e);
         }
+        // The list is GOES's, so GOES is drawn: a tapped fire with the feed off showed
+        // nothing (operator, 2026-10-30).
+        if (!feed.filters.isOn("goes"))
+            feed.filters.setOn("goes", true);
         // The list stays open, so the next fire is one tap away (operator, 2026-10-30):
         // the map goes there and the feeds ask for that area now.
-        keepListUntil = System.currentTimeMillis() + 4000;
+        keepListUntil = System.currentTimeMillis() + 8000;
         feed.refresh();
     }
 
@@ -329,20 +329,16 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
 
     /** Takes the map to a NASA perimeter and draws it: the feed is turned on if it was off. */
     private void goTo(com.atakmap.android.firecast.model.Feds.Fire p) {
-        keepListUntil = System.currentTimeMillis() + 4000;
+        keepListUntil = System.currentTimeMillis() + 8000;
         try {
             final double padLat = (p.north - p.south) * 0.3 + 0.01, padLon = (p.east - p.west) * 0.3 + 0.01;
-            final com.atakmap.coremap.maps.coords.GeoPoint[] corners = {
-                    new com.atakmap.coremap.maps.coords.GeoPoint(p.south - padLat, p.west - padLon),
-                    new com.atakmap.coremap.maps.coords.GeoPoint(p.north + padLat, p.east + padLon) };
-            com.atakmap.android.util.ATAKUtilities.scaleToFit(getMapView(), corners, 0d,
-                    getMapView().getWidth(), getMapView().getHeight());
+            DetectionFeed.fitVisible(getMapView(), p.south - padLat, p.west - padLon, p.north + padLat, p.east + padLon);
         } catch (Exception e) {
             Log.w(TAG, "go to perimeter failed", e);
         }
         if (!feed.filters.isOn("feds"))
             feed.filters.setOn("feds", true);
-        keepListUntil = System.currentTimeMillis() + 4000;
+        keepListUntil = System.currentTimeMillis() + 8000;
         feed.refresh();
     }
 

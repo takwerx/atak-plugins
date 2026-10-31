@@ -714,6 +714,32 @@ public class DetectionFeed {
     }
 
     /**
+     * Fits a box into the map the operator can see. ATAK centers on the whole screen, so
+     * with a side pane open the fire landed under the pane (operator, 2026-10-30): the
+     * box is widened to the east by the pane's share, which puts it in the open part.
+     */
+    public static void fitVisible(MapView mapView, double south, double west, double north, double east) {
+        final int mw = mapView.getWidth(), mh = mapView.getHeight();
+        int right = 0, bottom = 0;
+        for (View p : PANES) {
+            if (!p.isShown())
+                continue;
+            if (p.getHeight() >= mh * 0.8)
+                right = Math.max(right, p.getWidth());
+            else if (p.getWidth() >= mw * 0.8)
+                bottom = Math.max(bottom, p.getHeight());
+        }
+        if (mw > 0 && right > 0 && right < mw * 0.9)
+            east = east + (east - west) * right / (double) (mw - right);
+        if (mh > 0 && bottom > 0 && bottom < mh * 0.9)
+            south = south - (north - south) * bottom / (double) (mh - bottom);
+        com.atakmap.android.util.ATAKUtilities.scaleToFit(mapView, new com.atakmap.coremap.maps.coords.GeoPoint[] {
+                new com.atakmap.coremap.maps.coords.GeoPoint(Math.max(-90, south), Math.max(-180, west)),
+                new com.atakmap.coremap.maps.coords.GeoPoint(Math.min(90, north), Math.min(180, east)) },
+                0d, mw, mh);
+    }
+
+    /**
      * South, west, north, east of the map not under an open Fire Cast pane; null when the
      * map cannot say. A side pane trims the east of the box, a bottom one the south, by
      * the share of the screen it covers. A view across the antimeridian is null rather
