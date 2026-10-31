@@ -51,6 +51,20 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
 
     private List<Activity.Fire> fires = new ArrayList<>();
+    /**
+     * NASA's fire event perimeters in the same area (operator, 2026-10-30: "can we do
+     * both"): each GOES fire that sits in one says so on its row, and every one has its
+     * own row in a section under the fires.
+     */
+    private List<com.atakmap.android.firecast.model.Feds.Fire> perimeters = new ArrayList<>();
+    private final java.util.Map<Activity.Fire, com.atakmap.android.firecast.model.Feds.Fire> matched = new java.util.HashMap<>();
+    /** County and state per perimeter, by its fire number; looked up after the list is up. */
+    private final java.util.Map<String, String> places = new java.util.HashMap<>();
+    private final ExecutorService placeWorker = Executors.newSingleThreadExecutor();
+    private static final int NAMED_ROWS = 25;
+    /** Which list is showing: the GOES fires, or NASA's perimeters. One at a time, a switch over them. */
+    private boolean showPerimeters;
+    private Button which;
     private List<String> states = new ArrayList<>();
     /** Null is everywhere the feed covers. */
     private String state;
@@ -102,12 +116,33 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         area = prefs.getString("activity.area", AREA_ANY);
         areaM = prefs.getFloat("activity.areaM", (float) Units.bigToMeters(50));
         this.list = view.findViewById(R.id.activity_list);
+        final View switchRow = PluginLayoutInflater.inflate(pluginContext, R.layout.model_run_row, null);
+        switchRow.findViewById(R.id.run_toggle).setVisibility(View.GONE);
+        switchRow.findViewById(R.id.run_delete).setVisibility(View.GONE);
+        which = switchRow.findViewById(R.id.run_name);
+        which.setGravity(android.view.Gravity.CENTER);
+        which.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showPerimeters = !showPerimeters;
+                labelWhich();
+                adapter.notifyDataSetChanged();
+                list.setSelection(0);
+            }
+        });
+        list.addHeaderView(switchRow, null, false);
         list.setAdapter(adapter);
+        labelWhich();
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
-                if (position >= 0 && position < fires.size())
-                    goTo(fires.get(position));
+                // The switch above the list is a header row: positions start after it.
+                final int p = position - list.getHeaderViewsCount();
+                if (showPerimeters) {
+                    if (p >= 0 && p < perimeters.size())
+                        goTo(perimeters.get(p));
+                } else if (p >= 0 && p < fires.size())
+                    goTo(fires.get(p));
             }
         });
         view.findViewById(R.id.btn_back).setOnClickListener(new View.OnClickListener() {
@@ -213,6 +248,32 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         feed.reopenPane();
     }
 
+    /** The switch says what tapping it shows: the other list, with its count. */
+    private void labelWhich() {
+        if (which != null)
+            which.setText(showPerimeters ? "Show: GOES fires (" + fires.size() + ")"
+                    : "Show: NASA Fire Event Perimeters (" + perimeters.size() + ")");
+    }
+
+    /** Takes the map to a NASA perimeter and draws it: the feed is turned on if it was off. */
+    private void goTo(com.atakmap.android.firecast.model.Feds.Fire p) {
+        try {
+            final double padLat = (p.north - p.south) * 0.3 + 0.01, padLon = (p.east - p.west) * 0.3 + 0.01;
+            final com.atakmap.coremap.maps.coords.GeoPoint[] corners = {
+                    new com.atakmap.coremap.maps.coords.GeoPoint(p.south - padLat, p.west - padLon),
+                    new com.atakmap.coremap.maps.coords.GeoPoint(p.north + padLat, p.east + padLon) };
+            com.atakmap.android.util.ATAKUtilities.scaleToFit(getMapView(), corners, 0d,
+                    getMapView().getWidth(), getMapView().getHeight());
+        } catch (Exception e) {
+            Log.w(TAG, "go to perimeter failed", e);
+        }
+        if (!feed.filters.isOn("feds"))
+            feed.filters.setOn("feds", true);
+        closeDropDown();
+        feed.refresh();
+        feed.reopenPane();
+    }
+
     private void pickState() {
         final List<String> options = new ArrayList<>();
         options.add("Any state");
@@ -269,6 +330,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
             public void run() {
                 List<Activity.Fire> found = null;
                 List<String> foundStates = null;
+                List<com.atakmap.android.firecast.model.Feds.Fire> foundPerimeters = null;
                 String error = null;
                 try {
                     found = Activity.fires(since, want, wantBox);
@@ -278,6 +340,34 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                             if (DetectionFeed.metersBetween(measureFrom, f.lat, f.lon) <= within)
                                 inside.add(f);
                         found = inside;
+                    }
+                    // NASA's perimeters for the same area: the box asked for, or around the
+                    // fires found when the area is a state or everywhere. A failure here
+                    // leaves the fires as they are.
+                    try {
+                        Esri.Box pbox = wantBox;
+                        if (pbox == null && !found.isEmpty()) {
+                            double s0 = 90, w0 = 180, n0 = -90, e0 = -180;
+                            for (Activity.Fire f : found) {
+                                s0 = Math.min(s0, f.lat);
+                                n0 = Math.max(n0, f.lat);
+                                w0 = Math.min(w0, f.lon);
+                                e0 = Math.max(e0, f.lon);
+                            }
+                            pbox = new Esri.Box(Math.max(-90, s0 - 0.3), Math.max(-180, w0 - 0.3),
+                                    Math.min(90, n0 + 0.3), Math.min(180, e0 + 0.3));
+                        }
+                        foundPerimeters = pbox == null ? new ArrayList<com.atakmap.android.firecast.model.Feds.Fire>()
+                                : com.atakmap.android.firecast.model.Feds.inBox(pbox.south, pbox.west, pbox.north, pbox.east);
+                        if (within > 0 && measureFrom != null) {
+                            final List<com.atakmap.android.firecast.model.Feds.Fire> inside = new ArrayList<>();
+                            for (com.atakmap.android.firecast.model.Feds.Fire p : foundPerimeters)
+                                if (DetectionFeed.metersBetween(measureFrom, p.lat(), p.lon()) <= within)
+                                    inside.add(p);
+                            foundPerimeters = inside;
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "NASA perimeters for the list: " + e);
                     }
                     // The state list is only worth rebuilding while looking everywhere;
                     // inside one state the feed would only ever name that one.
@@ -289,6 +379,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                 }
                 final List<Activity.Fire> result = found;
                 final List<String> resultStates = foundStates;
+                final List<com.atakmap.android.firecast.model.Feds.Fire> resultPerimeters = foundPerimeters;
                 final String err = error;
                 main.post(new Runnable() {
                     @Override
@@ -299,6 +390,18 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                             return;
                         }
                         fires = result;
+                        perimeters = resultPerimeters != null ? resultPerimeters
+                                : new ArrayList<com.atakmap.android.firecast.model.Feds.Fire>();
+                        matched.clear();
+                        for (Activity.Fire f : fires)
+                            for (com.atakmap.android.firecast.model.Feds.Fire p : perimeters)
+                                if (f.lat >= p.south - 0.01 && f.lat <= p.north + 0.01
+                                        && f.lon >= p.west - 0.01 && f.lon <= p.east + 0.01) {
+                                    matched.put(f, p);
+                                    break;
+                                }
+                        namePerimeters();
+                        labelWhich();
                         if (resultStates != null)
                             states = resultStates;
                         adapter.notifyDataSetChanged();
@@ -318,7 +421,9 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                     + (state == null ? "" : " in " + state);
         if (fires.isEmpty()) {
             status("Nothing burning in " + where + " in the last " + feed.filters.windowLabel()
-                    + " that GOES has seen.");
+                    + " that GOES has seen." + (perimeters.isEmpty() ? ""
+                    : " " + perimeters.size() + " NASA fire event " + (perimeters.size() == 1 ? "perimeter" : "perimeters")
+                            + " from the last 3 days: the switch above the list shows them."));
             return;
         }
         // The limit goes on the panel, not in a manual nobody has open: this is GOES, and
@@ -334,6 +439,10 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         if (onceOnly > 0)
             sb.append(' ').append(onceOnly).append(" seen once, often a burn pile.");
         sb.append(" MW is heat seen from space. GOES, lower 48 only.");
+        if (!perimeters.isEmpty())
+            sb.append(' ').append(matched.size()).append(matched.size() == 1 ? " sits" : " sit")
+                    .append(" in a NASA fire event perimeter; ").append(perimeters.size())
+                    .append(perimeters.size() == 1 ? " perimeter" : " perimeters").append(" from the last 3 days: the switch above the list shows them.");
         status(sb.toString());
     }
 
@@ -344,12 +453,12 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     private class Adapter extends BaseAdapter {
         @Override
         public int getCount() {
-            return fires.size();
+            return showPerimeters ? perimeters.size() : fires.size();
         }
 
         @Override
         public Object getItem(int position) {
-            return fires.get(position);
+            return showPerimeters ? perimeters.get(position) : fires.get(position);
         }
 
         @Override
@@ -360,8 +469,15 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             View v = convertView;
-            if (v == null)
+            if (v == null) {
                 v = PluginLayoutInflater.inflate(pluginContext, R.layout.activity_row, null);
+                // Two lines: the second carries the NASA perimeter a fire sits in.
+                final TextView d = v.findViewById(R.id.fire_detail);
+                d.setSingleLine(false);
+                d.setMaxLines(2);
+            }
+            if (showPerimeters)
+                return perimeterRow(v, perimeters.get(position));
             final Activity.Fire f = fires.get(position);
             ((TextView) v.findViewById(R.id.fire_name)).setText(f.title());
             final StringBuilder sb = new StringBuilder();
@@ -382,10 +498,72 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
             if (from != null)
                 sb.append(" · ").append(Units.rangeBearing(from, f.lat, f.lon))
                         .append(noFix ? " of map center" : " of you");
+            final com.atakmap.android.firecast.model.Feds.Fire p = matched.get(f);
+            if (p != null)
+                sb.append("\nNASA perimeter: ").append(acres(p)).append(", outline ").append(age(p.atMs)).append(" old");
             ((TextView) v.findViewById(R.id.fire_detail)).setText(sb.toString());
             ((TextView) v.findViewById(R.id.fire_power)).setText(f.powerText());
             return v;
         }
+    }
+
+    /** "Coconino County, AZ / burning 3 days · outline 37 h old · 40 mi NE of you / 6,192 ac". */
+    private View perimeterRow(View v, com.atakmap.android.firecast.model.Feds.Fire p) {
+        final String place = places.get(p.id);
+        ((TextView) v.findViewById(R.id.fire_name)).setText(place != null ? place : "NASA fire event perimeter");
+        final StringBuilder sb = new StringBuilder();
+        if (!Double.isNaN(p.burningDays))
+            sb.append(p.burningDays <= 0 ? "first seen in this outline" : p.burningDays < 1 ? "burning half a day"
+                    : "burning " + Math.round(p.burningDays) + (Math.round(p.burningDays) == 1 ? " day" : " days"));
+        sb.append(sb.length() == 0 ? "" : " · ").append("outline ").append(age(p.atMs)).append(" old");
+        if (from != null)
+            sb.append(" · ").append(Units.rangeBearing(from, p.lat(), p.lon())).append(noFix ? " of map center" : " of you");
+        ((TextView) v.findViewById(R.id.fire_detail)).setText(sb.toString());
+        ((TextView) v.findViewById(R.id.fire_power)).setText(acres(p));
+        return v;
+    }
+
+    private static String acres(com.atakmap.android.firecast.model.Feds.Fire p) {
+        return Double.isNaN(p.areaKm2) ? "size not known" : String.format(Locale.US, "%,.0f ac", p.areaKm2 * 247.105d);
+    }
+
+    /** County and state for the first rows, one at a time, the list redrawn as they come. */
+    private void namePerimeters() {
+        final List<com.atakmap.android.firecast.model.Feds.Fire> want = new ArrayList<>();
+        for (int i = 0; i < perimeters.size() && want.size() < NAMED_ROWS; i++)
+            if (!places.containsKey(perimeters.get(i).id))
+                want.add(perimeters.get(i));
+        if (want.isEmpty())
+            return;
+        placeWorker.execute(new Runnable() {
+            @Override
+            public void run() {
+                for (final com.atakmap.android.firecast.model.Feds.Fire p : want) {
+                    String name;
+                    try {
+                        name = com.atakmap.android.firecast.model.Feds.place(p.lat(), p.lon());
+                    } catch (Exception e) {
+                        name = null;
+                    }
+                    if (name == null)
+                        continue;
+                    final String got = name;
+                    main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            places.put(p.id, got);
+                            adapter.notifyDataSetChanged();
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    /** "14 h", "40 min": how long ago, without the word. */
+    private static String age(long when) {
+        final long mins = Math.max(0L, System.currentTimeMillis() - when) / 60000L;
+        return mins < 120 ? mins + " min" : (mins / 60) + " h";
     }
 
     private static String ago(long when) {
@@ -428,5 +606,6 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     @Override
     protected void disposeImpl() {
         worker.shutdownNow();
+        placeWorker.shutdownNow();
     }
 }
