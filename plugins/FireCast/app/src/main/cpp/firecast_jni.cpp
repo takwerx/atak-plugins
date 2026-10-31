@@ -45,9 +45,33 @@ FuelModels& fuelModels() {
 //        6 fire type (0 surface, 1 torching, 2 conditional crown, 3 crowning),
 //        7 crown fraction burned, 8 fireline intensity BTU/ft/s, 9 spot distance m
 // Returns false when behave threw.
+// Every number the Java side sends is checked here, before behave sees it. behave
+// assumes physical inputs: a NaN, an infinity or a wind of 1e308 sent its solver
+// into a loop that never ends (found by fuzzing the shipped bridge on the Mac,
+// 2026-10-31). Real inputs sit far inside these limits; anything outside them is
+// refused and the Java side gets no run.
+bool within(double v, double lo, double hi) {
+    return std::isfinite(v) && v >= lo && v <= hi;
+}
+
+bool surfaceInputsOk(int fuelModel, double m1, double m10, double m100, double mHerb, double mWoody,
+        double windMph, int windHeight, double windFrom, double slopeDeg, double aspectDeg,
+        double coverPct, double heightFt, double crownRatio) {
+    return fuelModel > 0 && fuelModel < 256
+            && within(m1, 0.5, 500) && within(m10, 0.5, 500) && within(m100, 0.5, 500)
+            && within(mHerb, 0.5, 500) && within(mWoody, 0.5, 500)
+            && within(windMph, 0, 200) && (windHeight == 0 || windHeight == 1)
+            && within(windFrom, -3600, 3600) && within(slopeDeg, 0, 90) && within(aspectDeg, -3600, 3600)
+            && within(coverPct, 0, 100) && within(heightFt, 0, 500) && within(crownRatio, 0, 1);
+}
+
 bool crownRun(double out[10], int fuelModel, double m1, double m10, double m100, double mHerb, double mWoody,
         double mFoliar, double windMph, int windHeight, double windFrom, double slopeDeg, double aspectDeg,
         double coverPct, double heightFt, double baseFt, double density) {
+    if (!surfaceInputsOk(fuelModel, m1, m10, m100, mHerb, mWoody, windMph, windHeight, windFrom, slopeDeg,
+            aspectDeg, coverPct, heightFt, 0) || !within(mFoliar, 30, 500) || !within(baseFt, 0, 500)
+            || !within(density, 0, 2))
+        return false;
     try {
         const double crownRatio = heightFt > 0 ? std::max(0.0, std::min(1.0, (heightFt - baseFt) / heightFt)) : 0.0;
         const WindHeightInputMode::WindHeightInputModeEnum wh =
@@ -165,8 +189,10 @@ Java_com_atakmap_android_firecast_model_Behave_surfaceRun(JNIEnv* env, jclass,
         jint fuelModel, jdouble m1, jdouble m10, jdouble m100, jdouble mHerb, jdouble mWoody,
         jdouble windMph, jint windHeight, jdouble windFrom, jdouble slopeDeg, jdouble aspectDeg,
         jdouble coverPct, jdouble heightFt, jdouble crownRatio) {
-    // The fuel model table has 256 slots and the library indexes it unchecked.
-    if (fuelModel <= 0 || fuelModel >= 256)
+    // The fuel model table has 256 slots and the library indexes it unchecked; every
+    // other input is held to physical limits (surfaceInputsOk).
+    if (!surfaceInputsOk(fuelModel, m1, m10, m100, mHerb, mWoody, windMph, windHeight, windFrom, slopeDeg,
+            aspectDeg, coverPct, heightFt, crownRatio))
         return nullptr;
     jdoubleArray out = env->NewDoubleArray(11);
     if (out == nullptr)
@@ -207,7 +233,8 @@ JNIEXPORT jdouble JNICALL
 Java_com_atakmap_android_firecast_model_Behave_spotDistance(JNIEnv*, jclass,
         jdouble flameLengthFt, jdouble windMph, jdouble coverHeightFt) {
     try {
-        if (flameLengthFt <= 0 || windMph <= 0)
+        if (!within(flameLengthFt, 0, 1000) || !within(windMph, 0, 200) || !within(coverHeightFt, 0, 500)
+                || flameLengthFt <= 0 || windMph <= 0)
             return 0;
         Spot s;
         s.updateSpotInputsForSurfaceFire(SpotFireLocation::MIDSLOPE_WINDWARD,
