@@ -29,7 +29,7 @@ itself where ATAK expects to find it.
 #toolbox.side-by-side(columns: (4fr, 8fr))[
   #image("02.png", width: 78%)
 ][
-  Eight kinds of data, each on its own page:
+  Nine kinds of data, each on its own page:
 
   - *Elevation (DTED2)* -- terrain, by state or province. What viewsheds and
     elevation readouts need.
@@ -47,6 +47,8 @@ itself where ATAK expects to find it.
     georeferenced PDFs and KMZs.
   - *Disaster Aerials* -- the imagery flown after a hurricane, flood, fire
     or tornado by NOAA, the Civil Air Patrol and Maxar, one overlay per flight.
+  - *Satellite (Sentinel-2)* -- recent satellite passes over the map center or
+    your position, in true color or as a fire view, streamed over the map.
 ]
 ]
 
@@ -563,6 +565,73 @@ covers before deciding to turn it on.
   A flight has no street names on it. With the Google roads overlay added
   from Streaming Base Maps, names and house numbers draw over the imagery,
   which is how a crew finds an address in it.
+]
+]
+
+#tak-slide[
+= Satellite (Sentinel-2)
+
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("60.png", width: 92%)
+][
+  Recent satellite pictures of the ground, from the European Sentinel-2
+  satellites, for the last 14 days. Each row is one pass over one area,
+  named for the nearest town, with its date and how much of it is cloud.
+
+  The right-hand button sets where to look: *Newest First* around the map
+  center, *Near: Map Center*, or *Near: Me* around your own position.
+  Tapping it searches again from there. The left-hand button picks the view.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("61.png", width: 100%)
+][
+  Tap a row to go there. An orange box shows exactly the area the pass
+  covers, before you add anything. *Add Online* then streams the picture
+  over whatever map you have. It needs a signal; there is no offline copy.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("62.png", width: 100%)
+][
+  Added, the pass draws over the map and the row offers *Remove*. Every pass
+  you add is held in both views, so nothing more is downloaded to switch.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("64.png", width: 100%)
+][
+  *True Color* is the picture as the eye sees it. Farm fields, roads and
+  water are easy to read, about 10 meters to a pixel.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (7fr, 5fr))[
+  #image("65.png", width: 100%)
+][
+  *SWIR Fire View* is the same place in shortwave infrared. Healthy plants
+  show bright green and bare or burned ground shows brown. Active fire and a
+  fresh burn glow orange and red. Thin smoke mostly clears.
+]
+]
+
+#tak-slide[
+#toolbox.side-by-side(columns: (5fr, 7fr))[
+  #image("63.png", width: 100%)
+][
+  The *View* button chooses which of the two to show. Under *Remove* each
+  added pass also has a button that flips every pass you added to the other
+  view at once. Clouds hide the ground in both views, so check the cloud
+  figure on the row. The satellites pass each place every few days.
+
+  Contains modified Copernicus Sentinel data.
 ]
 ]
 

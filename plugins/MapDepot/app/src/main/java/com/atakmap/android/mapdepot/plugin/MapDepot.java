@@ -171,8 +171,33 @@ public class MapDepot implements IPlugin {
      * mode says which list it is showing.
      */
     private enum PackageMode {
-        FORESTS, RECMAPS, STORMS
+        FORESTS, RECMAPS, STORMS, SATELLITE
     }
+
+    /**
+     * Sentinel-2 passes over the area the operator searched, newest first, as
+     * one layer each; see {@link Depot.Scene}. Live by nature, so held in
+     * memory only: a list from last week reads as what the satellite saw today.
+     */
+    private final List<Depot.Scene> allScenes = new ArrayList<>();
+    private String sceneStyle = Depot.STYLE_VISUAL;
+
+    /**
+     * Where the passes are searched and how they are ordered, the same three
+     * choices as Disaster Aerials: newest first around the map center, or
+     * nearest the map center, or nearest the operator. Each tap searches again
+     * around that point, so panning and tapping is how "search here" is done.
+     */
+    private enum SatSort {
+        NEWEST, MAP, ME
+    }
+
+    private SatSort satSort = SatSort.NEWEST;
+    private boolean scenesLoading;
+    private String scenesError;
+    /** Where the passes were searched, so changing the style asks about the same place. */
+    private double sceneLat = Double.NaN, sceneLon = Double.NaN;
+    private static final int SCENE_DAYS = 14;
 
     /** NOAA post-disaster imagery, newest event first; see {@link Depot.Storm}. */
     private final List<Depot.Storm> allStorms = new ArrayList<>();
@@ -776,6 +801,8 @@ public class MapDepot implements IPlugin {
             public void onClick(View v) {
                 if (packageMode == PackageMode.STORMS)
                     chooseStorm();
+                else if (packageMode == PackageMode.SATELLITE)
+                    chooseSceneStyle();
                 else
                     chooseSeries();
             }
@@ -788,10 +815,28 @@ public class MapDepot implements IPlugin {
                         showPackages(PackageMode.STORMS);
                     }
                 });
+        root.findViewById(R.id.btn_satellite).setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        showPackages(PackageMode.SATELLITE);
+                    }
+                });
         nearButton = root.findViewById(R.id.near_anchor);
         nearButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (packageMode == PackageMode.SATELLITE) {
+                    satSort = satSort == SatSort.NEWEST ? SatSort.MAP
+                            : satSort == SatSort.MAP ? SatSort.ME : SatSort.NEWEST;
+                    if (satSort == SatSort.ME && Distance.selfPoint() == null) {
+                        toast(pluginContext.getString(R.string.no_position));
+                        satSort = SatSort.NEWEST;
+                    }
+                    refreshSeriesControls();
+                    loadScenes(true);
+                    return;
+                }
                 // Storms: Newest first -> Near: map center -> Near: me.
                 // Elsewhere: map center <-> me.
                 if (packageMode == PackageMode.STORMS && newestFirst) {
@@ -849,6 +894,8 @@ public class MapDepot implements IPlugin {
                         if (position < 0 || position >= shownPackages.size())
                             return;
                         Depot.Package pkg = shownPackages.get(position);
+                        if (pkg instanceof Depot.Scene)
+                            FlightOutlines.preview((Depot.Scene) pkg);
                         if (!installedPackages.contains(pkg.id())
                                 && pkg instanceof Depot.Flight
                                 && ((Depot.Flight) pkg).pack != null
@@ -862,8 +909,11 @@ public class MapDepot implements IPlugin {
                             if (pkg instanceof Depot.Bounded
                                     && PackageInstaller.showBounds(
                                             ((Depot.Bounded) pkg).bounds()))
-                                forestStatus.setText("Showing where " + pkg.name()
-                                        + " is. Add it to see the imagery.");
+                                forestStatus.setText(pkg instanceof Depot.Scene
+                                        ? "The orange box is the area " + pkg.name()
+                                                + " covers. Add it to see the imagery."
+                                        : "Showing where " + pkg.name()
+                                                + " is. Add it to see the imagery.");
                             return;
                         }
                         // A freshly downloaded package is not in ATAK's map
@@ -1076,6 +1126,7 @@ public class MapDepot implements IPlugin {
     }
 
     private void showHome() {
+        FlightOutlines.clearPreview();
         homeView.setVisibility(View.VISIBLE);
         dtedView.setVisibility(View.GONE);
         baseMapView.setVisibility(View.GONE);
@@ -1103,16 +1154,117 @@ public class MapDepot implements IPlugin {
                 forestStatus.setText(block);
         }
 
+        if (mode == PackageMode.SATELLITE) {
+            // A fresh look every time the section opens: what passed over
+            // this morning is the point.
+            loadScenes(true);
+            return;
+        }
+
         if (!catalogFresh())
             loadCatalog();
         else
             applyForestFilter();
     }
 
+    private void chooseSceneStyle() {
+        final String[] items = { pluginContext.getString(R.string.scene_visual),
+                pluginContext.getString(R.string.scene_swir) };
+        new AlertDialog.Builder(hostContext())
+                .setTitle(pluginContext.getString(R.string.choose_scene_style))
+                .setSingleChoiceItems(items,
+                        Depot.STYLE_SWIR.equals(sceneStyle) ? 1 : 0,
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                d.dismiss();
+                                switchSceneView(which == 1 ? Depot.STYLE_SWIR : Depot.STYLE_VISUAL);
+                            }
+                        })
+                .setNegativeButton(pluginContext.getString(R.string.cancel), null)
+                .show();
+    }
+
+    /**
+     * Switches every pass you added to one view, and relabels the list to
+     * match. Nothing is fetched: the same passes are on the list, held in the
+     * other view, so the list stays put and only the names change.
+     */
+    private void switchSceneView(String style) {
+        sceneStyle = style;
+        PackageInstaller.showSceneView(style);
+        final List<Depot.Scene> relabeled = new ArrayList<>();
+        for (Depot.Scene s : allScenes)
+            relabeled.add(s.style.equals(style) ? s : s.otherView());
+        allScenes.clear();
+        allScenes.addAll(relabeled);
+        FlightOutlines.clearPreview();
+        refreshSeriesControls();
+        refreshInstalledPackages();
+        applyForestFilter();
+        forestStatus.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                forestStatus.setText("Showing "
+                        + Depot.Scene.viewLabel(sceneStyle)
+                        + " on every pass you added.");
+            }
+        }, 300L);
+    }
+
+    /**
+     * Asks the satellite service what passed over the map (here) or over the
+     * place last searched. The list is emptied first so a slow answer is not
+     * mistaken for the previous place's passes.
+     */
+    private void loadScenes(boolean here) {
+        if (client == null) {
+            forestStatus.setText("Map Depot is not running — reload the plugin.");
+            return;
+        }
+        if (here || Double.isNaN(sceneLat)) {
+            final GeoPoint self = satSort == SatSort.ME ? Distance.selfPoint() : null;
+            final GeoPoint c = self != null ? self : Distance.mapCenter();
+            if (c == null) {
+                forestStatus.setText(pluginContext.getString(R.string.no_position));
+                return;
+            }
+            sceneLat = c.getLatitude();
+            sceneLon = c.getLongitude();
+        }
+        FlightOutlines.clearPreview();
+        scenesLoading = true;
+        scenesError = null;
+        allScenes.clear();
+        applyForestFilter();
+        client.fetchScenes(sceneLat, sceneLon, 0.5, SCENE_DAYS, sceneStyle,
+                new DepotClient.SceneCallback() {
+                    @Override
+                    public void onScenes(List<Depot.Scene> scenes) {
+                        scenesLoading = false;
+                        allScenes.clear();
+                        allScenes.addAll(scenes);
+                        refreshInstalledPackages();
+                        if (packageMode == PackageMode.SATELLITE)
+                            applyForestFilter();
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        scenesLoading = false;
+                        scenesError = message;
+                        if (packageMode == PackageMode.SATELLITE)
+                            applyForestFilter();
+                    }
+                });
+    }
+
     /** The list behind the current mode and series, in catalog order. */
     private List<? extends Depot.Package> sourceList() {
         if (packageMode == PackageMode.FORESTS)
             return allForests;
+        if (packageMode == PackageMode.SATELLITE)
+            return allScenes;
         if (packageMode == PackageMode.STORMS)
             return stormIndex < 0 ? allFlights
                     : stormIndex < allStorms.size()
@@ -1134,18 +1286,25 @@ public class MapDepot implements IPlugin {
     private void refreshSeriesControls() {
         final boolean sheets = packageMode == PackageMode.RECMAPS;
         final boolean storms = packageMode == PackageMode.STORMS;
+        final boolean sat = packageMode == PackageMode.SATELLITE;
         final boolean located = locatedList();
-        seriesRow.setVisibility(sheets || storms || located ? View.VISIBLE : View.GONE);
-        seriesButton.setVisibility(sheets || storms ? View.VISIBLE : View.GONE);
+        seriesRow.setVisibility(sheets || storms || sat || located ? View.VISIBLE : View.GONE);
+        seriesButton.setVisibility(sheets || storms || sat ? View.VISIBLE : View.GONE);
         if (sheets)
             seriesButton.setText(seriesLabel(series, true) + "  \u25be");
         else if (storms)
             seriesButton.setText(stormLabel(stormIndex, true) + "  \u25be");
-        nearButton.setVisibility(located ? View.VISIBLE : View.GONE);
-        nearButton.setText(pluginContext.getString(
-                storms && newestFirst ? R.string.newest_first
+        else if (sat)
+            seriesButton.setText(pluginContext.getString(
+                    Depot.STYLE_SWIR.equals(sceneStyle) ? R.string.scene_swir
+                            : R.string.scene_visual) + "  \u25be");
+        nearButton.setVisibility(located || sat ? View.VISIBLE : View.GONE);
+        nearButton.setText(pluginContext.getString(sat
+                ? (satSort == SatSort.NEWEST ? R.string.newest_first
+                        : satSort == SatSort.ME ? R.string.near_me : R.string.near_map)
+                : storms && newestFirst ? R.string.newest_first
                         : nearMe ? R.string.near_me : R.string.near_map));
-        forestSearch.setHint(storms ? R.string.search_flights
+        forestSearch.setHint(storms || sat ? R.string.search_flights
                 : !sheets ? R.string.search_forests
                 : series == Series.DISTRICT ? R.string.search_recmaps
                         : series == Series.REGIONAL ? R.string.search_regional
@@ -2068,6 +2227,7 @@ public class MapDepot implements IPlugin {
             installedPackages.addAll(PackageInstaller.installedIds(s.flights));
             installedPackages.addAll(PackageInstaller.installedIds(s.packs()));
         }
+        installedPackages.addAll(PackageInstaller.installedIds(allScenes));
     }
 
     private void applyForestFilter() {
@@ -2115,6 +2275,9 @@ public class MapDepot implements IPlugin {
      * is, so a series that gains locations sorts without a plugin release.
      */
     private boolean locatedList() {
+        // Passes are listed newest first, as the service sends them.
+        if (packageMode == PackageMode.SATELLITE)
+            return false;
         for (Depot.Package p : sourceList()) {
             if (p instanceof Depot.Located && ((Depot.Located) p).located())
                 return true;
@@ -2124,12 +2287,18 @@ public class MapDepot implements IPlugin {
 
     /** The point "nearest" is measured from; falls back to the map center. */
     private GeoPoint anchor() {
+        if (packageMode == PackageMode.SATELLITE && !Double.isNaN(sceneLat))
+            return new GeoPoint(sceneLat, sceneLon);
         final GeoPoint self = nearMe ? Distance.selfPoint() : null;
         return self != null ? self : Distance.mapCenter();
     }
 
     private int sortNearest() {
         distances.clear();
+        if (packageMode == PackageMode.SATELLITE) {
+            sortScenes();
+            return 0;
+        }
         if (!locatedList())
             return 0;
         final GeoPoint center = anchor();
@@ -2188,6 +2357,47 @@ public class MapDepot implements IPlugin {
         return hidden;
     }
 
+    /**
+     * Newest first as the service sends them, or nearest the point searched:
+     * the passes that cover the point come first, newest of those on top,
+     * then the rest by distance. A tile's center can be 50 km from a point it
+     * covers, so distance alone would rank a pass over the crew below one
+     * beside it.
+     */
+    private void sortScenes() {
+        if (satSort == SatSort.NEWEST || Double.isNaN(sceneLat))
+            return;
+        final GeoPoint at = new GeoPoint(sceneLat, sceneLon);
+        for (Depot.Package p : shownPackages) {
+            final Depot.Scene sc = (Depot.Scene) p;
+            if (sc.located())
+                distances.put(p.id(), new double[] {
+                        Distance.meters(at, sc.lat(), sc.lon()),
+                        Distance.bearing(at, sc.lat(), sc.lon()) });
+        }
+        Collections.sort(shownPackages, new Comparator<Depot.Package>() {
+            @Override
+            public int compare(Depot.Package a, Depot.Package b) {
+                final Depot.Scene sa = (Depot.Scene) a, sb = (Depot.Scene) b;
+                final boolean ca = covers(sa, at), cb = covers(sb, at);
+                if (ca != cb)
+                    return ca ? -1 : 1;
+                if (ca)
+                    return sb.date.compareTo(sa.date);
+                final double[] da = distances.get(a.id());
+                final double[] db = distances.get(b.id());
+                return Double.compare(da == null ? Double.MAX_VALUE : da[0],
+                        db == null ? Double.MAX_VALUE : db[0]);
+            }
+        });
+    }
+
+    private static boolean covers(Depot.Scene sc, GeoPoint at) {
+        final double[] b = sc.bounds();
+        return b != null && at.getLatitude() >= b[0] && at.getLatitude() <= b[2]
+                && at.getLongitude() >= b[1] && at.getLongitude() <= b[3];
+    }
+
     /** The flight a storms row belongs to: itself, or the flight its pack copies. */
     private static Depot.Flight flightOf(Depot.Package p) {
         if (p instanceof Depot.Flight)
@@ -2224,6 +2434,8 @@ public class MapDepot implements IPlugin {
         final int total = sourceList().size();
         if (packageMode == PackageMode.STORMS)
             return stormsStatus(query, hidden, total);
+        if (packageMode == PackageMode.SATELLITE)
+            return satelliteStatus(query, total);
         if (total == 0) {
             if (packageMode != PackageMode.RECMAPS)
                 return "No packages in the catalog yet.";
@@ -2257,6 +2469,27 @@ public class MapDepot implements IPlugin {
             return String.format("%d of %d shown · %d installed",
                     shownPackages.size(), total, held);
         return String.format("%d of %d installed", held, total);
+    }
+
+    private String satelliteStatus(String query, int total) {
+        if (scenesLoading)
+            return "Looking for satellite passes…";
+        if (scenesError != null)
+            return "Could not look for satellite passes: " + scenesError;
+        if (total == 0)
+            return "No passes in the last " + SCENE_DAYS
+                    + " days here. Move the map and tap Search Here.";
+        int held = 0;
+        for (Depot.Package p : allScenes)
+            if (installedPackages.contains(p.id()))
+                held++;
+        if (shownPackages.isEmpty())
+            return query.isEmpty() ? "Nothing to show in this view."
+                    : "Nothing matches \"" + query + "\" in " + total + ".";
+        return total + " passes in " + SCENE_DAYS + " days "
+                + (satSort == SatSort.ME ? "around you"
+                        : "around the map center")
+                + " · " + held + " installed";
     }
 
     /**
@@ -2344,6 +2577,11 @@ public class MapDepot implements IPlugin {
     private void uninstallPackage(final Depot.Package pkg) {
         forestStatus.setText("Removing " + pkg.name() + "…");
         packages.uninstall(pkg, packageCallback());
+        if (pkg instanceof Depot.Scene) {
+            final Depot.Scene twin = ((Depot.Scene) pkg).otherView();
+            if (PackageInstaller.isInstalled(twin))
+                packages.uninstall(twin, packageCallback());
+        }
     }
 
 
@@ -2364,6 +2602,35 @@ public class MapDepot implements IPlugin {
                 showCancelBar(false);
                 installedPackages.add(p.id());
                 packageAdapter.notifyDataSetChanged();
+                if (p instanceof Depot.Scene) {
+                    // A pass is held in both views, a few hundred bytes each,
+                    // and the View button switches which one draws.
+                    final Depot.Scene twin = ((Depot.Scene) p).otherView();
+                    if (!PackageInstaller.isInstalled(twin)) {
+                        activeForestId = twin.id();
+                        packages.install(twin, packageCallback());
+                        return;
+                    }
+                    forestStatus.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            PackageInstaller.showSceneView(sceneStyle);
+                            packageAdapter.notifyDataSetChanged();
+                        }
+                    }, 1500L);
+                    forestStatus.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            PackageInstaller.showSceneView(sceneStyle);
+                            packageAdapter.notifyDataSetChanged();
+                        }
+                    }, 4000L);
+                    forestStatus.setText(((Depot.Scene) p).name()
+                            + " added in both views. Showing "
+                            + Depot.Scene.viewLabel(sceneStyle)
+                            + "; the View button switches.");
+                    return;
+                }
                 if (p instanceof Depot.Flight || p instanceof Depot.Pack) {
                     syncOutlines();
                     // ATAK keeps an on/off state per overlay name and a
@@ -2381,7 +2648,7 @@ public class MapDepot implements IPlugin {
                 forestStatus.setText(p.name()
                         + (p instanceof Depot.Pack
                                 ? " saved — this flight now works with no signal."
-                                : p instanceof Depot.Flight
+                                : p instanceof Depot.Flight || p instanceof Depot.Scene
                                 ? " installed — drawing over the map; tap the row to go there."
                                 : " installed — it is in ATAK's map layer list."));
             }
@@ -2732,7 +2999,10 @@ public class MapDepot implements IPlugin {
                 nifcOutlines, forestOutlines }) {
             if (b == null)
                 continue;
-            if (label == null) {
+            // Outlines are for flights and incident maps; a satellite pass is a
+            // whole scene with no outline of its own.
+            if (label == null || (b == forestOutlines
+                    && packageMode == PackageMode.SATELLITE)) {
                 b.setVisibility(View.GONE);
                 continue;
             }
@@ -3609,7 +3879,21 @@ public class MapDepot implements IPlugin {
             // Hide / Show drives whatever of this flight is on the phone: the
             // online layer when it is added, else the offline copy.
             final Depot.Package shown = done ? pkg : packDone ? pack : null;
-            if (shown != null && !active && !packActive) {
+            if (pkg instanceof Depot.Scene && done && !active) {
+                // A pass is held in both views. The switch sits under Remove,
+                // in the slot a flight uses for its offline copy, so the name
+                // keeps the width and fits on one line.
+                final boolean toSwir = !Depot.STYLE_SWIR.equals(sceneStyle);
+                action2.setVisibility(View.VISIBLE);
+                action2.setEnabled(true);
+                action2.setText(toSwir ? "Show SWIR" : "Show Color");
+                action2.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        switchSceneView(toSwir ? Depot.STYLE_SWIR : Depot.STYLE_VISUAL);
+                    }
+                });
+            } else if (shown != null && !active && !packActive) {
                 final Boolean visible = PackageInstaller.isVisible(shown);
                 if (visible != null) {
                     eye.setVisibility(View.VISIBLE);
@@ -3630,7 +3914,13 @@ public class MapDepot implements IPlugin {
                 }
             }
 
-            name.setText(pkg.name());
+            // The whole screen is Sentinel-2 and a crew has no use for the
+            // tile code, so the row title is "Oct 29 SWIR Fire View" and fits
+            // on one line. ATAK's layer name keeps both.
+            name.setText(pkg instanceof Depot.Scene
+                    ? pkg.name().replaceFirst("^Sentinel2 ", "")
+                            .replaceFirst(" [0-9]{2}[A-Z]{3}$", "")
+                    : pkg.name());
             if (done || packDone) {
                 // Only the hint is coloured; the size stays the same weight as
                 // every other row so the list does not turn into a christmas
@@ -3648,7 +3938,10 @@ public class MapDepot implements IPlugin {
                 detail.setText(line);
             } else if (pkg instanceof Depot.Bounded
                     && ((Depot.Bounded) pkg).bounds() != null) {
-                final String hint = "\ntap to see where";
+                // A pass is a whole scene: tapping it moves the map there, and
+                // the row says so before and after it is added.
+                final String hint = pkg instanceof Depot.Scene
+                        ? "\ntap to go there" : "\ntap to see where";
                 final SpannableString line =
                         new SpannableString(describeRow(pkg) + hint);
                 line.setSpan(
@@ -3691,7 +3984,7 @@ public class MapDepot implements IPlugin {
                 // "Download" promised a file that never arrives (2026-10-11).
                 // The operator's words (2026-10-11): "Add online" then
                 // "Download offline", so the two buttons explain each other.
-                action.setText(pkg instanceof Depot.Flight
+                action.setText(pkg instanceof Depot.Flight || pkg instanceof Depot.Scene
                         ? (done ? R.string.remove : R.string.add_online)
                         : done ? R.string.remove : R.string.download);
             }
