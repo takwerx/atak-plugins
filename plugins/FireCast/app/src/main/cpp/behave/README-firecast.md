@@ -1,4 +1,4 @@
-# behave, as vendored into Fire Cast
+# behave, as vendored into FireCast
 
 The USFS Missoula Fire Sciences Laboratory's `behave` library, the fire behavior
 engine inside FlamMap and Behave7, copied verbatim from

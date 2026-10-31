@@ -13,12 +13,12 @@ import java.io.File;
  * package and the run goes, the package's eye hides and shows it. ATAK asks this
  * resolver for a handler whenever it needs one for a file (the package's delete asks
  * for each file it holds); a received run's file is the one the package extracted.
- * Asked on demand and unregistered when Fire Cast stops, so a plugin reload leaves no
+ * Asked on demand and unregistered when FireCast stops, so a plugin reload leaves no
  * handler pointing at an old model.
  */
 final class RunContent implements URIContentResolver {
 
-    static final String CONTENT_TYPE = "Fire Cast run";
+    static final String CONTENT_TYPE = "FireCast run";
     private final FireModel model;
 
     RunContent(FireModel model) {

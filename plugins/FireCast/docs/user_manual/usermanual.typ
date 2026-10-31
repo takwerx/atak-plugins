@@ -2,7 +2,7 @@
 #import "formatting.typ": *
 
 #show: userguide.with(
-   plugin-name: "Fire Cast",
+   plugin-name: "FireCast",
    plugin-version: "0.2",
    platform: "ATAK",
    platform-version: "5.7.0",
@@ -14,7 +14,7 @@
 #toolbox.side-by-side(columns: (1.5fr, 9fr))[
   #image("plugin_icon.png", width: 85%)
 ][
-Fire Cast puts satellite heat detections on the ATAK map and runs a fire spread
+FireCast puts satellite heat detections on the ATAK map and runs a fire spread
 model on the device, from a point you tap or a perimeter you draw. It also shows
 other agencies' published fire forecasts beside your own runs.
 ]
@@ -285,7 +285,7 @@ their logo and a link to pyrecast.com.
 
 Each is a switch in the pane. Long press a switch for its list, and pick a fire
 to put its time slider on it. PyreCast ranks its runs by what burned at the end
-of the forecast; Fire Cast shows the middle run unless you pick the smaller or
+of the forecast; FireCast shows the middle run unless you pick the smaller or
 larger end.
 ]
 
@@ -314,7 +314,7 @@ says where the fire is by then and how big.
 #tak-slide[
 = Offline
 
-Everything Fire Cast has fetched or run stays on the device. After a restart of
+Everything FireCast has fetched or run stays on the device. After a restart of
 ATAK, or with no signal, your runs, the last detections and the PyreCast
 forecasts come back with their age on the pane.
 

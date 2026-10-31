@@ -141,9 +141,9 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
             m.setMovable(false);
             m.setClickable(false);
             m.setMetaInteger("color", 0xFFFF40C0);
-            com.atakmap.android.maps.MapGroup g = getMapView().getRootGroup().findMapGroup("Fire Cast");
+            com.atakmap.android.maps.MapGroup g = getMapView().getRootGroup().findMapGroup("FireCast");
             if (g == null) {
-                g = new com.atakmap.android.maps.DefaultMapGroup("Fire Cast");
+                g = new com.atakmap.android.maps.DefaultMapGroup("FireCast");
                 getMapView().getRootGroup().addGroup(g);
             }
             g.addItem(m);

@@ -254,6 +254,16 @@ public final class Spread {
      */
     public static Result run(Landscape land, double lat, double lon, double halfKm, double maxMin, Behavior behavior,
             double[][] seedRing, double rateScale, Wind wind, long startMs, double cellM, final int hours) {
+        return run(land, lat, lon, halfKm, maxMin, behavior, seedRing == null ? null : new double[][][] { seedRing },
+                rateScale, wind, startMs, cellM, hours);
+    }
+
+    /**
+     * @param seedRings every part of a perimeter, [lat, lon] pairs each: a fire NASA maps
+     *                  as two or more pieces burns in all of them at time 0
+     */
+    public static Result run(Landscape land, double lat, double lon, double halfKm, double maxMin, Behavior behavior,
+            double[][][] seedRings, double rateScale, Wind wind, long startMs, double cellM, final int hours) {
         // 15 m is half the grid's own 30 m: the fuel is sampled nearest, so the run
         // follows the same ground, but the front moves in finer steps and the rings
         // come out smooth. Three hours over 20 km runs at 30 m.
@@ -341,19 +351,33 @@ public final class Spread {
         java.util.Arrays.fill(arrival, Float.POSITIVE_INFINITY);
         final int start = half * nx + half;
         double offsetM = 0, offsetDeg = 0;
-        if (seedRing != null && seedRing.length >= 3) {
+        if (seedRings != null && seedRings.length > 0) {
             // Everything inside the perimeter is burning now. Walls inside it are not
             // (a house already lost is not a source); the edge cells carry the fire out.
+            // Each part is tested only over the cells inside its own box.
             int lit = 0;
-            for (int y = 0; y < ny; y++)
-                for (int x = 0; x < nx; x++) {
-                    if (cells[y * nx + x] == BARRIER)
-                        continue;
-                    if (inside(seedRing, lat0 + (y + 0.5) * dLat, lon0 + (x + 0.5) * dLon)) {
-                        arrival[y * nx + x] = 0;
-                        lit++;
-                    }
+            for (double[][] ring : seedRings) {
+                if (ring == null || ring.length < 3)
+                    continue;
+                double s = 90, w = 180, n = -90, e = -180;
+                for (double[] p : ring) {
+                    s = Math.min(s, p[0]);
+                    n = Math.max(n, p[0]);
+                    w = Math.min(w, p[1]);
+                    e = Math.max(e, p[1]);
                 }
+                final int y0 = Math.max(0, (int) Math.floor((s - lat0) / dLat)), y1 = Math.min(ny - 1, (int) Math.ceil((n - lat0) / dLat));
+                final int x0 = Math.max(0, (int) Math.floor((w - lon0) / dLon)), x1 = Math.min(nx - 1, (int) Math.ceil((e - lon0) / dLon));
+                for (int y = y0; y <= y1; y++)
+                    for (int x = x0; x <= x1; x++) {
+                        if (cells[y * nx + x] == BARRIER || arrival[y * nx + x] == 0)
+                            continue;
+                        if (inside(ring, lat0 + (y + 0.5) * dLat, lon0 + (x + 0.5) * dLon)) {
+                            arrival[y * nx + x] = 0;
+                            lit++;
+                        }
+                    }
+            }
             if (lit == 0 && cells[start] != BARRIER)
                 arrival[start] = 0;
         } else {

@@ -238,7 +238,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             model.satellitePerimeter(new Feds.Fire(fedsId, Double.NaN, intent.getDoubleExtra("fedsDays", Double.NaN),
                     intent.getLongExtra("fedsAt", 0), box[0], box[1], box[2], box[3]));
         }
-        // From a "Fire Cast run from ..." notice: open that run and fly to it.
+        // From a "FireCast run from ..." notice: open that run and fly to it.
         final String runId = intent == null ? null : intent.getStringExtra(FireModel.EXTRA_RUN);
         final FireModel.Run asked = runId != null && runId.matches("[0-9a-f-]{36}") ? model.find(runId) : null;
         if (asked != null) {

@@ -18,7 +18,7 @@ import gov.tak.api.ui.ToolbarItemAdapter;
 import gov.tak.platform.marshal.MarshalManager;
 
 /**
- * Fire Cast: satellite heat detections drawn at the ground they actually cover.
+ * FireCast: satellite heat detections drawn at the ground they actually cover.
  *
  * <p>This class is lifecycle and nothing else. The detections live in
  * {@link DetectionFeed}, which runs for as long as the plugin is loaded - not inside a
@@ -146,7 +146,7 @@ public class FireCast implements IPlugin {
             };
             final com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter sf =
                     new com.atakmap.android.ipc.AtakBroadcast.DocumentedIntentFilter();
-            sf.addAction(SHOW, "open the Fire Cast pane");
+            sf.addAction(SHOW, "open the FireCast pane");
             com.atakmap.android.ipc.AtakBroadcast.getInstance().registerSystemReceiver(showReceiver, sf);
         }
     }

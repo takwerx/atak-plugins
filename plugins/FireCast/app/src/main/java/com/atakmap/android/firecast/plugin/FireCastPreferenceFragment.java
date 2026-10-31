@@ -24,7 +24,7 @@ public class FireCastPreferenceFragment extends PluginPreferenceFragment {
     /** Extracted under the plugin's own folder, named for what it is: the name a file picker shows. */
     private static final String USER_GUIDE_PATH = FileSystemUtils.getRoot()
             + File.separator + "tools" + File.separator + "firecast"
-            + File.separator + "Fire Cast User Guide.pdf";
+            + File.separator + "FireCast User Guide.pdf";
 
     private static Context pluginContext;
 
@@ -53,7 +53,7 @@ public class FireCastPreferenceFragment extends PluginPreferenceFragment {
 
     @Override
     public String getSubTitle() {
-        return getSubTitle("Tool Preferences", "Fire Cast");
+        return getSubTitle("Tool Preferences", "FireCast");
     }
 
     @Override

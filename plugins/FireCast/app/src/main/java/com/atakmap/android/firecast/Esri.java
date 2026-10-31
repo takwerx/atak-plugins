@@ -20,7 +20,7 @@ import java.util.Iterator;
 /**
  * ArcGIS REST plumbing: HTTP, paged queries over a map box, Esri JSON geometry.
  *
- * <p>Copied from the Feature Layer plugin and cut down to what Fire Cast needs. Fire
+ * <p>Copied from the Feature Layer plugin and cut down to what FireCast needs. Fire
  * Cast reads public NIFC services with no key, so none of the portal search, org
  * scoping or token handling came across: every request here is anonymous https.
  */

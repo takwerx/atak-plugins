@@ -1,15 +1,15 @@
-ATAK Plugin — Fire Cast
+ATAK Plugin — FireCast
 
-**Download Fire Cast 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download FireCast 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/fire-cast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/fire-cast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/fire-cast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/firecast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/firecast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/firecast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.8.0-civ-release.apk
 
-All releases: https://github.com/takwerx/fire-cast/releases
+All releases: https://github.com/takwerx/firecast/releases
 
 **User guide with screenshots: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)**
-(https://github.com/takwerx/fire-cast/blob/main/docs/USER_GUIDE.md)
+(https://github.com/takwerx/firecast/blob/main/docs/USER_GUIDE.md)
 
 
 _________________________________________________________________
@@ -23,7 +23,7 @@ what a pin means. A VIIRS detection means "something inside this 375 m square wa
 hot at 23:38 Zulu". A GOES detection seen at 58 degrees off nadir means
 "something inside this 4 km by 2 km patch was hot", and that is the same dot on
 every other map. An operator deciding whether to drive to it needs the
-difference, so Fire Cast draws the footprint the record itself describes and puts
+difference, so FireCast draws the footprint the record itself describes and puts
 the rest in words on a detail panel.
 
 Feeds, all public NIFC services and none of them needing a key or a sign-in:
@@ -89,7 +89,7 @@ POINT OF CONTACTS
 Andreas Johansson, TAKwerx.
 
 Bug reports and questions:
-https://github.com/takwerx/fire-cast/issues
+https://github.com/takwerx/firecast/issues
 
 _________________________________________________________________
 PORTS REQUIRED
@@ -159,7 +159,7 @@ LICENSE
 
 Copyright (C) 2026 Andreas Johansson (TAKWERX).
 
-Fire Cast is free software, licensed under the
+FireCast is free software, licensed under the
 **[GNU Affero General Public License v3.0 or later](LICENSE)**
 (AGPL-3.0-or-later), with an
 **[additional permission for the TAK Software](LICENSE-EXCEPTION.md)** so that
@@ -168,15 +168,15 @@ without the AGPL reaching into ATAK itself.
 
 You may run it, study it, modify it, and share it -- for any purpose, commercial
 or not, with no fee and no per-seat license. What the AGPL adds over a permissive
-license is a guarantee that it **stays** free: modify Fire Cast and pass it on,
+license is a guarantee that it **stays** free: modify FireCast and pass it on,
 and the people you pass it to are owed the complete corresponding source of your
 version under the same license. Nobody can take this, close it, and sell it back
 to the emergency-services community.
 
-**If you only install and use Fire Cast, this obligation never touches you.**
+**If you only install and use FireCast, this obligation never touches you.**
 Running it, in any agency, on any number of devices, triggers nothing.
 
-**Scope.** The AGPL covers Fire Cast's own code. It does not change the license
+**Scope.** The AGPL covers FireCast's own code. It does not change the license
 of the TAK Software, which stays under the TAK Software License Agreement, and it
 does not cover the parts of this repository scaffolded from the TAK-SDK plugin
 template -- those are listed under Provenance in

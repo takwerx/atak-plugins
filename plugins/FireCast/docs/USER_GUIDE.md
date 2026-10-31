@@ -1,24 +1,24 @@
-# Fire Cast for ATAK — User Guide
+# FireCast for ATAK — User Guide
 
 **Version 0.2 · takwerx**
 
-**Download Fire Cast 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
+**Download FireCast 0.2** (pick the one matching your ATAK-CIV version, sideload, then load it in ATAK's Plugins manager):
 
-- **ATAK-CIV 5.6:** https://github.com/takwerx/fire-cast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.6.0-civ-release.apk
-- **ATAK-CIV 5.7:** https://github.com/takwerx/fire-cast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.7.0-civ-release.apk
-- **ATAK-CIV 5.8:** https://github.com/takwerx/fire-cast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.8.0-civ-release.apk
+- **ATAK-CIV 5.6:** https://github.com/takwerx/firecast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.6.0-civ-release.apk
+- **ATAK-CIV 5.7:** https://github.com/takwerx/firecast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.7.0-civ-release.apk
+- **ATAK-CIV 5.8:** https://github.com/takwerx/firecast/releases/download/v0.2/ATAK-Plugin-FireCast-0.2--5.8.0-civ-release.apk
 
-All releases: https://github.com/takwerx/fire-cast/releases
+All releases: https://github.com/takwerx/firecast/releases
 
-**Before you start:** the builds listed above are the ATAK-CIV versions with a published Fire Cast build. Install the one that matches the ATAK on your device.
+**Before you start:** the builds listed above are the ATAK-CIV versions with a published FireCast build. Install the one that matches the ATAK on your device.
 
-Fire Cast puts satellite heat detections on the ATAK map and lets you run a fire spread model on the device, from a point you tap or a perimeter you draw. It also shows other agencies' published fire forecasts beside your own runs.
+FireCast puts satellite heat detections on the ATAK map and lets you run a fire spread model on the device, from a point you tap or a perimeter you draw. It also shows other agencies' published fire forecasts beside your own runs.
 
 ---
 
 ## 1. The pane
 
-Tap the Fire Cast icon in the toolbar. The pane opens on the right.
+Tap the FireCast icon in the toolbar. The pane opens on the right.
 
 ![The main pane](screenshots/1_main_pane.png)
 
@@ -136,7 +136,7 @@ A run can be small. A litter fire under trees in a light wind may cover a fracti
 
 ### Predicted Fire Size
 
-A fire does not spread exactly as forecast. The wind misses, the fuel is drier or wetter than measured. Fire Cast repeats each run 30 times with the wind speed, wind direction and fuel moisture nudged the way a forecast misses, ranks the 30 by how much burned, and offers five of them.
+A fire does not spread exactly as forecast. The wind misses, the fuel is drier or wetter than measured. FireCast repeats each run 30 times with the wind speed, wind direction and fuel moisture nudged the way a forecast misses, ranks the 30 by how much burned, and offers five of them.
 
 ![The Predicted Fire Size picker](screenshots/9_size_picker.png)
 
@@ -184,11 +184,11 @@ Each forecast runs out to about two weeks, drawn from yellow for the first hours
 
 Drag the slider to any time in the forecast. The edge at that time is drawn in cyan, and the pane says where the fire is by then: *By Nov 2 11:04, in 3 days: 1,236 acres.*
 
-PyreCast ranks its own runs by how much burned at the end of the forecast. Fire Cast shows the middle run unless you pick the smaller or larger end, and shows one run at a time.
+PyreCast ranks its own runs by how much burned at the end of the forecast. FireCast shows the middle run unless you pick the smaller or larger end, and shows one run at a time.
 
 ## 5. Offline
 
-Everything Fire Cast has fetched or run stays on the device. After a restart of ATAK, or with no signal, your runs, the last detections and the PyreCast forecasts come back, with their age on the pane. Switching a layer off only hides it. A failed fetch never empties what you already have, and a new run with no signal says what it could not reach, for example "Could not read the fuel and slope here", and leaves your other runs alone.
+Everything FireCast has fetched or run stays on the device. After a restart of ATAK, or with no signal, your runs, the last detections and the PyreCast forecasts come back, with their age on the pane. Switching a layer off only hides it. A failed fetch never empties what you already have, and a new run with no signal says what it could not reach, for example "Could not read the fuel and slope here", and leaves your other runs alone.
 
 ## 6. What to keep in mind
 
@@ -196,4 +196,4 @@ A spread model gives a direction and an order of magnitude. It is not a plan to 
 
 ## Questions and bugs
 
-Open an issue at https://github.com/takwerx/fire-cast/issues.
+Open an issue at https://github.com/takwerx/firecast/issues.

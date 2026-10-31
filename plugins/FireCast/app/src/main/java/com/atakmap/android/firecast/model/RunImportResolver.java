@@ -15,12 +15,12 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Claims a Fire Cast run file wherever ATAK finds one: a file a contact sent, a Data
+ * Claims a FireCast run file wherever ATAK finds one: a file a contact sent, a Data
  * Sync download, a data package, the Import Manager. ATAK hands every file to the
  * resolvers that match it; this one matches a {@code .firerun.kmz} carrying our saved
  * form, takes ATAK's own KMZ resolver off the list for that file, and gives the run to
- * the model, so a phone with Fire Cast gets a run, not a second, plain KML overlay. A
- * phone without Fire Cast never sees this class and imports the KML.
+ * the model, so a phone with FireCast gets a run, not a second, plain KML overlay. A
+ * phone without FireCast never sees this class and imports the KML.
  *
  * <p>The stable {@code gov.tak.api} resolver (present in 5.6, 5.7 and 5.8), per the
  * rule to prefer it where one exists.
@@ -31,7 +31,7 @@ final class RunImportResolver extends ImportResolver {
     private final FireModel model;
 
     RunImportResolver(FireModel model, gov.tak.api.commons.graphics.Drawable icon) {
-        super(".kmz", RunFile.dir(), "Fire Cast run", icon);
+        super(".kmz", RunFile.dir(), "FireCast run", icon);
         this.model = model;
     }
 
@@ -89,6 +89,6 @@ final class RunImportResolver extends ImportResolver {
 
     @Override
     public Pair<String, String> getContentMIME() {
-        return new Pair<>("Fire Cast run", "application/vnd.google-earth.kmz");
+        return new Pair<>("FireCast run", "application/vnd.google-earth.kmz");
     }
 }

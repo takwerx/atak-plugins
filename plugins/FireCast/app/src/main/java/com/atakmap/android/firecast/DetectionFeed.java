@@ -483,7 +483,7 @@ public class DetectionFeed {
         store = new FeatureSetDatabase2(storeFile);
         final FeatureDataStore2.FeatureQueryParameters visibleOnly = new FeatureDataStore2.FeatureQueryParameters();
         visibleOnly.visibleOnly = true;
-        layer = new FeatureLayer3("Fire Cast heat detections", store, visibleOnly);
+        layer = new FeatureLayer3("FireCast heat detections", store, visibleOnly);
         final FeatureDataStoreDeepMapItemQuery query = new FeatureDataStoreDeepMapItemQuery(layer) {
             @Override
             protected MapItem featureToMapItem(Feature feature) {
@@ -543,7 +543,7 @@ public class DetectionFeed {
             }
         };
         overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
-                "Fire Cast heat detections", "file://asset/nothing", query, null, null);
+                "FireCast heat detections", "file://asset/nothing", query, null, null);
         // A reload interrupted mid-write can leave two generations of a set; keep the newest.
         dedupeSets();
         mapView.getMapOverlayManager().addFilesOverlay(overlay);
@@ -690,7 +690,7 @@ public class DetectionFeed {
     }
 
     /**
-     * Fire Cast's panes, so "in view" can leave out the map they cover. "What is in view"
+     * FireCast's panes, so "in view" can leave out the map they cover. "What is in view"
      * means the map the operator can see, as in every takwerx plugin: ATAK's own bounds
      * run on under the side pane, and a fire in Arkansas under it topped a list for a
      * view of the West (operator, 2026-10-30).
@@ -729,7 +729,7 @@ public class DetectionFeed {
     }
 
     /**
-     * South, west, north, east of the map not under an open Fire Cast pane; null when the
+     * South, west, north, east of the map not under an open FireCast pane; null when the
      * map cannot say. A side pane trims the east of the box, a bottom one the south, by
      * the share of the screen it covers. A view across the antimeridian is null rather
      * than the whole world the long way round.

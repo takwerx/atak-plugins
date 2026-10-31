@@ -28,7 +28,7 @@ public class FedsSource implements DetectionSource {
     static final String ITEMS = "https://openveda.cloud/api/features/collections/"
             + "public.eis_fire_snapshot_perimeter_nrt/items";
     /** One answer at most; a 12-degree view in a busy week held about 100. */
-    private static final int MAX_FEATURES = 200, MAX_VERTICES = 200_000, RING_VERTICES = 400;
+    private static final int MAX_FEATURES = 200, MAX_VERTICES = 200_000;
     /**
      * Outlines are 12 hours apart and reach the service up to a day and more after the pass, so
      * a window shorter than this would show none: the window is never narrower.
@@ -142,15 +142,23 @@ public class FedsSource implements DetectionSource {
         for (JSONArray r : outer) {
             if (r == null || r.length() < 4 || r.length() > MAX_VERTICES)
                 continue;
-            final int n = r.length(), keep = Math.min(n, RING_VERTICES);
-            final List<double[]> pts = new ArrayList<>(keep + 1);
-            for (int i = 0; i < keep; i++) {
-                final JSONArray p = r.optJSONArray((int) ((long) i * n / keep));
+            // Every corner read, then simplified by distance, the same as the model's start:
+            // skipping every Nth corner cut the tips off fingers (operator, 2026-10-30).
+            final double[][] full = new double[r.length()][];
+            for (int i = 0; i < full.length; i++) {
+                final JSONArray p = r.optJSONArray(i);
                 final double lon = p == null ? Double.NaN : p.optDouble(0, Double.NaN), lat = p == null ? Double.NaN : p.optDouble(1, Double.NaN);
                 if (!(Math.abs(lat) <= 90) || !(Math.abs(lon) <= 180))
                     return null;
-                pts.add(new double[] { lon, lat });
+                full[i] = new double[] { lat, lon };
             }
+            final List<double[]> pts = new ArrayList<>();
+            for (double[] q : com.atakmap.android.firecast.model.Feds.thin(full))
+                pts.add(new double[] { q[1], q[0] });
+            if (pts.size() > 1 && pts.get(0)[0] == pts.get(pts.size() - 1)[0] && pts.get(0)[1] == pts.get(pts.size() - 1)[1])
+                pts.remove(pts.size() - 1);
+            if (pts.size() < 3)
+                continue;
             double area2 = 0;
             for (int i = 0; i < pts.size(); i++) {
                 final double[] a = pts.get(i), b = pts.get((i + 1) % pts.size());

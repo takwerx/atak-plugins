@@ -160,6 +160,13 @@ public final class FireModel {
         public String groundNote;
         /** The perimeter the run began from, [lat, lon] pairs, or null for a point start. */
         public double[][] perimeter;
+        /** Every part of it, the main one first, when NASA mapped the fire as several pieces; null for one. */
+        public double[][][] perimeterParts;
+
+        /** What the run lights at time 0: every part. */
+        double[][][] seeds() {
+            return perimeterParts != null ? perimeterParts : perimeter == null ? null : new double[][][] { perimeter };
+        }
         /** Where the perimeter came from when it was not drawn: the satellite outline and its age. */
         public String perimeterNote;
         /** When the fire started, epoch ms, or 0 for unknown; with a perimeter it calibrates the run. */
@@ -324,7 +331,7 @@ public final class FireModel {
 
     // the start marker: an ordinary ATAK marker, so Move and Fine Adjust on its radial
     // are ATAK's own, and the model reads wherever it was left
-    private static final String GROUP = "Fire Cast";
+    private static final String GROUP = "FireCast";
     private static final String MARKER_UID = "firecast.model.start";
     private MapGroup group;
     private Marker marker;
@@ -332,6 +339,9 @@ public final class FireModel {
     private PerimeterPicker perimeterPicker;
     /** The drawn perimeter waiting for a run, or null. */
     private volatile double[][] perimeter;
+    /** Every part of a NASA perimeter, the main one first; null for one part or a drawn one. */
+    private volatile double[][][] perimeterParts;
+    private static final String PREF_PERIMETER_PARTS = "model.perimeterParts";
     private static final String PREF_PERIMETER = "model.perimeter", PREF_STARTED = "model.startedMin",
             PREF_PERIMETER_NOTE = "model.perimeterNote";
     /** Null for a drawn perimeter; for a satellite one, what it is and when it was drawn. */
@@ -383,8 +393,8 @@ public final class FireModel {
                 Feds.Perimeter p = null;
                 try {
                     p = Feds.outline(fire);
-                    if (Feds.spanM(p.ring) / 2000d + spreadRoomKm(horizonMinutes() >= 180) > MAX_HALF_KM)
-                        said = "This fire's satellite perimeter is " + Units.format(Feds.spanM(p.ring))
+                    if (Feds.spanM(p.rings) / 2000d + spreadRoomKm(horizonMinutes() >= 180) > MAX_HALF_KM)
+                        said = "This fire's satellite perimeter is " + Units.format(Feds.spanM(p.rings))
                                 + " across, more than the model can take on the phone ("
                                 + Units.format(2 * (MAX_HALF_KM - spreadRoomKm(horizonMinutes() >= 180)) * 1000d)
                                 + "). Choose A point and place it on the edge that is moving instead.";
@@ -410,19 +420,22 @@ public final class FireModel {
                             lon += found.ring[i][1];
                         }
                         setPerimeter(pts, fedsNote(found, fire));
-                        if (perimeterPicker == null)
-                            drawPerimeterPicker();
-                        perimeterPicker.show(pts);
+                        setParts(found.rings != null && found.rings.length > 1 ? found.rings : null);
+                        // No copy of the outline: the NASA feed draws it, and a red twin on
+                        // the same edge read as a second perimeter (operator, 2026-10-30).
+                        if (perimeterPicker != null)
+                            perimeterPicker.clearDrawn();
                         // The marker goes with the fire, so the map does not show a start somewhere else.
                         place(new GeoPoint(lat / pts.length, lon / pts.length));
                         try {
                             double s = 90, w = 180, n = -90, e = -180;
-                            for (GeoPoint q : pts) {
-                                s = Math.min(s, q.getLatitude());
-                                n = Math.max(n, q.getLatitude());
-                                w = Math.min(w, q.getLongitude());
-                                e = Math.max(e, q.getLongitude());
-                            }
+                            for (double[][] part : found.rings != null ? found.rings : new double[][][] { found.ring })
+                                for (double[] q : part) {
+                                    s = Math.min(s, q[0]);
+                                    n = Math.max(n, q[0]);
+                                    w = Math.min(w, q[1]);
+                                    e = Math.max(e, q[1]);
+                                }
                             com.atakmap.android.firecast.DetectionFeed.fitVisible(mapView, s, w, n, e);
                         } catch (Exception e) {
                             Log.w(TAG, "could not go to the satellite perimeter", e);
@@ -481,8 +494,60 @@ public final class FireModel {
         });
     }
 
+    /** The other parts of a NASA perimeter, kept with it so a restart has them too. */
+    private void setParts(double[][][] parts) {
+        perimeterParts = parts;
+        if (parts == null) {
+            prefs.edit().remove(PREF_PERIMETER_PARTS).apply();
+            return;
+        }
+        try {
+            prefs.edit().putString(PREF_PERIMETER_PARTS, partsJson(parts).toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    static org.json.JSONArray partsJson(double[][][] parts) throws org.json.JSONException {
+        final org.json.JSONArray out = new org.json.JSONArray();
+        for (double[][] part : parts) {
+            final org.json.JSONArray a = new org.json.JSONArray();
+            for (double[] p : part)
+                a.put(new org.json.JSONArray().put(p[0]).put(p[1]));
+            out.put(a);
+        }
+        return out;
+    }
+
+    /** Parts back from JSON, every coordinate checked; null when any is not a usable ring. */
+    static double[][][] partsFrom(org.json.JSONArray out) {
+        if (out == null || out.length() < 1 || out.length() > 200)
+            return null;
+        try {
+            final double[][][] parts = new double[out.length()][][];
+            int total = 0;
+            for (int k = 0; k < out.length(); k++) {
+                final org.json.JSONArray a = out.getJSONArray(k);
+                total += a.length();
+                if (a.length() < 3 || total > 50000)
+                    return null;
+                parts[k] = new double[a.length()][];
+                for (int i = 0; i < a.length(); i++) {
+                    final double la = a.getJSONArray(i).getDouble(0), lo = a.getJSONArray(i).getDouble(1);
+                    if (!(Math.abs(la) <= 90) || !(Math.abs(lo) <= 180))
+                        return null;
+                    parts[k][i] = new double[] { la, lo };
+                }
+            }
+            return parts;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private void setPerimeter(GeoPoint[] ring, String note) {
         perimeterNote = note;
+        perimeterParts = null;
+        prefs.edit().remove(PREF_PERIMETER_PARTS).apply();
         startNote = note;
         if (note == null)
             prefs.edit().remove(PREF_PERIMETER_NOTE).apply();
@@ -503,6 +568,8 @@ public final class FireModel {
 
     public void clearPerimeter() {
         perimeter = null;
+        perimeterParts = null;
+        prefs.edit().remove(PREF_PERIMETER_PARTS).apply();
         perimeterNote = null;
         startNote = null;
         prefs.edit().remove(PREF_PERIMETER).remove(PREF_PERIMETER_NOTE).apply();
@@ -720,6 +787,8 @@ public final class FireModel {
                     perimeter = r;
                     perimeterNote = prefs.getString(PREF_PERIMETER_NOTE, null);
                     startNote = perimeterNote;
+                    final String parts = prefs.getString(PREF_PERIMETER_PARTS, null);
+                    perimeterParts = parts == null ? null : partsFrom(new org.json.JSONArray(parts));
                 }
             }
         } catch (Exception e) {
@@ -924,6 +993,7 @@ public final class FireModel {
                 r.ranAt = System.currentTimeMillis();
                 r.perimeter = perimeter;
                 r.perimeterNote = r.perimeter == null ? null : perimeterNote;
+                r.perimeterParts = r.perimeter == null ? null : perimeterParts;
                 final boolean threeHours = horizonMinutes() >= 180;
                 r.steps = threeHours ? STEPS_3H : STEPS_MIN;
                 r.halfKm = threeHours ? 10 : HALF_KM;
@@ -932,7 +1002,10 @@ public final class FireModel {
                     // A perimeter wider than the usual square gets a square that holds it with
                     // room to spread past its edge; past 10 km the cells grow to 60 m so the run
                     // stays the same size on the phone.
-                    final double need = perimeterReachKm(r.perimeter, lat, lon) + spreadRoomKm(threeHours);
+                    double reach = 0;
+                    for (double[][] part : r.seeds())
+                        reach = Math.max(reach, perimeterReachKm(part, lat, lon));
+                    final double need = reach + spreadRoomKm(threeHours);
                     if (need > r.halfKm) {
                         r.halfKm = Math.min(MAX_HALF_KM, Math.ceil(need));
                         r.cellM = r.halfKm > 10 ? 60 : 30;
@@ -1490,7 +1563,7 @@ public final class FireModel {
     private final java.util.Map<String, Integer> notices = new java.util.HashMap<>();
 
     /**
-     * "Fire Cast run from TAPER" in ATAK's notifications; a tap opens the run and flies
+     * "FireCast run from TAPER" in ATAK's notifications; a tap opens the run and flies
      * to it. A resend of the same run replaces its notice. Any thread.
      */
     private void notifyArrived(final Run r) {
@@ -1507,7 +1580,7 @@ public final class FireModel {
                     final android.content.Intent open = new android.content.Intent(ModelReceiver.ACTION)
                             .putExtra(EXTRA_RUN, r.runId);
                     n.postNotification(id, com.atakmap.android.util.NotificationUtil.GeneralIcon.DOWNLOAD_COMPLETE.getID(),
-                            "Fire Cast run from " + r.by, "Fire Cast run from " + r.by,
+                            "FireCast run from " + r.by, "FireCast run from " + r.by,
                             r.label() + ". Tap to see it.", open, true);
                 } catch (Throwable t) {
                     Log.w(TAG, "could not post the arrival notice", t);
@@ -1707,7 +1780,7 @@ public final class FireModel {
             status = "Running the fire " + (k + 1) + " of " + SIZE_RUNS + " times with the weather nudged…";
             changed();
             final Spread.Result m = Spread.run(land, r.lat, r.lon, r.halfKm, last, behaviorFor(r, n[0], n[1], n[2]),
-                    r.perimeter, r.rateScale, fieldFor(r, useField, n[0], n[1]), r.ranAt, r.cellM, hours);
+                    r.seeds(), r.rateScale, fieldFor(r, useField, n[0], n[1]), r.ranAt, r.cellM, hours);
             nudges.add(n);
             acres.add(m.acres(last));
         }
@@ -1747,7 +1820,7 @@ public final class FireModel {
                 i = k;
         final double[] n = r.sizeNudges[i];
         final Spread.Result m = Spread.run(land, r.lat, r.lon, r.halfKm, r.steps[r.steps.length - 1],
-                behaviorFor(r, n[0], n[1], n[2]), r.perimeter, r.rateScale, fieldFor(r, useField, n[0], n[1]),
+                behaviorFor(r, n[0], n[1], n[2]), r.seeds(), r.rateScale, fieldFor(r, useField, n[0], n[1]),
                 r.ranAt, r.cellM, r.hourly == null ? 1 : r.hourly.length);
         if (m.cellsSeen > 4)
             r.ground = m;
@@ -1824,7 +1897,9 @@ public final class FireModel {
         r.rateScale = 1;
         if (r.perimeter != null && r.startedAt > 0) {
             final double elapsedMin = (r.ranAt - r.startedAt) / 60000d;
-            final double observedAcres = Spread.ringAcres(r.perimeter);
+            double observedAcres = 0;
+            for (double[][] part : r.seeds())
+                observedAcres += Spread.ringAcres(part);
             if (elapsedMin >= 5 && observedAcres > 0.1) {
                 final Spread.Result trial = Spread.run(land, r.lat, r.lon, r.halfKm, elapsedMin, behavior, null, 1d, null, r.startedAt, r.cellM);
                 final double modeled = trial.acres(elapsedMin);
@@ -1841,7 +1916,7 @@ public final class FireModel {
         }
         final Spread.Wind field = fieldFor(r, useField, 1, 0);
         final Spread.Result g = Spread.run(land, r.lat, r.lon, r.halfKm, r.steps[r.steps.length - 1],
-                behavior, r.perimeter, r.rateScale, field, r.ranAt, r.cellM, r.hourly == null ? 1 : r.hourly.length);
+                behavior, r.seeds(), r.rateScale, field, r.ranAt, r.cellM, r.hourly == null ? 1 : r.hourly.length);
         Log.d(TAG, "ground run: " + g.cellsSeen + " cells reached of " + g.cellsBurnable + " burnable, "
                 + g.fuelsCrossed + " fuels, " + (System.currentTimeMillis() - t0) + " ms");
         if (g.cellsSeen < 2) {
@@ -1971,7 +2046,7 @@ public final class FireModel {
             final double reachM = Math.max(60, r.headM(r.steps[r.steps.length - 1]) * 1.3d);
             final double dLat = reachM / 111320d;
             final double dLon = reachM / (111320d * Math.max(0.02d, Math.cos(Math.toRadians(r.lat))));
-            // Into the map the operator can see: the same fit as every Go to in Fire Cast,
+            // Into the map the operator can see: the same fit as every Go to in FireCast,
             // the box widened east by the open pane's share (2026-10-30).
             com.atakmap.android.firecast.DetectionFeed.fitVisible(mapView, r.lat - dLat, r.lon - dLon, r.lat + dLat, r.lon + dLon);
         } catch (Exception e) {
@@ -2009,7 +2084,7 @@ public final class FireModel {
 
     /**
      * Sends a run as one file through ATAK's own send dialog: contacts, groups, feeds,
-     * other apps, whatever this phone can send to. Fire Cast never picks the
+     * other apps, whatever this phone can send to. FireCast never picks the
      * destination. The file is written on the worker, the dialog shown on the main
      * thread. Main thread.
      */
@@ -2024,7 +2099,7 @@ public final class FireModel {
                 // storage refuses a colon in a file name ("10:12" failed with EPERM). A
                 // different package already saved under the same title (another run with
                 // the same label) is never touched: this one is told apart by its id.
-                String t = RunFile.safeName("Fire Cast - " + r.label());
+                String t = RunFile.safeName("FireCast - " + r.label());
                 final File dpDir = FileSystemUtils.getItem("tools/datapackage");
                 final String existing = RunFile.packageUid(new File(dpDir, t + ".zip"));
                 if (existing != null && !existing.equals(r.runId))
@@ -2054,7 +2129,7 @@ public final class FireModel {
                         try {
                             // A data package, not a bare file: it keeps its title and stays
                             // in Data Packages on every phone it reaches, its run imported
-                            // (a KML overlay, or a run where Fire Cast is installed). Its id is
+                            // (a KML overlay, or a run where FireCast is installed). Its id is
                             // the run's, so a resend updates the package instead of adding one.
                             final com.atakmap.android.missionpackage.file.MissionPackageManifest m =
                                     new com.atakmap.android.missionpackage.file.MissionPackageManifest(title, r.runId,
@@ -2115,7 +2190,7 @@ public final class FireModel {
     /** The run in plain words, for the file's card: what went in, what came out, what it does not mean. */
     static String card(Run r) {
         final StringBuilder c = new StringBuilder();
-        c.append("Fire Cast model run, ").append(new java.text.SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.US)
+        c.append("FireCast model run, ").append(new java.text.SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.US)
                 .format(new java.util.Date(r.ranAt))).append(".\n");
         c.append(r.perimeter == null ? "Start at " : r.perimeterNote != null ? "From NASA's satellite perimeter around "
                 : "From a drawn perimeter around ")
@@ -2210,7 +2285,7 @@ public final class FireModel {
         store = new FeatureSetDatabase2(storeFile);
         final FeatureDataStore2.FeatureQueryParameters visibleOnly = new FeatureDataStore2.FeatureQueryParameters();
         visibleOnly.visibleOnly = true;
-        layer = new FeatureLayer3("Fire Cast fire model", store, visibleOnly);
+        layer = new FeatureLayer3("FireCast fire model", store, visibleOnly);
         final FeatureDataStoreDeepMapItemQuery query = new FeatureDataStoreDeepMapItemQuery(layer) {
             @Override
             protected MapItem featureToMapItem(Feature feature) {
@@ -2221,7 +2296,7 @@ public final class FireModel {
             }
         };
         overlay = new FeatureDataStoreMapOverlay(mapView.getContext(), store, null,
-                "Fire Cast fire model", "file://asset/nothing", query, null, null);
+                "FireCast fire model", "file://asset/nothing", query, null, null);
         mapView.getMapOverlayManager().addFilesOverlay(overlay);
         mapView.addLayer(MapView.RenderStack.VECTOR_OVERLAYS, layer);
     }
@@ -2249,7 +2324,7 @@ public final class FireModel {
             store.acquireModifyLock(true);
             bulk = true;
             {
-                final long fsid = store.insertFeatureSet(new FeatureSet("Fire Cast", "Fire model",
+                final long fsid = store.insertFeatureSet(new FeatureSet("FireCast", "Fire model",
                         r.label(), Double.MAX_VALUE, 0d));
                 store.setFeatureSetVisible(fsid, r.visible);
                 r.fsid = fsid;
@@ -2520,6 +2595,8 @@ public final class FireModel {
                 for (double[] p : r.perimeter)
                     pa.put(new org.json.JSONArray().put(p[0]).put(p[1]));
                 o.put("perimeter", pa);
+                if (r.perimeterParts != null)
+                    o.put("perimeterParts", partsJson(r.perimeterParts));
                 if (r.perimeterNote != null)
                     o.put("perimeterNote", r.perimeterNote);
             }
@@ -2745,6 +2822,7 @@ public final class FireModel {
                     per[i] = new double[] { la, lo };
                 }
                 r.perimeter = per;
+                r.perimeterParts = partsFrom(o.optJSONArray("perimeterParts"));
                 final String pn = o.optString("perimeterNote", "");
                 r.perimeterNote = pn.isEmpty() || pn.length() > 600 ? null : pn;
             }

@@ -21,9 +21,9 @@ import java.util.zip.ZipOutputStream;
  *
  * <p>{@code doc.kml} is a KML document any ATAK imports as a single overlay: a ring per
  * step in the colors the map draws, the start, the perimeter it began from, and the
- * run's card as the document's description, so a phone without Fire Cast still reads
+ * run's card as the document's description, so a phone without FireCast still reads
  * what the run assumed. {@code firecast-run.json} is the run's saved form, which a
- * phone with Fire Cast reads instead and reruns with its own engine. Nothing else goes
+ * phone with FireCast reads instead and reruns with its own engine. Nothing else goes
  * in: no links, no scripts, no other files.
  */
 public final class RunFile {
@@ -64,7 +64,7 @@ public final class RunFile {
      * @param saved the run's saved form, with who ran it and the engine added
      * @param card  the run's inputs and outputs in plain words
      * @param icon  the start's icon, a PNG, or null for the viewer's own pin
-     * @param by    who ran it, for the descriptions a viewer without Fire Cast reads
+     * @param by    who ran it, for the descriptions a viewer without FireCast reads
      */
     static File write(FireModel.Run r, JSONObject saved, String card, byte[] icon, String by) throws Exception {
         final File f = fileFor(r.runId);
@@ -160,7 +160,7 @@ public final class RunFile {
     static String safeName(String title) {
         final String s = title.replace(':', '-').replaceAll("[^A-Za-z0-9 .,_-]", "").replaceAll("\\s+", " ").trim();
         final String cut = s.length() > 80 ? s.substring(0, 80).trim() : s;
-        return cut.isEmpty() ? "Fire Cast run" : cut;
+        return cut.isEmpty() ? "FireCast run" : cut;
     }
 
     /** Removes a run's file, if it has one; the operator's own Delete. */
@@ -253,7 +253,7 @@ public final class RunFile {
     }
 
     /**
-     * What a phone without Fire Cast shows: the rings named by the clock ("By 10:52
+     * What a phone without FireCast shows: the rings named by the clock ("By 10:52
      * (40 min), 131 acres"), each with a short description saying what it is and who
      * made it, and the start as a small marker of its own. The full card is the
      * document's description and the data package's remarks.
@@ -263,7 +263,7 @@ public final class RunFile {
         final StringBuilder k = new StringBuilder(64 * 1024);
         k.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
                 .append("<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n<Document>\n")
-                .append("<name>").append(esc("Fire Cast: " + r.label())).append("</name>\n")
+                .append("<name>").append(esc("FireCast: " + r.label())).append("</name>\n")
                 .append("<description>").append(esc(card)).append("</description>\n");
         for (int i = 0; i < r.steps.length; i++) {
             final int rgb = FireModel.stepColor(i, r.steps.length);
@@ -289,7 +289,7 @@ public final class RunFile {
             final String clock = FireModel.stamp(r.ranAt + r.steps[i] * 60000L);
             final String acres = FireModel.acresText(r.acres(r.steps[i]));
             k.append("<Placemark><name>").append(esc("By " + clock + " (" + r.steps[i] + " min), " + acres))
-                    .append("</name><description>").append(esc("Fire Cast model run" + who + " at "
+                    .append("</name><description>").append(esc("FireCast model run" + who + " at "
                             + FireModel.stamp(r.ranAt) + ": where the fire is expected to be by " + clock + ", "
                             + r.steps[i] + " minutes after the run, " + acres + ". A planning-grade estimate from the "
                             + "fuel, slope and weather it read; the data package's remarks list them. Run again as "
@@ -308,7 +308,7 @@ public final class RunFile {
             k.append("</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>\n");
         }
         k.append("<Placemark><name>").append(esc("Fire start, " + FireModel.stamp(r.ranAt))).append("</name><description>")
-                .append(esc("Where the Fire Cast model run" + who + " at " + FireModel.stamp(r.ranAt) + " started."))
+                .append(esc("Where the FireCast model run" + who + " at " + FireModel.stamp(r.ranAt) + " started."))
                 .append("</description>").append(icon ? "<styleUrl>#start</styleUrl>" : "")
                 .append("<Point><coordinates>");
         coord(k, r.lon, r.lat);

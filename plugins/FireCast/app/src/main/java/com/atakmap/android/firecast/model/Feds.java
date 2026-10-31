@@ -33,10 +33,13 @@ public final class Feds {
     /** The most features and vertices read from one answer; a real box holds a few dozen fires. */
     private static final int MAX_FEATURES = 200, MAX_VERTICES = 100_000;
     /**
-     * The model tests every cell against the ring, so a pixel-stepped outline with
-     * thousands of corners is thinned to this many. At 375 m pixels that loses nothing.
+     * The most corners a part keeps. NASA's outlines step along 375 m pixels; they are
+     * simplified by distance (Douglas-Peucker), never by skipping every Nth corner, which
+     * cut the tips off fingers (operator, 2026-10-30).
      */
-    private static final int RING_VERTICES = 400;
+    private static final int RING_VERTICES = 1500;
+    /** Corners closer than this to the line that replaces them go: a tenth of a pixel. */
+    private static final double SIMPLIFY_M = 30;
 
     /** One fire in a list: its box and numbers, not its outline. */
     public static final class Fire {
@@ -69,8 +72,10 @@ public final class Feds {
 
     /** One fire's outline, as the run's perimeter. */
     public static final class Perimeter {
-        /** The outer ring, [lat, lon] pairs, not closed. */
+        /** The largest part's outer ring, [lat, lon] pairs, not closed. */
         public final double[][] ring;
+        /** Every part, the largest first: NASA maps one fire as several pieces. */
+        public double[][][] rings;
         /** The 12-hour step it was drawn at, epoch ms UTC. */
         public final long atMs;
         /** Days between its first and last detection at that step. */
@@ -138,25 +143,32 @@ public final class Feds {
         return out;
     }
 
-    /** One fire's outline, its largest polygon. Worker thread. Throws when it cannot be read. */
+    /** One fire's outline, every part, largest first. Worker thread. Throws when it cannot be read. */
     public static Perimeter outline(Fire fire) throws Exception {
         if (!ID.matcher(fire.id).matches())
             throw new IllegalArgumentException("not a FEDS id");
         final JSONObject feature = new JSONObject(Esri.get(ITEMS + "/" + Esri.enc(fire.id).replace("+", "%20") + "?f=geojson"));
-        double[][] best = null;
+        final List<double[][]> parts = new ArrayList<>();
         int vertices = 0;
         for (double[][] ring : outerRings(feature.optJSONObject("geometry"))) {
             vertices += ring.length;
             if (vertices > MAX_VERTICES)
                 throw new IllegalStateException("satellite perimeter too large to read");
-            if (best == null || Spread.ringAcres(ring) > Spread.ringAcres(best))
-                best = ring;
+            parts.add(thin(ring));
         }
-        if (best == null)
+        if (parts.isEmpty())
             throw new IllegalStateException("no outline in the answer");
+        java.util.Collections.sort(parts, new java.util.Comparator<double[][]>() {
+            @Override
+            public int compare(double[][] a, double[][] b) {
+                return Double.compare(Spread.ringAcres(b), Spread.ringAcres(a));
+            }
+        });
         final JSONObject props = feature.optJSONObject("properties");
         final long at = props == null ? fire.atMs : Math.max(fire.atMs, parseTime(props.optString("t", "")));
-        return new Perimeter(thin(best), at, fire.burningDays);
+        final Perimeter p = new Perimeter(parts.get(0), at, fire.burningDays);
+        p.rings = parts.toArray(new double[0][][]);
+        return p;
     }
 
     /**
@@ -230,13 +242,80 @@ public final class Feds {
         return pts.size() < 3 ? null : pts.toArray(new double[0][]);
     }
 
-    private static double[][] thin(double[][] ring) {
-        if (ring.length <= RING_VERTICES)
+    /**
+     * Fewer corners, the same shape: Douglas-Peucker at {@link #SIMPLIFY_M}, the tolerance
+     * doubled until the part fits {@link #RING_VERTICES}. A tip is a corner far from the
+     * line that would replace it, so it is the last thing to go.
+     */
+    public static double[][] thin(double[][] ring) {
+        if (ring.length <= 8)
             return ring;
-        final double[][] out = new double[RING_VERTICES][];
-        for (int i = 0; i < RING_VERTICES; i++)
-            out[i] = ring[(int) ((long) i * ring.length / RING_VERTICES)];
+        final double lat = ring[0][0];
+        final double mLat = 111320d, mLon = 111320d * Math.max(0.02d, Math.cos(Math.toRadians(lat)));
+        final double[] x = new double[ring.length], y = new double[ring.length];
+        for (int i = 0; i < ring.length; i++) {
+            x[i] = ring[i][1] * mLon;
+            y[i] = ring[i][0] * mLat;
+        }
+        double tol = SIMPLIFY_M;
+        boolean[] keep;
+        int kept;
+        do {
+            keep = new boolean[ring.length];
+            keep[0] = true;
+            keep[ring.length - 1] = true;
+            // The farthest corner from the first splits the ring into two open runs.
+            int far = 0;
+            double best = -1;
+            for (int i = 1; i < ring.length; i++) {
+                final double d = (x[i] - x[0]) * (x[i] - x[0]) + (y[i] - y[0]) * (y[i] - y[0]);
+                if (d > best) {
+                    best = d;
+                    far = i;
+                }
+            }
+            keep[far] = true;
+            simplify(x, y, 0, far, tol, keep);
+            simplify(x, y, far, ring.length - 1, tol, keep);
+            kept = 0;
+            for (boolean k : keep)
+                if (k)
+                    kept++;
+            tol *= 2;
+        } while (kept > RING_VERTICES && tol < 5000);
+        final double[][] out = new double[kept][];
+        for (int i = 0, j = 0; i < ring.length; i++)
+            if (keep[i])
+                out[j++] = ring[i];
         return out;
+    }
+
+    /** Keeps the corner farthest from the chord when it is past the tolerance, and recurses; no recursion depth to blow. */
+    private static void simplify(double[] x, double[] y, int a, int b, double tol, boolean[] keep) {
+        final java.util.ArrayDeque<int[]> todo = new java.util.ArrayDeque<>();
+        todo.push(new int[] { a, b });
+        while (!todo.isEmpty()) {
+            final int[] r = todo.pop();
+            final int i0 = r[0], i1 = r[1];
+            if (i1 - i0 < 2)
+                continue;
+            final double dx = x[i1] - x[i0], dy = y[i1] - y[i0], len = Math.sqrt(dx * dx + dy * dy);
+            int far = -1;
+            double best = tol;
+            for (int i = i0 + 1; i < i1; i++) {
+                final double d = len == 0 ? Math.hypot(x[i] - x[i0], y[i] - y[i0])
+                        : Math.abs(dy * (x[i] - x[i0]) - dx * (y[i] - y[i0])) / len;
+                if (d > best) {
+                    best = d;
+                    far = i;
+                }
+            }
+            if (far < 0)
+                continue;
+            keep[far] = true;
+            todo.push(new int[] { i0, far });
+            todo.push(new int[] { far, i1 });
+        }
     }
 
     /** "2026-10-30T12:00:00", UTC with or without a zone; 0 when unreadable. */
@@ -250,6 +329,14 @@ public final class Feds {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    /** Across the widest way of every part together, meters. */
+    public static double spanM(double[][][] rings) {
+        final java.util.List<double[]> all = new ArrayList<>();
+        for (double[][] r : rings)
+            java.util.Collections.addAll(all, r);
+        return spanM(all.toArray(new double[0][]));
     }
 
     /** Across the widest way, meters: whether the model's square can hold it. */
