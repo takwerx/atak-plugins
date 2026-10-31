@@ -62,10 +62,14 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     private final java.util.Map<String, String> places = new java.util.HashMap<>();
     private final ExecutorService placeWorker = Executors.newSingleThreadExecutor();
     private static final int NAMED_ROWS = 25;
-    /** Which list is showing: the GOES fires, or NASA's perimeters. One at a time, a switch over them. */
-    private boolean showPerimeters;
-    /** Two tabs over the list, the one showing lit: GOES fires | NASA perimeters, each with its count. */
-    private Button tabFires, tabPerimeters;
+    /**
+     * One list (operator, 2026-10-30: "why isnt it one list"): the GOES fires burning now,
+     * then NASA perimeters no GOES fire sits in, nearest first, then the one-scan GOES
+     * detections. Each row is an {@link Activity.Fire} or a NASA perimeter.
+     */
+    private List<Object> rows = new ArrayList<>();
+    /** Perimeters that have their own row: the ones no GOES fire sits in. */
+    private int loosePerimeters;
     private List<String> states = new ArrayList<>();
     /** Null is everywhere the feed covers. */
     private String state;
@@ -123,23 +127,18 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         area = prefs.getString("activity.area", AREA_ANY);
         areaM = prefs.getFloat("activity.areaM", (float) Units.bigToMeters(50));
         this.list = view.findViewById(R.id.activity_list);
-        final android.widget.LinearLayout tabs = new android.widget.LinearLayout(view.getContext());
-        tabs.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-        tabFires = tab(tabs, false);
-        tabPerimeters = tab(tabs, true);
-        list.addHeaderView(tabs, null, false);
         list.setAdapter(adapter);
-        labelWhich();
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
-                // The switch above the list is a header row: positions start after it.
                 final int p = position - list.getHeaderViewsCount();
-                if (showPerimeters) {
-                    if (p >= 0 && p < perimeters.size())
-                        goTo(perimeters.get(p));
-                } else if (p >= 0 && p < fires.size())
-                    goTo(fires.get(p));
+                if (p < 0 || p >= rows.size())
+                    return;
+                final Object row = rows.get(p);
+                if (row instanceof Activity.Fire)
+                    goTo((Activity.Fire) row);
+                else
+                    goTo((com.atakmap.android.firecast.model.Feds.Fire) row);
             }
         });
         view.findViewById(R.id.btn_back).setOnClickListener(new View.OnClickListener() {
@@ -242,41 +241,6 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         // the map goes there and the feeds ask for that area now.
         keepListUntil = System.currentTimeMillis() + 4000;
         feed.refresh();
-    }
-
-    /** One tab: a TakwerxButton, half the row; tapping it shows its list. */
-    private Button tab(android.widget.LinearLayout row, final boolean perimeterTab) {
-        final View holder = PluginLayoutInflater.inflate(pluginContext, R.layout.model_run_row, null);
-        final Button b = holder.findViewById(R.id.run_name);
-        ((ViewGroup) b.getParent()).removeView(b);
-        b.setGravity(android.view.Gravity.CENTER);
-        final android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        if (perimeterTab)
-            lp.leftMargin = (int) (6 * view.getContext().getResources().getDisplayMetrics().density);
-        row.addView(b, lp);
-        b.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (showPerimeters == perimeterTab)
-                    return;
-                showPerimeters = perimeterTab;
-                labelWhich();
-                adapter.notifyDataSetChanged();
-                list.setSelection(0);
-            }
-        });
-        return b;
-    }
-
-    /** Both tabs with their counts; the one showing in green, the other plain. */
-    private void labelWhich() {
-        if (tabFires == null)
-            return;
-        tabFires.setText("GOES fires (" + fires.size() + ")");
-        tabPerimeters.setText("NASA perimeters (" + perimeters.size() + ")");
-        tabFires.setTextColor(showPerimeters ? 0xFFFFFFFF : 0xFF4CD964);
-        tabPerimeters.setTextColor(showPerimeters ? 0xFF4CD964 : 0xFFFFFFFF);
     }
 
     /** Takes the map to a NASA perimeter and draws it: the feed is turned on if it was off. */
@@ -435,12 +399,7 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                                     break;
                                 }
                         namePerimeters();
-                        // An empty tab is not where to land when the other has something.
-                        if (!showPerimeters && fires.isEmpty() && !perimeters.isEmpty())
-                            showPerimeters = true;
-                        else if (showPerimeters && perimeters.isEmpty() && !fires.isEmpty())
-                            showPerimeters = false;
-                        labelWhich();
+                        buildRows();
                         if (resultStates != null)
                             states = resultStates;
                         adapter.notifyDataSetChanged();
@@ -461,8 +420,8 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         if (fires.isEmpty()) {
             status("Nothing burning in " + where + " in the last " + feed.filters.windowLabel()
                     + " that GOES has seen." + (perimeters.isEmpty() ? ""
-                    : " " + perimeters.size() + " NASA fire event " + (perimeters.size() == 1 ? "perimeter" : "perimeters")
-                            + " from the last 3 days, under NASA perimeters."));
+                    : " " + perimeters.size() + " NASA " + (perimeters.size() == 1 ? "perimeter" : "perimeters")
+                            + " from the last 3 days below."));
             return;
         }
         // The limit goes on the panel, not in a manual nobody has open: this is GOES, and
@@ -478,10 +437,9 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         if (onceOnly > 0)
             sb.append(' ').append(onceOnly).append(" seen once, often a burn pile.");
         sb.append(" MW is heat seen from space. GOES, lower 48 only.");
-        if (!perimeters.isEmpty())
-            sb.append(' ').append(matched.size()).append(matched.size() == 1 ? " sits" : " sit")
-                    .append(" in a NASA fire event perimeter; ").append(perimeters.size())
-                    .append(perimeters.size() == 1 ? " perimeter" : " perimeters").append(" from the last 3 days, under NASA perimeters.");
+        if (loosePerimeters > 0)
+            sb.append(' ').append(loosePerimeters).append(loosePerimeters == 1 ? " NASA perimeter" : " NASA perimeters")
+                    .append(" from the last 3 days with no GOES fire in it, listed after the fires.");
         status(sb.toString());
     }
 
@@ -489,15 +447,34 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
         ((TextView) view.findViewById(R.id.activity_status)).setText(s);
     }
 
+    /** The one list: fires burning now, then perimeters no fire sits in, then one-scan detections. */
+    private void buildRows() {
+        final java.util.Set<com.atakmap.android.firecast.model.Feds.Fire> used = new java.util.HashSet<>(matched.values());
+        final List<Object> out = new ArrayList<>();
+        for (Activity.Fire f : fires)
+            if (f.established())
+                out.add(f);
+        loosePerimeters = 0;
+        for (com.atakmap.android.firecast.model.Feds.Fire p : perimeters)
+            if (!used.contains(p)) {
+                out.add(p);
+                loosePerimeters++;
+            }
+        for (Activity.Fire f : fires)
+            if (!f.established())
+                out.add(f);
+        rows = out;
+    }
+
     private class Adapter extends BaseAdapter {
         @Override
         public int getCount() {
-            return showPerimeters ? perimeters.size() : fires.size();
+            return rows.size();
         }
 
         @Override
         public Object getItem(int position) {
-            return showPerimeters ? perimeters.get(position) : fires.get(position);
+            return rows.get(position);
         }
 
         @Override
@@ -515,9 +492,10 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
                 d.setSingleLine(false);
                 d.setMaxLines(2);
             }
-            if (showPerimeters)
-                return perimeterRow(v, perimeters.get(position));
-            final Activity.Fire f = fires.get(position);
+            final Object row = rows.get(position);
+            if (!(row instanceof Activity.Fire))
+                return perimeterRow(v, (com.atakmap.android.firecast.model.Feds.Fire) row);
+            final Activity.Fire f = (Activity.Fire) row;
             ((TextView) v.findViewById(R.id.fire_name)).setText(f.title());
             final StringBuilder sb = new StringBuilder();
             if (f.name != null && f.state != null)
@@ -550,11 +528,11 @@ public class ActivityReceiver extends DropDownReceiver implements OnStateListene
     private View perimeterRow(View v, com.atakmap.android.firecast.model.Feds.Fire p) {
         final String place = places.get(p.id);
         ((TextView) v.findViewById(R.id.fire_name)).setText(place != null ? place : "NASA fire event perimeter");
-        final StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder("NASA perimeter · ");
         if (!Double.isNaN(p.burningDays))
             sb.append(p.burningDays <= 0 ? "first seen in this outline" : p.burningDays < 1 ? "burning half a day"
                     : "burning " + Math.round(p.burningDays) + (Math.round(p.burningDays) == 1 ? " day" : " days"));
-        sb.append(sb.length() == 0 ? "" : " · ").append("outline ").append(age(p.atMs)).append(" old");
+        sb.append(Double.isNaN(p.burningDays) ? "" : " · ").append("outline ").append(age(p.atMs)).append(" old");
         if (from != null)
             sb.append(" · ").append(Units.rangeBearing(from, p.lat(), p.lon())).append(noFix ? " of map center" : " of you");
         ((TextView) v.findViewById(R.id.fire_detail)).setText(sb.toString());
