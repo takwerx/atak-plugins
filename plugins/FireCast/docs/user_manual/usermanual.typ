@@ -126,7 +126,8 @@ a burn pile.
 
   - *Conditions:* as observed, at the gust, a dry day, or dry with 20 mph wind.
   - *Station:* automatic, or pick a weather station by name.
-  - *Draw perimeter:* start from the fire's current edge.
+  - *Draw perimeter:* start from the fire's current edge: NASA's satellite
+    outline (twice a day, up to 12 h old), or trace it yourself.
   - *Started:* how long ago it started, up to three hours.
   - *Horizon:* one or three hours ahead.
 

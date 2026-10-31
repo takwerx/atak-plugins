@@ -169,6 +169,30 @@ public final class PerimeterPicker implements ToolListener {
         return pts;
     }
 
+    /**
+     * Puts a perimeter that did not come from the drawing tool on the map, a satellite
+     * outline, as if it had been traced: same title, same look, so a restart adopts it
+     * and Clear takes it off.
+     */
+    public void show(GeoPoint[] pts) {
+        clearDrawn();
+        final DrawingShape s = new DrawingShape(mapView, DrawingToolsMapComponent.getGroup(),
+                java.util.UUID.randomUUID().toString());
+        s.setPoints(com.atakmap.coremap.maps.coords.GeoPointMetaData.wrap(pts));
+        s.setClosed(true);
+        s.setTitle(TITLE);
+        s.setCenterPointVisible(false);
+        s.setCenterPointLabelVisible(false);
+        s.hideLabels(true);
+        s.setAltitudeMode(com.atakmap.map.layer.feature.Feature.AltitudeMode.ClampToGround);
+        s.setStrokeColor(DRAW_COLOR);
+        s.setStrokeWeight(3d);
+        s.setFillColor(0x00000000);
+        DrawingToolsMapComponent.getGroup().addItem(s);
+        drawn = s;
+        Log.d(TAG, "satellite perimeter shown, " + pts.length + " vertices");
+    }
+
     /** Takes the perimeter off the map, and any with our title an earlier instance left. */
     public void clearDrawn() {
         final DrawingShape going = drawn;

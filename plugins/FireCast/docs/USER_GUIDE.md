@@ -71,7 +71,9 @@ Tap **Fire model**.
 2. Set what you know:
    - **Conditions:** *As observed* at the weather station, *As observed but at the gust*, *Dry day*, or *Dry and 20 mph wind*. The last two are for planning what a bad day would do.
    - **Station:** *automatic* picks a nearby weather station by distance and height, so a station on a ridge does not stand in for a valley. Tap it to pick one by name.
-   - **Draw perimeter:** trace the fire's current edge on the map. The run then starts from that edge, with everything inside already burning.
+   - **Draw perimeter:** start from the fire's current edge, with everything inside already burning. Two ways:
+     - **Satellite perimeter**: NASA's outline of the fire around the start (or the middle of the map), drawn by its Fire Event Data Suite (FEDS) from the VIIRS heat detections twice a day, day pass and night pass. It is there for a fire nobody has mapped yet and between the incident's own updates. Its edges are 375 m steps, it can be up to 12 hours old, and it is not the incident's mapped perimeter; the page says how old it is.
+     - **Draw it on the map**: trace the edge yourself with ATAK's shape tool.
    - **Started:** how long ago the fire started, from not known to three hours. With a drawn perimeter this calibrates the model's speed.
    - **Horizon:** one hour or three hours ahead.
 3. Tap **Run model**. It takes a few seconds.
@@ -108,7 +110,7 @@ The fire moves over this in 15 m steps (30 m for three hours).
 
 **What it reaches.** Buildings and the people in them from FEMA's national building inventory (USA Structures). A building counts when the fire reaches the ground beside it.
 
-**From a drawn perimeter.** With a perimeter and a start time, the model first runs from the middle of the perimeter for the time the fire has burned and compares that with what it actually covered. It then scales its rates to match, at most three times faster or slower, and says so on the page.
+**From a perimeter.** A perimeter is drawn by hand or taken from NASA's satellite outline (FEDS, from openveda.cloud). With a perimeter and a start time, the model first runs from the middle of the perimeter for the time the fire has burned and compares that with what it actually covered. It then scales its rates to match, at most three times faster or slower, and says so on the page.
 
 **Predicted Fire Size.** The run is repeated 30 times with the wind speed, wind direction and fuel moisture nudged the way forecasts miss, and ranked by how much burned (below).
 

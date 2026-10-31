@@ -160,6 +160,8 @@ public final class FireModel {
         public String groundNote;
         /** The perimeter the run began from, [lat, lon] pairs, or null for a point start. */
         public double[][] perimeter;
+        /** Where the perimeter came from when it was not drawn: the satellite outline and its age. */
+        public String perimeterNote;
         /** When the fire started, epoch ms, or 0 for unknown; with a perimeter it calibrates the run. */
         public long startedAt;
         /** True when the pixel under the marker does not burn; the ground run starts from the nearest fuel. */
@@ -330,7 +332,14 @@ public final class FireModel {
     private PerimeterPicker perimeterPicker;
     /** The drawn perimeter waiting for a run, or null. */
     private volatile double[][] perimeter;
-    private static final String PREF_PERIMETER = "model.perimeter", PREF_STARTED = "model.startedMin";
+    private static final String PREF_PERIMETER = "model.perimeter", PREF_STARTED = "model.startedMin",
+            PREF_PERIMETER_NOTE = "model.perimeterNote";
+    /** Null for a drawn perimeter; for a satellite one, what it is and when it was drawn. */
+    private volatile String perimeterNote;
+
+    public String perimeterNote() {
+        return perimeterNote;
+    }
 
     public double[][] perimeter() {
         return perimeter;
@@ -348,24 +357,102 @@ public final class FireModel {
     /** Hands the operator ATAK's polygon tool; the shape they close becomes the perimeter. */
     public void drawPerimeter() {
         if (perimeterPicker == null)
-            perimeterPicker = new PerimeterPicker(mapView, new PerimeterPicker.Callback() {
-                @Override
-                public void onPerimeter(GeoPoint[] ring) {
-                    setPerimeter(ring);
-                    if (onPlaced != null)
-                        onPlaced.run();
-                }
-
-                @Override
-                public void onCancelled(String reason) {
-                    status = reason == null ? "" : reason;
-                    changed();
-                }
-            });
+            drawPerimeterPicker();
         perimeterPicker.start();
     }
 
-    private void setPerimeter(GeoPoint[] ring) {
+    /**
+     * The satellite perimeter (NASA FEDS) around this point, or the nearest within 3 km,
+     * as the run's perimeter: drawn on the map like a traced one and said where it came
+     * from. The answer lands in {@link #status()}.
+     */
+    public void satellitePerimeter(final double lat, final double lon) {
+        status = "Looking for a satellite perimeter near the start...";
+        changed();
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                String said;
+                Feds.Perimeter p = null;
+                try {
+                    p = Feds.near(lat, lon);
+                    if (p == null)
+                        said = "No satellite perimeter within 2 mi of the start. NASA's outlines come from the VIIRS "
+                                + "passes, twice a day; a fire too small or too new for them has none. Draw it instead.";
+                    else if (Feds.spanM(p.ring) > 1.6d * halfKmFor(horizonMinutes()) * 1000d)
+                        said = "This fire's satellite perimeter is " + Units.format(Feds.spanM(p.ring))
+                                + " across, more than the model's square holds. Place a start on the edge that is "
+                                + "moving instead.";
+                    else
+                        said = null;
+                } catch (Exception e) {
+                    Log.w(TAG, "FEDS perimeter: " + e);
+                    said = "Could not reach NASA's satellite perimeters (no network, or the service did not answer).";
+                }
+                final Feds.Perimeter found = said == null ? p : null;
+                final String problem = said;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (found == null) {
+                            status = problem;
+                            changed();
+                            return;
+                        }
+                        final GeoPoint[] pts = new GeoPoint[found.ring.length];
+                        for (int i = 0; i < pts.length; i++)
+                            pts[i] = new GeoPoint(found.ring[i][0], found.ring[i][1]);
+                        setPerimeter(pts, fedsNote(found));
+                        if (perimeterPicker == null)
+                            drawPerimeterPicker();
+                        perimeterPicker.show(pts);
+                        status = perimeterNote;
+                        changed();
+                    }
+                });
+            }
+        });
+    }
+
+    private static double halfKmFor(int horizonMin) {
+        return horizonMin >= 180 ? 10 : HALF_KM;
+    }
+
+    private static String fedsNote(Feds.Perimeter p) {
+        final StringBuilder b = new StringBuilder("Satellite perimeter: NASA FEDS, drawn from the VIIRS heat detections");
+        if (p.atMs > 0) {
+            final long agoMin = Math.max(0, (System.currentTimeMillis() - p.atMs) / 60000L);
+            b.append(" at ").append(new java.text.SimpleDateFormat("MMM d HH:mm", Locale.US).format(new java.util.Date(p.atMs)))
+                    .append(" (").append(agoMin < 120 ? agoMin + " min" : (agoMin / 60) + " h").append(" ago)");
+        }
+        b.append(p.distanceM > 0 ? ", " + Units.format(p.distanceM) + " from the start" : "")
+                .append(". Its edges are 375 m steps; it is not the incident's mapped perimeter.");
+        return b.toString();
+    }
+
+    private void drawPerimeterPicker() {
+        perimeterPicker = new PerimeterPicker(mapView, new PerimeterPicker.Callback() {
+            @Override
+            public void onPerimeter(GeoPoint[] ring) {
+                setPerimeter(ring, null);
+                if (onPlaced != null)
+                    onPlaced.run();
+            }
+
+            @Override
+            public void onCancelled(String reason) {
+                status = reason == null ? "" : reason;
+                changed();
+            }
+        });
+    }
+
+    private void setPerimeter(GeoPoint[] ring, String note) {
+        perimeterNote = note;
+        if (note == null)
+            prefs.edit().remove(PREF_PERIMETER_NOTE).apply();
+        else
+            prefs.edit().putString(PREF_PERIMETER_NOTE, note).apply();
         final double[][] r = new double[ring.length][];
         for (int i = 0; i < ring.length; i++)
             r[i] = new double[] { ring[i].getLatitude(), ring[i].getLongitude() };
@@ -381,7 +468,8 @@ public final class FireModel {
 
     public void clearPerimeter() {
         perimeter = null;
-        prefs.edit().remove(PREF_PERIMETER).apply();
+        perimeterNote = null;
+        prefs.edit().remove(PREF_PERIMETER).remove(PREF_PERIMETER_NOTE).apply();
         if (perimeterPicker != null)
             perimeterPicker.clearDrawn();
     }
@@ -592,8 +680,10 @@ public final class FireModel {
                 final double[][] r = new double[a.length()][];
                 for (int i = 0; i < a.length(); i++)
                     r[i] = new double[] { a.getJSONArray(i).getDouble(0), a.getJSONArray(i).getDouble(1) };
-                if (r.length >= 3)
+                if (r.length >= 3) {
                     perimeter = r;
+                    perimeterNote = prefs.getString(PREF_PERIMETER_NOTE, null);
+                }
             }
         } catch (Exception e) {
             Log.w(TAG, "saved perimeter unreadable", e);
@@ -796,6 +886,7 @@ public final class FireModel {
                 r.lon = lon;
                 r.ranAt = System.currentTimeMillis();
                 r.perimeter = perimeter;
+                r.perimeterNote = r.perimeter == null ? null : perimeterNote;
                 final boolean threeHours = horizonMinutes() >= 180;
                 r.steps = threeHours ? STEPS_3H : STEPS_MIN;
                 r.halfKm = threeHours ? 10 : HALF_KM;
@@ -1982,7 +2073,8 @@ public final class FireModel {
         final StringBuilder c = new StringBuilder();
         c.append("Fire Cast model run, ").append(new java.text.SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.US)
                 .format(new java.util.Date(r.ranAt))).append(".\n");
-        c.append(r.perimeter != null ? "From a drawn perimeter around " : "Start at ")
+        c.append(r.perimeter == null ? "Start at " : r.perimeterNote != null ? "From NASA's satellite perimeter around "
+                : "From a drawn perimeter around ")
                 .append(String.format(Locale.US, "%.5f, %.5f.\n", r.lat, r.lon));
         if (r.fuelName != null)
             c.append("Fuel: ").append(r.fuelName).append(" (LANDFIRE 2024).\n");
@@ -2395,6 +2487,8 @@ public final class FireModel {
                 for (double[] p : r.perimeter)
                     pa.put(new org.json.JSONArray().put(p[0]).put(p[1]));
                 o.put("perimeter", pa);
+                if (r.perimeterNote != null)
+                    o.put("perimeterNote", r.perimeterNote);
             }
             if (r.structures != null) {
                 final org.json.JSONArray st = new org.json.JSONArray(), hm = new org.json.JSONArray(), pp = new org.json.JSONArray();
@@ -2616,6 +2710,8 @@ public final class FireModel {
                     per[i] = new double[] { la, lo };
                 }
                 r.perimeter = per;
+                final String pn = o.optString("perimeterNote", "");
+                r.perimeterNote = pn.isEmpty() || pn.length() > 600 ? null : pn;
             }
             r.fuelName = Behave.name(r.site.fuelModel);
             r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,

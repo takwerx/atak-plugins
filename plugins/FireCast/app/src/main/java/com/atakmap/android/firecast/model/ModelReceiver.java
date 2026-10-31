@@ -1,5 +1,6 @@
 package com.atakmap.android.firecast.model;
 
+import com.atakmap.coremap.maps.coords.GeoPoint;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -72,8 +73,26 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
                     render();
                     return;
                 }
-                closeDropDown();
-                model.drawPerimeter();
+                final GeoPoint start = model.startPoint();
+                final String[] choices = { start != null ? "Satellite perimeter around the start (NASA, twice a day)"
+                        : "Satellite perimeter around the middle of the map (NASA, twice a day)", "Draw it on the map" };
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("Fire perimeter")
+                        .setItems(choices, new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface dialog, int which) {
+                                if (which == 1) {
+                                    closeDropDown();
+                                    model.drawPerimeter();
+                                    return;
+                                }
+                                final GeoPoint at = start != null ? start : getMapView().getCenterPoint().get();
+                                model.satellitePerimeter(at.getLatitude(), at.getLongitude());
+                                render();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
             }
         });
         view.findViewById(R.id.btn_horizon).setOnClickListener(new View.OnClickListener() {
@@ -239,7 +258,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         final FireModel.Run r = shown;
         final com.atakmap.coremap.maps.coords.GeoPoint start = model.startPoint();
         ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && (start != null || model.perimeter() != null));
-        ((Button) view.findViewById(R.id.btn_perimeter)).setText(model.perimeter() != null ? "Perimeter:\ndrawn, tap to drop" : "Draw perimeter");
+        ((Button) view.findViewById(R.id.btn_perimeter)).setText(model.perimeter() == null ? "Draw perimeter"
+                : model.perimeterNote() != null ? "Perimeter:\nsatellite, tap to drop" : "Perimeter:\ndrawn, tap to drop");
         ((Button) view.findViewById(R.id.btn_horizon)).setText(model.horizonMinutes() >= 180 ? "Horizon:\n3 hours" : "Horizon:\n1 hour");
         final int ago = model.startedMinutesAgo();
         ((Button) view.findViewById(R.id.btn_started)).setText(ago == 0 ? "Started:\nnot known" : "Started:\n" + ago + " min ago");
@@ -258,8 +278,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             return;
         }
         if (start == null && model.perimeter() == null) {
-            section("Fire model", "Tap Place start, then tap the map where the fire starts. Or Draw perimeter and trace the fire's "
-                    + "edge as you find it; say when it started and the run is scaled to what it has already done. Move the marker if it "
+            section("Fire model", "Tap Place start, then tap the map where the fire starts. Or Draw perimeter: take NASA's satellite "
+                    + "outline of the fire, or trace its edge as you find it; say when it started and the run is scaled to what it has already done. Move the marker if it "
                     + "needs to be exact (drag it, or Fine Adjust on its menu), pick the conditions, then Run model. "
                     + "Where the fire is at 20, 40 and 60 minutes is drawn on the map, with everything the run assumed.");
             return;
@@ -347,7 +367,10 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
             }
             if (r.calibrationNote != null)
                 goes.append(r.calibrationNote).append('\n');
-            if (r.perimeter != null)
+            if (r.perimeter != null && r.perimeterNote != null)
+                goes.append("Run from the satellite perimeter: everything inside it was burning at the start. ")
+                        .append(r.perimeterNote).append('\n');
+            else if (r.perimeter != null)
                 goes.append("Run from the drawn perimeter: everything inside it was burning at the start.\n");
             if (r.ground.startOffsetM > 0 && r.perimeter == null)
                 goes.append("The start itself is on ground that does not carry fire here (a road, a roof, bare ground, or fuel too "
