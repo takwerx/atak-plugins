@@ -34,7 +34,7 @@ public final class Sources {
     /** Every feed the plugin reads, in the order the filters list them. */
     public static List<DetectionSource> all() {
         return Arrays.asList(PolarSource.viirs(), PolarSource.modis(),
-                new NgfsSource(), new RadrSource());
+                new NgfsSource(), new RadrSource(), new FedsSource());
     }
 
     /**
@@ -47,5 +47,18 @@ public final class Sources {
         final SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
         f.setTimeZone(TimeZone.getTimeZone("UTC"));
         return f.format(new Date(epochMillis));
+    }
+
+    /** "2026-10-30T12:00:00", UTC with or without a zone after it; 0 when unreadable. */
+    public static long parseIso(String t) {
+        if (t == null || t.length() < 19)
+            return 0;
+        try {
+            final SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+            f.setTimeZone(TimeZone.getTimeZone("UTC"));
+            return f.parse(t.substring(0, 19)).getTime();
+        } catch (Exception e) {
+            return 0;
+        }
     }
 }

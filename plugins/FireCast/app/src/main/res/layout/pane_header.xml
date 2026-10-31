@@ -48,90 +48,122 @@
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:layout_marginLeft="6dp"
-            android:text="Fire model" />
+            android:text="Run a Model" />
     </LinearLayout>
 
-    <!-- Other analysts' runs, beside our own: FIRIS publishes California incidents'
-         spread runs for ATAK. A switch that says what it holds; long press says whose. -->
-    <Button
-        android:id="@+id/btn_firis"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="FIRIS Model Runs   OFF" />
-    <TextView
-        android:id="@+id/firis_status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textColor="#B0B0B0"
-        android:textSize="12sp"
-        android:visibility="gone" />
-    <!-- Where a FIRIS run is by: the run picked from the list, a slider over its rings. -->
+    <!-- Models: other analysts' runs, folded like the feeds so the pane stays short
+         (operator, 2026-10-30). -->
     <LinearLayout
-        android:id="@+id/firis_slider"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone" />
-
-    <!-- PyreCast's ELMFIRE forecasts for large fires, by permission: their logo and a
-         link to pyrecast.com sit beside the forecasts whenever they are shown. -->
-    <Button
-        android:id="@+id/btn_pyrecast"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="PyreCast Forecasts   OFF" />
-    <TextView
-        android:id="@+id/pyrecast_status"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textColor="#B0B0B0"
-        android:textSize="12sp"
-        android:visibility="gone" />
-    <LinearLayout
-        android:id="@+id/pyrecast_credit"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingTop="4dp"
-        android:paddingBottom="2dp"
-        android:visibility="gone">
-        <ImageView
-            android:id="@+id/pyrecast_logo"
-            android:layout_width="wrap_content"
-            android:layout_height="34dp"
-            android:adjustViewBounds="true"
-            android:contentDescription="PyreCast"
-            android:src="@drawable/pyrecast_logo" />
-        <TextView
-            android:id="@+id/pyrecast_link"
+        android:layout_marginTop="6dp">
+        <Button
+            android:id="@+id/fold_models_head"
+            style="@style/TakwerxButton"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:paddingLeft="10dp"
-            android:textColor="#B0B0B0"
-            android:textSize="12sp"
-            android:text="Forecasts by PyreCast, used with permission. Tap for pyrecast.com" />
+            android:text="Models" />
+        <ImageButton
+            android:id="@+id/fold_models_chev"
+            style="@style/TakwerxIconButton"
+            android:layout_width="44dp"
+            android:layout_weight="0"
+            android:layout_marginRight="0dp"
+            android:contentDescription="Show models"
+            android:src="@drawable/ic_expand" />
     </LinearLayout>
-    <!-- PyreCast's own "Predicted Fire Size" choice, in its words: one of five runs
-         ranked by the area burned at the end, the median unless another is picked. -->
-    <Button
-        android:id="@+id/btn_pyrecast_pct"
-        style="@style/TakwerxButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="gone"
-        android:text="Predicted Fire Size: Median" />
     <LinearLayout
-        android:id="@+id/pyrecast_slider"
+        android:id="@+id/fold_models_body"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:visibility="gone" />
+        android:visibility="gone">
+        <!-- Other analysts' runs, beside our own: FIRIS publishes California incidents'
+             spread runs for ATAK. A switch that says what it holds; long press says whose. -->
+        <Button
+            android:id="@+id/btn_firis"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="FIRIS Model Runs   OFF" />
+        <TextView
+            android:id="@+id/firis_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#B0B0B0"
+            android:textSize="12sp"
+            android:visibility="gone" />
+        <!-- Where a FIRIS run is by: the run picked from the list, a slider over its rings. -->
+        <LinearLayout
+            android:id="@+id/firis_slider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+        <!-- PyreCast's ELMFIRE forecasts for large fires, by permission: their logo and a
+             link to pyrecast.com sit beside the forecasts whenever they are shown. -->
+        <Button
+            android:id="@+id/btn_pyrecast"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="PyreCast Forecasts   OFF" />
+        <TextView
+            android:id="@+id/pyrecast_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#B0B0B0"
+            android:textSize="12sp"
+            android:visibility="gone" />
+        <LinearLayout
+            android:id="@+id/pyrecast_credit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="4dp"
+            android:paddingBottom="2dp"
+            android:visibility="gone">
+            <ImageView
+                android:id="@+id/pyrecast_logo"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:adjustViewBounds="true"
+                android:contentDescription="PyreCast"
+                android:src="@drawable/pyrecast_logo" />
+            <TextView
+                android:id="@+id/pyrecast_link"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:paddingLeft="10dp"
+                android:textColor="#B0B0B0"
+                android:textSize="12sp"
+                android:text="Forecasts by PyreCast, used with permission. Tap for pyrecast.com" />
+        </LinearLayout>
+        <!-- PyreCast's own "Predicted Fire Size" choice, in its words: one of five runs
+             ranked by the area burned at the end, the median unless another is picked. -->
+        <Button
+            android:id="@+id/btn_pyrecast_pct"
+            style="@style/TakwerxButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:text="Predicted Fire Size: Median" />
+        <LinearLayout
+            android:id="@+id/pyrecast_slider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+    </LinearLayout>
 
     <!-- Feeds -->
     <LinearLayout

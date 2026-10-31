@@ -47,7 +47,7 @@ public final class Feds {
         public final long atMs;
         public final double south, west, north, east;
 
-        Fire(String id, double areaKm2, double burningDays, long atMs, double s, double w, double n, double e) {
+        public Fire(String id, double areaKm2, double burningDays, long atMs, double s, double w, double n, double e) {
             this.id = id;
             this.areaKm2 = areaKm2;
             this.burningDays = burningDays;

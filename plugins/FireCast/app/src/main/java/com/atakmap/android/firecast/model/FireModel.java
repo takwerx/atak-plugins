@@ -448,7 +448,7 @@ public final class FireModel {
     }
 
     private static String fedsNote(Feds.Perimeter p, Feds.Fire fire) {
-        final StringBuilder b = new StringBuilder("Satellite perimeter: NASA FEDS, drawn from the VIIRS heat detections");
+        final StringBuilder b = new StringBuilder("Satellite perimeter: NASA's Fire Event Data Suite, drawn from the VIIRS heat detections");
         if (p.atMs > 0) {
             final long agoMin = Math.max(0, (System.currentTimeMillis() - p.atMs) / 60000L);
             b.append(" at ").append(new java.text.SimpleDateFormat("MMM d HH:mm", Locale.US).format(new java.util.Date(p.atMs)))

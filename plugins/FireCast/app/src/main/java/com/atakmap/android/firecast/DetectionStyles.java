@@ -36,6 +36,13 @@ public final class DetectionStyles {
             HOURS_12 = 0xFFC400, HOURS_24 = 0xE8E040, OLDER = 0x9A8E7A;
     /** A flagged detection keeps its age color on the map but is outlined in this. */
     private static final int SUSPECT = 0xB080D0;
+    /** FEDS perimeter: magenta, a color no detection uses, bright while active. */
+    private static final int FEDS_ACTIVE = 0xFF40C0, FEDS_QUIET = 0xB070A0;
+
+    public static int fedsColor() {
+        return FEDS_ACTIVE;
+    }
+
     /** RADR scar: burned ground, drawn as the cold thing it is. */
     private static final int BURN_SCAR = 0x8A6A4A;
 
@@ -103,6 +110,13 @@ public final class DetectionStyles {
     public static Style forDetection(HeatDetection d, long now, long windowMillis) {
         final long age = d.ageMillis(now);
         final double fresh = freshness(age, windowMillis);
+        if ("feds".equals(d.sourceId)) {
+            // A perimeter: its line is the point and the detections inside it must show
+            // through, so a strong edge and only a wash of fill.
+            final int rgb = d.classification != null && d.classification.startsWith("active") ? FEDS_ACTIVE : FEDS_QUIET;
+            return new CompositeStyle(new Style[] { new BasicFillStyle(0x22000000 | rgb),
+                    new BasicStrokeStyle(0xFF000000 | rgb, 3f), new LabelPointStyle("", 0, 0, LabelPointStyle.ScrollMode.OFF) });
+        }
         final boolean scar = d.footprint.kind == Footprint.Kind.MAPPED
                 && d.classification != null && !d.classification.toLowerCase(Locale.US).contains("intense");
         final int rgb = scar ? BURN_SCAR : ageColor(age);

@@ -106,12 +106,38 @@ public class DetectionDetailsReceiver extends DropDownReceiver implements OnStat
         final String flags = flags(d);
         if (flags != null)
             section("Flagged", flags);
+        if ("feds".equals(d.sourceId) && d.trackingId != null)
+            body.addView(runFromPerimeter(d));
         bullets("What this does not mean", d.caveats);
         final String raw = raw(d);
         if (raw != null)
             section("As the service served it", raw);
 
         showDropDown(view, HALF_WIDTH, FULL_HEIGHT, FULL_WIDTH, HALF_HEIGHT, this);
+    }
+
+    /** Opens the model page with this outline as the start, like picking it from the Start list. */
+    private View runFromPerimeter(final HeatDetection d) {
+        final android.widget.Button b = (android.widget.Button) PluginLayoutInflater.inflate(pluginContext,
+                R.layout.model_action_row, null).findViewById(R.id.action);
+        ((android.view.ViewGroup) b.getParent()).removeView(b);
+        b.setText("Run a Model from this perimeter");
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final com.atakmap.map.layer.feature.geometry.Envelope e = d.footprint.mapped == null ? null
+                        : d.footprint.mapped.getEnvelope();
+                if (e == null)
+                    return;
+                final Intent i = new Intent(com.atakmap.android.firecast.model.ModelReceiver.ACTION)
+                        .putExtra("fedsId", d.trackingId).putExtra("fedsAt", d.acquired)
+                        .putExtra("fedsBox", new double[] { e.minY, e.minX, e.maxY, e.maxX })
+                        .putExtra("fedsDays", d.persistenceHours == null ? Double.NaN : d.persistenceHours / 24d);
+                closeDropDown();
+                com.atakmap.android.ipc.AtakBroadcast.getInstance().sendBroadcast(i);
+            }
+        });
+        return b;
     }
 
     private String coverage(HeatDetection d) {

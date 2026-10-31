@@ -49,7 +49,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
 
     private List<HeatDetection> rows = new ArrayList<>();
     private final android.content.SharedPreferences prefs;
-    private Fold feeds, filters, key;
+    private Fold models, feeds, filters, key;
 
     /**
      * One drop-down row: a head reading "Name: value", an arrow, and a body hidden until
@@ -103,6 +103,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         this.list = (ListView) root;
         this.header = PluginLayoutInflater.inflate(pluginContext, R.layout.pane_header, null);
         this.prefs = mapView.getContext().getSharedPreferences("firecast", Context.MODE_PRIVATE);
+        models = new Fold(R.id.fold_models_head, R.id.fold_models_chev, R.id.fold_models_body, "fold.models");
         feeds = new Fold(R.id.fold_feeds_head, R.id.fold_feeds_chev, R.id.source_buttons, "fold.feeds");
         filters = new Fold(R.id.fold_filters_head, R.id.fold_filters_chev, R.id.fold_filters_body, "fold.filters");
         key = new Fold(R.id.fold_key_head, R.id.fold_key_chev, R.id.legend, "fold.key");
@@ -190,6 +191,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         final boolean on = firis.isOn();
         final int n = firis.runs.size();
         b.setText("FIRIS Model Runs" + (n > 0 ? "  " + n : "") + (on ? "   ON" : "   OFF"));
+        modelsLabel();
         b.setTextColor(on ? 0xFF4CD964 : 0xFFFF5A5A);
         final TextView s = header.findViewById(R.id.firis_status);
         final StringBuilder t = new StringBuilder();
@@ -512,6 +514,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         final boolean on = pyrecast.isOn();
         final int n = pyrecast.forecasts.size();
         b.setText("PyreCast Forecasts" + (n > 0 ? "  " + n : "") + (on ? "   ON" : "   OFF"));
+        modelsLabel();
         b.setTextColor(on ? 0xFF4CD964 : 0xFFFF5A5A);
         final TextView s = header.findViewById(R.id.pyrecast_status);
         final StringBuilder t = new StringBuilder();
@@ -645,6 +648,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
         for (long age : ages)
             key.addView(keyRow(DetectionStyles.ageColor(age), false, DetectionStyles.ageBand(age)));
         key.addView(keyRow(DetectionStyles.burnScarColor(), false, "Burned ground, mapped from a pass (RADR)"));
+        key.addView(keyRow(DetectionStyles.fedsColor(), false, "Fire event perimeter, drawn by NASA from VIIRS"));
         key.addView(keyRow(DetectionStyles.suspectColor(), true, "Known industrial heat source"));
         final TextView fc = new TextView(mapView.getContext());
         fc.setText("PyreCast forecast, the fire's edge after the run");
@@ -903,6 +907,18 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
 
     // ---- state on screen ----------------------------------------------------------
 
+    /** "Models: FIRIS, PyreCast", which of the two are on. */
+    private void modelsLabel() {
+        if (models == null)
+            return;
+        final StringBuilder mon = new StringBuilder();
+        if (firis != null && firis.isOn())
+            mon.append("FIRIS");
+        if (pyrecast != null && pyrecast.isOn())
+            mon.append(mon.length() == 0 ? "" : ", ").append("PyreCast");
+        models.label("Models", mon.length() == 0 ? "none on" : mon.toString());
+    }
+
     public void refreshUi() {
         final long now = System.currentTimeMillis();
         for (int i = 0; i < sourceButtons.size() && i < feed.sources().size(); i++) {
@@ -929,6 +945,7 @@ public class DetectionPane implements DetectionFeed.Listener, FirisModels.Listen
             if (feed.filters.isOn(s.id()))
                 on.append(on.length() == 0 ? "" : ", ").append(s.title());
         feeds.label("Feeds", on.length() == 0 ? "none on" : on.toString());
+        modelsLabel();
         filters.label("Filters", (feed.filters.areaIsRadius() ? "within " + Units.formatBig(feed.filters.areaM) : "in view")
                 + ", last " + feed.filters.windowLabel()
                 + (feed.filters.minConfidence == 0 ? "" : ", " + feed.filters.confidenceLabel().toLowerCase(Locale.US))

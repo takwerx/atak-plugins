@@ -62,6 +62,12 @@ public class Footprint {
                 "measured by the sensor for this pixel, across-scan by along-track");
     }
 
+    /** FEDS: a fire's outline drawn by NASA's algorithm around the VIIRS detections. */
+    public static Footprint outlined(Geometry geometry) {
+        return new Footprint(Kind.MAPPED, 0, 0, 0, geometry,
+                "drawn by NASA's Fire Event Data Suite around the VIIRS 375 m heat detections of this fire, not traced by a person");
+    }
+
     /** RADR: a burn area mapped from imagery. */
     public static Footprint mapped(Geometry geometry, String sensor) {
         return new Footprint(Kind.MAPPED, 0, 0, 0, geometry,
