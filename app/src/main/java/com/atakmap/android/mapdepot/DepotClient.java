@@ -446,6 +446,50 @@ public final class DepotClient {
         });
     }
 
+    public interface SceneCallback {
+        void onScenes(List<Depot.Scene> scenes);
+
+        void onError(String message);
+    }
+
+    /**
+     * The Sentinel-2 passes over a box about {@code half} degrees either side
+     * of a point, newest first. Live by nature, so never saved: a list from
+     * last week would read as what the satellite saw this morning.
+     */
+    public void fetchScenes(final double lat, final double lon, final double half,
+            final int days, final String style, final SceneCallback cb) {
+        worker.execute(new Runnable() {
+            @Override
+            public void run() {
+                List<Depot.Scene> found = null;
+                String failed = null;
+                try {
+                    final double s = Math.max(-89.9, lat - half), n = Math.min(89.9, lat + half);
+                    final double w = Math.max(-179.9, lon - half), e = Math.min(179.9, lon + half);
+                    final String url = Depot.SAT_BASE + "/scenes?bbox="
+                            + String.format(java.util.Locale.US, "%.4f,%.4f,%.4f,%.4f", w, s, e, n)
+                            + "&days=" + days + "&limit=30";
+                    found = Depot.parseScenes(get(url, 512 * 1024), style);
+                } catch (Exception e) {
+                    Log.w(TAG, "scene search failed: " + describe(e));
+                    failed = describe(e);
+                }
+                final List<Depot.Scene> scenes = found;
+                final String message = failed;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (scenes != null)
+                            cb.onScenes(scenes);
+                        else
+                            cb.onError(message);
+                    }
+                });
+            }
+        });
+    }
+
     private static String get(String url) throws Exception {
         return get(url, MAX_DOCUMENT);
     }

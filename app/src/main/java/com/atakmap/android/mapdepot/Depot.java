@@ -1,6 +1,7 @@
 package com.atakmap.android.mapdepot;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
@@ -1190,6 +1191,160 @@ public final class Depot {
                 return "USGS";
             return s;
         }
+    }
+
+    /** Where the Sentinel-2 scene list and layer files come from; see tools/sattiles. */
+    public static final String SAT_BASE = "https://cams.takwerx.org/sat";
+
+    private static final Pattern SCENE_ID =
+            Pattern.compile("^S2[ABC]_\\d{2}[A-Z]{3}_\\d{8}_\\d_L2A$");
+
+    /** The two ways a Sentinel-2 scene is drawn, as the server names them. */
+    public static final String STYLE_VISUAL = "visual";
+    public static final String STYLE_SWIR = "swir";
+
+    /**
+     * One Sentinel-2 pass over the area, as one layer. The server holds the
+     * layer file (a map source pointing at its own tile service), so this
+     * installs like any other file: the plugin downloads a few hundred bytes
+     * into {@code grg/} and ATAK streams the tiles as the map pans.
+     */
+    public static final class Scene implements Package, Located, Bounded {
+        public final String scene;
+        public final String style;
+        public final String date;
+        /** Cloud cover of the whole scene, percent, or -1 when the server does not say. */
+        public final int clouds;
+        /** The biggest town the scene covers, "Fresno, California", or empty. */
+        public final String place;
+        private final double[] box;
+        private final String display;
+
+        Scene(JSONObject o, String style) {
+            scene = o.optString("id");
+            if (!SCENE_ID.matcher(scene).matches())
+                throw new IllegalArgumentException("invalid scene id: " + scene);
+            if (!STYLE_VISUAL.equals(style) && !STYLE_SWIR.equals(style))
+                throw new IllegalArgumentException("invalid scene style: " + style);
+            this.style = style;
+            final String dt = o.optString("datetime", "");
+            date = dt.length() >= 10 ? dt.substring(0, 10) : "";
+            if (!ISO_DATE.matcher(date).matches())
+                throw new IllegalArgumentException("scene " + scene + " has no date");
+            final double c = o.optDouble("cloud", -1);
+            clouds = c < 0 ? -1 : (int) Math.round(c);
+            // Shown as text only, so held to printable characters and a length.
+            final String pl = o.optString("place", "").trim();
+            place = pl.length() <= 80 && pl.matches("[\\p{L}\\p{N} .,'()-]*") ? pl : "";
+            final JSONArray b = o.optJSONArray("bounds");
+            box = b == null || b.length() != 4 ? null
+                    : new double[] { b.optDouble(1), b.optDouble(0),
+                            b.optDouble(3), b.optDouble(2) };
+            // The server writes this same name into the layer file: ATAK lists an
+            // image overlay by the name inside the XML, and finds it by the file.
+            display = "Sentinel2 " + monthDay(date) + " "
+                    + (STYLE_SWIR.equals(style) ? "SWIR Fire View" : "True Color")
+                    + " " + scene.substring(4, 9);
+        }
+
+        @Override
+        public String id() {
+            return "s2-" + style + "-" + scene;
+        }
+
+        @Override
+        public String name() {
+            return display;
+        }
+
+        @Override
+        public String url() {
+            return SAT_BASE + "/layer/" + style + "/" + scene + ".xml";
+        }
+
+        @Override
+        public String fileName() {
+            return safeFileName(display, id(), ".xml");
+        }
+
+        @Override
+        public String legacyFileName() {
+            return fileName();
+        }
+
+        @Override
+        public String destination() {
+            return "grg";
+        }
+
+        @Override
+        public long bytes() {
+            return 0;
+        }
+
+        @Override
+        public String describe() {
+            final StringBuilder sb = new StringBuilder();
+            if (!place.isEmpty())
+                sb.append(place).append(" area · ");
+            sb.append(prettyDate(date));
+            final long days = daysAgo(date);
+            if (days == 0)
+                sb.append(" · today");
+            else if (days == 1)
+                sb.append(" · yesterday");
+            else if (days > 1)
+                sb.append(" · ").append(days).append(" days ago");
+            if (clouds >= 0)
+                sb.append(" · ").append(clouds).append("% cloud");
+            return sb.append(" · streams as you pan").toString();
+        }
+
+        @Override
+        public double[] bounds() {
+            return box;
+        }
+
+        @Override
+        public boolean located() {
+            return box != null;
+        }
+
+        @Override
+        public double lat() {
+            return box == null ? Double.NaN : (box[0] + box[2]) / 2.0;
+        }
+
+        @Override
+        public double lon() {
+            return box == null ? Double.NaN : (box[1] + box[3]) / 2.0;
+        }
+
+        private static long daysAgo(String iso) {
+            try {
+                final java.text.SimpleDateFormat f =
+                        new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+                f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                final long then = f.parse(iso).getTime();
+                return Math.max(0L, (System.currentTimeMillis() - then) / 86400000L);
+            } catch (java.text.ParseException bad) {
+                return -1;
+            }
+        }
+    }
+
+    /** The server's scene list, newest first; one malformed entry is dropped, not fatal. */
+    public static List<Scene> parseScenes(String json, String style) throws JSONException {
+        final JSONArray a = new JSONArray(json);
+        final List<Scene> out = new ArrayList<>();
+        for (int i = 0; i < a.length(); i++) {
+            try {
+                out.add(new Scene(a.getJSONObject(i), style));
+            } catch (IllegalArgumentException | JSONException bad) {
+                com.atakmap.coremap.log.Log.w("MapDepot", "rejected scene: " + bad.getMessage());
+            }
+        }
+        return out;
     }
 
     /**
