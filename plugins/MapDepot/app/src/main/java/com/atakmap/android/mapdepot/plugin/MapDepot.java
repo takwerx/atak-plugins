@@ -1178,13 +1178,38 @@ public class MapDepot implements IPlugin {
                             @Override
                             public void onClick(DialogInterface d, int which) {
                                 d.dismiss();
-                                sceneStyle = which == 1 ? Depot.STYLE_SWIR : Depot.STYLE_VISUAL;
-                                refreshSeriesControls();
-                                loadScenes(false);
+                                switchSceneView(which == 1 ? Depot.STYLE_SWIR : Depot.STYLE_VISUAL);
                             }
                         })
                 .setNegativeButton(pluginContext.getString(R.string.cancel), null)
                 .show();
+    }
+
+    /**
+     * Switches every pass you added to one view, and relabels the list to
+     * match. Nothing is fetched: the same passes are on the list, held in the
+     * other view, so the list stays put and only the names change.
+     */
+    private void switchSceneView(String style) {
+        sceneStyle = style;
+        PackageInstaller.showSceneView(style);
+        final List<Depot.Scene> relabeled = new ArrayList<>();
+        for (Depot.Scene s : allScenes)
+            relabeled.add(s.style.equals(style) ? s : s.otherView());
+        allScenes.clear();
+        allScenes.addAll(relabeled);
+        FlightOutlines.clearPreview();
+        refreshSeriesControls();
+        refreshInstalledPackages();
+        applyForestFilter();
+        forestStatus.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                forestStatus.setText("Showing "
+                        + Depot.Scene.viewLabel(sceneStyle)
+                        + " on every pass you added.");
+            }
+        }, 300L);
     }
 
     /**
@@ -2552,6 +2577,11 @@ public class MapDepot implements IPlugin {
     private void uninstallPackage(final Depot.Package pkg) {
         forestStatus.setText("Removing " + pkg.name() + "…");
         packages.uninstall(pkg, packageCallback());
+        if (pkg instanceof Depot.Scene) {
+            final Depot.Scene twin = ((Depot.Scene) pkg).otherView();
+            if (PackageInstaller.isInstalled(twin))
+                packages.uninstall(twin, packageCallback());
+        }
     }
 
 
@@ -2572,10 +2602,37 @@ public class MapDepot implements IPlugin {
                 showCancelBar(false);
                 installedPackages.add(p.id());
                 packageAdapter.notifyDataSetChanged();
-                if (p instanceof Depot.Flight || p instanceof Depot.Pack
-                        || p instanceof Depot.Scene) {
-                    if (!(p instanceof Depot.Scene))
-                        syncOutlines();
+                if (p instanceof Depot.Scene) {
+                    // A pass is held in both views, a few hundred bytes each,
+                    // and the View button switches which one draws.
+                    final Depot.Scene twin = ((Depot.Scene) p).otherView();
+                    if (!PackageInstaller.isInstalled(twin)) {
+                        activeForestId = twin.id();
+                        packages.install(twin, packageCallback());
+                        return;
+                    }
+                    forestStatus.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            PackageInstaller.showSceneView(sceneStyle);
+                            packageAdapter.notifyDataSetChanged();
+                        }
+                    }, 1500L);
+                    forestStatus.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            PackageInstaller.showSceneView(sceneStyle);
+                            packageAdapter.notifyDataSetChanged();
+                        }
+                    }, 4000L);
+                    forestStatus.setText(((Depot.Scene) p).name()
+                            + " added in both views. Showing "
+                            + Depot.Scene.viewLabel(sceneStyle)
+                            + "; the View button switches.");
+                    return;
+                }
+                if (p instanceof Depot.Flight || p instanceof Depot.Pack) {
+                    syncOutlines();
                     // ATAK keeps an on/off state per overlay name and a
                     // fresh download of a name that was hidden came in
                     // hidden (2026-10-11). What was just asked for is on.
@@ -3822,7 +3879,21 @@ public class MapDepot implements IPlugin {
             // Hide / Show drives whatever of this flight is on the phone: the
             // online layer when it is added, else the offline copy.
             final Depot.Package shown = done ? pkg : packDone ? pack : null;
-            if (shown != null && !active && !packActive) {
+            if (pkg instanceof Depot.Scene && done && !active) {
+                // A pass is held in both views. The switch sits under Remove,
+                // in the slot a flight uses for its offline copy, so the name
+                // keeps the width and fits on one line.
+                final boolean toSwir = !Depot.STYLE_SWIR.equals(sceneStyle);
+                action2.setVisibility(View.VISIBLE);
+                action2.setEnabled(true);
+                action2.setText(toSwir ? "Show SWIR" : "Show Color");
+                action2.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        switchSceneView(toSwir ? Depot.STYLE_SWIR : Depot.STYLE_VISUAL);
+                    }
+                });
+            } else if (shown != null && !active && !packActive) {
                 final Boolean visible = PackageInstaller.isVisible(shown);
                 if (visible != null) {
                     eye.setVisibility(View.VISIBLE);
@@ -3843,7 +3914,10 @@ public class MapDepot implements IPlugin {
                 }
             }
 
-            name.setText(pkg.name());
+            // The whole screen is Sentinel-2, so the row title leaves the
+            // word off and "Oct 29 True Color 10SGC" fits on one line.
+            name.setText(pkg instanceof Depot.Scene
+                    ? pkg.name().replaceFirst("^Sentinel2 ", "") : pkg.name());
             if (done || packDone) {
                 // Only the hint is coloured; the size stays the same weight as
                 // every other row so the list does not turn into a christmas

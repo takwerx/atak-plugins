@@ -1090,6 +1090,52 @@ public final class PackageInstaller {
         return visibilityOf(held(pkg));
     }
 
+    /**
+     * Switches every installed satellite pass to one view. A pass is held in
+     * both views (True Color and SWIR Fire View) and only the chosen one is
+     * drawn, so the operator flips between them with no download and the two
+     * never stack. A pass held in one view only stays on, since hiding it would
+     * leave nothing on the map. Works from the files in the grg folder, so it
+     * covers passes from an earlier search and from before a restart.
+     * Returns how many layers it changed.
+     */
+    public static int showSceneView(String style) {
+        final String want = Depot.Scene.viewLabel(style);
+        final String other = Depot.Scene.viewLabel(
+                Depot.STYLE_SWIR.equals(style) ? Depot.STYLE_VISUAL : Depot.STYLE_SWIR);
+        final File dir = FileSystemUtils.getItem("grg");
+        final File[] files = dir.listFiles();
+        int changed = 0;
+        if (files == null)
+            return 0;
+        for (File f : files) {
+            final String n = f.getName();
+            if (!n.startsWith("Sentinel2 ") || !n.endsWith(".xml"))
+                continue;
+            final boolean isWanted = n.contains(" " + want + " ");
+            final boolean isOther = n.contains(" " + other + " ");
+            if (!isWanted && !isOther)
+                continue;
+            final boolean visible;
+            if (isWanted) {
+                visible = true;
+            } else {
+                final String twin = n.replace(" " + other + " ", " " + want + " ");
+                visible = !new File(dir, twin).isFile();
+            }
+            final com.atakmap.android.hierarchy.action.Visibility v = visibilityOf(f);
+            if (v == null)
+                continue;
+            try {
+                if (v.isVisible() != visible && v.setVisible(visible))
+                    changed++;
+            } catch (RuntimeException notThisBuild) {
+                Log.w(TAG, "could not switch " + n + ": " + notThisBuild);
+            }
+        }
+        return changed;
+    }
+
     /** ATAK's on/off handle for a file it has imported, or null. */
     static com.atakmap.android.hierarchy.action.Visibility visibilityOf(File f) {
         if (f == null)

@@ -1242,9 +1242,29 @@ public final class Depot {
                             b.optDouble(3), b.optDouble(2) };
             // The server writes this same name into the layer file: ATAK lists an
             // image overlay by the name inside the XML, and finds it by the file.
-            display = "Sentinel2 " + monthDay(date) + " "
-                    + (STYLE_SWIR.equals(style) ? "SWIR Fire View" : "True Color")
+            display = "Sentinel2 " + monthDay(date) + " " + viewLabel(style)
                     + " " + scene.substring(4, 9);
+        }
+
+        /** What ATAK's layer list and the file name call a view. */
+        public static String viewLabel(String style) {
+            return STYLE_SWIR.equals(style) ? "SWIR Fire View" : "True Color";
+        }
+
+        private Scene(Scene from, String style) {
+            scene = from.scene;
+            this.style = style;
+            date = from.date;
+            clouds = from.clouds;
+            place = from.place;
+            box = from.box;
+            display = "Sentinel2 " + monthDay(date) + " " + viewLabel(style)
+                    + " " + scene.substring(4, 9);
+        }
+
+        /** The same pass in the other view, so both can be held and switched. */
+        public Scene otherView() {
+            return new Scene(this, STYLE_SWIR.equals(style) ? STYLE_VISUAL : STYLE_SWIR);
         }
 
         @Override
@@ -1297,7 +1317,7 @@ public final class Depot {
                 sb.append(" · ").append(days).append(" days ago");
             if (clouds >= 0)
                 sb.append(" · ").append(clouds).append("% cloud");
-            return sb.append(" · streams as you pan").toString();
+            return sb.toString();
         }
 
         @Override
