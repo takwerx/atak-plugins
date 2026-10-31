@@ -71,7 +71,7 @@ then open it from the toolbar.
 #tak-slide[
 = Detections on the map
 
-#image("16.png", width: 92%)
+#image("16.jpg", width: 92%)
 
 Three VIIRS detections, each the 375 m square the sensor saw, inside one GOES
 detection, worked out from the satellite's viewing angle. The feeds list gives
@@ -101,7 +101,7 @@ ground, or that a hot pixel is a wildfire and not a flare or a solar farm.
 #tak-slide[
 = A detection up close
 
-#image("17.png", width: 88%)
+#image("17.jpg", width: 88%)
 
 How big the footprint is and how that is known, which satellite and when.
 ]
@@ -110,7 +110,7 @@ How big the footprint is and how that is known, which satellite and when.
 = NASA Fire Event Perimeters
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("19.png", width: 90%)
+  #image("19.jpg", width: 90%)
 ][
   A feed like the others: NASA's Fire Event Data Suite draws an outline around
   each fire's VIIRS detections every 12 hours, so a fire nobody has mapped has
@@ -126,7 +126,7 @@ How big the footprint is and how that is known, which satellite and when.
 #tak-slide[
 = A NASA perimeter up close
 
-#image("20.png", width: 88%)
+#image("20.jpg", width: 88%)
 
 Its acres, when NASA drew it, and what it is not. *Run a Model from this
 perimeter* starts a run from that outline.
@@ -188,7 +188,7 @@ perimeter* starts a run from that outline.
 = The start on the map
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("08.png", width: 80%)
+  #image("08.jpg", width: 80%)
 ][
   The *Fire start* marker sits where you tapped. Drag it, or use Fine Adjust on
   its menu, to put it exactly where the fire is.
@@ -237,7 +237,7 @@ the fire is the usual reason.
 = A run on the map
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("09.png", width: 80%)
+  #image("09.jpg", width: 80%)
 ][
   Each time step is a ring, red for the first, then orange, then yellow, with
   the burned ground filled in.
@@ -253,7 +253,7 @@ the fire is the usual reason.
 #tak-slide[
 = A run from a NASA perimeter
 
-#image("24.png", width: 92%)
+#image("24.jpg", width: 72%)
 
 The rings grow out from the outline. On a wet night a run may not grow at all,
 and the page says why; *Dry day* shows what it would do once it dries.
@@ -262,7 +262,7 @@ and the page says why; *Dry day* shows what it would do once it dries.
 #tak-slide[
 = The slider on a run
 
-#image("15.png", width: 92%)
+#image("15.jpg", width: 92%)
 
 Drag the slider and the cyan edge moves to that time. The line above it says
 where the fire is by then: the acres, how far it has gone and the buildings.
@@ -290,10 +290,10 @@ where the fire is by then: the acres, how far it has gone and the buildings.
 = Smallest and Largest
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("10.png", width: 80%)
+  #image("10.jpg", width: 80%)
   Smallest
 ][
-  #image("11.png", width: 80%)
+  #image("11.jpg", width: 80%)
   Largest
 ]
 
@@ -352,7 +352,7 @@ larger end.
 = A PyreCast forecast
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[
-  #image("12.png", width: 72%)
+  #image("12.jpg", width: 72%)
 ][
   #image("13.png", width: 96%)
 
@@ -364,7 +364,7 @@ larger end.
 #tak-slide[
 = The slider
 
-#image("14.png", width: 92%)
+#image("14.jpg", width: 92%)
 
 Drag the slider to any time. The edge at that time is drawn in cyan, and the pane
 says where the fire is by then and how big.
