@@ -172,6 +172,15 @@ the fire is the usual reason.
 ]
 
 #tak-slide[
+= The slider on a run
+
+#image("15.png", width: 92%)
+
+Drag the slider and the cyan edge moves to that time. The line above it says
+where the fire is by then: the acres, how far it has gone and the buildings.
+]
+
+#tak-slide[
 = Predicted Fire Size
 
 #toolbox.side-by-side(columns: (6fr, 6fr))[

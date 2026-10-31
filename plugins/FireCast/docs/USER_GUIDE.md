@@ -78,6 +78,10 @@ The model reads the real fuel, slope and canopy from LANDFIRE, wind from the nea
 
 ![A run on the map](screenshots/8_run_on_map.png)
 
+![The slider on a run](screenshots/17_run_slider.png)
+
+Drag the slider and the cyan edge moves to that time, with the line above it saying where the fire is by then.
+
 On the map each time step is a ring, red for the first, then orange, then yellow, with the burned ground filled in.
 
 A run can be small. A litter fire under trees in a light wind may cover a fraction of an acre in an hour, and the page says so: *A slow fire: the fuel here carries fire at ...*. Set **Conditions** to *Dry and 20 mph wind* to see what a bad day would do from the same start.
