@@ -27,7 +27,7 @@
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:layout_marginLeft="6dp"
-            android:text="Start: choose" />
+            android:text="Start from: choose" />
         <Button
             android:id="@+id/btn_clear"
             style="@style/TakwerxButton"

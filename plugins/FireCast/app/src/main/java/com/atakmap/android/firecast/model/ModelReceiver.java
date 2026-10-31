@@ -456,18 +456,18 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         return b.toString();
     }
 
-    /** How the fire starts: a point, NASA's satellite perimeter, or one traced; and taking a perimeter off. */
+    /** Start the run from: a point, NASA's satellite perimeter, or one traced; and taking a perimeter off (operator's name, 2026-10-30). */
     private void chooseStart() {
         final GeoPoint start = model.startPoint();
         final boolean hasPerimeter = model.perimeter() != null;
         final java.util.List<String> items = new java.util.ArrayList<>();
-        items.add("A point: tap the map where the fire starts");
+        items.add("A point: tap the map");
         items.add("NASA satellite perimeter: pick a fire in the map view");
-        items.add("Draw the perimeter on the map");
+        items.add("A perimeter you draw on the map");
         if (hasPerimeter)
             items.add("Remove the perimeter");
         new android.app.AlertDialog.Builder(getMapView().getContext())
-                .setTitle("How the fire starts")
+                .setTitle("Start the Run From")
                 .setItems(items.toArray(new String[0]), new android.content.DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(android.content.DialogInterface dialog, int which) {
@@ -507,8 +507,8 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         final com.atakmap.coremap.maps.coords.GeoPoint start = model.startPoint();
         ((Button) view.findViewById(R.id.btn_run)).setEnabled(!model.isRunning() && (start != null || model.perimeter() != null));
         ((Button) view.findViewById(R.id.btn_place)).setText(model.perimeter() != null
-                ? (model.perimeterNote() != null ? "Start: NASA perimeter" : "Start: drawn perimeter")
-                : start != null ? "Start: a point" : "Start: choose");
+                ? (model.perimeterNote() != null ? "Start from: NASA perimeter" : "Start from: drawn perimeter")
+                : start != null ? "Start from: a point" : "Start from: choose");
         ((Button) view.findViewById(R.id.btn_horizon)).setText(model.horizonMinutes() >= 180 ? "Horizon:\n3 hours" : "Horizon:\n1 hour");
         final int ago = model.startedMinutesAgo();
         ((Button) view.findViewById(R.id.btn_started)).setText(ago == 0 ? "Started:\nnot known" : "Started:\n" + ago + " min ago");
@@ -531,7 +531,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         if (fedsOpen)
             renderFeds();
         if (start == null && model.perimeter() == null) {
-            section("Fire model", "Tap Start and choose how the fire starts: a point you tap on the map, NASA's satellite "
+            section("Fire model", "Tap Start from and choose: a point you tap on the map, NASA's satellite "
                     + "perimeter of the fire, or a perimeter you draw; with a perimeter, say when it started and the run is scaled to what it has already done. Move the marker if it "
                     + "needs to be exact (drag it, or Fine Adjust on its menu), pick the conditions, then Run model. "
                     + "Where the fire is at 20, 40 and 60 minutes is drawn on the map, with everything the run assumed.");
