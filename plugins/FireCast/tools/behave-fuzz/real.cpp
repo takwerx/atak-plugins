@@ -21,7 +21,7 @@ int main() {
         for (int i = 0; i < 4000; i++) {   // realistic: what the plugin sends
             std::uniform_real_distribution<double> m(2, 40), live(30, 300), w(0, 60), d(0, 360), sl(0, 60), cc(0, 100), ch(0, 150), cb(0, 30), bd(0.01, 0.4), fo(60, 300);
             double h = ch(rng), base = std::min(h, cb(rng));
-            int wh = i % 2;
+            int wh = i % 3;
             snprintf(last, sizeof last, "real fm=%d", f);
             alarm(10);
             jdoubleArray a = Java_com_atakmap_android_firecast_model_Behave_surfaceRun(&env, nullptr, f, m(rng), m(rng), m(rng), live(rng), live(rng), w(rng), wh, d(rng), sl(rng), d(rng), cc(rng), h, 0.5);

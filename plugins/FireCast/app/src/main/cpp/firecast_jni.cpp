@@ -50,6 +50,13 @@ FuelModels& fuelModels() {
 // into a loop that never ends (found by fuzzing the shipped bridge on the Mac,
 // 2026-10-31). Real inputs sit far inside these limits; anything outside them is
 // refused and the Java side gets no run.
+// The wind's height: 0 at 20 ft (RAWS), 1 at 10 m (NWS networks, HRRR), 2 at eye
+// level, taken as the midflame wind (a hand-held meter such as a Kestrel).
+WindHeightInputMode::WindHeightInputModeEnum heightMode(int windHeight) {
+    return windHeight == 1 ? WindHeightInputMode::TenMeter
+            : windHeight == 2 ? WindHeightInputMode::DirectMidflame : WindHeightInputMode::TwentyFoot;
+}
+
 bool within(double v, double lo, double hi) {
     return std::isfinite(v) && v >= lo && v <= hi;
 }
@@ -60,7 +67,7 @@ bool surfaceInputsOk(int fuelModel, double m1, double m10, double m100, double m
     return fuelModel > 0 && fuelModel < 256
             && within(m1, 0.5, 500) && within(m10, 0.5, 500) && within(m100, 0.5, 500)
             && within(mHerb, 0.5, 500) && within(mWoody, 0.5, 500)
-            && within(windMph, 0, 200) && (windHeight == 0 || windHeight == 1)
+            && within(windMph, 0, 200) && windHeight >= 0 && windHeight <= 2
             && within(windFrom, -3600, 3600) && within(slopeDeg, 0, 90) && within(aspectDeg, -3600, 3600)
             && within(coverPct, 0, 100) && within(heightFt, 0, 500) && within(crownRatio, 0, 1);
 }
@@ -74,8 +81,7 @@ bool crownRun(double out[10], int fuelModel, double m1, double m10, double m100,
         return false;
     try {
         const double crownRatio = heightFt > 0 ? std::max(0.0, std::min(1.0, (heightFt - baseFt) / heightFt)) : 0.0;
-        const WindHeightInputMode::WindHeightInputModeEnum wh =
-                windHeight == 1 ? WindHeightInputMode::TenMeter : WindHeightInputMode::TwentyFoot;
+        const WindHeightInputMode::WindHeightInputModeEnum wh = heightMode(windHeight);
         Surface s(fuelModels());
         s.updateSurfaceInputs(fuelModel, m1, m10, m100, mHerb, mWoody, FractionUnits::Percent,
                 windMph, SpeedUnits::MilesPerHour, wh,
@@ -115,7 +121,10 @@ bool crownRun(double out[10], int fuelModel, double m1, double m10, double m100,
             c *= k;
         }
         const double flame = cr.getFinalFlameLength(LengthUnits::Feet);
-        const double wind20 = windHeight == 1 ? windMph * 0.87 : windMph;
+        // Embers fly on the 20 ft wind; an eye-level wind is turned into one by the
+        // fuel's own wind adjustment, as behave reports it.
+        const double wind20 = windHeight == 1 ? windMph * 0.87
+                : windHeight == 2 ? s.getWindSpeed(SpeedUnits::MilesPerHour, WindHeightInputMode::TwentyFoot) : windMph;
         double spotM = 0;
         if (flame > 0 && wind20 > 0) {
             Spot sp;
@@ -174,14 +183,15 @@ extern "C" {
 // Inputs, in the order the Java side sends them:
 //   fuelModel  FBFM40/13 number (LANDFIRE's own codes: 101 GR1 ... 204 SB4)
 //   m1, m10, m100, mHerb, mWoody   percent
-//   windMph    wind speed, miles per hour, at 20 ft (windHeight 0) or 10 m (windHeight 1)
+//   windMph    wind speed, miles per hour, at 20 ft (windHeight 0), 10 m (1) or eye level
+//              taken as midflame (2)
 //   windFrom   degrees clockwise from north the wind comes FROM (probed 2026-10-11:
 //              wind from 0 on flat ground sends the fire toward 180)
 //   slopeDeg, aspectDeg  degrees
 //   coverPct, heightFt, crownRatio   canopy
 // Outputs: [ ros ft/min, direction of max spread deg, length/width, flame length ft,
 //            fireline intensity BTU/ft/s, A ft per min, B ft per min, C ft per min,
-//            backing ros ft/min, flanking ros ft/min, midflame wind mph ]
+//            backing ros ft/min, flanking ros ft/min, midflame wind mph, 20 ft wind mph ]
 // A, B, C are the ellipse's semi-minor, semi-major and center-to-focus distances
 // per minute of spread; the ignition sits at the rear focus.
 JNIEXPORT jdoubleArray JNICALL
@@ -194,15 +204,15 @@ Java_com_atakmap_android_firecast_model_Behave_surfaceRun(JNIEnv* env, jclass,
     if (!surfaceInputsOk(fuelModel, m1, m10, m100, mHerb, mWoody, windMph, windHeight, windFrom, slopeDeg,
             aspectDeg, coverPct, heightFt, crownRatio))
         return nullptr;
-    jdoubleArray out = env->NewDoubleArray(11);
+    jdoubleArray out = env->NewDoubleArray(12);
     if (out == nullptr)
         return nullptr;
-    double v[11] = { 0 };
+    double v[12] = { 0 };
     try {
         Surface s(fuelModels());
         s.updateSurfaceInputs(fuelModel, m1, m10, m100, mHerb, mWoody, FractionUnits::Percent,
                 windMph, SpeedUnits::MilesPerHour,
-                windHeight == 1 ? WindHeightInputMode::TenMeter : WindHeightInputMode::TwentyFoot,
+                heightMode(windHeight),
                 windFrom, WindAndSpreadOrientationMode::RelativeToNorth,
                 slopeDeg, SlopeUnits::Degrees, aspectDeg,
                 coverPct, FractionUnits::Percent, heightFt, LengthUnits::Feet,
@@ -219,10 +229,14 @@ Java_com_atakmap_android_firecast_model_Behave_surfaceRun(JNIEnv* env, jclass,
         v[8] = s.getBackingSpreadRate(SpeedUnits::FeetPerMinute);
         v[9] = s.getFlankingSpreadRate(SpeedUnits::FeetPerMinute);
         v[10] = s.getMidflameWindspeed(SpeedUnits::MilesPerHour);
+        v[11] = s.getWindSpeed(SpeedUnits::MilesPerHour, WindHeightInputMode::TwentyFoot);
     } catch (...) {
         return nullptr;
     }
-    env->SetDoubleArrayRegion(out, 0, 11, v);
+    for (double& x : v)
+        if (!std::isfinite(x))
+            x = 0;
+    env->SetDoubleArrayRegion(out, 0, 12, v);
     return out;
 }
 

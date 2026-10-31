@@ -131,37 +131,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         view.findViewById(R.id.btn_station).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final FireModel.Run r = model.last();
-                final java.util.List<Weather.Reading> list = r == null ? new java.util.ArrayList<Weather.Reading>() : r.stations;
-                final String[] labels = new String[1 + list.size()];
-                labels[0] = "Closest at about the start's height (automatic)";
-                int current = 0;
-                for (int i = 0; i < list.size(); i++) {
-                    final Weather.Reading s = list.get(i);
-                    labels[1 + i] = s.station + ("HRRR".equals(s.source) ? "" : " (" + s.source + ")")
-                            + ("NWS forecast".equals(s.source) || "HRRR".equals(s.source) ? "" : " · " + Units.format(s.distanceM))
-                            + (s.elevationFt > 0 && r != null && !Double.isNaN(r.startElevFt)
-                                    ? String.format(Locale.US, " · %+,.0f ft", s.elevationFt - r.startElevFt) : "")
-                            + String.format(Locale.US, " · %.0f mph from %s", s.windMph, Units.compass(s.windFromDeg))
-                            + (Double.isNaN(s.gustMph) || s.gustMph <= s.windMph ? "" : String.format(Locale.US, " gust %.0f", s.gustMph))
-                            + (Double.isNaN(s.relativeHumidity) ? "" : String.format(Locale.US, " · RH %.0f%%", s.relativeHumidity));
-                    if (s.wxId.equals(model.station()))
-                        current = 1 + i;
-                }
-                if (list.isEmpty())
-                    labels[0] = "Run once to list the stations near the start";
-                new android.app.AlertDialog.Builder(getMapView().getContext())
-                        .setTitle("Weather station")
-                        .setSingleChoiceItems(labels, current, new android.content.DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(android.content.DialogInterface dialog, int which) {
-                                dialog.dismiss();
-                                model.setStation(which == 0 ? "" : list.get(which - 1).wxId);
-                                render();
-                            }
-                        })
-                        .setNegativeButton("Cancel", null)
-                        .show();
+                chooseWeather();
             }
         });
         view.findViewById(R.id.btn_conditions).setOnClickListener(new View.OnClickListener() {
@@ -437,6 +407,208 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         return b.toString();
     }
 
+    /**
+     * The run's weather: a station (automatic or picked), the operator's own observation
+     * typed in, or a Kestrel Wx station heard on the map (operator, 2026-10-31).
+     */
+    private void chooseWeather() {
+        final Observation ob = model.observation();
+        final java.util.List<String> items = new java.util.ArrayList<>();
+        items.add("A weather station (automatic, or pick one)");
+        items.add("My observation: type it in");
+        items.add("From a Kestrel station on the map");
+        if (ob != null)
+            items.add("Stop using my observation");
+        new android.app.AlertDialog.Builder(getMapView().getContext())
+                .setTitle(ob != null && ob.usable(System.currentTimeMillis()) ? "Weather: " + ob.summary() : "Weather for the run")
+                .setItems(items.toArray(new String[0]), new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface dialog, int which) {
+                        if (which == 0) {
+                            model.setObservation(null);
+                            chooseStation();
+                        } else if (which == 1) {
+                            enterObservation(ob, null);
+                        } else if (which == 2) {
+                            chooseKestrel();
+                        } else {
+                            model.setObservation(null);
+                            render();
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void chooseStation() {
+                final FireModel.Run r = model.last();
+                final java.util.List<Weather.Reading> list = r == null ? new java.util.ArrayList<Weather.Reading>() : r.stations;
+                final String[] labels = new String[1 + list.size()];
+                labels[0] = "Closest at about the start's height (automatic)";
+                int current = 0;
+                for (int i = 0; i < list.size(); i++) {
+                    final Weather.Reading s = list.get(i);
+                    labels[1 + i] = s.station + ("HRRR".equals(s.source) ? "" : " (" + s.source + ")")
+                            + ("NWS forecast".equals(s.source) || "HRRR".equals(s.source) ? "" : " · " + Units.format(s.distanceM))
+                            + (s.elevationFt > 0 && r != null && !Double.isNaN(r.startElevFt)
+                                    ? String.format(Locale.US, " · %+,.0f ft", s.elevationFt - r.startElevFt) : "")
+                            + String.format(Locale.US, " · %.0f mph from %s", s.windMph, Units.compass(s.windFromDeg))
+                            + (Double.isNaN(s.gustMph) || s.gustMph <= s.windMph ? "" : String.format(Locale.US, " gust %.0f", s.gustMph))
+                            + (Double.isNaN(s.relativeHumidity) ? "" : String.format(Locale.US, " · RH %.0f%%", s.relativeHumidity));
+                    if (s.wxId.equals(model.station()))
+                        current = 1 + i;
+                }
+                if (list.isEmpty())
+                    labels[0] = "Run once to list the stations near the start";
+                new android.app.AlertDialog.Builder(getMapView().getContext())
+                        .setTitle("Weather station")
+                        .setSingleChoiceItems(labels, current, new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                                model.setStation(which == 0 ? "" : list.get(which - 1).wxId);
+                                render();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+    }
+
+    /** Kestrel Wx stations heard on this phone, newest first; one picked fills the observation form. */
+    private void chooseKestrel() {
+        final java.util.List<KestrelStations.Station> all = KestrelStations.stations();
+        final GeoPoint here = model.startPoint() != null ? model.startPoint() : getMapView().getCenterPoint().get();
+        if (all.isEmpty()) {
+            new android.app.AlertDialog.Builder(getMapView().getContext())
+                    .setTitle("No Kestrel stations")
+                    .setMessage("No Kestrel Wx station has been heard on this device since FireCast started. A station "
+                            + "appears when the Kestrel Wx plugin on a phone with a meter shares its reading to the team.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+        final String[] labels = new String[all.size()];
+        final long now = System.currentTimeMillis();
+        for (int i = 0; i < labels.length; i++) {
+            final KestrelStations.Station k = all.get(i);
+            final long ago = Math.max(0, (now - k.at) / 60000L);
+            labels[i] = k.name + String.format(Locale.US, " · %.0f mph from %s", k.windMph, Units.compass(k.windFromDeg))
+                    + (Double.isNaN(k.tempF) ? "" : String.format(Locale.US, " · %.0f°F", k.tempF))
+                    + (Double.isNaN(k.rh) ? "" : String.format(Locale.US, " · %.0f%% RH", k.rh))
+                    + " · " + (ago < 120 ? ago + " min" : (ago / 60) + " h") + " ago"
+                    + (here == null ? "" : " · " + Units.rangeBearing(new double[] { here.getLatitude(), here.getLongitude() }, k.lat, k.lon));
+        }
+        new android.app.AlertDialog.Builder(getMapView().getContext())
+                .setTitle("Kestrel stations")
+                .setItems(labels, new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface dialog, int which) {
+                        final KestrelStations.Station k = all.get(which);
+                        enterObservation(Observation.checked(k.windMph, k.windFromDeg, Double.NaN, k.tempF, k.rh, Double.NaN,
+                                k.at, true, "Kestrel " + k.name), "Kestrel " + k.name);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /**
+     * The observation form: wind, direction, gust, temperature, humidity, 1 h fuel
+     * moisture, eye level or 20 ft. Filled from {@code start} when given (the last one,
+     * or a Kestrel reading), every field editable. MapView context, plain EditTexts.
+     */
+    private void enterObservation(final Observation start, final String source) {
+        final android.content.Context c = getMapView().getContext();
+        final LinearLayout form = new LinearLayout(c);
+        form.setOrientation(LinearLayout.VERTICAL);
+        final int pad = dp(16);
+        form.setPadding(pad, dp(8), pad, 0);
+        final android.widget.EditText wind = field(form, "Wind, mph", start == null ? "" : fmt(start.windMph), false);
+        final android.widget.EditText from = field(form, "Wind from: degrees or N, NE, SW ...",
+                start == null ? "" : fmt(start.windFromDeg), true);
+        final android.widget.EditText gust = field(form, "Gust, mph (optional)", start == null ? "" : fmt(start.gustMph), false);
+        final android.widget.EditText temp = field(form, "Temperature, °F", start == null ? "" : fmt(start.tempF), false);
+        final android.widget.EditText rh = field(form, "Relative humidity, %", start == null ? "" : fmt(start.rh), false);
+        final android.widget.EditText fm = field(form, "1 h fuel moisture, % (optional; else from temp and RH)",
+                start == null ? "" : fmt(start.fineFuelPct), false);
+        final android.widget.CheckBox eye = new android.widget.CheckBox(c);
+        eye.setText("Wind read at eye level (a hand-held meter)");
+        eye.setChecked(start == null || start.eyeLevel);
+        form.addView(eye);
+        final android.widget.ScrollView scroll = new android.widget.ScrollView(c);
+        scroll.addView(form);
+        new android.app.AlertDialog.Builder(c)
+                .setTitle(source != null ? "Observation from " + source : "My observation")
+                .setView(scroll)
+                .setPositiveButton("Use it", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface dialog, int which) {
+                        final Observation ob = Observation.checked(num(wind), direction(from.getText().toString()), num(gust),
+                                num(temp), num(rh), num(fm), start != null && source != null ? start.at : System.currentTimeMillis(),
+                                eye.isChecked(), source != null ? source : "your observation");
+                        if (ob == null) {
+                            new android.app.AlertDialog.Builder(c).setTitle("Not used")
+                                    .setMessage("A wind speed and a direction are needed, and every number has to be one a "
+                                            + "real reading can be (wind 0-150 mph, temperature -40 to 130°F, humidity 1-100%, "
+                                            + "fuel moisture 1-60%).")
+                                    .setPositiveButton("OK", null).show();
+                            return;
+                        }
+                        model.setObservation(ob);
+                        render();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private android.widget.EditText field(LinearLayout form, String hint, String value, boolean text) {
+        final TextView label = new TextView(form.getContext());
+        label.setText(hint);
+        label.setTextColor(0xFFB0B0B0);
+        form.addView(label);
+        final android.widget.EditText e = new android.widget.EditText(form.getContext());
+        e.setSingleLine(true);
+        e.setInputType(text ? android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+                : android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        e.setText(value);
+        form.addView(e);
+        return e;
+    }
+
+    private static String fmt(double v) {
+        return Double.isNaN(v) ? "" : String.format(Locale.US, "%.0f", v);
+    }
+
+    private static double num(android.widget.EditText e) {
+        final String s = e.getText().toString().trim();
+        if (s.isEmpty() || s.length() > 12)
+            return Double.NaN;
+        try {
+            return Double.parseDouble(s);
+        } catch (NumberFormatException x) {
+            return Double.NaN;
+        }
+    }
+
+    /** "225", "SW", "s" -> degrees; NaN when neither. */
+    static double direction(String s) {
+        final String t = s == null ? "" : s.trim().toUpperCase(Locale.US);
+        if (t.isEmpty() || t.length() > 8)
+            return Double.NaN;
+        final String[] names = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
+        for (int i = 0; i < names.length; i++)
+            if (names[i].equals(t))
+                return i * 22.5;
+        try {
+            final double d = Double.parseDouble(t.replace("°", ""));
+            return d >= 0 && d <= 360 ? d % 360 : Double.NaN;
+        } catch (NumberFormatException x) {
+            return Double.NaN;
+        }
+    }
+
     /** "Ignition:\n23:40 (35 min ago)", or not known, or set but too old to use. */
     private String ignitionLabel() {
         final long at = model.ignitionAt(), now = System.currentTimeMillis();
@@ -588,14 +760,19 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         ((Button) view.findViewById(R.id.btn_horizon)).setText(model.horizonMinutes() >= 180 ? "Horizon:\n3 hours" : "Horizon:\n1 hour");
         ((Button) view.findViewById(R.id.btn_started)).setText(ignitionLabel());
         ((Button) view.findViewById(R.id.btn_conditions)).setText("Conditions:\n" + FireModel.conditionsLabel(model.conditions()));
-        String stationLabel = "Station:\nautomatic";
+        final Observation obs = model.observation();
+        String stationLabel = "Weather:\nautomatic";
         if (!model.station().isEmpty()) {
-            stationLabel = "Station:\n" + model.station();
+            stationLabel = "Weather:\n" + model.station();
             if (r != null)
                 for (Weather.Reading s : r.stations)
                     if (s.wxId.equals(model.station()))
-                        stationLabel = "Station:\n" + s.station;
+                        stationLabel = "Weather:\n" + s.station;
         }
+        if (obs != null)
+            stationLabel = obs.usable(System.currentTimeMillis())
+                    ? "Weather:\n" + (obs.source.startsWith("Kestrel") ? obs.source : "my obs " + clock(obs.at))
+                    : "Weather:\nobs too old";
         ((Button) view.findViewById(R.id.btn_station)).setText(stationLabel);
         if (model.isRunning()) {
             section("Running", model.status());
@@ -843,7 +1020,7 @@ public class ModelReceiver extends DropDownReceiver implements OnStateListener, 
         }
         if (r.result != null || r.windNote != null) {
             in.append(String.format(Locale.US, "Wind %.0f mph from %s (%.0f°) at %s",
-                    r.windMph, Units.compass(r.windFromDeg), r.windFromDeg, r.tenMeterWind ? "10 m" : "20 ft"));
+                    r.windMph, Units.compass(r.windFromDeg), r.windFromDeg, r.eyeLevelWind ? "eye level" : r.tenMeterWind ? "10 m" : "20 ft"));
             if (r.windNote != null)
                 in.append(": ").append(r.windNote);
             in.append(".\n");

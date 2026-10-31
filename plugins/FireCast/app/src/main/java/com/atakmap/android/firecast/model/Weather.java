@@ -59,8 +59,19 @@ public final class Weather {
         /** An NWS observation station with its latest reading, or the forecast grid at the point. */
         Reading(String source, String id, String name, double lat, double lon, int elevationFt, long observedAt,
                 double windMph, double gustMph, double windFromDeg, double rh, double tempF) {
+            this(source, id, name, lat, lon, elevationFt, observedAt, windMph, gustMph, windFromDeg, rh, tempF, true);
+        }
+
+        /** The operator's own observation: at the fire, never 10 m. */
+        static Reading observation(Observation ob, double lat, double lon, int elevationFt) {
+            return new Reading("Observation", "OBS", ob.source, lat, lon, elevationFt, ob.at,
+                    ob.windMph, ob.gustMph, ob.windFromDeg, ob.rh, ob.tempF, false);
+        }
+
+        Reading(String source, String id, String name, double lat, double lon, int elevationFt, long observedAt,
+                double windMph, double gustMph, double windFromDeg, double rh, double tempF, boolean tenMeter) {
             this.source = source;
-            tenMeterWind = true;
+            tenMeterWind = tenMeter;
             station = name;
             wxId = id;
             latitude = lat;

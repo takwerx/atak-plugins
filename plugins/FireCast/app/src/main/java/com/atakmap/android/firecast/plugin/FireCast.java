@@ -93,6 +93,8 @@ public class FireCast implements IPlugin {
         if (mapView != null && model == null) {
             model = new com.atakmap.android.firecast.model.FireModel(mapView, pluginContext);
             model.start();
+            // Kestrel Wx stations heard as CoT, for the model's weather (operator, 2026-10-31).
+            com.atakmap.android.firecast.model.KestrelStations.start();
             modelPage = new com.atakmap.android.firecast.model.ModelReceiver(mapView, pluginContext, model,
                     new Runnable() {
                         @Override
@@ -187,6 +189,7 @@ public class FireCast implements IPlugin {
         if (model != null) {
             model.stop();
             model = null;
+            com.atakmap.android.firecast.model.KestrelStations.stop();
         }
         if (firis != null) {
             firis.setListener(null);

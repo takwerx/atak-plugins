@@ -32,6 +32,9 @@ public final class Behave {
         return loaded;
     }
 
+    /** Where a wind was measured. */
+    public static final int AT_20FT = 0, AT_10M = 1, AT_EYE_LEVEL = 2;
+
     /** One surface fire run's outputs, in the library's own units. */
     public static final class Result {
         /** Head fire spread rate, feet per minute. */
@@ -46,6 +49,8 @@ public final class Behave {
         public final double aFtPerMin, bFtPerMin, cFtPerMin;
         public final double backingFtPerMin, flankingFtPerMin;
         public final double midflameWindMph;
+        /** The 20 ft wind behave works out, the one embers fly on; for an eye-level input, from the fuel's wind adjustment. */
+        public final double wind20Mph;
 
         Result(double[] v) {
             rosFtPerMin = v[0];
@@ -59,23 +64,25 @@ public final class Behave {
             backingFtPerMin = v[8];
             flankingFtPerMin = v[9];
             midflameWindMph = v[10];
+            wind20Mph = v.length > 11 ? v[11] : Double.NaN;
         }
     }
 
     /**
      * @param fuelModel  LANDFIRE's FBFM40 (or FBFM13) code
      * @param windMph    wind, miles per hour, at 20 ft or at 10 m
-     * @param tenMeter   true when the wind was measured at 10 m (NWS networks), false for 20 ft (RAWS)
+     * @param windHeight {@link #AT_20FT} (RAWS), {@link #AT_10M} (NWS networks, HRRR) or
+     *                   {@link #AT_EYE_LEVEL} (a hand-held meter, taken as the midflame wind)
      * @param windFromDeg degrees the wind comes from, clockwise from north
      * @return the run, or null when the library is missing or refused the inputs
      */
     public static Result surface(int fuelModel, double m1, double m10, double m100,
-            double mHerb, double mWoody, double windMph, boolean tenMeter, double windFromDeg,
+            double mHerb, double mWoody, double windMph, int windHeight, double windFromDeg,
             double slopeDeg, double aspectDeg, double coverPct, double heightFt, double crownRatio) {
         if (!load() || !validFuelModel(fuelModel))
             return null;
         final double[] v = surfaceRun(fuelModel, m1, m10, m100, mHerb, mWoody,
-                windMph, tenMeter ? 1 : 0, windFromDeg, slopeDeg, aspectDeg, coverPct, heightFt, crownRatio);
+                windMph, windHeight, windFromDeg, slopeDeg, aspectDeg, coverPct, heightFt, crownRatio);
         return v == null || v.length < 11 ? null : new Result(v);
     }
 
@@ -116,11 +123,11 @@ public final class Behave {
      * @return the run, or null when the library is missing or refused the inputs
      */
     public static Crown crown(int fuelModel, double m1, double m10, double m100, double mHerb, double mWoody,
-            double mFoliar, double windMph, boolean tenMeter, double windFromDeg, double slopeDeg, double aspectDeg,
+            double mFoliar, double windMph, int windHeight, double windFromDeg, double slopeDeg, double aspectDeg,
             double coverPct, double heightFt, double baseFt, double density) {
         if (!load() || !validFuelModel(fuelModel))
             return null;
-        final double[] v = crownRun(fuelModel, m1, m10, m100, mHerb, mWoody, mFoliar, windMph, tenMeter ? 1 : 0,
+        final double[] v = crownRun(fuelModel, m1, m10, m100, mHerb, mWoody, mFoliar, windMph, windHeight,
                 windFromDeg, slopeDeg, aspectDeg, coverPct, heightFt, baseFt, density);
         return v == null || v.length < 10 ? null : new Crown(v);
     }

@@ -165,6 +165,15 @@ public final class FireModel {
         public double[] moistureGrid;
         public double windMph, windFromDeg;
         public boolean tenMeterWind;
+        /** The wind was read at eye level (the operator's observation): behave takes it as the midflame wind. */
+        public boolean eyeLevelWind;
+        /** The operator's observation this run used, in words; null when it used a station. */
+        public String obsNote;
+
+        /** Where the run's own wind was read, as the fire library takes it. */
+        public int windHeight() {
+            return eyeLevelWind ? Behave.AT_EYE_LEVEL : tenMeterWind ? Behave.AT_10M : Behave.AT_20FT;
+        }
         public String windNote;
         public String moistureNote;
         public double canopyHeightFt, crownRatio;
@@ -346,6 +355,16 @@ public final class FireModel {
     private static final String PREF_STATION = "model.station";
 
     /** The station the operator picked by id, or "" for the representative one. */
+    /** The operator's own weather, when set; the run uses it while it is under six hours old. */
+    public Observation observation() {
+        return Observation.load(prefs);
+    }
+
+    public void setObservation(Observation ob) {
+        Observation.save(prefs, ob);
+        changed();
+    }
+
     public String station() {
         return prefs.getString(PREF_STATION, "");
     }
@@ -1260,10 +1279,19 @@ public final class FireModel {
                         r.windFieldNote = "No HRRR wind field: " + e.getMessage();
                     }
 
+                    final Observation ob = observation();
+                    if (ob != null && ob.usable(r.ranAt)) {
+                        // The operator's own reading at the fire comes before any station.
+                        r.weather = Weather.Reading.observation(ob, lat, lon,
+                                Double.isNaN(r.startElevFt) ? 0 : (int) Math.round(r.startElevFt));
+                        r.stations.add(0, r.weather);
+                        r.obsNote = ob.summary();
+                        r.eyeLevelWind = ob.eyeLevel;
+                    }
                     try {
                         final String want = station();
                         for (Weather.Reading s : r.stations)
-                            if (!want.isEmpty() && want.equals(s.wxId))
+                            if (r.obsNote == null && !want.isEmpty() && want.equals(s.wxId))
                                 r.weather = s;
                         if (r.weather == null) {
                             final java.util.List<Weather.Reading> observed = new java.util.ArrayList<>();
@@ -1365,6 +1393,18 @@ public final class FireModel {
                 w = other;
         }
         moisture(r, w);
+        final boolean obs = w != null && "Observation".equals(w.source);
+        if (obs && !COND_DRY.equals(r.conditions) && !COND_DRY_WINDY.equals(r.conditions)) {
+            final Observation ob = observation();
+            final double emc = Weather.fineFuelMoisture(w.relativeHumidity, w.airTempF);
+            if (ob != null && !Double.isNaN(ob.fineFuelPct)) {
+                r.m1 = ob.fineFuelPct;
+                r.moistureNote = "The 1 h is the fine fuel moisture you entered, " + Math.round(r.m1) + "%. " + r.moistureNote;
+            } else if (!Double.isNaN(emc)) {
+                r.m1 = emc;
+                r.moistureNote = "The 1 h is worked out from your observation's humidity and temperature. " + r.moistureNote;
+            }
+        }
         if (fieldWind && !COND_DRY_WINDY.equals(r.conditions)) {
             r.windMph = r.weather.windMph;
             r.windFromDeg = r.weather.windFromDeg;
@@ -1393,11 +1433,16 @@ public final class FireModel {
             r.windFromDeg = 0;
             r.windNote = "no station with a wind reading within 50 mi; run with no wind";
         }
+        // An eye-level reading stays one only while it is the run's wind.
+        r.eyeLevelWind = r.eyeLevelWind && obs && !fieldWind && !COND_DRY_WINDY.equals(r.conditions);
+        if (obs && !COND_DRY_WINDY.equals(r.conditions))
+            r.windNote = (COND_GUST.equals(r.conditions) ? "the gust in " : "") + r.obsNote
+                    + (r.eyeLevelWind ? "; an eye-level wind, taken as the wind at the flames" : "");
         hourly(r);
         r.canopyHeightFt = r.site.coverPct >= 10 ? 30 : 0;
         r.crownRatio = r.site.coverPct >= 10 ? 0.5 : 0;
         r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
-                r.windMph, r.tenMeterWind, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
+                r.windMph, r.windHeight(), r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
                 r.site.coverPct, r.canopyHeightFt, r.crownRatio);
         finish(r);
     }
@@ -1514,7 +1559,7 @@ public final class FireModel {
         if (n == 1)
             return;
         final boolean dry = COND_DRY.equals(r.conditions) || COND_DRY_WINDY.equals(r.conditions);
-        final boolean windy = COND_DRY_WINDY.equals(r.conditions), gust = COND_GUST.equals(r.conditions);
+        final boolean windy = COND_DRY_WINDY.equals(r.conditions) || r.obsNote != null, gust = COND_GUST.equals(r.conditions);
         final FuelMoisture.Hour d0 = r.dead == null ? null : r.dead.at(r.ranAt);
         final Weather.Reading f0 = r.forecast == null ? null : r.forecast[0];
         String windFrom = null, wetFrom = null;
@@ -1562,7 +1607,8 @@ public final class FireModel {
             }
             r.hourly[h] = new Hour(at, mph, from, m1, m10, m100);
         }
-        r.hourlyNote = "Later hours: the wind " + (windy ? "held at the preset" : windFrom == null
+        r.hourlyNote = "Later hours: the wind " + (r.obsNote != null && !COND_DRY_WINDY.equals(r.conditions) ? "held as you observed it"
+                : windy ? "held at the preset" : windFrom == null
                 ? "held as read (no forecast reached)" : "follows " + windFrom) + "; the dead fuel "
                 + (dry ? "held at the preset" : wetFrom == null ? "held as read" : "follows " + wetFrom) + ".";
     }
@@ -1892,13 +1938,13 @@ public final class FireModel {
                         final boolean own = Double.isNaN(windMph);
                         final double mph = windX * (own ? (hr == null ? r.windMph : hr.windMph) : windMph);
                         final double from = dirPlus + (own ? (hr == null ? r.windFromDeg : hr.windFromDeg) : windFrom);
-                        final boolean tenM = own ? r.tenMeterWind : true;
+                        final int height = own ? r.windHeight() : Behave.AT_10M;
                         final double m1 = moistX * (hr == null ? r.m1 : hr.m1), m10 = moistX * (hr == null ? r.m10 : hr.m10),
                                 m100 = moistX * (hr == null ? r.m100 : hr.m100);
                         if (g.canopy()) {
                             // Trees over it: whether the fire stays down, torches or crowns.
                             final Behave.Crown c = Behave.crown(g.fuel, m1, m10, m100, r.mHerb, r.mWoody, r.mFoliar,
-                                    mph, tenM, from, g.slopeDeg, g.aspectDeg, g.coverPct, g.heightFt, g.baseFt, g.density);
+                                    mph, height, from, g.slopeDeg, g.aspectDeg, g.coverPct, g.heightFt, g.baseFt, g.density);
                             if (c == null)
                                 return null;
                             return new double[] { c.rosFtPerMin, c.headingDeg, c.aFtPerMin, c.bFtPerMin, c.cFtPerMin,
@@ -1909,13 +1955,14 @@ public final class FireModel {
                         final double cover = known ? 0 : r.site.coverPct, heightFt = known ? 0 : r.canopyHeightFt,
                                 ratio = known ? 0 : r.crownRatio;
                         final Behave.Result b = Behave.surface(g.fuel, m1, m10, m100, r.mHerb, r.mWoody,
-                                mph, tenM, from, g.slopeDeg, g.aspectDeg, cover, heightFt, ratio);
+                                mph, height, from, g.slopeDeg, g.aspectDeg, cover, heightFt, ratio);
                         if (b == null)
                             return null;
                         // Embers from this kind of cell: Albini's surface-fire reach at the
                         // 20 ft wind (a 10 m wind scaled down to 20 ft), over open ground
                         // or the canopy here.
-                        final double wind20 = tenM ? mph * 0.87d : mph;
+                        final double wind20 = height == Behave.AT_10M ? mph * 0.87d
+                                : height == Behave.AT_EYE_LEVEL ? (b.wind20Mph > 0 ? b.wind20Mph : mph) : mph;
                         final double spotM = Behave.spotDistanceM(b.flameLengthFt, wind20, heightFt);
                         return new double[] { b.rosFtPerMin, b.headingDeg, b.aFtPerMin, b.bFtPerMin, b.cFtPerMin,
                                 b.flameLengthFt, spotM, Behave.SURFACE };
@@ -2762,7 +2809,8 @@ public final class FireModel {
                     .put("aspectDeg", r.site.aspectDeg).put("coverPct", r.site.coverPct);
             o.put("m1", r.m1).put("m10", r.m10).put("m100", r.m100).put("mHerb", r.mHerb).put("mWoody", r.mWoody);
             o.put("windMph", r.windMph).put("windFromDeg", r.windFromDeg).put("windNote", r.windNote)
-                    .put("tenMeterWind", r.tenMeterWind).put("moistureNote", r.moistureNote);
+                    .put("tenMeterWind", r.tenMeterWind).put("moistureNote", r.moistureNote)
+                    .put("eyeLevelWind", r.eyeLevelWind).put("obsNote", r.obsNote == null ? "" : r.obsNote);
             o.put("canopyHeightFt", r.canopyHeightFt).put("crownRatio", r.crownRatio).put("conditions", r.conditions)
                     .put("visible", r.visible).put("ground", r.ground != null).put("halfKm", r.halfKm)
                     .put("startedAt", r.startedAt).put("rateScale", r.rateScale).put("cellM", r.cellM)
@@ -2945,6 +2993,9 @@ public final class FireModel {
                 r.windFromDeg = 0;
             r.windNote = text(o.optString("windNote", ""));
             r.tenMeterWind = o.optBoolean("tenMeterWind", false);
+            r.eyeLevelWind = o.optBoolean("eyeLevelWind", false);
+            final String on = o.optString("obsNote", "");
+            r.obsNote = on.isEmpty() || on.length() > 300 ? null : on;
             r.moistureNote = text(o.optString("moistureNote", ""));
             r.canopyHeightFt = clamp(o.optDouble("canopyHeightFt", 0), 0, 400, 0);
             r.crownRatio = clamp(o.optDouble("crownRatio", 0), 0, 1, 0);
@@ -3026,7 +3077,7 @@ public final class FireModel {
             }
             r.fuelName = Behave.name(r.site.fuelModel);
             r.result = Behave.surface(r.site.fuelModel, r.m1, r.m10, r.m100, r.mHerb, r.mWoody,
-                    r.windMph, r.tenMeterWind, r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
+                    r.windMph, r.windHeight(), r.windFromDeg, r.site.slopeDeg, r.site.aspectDeg,
                     r.site.coverPct, r.canopyHeightFt, r.crownRatio);
             finish(r);
             if (r.problem != null)
